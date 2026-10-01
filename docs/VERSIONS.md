@@ -146,7 +146,7 @@ Dependabot (`docker`, over `/docker`) proposes the bumps.
 |---|---|---|
 | Container base image | `gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3` | the `FROM` of `docker/Dockerfile`, and its `org.opencontainers.image.base.name` label without the digest |
 
-The quickstart `compose.yaml` pulls `ghcr.io/rubentalstra/ferrobridge` at the
+The quickstart `compose.yaml` pulls `ghcr.io/ferrohealth/ferrobridge` at the
 release it shipped with, so its tag is the product version below rather than a
 pin of its own, and the guard compares the two. Its CDM service runs the same
 `postgres:18.6` image the row above pins for the end-to-end lane, so a
@@ -224,7 +224,7 @@ the line until its first publish, when it joins at the line's current value.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `fhir-types` | 0.1.106 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
+| `fhir-types` | 0.1.107 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
 
 ## Language and runtime
 
@@ -250,7 +250,7 @@ version is 0.0.4.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| Product version | 0.0.4 | root `Cargo.toml` `[workspace.package]` `version` (#20), `CITATION.cff` `version` (#18), the `ghcr.io/rubentalstra/ferrobridge` image tag default in `compose.yaml` (#22) |
+| Product version | 0.0.4 | root `Cargo.toml` `[workspace.package]` `version` (#20), `CITATION.cff` `version` (#18), the `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml` (#22) |
 
 `CITATION.cff` tracks this row exactly, and the guard compares the two whenever
 `CITATION.cff` exists. Once the root `Cargo.toml` lands, the guard also compares

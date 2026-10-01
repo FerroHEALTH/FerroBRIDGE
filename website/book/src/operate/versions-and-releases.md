@@ -17,7 +17,7 @@ repository as a whole. Its version is the workspace `version` in the root
 names. A release is cut from that tag: the lane takes its notes from the
 matching `CHANGELOG.md` section, publishes the release, and the same number
 appears in `CITATION.cff` and in the product row of
-[`docs/VERSIONS.md`](https://github.com/rubentalstra/FerroBRIDGE/blob/main/docs/VERSIONS.md).
+[`docs/VERSIONS.md`](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/docs/VERSIONS.md).
 The milestone line is 0.0.x today, so the first product version is 0.0.1.
 
 Where to read it:

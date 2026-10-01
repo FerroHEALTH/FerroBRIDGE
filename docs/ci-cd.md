@@ -254,7 +254,7 @@ the actual risk.
 
 ## Why the GitHub licence field reads NOASSERTION
 
-`gh api repos/rubentalstra/FerroBRIDGE --jq .license` returns `NOASSERTION`
+`gh api repos/FerroHEALTH/FerroBRIDGE --jq .license` returns `NOASSERTION`
 ("Other"), and it will keep returning it. This is not a defect in `LICENSE`
 (#45).
 
@@ -383,7 +383,7 @@ the state on 2026-09-05.
 | Secret scanning with push protection, Dependabot alerts, and Dependabot security updates | done |
 | Artifact attestations, which the release lane's provenance and SBOM bundles are stored against | done |
 | The `SONAR_TOKEN` secret, with SonarQube Cloud's Automatic Analysis off (`.claude/rules/ai-code-review.md`) | done |
-| Pages publishes from GitHub Actions and serves `ferrobridge.eu` with HTTPS enforced; the apex A records point at the four GitHub Pages addresses, `www` is a CNAME to `rubentalstra.github.io`, and the domain is verified for the account | done |
+| Pages publishes from GitHub Actions and serves `ferrobridge.eu` with HTTPS enforced; the apex A records point at the four GitHub Pages addresses, `www` is a CNAME to `ferrohealth.github.io`, and the domain is verified for the `FerroHEALTH` organization | open: the transfer to `FerroHEALTH` on 2026-10-01 cleared the custom domain, which was verified for the `rubentalstra` account; the owner verifies it for the organization, sets it again under Settings, Pages, and points `www` at `ferrohealth.github.io` |
 | The roadmap board and the label bootstrap (`scripts/gh/labels.sh`) | done |
 | Registration at bestpractices.dev | done 2026-09-13: project 14612 (<https://www.bestpractices.dev/en/projects/14612>). The badge stays out of the README while the level reads "in progress"; it joins when the self-assessment is filled in from the draft on #19 and the level is worth showing (#62). The passing level is out of reach under BUSL-1.1, since `floss_license` is a MUST |
 | Dismissing the Scorecard alerts decided above as accepted trade-offs, in the Security tab | open: the decisions are recorded here; only the owner can dismiss an alert |

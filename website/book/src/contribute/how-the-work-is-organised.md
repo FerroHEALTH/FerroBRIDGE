@@ -57,6 +57,6 @@ pull request checkbox records your acceptance, and there is no separate
 agreement to sign.
 
 The rules in full are in
-[`CONTRIBUTING.md`](https://github.com/rubentalstra/FerroBRIDGE/blob/main/CONTRIBUTING.md)
+[`CONTRIBUTING.md`](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/CONTRIBUTING.md)
 and
-[`CLAUDE.md`](https://github.com/rubentalstra/FerroBRIDGE/blob/main/CLAUDE.md).
+[`CLAUDE.md`](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/CLAUDE.md).

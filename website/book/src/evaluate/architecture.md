@@ -9,7 +9,7 @@ Data Model through the OMOCL specification. It runs beside an openEHR CDR and
 reaches it only over the openEHR ITS-REST API, so it works against a CDR it did
 not build. This page is the short tour. The design authority, with the ground
 for every decision, is
-[`docs/architecture.md`](https://github.com/rubentalstra/FerroBRIDGE/blob/main/docs/architecture.md)
+[`docs/architecture.md`](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/docs/architecture.md)
 in the repository.
 
 <!-- toc -->

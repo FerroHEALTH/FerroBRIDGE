@@ -26,9 +26,9 @@
 #     index and for each platform manifest, and an SPDX SBOM per platform.
 #
 # Verify a published image (the tag resolves to the index):
-#   gh attestation verify oci://ghcr.io/rubentalstra/ferrobridge:<version> \
-#     --repo rubentalstra/FerroBRIDGE \
-#     --signer-workflow rubentalstra/FerroBRIDGE/.github/workflows/release-image.yml
+#   gh attestation verify oci://ghcr.io/ferrohealth/ferrobridge:<version> \
+#     --repo FerroHEALTH/FerroBRIDGE \
+#     --signer-workflow FerroHEALTH/FerroBRIDGE/.github/workflows/release-image.yml
 name: Release image (reusable)
 
 on:
@@ -50,8 +50,8 @@ on:
 permissions: {}
 
 env:
-  # Lowercase by GHCR's rule; the owner segment is derived, never typed.
-  IMAGE: ghcr.io/${{ github.repository_owner }}/ferrobridge
+  # NOTE: an OCI reference is lowercase and github.repository_owner is FerroHEALTH, so the owner is a literal.
+  IMAGE: ghcr.io/ferrohealth/ferrobridge
   # Annotate the index as well as the manifests: GHCR reads the package
   # description from the index
   # (https://docs.docker.com/build/ci/github-actions/annotations/).
@@ -146,7 +146,7 @@ jobs:
             org.opencontainers.image.title=FerroBRIDGE
             org.opencontainers.image.description=A standalone bridge between openEHR and HL7 FHIR, driven by FHIRconnect, and the OMOP Common Data Model, driven by OMOCL
             org.opencontainers.image.url=https://ferrobridge.eu
-            org.opencontainers.image.source=https://github.com/rubentalstra/FerroBRIDGE
+            org.opencontainers.image.source=https://github.com/FerroHEALTH/FerroBRIDGE
             org.opencontainers.image.vendor=FerroBRIDGE
             org.opencontainers.image.licenses=BUSL-1.1
           # The action derives its annotations from its own default labels, so
@@ -156,7 +156,7 @@ jobs:
             org.opencontainers.image.title=FerroBRIDGE
             org.opencontainers.image.description=A standalone bridge between openEHR and HL7 FHIR, driven by FHIRconnect, and the OMOP Common Data Model, driven by OMOCL
             org.opencontainers.image.url=https://ferrobridge.eu
-            org.opencontainers.image.source=https://github.com/rubentalstra/FerroBRIDGE
+            org.opencontainers.image.source=https://github.com/FerroHEALTH/FerroBRIDGE
             org.opencontainers.image.vendor=FerroBRIDGE
             org.opencontainers.image.licenses=BUSL-1.1
 

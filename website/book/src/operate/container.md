@@ -18,7 +18,7 @@ page is FerroBRIDGE's own design.
 
 | Fact | Value |
 |---|---|
-| Registry and repository | `ghcr.io/rubentalstra/ferrobridge` |
+| Registry and repository | `ghcr.io/ferrohealth/ferrobridge` |
 | Tag | the product version, for example `0.0.1`; each release publishes its own |
 | Base | `gcr.io/distroless/static-debian13:nonroot`, pinned by index digest |
 | Platforms | `linux/amd64` and `linux/arm64` |

@@ -11,7 +11,7 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
 
 Version 0.0.0 holds the crate name on crates.io until the first publish. The
 crate is built module by module under
-[FerroBRIDGE issue #1](https://github.com/rubentalstra/FerroBRIDGE/issues/1);
+[FerroBRIDGE issue #1](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1);
 the design is recorded in the repository's architecture document.
 
 ## The model module

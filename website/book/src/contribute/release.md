@@ -7,7 +7,7 @@ A milestone is a delivery promise, and a release is cut when its milestone
 reaches zero open issues. This page is what happens around that cut: the
 checklist before the tag, what the tag triggers, and what a consumer can check
 afterwards. The repository-side copy is
-[`docs/release.md`](https://github.com/rubentalstra/FerroBRIDGE/blob/main/docs/release.md),
+[`docs/release.md`](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/docs/release.md),
 and the two say the same thing.
 
 <!-- toc -->
@@ -67,7 +67,7 @@ plan ── github-release (draft) ── build-binaries ── build-image ─�
   three Sigstore bundles and the provenance envelope.
 - **build-image** calls the reusable `release-image.yml` once the musl binaries
   exist, verifies them against the build lane's signer identity, and pushes
-  `ghcr.io/rubentalstra/ferrobridge` for `linux/amd64` and `linux/arm64`.
+  `ghcr.io/ferrohealth/ferrobridge` for `linux/amd64` and `linux/arm64`.
 - **finalize-release** checks that the draft carries every asset this version
   promises, then publishes. Publishing last means a half-assembled release is
   never visible. A pre-release publishes with `--latest=false`.
