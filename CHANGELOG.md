@@ -23,6 +23,8 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-10-01
+
 ### Changed
 
 - **The repository moved to the FerroHEALTH organization**
@@ -1880,7 +1882,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.1...v0.0.2
