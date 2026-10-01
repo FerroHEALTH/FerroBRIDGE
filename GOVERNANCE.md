@@ -33,7 +33,7 @@ drift out of sync with the tree
 
 | Kind of decision                   | Where it lives                                                                                     |
 |------------------------------------|----------------------------------------------------------------------------------------------------|
-| What to work on next               | a [GitHub issue](https://github.com/rubentalstra/FerroBRIDGE/issues); the open list is the worklist |
+| What to work on next               | a [GitHub issue](https://github.com/FerroHEALTH/FerroBRIDGE/issues); the open list is the worklist |
 | Direction and status, publicly     | the roadmap project board, a view over the tracker (`.claude/rules/project-board.md`)              |
 | Why a change looks the way it does | the pull request description that landed it, and the issue's closing comment                        |
 | What a release contains            | [`CHANGELOG.md`](CHANGELOG.md) and the `vX.Y.Z` milestone                                          |
@@ -46,7 +46,7 @@ exists only in a conversation is not a decision this project made.
 ## The design phase, and why nothing is built yet
 
 FerroBRIDGE started as a research program rather than a codebase
-([issue #1](https://github.com/rubentalstra/FerroBRIDGE/issues/1)). The
+([issue #1](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1)). The
 foundation of a bridge is which specifications drive it and how mappings are
 expressed, and getting that wrong is expensive to undo, so the evidence comes
 first and the code follows. Until that program closes there are no crates and

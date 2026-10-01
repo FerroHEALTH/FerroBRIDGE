@@ -4,7 +4,7 @@
 # Pinned versions
 
 Every version FerroBRIDGE targets is pinned in one place,
-[`docs/VERSIONS.md`](https://github.com/rubentalstra/FerroBRIDGE/blob/main/docs/VERSIONS.md),
+[`docs/VERSIONS.md`](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/docs/VERSIONS.md),
 and a committed guard (`scripts/checks/versions.sh`) fails when any file that
 repeats a pin disagrees with it. This page is the reader's copy of the
 specification pins and the reason each one is what it is.

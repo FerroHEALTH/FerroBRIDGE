@@ -10,10 +10,10 @@ releases, and a release is cut when its milestone has no open issue left.
 ## What exists today
 
 - The design, recorded in
-  [`docs/architecture.md`](https://github.com/rubentalstra/FerroBRIDGE/blob/main/docs/architecture.md),
+  [`docs/architecture.md`](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/docs/architecture.md),
   with the pins and the decisions that follow from the primary sources.
 - The pin matrix,
-  [`docs/VERSIONS.md`](https://github.com/rubentalstra/FerroBRIDGE/blob/main/docs/VERSIONS.md),
+  [`docs/VERSIONS.md`](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/docs/VERSIONS.md),
   and the guard that fails on cross-file version or licence drift.
 - The working discipline: the engineering rules, the tracker workflow, and the
   committed check scripts.
@@ -80,6 +80,6 @@ CDM versions other than 5.4. Each one is a tracker issue rather than silence,
 so you can read the reasoning and argue with it.
 
 The current picture is the
-[milestone list](https://github.com/rubentalstra/FerroBRIDGE/milestones), and
-the [open issues](https://github.com/rubentalstra/FerroBRIDGE/issues) are the
+[milestone list](https://github.com/FerroHEALTH/FerroBRIDGE/milestones), and
+the [open issues](https://github.com/FerroHEALTH/FerroBRIDGE/issues) are the
 worklist behind it.

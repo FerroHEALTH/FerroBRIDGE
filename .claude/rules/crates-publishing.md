@@ -77,7 +77,7 @@ reaches the registry.
    crates.io, published by the sibling terminology server, so its Trusted
    Publisher entries move to this repository instead.
 2. On crates.io, each crate's Settings, Trusted Publishing: two GitHub entries,
-   repository owner `rubentalstra`, repository `FerroBRIDGE`, workflow
+   repository owner `FerroHEALTH`, repository `FerroBRIDGE`, workflow
    `release.yml` and workflow `publish-crates.yml`, environment `crates-io`.
 3. The `crates-io` GitHub environment carries the owner as required reviewer.
 

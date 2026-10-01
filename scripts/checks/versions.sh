@@ -461,11 +461,11 @@ fi
 if [ -f compose.yaml ] && [ -f docs/VERSIONS.md ]; then
   # Every ferrobridge image reference in the quickstart carries the same tag
   # default, so the set is collapsed and a second value is drift by itself.
-  tags="$(sed -nE 's|^[[:space:]]*image:[[:space:]]*ghcr\.io/rubentalstra/ferrobridge:\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]+)\}[[:space:]]*$|\1|p' compose.yaml | sort -u)"
+  tags="$(sed -nE 's|^[[:space:]]*image:[[:space:]]*ghcr\.io/ferrohealth/ferrobridge:\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]+)\}[[:space:]]*$|\1|p' compose.yaml | sort -u)"
   count="$(printf '%s\n' "$tags" | grep -c . || true)"
   matrix_product="$(pin_of "Product version" docs/VERSIONS.md)"
   if [ "$count" -eq 0 ]; then
-    bad "compose.yaml has no ghcr.io/rubentalstra/ferrobridge image tag default"
+    bad "compose.yaml has no ghcr.io/ferrohealth/ferrobridge image tag default"
   elif [ "$count" -ne 1 ]; then
     bad "compose.yaml names more than one ferrobridge tag default: $(printf '%s' "$tags" | tr '\n' ' ')"
   elif [ "$tags" != "$matrix_product" ]; then

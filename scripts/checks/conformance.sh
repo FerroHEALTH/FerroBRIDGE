@@ -48,16 +48,16 @@ readonly CORPORA=(fhirconnect-mapping-lib omocl roundtrip draft-rest-api hl7v2 h
 readonly OUT=target/conformance
 readonly BADGES=conformance/badges
 # The shields.io endpoint prefix every conformance badge file is read through.
-readonly ENDPOINT='https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Frubentalstra%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2F'
+readonly ENDPOINT='https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2F'
 # The build badges, the first row of the README block.
 readonly BUILD_BADGES=(
-  '[![CI](https://github.com/rubentalstra/FerroBRIDGE/actions/workflows/ci.yml/badge.svg)](https://github.com/rubentalstra/FerroBRIDGE/actions/workflows/ci.yml)'
-  '[![CodeQL](https://github.com/rubentalstra/FerroBRIDGE/actions/workflows/codeql.yml/badge.svg)](https://github.com/rubentalstra/FerroBRIDGE/actions/workflows/codeql.yml)'
-  '[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/rubentalstra/FerroBRIDGE/badge)](https://scorecard.dev/viewer/?uri=github.com/rubentalstra/FerroBRIDGE)'
+  '[![CI](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/ci.yml/badge.svg)](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/ci.yml)'
+  '[![CodeQL](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/codeql.yml/badge.svg)](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/codeql.yml)'
+  '[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/FerroHEALTH/FerroBRIDGE/badge)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroBRIDGE)'
   '[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rubentalstra_FerroBRIDGE&metric=alert_status)](https://sonarcloud.io/summary/overall?id=rubentalstra_FerroBRIDGE)'
   '[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rubentalstra_FerroBRIDGE&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rubentalstra_FerroBRIDGE)'
   '[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)'
-  '[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/rubentalstra/FerroBRIDGE?sort=semver)](https://github.com/rubentalstra/FerroBRIDGE/releases/latest)'
+  '[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/FerroHEALTH/FerroBRIDGE?sort=semver)](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest)'
 )
 
 mode=compare

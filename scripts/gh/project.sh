@@ -16,7 +16,7 @@
 #
 # OWNER SETUP REQUIRED: the board is not created by this script. The repository
 # owner must first create a GitHub Project (v2) titled "FerroBRIDGE Roadmap" under
-# the `rubentalstra` account, with a single-select "Status" field carrying the
+# the `FerroHEALTH` organization, with a single-select "Status" field carrying the
 # options Todo / In Progress / Done (and, for the roadmap view, a Date field
 # named "Target date"), then grant this clone the `project` token scope
 # (`gh auth refresh -s project`). Until that project exists, every command here

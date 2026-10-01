@@ -8,7 +8,7 @@ interoperability targets: HL7 FHIR, driven by the FHIRconnect specification,
 and the OMOP Common Data Model, driven by the OMOCL specification. It is in its
 **design phase**: there is no code, and the architecture is the output of the
 research program on
-[issue #1](https://github.com/rubentalstra/FerroBRIDGE/issues/1), which
+[issue #1](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1), which
 produces `docs/architecture.md`. The working discipline is
 [`CLAUDE.md`](CLAUDE.md). Read it before making a change.
 

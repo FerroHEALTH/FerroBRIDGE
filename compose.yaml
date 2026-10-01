@@ -7,7 +7,7 @@
 #   docker compose up
 #   curl http://127.0.0.1:8080/health/liveness
 #
-# It pulls the published image (ghcr.io/rubentalstra/ferrobridge, pinned to the
+# It pulls the published image (ghcr.io/ferrohealth/ferrobridge, pinned to the
 # release this file shipped with) and needs no repository checkout. The tag
 # below is bumped at every release cut and scripts/checks/versions.sh keeps it
 # equal to the workspace version.
@@ -62,7 +62,7 @@ name: ferrobridge
 
 services:
   ferrobridge:
-    image: ghcr.io/rubentalstra/ferrobridge:${FERROBRIDGE_VERSION:-0.0.4}
+    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.4}
     container_name: ferrobridge
     restart: unless-stopped
     ports:
@@ -136,7 +136,7 @@ services:
   #
   #   docker compose --profile cdm run --rm cdm-init
   cdm-init:
-    image: ghcr.io/rubentalstra/ferrobridge:${FERROBRIDGE_VERSION:-0.0.4}
+    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.4}
     profiles: [cdm]
     command: ["cdm", "init"]
     restart: "no"
@@ -163,7 +163,7 @@ services:
   # TODO(#233): `vocab load` exits 2 today naming that issue, so this service is
   # the shape the job runs in rather than a working load.
   vocab-load:
-    image: ghcr.io/rubentalstra/ferrobridge:${FERROBRIDGE_VERSION:-0.0.4}
+    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.4}
     profiles: [vocab]
     command: ["vocab", "load", "/vocabulary", "--schema", "cdm"]
     restart: "no"

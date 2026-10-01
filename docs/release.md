@@ -46,7 +46,7 @@ flowchart LR
   the target's own architecture. There is no cross-compilation and no
   emulation.
 - **build-image** calls `release-image.yml` once the musl binaries exist, and
-  builds `ghcr.io/rubentalstra/ferrobridge` for `linux/amd64` and `linux/arm64`
+  builds `ghcr.io/ferrohealth/ferrobridge` for `linux/amd64` and `linux/arm64`
   from them.
 - **finalize-release** checks that the draft carries every asset this version
   promises, then publishes. Publishing last means a half-assembled release is
@@ -192,7 +192,7 @@ before a real cut.
 2. **The version moves in every file the pin matrix names:** the root
    `Cargo.toml` `[workspace.package]` `version`, `CITATION.cff`, the
    product-version row of `docs/VERSIONS.md`, and the
-   `ghcr.io/rubentalstra/ferrobridge` image tag default in `compose.yaml`.
+   `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml`.
    `scripts/checks/versions.sh` fails on any file left behind, and the `plan`
    job checks the first three against the tag and refuses the release when one
    of them is missing.

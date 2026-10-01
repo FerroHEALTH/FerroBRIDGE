@@ -15,13 +15,26 @@ an entry under **[Unreleased]** in the same PR. Cutting a release renames
 
 The architecture is recorded in `docs/architecture.md`, the output of the
 research program on
-[issue #1](https://github.com/rubentalstra/FerroBRIDGE/issues/1). Releases on
+[issue #1](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1). Releases on
 the 0.0.x line carry the repository, its gates, its documentation, a Linux
 binary per architecture and a container image, each with provenance and an
 SBOM you can verify (`SECURITY.md`); from 0.0.3 they also carry the library
 crates on crates.io.
 
 ## [Unreleased]
+
+### Changed
+
+- **The repository moved to the FerroHEALTH organization**
+  (<https://github.com/FerroHEALTH/FerroBRIDGE>, #385); the old
+  `rubentalstra/FerroBRIDGE` URLs redirect. The image now publishes to
+  `ghcr.io/ferrohealth/ferrobridge`, and the quickstart, the book and the
+  landing page name that reference. Everything published up to v0.0.4 stays
+  available under `ghcr.io/rubentalstra/ferrobridge`, and its signatures name
+  `rubentalstra/FerroBRIDGE` as the repository that built it (`SECURITY.md`).
+  The roadmap board is now <https://github.com/orgs/FerroHEALTH/projects/3>.
+  `fhir-types` steps to 0.1.107 for its new `repository` field and README
+  links.
 
 ## [0.0.4] - 2026-09-26
 
@@ -1867,8 +1880,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/rubentalstra/FerroBRIDGE/compare/v0.0.4...HEAD
-[0.0.4]: https://github.com/rubentalstra/FerroBRIDGE/compare/v0.0.3...v0.0.4
-[0.0.3]: https://github.com/rubentalstra/FerroBRIDGE/compare/v0.0.2...v0.0.3
-[0.0.2]: https://github.com/rubentalstra/FerroBRIDGE/compare/v0.0.1...v0.0.2
-[0.0.1]: https://github.com/rubentalstra/FerroBRIDGE/releases/tag/v0.0.1
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.3...v0.0.4
+[0.0.3]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.2...v0.0.3
+[0.0.2]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.1...v0.0.2
+[0.0.1]: https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.1

@@ -44,7 +44,7 @@ for `spec.version`. The service base is `/fhir`.
 A type no loaded program maps is absent from the `CapabilityStatement` and
 answers `404` with a `not-supported` `OperationOutcome` on the wire. A batch
 Bundle answers `422` with `not-supported`. Search has no route
-([issue #98](https://github.com/rubentalstra/FerroBRIDGE/issues/98) lands it),
+([issue #98](https://github.com/FerroHEALTH/FerroBRIDGE/issues/98) lands it),
 and a `_count` that is not a non-negative integer is a `400` with `invalid`,
 so a client never reads a page it did not ask for.
 
@@ -277,7 +277,7 @@ The facade does not call the terminology server yet. The call site is the
 inbound engine seam, and it runs the calls before anything is built, so a
 terminology refusal will cost no CDR write. It arrives with the registry of
 mapping functions in
-[issue #95](https://github.com/rubentalstra/FerroBRIDGE/issues/95); until then
+[issue #95](https://github.com/FerroHEALTH/FerroBRIDGE/issues/95); until then
 a mapping that needs a display resolved refuses the unit rather than writing a
 coding without one.
 

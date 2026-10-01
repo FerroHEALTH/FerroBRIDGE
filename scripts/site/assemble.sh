@@ -29,7 +29,7 @@ cd "$root"
 
 readonly OUT="${1:?usage: $0 OUT}"
 readonly LANDING=website/landing
-readonly REPO=rubentalstra/FerroBRIDGE
+readonly REPO=FerroHEALTH/FerroBRIDGE
 
 # The open milestones as list items, oldest due date first. Every field that
 # reaches the page is HTML-escaped, because a milestone title is text somebody

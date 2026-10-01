@@ -42,5 +42,5 @@ The four parts follow what you came to do.
 
 The tracker is the scope. Open issues are the worklist, milestones are
 releases, and the
-[roadmap](https://github.com/rubentalstra/FerroBRIDGE/milestones) is the
+[roadmap](https://github.com/FerroHEALTH/FerroBRIDGE/milestones) is the
 public view of both.

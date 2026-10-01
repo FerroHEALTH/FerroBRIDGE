@@ -13,7 +13,7 @@ authors:
   - given-names: Ruben
     family-names: Talstra
 license: BUSL-1.1
-repository-code: "https://github.com/rubentalstra/FerroBRIDGE"
+repository-code: "https://github.com/FerroHEALTH/FerroBRIDGE"
 url: "https://ferrobridge.eu"
 keywords:
   - openEHR
