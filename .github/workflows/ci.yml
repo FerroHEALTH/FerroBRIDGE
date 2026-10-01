@@ -678,9 +678,52 @@ jobs:
       # A release build: a full emit of the two generated crates takes minutes
       # in a debug build, and this job is the one place it runs.
       - run: cargo run --locked --release -p fhir-codegen -- emit --check
-      # The tests that emit a whole crate run only here, behind the gate the
-      # test binary reads (tools/fhir-codegen/tests/it/main.rs); the `test`
-      # and coverage jobs skip them and stay within their timeouts.
+
+  # The tests that emit a whole crate run only here, behind the gate the test
+  # binary reads (tools/fhir-codegen/tests/it/main.rs); the `test` and coverage
+  # jobs skip them. They run beside codegen-drift because the two halves in
+  # one job outgrew its 30-minute timeout (#388).
+  codegen-emit-tests:
+    name: codegen-emit-tests
+    needs: detect
+    if: needs.detect.outputs.cargo == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+        with:
+          components: rustfmt
+      # The HL7 v2 definitions are fetched at build time and never committed
+      # (tools/fhir-codegen/vendor/hl7-v2ig/PROVENANCE.md). The cache is keyed
+      # on the pinned commit, and the script verifies the file count and tree
+      # digest of a restored tree as it does of a download.
+      - name: Read the pinned HL7 v2 definitions commit
+        id: v2ig
+        run: echo "commit=$(bash scripts/vendor/v2ig.sh --commit)" >> "$GITHUB_OUTPUT"
+      - name: Restore the HL7 v2 definitions
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tools/fhir-codegen/vendor/hl7-v2ig/input
+          key: hl7-v2ig-${{ steps.v2ig.outputs.commit }}
+      - name: Fetch and verify the HL7 v2 definitions
+        run: bash scripts/vendor/v2ig.sh
+      # The HL7 v2 legacy tables are fetched and cached the same way
+      # (tools/fhir-codegen/vendor/hl7-v2-legacy/PROVENANCE.md).
+      - name: Read the pinned HL7 v2 legacy tables commit
+        id: v2-legacy
+        run: echo "commit=$(bash scripts/vendor/v2-legacy.sh --commit)" >> "$GITHUB_OUTPUT"
+      - name: Restore the HL7 v2 legacy tables
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tools/fhir-codegen/vendor/hl7-v2-legacy/src
+          key: hl7-v2-legacy-${{ steps.v2-legacy.outputs.commit }}
+      - name: Fetch and verify the HL7 v2 legacy tables
+        run: bash scripts/vendor/v2-legacy.sh
       - uses: taiki-e/install-action@76c2e6406e52637deed7160d77bded76bd83e06e # v2.87.14
         with:
           tool: cargo-nextest
@@ -826,6 +869,7 @@ jobs:
       - msrv
       - fhir-types-features
       - codegen-drift
+      - codegen-emit-tests
       - omop-cdm-codegen-drift
       - crate-version-guard
       - publish-dry-run
