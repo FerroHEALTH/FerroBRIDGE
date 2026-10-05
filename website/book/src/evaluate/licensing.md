@@ -32,7 +32,11 @@ or exchanges health data needs one in every case, and so does selling,
 sublicensing, or distributing it for a fee, on its own or inside another
 product.
 
-A commercial licence starts with a conversation with the maintainer named in
+A commercial licence is arranged with Cadasto B.V., the Licensor, which handles
+the business side of FerroBRIDGE: write to
+[info@cadasto.com](mailto:info@cadasto.com) or use
+<https://www.cadasto.com/contact/>. Technical questions go to the maintainer
+named in
 [`MAINTAINERS.md`](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/MAINTAINERS.md).
 
 ## The change date
