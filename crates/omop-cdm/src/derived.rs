@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Vernum Projecten B.V.
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The derived tables: `OBSERVATION_PERIOD`, `CONDITION_ERA` and `DRUG_ERA`,

@@ -23,6 +23,14 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Changed
+
+- The Licensor and copyright holder of the project's own work is Cadasto B.V.,
+  replacing Vernum Projecten B.V. (#392). Every `Licensor:`, copyright and
+  `SPDX-FileCopyrightText` line names the new company, as do the governance
+  text and the site footer. The licence terms are unchanged, and maintainer
+  credit stays a person. `fhir-types` steps to 0.1.108 for its new headers.
+
 ## [0.0.5] - 2026-10-01
 
 ### Changed

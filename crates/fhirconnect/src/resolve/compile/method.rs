@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Vernum Projecten B.V.
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The concept methods, the slots and the `manual` entries of a mapping.

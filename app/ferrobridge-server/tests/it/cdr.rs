@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Vernum Projecten B.V.
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The CDR client of the bridge over the generated ITS-REST 1.1.0 client of

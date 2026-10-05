@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-FileCopyrightText: Vernum Projecten B.V.
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # Regenerates, or checks, the sqlx query metadata of omop-cdm (#89). The
 # crate's queries are checked at compile time from crates/omop-cdm/.sqlx/, so a

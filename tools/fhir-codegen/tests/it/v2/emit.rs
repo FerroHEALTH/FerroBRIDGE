@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Vernum Projecten B.V.
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The full emit: byte-identical twice, drift reported, the committed crate in
@@ -74,7 +74,7 @@ fn emitting_twice_is_byte_identical_and_check_passes() {
         };
         assert!(content.starts_with(source), "{path} starts with the banner");
         assert!(content.contains(
-            "DO NOT EDIT.\n// Change the emitter (tools/fhir-codegen) and regenerate.\n// SPDX-FileCopyrightText: Vernum Projecten B.V.\n// SPDX-License-Identifier: Apache-2.0\n"
+            "DO NOT EDIT.\n// Change the emitter (tools/fhir-codegen) and regenerate.\n// SPDX-FileCopyrightText: Cadasto B.V.\n// SPDX-License-Identifier: Apache-2.0\n"
         ), "{path} carries the SPDX tags under the banner");
     }
 }

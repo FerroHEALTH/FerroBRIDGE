@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Vernum Projecten B.V.
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # A FerroBRIDGE-authored model mapping whose manual block writes text into
 # DV_CODED_TEXT.defining_code/terminology_id below the node of items[at0073].

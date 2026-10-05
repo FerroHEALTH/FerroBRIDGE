@@ -1,5 +1,5 @@
 -- SPDX-FileCopyrightText: Observational Health Data Sciences and Informatics (OHDSI)
--- SPDX-FileCopyrightText: Vernum Projecten B.V.
+-- SPDX-FileCopyrightText: Cadasto B.V.
 -- SPDX-License-Identifier: Apache-2.0
 --
 -- The PostgreSQL form of the "Condition Eras" script of the OMOP CDM SQL

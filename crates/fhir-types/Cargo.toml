@@ -1,9 +1,9 @@
-# SPDX-FileCopyrightText: Vernum Projecten B.V.
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: Apache-2.0
 [package]
 name = "fhir-types"
 description = "Generated per-version FHIR types and terminology operation contracts"
-version = "0.1.107"
+version = "0.1.108"
 edition.workspace = true
 rust-version.workspace = true
 # The one first-party crate under Apache-2.0 (docs/architecture.md section 4.1).

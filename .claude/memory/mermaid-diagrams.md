@@ -5,7 +5,7 @@ metadata:
   type: feedback
 ---
 
-<!-- SPDX-FileCopyrightText: Vernum Projecten B.V. -->
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 Owner request 2026-09-12: `docs/architecture.md` explains the design with

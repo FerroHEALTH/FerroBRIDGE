@@ -1279,7 +1279,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-types"
-version = "0.1.107"
+version = "0.1.108"
 dependencies = [
  "quick-xml",
  "regex",

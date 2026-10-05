@@ -6,7 +6,7 @@
   "title": "FerroBRIDGE supplement: BAR_P01 to Bundle",
   "status": "active",
   "experimental": true,
-  "publisher": "Vernum Projecten B.V. (FerroBRIDGE)",
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
   "description": "Adds a message map for the HL7 v2 BAR_P01 structure (P01, add patient accounts; http://hl7.org/v2/StructureDefinition/BAR_P01), for which hl7.fhir.uv.v2mappings 1.0.0 ships none. The rows are those of ConceptMap/message-adt-a01-to-bundle for the segments BAR_P01 shares with ADT_A01, at their BAR_P01 paths (the visit segments under VISIT); the account is the guide's PID row into Account (segment-pid-to-account). The guide ships no segment map for GT1, UB1, UB2, ACC or DRG, so those segments stay counted as unmapped. Recorded on FerroBRIDGE #256.",
   "group": [
     {

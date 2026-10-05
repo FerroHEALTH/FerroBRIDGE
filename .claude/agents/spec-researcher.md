@@ -14,7 +14,7 @@ model: opus
 color: blue
 ---
 
-<!-- SPDX-FileCopyrightText: Vernum Projecten B.V. -->
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 You are a specification researcher for FerroBRIDGE, a pure-Rust standalone

@@ -1,4 +1,4 @@
-<!-- SPDX-FileCopyrightText: Vernum Projecten B.V. -->
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 # CLAUDE.md
@@ -328,7 +328,7 @@ every non-production use and for non-commercial production use, a commercial
 licence from the Licensor for any other production use (always for a hosted,
 managed, or embedded service and for for-fee distribution), and Apache License
 2.0 four years after each version. Every first-party file carries
-`SPDX-FileCopyrightText: Vernum Projecten B.V.` and `SPDX-License-Identifier: BUSL-1.1`
+`SPDX-FileCopyrightText: Cadasto B.V.` and `SPDX-License-Identifier: BUSL-1.1`
 in its header. A generated file keeps its `// @generated … DO NOT EDIT.` banner
 on the first line and carries the two SPDX lines under it, written by its
 emitter, which names Apache-2.0 for `crates/fhir-types` and `crates/hl7v2-types`. A contribution

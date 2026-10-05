@@ -6,7 +6,7 @@
   "title": "FerroBRIDGE supplement: CWE to CodeableConcept with the CWE.1 code",
   "status": "active",
   "experimental": true,
-  "publisher": "Vernum Projecten B.V. (FerroBRIDGE)",
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
   "description": "Overrides ConceptMap/datatype-cwe-to-codeableconcept of hl7.fhir.uv.v2mappings 1.0.0. The guide gates its CWE.1 row into coding[1].code on the Narrative-Condition \"If mapped to FHIR, use Code System and Display\", which no machine evaluates, so no Coding the map writes gets a code and every Coding it writes lacks the element that makes it a concept. This supplement runs that row with no condition, so CWE.1 is the code beside the display (CWE.2) and the system (CWE.3) the guide already writes; every other row is the guide's. Recorded as an upstream defect on FerroBRIDGE #332.",
   "group": [
     {

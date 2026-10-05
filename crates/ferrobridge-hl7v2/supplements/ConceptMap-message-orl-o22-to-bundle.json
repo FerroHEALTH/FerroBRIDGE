@@ -6,7 +6,7 @@
   "title": "FerroBRIDGE supplement: ORL_O22 to Bundle",
   "status": "active",
   "experimental": true,
-  "publisher": "Vernum Projecten B.V. (FerroBRIDGE)",
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
   "description": "Adds a message map for the HL7 v2 ORL_O22 structure (O22, the laboratory order response to an OML_O21; http://hl7.org/v2/StructureDefinition/ORL_O22), for which hl7.fhir.uv.v2mappings 1.0.0 ships none. The rows are those of ConceptMap/message-oml-o21-to-bundle for the segments ORL_O22 shares with OML_O21, at their ORL_O22 paths under RESPONSE, and the MSA row into MessageHeader[1] that segment-msa-to-messageheader fills. The guide ships no segment map for ERR, so it stays counted as unmapped. Recorded on FerroBRIDGE #256.",
   "group": [
     {

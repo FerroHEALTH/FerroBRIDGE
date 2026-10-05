@@ -6,7 +6,7 @@
   "title": "FerroBRIDGE supplement: ADT_A09 to Bundle with its own PD1 path",
   "status": "active",
   "experimental": true,
-  "publisher": "Vernum Projecten B.V. (FerroBRIDGE)",
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
   "description": "Overrides ConceptMap/message-adt-a09-to-bundle of hl7.fhir.uv.v2mappings 1.0.0. The guide names one row of this map ADT_A01.PD1 (the PD1 row into Observation[1]) where every other row names ADT_A09, so no ADT_A09 message has a message map whose rows all name its structure. This supplement names that row ADT_A09.PD1, the PD1 of the ADT_A09 structure; every other row is the guide's. Recorded as an upstream defect on FerroBRIDGE #332.",
   "group": [
     {

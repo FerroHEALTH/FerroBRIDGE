@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-FileCopyrightText: Vernum Projecten B.V.
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The conformance gate (#24): runs the eleven corpus tests, compares what they
 # measured with the committed pass lists under conformance/, and renders one

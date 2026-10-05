@@ -6,7 +6,7 @@
   "title": "FerroBRIDGE supplement: HD name to MessageHeader.source without software",
   "status": "active",
   "experimental": true,
-  "publisher": "Vernum Projecten B.V. (FerroBRIDGE)",
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
   "description": "Overrides ConceptMap/datatype-hd-name-to-messageheader-source of hl7.fhir.uv.v2mappings 1.0.0. The guide writes HD.2, the universal ID, into MessageHeader.source.software, which FHIR R4 defines as the name of the software running the source system; a universal ID names the application, so it is no software name. This supplement drops that row and keeps the HD.1 row into name; HD.2 reaches the endpoint through datatype-hd-endpoint-to-messageheader-source. Recorded on FerroBRIDGE #332 (#324).",
   "group": [
     {
