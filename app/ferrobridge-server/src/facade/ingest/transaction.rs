@@ -449,8 +449,9 @@ impl Ingest<'_> {
                 signature: None,
                 lifecycle_state: commit::lifecycle(),
                 attestations: None,
-                data: Versionable::Composition(entry.composition.as_ref().clone()),
+                data: Some(Versionable::Composition(entry.composition.as_ref().clone())),
                 commit_audit: commit::audit(change_of(prior.as_ref()), system_id),
+                additional_properties: BTreeMap::new(),
             })
             .collect();
         // NOTE: no specification governs this: our own design; the contribution's
@@ -464,6 +465,7 @@ impl Ingest<'_> {
             uid: None,
             versions,
             audit: commit::audit(change, system_id),
+            additional_properties: BTreeMap::new(),
         };
         let answered = match self
             .client
@@ -484,17 +486,7 @@ impl Ingest<'_> {
                     headers.etag.as_deref(),
                 )
                 .map_err(|error| cdr_refusal(&error))?;
-                let returned = match crate::cdr::committed(
-                    &contribution_uid,
-                    body.as_ref(),
-                    Prefer::Representation,
-                ) {
-                    Ok(returned) => returned,
-                    // NOTE: no specification governs this: our own design; the
-                    // commit happened, so its versions are read back by the uid.
-                    Err(CdrError::CommittedBody { .. }) => Returned::Minimal,
-                    Err(error) => return Err(cdr_refusal(&error)),
-                };
+                let returned = crate::cdr::returned(body, Prefer::Representation);
                 Ok((contribution_uid, returned))
             }
             ContributionCreateOutcome::NoContent { headers } => {

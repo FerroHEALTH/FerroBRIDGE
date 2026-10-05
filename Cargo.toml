@@ -46,10 +46,10 @@ rust_decimal = { version = "1.43.0", default-features = false, features = ["std"
 # crates.io on 2026-09-22.
 regex = "1.13.1"
 # The openEHR RM 1.1.0 model and the BASE path parser.
-openehr-rm = "0.0.72"
+openehr-rm = "0.0.84"
 # The BASE identification types the RM leaves to it: TERMINOLOGY_ID is a
 # CODE_PHRASE field, so a lens that builds one names this crate.
-openehr-base = "0.0.72"
+openehr-base = "0.0.84"
 # anyhow is a binary-only error type (.claude/rules/rust-style.md).
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
@@ -64,7 +64,7 @@ sha2 = "0.11.0"
 # version: cargo resolves the path locally and the version on crates.io.
 fhir-types = { path = "crates/fhir-types", version = "0.1.108", default-features = false }
 hl7v2-types = { path = "crates/hl7v2-types", version = "0.0.0" }
-openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "0.0.0" }
+openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "0.1.108" }
 # The OMOP CDM layer, taken metadata-only by default: a consumer that writes
 # to a CDM database turns on its `database` feature.
 omop-cdm = { path = "crates/omop-cdm", version = "0.0.0", default-features = false }
@@ -81,7 +81,7 @@ ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2" }
 # The FHIRconnect language crate: the facade, the operations surface and the
 # published ferrobridge-hl7v2 consume it, so the requirement carries both a
 # path and a version.
-fhirconnect = { path = "crates/fhirconnect", version = "0.0.0" }
+fhirconnect = { path = "crates/fhirconnect", version = "0.1.108" }
 # The OMOCL language crate: the ETL runner is its one in-process consumer, so
 # the requirement is path-only too.
 omocl = { path = "crates/omocl" }
@@ -92,16 +92,16 @@ omocl = { path = "crates/omocl" }
 # .claude/rules/codegen.md forbids. From 0.0.69 the Simplified Data Template
 # engines (FLAT, STRUCTURED, Web Template, TDD, RM-instance validation) live in
 # openehr-sdt, taken without its `cache` feature (`moka`).
-openehr-its = { version = "0.0.72", default-features = false, features = ["opt14", "json", "rest", "rest-client"] }
-openehr-sdt = { version = "0.0.72", default-features = false, features = ["flat"] }
-openehr-am = "0.0.72"
+openehr-its = { version = "0.0.84", default-features = false, features = ["opt14", "json", "rest", "rest-client"] }
+openehr-sdt = { version = "0.0.84", default-features = false, features = ["flat"] }
+openehr-am = "0.0.84"
 # The AQL 1.1.0 parser: the ETL checks its configured queries at load
 # (docs/architecture.md section 5.4). Verified against crates.io on 2026-09-25.
-openehr-query = "0.0.72"
+openehr-query = "0.0.84"
 # The ADL 2 parser: openehr-mapping-core compiles its ADL 2 test fixtures from
 # their .adls sources with it, and the server reads the archetype HRID an adl2
 # template ETag carries with its `hrid::parse_hrid`.
-openehr-adl = "0.0.72"
+openehr-adl = "0.0.84"
 # The HTTP client for the CDR wire. reqwest 0.13 spells the rustls selection
 # "rustls"; it carries its own platform verifier and aws-lc-rs provider.
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "http2"] }

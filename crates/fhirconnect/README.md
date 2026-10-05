@@ -9,10 +9,12 @@ Part of [FerroBRIDGE](https://ferrobridge.eu), a pure-Rust bridge between
 openEHR and two interoperability targets: HL7 FHIR through the FHIRconnect
 specification, and the OMOP Common Data Model through the OMOCL specification.
 
-Version 0.0.0 holds the crate name on crates.io until the first publish. The
-crate is built module by module under
-[FerroBRIDGE issue #1](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1);
-the design is recorded in the repository's architecture document.
+The crate is on FerroBRIDGE's crate line, the version line `fhir-types`
+carries, and builds on the `openehr-*` 0.0.84 crates. Take the same
+`openehr-*` release in your own manifest: Cargo treats every `0.0.x` release
+as incompatible with the next, so a different one gives you a second copy of
+the openEHR types this crate takes and returns.
+The design is recorded in the repository's architecture document.
 
 ## The model module
 

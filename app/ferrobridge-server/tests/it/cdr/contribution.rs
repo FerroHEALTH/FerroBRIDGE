@@ -77,7 +77,7 @@ fn created(
                 http::StatusCode::CREATED,
                 headers.etag.as_deref(),
             )?;
-            let returned = ferrobridge_server::cdr::committed(&uid, body.as_ref(), prefer)?;
+            let returned = ferrobridge_server::cdr::returned(body, prefer);
             Ok((uid, returned))
         }
         other => Err(format!("expected a created contribution, got {other:?}").into()),
@@ -229,26 +229,13 @@ async fn create_contribution_names_the_committed_uid_when_the_201_body_is_neithe
         .mount(&server)
         .await;
 
-    let answered = support::client(&server)?
+    let error = support::client(&server)?
         .create_contribution(
             &EhrId::new(EHR)?,
             &new_contribution()?,
             Prefer::Representation,
         )
-        .await?;
-    let ContributionCreateOutcome::Created { body, headers } = answered.outcome else {
-        return Err(format!(
-            "expected a created contribution, got {:?}",
-            answered.outcome
-        )
-        .into());
-    };
-    let uid = ferrobridge_server::cdr::contribution_uid_from_etag(
-        "contribution_create",
-        http::StatusCode::CREATED,
-        headers.etag.as_deref(),
-    )?;
-    let error = ferrobridge_server::cdr::committed(&uid, body.as_ref(), Prefer::Representation)
+        .await
         .expect_err("a body that is neither schema is refused");
     match error {
         CdrError::CommittedBody {

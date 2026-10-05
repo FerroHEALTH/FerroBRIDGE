@@ -35,7 +35,7 @@ impl CdrClient {
     ///
     /// # Errors
     /// Returns [`CdrError::CommittedBody`], naming the committed contribution,
-    /// when a `201` body is not JSON, and [`CdrError`] otherwise when the call
+    /// when a `201` body is neither schema the operation admits, and [`CdrError`] otherwise when the call
     /// did not reach a documented answer.
     pub async fn create_contribution(
         &self,

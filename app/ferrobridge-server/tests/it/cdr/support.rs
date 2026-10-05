@@ -183,6 +183,7 @@ pub(crate) fn audit(change_type: &str, external_ref: Option<PartyRef>) -> Update
                 identifiers: None,
             },
         )),
+        additional_properties: std::collections::BTreeMap::new(),
     }
 }
 

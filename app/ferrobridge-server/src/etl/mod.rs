@@ -151,6 +151,7 @@ fn request(query: &CheckedQuery, since: Option<&str>) -> AdhocQueryExecute {
                 serde_json::Value::String(since.to_owned()),
             )])
         }),
+        additional_properties: BTreeMap::new(),
     }
 }
 

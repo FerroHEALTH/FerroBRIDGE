@@ -11,7 +11,6 @@ use ferrobridge_server::cdr::{Prefer, Returned};
 use openehr_its::rest::generated::ehr::client::{
     EhrCreateOutcome, EhrGetByIdOutcome, EhrGetBySubjectOutcome,
 };
-use openehr_rm::v1_2::ehr::ehr::Ehr;
 use std::error::Error;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -40,11 +39,7 @@ async fn create_ehr_reads_the_ehr_id_out_of_the_201_etag() -> Result<(), Box<dyn
                 headers.etag.as_deref(),
             )?;
             assert_eq!("7d44b88c-4199-4bad-97dc-d78268e01398", ehr_id.as_str());
-            let returned = ferrobridge_server::cdr::returned::<Ehr>(
-                "ehr_create",
-                body.as_ref(),
-                Prefer::Representation,
-            )?;
+            let returned = ferrobridge_server::cdr::returned(body, Prefer::Representation);
             assert!(matches!(returned, Returned::Representation(_)));
         }
         other => return Err(format!("expected a created EHR, got {other:?}").into()),
@@ -73,11 +68,7 @@ async fn create_ehr_with_minimal_prefer_reads_no_body() -> Result<(), Box<dyn Er
         .await?;
     match answered.outcome {
         EhrCreateOutcome::Created { body, .. } => {
-            let returned = ferrobridge_server::cdr::returned::<Ehr>(
-                "ehr_create",
-                body.as_ref(),
-                Prefer::Minimal,
-            )?;
+            let returned = ferrobridge_server::cdr::returned(body, Prefer::Minimal);
             assert!(matches!(returned, Returned::Minimal));
         }
         other => return Err(format!("expected a created EHR, got {other:?}").into()),

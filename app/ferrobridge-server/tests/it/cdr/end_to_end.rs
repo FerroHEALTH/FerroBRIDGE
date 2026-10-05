@@ -29,7 +29,6 @@ use openehr_its::rest::generated::ehr::client::{
 use openehr_its::rest::generated::query::AdhocQueryExecute;
 use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
 use openehr_rm::v1_2::composition::composition::Composition;
-use openehr_rm::v1_2::ehr::ehr::Ehr;
 use openehr_rm::v1_2::ehr::ehr_status::EhrStatus;
 use std::error::Error;
 
@@ -136,11 +135,7 @@ async fn create_ehr(client: &CdrClient) -> Result<EhrId, Box<dyn Error>> {
         .await?;
     match answered.outcome {
         EhrCreateOutcome::Created { body, headers } => {
-            let returned = ferrobridge_server::cdr::returned::<Ehr>(
-                "ehr_create",
-                body.as_ref(),
-                Prefer::Representation,
-            )?;
+            let returned = ferrobridge_server::cdr::returned(body, Prefer::Representation);
             assert!(
                 matches!(returned, Returned::Representation(_)),
                 "the representation was asked for and not returned"
@@ -218,11 +213,7 @@ async fn commit(
                 http::StatusCode::CREATED,
                 headers.etag.as_deref(),
             )?;
-            let returned = ferrobridge_server::cdr::returned::<Composition>(
-                "composition_create",
-                body.as_ref(),
-                Prefer::Representation,
-            )?;
+            let returned = ferrobridge_server::cdr::returned(body, Prefer::Representation);
             let Returned::Representation(committed) = returned else {
                 return Err("the representation was asked for and not returned".into());
             };
@@ -364,6 +355,7 @@ async fn query_finds_the_composition(
         offset: None,
         fetch: None,
         query_parameters: None,
+        additional_properties: std::collections::BTreeMap::new(),
     };
     let answered = client.query_aql(&request).await?;
     match answered.outcome {

@@ -64,13 +64,13 @@ carries the exact patch.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `openehr-base` | 0.0.72 | `docs/architecture.md`, later the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-rm` | 0.0.72 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-its` | 0.0.72 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-sdt` | 0.0.72 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the Simplified Data Template engines, split out of `openehr-its` at 0.0.68) |
-| `openehr-query` | 0.0.72 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-am` | 0.0.72 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the AOM2 OPT2 types an ADL 2 template decodes into) |
-| `openehr-adl` | 0.0.72 | the root `Cargo.toml` `[workspace.dependencies]`, test-only: the ADL 2 test fixtures of `openehr-mapping-core` are compiled from their `.adls` sources |
+| `openehr-base` | 0.0.84 | `docs/architecture.md`, later the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-rm` | 0.0.84 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-its` | 0.0.84 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-sdt` | 0.0.84 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the Simplified Data Template engines, split out of `openehr-its` at 0.0.68) |
+| `openehr-query` | 0.0.84 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-am` | 0.0.84 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the AOM2 OPT2 types an ADL 2 template decodes into) |
+| `openehr-adl` | 0.0.84 | the root `Cargo.toml` `[workspace.dependencies]`, test-only: the ADL 2 test fixtures of `openehr-mapping-core` are compiled from their `.adls` sources |
 
 ## Third-party crates
 
@@ -218,9 +218,11 @@ The library crates are published to crates.io on one crate version line,
 distinct from the product version (owner decision 2026-09-05). The line is
 `fhir-types`' own: the sibling published 0.1.97 on 2026-09-12, the first
 release from here was 0.1.98, and the line moves one patch with every change
-to the crate's packaged content (`.claude/rules/crates-publishing.md`). Every
-other library crate holds its name with a 0.0.0 placeholder (#107), outside
-the line until its first publish, when it joins at the line's current value.
+to the crate's packaged content (`.claude/rules/crates-publishing.md`).
+`openehr-mapping-core` and `fhirconnect` joined the line at 0.1.108 with their
+first publish (#397). Every other library crate holds its name with a 0.0.0
+placeholder (#107), outside the line until its first publish, when it joins
+at the line's current value.
 
 | Item | Pin | Repeated in |
 |---|---|---|

@@ -246,6 +246,8 @@ fn object_id_value(id: &ObjectId) -> &str {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::{
         AUDIT_DETAILS_HEADER, CommitContext, HeaderError, TEMPLATE_ID_HEADER, VERSION_HEADER,
     };
@@ -325,6 +327,7 @@ mod tests {
             change_type: coded(change_type),
             description: None,
             committer,
+            additional_properties: BTreeMap::new(),
         }
     }
 
