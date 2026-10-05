@@ -25,6 +25,12 @@ crates on crates.io.
 
 ### Changed
 
+- A commercial licence, and any other business or licensing question, goes to
+  Cadasto B.V., the Licensor, at info@cadasto.com or
+  <https://www.cadasto.com/contact/> (#395). Every BUSL `LICENSE` copy names
+  that contact in place of the maintainer, and the README, the book's licensing
+  page, `MAINTAINERS.md`, `GOVERNANCE.md` and `SUPPORT.md` say the same. The
+  maintainer handles the technical side. The licence terms are unchanged.
 - The Licensor and copyright holder of the project's own work is Cadasto B.V.,
   replacing Vernum Projecten B.V. (#392). Every `Licensor:`, copyright and
   `SPDX-FileCopyrightText` line names the new company, as do the governance

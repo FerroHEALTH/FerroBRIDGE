@@ -21,6 +21,10 @@ The terms, as `LICENSE` and `NOTICE` state them:
 - Free for every non-production use and for non-commercial production use.
 - A commercial licence from the Licensor for any other production use, always
   for a hosted, managed, or embedded service and for for-fee distribution.
+  Since 2026-10-05 Cadasto B.V., the Licensor, handles the business side: a
+  commercial licence or any business question goes to info@cadasto.com or
+  <https://www.cadasto.com/contact/>, and `LICENSE` names that contact. The
+  maintainer (MAINTAINERS.md) handles only the technical side.
 - The Change License is Apache License 2.0, four years after each version.
 - Contribution is inbound equals outbound under the same licence. There is no
   contributor licence agreement and no copyright assignment.

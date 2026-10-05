@@ -20,8 +20,12 @@ to grow into.
 **The bus factor of this project is one.** There is exactly one person with
 write access to the repository, one person who can publish a release, and one
 person who can accept a pull request. No second maintainer exists. The
-Licensor and copyright holder is Cadasto B.V. (`LICENSE`), which holds the
-licence and grants commercial licences; it adds no engineering capacity.
+Licensor and copyright holder is Cadasto B.V. (`LICENSE`), which handles the
+business side of the project, the commercial licence included: write to
+[info@cadasto.com](mailto:info@cadasto.com) or use
+<https://www.cadasto.com/contact/>. The maintainer handles the technical side:
+the code, review, releases, issues and security reports. Cadasto B.V. adds no
+engineering capacity.
 
 Everything else in this file follows from that sentence, and no wording
 elsewhere in the repository should be read as softening it. The path out is in
@@ -48,8 +52,8 @@ one person's GitHub account or one person's hardware. Keyless Sigstore signing
 removes the *stored secret* risk for releases (there is no long-lived signing
 key to leak), and it does not distribute the *authority*, which is still one
 account's. That is the residual risk, and it is stated rather than mitigated
-because no mitigation is currently available to a one-person project without a
-legal entity behind it.
+because no mitigation is currently available while the technical roles rest
+with one maintainer.
 
 ## If the maintainer is unavailable
 

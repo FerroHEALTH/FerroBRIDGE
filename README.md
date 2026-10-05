@@ -140,9 +140,11 @@ work derived from it, to third parties as a hosted, managed, or embedded
 service that maps or exchanges health data, and selling, sublicensing, or
 otherwise distributing it for a fee on its own or inside another product, need
 a commercial licence in every case. Each version becomes Apache License 2.0
-four years after that version is published. The commercial licence starts with
-a short conversation with the maintainer named in
-[MAINTAINERS.md](MAINTAINERS.md).
+four years after that version is published. A commercial licence is arranged
+with Cadasto B.V., the Licensor, which handles the business side of
+FerroBRIDGE: write to [info@cadasto.com](mailto:info@cadasto.com) or use
+<https://www.cadasto.com/contact/>. Technical questions go to the maintainer
+named in [MAINTAINERS.md](MAINTAINERS.md).
 
 Contributions carry the terms in
 [CONTRIBUTING.md](CONTRIBUTING.md#licensing-of-contributions): you keep your
