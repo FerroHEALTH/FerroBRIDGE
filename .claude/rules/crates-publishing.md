@@ -26,9 +26,9 @@ rule, machine-enforced by the `crate-version-guard` CI job.
 - **The crate line** is the `version` in each `crates/*/Cargo.toml`. It never
   adopts the product version or a specification version; it is the crates' own
   SemVer line. `fhir-types` carries the line (its pin is the `fhir-types` row
-  of `docs/VERSIONS.md`) and every other member still holds its name at the
-  0.0.0 placeholder, so only one crate is on the line today; a member joins
-  it at its first publish.
+  of `docs/VERSIONS.md`); `openehr-mapping-core` and `fhirconnect` joined it
+  at their first publish (#397), and every other member still holds its name
+  at the 0.0.0 placeholder until it joins the line at its own first publish.
 
 ## The bump rule
 

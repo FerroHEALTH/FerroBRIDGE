@@ -9,7 +9,6 @@ use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::ehr::client::CompositionCreateOutcome;
 use openehr_its::rest::generated::ehr::client::CompositionUpdateOutcome;
-use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::cdr::Prefer;
 use crate::cdr::ids::EhrId;
@@ -210,12 +209,7 @@ impl Ingest<'_> {
                     headers.etag.as_deref(),
                 )
                 .map_err(|error| cdr_refusal(&error))?;
-                let returned = crate::cdr::returned::<Composition>(
-                    "composition_create",
-                    body.as_ref(),
-                    Prefer::Representation,
-                )
-                .map_err(|error| cdr_refusal(&error))?;
+                let returned = crate::cdr::returned(body, Prefer::Representation);
                 (version, representation(returned, &composition)?)
             }
             CompositionCreateOutcome::NoContent { headers } => {
@@ -295,12 +289,7 @@ impl Ingest<'_> {
                     headers.etag.as_deref(),
                 )
                 .map_err(|error| cdr_refusal(&error))?;
-                let returned = crate::cdr::returned::<Composition>(
-                    "composition_update",
-                    Some(&body),
-                    Prefer::Representation,
-                )
-                .map_err(|error| cdr_refusal(&error))?;
+                let returned = crate::cdr::returned(Some(body), Prefer::Representation);
                 (version, representation(returned, &composition)?)
             }
             CompositionUpdateOutcome::NoContent { headers } => {

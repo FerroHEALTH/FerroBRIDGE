@@ -8,9 +8,9 @@
 # `[workspace.dependencies]` entry a member consumes is packaged content too:
 # `cargo package` renders the concrete requirement.
 #
-# Versions are per crate here, not lockstep: `fhir-types` carries the crate line
-# and every other member still holds its name at the 0.0.0 placeholder
-# (docs/VERSIONS.md).
+# Versions are per crate here, not lockstep: `fhir-types`, `openehr-mapping-core`
+# and `fhirconnect` are on the crate line and every other member still holds its
+# name at the 0.0.0 placeholder (docs/VERSIONS.md).
 #
 #   crate-version-guard.sh <base-ref> [head-ref]
 #

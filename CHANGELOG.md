@@ -23,8 +23,24 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Added
+
+- `fhirconnect` and `openehr-mapping-core` are published on crates.io at
+  0.1.108, joining the crate line `fhir-types` carries (#397). Both build on
+  the `openehr-*` 0.0.84 crates, so a project on that release, such as the
+  family's federation gateway, runs FHIRconnect mappings in process with one
+  copy of the openEHR types.
+
 ### Changed
 
+- The `openehr-*` crates move from 0.0.72 to 0.0.84 as one pin group (#397).
+  The generated ITS-REST client now reads a `2xx` body that depends on
+  `Prefer` as the resource or its `Identifier` itself, so a CONTRIBUTION
+  `201` body that is neither is refused by the client and the bridge still
+  answers with the committed contribution's uid. Four new client refusals (a
+  passed deadline, a failed DPoP proof, a credential provider that produced
+  nothing, and credentials that cannot form an `Authorization` value) each
+  name their own class in a diagnostic.
 - A commercial licence, and any other business or licensing question, goes to
   Cadasto B.V., the Licensor, at info@cadasto.com or
   <https://www.cadasto.com/contact/> (#395). Every BUSL `LICENSE` copy names

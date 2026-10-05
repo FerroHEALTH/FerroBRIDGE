@@ -9,6 +9,8 @@
 //! `contribution_create`). This module builds both from one description, so a
 //! single write and a transaction record the same committer and change type.
 
+use std::collections::BTreeMap;
+
 use crate::cdr::commit::CommitContext;
 use crate::cdr::ids::IdError;
 use crate::cdr::ids::template_id;
@@ -134,6 +136,7 @@ fn audit_data(change: Change, system_id: &str) -> UpdateAuditData {
                 identifiers: None,
             },
         )),
+        additional_properties: BTreeMap::new(),
     }
 }
 

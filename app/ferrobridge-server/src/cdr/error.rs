@@ -273,6 +273,10 @@ fn answered_status(upstream: Option<&Upstream>) -> String {
 pub(crate) fn client_kind(error: &ClientError) -> &'static str {
     match error {
         ClientError::BaseUrl { .. } => "base-url",
+        ClientError::DeadlineElapsed { .. } => "deadline-elapsed",
+        ClientError::DpopProof { .. } => "dpop-proof",
+        ClientError::Credentials { .. } => "credentials",
+        ClientError::InvalidCredentials { .. } => "invalid-credentials",
         ClientError::Transport { .. } => "transport",
         ClientError::Build { .. } => "request-build",
         ClientError::HeaderName { .. } | ClientError::HeaderValue { .. } => "header-value",

@@ -52,12 +52,13 @@ second, and changed seven things:
    targets and their order; the reference CDR's decision to author no profile
    mapping (its issue #3206) is inherited here, where the mappings belong.
 7. **The pins moved where the crates did.** The `openehr-*` crates are at
-   0.0.72 (0.0.65 to 0.0.67 changed only the copyright holder in every
+   0.0.84 (0.0.65 to 0.0.67 changed only the copyright holder in every
    source header; 0.0.68 split the Simplified Data Template engines out of
    `openehr-its` into `openehr-sdt`, 0.0.69 is the first lockstep publish
    of the nine, 0.0.71 adds the `rest` and `rest-client` features to
    `openehr-its`, and 0.0.72 gives that client the commit headers, the `4xx`
-   error bodies and `SecretString` credentials); the specification corpora did not move (every pinned commit is
+   error bodies and `SecretString` credentials; 0.0.84 is the line the
+   federation gateway pins, so `fhirconnect` publishes on it); the specification corpora did not move (every pinned commit is
    still the head of its default branch); OMOP CDM v5.5.0 shipped and stays
    tracked, never assumed; Eos, the OMOCL reference engine, has had no commit
    since 2026-03-09.
@@ -202,13 +203,13 @@ default branch.
 | HL7 v2 definitions | `HL7/v2ig` `input/sourceOfTruth` at `3adcdbfff654ccbff5cd33aa34bd909a087e8e19` (1694 files, v2.9.1-derived logical StructureDefinitions; no LICENSE, the v2+ page licenses copying "for internal purposes only") | the generator input for the v2 message-structure table (#253); fetched at build time into an ignored directory and never committed, per the redistribution rule; the owner holds the HL7 membership condition |
 | HL7 v2 legacy tables | `usnistgov/igamt-hl7Tools-service` `src/main/resources/hl7db` at `83322dffdac18cb129a1bd80149f5439cf5686fd` (169 files, the NIST IGAMT export of HL7's v2 database for versions 2.1 to 2.8.2; no LICENSE, HL7's content) | the generator input for the structures v2.9.1 withdrew (#303); fetched at build time into an ignored directory and never committed, on the same terms as the definitions |
 | openEHR ITS-REST | 1.1.0 (OpenAPI at `openEHR/specifications-ITS-REST` tag `Release-1.1.0`, commit `24058992`; each document declares CC-BY-ND-3.0 in `info.license` while the repository's `LICENSE` file is Apache-2.0, both recorded in the provenance; modules EHR, Query and Definition, `STABLE`) | the released REST API a conformant CDR speaks; Admin and Demographic are `x-status: DEVELOPMENT` in the same release and the bridge does not depend on them; every tagged OAS file says `info.version: latest`, so provenance records tag and blob |
-| `openehr-base` | 0.0.72 (minor line 0.0; Apache-2.0) | the RM foundation types, including partial ISO 8601 dates (section 3); the line moved from 0.0.61 to 0.0.64 between passes, to 0.0.69 on 2026-09-24, to 0.0.71 on 2026-09-25 and to 0.0.72 the same day with no change to the surfaces named here |
-| `openehr-rm` | 0.0.72 (Apache-2.0) | the RM 1.1.0 model, its canonical JSON codec and the BASE path parser |
-| `openehr-its` | 0.0.72 (Apache-2.0) | the ITS wire layer: the OPT 1.4 codec, the canonical JSON and XML codecs, the ITS-REST 1.1.0 data types; the bridge takes `default-features = false` with `opt14`, `json` and `rest` (the DTOs without axum), and #285 adds `rest-client`, whose 0.0.72 commit headers, `4xx` error bodies and `SecretString` credentials the CDR client takes as they stand (#293) |
-| `openehr-sdt` | 0.0.72 (BUSL-1.1) | the Simplified Data Template engines split out of `openehr-its` at 0.0.68: the Web Template builder, the FLAT and STRUCTURED codecs, the composition builder (`flat::build`) and the RM-instance validation (`rm_instance`); the bridge takes `default-features = false` with `flat`, leaving the `moka` cache out |
-| `openehr-query` | 0.0.72 (BUSL-1.1) | the AQL 1.1.0 parser and canonical printer. `openehr-term` (Apache-2.0 AND CC-BY-SA-3.0) and `openehr-lang` arrive transitively |
-| `openehr-am` | 0.0.72 (Apache-2.0) | the generated AM 2.4 model: the AOM2 `OPERATIONAL_TEMPLATE` and `ARCHETYPE_HRID` types an ADL 2 template decodes into (section 3); taken directly because the bridge names those types |
-| `openehr-adl` | not taken in the first cut (0.0.72, BUSL-1.1) | the ADL 2 text parser, flattener and OPT2 generator; the bridge fetches an ADL 2 template as AOM2 canonical JSON, so it never parses ADL source (section 3); taken later only if a CDR serves ADL 2 templates as text alone |
+| `openehr-base` | 0.0.84 (minor line 0.0; Apache-2.0) | the RM foundation types, including partial ISO 8601 dates (section 3); the line moved from 0.0.61 to 0.0.64 between passes, to 0.0.69 on 2026-09-24, to 0.0.71 on 2026-09-25 and to 0.0.72 the same day, and to 0.0.84 on 2026-10-05, the line the federation gateway pins, with no change to the surfaces named here |
+| `openehr-rm` | 0.0.84 (Apache-2.0) | the RM 1.1.0 model, its canonical JSON codec and the BASE path parser |
+| `openehr-its` | 0.0.84 (Apache-2.0) | the ITS wire layer: the OPT 1.4 codec, the canonical JSON and XML codecs, the ITS-REST 1.1.0 data types; the bridge takes `default-features = false` with `opt14`, `json` and `rest` (the DTOs without axum), and #285 adds `rest-client`, whose 0.0.72 commit headers, `4xx` error bodies and `SecretString` credentials the CDR client takes as they stand (#293) |
+| `openehr-sdt` | 0.0.84 (BUSL-1.1) | the Simplified Data Template engines split out of `openehr-its` at 0.0.68: the Web Template builder, the FLAT and STRUCTURED codecs, the composition builder (`flat::build`) and the RM-instance validation (`rm_instance`); the bridge takes `default-features = false` with `flat`, leaving the `moka` cache out |
+| `openehr-query` | 0.0.84 (BUSL-1.1) | the AQL 1.1.0 parser and canonical printer. `openehr-term` (Apache-2.0 AND CC-BY-SA-3.0) and `openehr-lang` arrive transitively |
+| `openehr-am` | 0.0.84 (Apache-2.0) | the generated AM 2.4 model: the AOM2 `OPERATIONAL_TEMPLATE` and `ARCHETYPE_HRID` types an ADL 2 template decodes into (section 3); taken directly because the bridge names those types |
+| `openehr-adl` | not taken in the first cut (0.0.84, BUSL-1.1) | the ADL 2 text parser, flattener and OPT2 generator; the bridge fetches an ADL 2 template as AOM2 canonical JSON, so it never parses ADL source (section 3); taken later only if a CDR serves ADL 2 templates as text alone |
 | `fhir-types` | 0.1.108 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
 | openFHIR, the FHIRconnect reference engine | 3.0.1 (2026-09-09), read for behaviour only | never an oracle; section 4.4 records the 3.0.0 behaviour changes and what the bridge takes |
 | Eos, the OMOCL reference engine | 0.0.62 (2024-03-20), last commit 2026-03-09 | never an oracle; dormant, so its behaviour is prior art with no expected movement |
@@ -240,7 +241,7 @@ flowchart LR
     CMP2 -->|"PATHABLE navigation"| RES
 ```
 
-**What the openEHR crates provide, verified in the 0.0.64 sources and re-read at 0.0.72.**
+**What the openEHR crates provide, verified in the 0.0.64 sources and re-read at 0.0.72 and 0.0.84.**
 `openehr-its` parses OPT 1.4 (`opt14`) and carries the canonical JSON and XML
 codecs; `openehr-sdt` (split out of it at 0.0.68) builds the Web Template in
 the Better and EHRbase shape (`tree`, `id`, `rmType`, `aqlPath`, `inputs`),
@@ -1237,7 +1238,7 @@ that carries identifiable data says so at start-up.
 **Dependencies, verified against crates.io on 2026-09-12**, with `redb` and
 `jiff` re-verified on 2026-09-15 when the facade added them, and recorded in
 `docs/VERSIONS.md`: `openehr-base`, `openehr-rm`, `openehr-its`,
-`openehr-sdt`, `openehr-query` 0.0.72; `serde-saphyr` 1.3.0 (the
+`openehr-sdt`, `openehr-query` 0.0.84 (re-verified on 2026-10-05); `serde-saphyr` 1.3.0 (the
 maintained serde YAML with anchors, aliases, merge keys and spans;
 `serde_yaml` is archived, `serde-yaml-ng` and `serde_yml` unmaintained);
 `jsonschema` 0.57.0 with `default-features = false`; `axum` 0.8.9, `tower-http`
@@ -1252,7 +1253,7 @@ features (since 0.0.71 the DTOs ride `rest` over serde and `http` alone, and
 `rest-client` is the generated client, so `axum` no longer arrives through the
 ITS crate), and `openehr-sdt` with `flat` alone (which carries both Web
 Template builders and implies `openehr-its/opt14`) keeps `moka` out; the
-transitive cost (`quick-xml`, `reqwest`) is accepted and recorded here; `openehr-am` 0.0.72
+transitive cost (`quick-xml`, `reqwest`) is accepted and recorded here; `openehr-am` 0.0.84
 is taken directly for the OPT2 types. `openehr-adl` (until a CDR serves ADL 2 as text alone),
 `fhir-terminology`, `fhir-model` and every FHIRPath crate stay out.
 

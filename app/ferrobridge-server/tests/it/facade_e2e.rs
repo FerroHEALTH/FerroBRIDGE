@@ -534,6 +534,7 @@ async fn compositions(client: &CdrClient) -> Result<usize, Box<dyn StdError>> {
         offset: None,
         fetch: None,
         query_parameters: None,
+        additional_properties: std::collections::BTreeMap::new(),
     };
     match client.query_aql(&request).await?.outcome {
         openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome::Ok {

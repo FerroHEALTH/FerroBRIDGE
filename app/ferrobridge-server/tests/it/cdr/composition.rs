@@ -15,7 +15,6 @@ use openehr_its::rest::generated::ehr::client::{
     CompositionCreateOutcome, CompositionDeleteOutcome, CompositionGetOutcome,
     CompositionUpdateOutcome,
 };
-use openehr_rm::v1_2::composition::composition::Composition;
 use std::error::Error;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -59,11 +58,7 @@ async fn create_composition_sends_the_three_commit_headers() -> Result<(), Box<d
             )?;
             assert_eq!(VERSION_1, version_id.value().to_owned());
             assert_eq!("1", version_id.version_tree_id().value());
-            let returned = ferrobridge_server::cdr::returned::<Composition>(
-                "composition_create",
-                body.as_ref(),
-                Prefer::Representation,
-            )?;
+            let returned = ferrobridge_server::cdr::returned(body, Prefer::Representation);
             assert!(matches!(returned, Returned::Representation(_)));
         }
         other => return Err(format!("expected a created composition, got {other:?}").into()),
@@ -124,11 +119,7 @@ async fn create_composition_reads_an_empty_201_as_minimal_whatever_was_preferred
                 headers.etag.as_deref(),
             )?;
             assert_eq!(VERSION_1, version_id.value().to_owned());
-            let returned = ferrobridge_server::cdr::returned::<Composition>(
-                "composition_create",
-                body.as_ref(),
-                Prefer::Representation,
-            )?;
+            let returned = ferrobridge_server::cdr::returned(body, Prefer::Representation);
             assert!(matches!(returned, Returned::Minimal));
         }
         other => return Err(format!("expected a created composition, got {other:?}").into()),

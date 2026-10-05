@@ -23,6 +23,7 @@ fn request() -> AdhocQueryExecute {
         offset: None,
         fetch: None,
         query_parameters: None,
+        additional_properties: std::collections::BTreeMap::new(),
     }
 }
 

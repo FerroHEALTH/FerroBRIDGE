@@ -37,8 +37,7 @@ use openehr_its::rest::client::Credentials;
 use openehr_its::rest::client::ReqwestTransport;
 use openehr_its::rest::client::RetryPolicy;
 use openehr_its::rest::generated::common::Identifier;
-use openehr_rm::v1_2::common::change_control::contribution::Contribution;
-use serde::de::DeserializeOwned;
+use openehr_its::rest::runtime::Representation;
 
 use crate::cdr::config::CdrConfig;
 use crate::cdr::error::CdrError;
@@ -421,71 +420,19 @@ pub fn contribution_uid_from_etag(
 ///
 /// ITS-REST 1.1.0 pairs each preference with a body: no body for
 /// `return=minimal`, the `Identifier` schema for `return=identifier`, and the
-/// resource itself for `return=representation`. An absent body answers
-/// [`Returned::Minimal`] whatever was asked, because the answer's status and
-/// headers already name what the service stored.
-///
-/// # Errors
-/// Returns [`CdrError::Body`] when a body is not the schema its preference
-/// selects.
-pub fn returned<T: DeserializeOwned>(
-    operation: &'static str,
-    body: Option<&serde_json::Value>,
-    prefer: Prefer,
-) -> Result<Returned<T>, CdrError> {
+/// resource itself for `return=representation`. The generated client reads
+/// such a body as `oneOf` the resource and `Identifier` ([`Representation`]),
+/// so a body that is neither is its refusal and never reaches this function.
+/// An absent body answers [`Returned::Minimal`] whatever was asked, because
+/// the answer's status and headers already name what the service stored.
+#[must_use]
+pub fn returned<T>(body: Option<Representation<T>>, prefer: Prefer) -> Returned<T> {
     // NOTE: RFC 7240 §2 lets a server ignore a preference it cannot honour, so
-    // an absent body is the minimal answer and never a decoding failure.
-    let Some(body) = body else {
-        return Ok(Returned::Minimal);
-    };
-    match prefer {
-        Prefer::Minimal => Ok(Returned::Minimal),
-        Prefer::Identifier => serde_json::from_value::<Identifier>(body.clone())
-            .map(Returned::Identifier)
-            .map_err(|source| CdrError::Body {
-                operation,
-                source: Box::new(error::BodyError::Json(source)),
-            }),
-        Prefer::Representation => openehr_its::json::from_canonical_value::<T>(body)
-            .map(|value| Returned::Representation(Box::new(value)))
-            .map_err(|source| CdrError::Body {
-                operation,
-                source: Box::new(error::BodyError::CanonicalJson(source)),
-            }),
-    }
-}
-
-/// Returns what the `201` of a committed contribution carries.
-///
-/// The schema is `oneOf` CONTRIBUTION and `Identifier`, and the body is empty
-/// for `return=minimal` (`ehr-codegen.openapi.yaml`, `201_CONTRIBUTION`), so
-/// the body is read as whichever of the three it is.
-///
-/// # Errors
-/// Returns [`CdrError::CommittedBody`], naming `contribution_uid`, when the
-/// body is neither schema: the commit already happened, so the uid is what
-/// the answer still carries.
-pub fn committed(
-    contribution_uid: &ContributionUid,
-    body: Option<&serde_json::Value>,
-    prefer: Prefer,
-) -> Result<Returned<Contribution>, CdrError> {
-    let Some(body) = body else {
-        return Ok(Returned::Minimal);
-    };
-    if prefer == Prefer::Minimal {
-        return Ok(Returned::Minimal);
-    }
-    match openehr_its::json::from_canonical_value::<Contribution>(body) {
-        Ok(contribution) => Ok(Returned::Representation(Box::new(contribution))),
-        // NOTE: `201_CONTRIBUTION` is `oneOf` CONTRIBUTION and `Identifier`, so
-        // a body that is no CONTRIBUTION is legitimately read as the other.
-        Err(first) => serde_json::from_value::<Identifier>(body.clone())
-            .map(Returned::Identifier)
-            .map_err(|_identifier| CdrError::CommittedBody {
-                contribution_uid: contribution_uid.clone(),
-                source: Box::new(first),
-            }),
+    // the body is taken in the form the server chose, and none is minimal.
+    match (body, prefer) {
+        (None, _) | (Some(_), Prefer::Minimal) => Returned::Minimal,
+        (Some(Representation::Full(full)), _) => Returned::Representation(Box::new(full)),
+        (Some(Representation::Identifier(identifier)), _) => Returned::Identifier(identifier),
     }
 }
 
