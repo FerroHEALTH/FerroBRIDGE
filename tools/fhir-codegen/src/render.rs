@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Vernum Projecten B.V.
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
 //! Rendering type definitions to source text.
@@ -24,7 +24,7 @@ use crate::roots::RootScope;
 /// first line, so the tags follow the banner block
 /// (<https://spdx.dev/learn/handling-license-info/>).
 pub const SPDX: &str =
-    "// SPDX-FileCopyrightText: Vernum Projecten B.V.\n// SPDX-License-Identifier: Apache-2.0\n";
+    "// SPDX-FileCopyrightText: Cadasto B.V.\n// SPDX-License-Identifier: Apache-2.0\n";
 
 /// The banner every generated file starts with.
 #[must_use]

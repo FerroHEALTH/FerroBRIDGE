@@ -5,7 +5,7 @@ metadata:
   type: feedback
 ---
 
-<!-- SPDX-FileCopyrightText: Vernum Projecten B.V. -->
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 On FerroBRIDGE, the owner decides foundational architecture from **cited

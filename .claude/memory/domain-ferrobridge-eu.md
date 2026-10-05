@@ -6,7 +6,7 @@ metadata:
   type: reference
 ---
 
-<!-- SPDX-FileCopyrightText: Vernum Projecten B.V. -->
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 `ferrobridge.eu` is the public domain for the landing page and the book under

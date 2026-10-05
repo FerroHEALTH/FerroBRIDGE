@@ -6,7 +6,7 @@
   "title": "FerroBRIDGE supplement: OUL_R22 to Bundle",
   "status": "active",
   "experimental": true,
-  "publisher": "Vernum Projecten B.V. (FerroBRIDGE)",
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
   "description": "Adds a message map for the HL7 v2 OUL_R22 structure (R22, the unsolicited specimen-oriented observation; http://hl7.org/v2/StructureDefinition/OUL_R22), for which hl7.fhir.uv.v2mappings 1.0.0 ships none. The rows are those of ConceptMap/message-oru-r01-to-bundle for the segments OUL_R22 shares with ORU_R01, at their OUL_R22 paths: the patient segments under PATIENT, the specimen under SPECIMEN, and the order, its request and its results under SPECIMEN.ORDER. The ORU_R01 row from OBR into Specimen[1] is left out, since OUL_R22 carries its specimen in the SPM that opens the SPECIMEN group, which the SPM row maps. The guide ships no segment map for SAC, INV, TCD, SID, CTI or DEV, so those stay counted as unmapped. Recorded on FerroBRIDGE #256.",
   "group": [
     {

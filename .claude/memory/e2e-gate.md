@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-<!-- SPDX-FileCopyrightText: Vernum Projecten B.V. -->
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 Landed with #78 (2026-09-12). `tools/ferrobridge-testkit/src/containers.rs` is

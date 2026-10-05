@@ -1,4 +1,4 @@
-<!-- SPDX-FileCopyrightText: Vernum Projecten B.V. -->
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 # Maintainers and access continuity
@@ -19,8 +19,9 @@ to grow into.
 
 **The bus factor of this project is one.** There is exactly one person with
 write access to the repository, one person who can publish a release, and one
-person who can accept a pull request. No second maintainer exists, no
-organisation stands behind the project, and no legal entity is a party to it.
+person who can accept a pull request. No second maintainer exists. The
+Licensor and copyright holder is Cadasto B.V. (`LICENSE`), which holds the
+licence and grants commercial licences; it adds no engineering capacity.
 
 Everything else in this file follows from that sentence, and no wording
 elsewhere in the repository should be read as softening it. The path out is in

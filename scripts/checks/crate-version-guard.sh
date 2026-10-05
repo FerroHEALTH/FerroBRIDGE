@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-FileCopyrightText: Vernum Projecten B.V.
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The crate bump rule (.claude/rules/crates-publishing.md): a change that alters
 # the PACKAGED content of a `crates/*` member (what its `include` ships:

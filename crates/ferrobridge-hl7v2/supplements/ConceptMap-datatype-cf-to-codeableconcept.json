@@ -6,7 +6,7 @@
   "title": "FerroBRIDGE supplement: CF to CodeableConcept with the CF.1 code",
   "status": "active",
   "experimental": true,
-  "publisher": "Vernum Projecten B.V. (FerroBRIDGE)",
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
   "description": "Overrides ConceptMap/datatype-cf-to-codeableconcept of hl7.fhir.uv.v2mappings 1.0.0. The guide names every source of this CF map as a CWE component (CWE.1 to CWE.13), which no CF value holds, so none of its rows runs; this supplement names them CF.1 to CF.13, the components of the HL7 v2 CF data type at the same positions. The guide gates its CF.1 row into coding[1].code on the Narrative-Condition \"If mapped to FHIR, use Code System and Display\", which no machine evaluates, so no Coding the map writes gets a code and every Coding it writes lacks the element that makes it a concept. This supplement runs that row with no condition, so CF.1 is the code beside the display (CF.2) and the system (CF.3) the guide already writes; every other row is the guide's. Recorded as an upstream defect on FerroBRIDGE #332.",
   "group": [
     {

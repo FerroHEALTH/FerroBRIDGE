@@ -1,4 +1,4 @@
-<!-- SPDX-FileCopyrightText: Vernum Projecten B.V. -->
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 <!-- The two SQL files beside this one are a modified form of OHDSI material and
      keep its licence, the Apache License 2.0. -->

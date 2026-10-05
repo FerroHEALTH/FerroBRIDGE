@@ -6,7 +6,7 @@
   "title": "FerroBRIDGE supplement: ADT_A03 to Bundle",
   "status": "active",
   "experimental": true,
-  "publisher": "Vernum Projecten B.V. (FerroBRIDGE)",
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
   "description": "Adds a message map for the HL7 v2 ADT_A03 structure (A03, discharge/end visit; http://hl7.org/v2/StructureDefinition/ADT_A03), for which hl7.fhir.uv.v2mappings 1.0.0 ships none. The rows are those of ConceptMap/message-adt-a01-to-bundle, each at the ADT_A03 path of its segment: ADT_A03 holds every segment the ADT_A01 map names at the same group path, so the guide's segment maps apply unchanged. Recorded on FerroBRIDGE #256.",
   "group": [
     {

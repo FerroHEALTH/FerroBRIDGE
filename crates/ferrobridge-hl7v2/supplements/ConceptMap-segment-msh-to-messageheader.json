@@ -6,7 +6,7 @@
   "title": "FerroBRIDGE supplement: MSH to MessageHeader with one map per source row",
   "status": "active",
   "experimental": true,
-  "publisher": "Vernum Projecten B.V. (FerroBRIDGE)",
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
   "description": "Overrides ConceptMap/segment-msh-to-messageheader of hl7.fhir.uv.v2mappings 1.0.0. The guide maps MSH-3 into source[1] and MSH-24 into source with no data type map named, so each runs both HD maps into MessageHeader.source (datatype-hd-name- and datatype-hd-endpoint-to-messageheader-source). With both fields valued, the two rows write the source twice and the MSH-3 endpoint stands, although the guide gates its MSH-3 endpoint row on IF MSH-24 NOT VALUED. This supplement keeps each row as the guide writes it while the other field is empty (MSH-3 IF MSH-24 NOT VALUED, MSH-24 IF MSH-3 NOT VALUED, both into source[1]); with both valued, MSH-3 runs the name map alone and MSH-24 the endpoint map alone, so the application names the source and the network address gives its endpoint. Every other row is the guide's. Recorded on FerroBRIDGE #332 (#311).",
   "group": [
     {

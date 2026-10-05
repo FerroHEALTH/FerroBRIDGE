@@ -5,7 +5,7 @@ metadata:
   type: feedback
 ---
 
-<!-- SPDX-FileCopyrightText: Vernum Projecten B.V. -->
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 On 2026-09-25 the owner: "we also need to support legacy systems please later

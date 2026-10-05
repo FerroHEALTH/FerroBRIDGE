@@ -6,7 +6,7 @@
   "title": "FerroBRIDGE supplement: PID to Appointment with the patient by identifier",
   "status": "active",
   "experimental": true,
-  "publisher": "Vernum Projecten B.V. (FerroBRIDGE)",
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
   "description": "Overrides ConceptMap/segment-pid-to-appointment of hl7.fhir.uv.v2mappings 1.0.0. The guide maps PID-2, PID-3 and PID-4 into extension[n].valueReference(Patient) and participant.actor[n](Patient), which create a Patient per row beside the Patient[1] the SIU_S12 message map builds from the same PID, and ships no CX to Patient data type map to fill them. This supplement writes each into the identifier of that reference, the logical reference FHIR R4 Reference.identifier defines, through the guide's CX to Identifier map, so the message keeps one Patient. Every other row is the guide's. Recorded on FerroBRIDGE #332 (#336).",
   "group": [
     {

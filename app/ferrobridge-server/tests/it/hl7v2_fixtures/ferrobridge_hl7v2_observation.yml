@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Vernum Projecten B.V.
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The model mapping the HL7 v2 face suite runs: the text of an Observation's
 # code (OBX-3.9 through the guide's CWE map) and its effective time (OBX-14)

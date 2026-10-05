@@ -6,7 +6,7 @@
   "title": "FerroBRIDGE supplement: ORC to DiagnosticReport with basedOn by identifier",
   "status": "active",
   "experimental": true,
-  "publisher": "Vernum Projecten B.V. (FerroBRIDGE)",
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
   "description": "Overrides ConceptMap/segment-orc-to-diagnosticreport of hl7.fhir.uv.v2mappings 1.0.0. The guide maps ORC-2 into basedOn(ServiceRequest), which creates a ServiceRequest, and ships no EI to ServiceRequest data type map to fill it; a ServiceRequest known only by its placer order number lacks the status, intent and subject FHIR R4 requires. This supplement writes ORC-2 into basedOn.identifier, the logical reference FHIR R4 Reference.identifier defines, through the guide's EI to Identifier maps. Every other row is the guide's. Recorded on FerroBRIDGE #332 (#336).",
   "group": [
     {
