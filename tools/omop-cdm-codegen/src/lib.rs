@@ -6,15 +6,18 @@
 //! Reads the vendored OMOP CDM v5.4 definitions under
 //! `docs/specs/omop-cdm/inst/csv/` and emits `crates/omop-cdm/src/generated/`:
 //! one module per table with its row type and its column metadata, plus the
-//! four rendered PostgreSQL DDL files copied in for `include_str!`. The output
+//! four rendered PostgreSQL DDL files copied in for `include_str!`, and the
+//! OHDSI Data Quality Dashboard's check catalogue and CDM v5.4 settings from
+//! `docs/specs/dqd/inst/csv/` as the `dqd` module. The output
 //! is byte-deterministic so the CI drift check can regenerate and compare.
 //!
 //! The pipeline is [`definitions::Definitions`] (read the two CSV files),
-//! [`lower::Model`] (the Rust model), [`render`] (source text) and [`emit`]
-//! (write or check).
+//! [`lower::Model`] (the Rust model), [`dqd::Catalogue`] (the Dashboard's files
+//! against that model), [`render`] (source text) and [`emit`] (write or check).
 #![doc(test(attr(deny(warnings))))]
 
 pub mod definitions;
+pub mod dqd;
 pub mod emit;
 pub mod lower;
 pub mod render;
@@ -46,6 +49,9 @@ pub enum Command {
         /// The directory holding the four vendored PostgreSQL DDL files.
         #[arg(long, value_name = "DIR", default_value = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/specs/omop-cdm/inst/ddl/5.4/postgresql"))]
         ddl: PathBuf,
+        /// The directory holding the three vendored Data Quality Dashboard CSV files.
+        #[arg(long, value_name = "DIR", default_value = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/specs/dqd/inst/csv"))]
+        dqd: PathBuf,
         /// The generated crate directory.
         #[arg(long, value_name = "DIR", default_value = concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/omop-cdm"))]
         out: PathBuf,
@@ -82,11 +88,13 @@ pub fn run(cli: &Cli) -> Result<Report, Error> {
             check,
             definitions,
             ddl,
+            dqd,
             out,
             rustfmt_config,
         } => Ok(Report::Emit(emit::emit(&emit::EmitOptions {
             definitions_dir: definitions.clone(),
             ddl_dir: ddl.clone(),
+            dqd_dir: dqd.clone(),
             crate_dir: out.clone(),
             rustfmt_config: rustfmt_config.clone(),
             check: *check,

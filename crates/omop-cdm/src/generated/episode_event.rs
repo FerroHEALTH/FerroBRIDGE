@@ -68,6 +68,7 @@ pub static EPISODE_EVENT_COLUMNS: [crate::meta::ColumnMeta; 3] = [
         primary_key: false,
         foreign_key: Some(("episode", "episode_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -78,6 +79,7 @@ pub static EPISODE_EVENT_COLUMNS: [crate::meta::ColumnMeta; 3] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -88,6 +90,7 @@ pub static EPISODE_EVENT_COLUMNS: [crate::meta::ColumnMeta; 3] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: Some("Metadata"),
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
 ];

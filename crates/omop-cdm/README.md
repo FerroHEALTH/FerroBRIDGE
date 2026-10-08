@@ -24,6 +24,10 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
   `varchar(n)`, and `CdmDate` and `CdmDatetime`, which keep the value as ISO
   8601 text and validate it at construction.
 
+- `quality`: the OHDSI Data Quality Dashboard v2.9.0 check catalogue and its
+  CDM v5.4 settings, generated from the Dashboard's files, and the plan of
+  conformance checks over the CDM tables with each check's PostgreSQL query.
+
 - `graph`: the record graph one openEHR composition becomes, the seam
   between a mapping engine and a CDM writer. A row is keyed by where it came
   from (the EHR, the versioned composition, the archetype root and the
@@ -37,6 +41,9 @@ With the `database` feature, on by default:
 - `writer`: one record graph per transaction through binary `COPY`, with a
   natural-key side table that keeps each row on its id across runs and a
   watermark per composition.
+- `quality::run`: the nine conformance checks of the OHDSI Data Quality
+  Dashboard v2.9.0 against the database, with the Dashboard's counts,
+  threshold verdict and result fields.
 - `derived`: `OBSERVATION_PERIOD`, and `CONDITION_ERA` and `DRUG_ERA` through
   the PostgreSQL form of the scripts the CDM publishes, under `sql/` with the
   Apache License 2.0 of their source (`sql/PROVENANCE.md`).

@@ -7,5 +7,6 @@
 #![allow(clippy::panic_in_result_fn, reason = "test assertions")]
 
 mod definitions;
+mod dqd;
 mod emit;
 mod lower;

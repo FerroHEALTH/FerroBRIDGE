@@ -4,8 +4,8 @@
 //! Concept resolution: a source code to its standard concepts, by SQL over
 //! the vocabulary tables of a CDM schema.
 //!
-//! A [`SourceKey`] names a code in a vocabulary. [`ConceptResolver::resolve`]
-//! finds the one valid `CONCEPT` row under that key on the record date and
+//! A [`SourceKey`] names a code in a vocabulary. With the `database` feature,
+//! `ConceptResolver::resolve` finds the one valid `CONCEPT` row under that key on the record date and
 //! returns it when it is standard, or the standard concepts its `Maps to`
 //! relationships reach, every one of them. Each row the query touches must be
 //! valid on the record date. The conventions are OHDSI's

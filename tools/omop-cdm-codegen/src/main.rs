@@ -12,8 +12,9 @@ fn main() -> anyhow::Result<()> {
         omop_cdm_codegen::Report::Emit(report) => {
             let columns: usize = report.columns.values().sum();
             println!(
-                "omop-cdm-codegen: {} tables, {columns} columns, {} files",
+                "omop-cdm-codegen: {} tables, {columns} columns, {} checks, {} files",
                 report.columns.len(),
+                report.checks,
                 report.files.len()
             );
         }

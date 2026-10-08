@@ -2,9 +2,12 @@
 // Change the emitter (tools/omop-cdm-codegen) and regenerate.
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
-//! The generated OMOP Common Data Model v5.4 layer: one module per
-//! table, each with its row type and its column metadata, and the
-//! embedded OHDSI PostgreSQL DDL.
+//! The generated OMOP Common Data Model v5.4 layer.
+//!
+//! One module per table, each with its row type and its column
+//! metadata, the embedded OHDSI PostgreSQL DDL, and the OHDSI Data
+//! Quality Dashboard's check catalogue with its CDM v5.4 settings
+//! (`dqd`).
 //!
 //! The tables are the complete set the definitions carry, across the
 //! `CDM`, `VOCAB` and `RESULTS` schemas
@@ -31,6 +34,7 @@ pub mod death;
 pub mod device_exposure;
 pub mod domain;
 pub mod dose_era;
+pub mod dqd;
 pub mod drug_era;
 pub mod drug_exposure;
 pub mod drug_strength;

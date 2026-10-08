@@ -25,6 +25,20 @@ crates on crates.io.
 
 ### Added
 
+- `omop_cdm::quality` runs the nine conformance checks of the OHDSI Data
+  Quality Dashboard v2.9.0 (`cdmTable`, `cdmField`, `isRequired`,
+  `cdmDatatype`, `isPrimaryKey`, `isForeignKey`, `fkDomain`, `fkClass`,
+  `isStandardValidConcept`) against a CDM v5.4 PostgreSQL database, with the
+  Dashboard's violated-row count, denominator, threshold verdict, check id and
+  result fields (#404). The checks follow the CDM v5.4.3 definitions where
+  the Dashboard's field settings disagree with them, so
+  `episode.episode_object_concept_id` is checked against both of its domains,
+  and `note_nlp.offset` is checked too. A query that fails or returns no
+  counts is an error result and never a pass, and the run summary counts a
+  pass only from a passed check. The generator emits the Dashboard's check
+  catalogue and its table and field settings as `omop_cdm::generated::dqd`,
+  refusing any threshold that is not a whole percentage, and the column
+  metadata gains `fk_class`.
 - `scripts/vendor/dqd.sh` vendors the OHDSI Data Quality Dashboard v2.9.0
   CDM v5.4 check catalogue, thresholds, the SQL templates of its fifteen
   conformance and completeness checks, and the R sources that define their

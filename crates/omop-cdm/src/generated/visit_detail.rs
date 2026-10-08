@@ -244,6 +244,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: true,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -254,6 +255,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: Some(("person", "person_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -264,6 +266,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: Some("Visit"),
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -274,6 +277,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -284,6 +288,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -294,6 +299,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -304,6 +310,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -314,6 +321,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: Some("Type Concept"),
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -324,6 +332,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: Some(("provider", "provider_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -334,6 +343,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: Some(("care_site", "care_site_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -344,6 +354,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -354,6 +365,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -364,6 +376,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: Some("Visit"),
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -374,6 +387,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -384,6 +398,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -394,6 +409,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: Some("Visit"),
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -404,6 +420,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: Some(("visit_detail", "visit_detail_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -414,6 +431,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: Some(("visit_detail", "visit_detail_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -424,6 +442,7 @@ pub static VISIT_DETAIL_COLUMNS: [crate::meta::ColumnMeta; 19] = [
         primary_key: false,
         foreign_key: Some(("visit_occurrence", "visit_occurrence_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
 ];

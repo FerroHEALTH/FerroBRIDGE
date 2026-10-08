@@ -169,3 +169,35 @@ fn a_concept_column_carries_the_domain_its_definition_names() -> Result<(), Box<
     );
     Ok(())
 }
+
+#[test]
+fn a_concept_column_carries_the_class_its_definition_names() -> Result<(), Box<dyn Error>> {
+    let model = model()?;
+    let class = |table_name: &str, column_name: &str| -> Result<Option<String>, String> {
+        let table = model
+            .tables
+            .iter()
+            .find(|table| table.name == table_name)
+            .ok_or_else(|| format!("no {table_name} table"))?;
+        let column = table
+            .columns
+            .iter()
+            .find(|column| column.name == column_name)
+            .ok_or_else(|| format!("no {table_name}.{column_name} column"))?;
+        Ok(column.fk_class.clone())
+    };
+    assert_eq!(
+        class("drug_era", "drug_concept_id")?.as_deref(),
+        Some("Ingredient")
+    );
+    assert_eq!(
+        class("dose_era", "drug_concept_id")?.as_deref(),
+        Some("Ingredient")
+    );
+    assert_eq!(
+        class("drug_strength", "ingredient_concept_id")?,
+        None,
+        "a definition that writes `NA` lowers to no class"
+    );
+    Ok(())
+}

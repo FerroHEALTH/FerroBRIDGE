@@ -10,15 +10,17 @@
 //! `tools/omop-cdm-codegen`; [`meta`] is the metadata vocabulary those modules
 //! are written in, [`value`] the three column types Rust has no type for, and
 //! [`ddl`] points the embedded DDL at a schema. [`graph`] is the record graph
-//! one composition becomes, checked against the metadata as it is built, and
-//! [`vocabulary`] names a source code and what it resolves to.
+//! one composition becomes, checked against the metadata as it is built,
+//! [`vocabulary`] names a source code and what it resolves to, and [`quality`]
+//! is the port of the OHDSI Data Quality Dashboard's conformance checks: the
+//! plan of check instances, their PostgreSQL queries and their verdicts.
 //!
 //! With the `database` feature, on by default, `database` binds a PostgreSQL
 //! pool to a CDM schema and applies the DDL to it, the `vocabulary` resolver
 //! resolves source codes to standard concepts over the loaded vocabulary tables,
-//! `writer` commits one record graph at a time, and `derived` rebuilds the
-//! tables the CDM leaves to the ETL. The model is documented at
-//! <https://ohdsi.github.io/CommonDataModel/cdm54.html>.
+//! `writer` commits one record graph at a time, `derived` rebuilds the
+//! tables the CDM leaves to the ETL, and `quality::run` runs the checks. The
+//! model is documented at <https://ohdsi.github.io/CommonDataModel/cdm54.html>.
 #![doc(test(attr(deny(warnings))))]
 
 // TODO(#233): the vocabulary loader for an Athena export, once #88 records the
@@ -34,6 +36,7 @@ pub mod derived;
 pub mod generated;
 pub mod graph;
 pub mod meta;
+pub mod quality;
 pub mod value;
 pub mod vocabulary;
 #[cfg(feature = "database")]

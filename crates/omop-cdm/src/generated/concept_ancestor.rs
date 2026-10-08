@@ -74,6 +74,7 @@ pub static CONCEPT_ANCESTOR_COLUMNS: [crate::meta::ColumnMeta; 4] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
     crate::meta::ColumnMeta {
@@ -84,6 +85,7 @@ pub static CONCEPT_ANCESTOR_COLUMNS: [crate::meta::ColumnMeta; 4] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
     crate::meta::ColumnMeta {
@@ -94,6 +96,7 @@ pub static CONCEPT_ANCESTOR_COLUMNS: [crate::meta::ColumnMeta; 4] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
     crate::meta::ColumnMeta {
@@ -104,6 +107,7 @@ pub static CONCEPT_ANCESTOR_COLUMNS: [crate::meta::ColumnMeta; 4] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
 ];

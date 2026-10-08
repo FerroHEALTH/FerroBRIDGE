@@ -19,3 +19,13 @@ and green. CI runs the gated tests in the `e2e (containers)` job, per package.
 never its own `docker` calls; a new image is a `PinnedImage` constant plus a
 `docs/VERSIONS.md` row, which `scripts/checks/versions.sh` compares. Locally:
 `FERROBRIDGE_E2E=1 cargo nextest run -p <crate>` with Docker running.
+
+**The owner's machine runs Podman, not Docker** (owner, 2026-10-08). The
+committed text (README, `compose.yaml`, `docker/Dockerfile`, CI, scripts)
+keeps saying Docker; never edit it to name Podman. Locally, point
+testcontainers at the Podman socket:
+`DOCKER_HOST=unix://$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}')`
+with `TESTCONTAINERS_RYUK_DISABLED=true`, and run a tool image such as
+shellcheck through `podman run`. Under Podman the `postgres_tls()` container
+of the `omop-cdm` `tls::` tests times out at startup; plain `postgres()`
+works, and CI runs the TLS tests on Docker.

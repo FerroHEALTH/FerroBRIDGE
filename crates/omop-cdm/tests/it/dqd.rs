@@ -4,7 +4,7 @@
 //! The Data Quality Dashboard's v5.4 field thresholds against the generated
 //! metadata: the same field set, and exactly the recorded disagreements on
 //! the facts the conformance checks read (`isRequired`, `isPrimaryKey`,
-//! `isForeignKey`, `fkDomain`).
+//! `isForeignKey`, `fkDomain`, `fkClass`).
 //!
 //! The port takes its field set from the CDM v5.4.3 definitions, which the
 //! vendored DDL agrees with, and its thresholds from the Dashboard
@@ -27,6 +27,7 @@ struct Facts {
     primary_key: bool,
     foreign_key: Option<(String, String)>,
     fk_domain: Option<String>,
+    fk_class: Option<String>,
 }
 
 /// The facts of every field the Dashboard thresholds, keyed by table and
@@ -48,6 +49,7 @@ fn dashboard() -> Result<BTreeMap<(String, String), Facts>, Box<dyn Error>> {
     let fk_table = index("fkTableName")?;
     let fk_field = index("fkFieldName")?;
     let fk_domain = index("fkDomain")?;
+    let fk_class = index("fkClass")?;
     let mut facts = BTreeMap::new();
     for record in reader.records() {
         let record = record?;
@@ -61,6 +63,9 @@ fn dashboard() -> Result<BTreeMap<(String, String), Facts>, Box<dyn Error>> {
                 .then(|| (cell(fk_table).to_lowercase(), cell(fk_field).to_lowercase())),
             fk_domain: Some(cell(fk_domain))
                 .filter(|domain| !domain.is_empty())
+                .map(str::to_owned),
+            fk_class: Some(cell(fk_class))
+                .filter(|class| !class.is_empty())
                 .map(str::to_owned),
         };
         assert!(
@@ -86,6 +91,7 @@ fn definitions() -> BTreeMap<(String, String), Facts> {
                             .foreign_key
                             .map(|(table, field)| (table.to_owned(), field.to_owned())),
                         fk_domain: column.fk_domain.map(str::to_owned),
+                        fk_class: column.fk_class.map(str::to_owned),
                     },
                 )
             })
@@ -139,6 +145,12 @@ fn the_dashboard_and_the_definitions_disagree_exactly_where_recorded() -> Result
                 dqd.fk_domain, cdm.fk_domain
             ));
         }
+        if dqd.fk_class != cdm.fk_class {
+            found.push(format!(
+                "{place} fkClass: {:?} / {:?}",
+                dqd.fk_class, cdm.fk_class
+            ));
+        }
     }
     // NOTE: DQD v2.9.0 `inst/csv/OMOP_CDMv5.4_Field_Level.csv` against CDM v5.4.3
     // `OMOP_CDMv5.4_Field_Level.csv`; each pair is Dashboard / definitions.
@@ -147,6 +159,7 @@ fn the_dashboard_and_the_definitions_disagree_exactly_where_recorded() -> Result
         "cohort_definition.cohort_definition_id isForeignKey: Some((\"cohort\", \"cohort_definition_id\")) / None",
         "death.person_id isPrimaryKey: true / false",
         "drug_strength.drug_concept_id fkDomain: Some(\"Drug\") / None",
+        "drug_strength.ingredient_concept_id fkClass: Some(\"Ingredient\") / None",
         "episode.episode_object_concept_id fkDomain: None / Some(\"Procedure, Regimen\")",
         "episode.episode_parent_id isForeignKey: None / Some((\"episode\", \"episode_id\"))",
         "location.country_concept_id fkDomain: Some(\"Geography\") / None",

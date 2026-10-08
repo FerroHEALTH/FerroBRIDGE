@@ -28,3 +28,11 @@ trip on the published `EVALUATION.problem_diagnosis.v1` mapping; `v0.0.4` is
 the OMOP round trip on the published laboratory OMOCL files. A plan laid out
 deliberately places each issue in the milestone its build order implies; the
 "current milestone" rule is for work found while implementing.
+
+Update 2026-10-08 (owner): **close a milestone the moment its release is
+published.** v0.0.4 and v0.0.5 shipped with their milestones left open, and
+the owner flagged it hard ("always close the milestone!!"). The step is
+`docs/release.md` "After the tag" step 5 (#413):
+`gh api -X PATCH repos/:owner/:repo/milestones/<number> -f state=closed`. When
+orienting on the tracker, compare `gh release list` with the open milestones
+and close any released one still open.
