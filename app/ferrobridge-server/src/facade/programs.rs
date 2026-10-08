@@ -246,37 +246,13 @@ impl Programs {
 ///
 /// Returns [`LoadError::Directory`] when the directory cannot be listed.
 pub fn mapping_files(directory: &Path) -> Result<Vec<PathBuf>, LoadError> {
-    let mut found = Vec::new();
-    collect(directory, &mut found)?;
-    found.sort();
-    Ok(found)
-}
-
-/// Adds every mapping file under `directory` to `found`, recursively.
-fn collect(directory: &Path, found: &mut Vec<PathBuf>) -> Result<(), LoadError> {
-    let entries = std::fs::read_dir(directory).map_err(|source| LoadError::Directory {
-        path: directory.to_path_buf(),
-        source,
-    })?;
-    for entry in entries {
-        let entry = entry.map_err(|source| LoadError::Directory {
-            path: directory.to_path_buf(),
-            source,
-        })?;
-        let path = entry.path();
-        if path.is_dir() {
-            collect(&path, found)?;
-            continue;
-        }
-        let extension = path
-            .extension()
+    crate::walk::files(directory, |path| {
+        path.extension()
             .and_then(std::ffi::OsStr::to_str)
-            .map(str::to_ascii_lowercase);
-        if extension.is_some_and(|found| MAPPING_EXTENSIONS.contains(&found.as_str())) {
-            found.push(path);
-        }
-    }
-    Ok(())
+            .map(str::to_ascii_lowercase)
+            .is_some_and(|found| MAPPING_EXTENSIONS.contains(&found.as_str()))
+    })
+    .map_err(|crate::walk::Error { path, source }| LoadError::Directory { path, source })
 }
 
 /// Reads and validates the mapping set under `directory`.

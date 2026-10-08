@@ -414,38 +414,9 @@ fn template_of(context: &fhirconnect::model::ast::ContextMappingFile) -> Result<
 }
 
 /// Returns every file under `directory` whose extension is one of `wanted`.
-///
-/// The walk descends into every subdirectory and the result is sorted, so two
-/// deployments with the same tree load the same set in the same order.
 fn files(directory: &Path, wanted: &[&str]) -> Result<Vec<PathBuf>, Error> {
-    let mut found = Vec::new();
-    let mut stack = vec![directory.to_path_buf()];
-    while let Some(current) = stack.pop() {
-        let entries = std::fs::read_dir(&current).map_err(|source| Error::Read {
-            path: current.clone(),
-            source,
-        })?;
-        for entry in entries {
-            let entry = entry.map_err(|source| Error::Read {
-                path: current.clone(),
-                source,
-            })?;
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-                continue;
-            }
-            let matches = path
-                .extension()
-                .and_then(std::ffi::OsStr::to_str)
-                .is_some_and(|extension| wanted.contains(&extension));
-            if matches {
-                found.push(path);
-            }
-        }
-    }
-    found.sort();
-    Ok(found)
+    crate::walk::files(directory, |path| crate::walk::has_extension(path, wanted))
+        .map_err(|crate::walk::Error { path, source }| Error::Read { path, source })
 }
 
 /// Renders a diagnostic list as one line.

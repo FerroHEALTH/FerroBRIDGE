@@ -88,6 +88,12 @@ crates on crates.io.
 
 ### Fixed
 
+- The mapping directory walk of the facade, the FHIRconnect operations and
+  `etl run` reads a Kubernetes ConfigMap volume once. It skips every entry
+  whose name starts with `..` and follows a symlink only when it names a
+  file, so the `..data` link and the `..<timestamp>` directory behind it no
+  longer make each mapping load three times and refuse the start with
+  `duplicate-mapping-name` (#420).
 - The generated CDM metadata carries the vocabulary domains of a concept
   column as a list (`ColumnMeta::fk_domain`), so
   `episode.episode_object_concept_id`, which the CDM v5.4.3 definitions give
