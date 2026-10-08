@@ -70,3 +70,4 @@
 - [HL7 v2 test corpora](hl7v2-test-corpora.md) — the vendored v2 message sets, their licences, and that no real traffic is public
 - [File-length rule](file-length-rule.md) — hand-written .rs ≤ 1000 lines, split at 750 into module folders; guard with ratchet allow-list (#351)
 - [Repo moved to FerroHEALTH](repo-moved-to-ferrohealth.md) — 2026-10-01 transfer; ghcr.io/ferrohealth image, org board #3, what keeps the old owner
+- [FerroHEALTH is the mother name](ferrohealth-umbrella.md) — family-level docs (manufacturer, EHDS system, CRA overview, licensing) go to the FerroHEALTH book
