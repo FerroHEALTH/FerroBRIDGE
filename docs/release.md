@@ -236,6 +236,9 @@ unsigned tag is refused at push time. `release.yml` takes it from there.
    `docker pull`. The owner sets it public once, in the package settings.
 4. **Post the board status update** with what shipped and what the next
    milestone targets (`.claude/rules/project-board.md`).
+5. **Close the milestone.** It is empty by step 1 of the cut, and a released
+   milestone left open still reads as pending work on the board:
+   `gh api -X PATCH repos/:owner/:repo/milestones/<number> -f state=closed`.
 
 ## What a published release is protected against
 
