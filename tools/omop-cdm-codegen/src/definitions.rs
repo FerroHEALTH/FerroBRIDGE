@@ -78,6 +78,9 @@ pub struct FieldRecord {
     /// The vocabulary domain a concept column references, or `NA`.
     #[serde(rename = "fkDomain")]
     pub fk_domain: String,
+    /// The concept class a concept column references, or `NA`.
+    #[serde(rename = "fkClass")]
+    pub fk_class: String,
 }
 
 /// Both definition files, in file order.

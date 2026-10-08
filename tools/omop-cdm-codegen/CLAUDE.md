@@ -12,12 +12,24 @@ The generator: the vendored OMOP CDM v5.4 definitions in,
   model: one table per module, one column per field, the CDM datatype mapped to
   its Rust type), `render` (source text) and `emit` (write or `--check`). The
   emission scope is every table the definitions carry, all 39 across the `CDM`,
-  `VOCAB` and `RESULTS` schemas, with every column. A shape the consumer lacks
+  `VOCAB` and `RESULTS` schemas, with every column, and every record of the
+  Data Quality Dashboard's check catalogue. A shape the consumer lacks
   is fixed here, never shadowed downstream.
 - The four rendered PostgreSQL DDL files are copied into `crates/omop-cdm/ddl/`
   by `emit`, with the provenance note beside them, so `include_str!` reaches
   them in a packaged crate. The DDL is not generated: OHDSI renders it from the
   same definitions through a dialect layer that sits outside them.
+- The emitter also reads the OHDSI Data Quality Dashboard v2.9.0 files under
+  `docs/specs/dqd/inst/csv/` (`dqd`: the check catalogue and the two
+  threshold files) and renders `generated/dqd.rs`. A column named after a
+  catalogue check at the file's level is that check's value,
+  `<check>Threshold` and `<check>Notes` its threshold and notes, and every
+  other column a parameter; the documentation columns (`schema`,
+  `databaseSchema`, `validation`, `tableDescription`, `userGuidance`,
+  `etlConventions`) are left out by declaration. A threshold that is not a
+  whole number from 0 to 100, a closed-set catalogue cell outside its set, a
+  threshold column naming no check, and a table or field the definitions
+  lack are all refused. The module's banner names both pins.
 - The definitions carry one field spelled `Integer` where every other integer
   column is `integer`, and one column name quoted as `"offset"` because OFFSET
   is a reserved word in SQL. The emitter normalises both, each with a `NOTE` at

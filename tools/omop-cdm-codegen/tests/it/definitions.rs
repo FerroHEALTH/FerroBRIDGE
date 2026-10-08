@@ -14,6 +14,10 @@ pub(crate) const CSV_DIR: &str = concat!(
     "/../../docs/specs/omop-cdm/inst/csv"
 );
 
+/// The vendored Data Quality Dashboard CSV directory.
+pub(crate) const DQD_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/specs/dqd/inst/csv");
+
 /// The vendored PostgreSQL DDL directory.
 pub(crate) const DDL_DIR: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),

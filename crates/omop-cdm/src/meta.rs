@@ -62,6 +62,11 @@ pub struct ColumnMeta {
     ///
     /// A column whose definition writes `NA` carries `None`.
     pub fk_domain: Option<&'static str>,
+    /// The concept class the definitions name for a concept column
+    /// (`fkClass`), for example `Ingredient` for `drug_era.drug_concept_id`.
+    ///
+    /// A column whose definition writes `NA` carries `None`.
+    pub fk_class: Option<&'static str>,
     /// The schema of the table the column belongs to.
     pub cdm_schema: CdmSchema,
 }

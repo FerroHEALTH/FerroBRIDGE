@@ -61,6 +61,7 @@ pub static METADATA_COLUMNS: [crate::meta::ColumnMeta; 9] = [
         primary_key: true,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -71,6 +72,7 @@ pub static METADATA_COLUMNS: [crate::meta::ColumnMeta; 9] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -81,6 +83,7 @@ pub static METADATA_COLUMNS: [crate::meta::ColumnMeta; 9] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -91,6 +94,7 @@ pub static METADATA_COLUMNS: [crate::meta::ColumnMeta; 9] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -101,6 +105,7 @@ pub static METADATA_COLUMNS: [crate::meta::ColumnMeta; 9] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -111,6 +116,7 @@ pub static METADATA_COLUMNS: [crate::meta::ColumnMeta; 9] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -121,6 +127,7 @@ pub static METADATA_COLUMNS: [crate::meta::ColumnMeta; 9] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -131,6 +138,7 @@ pub static METADATA_COLUMNS: [crate::meta::ColumnMeta; 9] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -141,6 +149,7 @@ pub static METADATA_COLUMNS: [crate::meta::ColumnMeta; 9] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
 ];

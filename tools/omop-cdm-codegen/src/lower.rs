@@ -122,6 +122,8 @@ pub struct Column {
     pub foreign_key: Option<(String, String)>,
     /// The vocabulary domain the definitions name for a concept column.
     pub fk_domain: Option<String>,
+    /// The concept class the definitions name for a concept column.
+    pub fk_class: Option<String>,
     /// The definitions' `userGuidance` text, when there is any.
     pub user_guidance: Option<String>,
     /// The definitions' `etlConventions` text, when there is any.
@@ -383,6 +385,7 @@ fn lower_column(field: &FieldRecord) -> Result<Column, LowerError> {
         primary_key: flag(field, "isPrimaryKey", &field.primary_key)?,
         foreign_key,
         fk_domain: named(&field.fk_domain).map(str::to_owned),
+        fk_class: named(&field.fk_class).map(str::to_owned),
         user_guidance: prose(&field.user_guidance),
         etl_conventions: prose(&field.etl_conventions),
     })

@@ -37,6 +37,7 @@ pub static COHORT_COLUMNS: [crate::meta::ColumnMeta; 4] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Results,
     },
     crate::meta::ColumnMeta {
@@ -47,6 +48,7 @@ pub static COHORT_COLUMNS: [crate::meta::ColumnMeta; 4] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Results,
     },
     crate::meta::ColumnMeta {
@@ -57,6 +59,7 @@ pub static COHORT_COLUMNS: [crate::meta::ColumnMeta; 4] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Results,
     },
     crate::meta::ColumnMeta {
@@ -67,6 +70,7 @@ pub static COHORT_COLUMNS: [crate::meta::ColumnMeta; 4] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Results,
     },
 ];

@@ -16,8 +16,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::definitions::{Definitions, LoadError};
+use crate::dqd::{Catalogue, Dashboard, DqdError};
 use crate::lower::{LowerError, Model};
-use crate::render::{DDL_FILES, render_ddl, render_mod, render_table};
+use crate::render::{DDL_FILES, render_ddl, render_dqd, render_mod, render_table};
 
 /// The directory of the generated modules, under the crate's `src/`.
 pub const GENERATED_DIR: &str = "generated";
@@ -32,6 +33,9 @@ pub struct EmitOptions {
     pub definitions_dir: PathBuf,
     /// The directory holding the four vendored PostgreSQL DDL files.
     pub ddl_dir: PathBuf,
+    /// The directory holding the three vendored Data Quality Dashboard CSV
+    /// files.
+    pub dqd_dir: PathBuf,
     /// The generated crate directory (the one holding `Cargo.toml` and `src/`).
     pub crate_dir: PathBuf,
     /// The `rustfmt.toml` the output is formatted with, when it exists.
@@ -49,6 +53,12 @@ pub enum EmitError {
     /// Lowering failed.
     #[error(transparent)]
     Lower(#[from] LowerError),
+    /// The Data Quality Dashboard files did not load.
+    #[error(transparent)]
+    DqdLoad(#[from] crate::dqd::LoadError),
+    /// The Data Quality Dashboard files did not lower.
+    #[error(transparent)]
+    Dqd(#[from] DqdError),
     /// Rendering to a string failed.
     #[error("rendering failed")]
     Render(#[from] std::fmt::Error),
@@ -80,6 +90,8 @@ pub enum EmitError {
 pub struct EmitReport {
     /// The number of columns per table, in table-name order.
     pub columns: BTreeMap<String, usize>,
+    /// The number of checks in the Data Quality Dashboard catalogue.
+    pub checks: usize,
     /// The files written or checked, relative to the crate directory.
     pub files: Vec<String>,
 }
@@ -94,10 +106,12 @@ pub struct EmitReport {
 pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
     let definitions = Definitions::load(&options.definitions_dir)?;
     let model = Model::lower(&definitions)?;
+    let catalogue = Catalogue::lower(&Dashboard::load(&options.dqd_dir)?, &model)?;
 
     let mut sources = BTreeMap::new();
     sources.insert(format!("{GENERATED_DIR}/mod.rs"), render_mod(&model)?);
     sources.insert(format!("{GENERATED_DIR}/ddl.rs"), render_ddl()?);
+    sources.insert(format!("{GENERATED_DIR}/dqd.rs"), render_dqd(&catalogue)?);
     for table in &model.tables {
         sources.insert(
             format!("{GENERATED_DIR}/{}.rs", table.name),
@@ -142,6 +156,7 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
             .iter()
             .map(|table| (table.name.clone(), table.columns.len()))
             .collect(),
+        checks: catalogue.checks.len(),
         files: files.keys().cloned().collect(),
     })
 }

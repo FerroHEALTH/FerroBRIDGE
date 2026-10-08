@@ -144,6 +144,7 @@ pub static CONCEPT_COLUMNS: [crate::meta::ColumnMeta; 10] = [
         primary_key: true,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
     crate::meta::ColumnMeta {
@@ -154,6 +155,7 @@ pub static CONCEPT_COLUMNS: [crate::meta::ColumnMeta; 10] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
     crate::meta::ColumnMeta {
@@ -164,6 +166,7 @@ pub static CONCEPT_COLUMNS: [crate::meta::ColumnMeta; 10] = [
         primary_key: false,
         foreign_key: Some(("domain", "domain_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
     crate::meta::ColumnMeta {
@@ -174,6 +177,7 @@ pub static CONCEPT_COLUMNS: [crate::meta::ColumnMeta; 10] = [
         primary_key: false,
         foreign_key: Some(("vocabulary", "vocabulary_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
     crate::meta::ColumnMeta {
@@ -184,6 +188,7 @@ pub static CONCEPT_COLUMNS: [crate::meta::ColumnMeta; 10] = [
         primary_key: false,
         foreign_key: Some(("concept_class", "concept_class_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
     crate::meta::ColumnMeta {
@@ -194,6 +199,7 @@ pub static CONCEPT_COLUMNS: [crate::meta::ColumnMeta; 10] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
     crate::meta::ColumnMeta {
@@ -204,6 +210,7 @@ pub static CONCEPT_COLUMNS: [crate::meta::ColumnMeta; 10] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
     crate::meta::ColumnMeta {
@@ -214,6 +221,7 @@ pub static CONCEPT_COLUMNS: [crate::meta::ColumnMeta; 10] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
     crate::meta::ColumnMeta {
@@ -224,6 +232,7 @@ pub static CONCEPT_COLUMNS: [crate::meta::ColumnMeta; 10] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
     crate::meta::ColumnMeta {
@@ -234,6 +243,7 @@ pub static CONCEPT_COLUMNS: [crate::meta::ColumnMeta; 10] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Vocab,
     },
 ];

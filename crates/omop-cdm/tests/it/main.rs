@@ -21,6 +21,7 @@ mod graph;
 #[cfg(feature = "database")]
 mod init;
 mod pins;
+mod quality;
 mod tables;
 #[cfg(feature = "database")]
 mod tls;

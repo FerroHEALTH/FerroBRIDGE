@@ -236,6 +236,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: true,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -246,6 +247,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: Some("Gender"),
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -256,6 +258,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -266,6 +269,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -276,6 +280,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -286,6 +291,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -296,6 +302,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: Some("Race"),
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -306,6 +313,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: Some("Ethnicity"),
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -316,6 +324,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: Some(("location", "location_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -326,6 +335,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: Some(("provider", "provider_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -336,6 +346,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: Some(("care_site", "care_site_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -346,6 +357,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -356,6 +368,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -366,6 +379,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -376,6 +390,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -386,6 +401,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -396,6 +412,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -406,6 +423,7 @@ pub static PERSON_COLUMNS: [crate::meta::ColumnMeta; 18] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
 ];

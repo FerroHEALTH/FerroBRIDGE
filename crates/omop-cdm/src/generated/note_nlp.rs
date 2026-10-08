@@ -151,6 +151,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: true,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -161,6 +162,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: Some(("note", "note_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -171,6 +173,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -181,6 +184,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -191,6 +195,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -201,6 +206,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -211,6 +217,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -221,6 +228,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: Some(("concept", "concept_id")),
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -231,6 +239,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -241,6 +250,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -251,6 +261,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -261,6 +272,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -271,6 +283,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
     crate::meta::ColumnMeta {
@@ -281,6 +294,7 @@ pub static NOTE_NLP_COLUMNS: [crate::meta::ColumnMeta; 14] = [
         primary_key: false,
         foreign_key: None,
         fk_domain: None,
+        fk_class: None,
         cdm_schema: crate::meta::CdmSchema::Cdm,
     },
 ];
