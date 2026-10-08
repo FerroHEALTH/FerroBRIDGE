@@ -41,5 +41,8 @@ list can filter on the fields.
   issue up sets the three.
 - Read an issue with `gh issue view <n> --json title,body,comments`; on gh
   2.102.0 `--comments` prints nothing for an issue without comments.
+- The migration ran on 2026-10-08 (`scripts/gh/migrate-fields.sh apply`, 549
+  changes over 227 issues, `verify` at `changes: 0`), and `labels.sh` retired
+  `bug`, `enhancement` and `P0` to `P3` the same day.
 - Related: [[repo-moved-to-ferrohealth]], [[pr-auto-merge]],
   [[upstream-reports-no-milestone]].
