@@ -5,7 +5,7 @@
 
 Every pull request and every push to `main` is analyzed by SonarQube Cloud
 (`.github/workflows/sonar.yml`; scope in `sonar-project.properties`; project
-`rubentalstra_FerroBRIDGE`, organization `rubentalstra`, the built-in "Sonar
+`FerroHEALTH_FerroBRIDGE`, organization `ferrohealth`, the built-in "Sonar
 way" quality gate). It exists as a second opinion beside the local gates and
 CodeQL, and it also reads the trees the Rust gates never see: shell, workflow
 YAML, and JSON.

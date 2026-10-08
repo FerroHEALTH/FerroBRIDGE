@@ -53,6 +53,11 @@ crates on crates.io.
 
 ### Changed
 
+- SonarQube Cloud analyses FerroBRIDGE under the FerroHEALTH organisation:
+  organization `ferrohealth`, project key `FerroHEALTH_FerroBRIDGE`, in
+  `sonar-project.properties`, the MCP server configuration and the README
+  badges.
+
 - The `openehr-*` crates move from 0.0.72 to 0.0.84 as one pin group (#397).
   The generated ITS-REST client now reads a `2xx` body that depends on
   `Prefer` as the resource or its `Identifier` itself, so a CONTRIBUTION
