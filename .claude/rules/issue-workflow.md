@@ -41,10 +41,9 @@ between issues live in `issue-relationships.md`; the public board is
 3. **Do the work.** At pickup, move the issue to `In Progress` on the board
    (`scripts/gh/project.sh status <n> in-progress`). First read the governing
    spec text (`/spec-lookup`; FHIR, FHIRconnect, OMOP, OMOCL, and openEHR
-   ITS-REST are the oracles, see `spec-adherence.md`). While the project is in
-   its design phase, most issues are research: the deliverable is cited
-   evidence and a recommendation rather than code (`CLAUDE.md` §Status). Once
-   the architecture is fixed, a generated layer changes through its generator
+   ITS-REST are the oracles, see `spec-adherence.md`). A research issue
+   delivers cited evidence and a recommendation, and records the decision in
+   `docs/architecture.md`. A generated layer changes through its generator
    (never a hand-edit of `// @generated`) and the engine is idiomatic Rust of
    our own design, built as compiling, tested increments.
 4. **Record progress on the issue.** Tick verified acceptance-criteria

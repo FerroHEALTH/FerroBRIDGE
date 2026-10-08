@@ -34,6 +34,8 @@ the committed guards, so both are live code from day one and both need a gate.
 | `comment-style` | `scripts/checks/comment-style.sh --all` |
 | `versions` | `scripts/checks/versions.sh` |
 | `favicon-sync` | `scripts/checks/favicon-sync.sh` |
+| `file-length` | `scripts/checks/file-length.sh`: a hand-written Rust file stays at most 1000 lines |
+| `contribution-licence` | `scripts/checks/contribution-licence.sh` on a pull request: the licensing checkbox of the body is ticked |
 | `tracker-helpers` | the `--self-test` of `scripts/gh/fields.sh`, `labels.sh` and `migrate-fields.sh`, each driven against a stub `gh` on `PATH` |
 
 `hadolint` runs against a real recipe since #22: `docker/Dockerfile`, the one

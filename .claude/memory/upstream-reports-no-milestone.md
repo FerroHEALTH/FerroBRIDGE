@@ -17,8 +17,8 @@ upstream report is closed when the specification or library it targets
 changes, on a timeline nobody here controls, so a milestone holding one can
 never reach zero open issues.
 
-**How to apply:** file an `upstream-report` issue with labels only, never
-`--milestone`. When one is found inside a milestone, take it out
+**How to apply:** file an `upstream-report` issue through `scripts/gh/fields.sh
+new task <priority> low … --label upstream-report`, never with `--milestone`. When one is found inside a milestone, take it out
 (`gh issue edit <n> --milestone ""`). The FerroBRIDGE-side decision an
 upstream defect forces (the adjudication, the refusal, the workaround
 removal) is its own issue, and that one carries the milestone.
