@@ -59,7 +59,7 @@ jobs:
 
       - name: Install cargo-llvm-cov and cargo-nextest
         if: ${{ hashFiles('Cargo.toml') != '' }}
-        uses: taiki-e/install-action@76c2e6406e52637deed7160d77bded76bd83e06e # v2.87.14
+        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
         with:
           tool: cargo-llvm-cov,cargo-nextest
 
@@ -158,6 +158,6 @@ jobs:
           fi
           echo "sonar.projectVersion=$v" >> sonar-project.properties
 
-      - uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.2
+      - uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
