@@ -148,12 +148,12 @@ fn field_checks(table: &'static TableMeta, column: &'static ColumnMeta, checks: 
                 field: fk_field,
             },
         );
-        if let Some(domain) = column.fk_domain {
+        if !column.fk_domain.is_empty() {
             push(
                 CheckName::FkDomain,
                 Kind::FkDomain {
                     column,
-                    domains: domain.split(',').map(str::trim).collect(),
+                    domains: column.fk_domain,
                 },
             );
         }

@@ -8,7 +8,7 @@ use std::error::Error;
 use std::path::Path;
 
 use omop_cdm_codegen::definitions::Definitions;
-use omop_cdm_codegen::lower::{Model, RustType, Schema, upper_camel_case};
+use omop_cdm_codegen::lower::{LowerError, Model, RustType, Schema, upper_camel_case};
 
 use crate::definitions::CSV_DIR;
 
@@ -141,7 +141,7 @@ fn a_quoted_column_name_loses_its_sql_quoting() -> Result<(), Box<dyn Error>> {
 #[test]
 fn a_concept_column_carries_the_domain_its_definition_names() -> Result<(), Box<dyn Error>> {
     let model = model()?;
-    let domain = |table_name: &str, column_name: &str| -> Result<Option<String>, String> {
+    let domain = |table_name: &str, column_name: &str| -> Result<Vec<String>, String> {
         let table = model
             .tables
             .iter()
@@ -155,16 +155,20 @@ fn a_concept_column_carries_the_domain_its_definition_names() -> Result<(), Box<
         Ok(column.fk_domain.clone())
     };
     assert_eq!(
-        domain("measurement", "measurement_concept_id")?.as_deref(),
-        Some("Measurement")
+        domain("measurement", "measurement_concept_id")?,
+        ["Measurement"]
     );
     assert_eq!(
-        domain("drug_exposure", "drug_type_concept_id")?.as_deref(),
-        Some("Type Concept")
+        domain("drug_exposure", "drug_type_concept_id")?,
+        ["Type Concept"]
     );
     assert_eq!(
-        domain("observation", "observation_concept_id")?,
-        None,
+        domain("episode", "episode_object_concept_id")?,
+        ["Procedure", "Regimen"],
+        "the definitions name two domains here"
+    );
+    assert!(
+        domain("observation", "observation_concept_id")?.is_empty(),
         "a definition that writes `NA` lowers to no domain"
     );
     Ok(())
@@ -198,6 +202,25 @@ fn a_concept_column_carries_the_class_its_definition_names() -> Result<(), Box<d
         class("drug_strength", "ingredient_concept_id")?,
         None,
         "a definition that writes `NA` lowers to no class"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_domain_list_with_an_empty_domain_is_refused() -> Result<(), Box<dyn Error>> {
+    let mut definitions = Definitions::load(Path::new(CSV_DIR))?;
+    let field = definitions
+        .fields
+        .iter_mut()
+        .find(|field| field.table == "episode" && field.field == "episode_object_concept_id")
+        .ok_or("no episode.episode_object_concept_id definition")?;
+    field.fk_domain = String::from("Procedure, , Regimen");
+    let refused = Model::lower(&definitions)
+        .err()
+        .ok_or("an empty domain lowered")?;
+    assert!(
+        matches!(refused, LowerError::Domain { ref list, .. } if list == "Procedure, , Regimen"),
+        "refused for the wrong reason: {refused}"
     );
     Ok(())
 }

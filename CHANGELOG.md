@@ -73,6 +73,16 @@ crates on crates.io.
   text and the site footer. The licence terms are unchanged, and maintainer
   credit stays a person. `fhir-types` steps to 0.1.108 for its new headers.
 
+### Fixed
+
+- The generated CDM metadata carries the vocabulary domains of a concept
+  column as a list (`ColumnMeta::fk_domain`), so
+  `episode.episode_object_concept_id`, which the CDM v5.4.3 definitions give
+  the two domains `Procedure, Regimen`, accepts a concept of either. The
+  `omocl` domain checks test membership instead of comparing the whole cell
+  as one domain name, and the quality checks read the list instead of
+  splitting the cell (#414).
+
 ## [0.0.5] - 2026-10-01
 
 ### Changed

@@ -247,10 +247,13 @@ fn render_columns(out: &mut String, table: &Table) -> Result<(), std::fmt::Error
             )?,
             None => writeln!(out, "        foreign_key: None,")?,
         }
-        match &column.fk_domain {
-            Some(domain) => writeln!(out, "        fk_domain: Some(\"{domain}\"),")?,
-            None => writeln!(out, "        fk_domain: None,")?,
-        }
+        let domains = column
+            .fk_domain
+            .iter()
+            .map(|domain| format!("\"{domain}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        writeln!(out, "        fk_domain: &[{domains}],")?;
         match &column.fk_class {
             Some(class) => writeln!(out, "        fk_class: Some(\"{class}\"),")?,
             None => writeln!(out, "        fk_class: None,")?,

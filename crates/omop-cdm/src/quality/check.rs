@@ -131,7 +131,7 @@ pub enum CheckParameters {
     },
     /// The vocabulary domains a concept may belong to (`fkDomain`), the
     /// definitions' `fkDomain` cell split on commas.
-    Domains(Vec<&'static str>),
+    Domains(&'static [&'static str]),
     /// The concept class a concept must belong to (`fkClass`).
     ConceptClass(&'static str),
 }
@@ -164,7 +164,7 @@ pub(crate) enum Kind {
         /// The checked column.
         column: &'static ColumnMeta,
         /// The domains a concept may belong to.
-        domains: Vec<&'static str>,
+        domains: &'static [&'static str],
     },
     /// `fkClass` on the column.
     FkClass {
@@ -250,7 +250,7 @@ impl Check {
     pub fn parameters(&self) -> CheckParameters {
         match &self.kind {
             Kind::IsForeignKey { table, field, .. } => CheckParameters::ForeignKey { table, field },
-            Kind::FkDomain { domains, .. } => CheckParameters::Domains(domains.clone()),
+            Kind::FkDomain { domains, .. } => CheckParameters::Domains(domains),
             Kind::FkClass { class, .. } => CheckParameters::ConceptClass(class),
             Kind::CdmTable
             | Kind::CdmField(_)
@@ -334,7 +334,7 @@ impl Check {
                 ("@cdmFieldName", upper(Some(column.name))),
                 ("@fkTableName", upper(fk_table)),
                 ("@fkFieldName", upper(fk_field)),
-                ("@fkDomain", upper(column.fk_domain)),
+                ("@fkDomain", column.fk_domain.join(", ").to_uppercase()),
                 ("@fkClass", upper(column.fk_class)),
             ] {
                 text = text.replace(placeholder, &value);

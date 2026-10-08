@@ -120,8 +120,9 @@ pub struct Column {
     pub primary_key: bool,
     /// The table and column a foreign key references, both lower case.
     pub foreign_key: Option<(String, String)>,
-    /// The vocabulary domain the definitions name for a concept column.
-    pub fk_domain: Option<String>,
+    /// The vocabulary domains the definitions name for a concept column, in
+    /// their order; empty where they write `NA`.
+    pub fk_domain: Vec<String>,
     /// The concept class the definitions name for a concept column.
     pub fk_class: Option<String>,
     /// The definitions' `userGuidance` text, when there is any.
@@ -252,6 +253,16 @@ pub enum LowerError {
         table: String,
         /// The column.
         column: String,
+    },
+    /// A domain list holds an empty domain.
+    #[error("the {table}.{column} domain list `{list}` holds an empty domain")]
+    Domain {
+        /// The table.
+        table: String,
+        /// The column.
+        column: String,
+        /// The list as the definitions write it.
+        list: String,
     },
     /// A table of the table definitions has no field definitions.
     #[error("the {table} table has no columns in the field definitions")]
@@ -384,11 +395,32 @@ fn lower_column(field: &FieldRecord) -> Result<Column, LowerError> {
         required: flag(field, "isRequired", &field.required)?,
         primary_key: flag(field, "isPrimaryKey", &field.primary_key)?,
         foreign_key,
-        fk_domain: named(&field.fk_domain).map(str::to_owned),
+        fk_domain: domains(field)?,
         fk_class: named(&field.fk_class).map(str::to_owned),
         user_guidance: prose(&field.user_guidance),
         etl_conventions: prose(&field.etl_conventions),
     })
+}
+
+/// Splits the `fkDomain` cell of one field into its domains.
+///
+/// The definitions name two domains for `episode.episode_object_concept_id`,
+/// written `Procedure, Regimen`; every other concept column names one or
+/// writes `NA`.
+fn domains(field: &FieldRecord) -> Result<Vec<String>, LowerError> {
+    let Some(list) = named(&field.fk_domain) else {
+        return Ok(Vec::new());
+    };
+    list.split(',')
+        .map(|domain| match domain.trim() {
+            "" => Err(LowerError::Domain {
+                table: field.table.clone(),
+                column: field.field.clone(),
+                list: list.to_owned(),
+            }),
+            domain => Ok(domain.to_owned()),
+        })
+        .collect()
 }
 
 /// Maps one normalised CDM datatype onto its Rust type.

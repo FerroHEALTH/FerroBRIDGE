@@ -58,7 +58,7 @@ fn a_two_domain_definition_is_checked_against_both_domains() -> Result<(), Box<d
         Some("episode_object_concept_id"),
     )?;
     assert_eq!(
-        CheckParameters::Domains(vec!["Procedure", "Regimen"]),
+        CheckParameters::Domains(&["Procedure", "Regimen"]),
         check.parameters()
     );
     Ok(())
