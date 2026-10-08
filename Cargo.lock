@@ -2533,6 +2533,7 @@ dependencies = [
 name = "omop-cdm"
 version = "0.0.0"
 dependencies = [
+ "csv",
  "ferrobridge-testkit",
  "futures-util",
  "openehr-base",
