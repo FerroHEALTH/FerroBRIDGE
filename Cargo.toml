@@ -34,7 +34,7 @@ serde_json = { version = "1.0.151", features = ["raw_value"] }
 serde-saphyr = { version = "1.3.0", default-features = false, features = ["deserialize"] }
 # draft-07 JSON Schema validation for the FHIRconnect mapping schemas. Both
 # schemas are self-contained, so no remote or file reference resolver is built.
-jsonschema = { version = "0.57.0", default-features = false }
+jsonschema = { version = "0.58.3", default-features = false }
 thiserror = "2.0.21"
 # The exact decimal the OMOCL `multiplication` product and every DV_QUANTITY
 # magnitude are carried in, so no factor passes through a float. Verified
