@@ -4,7 +4,7 @@
 //! The credentials of each upstream, every secret read once from its value
 //! or its `_file` sibling.
 
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 use std::path::Path;
 
 use super::Error;
@@ -39,15 +39,18 @@ pub(super) fn resolve_credentials(
         credentials.password.as_deref(),
         credentials.password_file.as_deref(),
     )?;
-    match (token, credentials.user.as_deref(), password) {
+    let user = secret(
+        &format!("{section}.user"),
+        credentials.user.as_deref(),
+        credentials.user_file.as_deref(),
+    )?
+    .map(|user| user.expose_secret().to_owned());
+    match (token, user, password) {
         (Some(_), Some(_), _) | (Some(_), None, Some(_)) => Err(Error::Scheme {
             section: section.to_owned(),
         }),
         (Some(token), None, None) => Ok(Some(Scheme::Bearer(token))),
-        (None, Some(user), Some(password)) => Ok(Some(Scheme::Basic {
-            user: user.to_owned(),
-            password,
-        })),
+        (None, Some(user), Some(password)) => Ok(Some(Scheme::Basic { user, password })),
         (None, Some(_), None) => Err(Error::Missing {
             key: format!("{section}.password"),
         }),

@@ -140,3 +140,43 @@ fn a_user_without_a_password_refuses_to_boot() -> Result<(), Box<dyn StdError>> 
     }
     Ok(())
 }
+
+#[test]
+fn a_user_file_sibling_is_read_at_boot() -> Result<(), Box<dyn StdError>> {
+    let mut file = tempfile::NamedTempFile::new()?;
+    writeln!(file, "12345")?;
+    let text = format!(
+        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n[cdr.credentials]\nuser_file = {:?}\npassword = \"p\"\n",
+        file.path()
+    );
+
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let cdr = settings.cdr.as_ref().ok_or("the CDR lane is on")?;
+    match cdr.credentials.as_ref() {
+        Some(openehr_its::rest::client::Credentials::Basic { user, .. }) => {
+            assert_eq!(
+                "12345", user,
+                "the trailing newline is not part of the user"
+            );
+        }
+        other => return Err(format!("expected basic authentication, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_user_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn StdError>> {
+    let text = concat!(
+        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
+        "[cdr.credentials]\nuser = \"bridge\"\nuser_file = \"/run/secrets/user\"\npassword = \"p\"\n",
+    );
+
+    let error = Config::from_sources(Some(text), &BTreeMap::new())?
+        .resolve()
+        .expect_err("a user set twice is a boot error");
+    match &error {
+        Error::Conflict { key } => assert_eq!("cdr.credentials.user", key),
+        other => return Err(format!("expected a conflict, got {other:?}").into()),
+    }
+    Ok(())
+}

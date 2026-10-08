@@ -16,7 +16,7 @@ pub mod section;
 
 use secrecy::SecretString;
 use serde::Deserialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -25,6 +25,8 @@ use crate::telemetry::{FILTER_ENV, FORMAT_ENV, Format};
 
 use overrides::apply_console_overrides;
 use overrides::apply_override;
+use overrides::parse_override;
+use overrides::retype;
 use resolve::resolve_cdm;
 use resolve::resolve_cdr;
 use resolve::resolve_etl;
@@ -355,18 +357,42 @@ impl Config {
         text: Option<&str>,
         environment: &BTreeMap<String, String>,
     ) -> Result<Self, Error> {
-        let mut table = match text {
+        let file = match text {
             None => toml::Table::new(),
             Some(text) => toml::from_str(text).map_err(|source| Error::Parse { source })?,
         };
+        let mut overrides = Vec::new();
         for (name, raw) in environment {
-            apply_override(&mut table, name, raw)?;
+            if let Some(item) = parse_override(name, raw)? {
+                overrides.push(item);
+            }
         }
-        apply_console_overrides(&mut table, environment)?;
-        // The merged tree is written back and re-read so every refusal carries
-        // the key and its position, which a `Table` alone cannot report.
-        let merged = toml::to_string(&table).map_err(|source| Error::Assemble { source })?;
-        toml::from_str(&merged).map_err(|source| Error::Parse { source })
+        // Each pass places one more override typed, so the loop ends after at
+        // most one pass per override.
+        let mut typed = BTreeSet::new();
+        loop {
+            let mut table = file.clone();
+            for (index, item) in overrides.iter().enumerate() {
+                apply_override(&mut table, item, typed.contains(&index))?;
+            }
+            apply_console_overrides(&mut table, environment)?;
+            // The merged tree is written back and re-read so every refusal
+            // carries the key and its position, which a `Table` cannot report.
+            let merged = toml::to_string(&table).map_err(|source| Error::Assemble { source })?;
+            let source = match toml::from_str(&merged) {
+                Ok(config) => return Ok(config),
+                Err(source) => source,
+            };
+            let retyped = source
+                .span()
+                .and_then(|span| retype(&overrides, &typed, &merged, &span));
+            match retyped {
+                Some(index) => {
+                    typed.insert(index);
+                }
+                None => return Err(Error::Parse { source }),
+            }
+        }
     }
 
     /// Resolves this tree into the settings the run path holds.

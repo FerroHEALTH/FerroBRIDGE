@@ -121,3 +121,116 @@ fn a_log_format_outside_the_three_exits_seventy_eight() {
     );
     assert!(output.stdout.is_empty(), "no banner before a refused start");
 }
+
+/// Returns the CDR user name the environment value `user` resolves to.
+fn cdr_user(user: &str) -> Result<String, Box<dyn StdError>> {
+    let environment = BTreeMap::from([
+        (
+            String::from("FERROBRIDGE__CDR__BASE_URL"),
+            String::from("http://cdr.invalid/v1"),
+        ),
+        (
+            String::from("FERROBRIDGE__CDR__CREDENTIALS__USER"),
+            user.to_owned(),
+        ),
+        (
+            String::from("FERROBRIDGE__CDR__CREDENTIALS__PASSWORD"),
+            String::from("12345"),
+        ),
+    ]);
+    let settings = Config::from_sources(None, &environment)?.resolve()?;
+    let cdr = settings.cdr.ok_or("the CDR lane is on")?;
+    match cdr.credentials {
+        Some(openehr_its::rest::client::Credentials::Basic { user, .. }) => Ok(user),
+        other => Err(format!("expected basic authentication, got {other:?}").into()),
+    }
+}
+
+#[test]
+fn an_all_digit_value_reaches_a_string_key_as_a_string() -> Result<(), Box<dyn StdError>> {
+    assert_eq!("12345", cdr_user("12345")?);
+    Ok(())
+}
+
+#[test]
+fn a_boolean_looking_value_reaches_a_string_key_as_a_string() -> Result<(), Box<dyn StdError>> {
+    assert_eq!("true", cdr_user("true")?);
+    Ok(())
+}
+
+#[test]
+fn a_float_looking_value_reaches_a_string_key_as_a_string() -> Result<(), Box<dyn StdError>> {
+    assert_eq!("1.5", cdr_user("1.5")?);
+    Ok(())
+}
+
+#[test]
+fn a_quoted_value_reaches_a_string_key_with_its_quotes() -> Result<(), Box<dyn StdError>> {
+    assert_eq!("\"bridge\"", cdr_user("\"bridge\"")?);
+    Ok(())
+}
+
+#[test]
+fn a_digit_string_and_a_number_in_one_environment_each_take_their_key_type()
+-> Result<(), Box<dyn StdError>> {
+    let environment = BTreeMap::from([
+        (
+            String::from("FERROBRIDGE__SERVER__BODY_LIMIT_BYTES"),
+            String::from("2048"),
+        ),
+        (
+            String::from("FERROBRIDGE__FACADE__ENABLED"),
+            String::from("true"),
+        ),
+        (
+            String::from("FERROBRIDGE__FACADE__SYSTEM_ID"),
+            String::from("2048"),
+        ),
+        (
+            String::from("FERROBRIDGE__TELEMETRY__LOGGED_QUERY_PARAMETERS"),
+            String::from("[\"_count\", \"_sort\"]"),
+        ),
+        (
+            String::from("FERROBRIDGE__ETL__TYPE_CONCEPT_ID"),
+            String::from("32817"),
+        ),
+    ]);
+    let config = Config::from_sources(Some(FULL), &environment)?;
+    assert_eq!(2048, config.server.body_limit_bytes);
+    assert!(config.facade.enabled);
+    assert_eq!("2048", config.facade.system_id);
+    assert_eq!(
+        vec![String::from("_count"), String::from("_sort")],
+        config.telemetry.logged_query_parameters
+    );
+    assert_eq!(
+        Some(32817),
+        config.etl.as_ref().and_then(|etl| etl.type_concept_id)
+    );
+    Ok(())
+}
+
+#[test]
+fn a_numeric_key_given_text_that_is_no_number_is_refused_naming_the_key() {
+    let error = Config::from_sources(
+        Some(FULL),
+        &env("FERROBRIDGE__CDR__RETRY__MAX_ATTEMPTS", "many"),
+    )
+    .expect_err("max_attempts is a number");
+    assert!(matches!(error, Error::Parse { .. }), "{error:?}");
+    let cause = StdError::source(&error).map(ToString::to_string);
+    assert!(
+        cause.is_some_and(|cause| cause.contains("max_attempts")),
+        "the refusal names the key: {error:?}"
+    );
+}
+
+#[test]
+fn a_numeric_key_given_a_number_out_of_its_range_is_refused() {
+    let error = Config::from_sources(
+        Some(FULL),
+        &env("FERROBRIDGE__CDR__RETRY__MAX_ATTEMPTS", "-1"),
+    )
+    .expect_err("max_attempts is unsigned");
+    assert!(matches!(error, Error::Parse { .. }), "{error:?}");
+}

@@ -94,6 +94,15 @@ crates on crates.io.
   file, so the `..data` link and the `..<timestamp>` directory behind it no
   longer make each mapping load three times and refuse the start with
   `duplicate-mapping-name` (#420).
+- A `FERROBRIDGE__…` environment value takes the type of the key it sets: a
+  string key takes the text verbatim, so
+  `FERROBRIDGE__CDR__CREDENTIALS__USER=12345` is the user name `12345`
+  instead of a number the boot refuses, and `true` or `1.5` stay text too. A
+  number, boolean or array key still reads the text as TOML syntax. Quotes
+  are kept as part of a string value, so write a value without the quotes
+  that used to keep it text (`12345`, not `"12345"`). `[cdr.credentials]`
+  and `[terminology.credentials]` gain `user_file` beside `password_file`
+  (#424).
 - The generated CDM metadata carries the vocabulary domains of a concept
   column as a list (`ColumnMeta::fk_domain`), so
   `episode.episode_object_concept_id`, which the CDM v5.4.3 definitions give
