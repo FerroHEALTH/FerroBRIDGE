@@ -88,6 +88,12 @@ crates on crates.io.
 
 ### Fixed
 
+- Readiness no longer reports a CDR that refuses the configured credentials
+  as up. The CDR check lists the ADL 1.4 templates through the ITS-REST
+  Definition API with the configured credentials, filtered so the answer is
+  empty, instead of a `GET` on the REST root, and a `401` or `403` from the
+  CDR or the terminology server marks that indicator down with the reason in
+  its detail (#423).
 - The mapping directory walk of the facade, the FHIRconnect operations and
   `etl run` reads a Kubernetes ConfigMap volume once. It skips every entry
   whose name starts with `..` and follows a symlink only when it names a

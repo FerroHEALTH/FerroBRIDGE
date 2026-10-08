@@ -286,18 +286,53 @@ async fn an_undocumented_status_is_an_error_carrying_the_body() -> Result<(), Bo
 #[tokio::test]
 async fn a_reachability_probe_reports_every_status_the_service_answers()
 -> Result<(), Box<dyn Error>> {
-    for answered in [200_u16, 401, 404, 503] {
+    for answered in [
+        http::StatusCode::UNAUTHORIZED,
+        http::StatusCode::FORBIDDEN,
+        http::StatusCode::NOT_FOUND,
+        http::StatusCode::SERVICE_UNAVAILABLE,
+    ] {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
-            .and(path("/v1"))
-            .respond_with(ResponseTemplate::new(answered))
+            .and(path(PROBE_PATH))
+            .respond_with(ResponseTemplate::new(answered.as_u16()))
             .expect(1)
             .mount(&server)
             .await;
 
         let status = support::client(&server)?.reachability().await?;
-        assert_eq!(answered, status.as_u16(), "the probe reports what it saw");
+        assert_eq!(answered, status, "the probe reports what it saw");
     }
+    Ok(())
+}
+
+/// The ADL 1.4 template list the probe reads (ITS-REST 1.1.0 Definition API).
+const PROBE_PATH: &str = "/v1/definition/template/adl1.4";
+
+#[tokio::test]
+async fn a_reachability_probe_lists_templates_with_the_configured_credential()
+-> Result<(), Box<dyn Error>> {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path(PROBE_PATH))
+        .and(wiremock::matchers::query_param(
+            "template_id",
+            "ferrobridge-readiness-probe",
+        ))
+        .and(wiremock::matchers::header(
+            "authorization",
+            "Bearer synthetic-token",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let client = CdrClient::new(
+        &CdrConfig::new(format!("{}/v1", server.uri()).parse()?)
+            .with_credentials(Credentials::Bearer(SecretString::from("synthetic-token"))),
+    )?;
+
+    assert_eq!(http::StatusCode::OK, client.reachability().await?);
     Ok(())
 }
 
