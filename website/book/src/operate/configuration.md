@@ -288,6 +288,13 @@ archetype and no template.
 | `templates` | none | The directory holding the operational templates the two operations compile against, as OPT 1.4 XML (`.opt`) |
 | `omocl` | none | The directory the OMOCL files `ferrobridge etl run` maps with are read from, recursively (`.yml`, `.yaml`); read and validated once at start, and every file an `Include` names must be in it |
 
+The three directories are walked the same way. Every real subdirectory is
+read, a symlink to a file is followed, and a symlink to a directory is not.
+An entry whose name starts with `..` is skipped, so a Kubernetes ConfigMap
+mounted as a whole directory is read once: its files sit in a hidden
+`..<timestamp>` directory behind a `..data` symlink, and each key appears at
+the top level as a file symlink.
+
 The facade always takes its templates from the CDR and needs `directory`
 alone. The two FHIRconnect operations take theirs from one of two sources:
 

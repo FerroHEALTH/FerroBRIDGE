@@ -29,6 +29,7 @@ pub mod request_log;
 pub mod startup;
 pub mod state;
 pub mod telemetry;
+pub mod walk;
 
 use std::future::Future;
 use std::io::IsTerminal;

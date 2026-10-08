@@ -77,27 +77,6 @@ fn render(diagnostics: &[Diagnostic]) -> String {
         .join("; ")
 }
 
-/// Collects every `.yml` and `.yaml` file below `directory`.
-fn collect(directory: &Path, found: &mut Vec<PathBuf>) -> Result<(), MapperError> {
-    let read = |source| MapperError::Read {
-        path: directory.to_path_buf(),
-        source,
-    };
-    for entry in std::fs::read_dir(directory).map_err(read)? {
-        let path = entry.map_err(read)?.path();
-        if path.is_dir() {
-            collect(&path, found)?;
-        } else if path
-            .extension()
-            .and_then(|extension| extension.to_str())
-            .is_some_and(|extension| extension == "yml" || extension == "yaml")
-        {
-            found.push(path);
-        }
-    }
-    Ok(())
-}
-
 /// Reads and validates every OMOCL file below `directory`.
 ///
 /// # Errors
@@ -106,8 +85,10 @@ fn collect(directory: &Path, found: &mut Vec<PathBuf>) -> Result<(), MapperError
 /// [`MapperError::Empty`] when it holds no file, and [`MapperError::Mappings`]
 /// with every diagnostic when a file does not load.
 pub fn read_set(directory: &Path) -> Result<MappingSet, MapperError> {
-    let mut files = Vec::new();
-    collect(directory, &mut files)?;
+    let files = crate::walk::files(directory, |path| {
+        crate::walk::has_extension(path, &["yml", "yaml"])
+    })
+    .map_err(|crate::walk::Error { path, source }| MapperError::Read { path, source })?;
     if files.is_empty() {
         return Err(MapperError::Empty {
             path: directory.to_path_buf(),
