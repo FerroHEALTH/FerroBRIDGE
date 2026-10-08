@@ -424,6 +424,8 @@ pub struct Credentials {
     pub bearer_token_file: Option<PathBuf>,
     /// The user name of RFC 7617 basic authentication.
     pub user: Option<String>,
+    /// A file holding the user name, read at boot.
+    pub user_file: Option<PathBuf>,
     /// The password of RFC 7617 basic authentication.
     pub password: Option<String>,
     /// A file holding the password, read at boot.

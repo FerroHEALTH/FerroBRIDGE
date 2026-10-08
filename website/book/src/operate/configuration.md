@@ -27,10 +27,13 @@ FERROBRIDGE__CDR__BASE_URL             -> [cdr] base_url
 FERROBRIDGE__CDR__RETRY__MAX_ATTEMPTS  -> [cdr.retry] max_attempts
 ```
 
-A value is read as TOML syntax when it is valid TOML, and as plain text
-otherwise. `5` is the number 5, `true` is a boolean, `["a","b"]` is an array,
-and `http://cdr.example/v1` is a string. Quote a text value that would
-otherwise read as a number: `FERROBRIDGE__CDR__CREDENTIALS__BEARER_TOKEN='"0123"'`.
+A value takes the type of the key it sets. A string key takes the text as it
+is, whatever its characters: `FERROBRIDGE__CDR__CREDENTIALS__USER=12345` sets
+the user name `12345`, and `true` or `1.5` stay text too. Quotes are part of
+the value, so do not add any. A number, boolean or array key reads the text as
+TOML syntax: `5` is the number 5, `true` is a boolean and `["a","b"]` is an
+array. Text that does not read as the key's type is refused at boot, naming
+the key.
 
 ## The variables
 
@@ -156,7 +159,7 @@ an inline value beside its `_file` sibling.
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
 | `bearer_token` | none | yes | An RFC 6750 bearer token |
-| `user` | none | | The user name of RFC 7617 basic authentication |
+| `user` | none | | The user name of RFC 7617 basic authentication; a `user_file` sibling names a file holding it, read at boot like a secret |
 | `password` | none | yes | The password of RFC 7617 basic authentication |
 
 For the CDR, the scheme becomes the `Authorization` header of every call the
