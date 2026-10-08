@@ -167,7 +167,8 @@ the testkit tool crate. Beside it:
   profiles over the pinned PostgreSQL.
 - `.claude/`: the working discipline. `rules/` (the path-scoped and standing
   rules), `hooks/`, `skills/`, `agents/`, `memory/`.
-- `scripts/gh/`: the tracker helpers (`rel.sh`, `project.sh`, `labels.sh`).
+- `scripts/gh/`: the tracker helpers (`rel.sh`, `project.sh`, `fields.sh`,
+  `labels.sh`, `migrate-fields.sh`).
 - `scripts/checks/`: the committed guards. `comment-style.sh`; `versions.sh`,
   which fails when a file disagrees with the `docs/VERSIONS.md` pin matrix or
   claims a licence other than `BUSL-1.1`; `crate-version-guard.sh`, the crate
@@ -199,17 +200,25 @@ crate-local discipline, and this section becomes the crate map.
 ## Issue workflow (the loop)
 
 The tracker is GitHub Issues; the open issue list is the worklist
-(`.claude/rules/issue-workflow.md`). One type label per issue
-(bug/enhancement/documentation/chore/refactor/perf/ci), one priority label
-(P0 to P3), and domain labels as needed (`spec:FHIR`, `spec:FHIRconnect`,
-`spec:openEHR`, `spec:OMOP`, `spec:OMOCL`). Milestones are releases. Record progress on the issue (tick
-criteria, comment); a PR declares `Closes #N`. New work found while working an
-issue is filed and fixed before the next unit starts (the fix-first cadence).
+(`.claude/rules/issue-workflow.md`). The type (Bug, Feature, Task), the
+priority (Urgent, High, Medium, Low) and the effort (High, Medium, Low) are
+GitHub's native issue type and the organisation's `Priority` and `Effort`
+issue fields, never labels, set with `scripts/gh/fields.sh`; an issue is
+filed with `scripts/gh/fields.sh new` so it carries all three from the start.
+A Task carries exactly one work-kind label (documentation/chore/refactor/
+perf/test/ci), and domain labels are added as needed (`spec:FHIR`,
+`spec:FHIRconnect`, `spec:openEHR`, `spec:OMOP`, `spec:OMOCL`). Read an issue
+with `gh issue view <n> --json title,body,comments`, never `--comments`, which
+prints nothing for an issue without comments. Milestones are releases. Record
+progress on the issue (tick criteria, comment); a PR declares `Closes #N`. New
+work found while working an issue is filed and fixed before the next unit
+starts (the fix-first cadence).
 Native sub-issue and dependency edges are set only with `scripts/gh/rel.sh`;
 the roadmap board is a view over the tracker, written only with
 `scripts/gh/project.sh` (`.claude/rules/issue-relationships.md`,
 `.claude/rules/project-board.md`). The SessionStart hook prints the open issue
-list.
+list with `<Type/Priority>` after each title, and `/next-task` takes the
+highest priority first, the oldest first within a priority.
 
 ## Model orchestration (workflows and subagents)
 

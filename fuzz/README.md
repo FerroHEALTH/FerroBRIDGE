@@ -23,4 +23,4 @@ cargo +nightly fuzz run mapping_loader fuzz/corpus/mapping_loader -- -max_total_
 ```
 
 The scheduled lane is `.github/workflows/fuzz.yml`; a reproducing input is
-uploaded as a run artifact and becomes a `bug` issue with the input attached.
+uploaded as a run artifact and becomes a `Bug` issue with the input attached.

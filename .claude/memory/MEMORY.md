@@ -72,3 +72,4 @@
 - [Repo moved to FerroHEALTH](repo-moved-to-ferrohealth.md) — 2026-10-01 transfer; ghcr.io/ferrohealth image, org board #3, what keeps the old owner
 - [FerroHEALTH is the mother name](ferrohealth-umbrella.md) — family-level docs (manufacturer, EHDS system, CRA overview, licensing) go to the FerroHEALTH book
 - [PR licence box](pr-licence-box.md) — tick the contribution-licence checkbox in every pull request body; owner standing consent 2026-10-08
+- [Native issue types and fields](native-issue-types-and-priority.md): type, priority and effort are the native issue type and the FerroHEALTH Priority and Effort fields, set with scripts/gh/fields.sh; bug, enhancement and P0 to P3 retired; owner 2026-10-08 (#416)

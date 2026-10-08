@@ -72,6 +72,14 @@ crates on crates.io.
   `SPDX-FileCopyrightText` line names the new company, as do the governance
   text and the site footer. The licence terms are unchanged, and maintainer
   credit stays a person. `fhir-types` steps to 0.1.108 for its new headers.
+- The tracker records the kind, the urgency and the size of an issue in
+  GitHub's native issue type (Bug, Feature, Task) and the organisation's
+  Priority and Effort fields (#416). The `bug`, `enhancement` and `P0` to
+  `P3` labels are retired, the bug and feature forms set the issue type, the
+  release notes drop their two label-keyed categories, and
+  `scripts/gh/fields.sh` and `scripts/gh/migrate-fields.sh` carry the model
+  and the migration. `labels.sh` gains the `no-crate-bump` label the
+  crate-version guard already reads.
 
 ## [0.0.5] - 2026-10-01
 
