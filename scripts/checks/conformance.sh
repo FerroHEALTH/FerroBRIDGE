@@ -54,8 +54,8 @@ readonly BUILD_BADGES=(
   '[![CI](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/ci.yml/badge.svg)](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/ci.yml)'
   '[![CodeQL](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/codeql.yml/badge.svg)](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/codeql.yml)'
   '[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/FerroHEALTH/FerroBRIDGE/badge)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroBRIDGE)'
-  '[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rubentalstra_FerroBRIDGE&metric=alert_status)](https://sonarcloud.io/summary/overall?id=rubentalstra_FerroBRIDGE)'
-  '[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rubentalstra_FerroBRIDGE&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rubentalstra_FerroBRIDGE)'
+  '[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=FerroHEALTH_FerroBRIDGE&metric=alert_status)](https://sonarcloud.io/summary/overall?id=FerroHEALTH_FerroBRIDGE)'
+  '[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=FerroHEALTH_FerroBRIDGE&metric=coverage)](https://sonarcloud.io/summary/new_code?id=FerroHEALTH_FerroBRIDGE)'
   '[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)'
   '[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/FerroHEALTH/FerroBRIDGE?sort=semver)](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest)'
 )

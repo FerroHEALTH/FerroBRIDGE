@@ -17,8 +17,12 @@ retired.
 - The image is `ghcr.io/ferrohealth/ferrobridge`, a literal in
   `release-image.yml`: `github.repository_owner` is `FerroHEALTH`, and an OCI
   reference must be lowercase.
-- Still under the user account (do not rewrite): the SonarQube Cloud
-  organization and key `rubentalstra_FerroBRIDGE`, the FerroEHR 4.2.5 and
+- SonarQube Cloud moved to the organisation on 2026-10-08: organization
+  `ferrohealth`, project key `FerroHEALTH_FerroBRIDGE`, in
+  `sonar-project.properties`, `.mcp.json`, the README badge and
+  `.claude/rules/ai-code-review.md`; the `SONAR_TOKEN` secret and the
+  `SONARQUBE_TOKEN` of the MCP server must be tokens of that organisation.
+- Still under the user account (do not rewrite): the FerroEHR 4.2.5 and
   FerroTERM image pins under `ghcr.io/rubentalstra`, personal handles
   (CODEOWNERS, FUNDING, the roster), the released changelog sections.
 - Releases up to v0.0.4 were signed as `rubentalstra/FerroBRIDGE` and their
