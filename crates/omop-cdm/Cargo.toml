@@ -54,6 +54,8 @@ tokio-postgres-rustls = { workspace = true, optional = true }
 webpki-roots = { workspace = true, optional = true }
 
 [dev-dependencies]
+# The Data Quality Dashboard thresholds quote cells that hold commas.
+csv.workspace = true
 ferrobridge-testkit.workspace = true
 # The era scripts are checked against the digest of the page they follow.
 sha2.workspace = true

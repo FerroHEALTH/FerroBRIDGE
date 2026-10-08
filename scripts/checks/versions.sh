@@ -530,6 +530,7 @@ docs/specs/fhirconnect/draft-rest-api|FHIRconnect REST API chapter (draft, unmer
 docs/specs/fhirconnect-mapping-lib|FHIRconnect mapping library (corpus, never an oracle)
 docs/specs/omocl|OMOCL corpus
 docs/specs/omop-cdm|OMOP CDM definitions and PostgreSQL DDL
+docs/specs/dqd|OHDSI Data Quality Dashboard
 docs/specs/its-rest|openEHR ITS-REST OpenAPI
 tools/ferrobridge-testkit/fixtures/opt/kds|KDS Diagnose operational template (fixture)
 tools/fhir-codegen/vendor/hl7-v2ig|HL7 v2 definitions (v2ig source of truth, never committed)

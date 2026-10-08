@@ -25,6 +25,12 @@ crates on crates.io.
 
 ### Added
 
+- `scripts/vendor/dqd.sh` vendors the OHDSI Data Quality Dashboard v2.9.0
+  CDM v5.4 check catalogue, thresholds, the SQL templates of its fifteen
+  conformance and completeness checks, and the R sources that define their
+  verdicts under `docs/specs/dqd/` (#403), as the oracle of the Rust port of
+  those checks (#97). A test pins the ten places where the Dashboard's field
+  thresholds disagree with the CDM v5.4.3 definitions (#411).
 - `fhirconnect` and `openehr-mapping-core` are published on crates.io at
   0.1.108, joining the crate line `fhir-types` carries (#397). Both build on
   the `openehr-*` 0.0.84 crates, so a project on that release, such as the

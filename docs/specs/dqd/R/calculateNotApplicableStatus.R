@@ -1,0 +1,247 @@
+# Copyright 2026 Observational Health Data Sciences and Informatics
+#
+# This file is part of DataQualityDashboard
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#' Determines if all checks are present expected to calculate the 'Not Applicable' status
+#'
+#' @param checkResults A dataframe containing the results of the data quality checks
+#'
+#' @return A logical value indicating whether all required checks are present
+#'
+#' @keywords internal
+.hasNAchecks <- function(checkResults) {
+  checkNames <- unique(checkResults$checkName)
+  return(.containsNAchecks(checkNames))
+}
+
+#' Determines if all checks required for 'Not Applicable' status are in the checkNames
+#'
+#' @param checkNames A character vector of check names
+#'
+#' @return A logical value indicating whether all required checks are present
+#'
+#' @keywords internal
+.containsNAchecks <- function(checkNames) {
+  naCheckNames <- c("cdmTable", "cdmField", "measureValueCompleteness")
+  missingNAChecks <- !(naCheckNames %in% checkNames)
+  if (any(missingNAChecks)) {
+    return(FALSE)
+  }
+  return(TRUE)
+}
+
+#' Applies the 'Not Applicable' status to a single check
+#'
+#' @param x Results from a single check
+#'
+#' @return A numeric value (0 or 1) indicating whether the check is not applicable
+#'
+#' @keywords internal
+.applyNotApplicable <- function(x) {
+  # Special rule for measurePersonCompleteness
+  if (x$checkName == "measurePersonCompleteness") {
+    if (x$tableIsMissing) {
+      return(1)
+    } else {
+      return(0)
+    }
+  }
+
+  # Special case: cdmTable should never be marked as NA, no matter what
+  if (x$checkName == "cdmTable") {
+    return(0)
+  }
+
+  # Special case: cdmField should only be NA if table is missing, otherwise never NA
+  if (x$checkName == "cdmField") {
+    if (x$tableIsMissing) {
+      return(1)
+    } else {
+      return(0)
+    }
+  }
+
+  # Not applicable if table or field is missing (for regular checks)
+  if (x$tableIsMissing || x$fieldIsMissing) {
+    return(1)
+  }
+
+  # Errors not related to a missing table or field should not be marked NA
+  if (x$isError == 1) {
+    return(0)
+  }
+
+  if (x$tableIsEmpty) {
+    return(1)
+  }
+
+  # No NA status for measureValueCompleteness if field is empty
+  if (x$checkName == "measureValueCompleteness") {
+    return(0)
+  }
+
+  if (any(x$fieldIsEmpty, x$conceptIsMissing, x$conceptAndUnitAreMissing, na.rm = TRUE)) {
+    return(1)
+  }
+
+  return(0)
+}
+
+#' Determines if check should be notApplicable and the notApplicableReason
+#'
+#' @param checkResults A dataframe containing the results of the data quality checks
+#'
+#' @return A dataframe with updated check results including notApplicable status and reasons
+#'
+#' @keywords internal
+.calculateNotApplicableStatus <- function(checkResults) {
+  # Look up missing tables and add variable tableIsMissing to checkResults
+  missingTables <- checkResults %>%
+    dplyr::filter(
+      .data$checkName == "cdmTable"
+    ) %>%
+    dplyr::mutate(
+      .data$cdmTableName,
+      tableIsMissing = .data$failed == 1,
+      .keep = "none"
+    )
+
+  # Look up missing fields and add variable fieldIsMissing to checkResults
+  missingFields <- checkResults %>%
+    dplyr::filter(
+      .data$checkName == "cdmField"
+    ) %>%
+    dplyr::mutate(
+      .data$cdmTableName,
+      .data$cdmFieldName,
+      fieldIsMissing = .data$failed == 1,
+      .keep = "none"
+    )
+
+  # Look up empty tables and add variable tableIsEmpty to checkResults
+  # One row per table: table is empty if any measureValueCompleteness check has numDenominatorRows == 0
+  emptyTables <- checkResults %>%
+    dplyr::filter(
+      .data$checkName == "measureValueCompleteness"
+    ) %>%
+    dplyr::mutate(
+      .data$cdmTableName,
+      tableIsEmpty = .data$numDenominatorRows == 0,
+      .keep = "none"
+    ) %>%
+    dplyr::distinct()
+
+  # Each table should appear at most once; duplicates indicate a deeper bug
+  duplicateMissing <- missingTables %>%
+    dplyr::count(.data$cdmTableName) %>%
+    dplyr::filter(.data$n > 1)
+  if (nrow(duplicateMissing) > 0) {
+    stop("Duplicate table names in missingTables indicates an issue with check execution - cdmTable ran more than once for the same table: ", paste(duplicateMissing$cdmTableName, collapse = ", "))
+  }
+  duplicateEmpty <- emptyTables %>%
+    dplyr::count(.data$cdmTableName) %>%
+    dplyr::filter(.data$n > 1)
+  if (nrow(duplicateEmpty) > 0) {
+    stop("Duplicate table names in emptyTables indicates an issue with check execution - measureValueCompleteness had different denominator counts for the same table: ", paste(duplicateEmpty$cdmTableName, collapse = ", "))
+  }
+
+  # Look up empty fields and add variable fieldIsEmpty to checkResults
+  emptyFields <- checkResults %>%
+    dplyr::filter(
+      .data$checkName == "measureValueCompleteness"
+    ) %>%
+    dplyr::mutate(
+      .data$cdmTableName,
+      .data$cdmFieldName,
+      fieldIsEmpty = .data$numDenominatorRows == .data$numViolatedRows,
+      .keep = "none"
+    )
+
+  # Assign notApplicable status
+  checkResults <- checkResults %>%
+    dplyr::left_join(
+      missingTables,
+      by = "cdmTableName"
+    ) %>%
+    dplyr::left_join(
+      missingFields,
+      by = c("cdmTableName", "cdmFieldName")
+    ) %>%
+    dplyr::left_join(
+      emptyTables,
+      by = "cdmTableName"
+    ) %>%
+    dplyr::left_join(
+      emptyFields,
+      by = c("cdmTableName", "cdmFieldName")
+    ) %>%
+    dplyr::mutate(
+      tableIsMissing = dplyr::coalesce(.data$tableIsMissing, FALSE),
+      tableIsEmpty = dplyr::coalesce(.data$tableIsEmpty, FALSE),
+      conceptIsMissing = dplyr::coalesce(.data$checkLevel == "CONCEPT" & is.na(.data$unitConceptId) & .data$numDenominatorRows == 0, FALSE),
+      conceptAndUnitAreMissing = dplyr::coalesce(.data$checkLevel == "CONCEPT" & !is.na(.data$unitConceptId) & .data$numDenominatorRows == 0, FALSE),
+      fieldIsMissing = dplyr::coalesce(.data$fieldIsMissing, FALSE),
+      fieldIsEmpty = dplyr::coalesce(.data$fieldIsEmpty, FALSE)
+    )
+
+  checkResults$notApplicable <- NA
+  checkResults$notApplicableReason <- NA
+
+  conditionOccurrenceIsMissing <- missingTables %>%
+    dplyr::filter(.data$cdmTableName == "CONDITION_OCCURRENCE") %>%
+    dplyr::mutate(conditionOccurrenceIsMissing = dplyr::coalesce(.data$tableIsMissing, FALSE)) %>%
+    dplyr::pull(.data$conditionOccurrenceIsMissing)
+
+  conditionOccurrenceIsEmpty <- emptyTables %>%
+    dplyr::filter(.data$cdmTableName == "CONDITION_OCCURRENCE") %>%
+    dplyr::mutate(conditionOccurrenceIsEmpty = dplyr::coalesce(.data$tableIsEmpty, FALSE)) %>%
+    dplyr::pull(.data$conditionOccurrenceIsEmpty)
+
+  for (i in seq_len(nrow(checkResults))) {
+    # Special rule for measureConditionEraCompleteness, which should be notApplicable if CONDITION_OCCURRENCE is empty
+    if (checkResults[i, "checkName"] == "measureConditionEraCompleteness") {
+      if (conditionOccurrenceIsMissing || conditionOccurrenceIsEmpty) {
+        checkResults$notApplicable[i] <- 1
+        checkResults$notApplicableReason[i] <- "Table CONDITION_OCCURRENCE is empty."
+      } else {
+        checkResults$notApplicable[i] <- 0
+      }
+    } else {
+      checkResults$notApplicable[i] <- .applyNotApplicable(checkResults[i, ])
+    }
+  }
+
+  checkResults <- checkResults %>%
+    dplyr::mutate(
+      notApplicableReason = ifelse(
+        .data$notApplicable == 1,
+        dplyr::case_when(
+          !is.na(.data$notApplicableReason) ~ .data$notApplicableReason,
+          .data$tableIsMissing ~ sprintf("Table %s does not exist.", .data$cdmTableName),
+          .data$fieldIsMissing ~ sprintf("Field %s.%s does not exist.", .data$cdmTableName, .data$cdmFieldName),
+          .data$tableIsEmpty ~ sprintf("Table %s is empty.", .data$cdmTableName),
+          .data$fieldIsEmpty ~ sprintf("Field %s.%s is not populated.", .data$cdmTableName, .data$cdmFieldName),
+          .data$conceptIsMissing ~ sprintf("%s=%s is missing from the %s table.", .data$cdmFieldName, .data$conceptId, .data$cdmTableName),
+          .data$conceptAndUnitAreMissing ~ sprintf("Combination of %s=%s, unitConceptId=%s and VALUE_AS_NUMBER IS NOT NULL is missing from the %s table.", .data$cdmFieldName, .data$conceptId, .data$unitConceptId, .data$cdmTableName) # nolint
+        ),
+        NA
+      ),
+      failed = ifelse(.data$notApplicable == 1, 0, .data$failed),
+      passed = ifelse(.data$failed == 0 & .data$isError == 0 & .data$notApplicable == 0, 1, 0)
+    ) %>%
+    dplyr::select(-c("tableIsMissing", "fieldIsMissing", "tableIsEmpty", "fieldIsEmpty", "conceptIsMissing", "conceptAndUnitAreMissing"))
+
+  return(checkResults)
+}
