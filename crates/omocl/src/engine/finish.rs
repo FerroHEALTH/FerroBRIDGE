@@ -654,16 +654,19 @@ fn check_domain(
     let chosen = projection.chosen;
     let declared = omop_cdm::meta::table(projection.target.table())
         .and_then(|table| table.column(column.column))
-        .and_then(|meta| meta.fk_domain);
+        .map_or(&[][..], |meta| meta.fk_domain);
     let primary = (PRIMARY_KEYS.contains(&chosen.projection.key) && column.part == Part::Concept)
         .then(|| target_domain(projection.target))
         .flatten();
-    let Some(expected) = declared.or(primary) else {
-        return Ok(());
+    let expected: Vec<&str> = if declared.is_empty() {
+        primary.into_iter().collect()
+    } else {
+        declared.to_vec()
     };
-    if concept.domain_id.as_str() == expected {
+    if expected.is_empty() || expected.contains(&concept.domain_id.as_str()) {
         return Ok(());
     }
+    let expected = expected.join("` or `");
     Err(Refused::new(
         RefusalKind::DomainMismatch,
         Some(chosen.projection.key),

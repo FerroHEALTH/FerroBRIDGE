@@ -112,11 +112,14 @@ fn a_concept_column_names_the_domain_of_its_definition() -> Result<(), Box<dyn E
     let status = table
         .column("condition_status_concept_id")
         .ok_or("no condition_status_concept_id column")?;
-    assert_eq!(Some("Condition Status"), status.fk_domain);
+    assert_eq!(["Condition Status"], status.fk_domain);
     let source = table
         .column("condition_source_concept_id")
         .ok_or("no condition_source_concept_id column")?;
-    assert_eq!(None, source.fk_domain, "the definitions write `NA` here");
+    assert!(
+        source.fk_domain.is_empty(),
+        "the definitions write `NA` here"
+    );
     Ok(())
 }
 

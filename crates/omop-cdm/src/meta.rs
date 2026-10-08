@@ -57,11 +57,14 @@ pub struct ColumnMeta {
     /// The table and the column a foreign key references, in that order,
     /// both spelled as [`TableMeta::name`] and [`ColumnMeta::name`] are.
     pub foreign_key: Option<(&'static str, &'static str)>,
-    /// The vocabulary domain the definitions name for a concept column
-    /// (`fkDomain`), for example `Measurement` for `measurement_concept_id`.
+    /// The vocabulary domains the definitions name for a concept column
+    /// (`fkDomain`), for example `["Measurement"]` for
+    /// `measurement_concept_id`.
     ///
-    /// A column whose definition writes `NA` carries `None`.
-    pub fk_domain: Option<&'static str>,
+    /// A concept of the column belongs to any one of them:
+    /// `episode.episode_object_concept_id` names two, `Procedure` and
+    /// `Regimen`. A column whose definition writes `NA` carries none.
+    pub fk_domain: &'static [&'static str],
     /// The concept class the definitions name for a concept column
     /// (`fkClass`), for example `Ingredient` for `drug_era.drug_concept_id`.
     ///

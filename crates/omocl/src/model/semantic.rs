@@ -146,7 +146,7 @@ fn claimed_twice(
 /// writes a concept column: the literal must be a concept of the vocabulary,
 /// and when the CDM field definitions name a domain for that column
 /// (`fkDomain`, carried as `omop_cdm::meta::ColumnMeta::fk_domain`) its
-/// domain must be that one. The CDM routes a record by the domain of its
+/// domain must be one of them. The CDM routes a record by the domain of its
 /// standard concept ("Write the data record into the table(s) corresponding
 /// to the domain of the Standard `CONCEPT_ID`(s)",
 /// <https://ohdsi.github.io/CommonDataModel/dataModelConventions.html>).
@@ -189,7 +189,7 @@ fn check_record(
         };
         let expected = table
             .and_then(|table| table.column(concept_column.column))
-            .and_then(|meta| meta.fk_domain);
+            .map_or(&[][..], |meta| meta.fk_domain);
         let column_path = path.field(column.key()).field("alternatives");
         for (position, literal, literal_path) in literals(&column.alternatives, &column_path) {
             if literal == ConceptId::NO_MATCHING_CONCEPT {
@@ -205,9 +205,8 @@ fn check_record(
                 ));
                 continue;
             };
-            if let Some(expected) = expected
-                && domain.as_str() != expected
-            {
+            if !expected.is_empty() && !expected.contains(&domain.as_str()) {
+                let expected = expected.join("` or `");
                 diagnostics.push(error(
                     file,
                     ModelCode::DomainMismatch,

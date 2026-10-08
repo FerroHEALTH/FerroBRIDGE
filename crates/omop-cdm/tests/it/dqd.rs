@@ -90,7 +90,8 @@ fn definitions() -> BTreeMap<(String, String), Facts> {
                         foreign_key: column
                             .foreign_key
                             .map(|(table, field)| (table.to_owned(), field.to_owned())),
-                        fk_domain: column.fk_domain.map(str::to_owned),
+                        fk_domain: Some(column.fk_domain.join(", "))
+                            .filter(|domains| !domains.is_empty()),
                         fk_class: column.fk_class.map(str::to_owned),
                     },
                 )
