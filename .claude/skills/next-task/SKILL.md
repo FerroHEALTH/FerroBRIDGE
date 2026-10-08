@@ -18,24 +18,31 @@ that is a separate step the caller takes after seeing the plan.
 
 1. **Read the tracker**: `gh issue list --state open` (the SessionStart dump
    annotates each issue with `{k/n}` sub-issue progress, `child-of #parent`,
-   and open `BLOCKED-by`/`blocks` edges). Take the pinned issue (current focus)
-   or the issue the user named. **Respect relationships**
+   and open `BLOCKED-by`/`blocks` edges, and prints `<Type/Priority>` after
+   each title). Take the pinned issue (current focus) or the issue the user
+   named; otherwise take the open, unblocked issue with the highest `Priority`
+   field (`Urgent`, then `High`, `Medium`, `Low`), the oldest first within a
+   priority. **Respect relationships**
    (`.claude/rules/issue-relationships.md`): do NOT pick an issue shown
    `BLOCKED-by` an open issue (surface its blocker as the real next task
    instead); for a parent issue, point at its next open child rather than the
-   parent itself. Then `gh issue view <n> --comments` for the full contract
-   (the opening summary plus `## Acceptance criteria`) and the running
-   discussion, and `scripts/gh/rel.sh tree <n>` for its parent, children, and
-   blockers.
+   parent itself. An issue shown `<?/?>` has no type or priority yet (a
+   scheduled lane filed it): set the type, the priority, the effort and the
+   milestone with `scripts/gh/fields.sh` before planning it. Then
+   `gh issue view <n> --json title,body,comments --jq '.title, .body,
+   (.comments[] | "--- comment ---", .body)'` for the full contract (the
+   opening summary plus `## Acceptance criteria`) and the running discussion
+   (`--comments` prints nothing for an issue without comments,
+   `issue-workflow.md` §The loop), and `scripts/gh/rel.sh tree <n>` for its
+   parent, children, and blockers.
 2. **Turn the task into a plan**, stating:
    - **What** the task requires, in one or two sentences.
-   - **Which sources or files** are involved. The project is in its design
-     phase, so most issues are research: name the specification sections and
-     the prior-art repositories to read, not files that do not exist. Once code
-     exists, find the files by searching rather than guessing paths.
+   - **Which sources or files** are involved: the specification sections that
+     govern the work, and the files, found by searching rather than guessing
+     paths.
    - **Which mechanism** applies. A **research** issue produces cited evidence
-     and a recommendation on the issue thread, and it may produce
-     `docs/architecture.md` when issue #1 closes. An **implementation** issue
+     and a recommendation on the issue thread, and records a settled decision
+     in `docs/architecture.md`. An **implementation** issue
      on a generated layer changes the generator and regenerates, never a
      `// @generated` file (`.claude/rules/codegen.md`); an implementation issue
      on the engine is idiomatic Rust of our own design, built as compiling,

@@ -34,6 +34,9 @@ the committed guards, so both are live code from day one and both need a gate.
 | `comment-style` | `scripts/checks/comment-style.sh --all` |
 | `versions` | `scripts/checks/versions.sh` |
 | `favicon-sync` | `scripts/checks/favicon-sync.sh` |
+| `file-length` | `scripts/checks/file-length.sh`: a hand-written Rust file stays at most 1000 lines |
+| `contribution-licence` | `scripts/checks/contribution-licence.sh` on a pull request: the licensing checkbox of the body is ticked |
+| `tracker-helpers` | the `--self-test` of `scripts/gh/fields.sh`, `labels.sh` and `migrate-fields.sh`, each driven against a stub `gh` on `PATH` |
 
 `hadolint` runs against a real recipe since #22: `docker/Dockerfile`, the one
 tracked Dockerfile, whose digest-pinned `FROM` the `versions` job checks
@@ -245,8 +248,11 @@ digest.
 project, which is the tag the image and the installer both carry. The workflow
 runs it every Monday and on dispatch. When a pin is behind it opens one issue
 carrying the report, and when an open issue already carries that report it adds
-nothing. A pin it could not read fails the job, so a network failure never
-reads as a fresh pin.
+nothing. The issue goes through `scripts/gh/fields.sh new` as a Task at Low
+priority and Low effort. The job's default token may not read the
+organisation's issue types; then the issue lands with its `ci` label alone,
+and whoever picks it up sets the type, the priority and the effort. A pin it
+could not read fails the job, so a network failure never reads as a fresh pin.
 
 It opens an issue rather than failing red. A weekly red job on a lint version
 teaches a maintainer to ignore red jobs, which is the habit #41 identified as
@@ -354,7 +360,7 @@ crate (the YAML mapping loader and the openEHR mapping-path parser of
 target by default. It is a time-boxed search rather than a pass-or-fail check,
 so it is never a pull-request gate and never a `conclusion` input. A panic, an
 abort or a hang is a defect: the run fails and uploads the reproducing input as
-an artifact for 90 days, and the finding becomes a `bug` issue with the input
+an artifact for 90 days, and the finding becomes a `Bug` issue with the input
 attached. An `Err` from the parser is the correct answer and is never a
 finding. The lane is the one job on a nightly toolchain, through the
 `toolchain` input of the `setup-rust` composite, because cargo-fuzz needs

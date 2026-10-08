@@ -29,8 +29,8 @@ Your sources of truth, in order:
 
 1. **Vendored, pinned artifacts**, when they exist: a JSON schema, a FHIR
    package's `StructureDefinition` or `OperationDefinition`, a pinned
-   specification text under `docs/specs/`. Grep the tree first; today it is
-   empty of these, and saying so is a correct answer.
+   specification text under `docs/specs/`. Grep the tree first; where the
+   artifact you need is not vendored, saying so is a correct answer.
 2. **The published specifications**, fetched from their official URLs and
    cited:
    - FHIRconnect v1.0.0:
@@ -76,6 +76,8 @@ Anything you notice that is wrong, misplaced, or suspicious OUTSIDE your
 assigned scope (a stale claim in a document, a specification contradiction, a
 claim in this repository that the sources do not support, a missing test) goes
 in your final report under an explicit "En-route findings" heading, each with a
-location and one sentence of evidence, so the orchestrator files a tracker
-issue for it. "Not in my task list" is never a reason to stay silent. Do not
-fix an out-of-scope finding yourself; report it.
+location and one sentence of evidence and the type (Bug, Feature or Task) and
+priority you would give it, so the orchestrator files a tracker issue for it
+with `scripts/gh/fields.sh new`. You file no issue yourself. "Not in my task
+list" is never a reason to stay silent. Do not fix an out-of-scope finding
+yourself; report it.
