@@ -2098,7 +2098,9 @@ impl super::super::codec::Json for TestScriptMetadataCapability {
         }
         if !self.origin.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.origin)?;
-            object.insert(std::string::String::from("origin"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("origin"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_origin"), elements);
             }
@@ -2113,7 +2115,9 @@ impl super::super::codec::Json for TestScriptMetadataCapability {
         }
         if !self.link.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.link)?;
-            object.insert(std::string::String::from("link"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("link"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_link"), elements);
             }

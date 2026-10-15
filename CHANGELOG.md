@@ -228,6 +228,15 @@ crates on crates.io.
 
 ### Fixed
 
+- `fhir-types` 0.1.110 writes a repeating primitive whose every position
+  carries only an `id` or an `extension` as the `_name` array alone, in every
+  version, where it wrote a value array of nulls beside it (`"event": [null]`);
+  FHIR JSON renders only the `_` property for a primitive with no value
+  (<https://hl7.org/fhir/R4/json.html#primitive>). `primitive_arrays` returns
+  the value array as an `Option`. The examples that carry the shape now
+  round-trip: eight in STU3 and nine in each of R4, R4B, R5 and R6, among them
+  the ActivityDefinitions with a `timingTiming` that holds only `_event`
+  (#486).
 - The R4 profile validator resolves a canonical that two versions of one
   package carry at one resource version to the higher package version, where
   it refused it as ambiguous; two different packages carrying one canonical

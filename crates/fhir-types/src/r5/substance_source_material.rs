@@ -261,7 +261,9 @@ impl super::super::codec::Json for SubstanceSourceMaterial {
         if !self.parent_substance_name.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.parent_substance_name)?;
-            object.insert(std::string::String::from("parentSubstanceName"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("parentSubstanceName"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_parentSubstanceName"), elements);
             }
@@ -281,7 +283,9 @@ impl super::super::codec::Json for SubstanceSourceMaterial {
         if !self.geographical_location.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.geographical_location)?;
-            object.insert(std::string::String::from("geographicalLocation"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("geographicalLocation"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_geographicalLocation"), elements);
             }

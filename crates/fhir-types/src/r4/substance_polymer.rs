@@ -185,7 +185,9 @@ impl super::super::codec::Json for SubstancePolymer {
         }
         if !self.modification.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.modification)?;
-            object.insert(std::string::String::from("modification"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("modification"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_modification"), elements);
             }

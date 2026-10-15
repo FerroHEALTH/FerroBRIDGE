@@ -78,7 +78,9 @@ impl super::super::codec::Json for VirtualServiceDetail {
         }
         if !self.additional_info.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.additional_info)?;
-            object.insert(std::string::String::from("additionalInfo"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("additionalInfo"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_additionalInfo"), elements);
             }

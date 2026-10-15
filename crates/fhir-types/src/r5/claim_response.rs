@@ -1635,14 +1635,18 @@ impl super::super::codec::Json for ClaimResponseAddItem {
         }
         if !self.item_sequence.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.item_sequence)?;
-            object.insert(std::string::String::from("itemSequence"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("itemSequence"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_itemSequence"), elements);
             }
         }
         if !self.detail_sequence.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.detail_sequence)?;
-            object.insert(std::string::String::from("detailSequence"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("detailSequence"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_detailSequence"), elements);
             }
@@ -1650,7 +1654,9 @@ impl super::super::codec::Json for ClaimResponseAddItem {
         if !self.subdetail_sequence.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.subdetail_sequence)?;
-            object.insert(std::string::String::from("subdetailSequence"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("subdetailSequence"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_subdetailSequence"), elements);
             }
@@ -1797,7 +1803,9 @@ impl super::super::codec::Json for ClaimResponseAddItem {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -2980,7 +2988,9 @@ impl super::super::codec::Json for ClaimResponseAddItemDetail {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -3640,7 +3650,9 @@ impl super::super::codec::Json for ClaimResponseAddItemDetailSubDetail {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -4386,7 +4398,9 @@ impl super::super::codec::Json for ClaimResponseError {
         );
         if !self.expression.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.expression)?;
-            object.insert(std::string::String::from("expression"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("expression"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_expression"), elements);
             }
@@ -5377,7 +5391,9 @@ impl super::super::codec::Json for ClaimResponseItem {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -6072,7 +6088,9 @@ impl super::super::codec::Json for ClaimResponseItemDetail {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -6458,7 +6476,9 @@ impl super::super::codec::Json for ClaimResponseItemDetailSubDetail {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }

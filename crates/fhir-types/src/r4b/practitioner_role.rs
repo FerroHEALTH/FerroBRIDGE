@@ -975,7 +975,9 @@ impl super::super::codec::Json for PractitionerRoleAvailableTime {
         }
         if !self.days_of_week.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.days_of_week)?;
-            object.insert(std::string::String::from("daysOfWeek"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("daysOfWeek"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_daysOfWeek"), elements);
             }

@@ -468,7 +468,9 @@ impl super::super::codec::Json for ResearchDefinition {
         }
         if !self.comment.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.comment)?;
-            object.insert(std::string::String::from("comment"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("comment"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_comment"), elements);
             }
@@ -617,7 +619,9 @@ impl super::super::codec::Json for ResearchDefinition {
         }
         if !self.library.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.library)?;
-            object.insert(std::string::String::from("library"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("library"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_library"), elements);
             }

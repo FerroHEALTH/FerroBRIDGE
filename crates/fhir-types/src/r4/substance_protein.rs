@@ -195,7 +195,9 @@ impl super::super::codec::Json for SubstanceProtein {
         if !self.disulfide_linkage.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.disulfide_linkage)?;
-            object.insert(std::string::String::from("disulfideLinkage"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("disulfideLinkage"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_disulfideLinkage"), elements);
             }

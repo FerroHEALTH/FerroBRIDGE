@@ -1560,7 +1560,9 @@ impl super::super::codec::Json for PaymentReconciliationAllocation {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }

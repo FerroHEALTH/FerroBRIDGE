@@ -205,7 +205,9 @@ impl super::super::codec::Json for VerificationResult {
         }
         if !self.target_location.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.target_location)?;
-            object.insert(std::string::String::from("targetLocation"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("targetLocation"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_targetLocation"), elements);
             }

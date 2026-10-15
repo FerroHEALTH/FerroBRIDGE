@@ -128,10 +128,12 @@ fn render_field_to_json(model: &VersionModule, out: &mut String, field: &Field) 
                 out,
                 "            let (values, elements) = {C}::primitive_arrays(&{access})?;"
             )?;
+            writeln!(out, "            if let Some(values) = values {{")?;
             writeln!(
                 out,
-                "            object.insert(std::string::String::from({key:?}), values);"
+                "                object.insert(std::string::String::from({key:?}), values);"
             )?;
+            writeln!(out, "            }}")?;
             writeln!(out, "            if let Some(elements) = elements {{")?;
             writeln!(
                 out,

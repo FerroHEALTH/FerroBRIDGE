@@ -355,7 +355,9 @@ impl super::super::codec::Json for Questionnaire {
         }
         if !self.derived_from.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.derived_from)?;
-            object.insert(std::string::String::from("derivedFrom"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("derivedFrom"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_derivedFrom"), elements);
             }
@@ -376,7 +378,9 @@ impl super::super::codec::Json for Questionnaire {
         }
         if !self.subject_type.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.subject_type)?;
-            object.insert(std::string::String::from("subjectType"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("subjectType"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_subjectType"), elements);
             }
@@ -1437,7 +1441,9 @@ impl super::super::codec::Json for QuestionnaireItem {
         }
         if !self.definition.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.definition)?;
-            object.insert(std::string::String::from("definition"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("definition"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_definition"), elements);
             }
