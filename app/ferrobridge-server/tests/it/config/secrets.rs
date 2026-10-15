@@ -21,7 +21,9 @@ fn a_secret_file_sibling_is_read_at_boot() -> Result<(), Box<dyn StdError>> {
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let cdr = settings.cdr.as_ref().ok_or("the CDR lane is on")?;
     match cdr.credentials.as_ref() {
-        Some(openehr_its::rest::client::Credentials::Bearer(token)) => {
+        Some(ferrobridge_server::cdr::config::CdrCredentials::Static(
+            openehr_its::rest::client::Credentials::Bearer(token),
+        )) => {
             assert_eq!(
                 "synthetic-token",
                 token.expose_secret(),
@@ -153,7 +155,9 @@ fn a_user_file_sibling_is_read_at_boot() -> Result<(), Box<dyn StdError>> {
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let cdr = settings.cdr.as_ref().ok_or("the CDR lane is on")?;
     match cdr.credentials.as_ref() {
-        Some(openehr_its::rest::client::Credentials::Basic { user, .. }) => {
+        Some(ferrobridge_server::cdr::config::CdrCredentials::Static(
+            openehr_its::rest::client::Credentials::Basic { user, .. },
+        )) => {
             assert_eq!(
                 "12345", user,
                 "the trailing newline is not part of the user"

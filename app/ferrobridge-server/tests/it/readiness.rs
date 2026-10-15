@@ -108,6 +108,55 @@ async fn a_cdr_that_refuses_the_credentials_makes_readiness_five_hundred_and_thr
 }
 
 #[tokio::test]
+async fn a_cdr_token_that_cannot_be_obtained_makes_readiness_five_hundred_and_three()
+-> Result<(), Box<dyn StdError>> {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/oauth/token"))
+        .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+            "error": "invalid_client",
+            "error_description": "unknown client",
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path(PROBE_PATH))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+        .expect(0)
+        .mount(&server)
+        .await;
+
+    let base = server.uri();
+    let text = format!(
+        concat!(
+            "[cdr]\nbase_url = \"{base}/v1\"\ntimeout_ms = 2000\n\n",
+            "[cdr.credentials.oauth]\ntoken_endpoint = \"{base}/oauth/token\"\n",
+            "client_id = \"ferrobridge\"\nclient_secret = \"synthetic-secret\"\n",
+        ),
+        base = base
+    );
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let state = Arc::new(AppState::build(&settings).await?);
+    let app = ferrobridge_server::router(state, &support::settings());
+
+    let (status, document) = readiness(app).await?;
+    assert_eq!(StatusCode::SERVICE_UNAVAILABLE, status);
+    assert_eq!(
+        Some("down"),
+        document["indicators"]["cdr"]["state"].as_str()
+    );
+    let detail = document["indicators"]["cdr"]["detail"]
+        .as_str()
+        .unwrap_or_default();
+    assert!(
+        detail.contains("401") && detail.contains("invalid_client"),
+        "the detail names the token endpoint's status and OAuth error: {document}"
+    );
+    assert!(!detail.contains("synthetic-secret"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_cdr_that_never_answers_makes_readiness_five_hundred_and_three()
 -> Result<(), Box<dyn StdError>> {
     // Port 1 is reserved and unbindable, so the connection is refused at once.

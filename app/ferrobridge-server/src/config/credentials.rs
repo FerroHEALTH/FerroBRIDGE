@@ -6,10 +6,92 @@
 
 use secrecy::{ExposeSecret, SecretString};
 use std::path::Path;
+use std::time::Duration;
 
 use super::Error;
+use super::resolve::url_of;
 use super::section::Cdm;
 use super::section::Credentials;
+use super::section::OAuthClient;
+use crate::cdr::oauth::Endpoint;
+use crate::cdr::oauth::OAuthConfig;
+
+/// Returns the client credentials grant the OAuth section `section` holds.
+pub(super) fn resolve_oauth(section: &str, oauth: &OAuthClient) -> Result<OAuthConfig, Error> {
+    let endpoint = match (oauth.issuer.as_deref(), oauth.token_endpoint.as_deref()) {
+        (Some(_), Some(_)) => {
+            return Err(Error::OAuthEndpoint {
+                section: section.to_owned(),
+            });
+        }
+        (None, None) => {
+            return Err(Error::Missing {
+                key: format!("{section}.token_endpoint"),
+            });
+        }
+        (Some(issuer), None) => {
+            let key = format!("{section}.issuer");
+            let url = url_of(&key, issuer)?;
+            if url.scheme() != "https" || url.query().is_some() || url.fragment().is_some() {
+                return Err(Error::Issuer { key });
+            }
+            Endpoint::Issuer(issuer.to_owned())
+        }
+        (None, Some(token_endpoint)) => Endpoint::Token(url_of(
+            &format!("{section}.token_endpoint"),
+            token_endpoint,
+        )?),
+    };
+    if oauth.client_id.is_empty() {
+        return Err(Error::Missing {
+            key: format!("{section}.client_id"),
+        });
+    }
+    let secret_key = format!("{section}.client_secret");
+    let client_secret = secret(
+        &secret_key,
+        oauth.client_secret.as_deref(),
+        oauth.client_secret_file.as_deref(),
+    )?
+    .ok_or(Error::Missing { key: secret_key })?;
+    if let Some(scope) = oauth.scope.as_deref()
+        && !is_scope(scope)
+    {
+        return Err(Error::Scope {
+            key: format!("{section}.scope"),
+        });
+    }
+    let resource = oauth
+        .resource
+        .as_deref()
+        .map(|resource| {
+            let key = format!("{section}.resource");
+            let url = url_of(&key, resource)?;
+            if url.fragment().is_some() {
+                return Err(Error::Resource { key });
+            }
+            Ok(url)
+        })
+        .transpose()?;
+    let mut config = OAuthConfig::new(endpoint, oauth.client_id.clone(), client_secret);
+    config.client_auth = oauth.client_auth;
+    config.scope.clone_from(&oauth.scope);
+    config.audience.clone_from(&oauth.audience);
+    config.resource = resource;
+    config.refresh_margin = Duration::from_millis(oauth.refresh_margin_ms);
+    Ok(config)
+}
+
+/// Returns whether `scope` is the `scope` of RFC 6749 §3.3: scope tokens of
+/// `%x21 / %x23-5B / %x5D-7E`, each separated by one space.
+fn is_scope(scope: &str) -> bool {
+    scope.split(' ').all(|token| {
+        !token.is_empty()
+            && token
+                .bytes()
+                .all(|byte| matches!(byte, 0x21 | 0x23..=0x5B | 0x5D..=0x7E))
+    })
+}
 
 /// The authentication scheme a credentials section resolves to.
 pub(super) enum Scheme {

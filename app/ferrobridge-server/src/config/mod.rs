@@ -193,6 +193,37 @@ pub enum Error {
         /// The credentials section.
         section: String,
     },
+    /// A credentials section names the OAuth grant beside a static scheme.
+    #[error("{section} names the oauth grant beside a bearer token or a user; set one scheme")]
+    OAuthScheme {
+        /// The credentials section.
+        section: String,
+    },
+    /// An OAuth section names both an issuer and a token endpoint.
+    #[error("{section} names both an issuer and a token_endpoint; set one of them")]
+    OAuthEndpoint {
+        /// The OAuth section.
+        section: String,
+    },
+    /// An issuer is not an `https` URL free of a query and a fragment, the
+    /// form RFC 8414 §2 gives an issuer identifier.
+    #[error("{key} is not an https URL without a query or a fragment (RFC 8414 §2)")]
+    Issuer {
+        /// The key that holds it.
+        key: String,
+    },
+    /// A resource indicator carries a fragment, which RFC 8707 §2 forbids.
+    #[error("{key} carries a fragment, which a resource indicator may not (RFC 8707 §2)")]
+    Resource {
+        /// The key that holds it.
+        key: String,
+    },
+    /// A scope is not a space-delimited list of scope tokens (RFC 6749 §3.3).
+    #[error("{key} is not a space-delimited list of scope tokens (RFC 6749 §3.3)")]
+    Scope {
+        /// The key that holds it.
+        key: String,
+    },
     /// An upstream client refused the configuration it was handed.
     #[error("the {upstream} client refused its configuration")]
     Client {
