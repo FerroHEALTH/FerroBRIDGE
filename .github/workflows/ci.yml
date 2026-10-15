@@ -753,6 +753,10 @@ jobs:
     if: needs.detect.outputs.cargo == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # fhir-types (five versions) and hl7v2-types each fill most of the runner's
+    # memory in release; one job builds them one after the other (#505).
+    env:
+      CARGO_BUILD_JOBS: "1"
     permissions:
       contents: read
     steps:
