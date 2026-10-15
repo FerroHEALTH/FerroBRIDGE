@@ -37,6 +37,9 @@ use openehr_its::rest::client::Credentials;
 use openehr_its::rest::client::ReqwestTransport;
 use openehr_its::rest::client::RetryPolicy;
 use openehr_its::rest::generated::common::Identifier;
+use openehr_its::rest::generated::definition::DefinitionTemplateAdl14ListParams;
+use openehr_its::rest::generated::definition::client::DefinitionClient;
+use openehr_its::rest::generated::definition::client::DefinitionTemplateAdl14ListOutcome;
 use openehr_its::rest::runtime::Representation;
 
 use crate::cdr::config::CdrConfig;
@@ -58,6 +61,10 @@ const REQUEST_ID: &str = "x-request-id";
 
 /// The `Prefer` request header name.
 const PREFER: &str = "prefer";
+
+/// The template id the readiness probe filters the template list on; no CDR
+/// holds it, so the answer stays an empty list.
+const PROBE_TEMPLATE: &str = "ferrobridge-readiness-probe";
 
 /// What the caller wants back from a state-changing call.
 ///
@@ -218,29 +225,44 @@ impl CdrClient {
         self.scoped(headers, self.client.retry())
     }
 
-    /// Returns the status the service answers a `GET` on its base URL with.
+    /// Returns the status the service answers an authenticated probe with.
     ///
-    /// The call is sent once, with the configured credentials and timeout, and
-    /// every status the service produces is returned as it stands, `401` and
-    /// `5xx` included: the question is whether the service answered, and a
-    /// caller reading reachability decides what each status means.
+    /// The probe is the ADL 1.4 template list (ITS-REST 1.1.0 Definition API,
+    /// `definition_template_adl1.4_list`), filtered on a template id no CDR
+    /// holds, so the answer is an empty list. It is sent once, with the
+    /// configured credentials and timeout, so a refused credential answers
+    /// `401` or `403`. Every status is returned as it stands, and a caller
+    /// reading reachability decides what each one means.
     ///
     /// # Errors
     /// Returns [`CdrError::Client`] when the request never reached the
-    /// service, the configured timeout included.
+    /// service, the configured timeout included, or the answer was not the
+    /// documented template list.
     pub async fn reachability(&self) -> Result<StatusCode, CdrError> {
         let once = RetryPolicy {
             max_attempts: 1,
             ..self.client.retry()
         };
         let client = self.scoped(HeaderMap::new(), once)?;
-        let request = openehr_its::rest::client::Request::new(http::Method::GET, String::new());
-        let answered = client.execute(request).await;
+        let params = DefinitionTemplateAdl14ListParams {
+            accept: None,
+            template_id: Some(String::from(PROBE_TEMPLATE)),
+            concept: None,
+            version: None,
+            offset: None,
+            fetch: None,
+        };
+        let answered = DefinitionClient::new(&client)
+            .definition_template_adl1_4_list(&params)
+            .await;
         let status = match answered {
-            Ok(answer) => answer.status(),
+            Ok(DefinitionTemplateAdl14ListOutcome::Ok { .. }) => StatusCode::OK,
             Err(ClientError::Unauthorized { .. }) => StatusCode::UNAUTHORIZED,
             Err(ClientError::Forbidden { .. }) => StatusCode::FORBIDDEN,
-            Err(ClientError::ServiceFailure { status, .. }) => status,
+            Err(
+                ClientError::ServiceFailure { status, .. }
+                | ClientError::UndocumentedStatus { status, .. },
+            ) => status,
             Err(source) => return Err(CdrError::client(source, None)),
         };
         tracing::debug!(status = %status, "the openEHR service answered a probe");

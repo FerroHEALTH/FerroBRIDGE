@@ -16,6 +16,9 @@ use tower::ServiceExt as _;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+/// The ADL 1.4 template list the CDR probe reads (ITS-REST 1.1.0 Definition API).
+const PROBE_PATH: &str = "/v1/definition/template/adl1.4";
+
 /// Returns the router of a deployment whose CDR is `base`.
 async fn router(base: &str) -> Result<Router, Box<dyn StdError>> {
     let text = format!("[cdr]\nbase_url = \"{base}/v1\"\ntimeout_ms = 2000\n");
@@ -38,8 +41,8 @@ async fn readiness(app: Router) -> Result<(StatusCode, serde_json::Value), Box<d
 async fn a_cdr_that_answers_makes_readiness_two_hundred() -> Result<(), Box<dyn StdError>> {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
-        .and(path("/v1"))
-        .respond_with(ResponseTemplate::new(200))
+        .and(path(PROBE_PATH))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
         .mount(&server)
         .await;
 
@@ -55,7 +58,7 @@ async fn a_cdr_that_answers_five_hundred_and_three_makes_readiness_five_hundred_
 -> Result<(), Box<dyn StdError>> {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
-        .and(path("/v1"))
+        .and(path(PROBE_PATH))
         .respond_with(ResponseTemplate::new(503))
         .mount(&server)
         .await;
@@ -77,18 +80,30 @@ async fn a_cdr_that_answers_five_hundred_and_three_makes_readiness_five_hundred_
 }
 
 #[tokio::test]
-async fn a_cdr_that_refuses_the_credentials_still_counts_as_reachable()
+async fn a_cdr_that_refuses_the_credentials_makes_readiness_five_hundred_and_three()
 -> Result<(), Box<dyn StdError>> {
-    let server = MockServer::start().await;
-    Mock::given(method("GET"))
-        .and(path("/v1"))
-        .respond_with(ResponseTemplate::new(401))
-        .mount(&server)
-        .await;
+    for refused in [StatusCode::UNAUTHORIZED, StatusCode::FORBIDDEN] {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path(PROBE_PATH))
+            .respond_with(ResponseTemplate::new(refused.as_u16()))
+            .mount(&server)
+            .await;
 
-    let (status, document) = readiness(router(&server.uri()).await?).await?;
-    assert_eq!(StatusCode::OK, status, "a 401 means the service is there");
-    assert_eq!(Some("up"), document["indicators"]["cdr"]["state"].as_str());
+        let (status, document) = readiness(router(&server.uri()).await?).await?;
+        assert_eq!(StatusCode::SERVICE_UNAVAILABLE, status, "{refused}");
+        assert_eq!(
+            Some("down"),
+            document["indicators"]["cdr"]["state"].as_str(),
+            "{refused}"
+        );
+        assert!(
+            document["indicators"]["cdr"]["detail"]
+                .as_str()
+                .is_some_and(|detail| detail.contains("credentials")),
+            "the detail says the credentials were refused: {document}"
+        );
+    }
     Ok(())
 }
 

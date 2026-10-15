@@ -3,10 +3,11 @@
 
 //! The indicators readiness runs: one per configured upstream.
 //!
-//! Each probe asks its upstream whether it answers at all. A status counts as
-//! reachable, `401` and `404` included, because the question is whether the
-//! service is there; a `5xx` and a failure to connect count as down. No
-//! specification governs the probe: our own design.
+//! Each probe calls its upstream with the configured credentials. A refused
+//! credential (`401` or `403`) counts as down, because every real call would
+//! be refused the same way; a `5xx` and a failure to connect count as down;
+//! any other status means the service answered. No specification governs the
+//! probe: our own design.
 
 use http::StatusCode;
 
@@ -159,6 +160,11 @@ fn reason(error: impl std::error::Error) -> String {
 fn classify(outcome: Result<StatusCode, String>) -> IndicatorState {
     match outcome {
         Err(detail) => IndicatorState::down(detail),
+        Ok(status) if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN => {
+            IndicatorState::down(format!(
+                "the upstream refused the configured credentials with {status}"
+            ))
+        }
         Ok(status) if status.is_server_error() => {
             IndicatorState::down(format!("the upstream answered {status}"))
         }
@@ -176,7 +182,7 @@ mod tests {
     fn a_2xx_and_a_4xx_are_up_and_a_5xx_is_down() {
         for reachable in [
             StatusCode::OK,
-            StatusCode::UNAUTHORIZED,
+            StatusCode::BAD_REQUEST,
             StatusCode::NOT_FOUND,
         ] {
             assert_eq!(State::Up, classify(Ok(reachable)).state, "{reachable}");
@@ -189,6 +195,22 @@ mod tests {
                 State::Down,
                 classify(Ok(unreachable)).state,
                 "{unreachable}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_refused_credential_is_down_and_names_the_status() {
+        for refused in [StatusCode::UNAUTHORIZED, StatusCode::FORBIDDEN] {
+            let outcome = classify(Ok(refused));
+            assert_eq!(State::Down, outcome.state, "{refused}");
+            assert!(
+                outcome
+                    .detail
+                    .as_deref()
+                    .is_some_and(|detail| detail.contains(refused.as_str())),
+                "the detail names {refused}: {:?}",
+                outcome.detail
             );
         }
     }
