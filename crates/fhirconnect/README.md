@@ -10,7 +10,7 @@ openEHR and two interoperability targets: HL7 FHIR through the FHIRconnect
 specification, and the OMOP Common Data Model through the OMOCL specification.
 
 The crate is on FerroBRIDGE's crate line, the version line `fhir-types`
-carries, and builds on the `openehr-*` 0.0.84 crates. Take the same
+carries, and builds on the `openehr-*` 0.0.86 crates. Take the same
 `openehr-*` release in your own manifest: Cargo treats every `0.0.x` release
 as incompatible with the next, so a different one gives you a second copy of
 the openEHR types this crate takes and returns.

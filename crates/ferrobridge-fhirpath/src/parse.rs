@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The parser of the N1 grammar (<https://hl7.org/fhirpath/N1/grammar.html>)
-//! over the tokens of the private `lex` module, with the operator precedence
+//! The parser of the N1 grammar.
+//!
+//! It reads the tokens of the private `lex` module by the grammar of
+//! <https://hl7.org/fhirpath/N1/grammar.html>, with the operator precedence
 //! of N1 §6.8 and every binary operator associating to the left.
 
 use std::ops::Range;
