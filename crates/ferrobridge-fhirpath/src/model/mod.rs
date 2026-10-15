@@ -27,7 +27,7 @@ pub trait Model: fmt::Debug + Send + Sync {
     ///
     /// The generated element table carries no base type, so the R4 model
     /// answers `None` for every type.
-    // TODO(#436): emit each type's baseDefinition into the element table, so
+    // TODO(#458): emit each type's baseDefinition into the element table, so
     // `is`, `as` and `ofType` see `Age` as a `Quantity` and every resource as
     // a `DomainResource` and a `Resource`.
     fn base(&self, _name: &str) -> Option<&'static str> {

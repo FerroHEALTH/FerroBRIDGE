@@ -222,7 +222,7 @@ fn in_unit(quantity: Quantity, unit: Option<&str>) -> Option<Quantity> {
             let value = from.convert(quantity.value, *to)?;
             Some(Quantity::new(value, wanted))
         }
-        // TODO(#436): convert between different UCUM units.
+        // TODO(#459): convert between different UCUM units.
         _ => None,
     }
 }
