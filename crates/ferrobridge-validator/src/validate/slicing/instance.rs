@@ -269,7 +269,7 @@ impl<'i> Walk<'_, '_, 'i> {
                     MessageId::UnresolvedReference,
                     location,
                     format!(
-                        "the reference {reference} resolves to nothing, so the discriminator {path} is not evaluated"
+                        "the reference resolves to nothing, so the discriminator {path} is not evaluated"
                     ),
                 );
                 Err(Reason::UnresolvedReference)
