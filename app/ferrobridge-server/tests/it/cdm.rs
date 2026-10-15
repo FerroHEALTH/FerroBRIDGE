@@ -189,7 +189,7 @@ const ETL_OVER_TLS: &str = r#"
 url = "postgres://bridge:s3cret@cdm.invalid:5433/omop?sslmode=verify-full"
 
 [etl]
-aql = "SELECT e/ehr_id/value AS ehr_id, vo/uid/value AS versioned_object_uid, v/uid/value AS version_uid, c AS composition FROM EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v CONTAINS COMPOSITION c ORDER BY v/uid/value"
+aql = "SELECT e/ehr_id/value AS ehr_id, vo/uid/value AS versioned_object_uid, v/uid/value AS version_uid, c AS composition FROM EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY v/uid/value"
 type_concept_id = 32817
 observation_period_type_concept_id = 32880
 "#;
