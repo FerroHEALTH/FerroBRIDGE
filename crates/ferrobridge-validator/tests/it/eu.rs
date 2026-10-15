@@ -28,7 +28,7 @@ fn fetched() -> PathBuf {
 
 /// The package set of every fetched profile package and R4 core, `None`
 /// when the packages are not fetched.
-fn eu_set() -> TestResult<Option<PackageSet>> {
+pub(crate) fn eu_set() -> TestResult<Option<PackageSet>> {
     let root = fetched();
     if !root
         .join("hl7.fhir.eu.base#2.0.1/package/package.json")

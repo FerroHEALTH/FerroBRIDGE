@@ -22,20 +22,27 @@ use crate::support::patient_url;
 use crate::support::validate;
 
 #[test]
-fn the_slicing_the_profile_declares_is_named_unevaluated() -> TestResult {
+fn a_slice_without_a_value_at_its_discriminator_is_named_unevaluated() -> TestResult {
     let mut resource = patient();
     resource["identifier"] = json!([{"system": "urn:example:local", "value": "1"}]);
     let report = against_patient(&resource)?;
     let slicing: Vec<_> = report
         .unevaluated()
         .iter()
-        .filter(|entry| entry.constraint == Constraint::Slicing)
+        .filter(|entry| matches!(entry.constraint, Constraint::Discriminator { .. }))
         .collect();
-    assert_eq!(slicing.len(), 1);
+    assert_eq!(slicing.len(), 1, "{:#?}", report.unevaluated());
     assert_eq!(slicing[0].structure, patient_url());
     assert_eq!(slicing[0].element, "Patient.identifier");
     assert_eq!(slicing[0].location, "Patient.identifier[0]");
-    assert_eq!(slicing[0].reason, Reason::Slicing);
+    assert_eq!(
+        slicing[0].constraint,
+        Constraint::Discriminator {
+            kind: "value".to_owned(),
+            path: "system".to_owned()
+        }
+    );
+    assert_eq!(slicing[0].reason, Reason::NoDiscriminatorValue);
     Ok(())
 }
 

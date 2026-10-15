@@ -33,10 +33,23 @@ ranges, the length a primitive's definition allows and a profile's
 `maxLength`, `fixed[x]`, `pattern[x]`, and extensions resolved by `url` and
 walked against their definition.
 
-Slicing, invariants, terminology bindings, the profiles an element names and
-the profiles a resource claims are not evaluated yet. Each one the validator
-meets is listed in the report and in the `OperationOutcome` as a `warning` of
-type `not-supported`, never passed in silence.
+Slicing is evaluated as FHIR R4 profiling defines it: the discriminator types
+`value`, `exists`, `pattern`, `type` and `profile` over paths in the simple
+FHIRPath subset (`resolve()` through contained resources, `extension(url)`,
+`ofType()` and `as()`), a required binding over a value set the package set
+enumerates, slicing without a discriminator, the rules `closed`, `open` and
+`openAtEnd`, ordered slicing, the `@default` slice, re-slicing, extension
+slices by `url`, and the cardinality of each slice and of the slicing entry.
+An item matched to a slice is held to the slice's own constraints. Content
+is validated against the profiles its type names and passes when it conforms
+to one of them.
+
+Invariants, terminology bindings, target profiles and the profiles a
+resource claims are not evaluated yet, and neither is a discriminator the
+validator cannot decide (a path outside the subset, a reference outside the
+resource, a value set it cannot enumerate). Each one the validator meets is
+listed in the report and in the `OperationOutcome` as a `warning` of type
+`not-supported`, never passed in silence.
 
 ## Message ids
 

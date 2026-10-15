@@ -1003,6 +1003,22 @@ invariants (#439), bindings (#440) and Bundle and entry profiles (#441) fill
 in what it lists as unevaluated, and agreement with the HL7 FHIR Validator,
 prior art and never the oracle, is #442.
 
+**Slicing reuses the walk** (#438, profiling.html §5.1.0.10 to §5.1.0.14). A
+discriminator path is parsed by the `ferrobridge-fhirpath` parser and held
+to the simple subset (fhirpath.html §2.9.2), accepting both `ofType()` and
+`as()` because R4 names each in a different place (#443). A `profile`
+discriminator, and slicing with no discriminator, validate the item against
+each candidate slice in a walk of its own; an item matched to a slice is
+then walked against the slice's sub-tree of the snapshot. `resolve()` goes
+through a resolver seam, filled today by contained resources and by Bundle
+resolution with #441, and an item whose discriminator cannot be decided is
+named unevaluated and placed in no slice, never counted as a non-match. The
+codes of a required binding are read from a value set the package set
+enumerates; anything needing an expansion beyond that is named, and
+bindings proper stay with #440. Where R4 is silent (an item matching two
+slices, an item in no slice between ordered open slices) the behaviour is
+our own design, recorded at its site.
+
 ## 5. The OMOP side
 
 OMOP is a relational analytics schema, not an API: the deliverable is rows in

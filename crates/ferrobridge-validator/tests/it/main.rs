@@ -20,6 +20,8 @@ mod extensions;
 mod outcome;
 mod packages;
 mod resolve;
+mod scope;
+mod slicing;
 mod structure;
 mod support;
 mod values;

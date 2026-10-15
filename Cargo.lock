@@ -1271,6 +1271,7 @@ dependencies = [
 name = "ferrobridge-validator"
 version = "0.0.0"
 dependencies = [
+ "ferrobridge-fhirpath",
  "fhir-types",
  "flate2",
  "regex",

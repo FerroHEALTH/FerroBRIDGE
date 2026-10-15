@@ -20,6 +20,9 @@ publish = true
 include = ["src/**", "README.md", "LICENSE"]
 
 [dependencies]
+# A slice discriminator's path is parsed as FHIRPath and held to the simple
+# subset R4 allows (fhirpath.html section 2.9.2).
+ferrobridge-fhirpath.workspace = true
 # The `.tgz` form of a FHIR package.
 flate2.workspace = true
 # StructureDefinitions decode into the generated R4 model, and the R4 element

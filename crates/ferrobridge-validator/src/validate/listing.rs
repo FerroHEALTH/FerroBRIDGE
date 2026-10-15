@@ -11,7 +11,7 @@ use crate::report::Reason;
 use crate::validate::structure::Structure;
 use crate::validate::walk::Walk;
 
-impl Walk<'_, '_> {
+impl Walk<'_, '_, '_> {
     /// Lists the constraints of `element` this validator does not evaluate.
     pub(crate) fn list(
         &mut self,
@@ -52,27 +52,7 @@ impl Walk<'_, '_> {
                 );
             }
         }
-        if element.slicing.is_some() {
-            // TODO(#438): evaluate the slicing.
-            self.out()
-                .unevaluated(url, id, Constraint::Slicing, location, Reason::Slicing);
-        }
         for kind in &element.r#type {
-            let profiles: Vec<String> = kind
-                .profile
-                .iter()
-                .filter_map(|profile| profile.value.clone())
-                .collect();
-            if !profiles.is_empty() {
-                // TODO(#438): validate the element against the profiles its type names.
-                self.out().unevaluated(
-                    url,
-                    id,
-                    Constraint::TypeProfile { profiles },
-                    location,
-                    Reason::Profiles,
-                );
-            }
             let targets: Vec<String> = kind
                 .target_profile
                 .iter()

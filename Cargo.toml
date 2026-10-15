@@ -74,6 +74,9 @@ ferrobridge-testkit = { path = "tools/ferrobridge-testkit" }
 # Published from this workspace and consumed by the published
 # ferrobridge-hl7v2, so the requirement carries both a path and a version.
 ferrobridge-term = { path = "crates/ferrobridge-term", version = "0.0.0" }
+# Published from this workspace and consumed by the published
+# ferrobridge-validator, so the requirement carries both a path and a version.
+ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "0.0.0" }
 # The HL7 v2 face's crate (MLLP, MSH-18 decoding, parsing, the ACK and the
 # v2-to-FHIR ConceptMap interpreter): the server is its one consumer, so the
 # requirement is path-only.

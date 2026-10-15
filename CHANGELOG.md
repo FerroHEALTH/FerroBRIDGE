@@ -61,6 +61,20 @@ crates on crates.io.
   carries typed issues with their FHIRPath location and converts into an R4
   `OperationOutcome`; every slicing, invariant, binding and profile the
   validator meets and does not yet evaluate is named in it as `not-supported`.
+- The R4 profile validator evaluates slicing (#438): the discriminator types
+  `value`, `exists`, `pattern`, `type` and `profile`, combined; discriminator
+  paths in the simple FHIRPath subset, with `resolve()` through contained
+  resources, `extension(url)`, `ofType()` and `as()`; `value` and `pattern`
+  matched by a required binding over a value set the package set enumerates;
+  slicing without a discriminator; the rules `closed`, `open` and
+  `openAtEnd`, ordered slicing, the `@default` slice and re-slicing; extension
+  slices by `url`, including the relative urls of a complex extension's
+  children; and the cardinality of each slice and of the slicing entry. An
+  item matched to a slice is held to the slice's constraints, and content is
+  validated against the profiles its type names. A discriminator the
+  validator cannot decide (a path outside the subset, a reference outside the
+  resource, a value set it cannot enumerate) is named as `not-supported`, and
+  a `#id` reference that resolves to nothing is a warning.
 - `omop_cdm::quality` runs the nine conformance checks of the OHDSI Data
   Quality Dashboard v2.9.0 (`cdmTable`, `cdmField`, `isRequired`,
   `cdmDatatype`, `isPrimaryKey`, `isForeignKey`, `fkDomain`, `fkClass`,
@@ -124,6 +138,14 @@ crates on crates.io.
 
 ### Fixed
 
+- The R4 profile validator refuses a resource of a type its element's types
+  do not name, where an element typed `Resource` or `DomainResource` still
+  takes any resource (#488).
+- The R4 profile validator resolves a version-less canonical a definition
+  names within the dependency closure of the package that carries the
+  definition, so a profile built against one version of a package no longer
+  gets another loaded beside it, and falls back to the whole set only when
+  that closure does not carry the canonical (#489).
 - Readiness no longer reports a CDR that refuses the configured credentials
   as up. The CDR check lists the ADL 1.4 templates through the ITS-REST
   Definition API with the configured credentials, filtered so the answer is

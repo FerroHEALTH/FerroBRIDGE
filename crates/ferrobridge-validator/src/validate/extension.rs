@@ -13,6 +13,7 @@ use crate::report::Constraint;
 use crate::report::Reason;
 use crate::set::ResolveError;
 use crate::validate::ValidateError;
+use crate::validate::structure::Structure;
 use crate::validate::walk::Cursor;
 use crate::validate::walk::Walk;
 
@@ -27,14 +28,16 @@ pub(crate) enum Placement {
     Child,
 }
 
-impl Walk<'_, '_> {
+impl Walk<'_, '_, '_> {
     /// Returns the cursor an extension is walked with: the definition its
-    /// `url` names, or the core `Extension` when the url does not resolve.
+    /// `url` names, resolved as the definition `from` the walk holds the
+    /// extension's parent to, or the core `Extension` when the url does not
+    /// resolve.
     pub(crate) fn extension_cursor(
         &mut self,
         object: &Object,
         placement: Placement,
-        location: &str,
+        (location, from): (&str, &Structure),
     ) -> Result<Cursor, ValidateError> {
         let fallback = |walk: &Self| -> Result<Cursor, ValidateError> {
             Ok(Cursor::new(
@@ -57,10 +60,11 @@ impl Walk<'_, '_> {
                     format!("the extension url {url} is relative outside a complex extension"),
                 );
             }
-            // TODO(#438): resolve a child extension's relative url against the slices of its parent.
+            // NOTE: extensibility.html §2.5.0.1: a relative url names a child the complex extension
+            // defines, so the slice it is matched to by url holds it, never a definition of its own.
             return fallback(self);
         }
-        let structure = match self.validator().structure(url) {
+        let structure = match self.validator().structure(url, Some(from)) {
             Ok(structure) => structure,
             Err(ValidateError::Resolve(ResolveError::NotFound { .. })) => {
                 // NOTE: extensibility.html §2.5.0.2 forbids processing an unknown modifier, while

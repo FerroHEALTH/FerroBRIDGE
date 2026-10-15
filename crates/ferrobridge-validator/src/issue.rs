@@ -204,6 +204,24 @@ pub enum MessageId {
     /// An extension in `extension` defined as a modifier, or one in
     /// `modifierExtension` defined as none.
     ModifierMismatch,
+    /// An item of a closed slicing that matches no slice (profiling.html
+    /// §5.1.0.10).
+    UnmatchedSliceItem,
+    /// An item of an ordered slicing that comes before an item of a slice
+    /// declared earlier.
+    SliceOrder,
+    /// An item of a slicing with the rules `openAtEnd` that matches a slice
+    /// after an item that matched none.
+    OpenAtEnd,
+    /// An item that matches more than one slice (profiling.html §5.1.0.11).
+    OverlappingSlices,
+    /// A reference a discriminator resolves names no resource where it
+    /// points.
+    UnresolvedReference,
+    /// Content that conforms to none of the profiles its type names.
+    TypeProfileMismatch,
+    /// A resource of a type none of its element's types names.
+    ResourceTypeNotAllowed,
     /// A constraint the validator does not evaluate.
     ConstraintUnevaluated,
     /// The instance raised no issue and every constraint was evaluated.
@@ -241,6 +259,13 @@ impl MessageId {
             Self::NotAnExtension => "not-an-extension",
             Self::RelativeExtensionUrl => "relative-extension-url",
             Self::ModifierMismatch => "modifier-mismatch",
+            Self::UnmatchedSliceItem => "unmatched-slice-item",
+            Self::SliceOrder => "slice-order",
+            Self::OpenAtEnd => "open-at-end",
+            Self::OverlappingSlices => "overlapping-slices",
+            Self::UnresolvedReference => "unresolved-reference",
+            Self::TypeProfileMismatch => "type-profile-mismatch",
+            Self::ResourceTypeNotAllowed => "resource-type-not-allowed",
             Self::ConstraintUnevaluated => "constraint-unevaluated",
             Self::AllOk => "all-ok",
         }
