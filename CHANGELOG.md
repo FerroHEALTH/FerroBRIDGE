@@ -36,7 +36,8 @@ crates on crates.io.
   name see `Age` as a `Quantity` and `Patient` as a `DomainResource` and a
   `Resource`; the R4 profile validator takes a resource under an element typed
   `DomainResource` only when its type specializes `DomainResource`, so a
-  `Binary` or a `Bundle` there is refused (#458).
+  `Binary` or a `Bundle` there is refused, and the same base chain decides the
+  profiles such an element applies and a `type` slicing discriminator (#458).
 - `scripts/vendor/profile-packages.sh` fetches the package set of the R4
   profile validator at build time into the ignored
   `docs/specs/fhir-packages/<package>#<version>/package/` (#435), about
