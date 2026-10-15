@@ -540,6 +540,7 @@ testNEquality/testNEquality20
 testNEquality/testNEquality21
 testNEquality/testNEquality22
 testNEquality/testNEquality23
+testNEquality/testNEquality24
 testNEquality/testNEquality25
 testNEquality/testNEquality26
 testNEquality/testNEquality3
@@ -618,11 +619,16 @@ testPrecedence/testPrecedence3
 testPrecedence/testPrecedence4
 testPrecedence/testPrecedence5
 testPrecedence/testPrecedence6
+testQuantity/testQuantity1
 testQuantity/testQuantity10
 testQuantity/testQuantity11
+testQuantity/testQuantity2
+testQuantity/testQuantity3
+testQuantity/testQuantity4
 testQuantity/testQuantity5
 testQuantity/testQuantity7
 testQuantity/testQuantity8
+testQuantity/testQuantity9
 testRepeat/testRepeat1
 testRepeat/testRepeat2
 testRepeat/testRepeat3

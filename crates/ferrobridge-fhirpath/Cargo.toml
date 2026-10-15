@@ -17,7 +17,8 @@ keywords = ["fhir", "fhirpath", "healthcare", "hl7"]
 categories = ["parser-implementations", "science"]
 # The crate line is published on crates.io; include is the packaged content.
 publish = true
-include = ["src/**", "README.md", "LICENSE"]
+# The UCUM essence ships whole with its licence and provenance (vendor/ucum/PROVENANCE.md).
+include = ["src/**", "vendor/ucum/**", "README.md", "LICENSE"]
 
 [dependencies]
 chumsky.workspace = true

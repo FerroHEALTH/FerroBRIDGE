@@ -205,24 +205,11 @@ fn to_quantity(item: &Item<'_>) -> Option<Quantity> {
     }
 }
 
-/// The quantity in `unit` when one is asked for: the same unit, or a
-/// calendar duration converted by N1 §5.5.7's factors; `None` otherwise, as
-/// N1 permits for a unit different from the input's.
+/// The quantity in `unit` when one is asked for, converted by UCUM and the
+/// calendar factors of N1 §5.5.7; `None` when it does not convert.
 fn in_unit(quantity: Quantity, unit: Option<&str>) -> Option<Quantity> {
-    let Some(unit) = unit else {
-        return Some(quantity);
-    };
-    let wanted = crate::quantity::Calendar::from_keyword(unit)
-        .map_or_else(|| Unit::Ucum(String::from(unit)), Unit::Calendar);
-    if quantity.unit == wanted {
-        return Some(quantity);
-    }
-    match (&quantity.unit, &wanted) {
-        (Unit::Calendar(from), Unit::Calendar(to)) => {
-            let value = from.convert(quantity.value, *to)?;
-            Some(Quantity::new(value, wanted))
-        }
-        // TODO(#459): convert between different UCUM units.
-        _ => None,
+    match unit {
+        Some(unit) => quantity.convert(&Unit::from_code(String::from(unit))),
+        None => Some(quantity),
     }
 }

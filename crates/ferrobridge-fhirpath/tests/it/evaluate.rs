@@ -237,9 +237,18 @@ fn a_ucum_quantity_converts_and_a_calendar_year_stays_unequal_to_an_annum() {
         truth(&eval_none("1 year ~ 1 'a'").expect("evaluates")),
         Some(true)
     );
+    // N1 §6.1.1: commensurable units compare, others are empty.
     assert_eq!(
         truth(&eval_none("4 'g' = 4000 'mg'").expect("evaluates")),
+        Some(true)
+    );
+    assert_eq!(
+        truth(&eval_none("4 'mg' = 4 'mL'").expect("evaluates")),
         None
+    );
+    assert_eq!(
+        truth(&eval("value > 80 'kg'", &observation).expect("evaluates")),
+        Some(true)
     );
 }
 
