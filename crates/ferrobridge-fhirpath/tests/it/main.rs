@@ -14,6 +14,7 @@
     reason = "test assertions"
 )]
 
+mod check;
 mod conformance;
 mod constraints;
 mod evaluate;

@@ -22,7 +22,7 @@ use crate::model::{FhirType, Model, TypeKind, choice_code, field_type, resource_
 
 /// A JSON value of the document, borrowed from the input or owned when a
 /// seam returned it.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) enum Doc<'a> {
     /// Part of the input document.
     Borrowed(&'a Value),
@@ -80,7 +80,7 @@ fn pick<'v>(value: &'v Value, key: &str, index: usize) -> Option<&'v Value> {
 }
 
 /// What a node holds.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 enum Data<'a> {
     /// A complex element or a resource: a JSON object.
     Complex(Doc<'a>),
@@ -92,11 +92,29 @@ enum Data<'a> {
 }
 
 /// An element or resource of the document.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// Its `Debug` form names the type and the definition and leaves the content
+/// out, so no clinical value reaches a log through it.
+#[derive(Clone, PartialEq)]
 pub struct Node<'a> {
     data: Data<'a>,
     ty: Option<FhirType>,
     definition: Option<&'static str>,
+}
+
+impl fmt::Debug for Node<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let present = match &self.data {
+            Data::Complex(_) => "complex",
+            Data::Primitive { value: Some(_), .. } => "primitive with a value",
+            Data::Primitive { value: None, .. } => "primitive without a value",
+        };
+        f.debug_struct("Node")
+            .field("type", &self.ty.map(|ty| ty.name))
+            .field("definition", &self.definition)
+            .field("holds", &present)
+            .finish()
+    }
 }
 
 impl fmt::Display for Node<'_> {

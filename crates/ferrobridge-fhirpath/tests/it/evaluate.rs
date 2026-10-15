@@ -164,6 +164,86 @@ fn iif_evaluates_only_the_chosen_branch() {
 }
 
 #[test]
+fn a_node_debugs_without_its_content() {
+    let patient = patient();
+    let names = eval("name.family", &patient).expect("evaluates");
+    let rendered = format!("{names:?}");
+    assert!(rendered.contains("string"), "{rendered}");
+    assert!(!rendered.contains("Chalmers"), "{rendered}");
+}
+
+#[test]
+fn a_function_of_a_later_fhirpath_release_is_not_defined() {
+    // N1 2.0.0 defines no lowBoundary(), sort() or trim().
+    for expression in ["1.5.lowBoundary()", "(1 | 2).sort()", "' a '.trim()"] {
+        assert!(
+            matches!(
+                eval_none(expression),
+                Err(EvalError::UnknownFunction { .. })
+            ),
+            "{expression}"
+        );
+    }
+}
+
+#[test]
+fn equivalence_ignores_case_and_decimal_precision() {
+    // N1 §6.1.2.
+    assert_eq!(
+        truth(&eval_none("'Abc' ~ 'aBC'").expect("evaluates")),
+        Some(true)
+    );
+    assert_eq!(
+        truth(&eval_none("1.2 / 1.8 ~ 0.67").expect("evaluates")),
+        Some(true)
+    );
+    assert_eq!(truth(&eval_none("{} ~ {}").expect("evaluates")), Some(true));
+}
+
+#[test]
+fn a_coding_is_equivalent_by_system_and_code() {
+    // FHIR R4 §2.9.1.6: display and version are ignored.
+    let observation = json(
+        r#"{"resourceType": "Observation", "status": "final",
+            "code": {"coding": [{"system": "http://loinc.org", "code": "1", "display": "a"}]},
+            "valueCodeableConcept": {"coding": [{"system": "http://loinc.org", "code": "1", "display": "b"}]}}"#,
+    );
+    let found = eval(
+        "code.coding.first() ~ (value as CodeableConcept).coding.first()",
+        &observation,
+    )
+    .expect("evaluates");
+    assert_eq!(truth(&found), Some(true));
+    let concepts = eval("code ~ (value as CodeableConcept)", &observation).expect("evaluates");
+    assert_eq!(truth(&concepts), Some(true));
+}
+
+#[test]
+fn a_ucum_quantity_converts_and_a_calendar_year_stays_unequal_to_an_annum() {
+    // FHIR R4 §2.9.1.3 and N1 §6.1.1.
+    let observation = json(
+        r#"{"resourceType": "Observation", "status": "final", "code": {"text": "w"},
+            "valueQuantity": {"value": 185, "unit": "lbs", "system": "http://unitsofmeasure.org", "code": "[lb_av]"}}"#,
+    );
+    assert_eq!(
+        truth(&eval("value = 185 '[lb_av]'", &observation).expect("evaluates")),
+        Some(true)
+    );
+    assert_eq!(
+        truth(&eval_none("1 year = 1 'a'").expect("evaluates")),
+        Some(false)
+    );
+    assert_eq!(
+        truth(&eval_none("1 year ~ 1 'a'").expect("evaluates")),
+        Some(true)
+    );
+    assert_eq!(
+        truth(&eval_none("4 'g' = 4000 'mg'").expect("evaluates")),
+        None
+    );
+}
+
+#[test]
 fn an_unknown_function_is_an_error() {
     assert!(matches!(
         eval_none("1.frobnicate()"),

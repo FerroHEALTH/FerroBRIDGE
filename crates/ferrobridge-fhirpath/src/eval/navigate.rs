@@ -68,6 +68,8 @@ impl<'a> Engine<'_, 'a> {
                         _ => {}
                     }
                 }
+                // NOTE: N1 §11 lists children(), descendants() and polymorphic members as
+                // untypable, and they yield system values; a member of one is empty, not an error.
                 _ => defined = true,
             }
         }

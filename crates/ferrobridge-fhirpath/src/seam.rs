@@ -22,12 +22,28 @@ use fhir_types::codec::Value;
 pub type SeamError = Box<dyn Error + Send + Sync + 'static>;
 
 /// Where a reference is resolved from (FHIR R4 §2.9.1.4).
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct ResolveContext<'r> {
     /// `%resource`, the resource holding the reference.
     pub resource: Option<&'r Value>,
     /// `%rootResource`, the resource that contains `%resource`.
     pub root_resource: Option<&'r Value>,
+}
+
+/// The `resourceType` of a resource, for a `Debug` form without content.
+fn resource_kind(value: Option<&Value>) -> Option<&str> {
+    value
+        .and_then(|value| value.get("resourceType"))
+        .and_then(Value::as_str)
+}
+
+impl fmt::Debug for ResolveContext<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ResolveContext")
+            .field("resource", &resource_kind(self.resource))
+            .field("root_resource", &resource_kind(self.root_resource))
+            .finish()
+    }
 }
 
 /// Locates the target of a reference for `resolve()`.

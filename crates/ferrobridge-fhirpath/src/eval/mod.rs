@@ -125,7 +125,7 @@ impl<'a> Environment<'a> {
 }
 
 /// The context an expression is evaluated on.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 enum Start<'a> {
     /// A resource.
     Resource(&'a Value),
@@ -140,11 +140,29 @@ enum Start<'a> {
 }
 
 /// The context node and the resources `%resource` and `%rootResource` name.
-#[derive(Debug, Clone)]
+///
+/// Its `Debug` form names what kind of context it is and leaves the document
+/// out.
+#[derive(Clone)]
 pub struct Focus<'a> {
     start: Start<'a>,
     resource: Option<&'a Value>,
     root: Option<&'a Value>,
+}
+
+impl fmt::Debug for Focus<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let start = match &self.start {
+            Start::Resource(_) => String::from("resource"),
+            Start::Element { type_name, .. } => format!("element of {type_name}"),
+            Start::Items(items) => format!("{} items", items.len()),
+        };
+        f.debug_struct("Focus")
+            .field("start", &start)
+            .field("resource", &self.resource.is_some())
+            .field("root", &self.root.is_some())
+            .finish()
+    }
 }
 
 impl<'a> Focus<'a> {
@@ -239,7 +257,7 @@ pub(crate) struct Engine<'e, 'a> {
 
 /// The variables of the expression being evaluated: the focus (`$this`), the
 /// iteration index and the aggregate total.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct Frame<'a> {
     focus: Collection<'a>,
     index: Option<usize>,

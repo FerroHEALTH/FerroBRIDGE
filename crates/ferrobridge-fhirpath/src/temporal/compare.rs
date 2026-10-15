@@ -80,6 +80,10 @@ fn shift(value: &DateTime, minutes: i16) -> Option<DateTime> {
 /// The component walk of N1 §6.1.1: `Some` with the order at the first
 /// difference or at a shared final precision, `None` when one value stops
 /// before the other.
+///
+/// NOTE: N1 §6.2 says only that a comparison across precisions is empty; the ordering
+/// operators walk as §6.1.1's equality does, so a difference before the shorter value
+/// ends decides (`@2012 < @2013-01-01` is true).
 fn walk(left: &Components, right: &Components) -> Option<Ordering> {
     for (a, b) in left.iter().zip(right) {
         match (a, b) {
