@@ -205,13 +205,57 @@ against the registry's `latest`.
 | `hl7.fhir.r5.examples` | 5.0.0 files `2824` digest `afddb711d22bbf8c45158cb4be0a8936ecd458df1a2a99cf5debd5274a7bee47` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r5.examples/PROVENANCE.md`, the same cache key |
 | `hl7.fhir.r6.examples` | 6.0.0-ballot5 files `2488` digest `4654c0fa42180b2ef3abec208458482cb1092fe3c63ef4ec4661a3feb50a7b3f` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r6.examples/PROVENANCE.md`, the same cache key |
 
-## Profile packages (the mapping targets)
+## Profile packages (the profile validator's package set, build time, never committed)
 
-No profile package is pinned yet. A row is added here the moment a context
-mapping targeting the package is authored (`docs/architecture.md` §4.8 names
-the candidates and their order: `hl7.fhir.eu.base`, `hl7.fhir.eu.laboratory`,
-`hl7.fhir.eu.mpd`, then `hl7.fhir.eu.eps`; the mapping library's own contexts
+The R4 profile validator runs offline against the packages below, fetched
+verbatim from the FHIR package registry at build time by
+`scripts/vendor/profile-packages.sh` into the ignored
+`docs/specs/fhir-packages/<package>#<version>/package/`, which reads its pins
+from this table (#435). At about 570 MB unpacked they are never committed;
+only each `PROVENANCE.md` is, and CI restores the trees from a cache keyed on
+`scripts/vendor/profile-packages.sh --cache-key`. The three roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
+one published version), `hl7.fhir.eu.base` 2.0.1 and `hl7.fhir.uv.ips` 2.0.0;
+every other row is in the set because a vendored package's `package.json`
+`dependencies` names it at that version. A package two dependents name at
+different versions has a row per version: EPS 1.0.0-ballot depends on EU Base
+2.0.0, so both 2.0.0 and 2.0.1 are here, and the five `hl7.terminology.r4`
+rows are the five versions the set names. Every package depends on
+`hl7.fhir.r4.core` 4.0.1, which has no row here: the set reads the tree the
+FHIR packages table above already vendors at
+`tools/fhir-codegen/vendor/hl7.fhir.r4.core/`. Each pin is the version, then
+the file count and tree digest of the unpacked tree, which the script checks
+a download or a cache-restored tree against. `--check` works offline: it reads
+every `PROVENANCE.md` against its row, verifies every tree on disk, refuses a
+tree with no row, and asserts the closure is complete: every `dependencies`
+entry of every package is itself pinned. It reads the dependencies from a
+fetched `package.json`, or from the `Declared dependencies` line `--stamp`
+wrote into the `PROVENANCE.md` when the tree is not on disk.
+`scripts/checks/versions.sh` reads the `Version`, `Files` and digest lines of
+every `PROVENANCE.md` back against its row.
+
+No context mapping targets these packages yet (`docs/architecture.md` §4.8
+names the candidates and their order; the mapping library's own contexts
 target the MII Kerndatensatz modules at 2025.0.0).
+
+| Item | Pin | Repeated in |
+|---|---|---|
+| `hl7.fhir.eu.eps` | 1.0.0-ballot files `76` digest `d8fe50b7359f698ce513821235502dd5bf43ad2e4e70c25a4dbe12d0b8b39f2e` | `docs/specs/fhir-packages/hl7.fhir.eu.eps#1.0.0-ballot/PROVENANCE.md` (a root) |
+| `hl7.fhir.eu.base` | 2.0.1 files `75` digest `05d7ea672cac41eaa5efb7806c6ce9e4638b1604a811a0aea78f84685efff91d` | `docs/specs/fhir-packages/hl7.fhir.eu.base#2.0.1/PROVENANCE.md` (a root) |
+| `hl7.fhir.eu.base` | 2.0.0 files `77` digest `0b2e85a498e4f0df5ed8f122d97737c824250cb247792db9e392f4186245ea01` | `docs/specs/fhir-packages/hl7.fhir.eu.base#2.0.0/PROVENANCE.md` |
+| `hl7.fhir.uv.ips` | 2.0.0 files `154` digest `86dbd916617c60642e0296c33bea0d1aa6497c4ca46a2db285a0e5c975f28316` | `docs/specs/fhir-packages/hl7.fhir.uv.ips#2.0.0/PROVENANCE.md` (a root) |
+| `hl7.fhir.uv.ipa` | 1.1.0 files `53` digest `70a5f0881a37859ef7fefd5502c0db05c6ce6c2d6dfa1e71828785f523ba7021` | `docs/specs/fhir-packages/hl7.fhir.uv.ipa#1.1.0/PROVENANCE.md` |
+| `hl7.fhir.uv.smart-app-launch` | 2.0.0 files `8` digest `68fd66519d2ff373d8f9e58bfa62455f3e0aeb95a780f2218e5ffee5c4b49c3e` | `docs/specs/fhir-packages/hl7.fhir.uv.smart-app-launch#2.0.0/PROVENANCE.md` (CC-BY-4.0) |
+| `hl7.fhir.eu.extensions.r4` | 1.3.1 files `33` digest `740cad8a7c5a182a4f37fd7877ffbb38f1f9769468a4a5d292fe12a78c26bb18` | `docs/specs/fhir-packages/hl7.fhir.eu.extensions.r4#1.3.1/PROVENANCE.md` |
+| `hl7.fhir.eu.extensions.r4` | 1.3.0 files `30` digest `32d6a88e8444b67150d5945926dabd004820dccd5e8140774be79e67c20346e8` | `docs/specs/fhir-packages/hl7.fhir.eu.extensions.r4#1.3.0/PROVENANCE.md` |
+| `ihe.pharm.mpd.r4` | 1.0.0-comment-2 files `111` digest `bb5122aaafc17b33a4691308cebb4e91283d45a560e8b9eeac984dd0966a5c32` | `docs/specs/fhir-packages/ihe.pharm.mpd.r4#1.0.0-comment-2/PROVENANCE.md` (CC-BY-SA-4.0) |
+| `hl7.fhir.uv.extensions.r4` | 5.3.0 files `1592` digest `39605ce9849da6e22d081c0c07ec3ba190805736e3b5b830ea493fe431b3cb9f` | `docs/specs/fhir-packages/hl7.fhir.uv.extensions.r4#5.3.0/PROVENANCE.md` |
+| `hl7.fhir.uv.extensions.r4` | 5.2.0 files `1401` digest `727a50ef9b1c4472653d772ae0b470405b305c2c983c02f1f621ebcc5e05a5b3` | `docs/specs/fhir-packages/hl7.fhir.uv.extensions.r4#5.2.0/PROVENANCE.md` |
+| `hl7.fhir.uv.xver-r5.r4` | 0.1.0 files `6139` digest `cb81d3f43fd473471a8a4e5ea0a8066aeeb06bbcf24acb31a24dd85db0ebb0e2` | `docs/specs/fhir-packages/hl7.fhir.uv.xver-r5.r4#0.1.0/PROVENANCE.md` |
+| `hl7.terminology.r4` | 7.3.0 files `4191` digest `0c47d902204317908d1103108f554ad5a0abd238466a9f7410b85d269fcb3098` | `docs/specs/fhir-packages/hl7.terminology.r4#7.3.0/PROVENANCE.md` |
+| `hl7.terminology.r4` | 7.1.0 files `4118` digest `0f91757bc29290a3c1c090cf3fe57c884f5af91472182157bac7cf4d0ead73c3` | `docs/specs/fhir-packages/hl7.terminology.r4#7.1.0/PROVENANCE.md` |
+| `hl7.terminology.r4` | 6.5.0 files `4407` digest `acae644b9b4dba9d388b96b35f452c2a35f8bf199c1d2b570e85634c6972ee09` | `docs/specs/fhir-packages/hl7.terminology.r4#6.5.0/PROVENANCE.md` |
+| `hl7.terminology.r4` | 6.3.0 files `4389` digest `67c5e37eee889968f623290df576cf8a24a6de8936c0ad4b14e742b6faf9833f` | `docs/specs/fhir-packages/hl7.terminology.r4#6.3.0/PROVENANCE.md` |
+| `hl7.terminology.r4` | 6.2.0 files `4342` digest `6d074864dff5ce089248b6113b6049b0420b8db1ffbb2837bf4e39847d3e28fe` | `docs/specs/fhir-packages/hl7.terminology.r4#6.2.0/PROVENANCE.md` |
 
 ## Crate line
 

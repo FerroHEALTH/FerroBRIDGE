@@ -79,3 +79,9 @@ fuzz/coverage/
 # instead, and only each PROVENANCE.md is committed.
 /tools/ferrobridge-testkit/vendor/*/*
 !/tools/ferrobridge-testkit/vendor/*/PROVENANCE.md
+
+# The profile validator's FHIR packages scripts/vendor/profile-packages.sh
+# fetches. Their licences would permit committing them; at about 570 MB they
+# are fetched instead, and only each PROVENANCE.md is committed.
+/docs/specs/fhir-packages/*/*
+!/docs/specs/fhir-packages/*/PROVENANCE.md
