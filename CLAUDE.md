@@ -55,7 +55,7 @@ v0.0.4 (OMOP). Nothing is scaffolded before its issues are filed.
 ## Repo map
 
 The Cargo workspace (#107) holds the root manifests with the full lint set,
-nine library crates (six at 0.0.0, the version that holds their crates.io
+ten library crates (seven at 0.0.0, the version that holds their crates.io
 names until a first publish, and `fhir-types`, `openehr-mapping-core` and
 `fhirconnect` on the published crate line), and
 the testkit tool crate. Beside it:
@@ -136,6 +136,17 @@ the testkit tool crate. Beside it:
   `conformsTo()` and the other outward functions over caller-supplied seams.
   The HL7 FHIRPath R4 test suite under `docs/specs/fhirpath-tests/` is its
   `fhirpath-r4` corpus.
+- `crates/ferrobridge-validator`: the FHIR R4 profile validator (#432,
+  foundation #437). `package` reads a package from a `.tgz` (`flate2`, `tar`)
+  or a directory, `set` refuses a missing dependency by name and resolves
+  StructureDefinitions by canonical into the generated `fhir_types::r4` model,
+  and `validate` walks a `Value` over the R4 element table and the profile
+  snapshot: unknown members, JSON shapes, cardinality per parent, choice
+  types, `contentReference`, primitive lexical forms from the package's
+  `regex` extensions, ranges and lengths, `fixed[x]`, `pattern[x]` and
+  extensions by `url`. `report` holds typed issues and every slicing,
+  invariant, binding and profile it met and did not evaluate, and converts to
+  an R4 `OperationOutcome`.
 - `tools/fhir-codegen`: the generator, with the six vendored HL7 FHIR packages
   under `vendor/` (380 MB, a `PROVENANCE.md` each; the sixth is the v2-to-FHIR
   guide, #252), the HL7 v2 definitions fetched at build time into the

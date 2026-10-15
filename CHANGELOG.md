@@ -49,6 +49,18 @@ crates on crates.io.
   without its seam is an error naming the function. The HL7 FHIRPath test
   suite for R4 runs as the `fhirpath-r4` conformance corpus, and every
   invariant of the vendored FHIR packages parses.
+- `ferrobridge-validator`, the foundation of a FHIR R4 profile validator
+  (#437). It reads FHIR packages offline from `.tgz` files and unpacked
+  directories, refuses a set that lacks a dependency a manifest names, and
+  resolves StructureDefinitions by canonical into the generated R4 model. It
+  checks a resource against the core definition of its type or a profile:
+  unknown elements, empty objects, arrays and strings, cardinality per parent,
+  choice types, `contentReference`, the lexical form, range and length of
+  every primitive, `maxLength`, `fixed[x]`, `pattern[x]`, and extensions
+  resolved by `url`, with an unknown modifier extension an error. The report
+  carries typed issues with their FHIRPath location and converts into an R4
+  `OperationOutcome`; every slicing, invariant, binding and profile the
+  validator meets and does not yet evaluate is named in it as `not-supported`.
 - `omop_cdm::quality` runs the nine conformance checks of the OHDSI Data
   Quality Dashboard v2.9.0 (`cdmTable`, `cdmField`, `isRequired`,
   `cdmDatatype`, `isPrimaryKey`, `isForeignKey`, `fkDomain`, `fkClass`,
