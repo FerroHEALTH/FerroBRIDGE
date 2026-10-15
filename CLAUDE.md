@@ -70,7 +70,9 @@ the testkit tool crate. Beside it:
   `vocab load` and `mapping check` parse and name the issue that lands each.
   `src/cdr/` reaches the CDR through the generated ITS-REST 1.1.0 client of
   `openehr-its` (`rest-client`, #285, #293): the handle built from `[cdr]`
-  with its `SecretString` credentials, the commit headers filled into the
+  with its `SecretString` credentials or, under `[cdr.credentials.oauth]`, the
+  OAuth 2.0 client-credentials token `src/cdr/oauth/` fetches, caches and
+  renews once on a CDR `401` (#421), the commit headers filled into the
   generated parameters, the `X-Request-Id` echo, the error body each outcome
   carries read into a refusal's diagnostics, the typed ids an `ETag` names,
   the two-route template fetch and the AQL paging, with the `wiremock`

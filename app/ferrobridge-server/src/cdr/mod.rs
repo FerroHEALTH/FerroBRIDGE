@@ -22,6 +22,7 @@ mod contribution;
 mod ehr;
 pub mod error;
 pub mod ids;
+pub mod oauth;
 pub mod query;
 pub mod template;
 mod transport;
@@ -36,6 +37,7 @@ use openehr_its::rest::client::ClientError;
 use openehr_its::rest::client::Credentials;
 use openehr_its::rest::client::ReqwestTransport;
 use openehr_its::rest::client::RetryPolicy;
+use openehr_its::rest::client::Transport;
 use openehr_its::rest::generated::common::Identifier;
 use openehr_its::rest::generated::definition::DefinitionTemplateAdl14ListParams;
 use openehr_its::rest::generated::definition::client::DefinitionClient;
@@ -43,12 +45,14 @@ use openehr_its::rest::generated::definition::client::DefinitionTemplateAdl14Lis
 use openehr_its::rest::runtime::Representation;
 
 use crate::cdr::config::CdrConfig;
+use crate::cdr::config::CdrCredentials;
 use crate::cdr::error::CdrError;
 use crate::cdr::error::Upstream;
 use crate::cdr::ids::ContributionUid;
 use crate::cdr::ids::EhrId;
 use crate::cdr::ids::IdError;
 use crate::cdr::ids::RequestId;
+use crate::cdr::oauth::cache::TokenSource;
 use crate::cdr::transport::Scoped;
 
 /// The openEHR ITS-REST release the bridge speaks.
@@ -135,8 +139,8 @@ pub struct Answered<O> {
 pub struct CdrClient {
     /// The configured generated-client runtime.
     client: Client<ReqwestTransport>,
-    /// The credentials the runtime was given, which a scoped call repeats.
-    credentials: Option<Credentials>,
+    /// How the runtime authenticates, which a scoped call repeats.
+    auth: Option<Auth>,
     /// The correlation identifier to echo, when the caller set one.
     request_id: Option<RequestId>,
 }
@@ -146,21 +150,26 @@ impl CdrClient {
     ///
     /// # Errors
     /// Returns [`CdrError::Build`] when the HTTP engine refuses the
-    /// configuration, and [`CdrError::Client`] when the base URL cannot carry
-    /// a path.
+    /// configuration, [`CdrError::TokenClient`] when the token client cannot
+    /// be built, and [`CdrError::Client`] when the base URL cannot carry a
+    /// path.
     pub fn new(config: &CdrConfig) -> Result<Self, CdrError> {
         let transport = ReqwestTransport::with_timeout(config.timeout)
             .map_err(|source| CdrError::Build { source })?;
-        let credentials = config.credentials.clone();
-        let mut client = Client::new(transport, config.base_url.clone())
+        let auth = match config.credentials.clone() {
+            None => None,
+            Some(CdrCredentials::Static(credentials)) => Some(Auth::Static(credentials)),
+            Some(CdrCredentials::OAuth(oauth)) => Some(Auth::OAuth(
+                TokenSource::new(*oauth, config.timeout)
+                    .map_err(|source| CdrError::TokenClient { source })?,
+            )),
+        };
+        let client = Client::new(transport, config.base_url.clone())
             .map_err(|source| CdrError::client(source, None))?
             .with_retry(config.retry);
-        if let Some(credentials) = credentials.clone() {
-            client = client.with_credentials(credentials);
-        }
         Ok(Self {
-            client,
-            credentials,
+            client: authenticated(client, auth.as_ref()),
+            auth,
             request_id: None,
         })
     }
@@ -170,7 +179,7 @@ impl CdrClient {
     pub fn with_request_id(&self, request_id: RequestId) -> Self {
         Self {
             client: self.client.clone(),
-            credentials: self.credentials.clone(),
+            auth: self.auth.clone(),
             request_id: Some(request_id),
         }
     }
@@ -210,14 +219,15 @@ impl CdrClient {
             })?;
             extra.insert(HeaderName::from_static(REQUEST_ID), value);
         }
-        let transport = Scoped::new(self.client.transport(), extra);
-        let mut client = Client::new(transport, self.client.base().clone())
+        let renewal = match self.auth.as_ref() {
+            Some(Auth::OAuth(source)) => Some(source.clone()),
+            Some(Auth::Static(_)) | None => None,
+        };
+        let transport = Scoped::new(self.client.transport(), extra, renewal);
+        let client = Client::new(transport, self.client.base().clone())
             .map_err(|source| CdrError::client(source, None))?
             .with_retry(retry);
-        if let Some(credentials) = self.credentials.clone() {
-            client = client.with_credentials(credentials);
-        }
-        Ok(client)
+        Ok(authenticated(client, self.auth.as_ref()))
     }
 
     /// Returns a runtime for one call under the configured retry budget.
@@ -267,6 +277,24 @@ impl CdrClient {
         };
         tracing::debug!(status = %status, "the openEHR service answered a probe");
         Ok(status)
+    }
+}
+
+/// How a [`CdrClient`] authenticates to the CDR.
+#[derive(Debug, Clone)]
+enum Auth {
+    /// One credential presented on every call.
+    Static(Credentials),
+    /// The token cache the client credentials grant fills.
+    OAuth(TokenSource),
+}
+
+/// Returns `client` presenting what `auth` describes on every attempt.
+fn authenticated<T: Transport>(client: Client<T>, auth: Option<&Auth>) -> Client<T> {
+    match auth {
+        None => client,
+        Some(Auth::Static(credentials)) => client.with_credentials(credentials.clone()),
+        Some(Auth::OAuth(source)) => client.with_credentials_provider(source.clone()),
     }
 }
 

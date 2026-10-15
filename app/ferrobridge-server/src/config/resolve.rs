@@ -17,6 +17,7 @@ use super::MappingSettings;
 use super::credentials::Scheme;
 use super::credentials::cdm_connection_key;
 use super::credentials::resolve_credentials;
+use super::credentials::resolve_oauth;
 use super::credentials::secret;
 use super::section::Cdm;
 use super::section::Cdr;
@@ -241,13 +242,25 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
             initial_backoff: Duration::from_millis(cdr.retry.initial_backoff_ms),
             max_backoff: Duration::from_millis(cdr.retry.max_backoff_ms),
         });
-    if let Some(scheme) = resolve_credentials("cdr.credentials", &cdr.credentials)? {
-        config = config.with_credentials(match scheme {
-            Scheme::Bearer(token) => openehr_its::rest::client::Credentials::bearer(token),
-            Scheme::Basic { user, password } => {
-                openehr_its::rest::client::Credentials::basic(user, password)
-            }
-        });
+    let scheme = resolve_credentials("cdr.credentials", &cdr.credentials.static_schemes())?;
+    match (scheme, cdr.credentials.oauth.as_ref()) {
+        (Some(_), Some(_)) => {
+            return Err(Error::OAuthScheme {
+                section: String::from("cdr.credentials"),
+            });
+        }
+        (Some(scheme), None) => {
+            config = config.with_credentials(match scheme {
+                Scheme::Bearer(token) => openehr_its::rest::client::Credentials::bearer(token),
+                Scheme::Basic { user, password } => {
+                    openehr_its::rest::client::Credentials::basic(user, password)
+                }
+            });
+        }
+        (None, Some(oauth)) => {
+            config = config.with_oauth(resolve_oauth("cdr.credentials.oauth", oauth)?);
+        }
+        (None, None) => {}
     }
     Ok(config)
 }
@@ -408,7 +421,7 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
 }
 
 /// Returns the URL `value` holds, naming `key` when it does not parse.
-fn url_of(key: &str, value: &str) -> Result<url::Url, Error> {
+pub(super) fn url_of(key: &str, value: &str) -> Result<url::Url, Error> {
     if value.is_empty() {
         return Err(Error::Missing {
             key: key.to_owned(),
