@@ -128,7 +128,7 @@ impl<'i> Walk<'_, '_, 'i> {
             Subject::Complex { value, name } => fork.complex(value, name, &root, location)?,
             Subject::Primitive { occurrence, code } => {
                 if let Some(element) = structure.element(code) {
-                    fork.checks(&structure, code, element, occurrence)?;
+                    fork.checks(&structure, code, element, occurrence, Some(code))?;
                 }
                 if let Some(element) = occurrence.element {
                     fork.complex(element, "Element", &root, location)?;

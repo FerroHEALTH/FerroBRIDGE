@@ -37,4 +37,5 @@ pub mod issue;
 pub mod package;
 pub mod report;
 pub mod set;
+pub mod terminology;
 pub mod validate;

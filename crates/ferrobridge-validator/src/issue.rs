@@ -222,6 +222,17 @@ pub enum MessageId {
     TypeProfileMismatch,
     /// A resource of a type none of its element's types names.
     ResourceTypeNotAllowed,
+    /// A value with no code from the value set of a required binding or of a
+    /// maximum value set (terminologies.html §4.1.5.1).
+    NotInValueSet,
+    /// A value with no code from the value set of an extensible binding
+    /// (terminologies.html §4.1.5.2).
+    NotInExtensibleValueSet,
+    /// A value with no code from the value set of a preferred binding
+    /// (terminologies.html §4.1.5.3).
+    NotInPreferredValueSet,
+    /// A coding whose display is none the code system defines for its code.
+    DisplayMismatch,
     /// A constraint the validator does not evaluate.
     ConstraintUnevaluated,
     /// The instance raised no issue and every constraint was evaluated.
@@ -266,6 +277,10 @@ impl MessageId {
             Self::UnresolvedReference => "unresolved-reference",
             Self::TypeProfileMismatch => "type-profile-mismatch",
             Self::ResourceTypeNotAllowed => "resource-type-not-allowed",
+            Self::NotInValueSet => "not-in-value-set",
+            Self::NotInExtensibleValueSet => "not-in-extensible-value-set",
+            Self::NotInPreferredValueSet => "not-in-preferred-value-set",
+            Self::DisplayMismatch => "display-mismatch",
             Self::ConstraintUnevaluated => "constraint-unevaluated",
             Self::AllOk => "all-ok",
         }

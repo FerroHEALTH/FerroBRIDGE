@@ -34,24 +34,6 @@ impl Walk<'_, '_, '_> {
                 Reason::Invariants,
             );
         }
-        if let Some(binding) = &element.binding {
-            let strength = binding.strength.value.clone().unwrap_or_default();
-            // NOTE: terminologies.html#strength: an example binding is no conformance
-            // requirement, so there is nothing to evaluate or to list.
-            if strength != "example" {
-                // TODO(#440): check the binding locally or through ferrobridge-term.
-                self.out().unevaluated(
-                    url,
-                    id,
-                    Constraint::Binding {
-                        strength,
-                        value_set: binding.value_set.as_ref().and_then(|set| set.value.clone()),
-                    },
-                    location,
-                    Reason::Bindings,
-                );
-            }
-        }
         for kind in &element.r#type {
             let targets: Vec<String> = kind
                 .target_profile

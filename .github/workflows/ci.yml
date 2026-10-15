@@ -469,6 +469,19 @@ jobs:
           key: fhir-examples-${{ steps.fhir-examples.outputs.key }}
       - name: Fetch and verify the FHIR examples packages
         run: bash scripts/vendor/fhir-packages.sh --build-time
+      # The profile validator's package-gated tests read the profile packages,
+      # restored from the cache key of the profile-packages lane, and fail
+      # under CI when they are absent.
+      - name: Read the pinned profile packages
+        id: profile-packages
+        run: echo "key=$(bash scripts/vendor/profile-packages.sh --cache-key)" >> "$GITHUB_OUTPUT"
+      - name: Restore the profile packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: docs/specs/fhir-packages/*/package
+          key: profile-packages-${{ steps.profile-packages.outputs.key }}
+      - name: Fetch and verify the profile packages
+        run: bash scripts/vendor/profile-packages.sh
       # One package at a time, as the clippy and msrv lanes do: a workspace-wide
       # test build schedules the generated giants side by side and the runner
       # kills it with exit 143 (docs/ci-cd.md).

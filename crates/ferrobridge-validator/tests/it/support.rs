@@ -28,6 +28,29 @@ pub(crate) fn core() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tools/fhir-codegen/vendor/hl7.fhir.r4.core")
 }
 
+/// Returns the directory `scripts/vendor/profile-packages.sh` fetches the
+/// profile packages into, `None` when they are absent.
+///
+/// Under CI (`CI=true`) an absent tree is an error, so a lane cannot pass by
+/// skipping the package-gated tests.
+pub(crate) fn profile_packages() -> TestResult<Option<PathBuf>> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/specs/fhir-packages");
+    if root
+        .join("hl7.fhir.eu.base#2.0.1/package/package.json")
+        .is_file()
+    {
+        return Ok(Some(root));
+    }
+    if std::env::var("CI").is_ok_and(|value| value == "true") {
+        return Err(format!(
+            "the profile packages are absent from {} under CI; run scripts/vendor/profile-packages.sh before the tests",
+            root.display()
+        )
+        .into());
+    }
+    Ok(None)
+}
+
 /// A synthetic package written to a temporary directory.
 pub(crate) struct Synthetic {
     pub(crate) dir: tempfile::TempDir,

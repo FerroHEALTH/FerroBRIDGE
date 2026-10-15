@@ -11,7 +11,7 @@
 
 /// A code in a code system, the neutral form of a FHIR `Coding`
 /// (<https://hl7.org/fhir/R4/datatypes.html#Coding>).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Concept {
     /// `Coding.system`.
     pub system: Option<String>,

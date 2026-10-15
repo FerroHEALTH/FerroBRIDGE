@@ -49,8 +49,11 @@ macro_rules! per_release {
                 Concept, Designation, Equivalence, Match, Property, PropertyValue,
             };
             use crate::error::{BodyError, Issue, Outcome, TxIssue};
-            use crate::outcome::{LookupOutcome, Request, TranslateOutcome, ValidateOutcome};
+            use crate::outcome::{
+                Coded, LookupOutcome, Request, TranslateOutcome, ValidateOutcome, Validation,
+            };
             use fhir_types::$release::bundle::{Bundle, BundleEntry, BundleEntryRequest};
+            use fhir_types::$release::codeable_concept::CodeableConcept;
             use fhir_types::$release::coding::Coding;
             use fhir_types::$release::operation_outcome::OperationOutcome;
             use fhir_types::$release::operations::code_system_lookup::CodeSystemLookupRequest;
@@ -92,17 +95,49 @@ macro_rules! per_release {
                         ..Default::default()
                     }
                     .into_parameters(),
-                    Request::ValidateCode {
-                        value_set_url,
+                    Request::ValidateCode(validation) => validate_code_parameters(validation),
+                }
+            }
+
+            /// Returns the `Parameters` of one `ValueSet/$validate-code`.
+            fn validate_code_parameters(validation: &Validation) -> Parameters {
+                let mut request = ValueSetValidateCodeRequest {
+                    url: Some(validation.value_set_url.as_str().into()),
+                    value_set_version: validation.value_set_version.as_deref().map(Into::into),
+                    ..Default::default()
+                };
+                match &validation.coded {
+                    Coded::Code {
                         system,
                         code,
-                    } => ValueSetValidateCodeRequest {
-                        url: Some(value_set_url.as_str().into()),
-                        system: Some(system.as_str().into()),
-                        code: Some(code.as_str().into()),
-                        ..Default::default()
+                        version,
+                        display,
+                    } => {
+                        request.system = Some(system.as_str().into());
+                        request.code = Some(code.as_str().into());
+                        request.system_version = version.as_deref().map(Into::into);
+                        request.display = display.as_deref().map(Into::into);
                     }
-                    .into_parameters(),
+                    Coded::Coding(concept) => request.coding = Some(coding(concept)),
+                    Coded::CodeableConcept { coding: codings, text } => {
+                        request.codeable_concept = Some(CodeableConcept {
+                            coding: codings.iter().map(coding).collect(),
+                            text: text.as_deref().map(Into::into),
+                            ..Default::default()
+                        });
+                    }
+                }
+                request.into_parameters()
+            }
+
+            /// Returns `concept` as a `Coding` of this release.
+            fn coding(concept: &Concept) -> Coding {
+                Coding {
+                    system: concept.system.as_deref().map(Into::into),
+                    version: concept.version.as_deref().map(Into::into),
+                    code: concept.code.as_deref().map(Into::into),
+                    display: concept.display.as_deref().map(Into::into),
+                    ..Default::default()
                 }
             }
 
@@ -336,7 +371,7 @@ fn path_of(request: &Request) -> &'static str {
     match request {
         Request::Lookup { .. } => crate::LOOKUP,
         Request::Translate { .. } => crate::TRANSLATE,
-        Request::ValidateCode { .. } => crate::VALIDATE_CODE,
+        Request::ValidateCode(_) => crate::VALIDATE_CODE,
     }
 }
 

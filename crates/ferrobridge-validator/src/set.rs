@@ -308,6 +308,7 @@ impl PackageSet {
         scope: Option<PackageId>,
     ) -> Result<(Arc<StructureDefinition>, PackageId), ResolveError> {
         resolve(
+            &self.packages,
             &self.structures,
             canonical,
             "StructureDefinition",
@@ -321,7 +322,13 @@ impl PackageSet {
         canonical: &str,
         scope: Option<PackageId>,
     ) -> Result<(Arc<ValueSet>, PackageId), ResolveError> {
-        resolve(&self.value_sets, canonical, "ValueSet", self.closure(scope))
+        resolve(
+            &self.packages,
+            &self.value_sets,
+            canonical,
+            "ValueSet",
+            self.closure(scope),
+        )
     }
 
     /// Resolves the `CodeSystem` `canonical` names as referenced from `scope`.
@@ -331,6 +338,7 @@ impl PackageSet {
         scope: Option<PackageId>,
     ) -> Result<(Arc<CodeSystem>, PackageId), ResolveError> {
         resolve(
+            &self.packages,
             &self.code_systems,
             canonical,
             "CodeSystem",
@@ -377,9 +385,10 @@ fn dependency_closure(packages: &[Package], start: usize) -> BTreeSet<PackageId>
     seen
 }
 
-/// Resolves `canonical` among `index`, the resources of type `kind`, within
-/// `closure` when given.
+/// Resolves `canonical` among `index`, the resources of type `kind` that
+/// `packages` carry, within `closure` when given.
 fn resolve<T: Json>(
+    packages: &[Package],
     index: &BTreeMap<String, Vec<Entry<T>>>,
     canonical: &str,
     kind: &str,
@@ -420,6 +429,25 @@ fn resolve<T: Json>(
         .iter()
         .copied()
         .filter(|entry| entry.version.as_deref() == wanted)
+        .collect();
+    let package = |entry: &Entry<T>| packages.get(entry.origin.0);
+    // NOTE: packages.html is silent on one canonical carried by two versions of one package;
+    // no specification governs this: our own design, the higher package version wins.
+    let matching: Vec<&Entry<T>> = matching
+        .iter()
+        .copied()
+        .filter(|entry| {
+            !matching
+                .iter()
+                .any(|other| match (package(entry), package(other)) {
+                    (Some(held), Some(rival)) => {
+                        held.name() == rival.name()
+                            && compare_versions(rival.version(), held.version())
+                                == Ordering::Greater
+                    }
+                    _ => false,
+                })
+        })
         .collect();
     let (entry, others) = matching.split_first().ok_or_else(not_found)?;
     let origin = entry.origin;
@@ -513,7 +541,8 @@ mod tests {
     }
 
     // scripts/vendor/profile-packages.sh fetches the EU trees at build time; the test
-    // returns early without them, as the other build-time corpora do.
+    // returns early without them, and fails under CI as tests/it/support.rs
+    // `profile_packages` does, since a unit test cannot reach that module.
     #[test]
     fn a_canonical_eps_names_resolves_to_the_eu_base_version_eps_depends_on() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/specs/fhir-packages");
@@ -521,6 +550,11 @@ mod tests {
             .join("hl7.fhir.eu.eps#1.0.0-ballot/package/package.json")
             .is_file()
         {
+            assert_ne!(
+                std::env::var("CI").as_deref(),
+                Ok("true"),
+                "the profile packages are absent under CI; run scripts/vendor/profile-packages.sh"
+            );
             return;
         }
         let mut paths = vec![

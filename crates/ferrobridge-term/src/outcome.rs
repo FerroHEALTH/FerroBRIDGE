@@ -8,7 +8,7 @@
 //! [`crate::error::Error`] carrying the upstream status and body. Nothing is
 //! ever flattened into an empty value.
 
-use crate::concept::{Designation, Match, Property};
+use crate::concept::{Concept, Designation, Match, Property};
 use crate::error::{Outcome, UpstreamError};
 
 /// What `CodeSystem/$lookup` answered.
@@ -129,14 +129,7 @@ pub enum Request {
         concept_map_url: Option<String>,
     },
     /// `ValueSet/$validate-code`.
-    ValidateCode {
-        /// The canonical URL of the value set to validate against.
-        value_set_url: String,
-        /// The code system the code is in.
-        system: String,
-        /// The code to validate.
-        code: String,
-    },
+    ValidateCode(Validation),
 }
 
 impl Request {
@@ -146,9 +139,54 @@ impl Request {
         match self {
             Self::Lookup { .. } => crate::LOOKUP,
             Self::Translate { .. } => crate::TRANSLATE,
-            Self::ValidateCode { .. } => crate::VALIDATE_CODE,
+            Self::ValidateCode(_) => crate::VALIDATE_CODE,
         }
     }
+}
+
+/// One `ValueSet/$validate-code` question: is the coded value a member of
+/// the value set.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Validation {
+    /// `url`, the canonical URL of the value set, without a version.
+    pub value_set_url: String,
+    /// `valueSetVersion`, the version of the value set, when the binding
+    /// names one.
+    pub value_set_version: Option<String>,
+    /// The coded value, in one of the three forms the operation accepts.
+    pub coded: Coded,
+}
+
+/// The coded value `ValueSet/$validate-code` tests, in the three input forms
+/// the operation declares
+/// (<https://hl7.org/fhir/R4/valueset-operation-validate-code.html>).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum Coded {
+    /// The `code`, `system`, `systemVersion` and `display` parameters. "If a
+    /// code is provided, a system or a context must be provided", so the
+    /// system is mandatory here.
+    Code {
+        /// `system`.
+        system: String,
+        /// `code`.
+        code: String,
+        /// `systemVersion`, the version of the system, if one was provided in
+        /// the source data.
+        version: Option<String>,
+        /// `display`, the display associated with the code, if provided.
+        display: Option<String>,
+    },
+    /// The `coding` parameter.
+    Coding(Concept),
+    /// The `codeableConcept` parameter: "the server returns true if one of the
+    /// coding values is in the value set".
+    CodeableConcept {
+        /// `CodeableConcept.coding`.
+        coding: Vec<Concept>,
+        /// `CodeableConcept.text`.
+        text: Option<String>,
+    },
 }
 
 /// What one batch entry answered, in the shape of the request that produced

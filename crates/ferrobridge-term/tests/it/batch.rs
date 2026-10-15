@@ -7,7 +7,9 @@
 use crate::support::{RELEASES, client, release_path, request_body};
 use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::error::Error;
-use ferrobridge_term::outcome::{BatchOutcome, LookupOutcome, Request, ValidateOutcome};
+use ferrobridge_term::outcome::{
+    BatchOutcome, Coded, LookupOutcome, Request, ValidateOutcome, Validation,
+};
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use std::error::Error as StdError;
@@ -36,11 +38,16 @@ fn requests() -> Vec<Request> {
             code: fixtures::TERM_UNKNOWN_CODE.to_owned(),
             version: None,
         },
-        Request::ValidateCode {
+        Request::ValidateCode(Validation {
             value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
-            system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
-            code: fixtures::TERM_MEMBER_CODE.to_owned(),
-        },
+            value_set_version: None,
+            coded: Coded::Code {
+                system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
+                code: fixtures::TERM_MEMBER_CODE.to_owned(),
+                version: None,
+                display: None,
+            },
+        }),
     ]
 }
 
@@ -190,11 +197,16 @@ async fn a_failed_entry_is_that_entrys_typed_error() -> Result<(), Box<dyn StdEr
     .await;
 
     let sent = vec![
-        Request::ValidateCode {
+        Request::ValidateCode(Validation {
             value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
-            system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
-            code: fixtures::TERM_MEMBER_CODE.to_owned(),
-        },
+            value_set_version: None,
+            coded: Coded::Code {
+                system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
+                code: fixtures::TERM_MEMBER_CODE.to_owned(),
+                version: None,
+                display: None,
+            },
+        }),
         Request::Lookup {
             system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
             code: fixtures::TERM_MEMBER_CODE.to_owned(),

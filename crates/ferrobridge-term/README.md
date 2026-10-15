@@ -18,6 +18,11 @@ Three operations on one configured server:
 - `ConceptMap/$translate` maps a code into another code system.
 - `ValueSet/$validate-code` tests membership of a value set.
 
+`validate` takes the three input forms `$validate-code` declares: a code with
+its system, `systemVersion` and `display`, a `Coding`, or a `CodeableConcept`,
+with an optional `valueSetVersion`. `validate_all` answers several validations
+by position, one call for one and one `batch` for several.
+
 `batch` sends several of them as one `batch` `Bundle` and answers them by
 position; an entry the server refused is that entry's own typed error and
 leaves the others alone.

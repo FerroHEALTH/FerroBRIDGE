@@ -61,7 +61,7 @@ fn the_core_invariants_of_a_datatype_reached_are_named_unevaluated() -> TestResu
 }
 
 #[test]
-fn a_required_binding_reached_is_named_unevaluated() -> TestResult {
+fn a_required_binding_the_core_package_enumerates_is_checked_and_not_listed() -> TestResult {
     let set = PackageSet::load([core()])?;
     let set_report = validate(
         &set,
@@ -77,7 +77,8 @@ fn a_required_binding_reached_is_named_unevaluated() -> TestResult {
             if strength == "required"
                 && value_set.as_deref().is_some_and(|set| set.starts_with("http://hl7.org/fhir/ValueSet/name-use")))
     });
-    assert!(binding.is_some(), "{:#?}", set_report.unevaluated());
+    assert!(binding.is_none(), "{:#?}", set_report.unevaluated());
+    assert!(set_report.is_valid(), "{:#?}", set_report.issues());
     Ok(())
 }
 

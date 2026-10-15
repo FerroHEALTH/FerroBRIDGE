@@ -106,6 +106,27 @@ crates on crates.io.
   re-encodes, and goes through the XML codec and back. It is fetched at build
   time like the other examples packages, and the suite strips the byte order
   mark 19 of its files begin with.
+- The R4 profile validator checks terminology bindings (#440) on `code`,
+  `string`, `uri`, `Coding`, `CodeableConcept` and quantity units: a code
+  outside the value set is an error under `required` and under the
+  `elementdefinition-maxValueSet` extension, a warning under `extensible`
+  and information under `preferred`; `example` is not checked. Membership is
+  read from the package set: listed concepts, whole code systems with their
+  nested concepts, excludes, imported value sets (all of them, as R4
+  valueset.html §4.9.5 composes them), pinned code system versions, the
+  `is-a`, `descendent-of`, `is-not-a` and `generalizes` filters over an `is-a`
+  hierarchy, the `=`, `in`, `not-in` and `exists` property filters,
+  `compose.inactive`, and a complete expansion. A coding whose display is
+  none its code system gives the code is a warning. A binding the package set
+  cannot decide is named with its reason and kept as a pending check that
+  `Report::resolve_bindings` sends to a terminology server through
+  `ferrobridge-term`, one call or one batch; a refusal or failure stays named
+  with its status and is never a pass. The slicing value-set discriminator
+  uses the same membership.
+- `ferrobridge-term` validates a `Coding` and a `CodeableConcept`, and a code
+  with its `systemVersion` and `display`, with an optional `valueSetVersion`
+  (#440). `Client::validate_all` answers several validations in one call or
+  one batch, and `Error::upstream_status` names the status of a refusal.
 - `omop_cdm::quality` runs the nine conformance checks of the OHDSI Data
   Quality Dashboard v2.9.0 (`cdmTable`, `cdmField`, `isRequired`,
   `cdmDatatype`, `isPrimaryKey`, `isForeignKey`, `fkDomain`, `fkClass`,
@@ -134,6 +155,10 @@ crates on crates.io.
 
 ### Changed
 
+- The CI `test` lane and the SonarQube Cloud lane restore and fetch the
+  profile packages before the tests, and the profile validator's
+  package-gated tests fail under CI when the packages are absent, where they
+  returned early and passed (#503).
 - `fhirconnect` 0.1.110 locates every loss a run declares (#498). A
   `fhirconnect::engine::outcome::Warning` is now a `Loss` (the former
   variants: `Skipped`, `Defaulted`, `LastOfMany`, `OneWayFallback`,
@@ -190,6 +215,10 @@ crates on crates.io.
 
 ### Fixed
 
+- The R4 profile validator resolves a canonical that two versions of one
+  package carry at one resource version to the higher package version, where
+  it refused it as ambiguous; two different packages carrying one canonical
+  at one version with different content stay ambiguous (#502).
 - The R4 profile validator refuses a resource of a type its element's types
   do not name, where an element typed `Resource` or `DomainResource` still
   takes any resource (#488).
