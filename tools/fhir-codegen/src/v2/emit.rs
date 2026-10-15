@@ -115,7 +115,7 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
     })?;
     let scratch_src = scratch.path().join("src");
     write_tree(&scratch_src, &files)?;
-    rustfmt(&scratch_src, &files, &options.crate_dir)?;
+    rustfmt(&scratch_src, &options.crate_dir)?;
     let formatted = read_tree(&scratch_src, &files)?;
 
     let target_src = options.crate_dir.join("src");
