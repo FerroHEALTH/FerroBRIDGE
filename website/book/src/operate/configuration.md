@@ -352,6 +352,8 @@ This lane reaches identifiable data, and the server says so once at start-up.
 | `system_id` | `FerroBRIDGE` | The `AUDIT_DETAILS.system_id` every commit records |
 | `composition_language` | none, required | The `COMPOSITION.language` every commit carries, an ISO 639-1 code |
 | `composition_territory` | none, required | The `COMPOSITION.territory` every commit carries, an ISO 3166-1 code |
+| `search_count` | `20` | The page size of a search that names no `_count` |
+| `search_count_max` | `100` | The largest page one search answers; a larger `_count` is answered with this many |
 
 The two composition fields have no default. FHIRconnect puts them on the
 project performing the mapping, and there is no correct language for a clinical

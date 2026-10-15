@@ -11,8 +11,8 @@ of its own.
 The facade runs. It is off until `[facade] enabled` turns it on, and a disabled
 facade mounts no route, so a request answers `404` rather than `403`. What this
 page describes is what the server answers today: conformance, create, read,
-vread, update, transaction and `$validate`. Search and batch are later work, and the
-`CapabilityStatement` leaves them out rather than claiming them.
+vread, update, search, transaction and `$validate`. Batch is later work, and the
+`CapabilityStatement` leaves it out rather than claiming it.
 
 <!-- toc -->
 
@@ -35,6 +35,8 @@ for `spec.version`. The service base is `/fhir`.
 |---|---|
 | `GET /fhir/metadata` | The `CapabilityStatement` of the loaded mapping set |
 | `POST /fhir/{type}` | Create, conditional through `If-None-Exist` |
+| `GET /fhir/{type}?…` | Search the type over the AQL its search declaration states |
+| `POST /fhir/{type}/_search` | The same search, its parameters in a form body |
 | `POST /fhir/{type}/$validate` | The dry run that commits nothing |
 | `GET /fhir/{type}/{id}` | Read one resource back out of its composition |
 | `GET /fhir/{type}/{id}/_history/{vid}` | Vread: read the version a write's `Location` named |
@@ -43,15 +45,18 @@ for `spec.version`. The service base is `/fhir`.
 
 A type no loaded program maps is absent from the `CapabilityStatement` and
 answers `404` with a `not-supported` `OperationOutcome` on the wire. A batch
-Bundle answers `422` with `not-supported`. Search has no route
-([issue #98](https://github.com/FerroHEALTH/FerroBRIDGE/issues/98) lands it),
-and a `_count` that is not a non-negative integer is a `400` with `invalid`,
-so a client never reads a page it did not ask for.
+Bundle answers `422` with `not-supported`. A search on a type no search
+declaration answers is a `404` with `not-supported`, and a `_count` that is not
+a non-negative integer is a `400` with `invalid`, so a client never reads a
+page it did not ask for.
 
 The `CapabilityStatement` names exactly the resource types the loaded programs
 map, with `create`, `read`, `vread` and `update` per type, `transaction` at system
 level, the `$validate` operation, `updateCreate: false`, `conditionalCreate`
-and `conditionalUpdate` true, `fhirVersion: 4.0.1`, and no search parameter.
+and `conditionalUpdate` true, and `fhirVersion: 4.0.1`. A type a search
+declaration answers also names `search-type` and, in `searchParam`, exactly
+`_id` and the parameters the declaration states; every other type names no
+search parameter.
 When the FHIRconnect operations lane is served under the same base,
 `rest.operation` also names `$tofhir` and `$toopenehr`; their direct forms are
 never declared ([The FHIRconnect operations](operations.md) says why).
@@ -252,6 +257,8 @@ both sides, and one wire test asserts each row.
 | `401` | `401`, propagating `WWW-Authenticate`, never `403` |
 | `400`, `405` or `415` | `500`: the bridge chose a call the CDR does not offer |
 | any `5xx` | `502` carrying the upstream status |
+| `400` on a search query | `500`: the bridge wrote the AQL the CDR refused |
+| `408` on a search query | `502` carrying the upstream status |
 | no answer: a connect failure or a timeout | `502` |
 
 ## Paths are written as well as read
@@ -281,22 +288,108 @@ mapping functions in
 a mapping that needs a display resolved refuses the unit rather than writing a
 coding without one.
 
-## Search is FerroBRIDGE's own design
+## Search
 
 FHIRconnect states that it "does not focus specifically on AQL and FHIRsearch",
-so no specification governs FHIR search here. The design is FerroBRIDGE's own,
-and it is labelled as such wherever it appears:
+so no specification governs FHIR search over an openEHR CDR. The surface below
+is FerroBRIDGE's own design, built on the R4 search page for everything the
+client sees.
 
-- An AQL projection per resource type, declared beside the context mapping.
-- Execution over `POST /query/aql` on the CDR.
-- A CapabilityStatement that names exactly which search parameters each
-  resource supports.
-- An `OperationOutcome` refusing every parameter outside that list, rather than
-  ignoring it.
+### Declaring search beside a context
 
-A refusal is deliberate. A search server that silently drops an unsupported
-parameter returns a result set that looks filtered and is not, which is the
-kind of quiet wrongness this project treats as a defect.
+A context answers search only when a search declaration names it. The
+declaration is a YAML file in the mapping directory whose name ends in
+`.search.yml` or `.search.yaml`; the FHIRconnect loader skips those files, and
+the facade reads them at boot after the mapping set compiles.
+
+```yaml
+context: condition.problem-list        # metadata.name of the context mapping
+patient:
+  parameters: [patient, subject]       # the names that address the EHR's subject
+  required: true                       # a search without one is a 400
+order:                                 # the total order every page is read in
+  - v/commit_audit/time_committed/value
+  - v/uid/value
+parameters:
+  code:
+    type: token
+    code: c/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value/defining_code/code_string
+    system: c/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value/defining_code/terminology_id/value
+    systems:
+      "http://snomed.info/sct": SNOMED-CT
+  onset-date:
+    type: date
+    path: c/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0077]/value/value
+```
+
+The facade writes the query itself:
+`SELECT e/ehr_id/value, v/uid/value, c FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c`,
+restricted to the context's template through
+`c/archetype_details/template_id/value`. So a row is always one composition,
+and a declaration contributes paths only, rooted at `e`, `v` or `c`. Every
+search value travels as a bound AQL parameter and never as query text.
+
+The declaration is checked when the server starts, and any of these refuses
+the start with the file named: an unknown key, a context no loaded mapping
+compiles, a parameter type other than `token`, `string` or `date`, a name
+under the `_` prefix R4 reserves, a path that is not one AQL path over the
+three aliases, a query that does not parse as AQL, two declarations of one
+resource type over one template, and two declarations of one type that state
+different parameters. `order` defaults to the commit time and then the version
+uid; set it when your CDR orders better by something else.
+
+### What a search answers
+
+| Parameter | What it does |
+|---|---|
+| a declared `token` | `[code]`, `[system]\|[code]`, `\|[code]` and `[system]\|`; `systems` translates a FHIR system URI into the openEHR terminology id, and an unlisted system compares as written |
+| a declared `string` | starts-with by default, `:contains` and `:exact` |
+| a declared `date` | the range of the value's precision, with the prefixes `eq`, `ne`, `gt`, `lt`, `ge`, `le`, `sa` and `eb` |
+| `patient`, `subject` (as declared) | `[id]`, `Patient/[id]`, an absolute URL on this server, or the `:Patient` modifier, resolved through the identity map to the EHR |
+| `_id` | a logical id, resolved through the identity map to its composition |
+| `_count` | the page size, capped at `[facade] search_count_max`; `0` answers the total alone |
+| `_sort` | declared parameters, `-` for descending, ahead of the declared order |
+| `_summary` | `count` answers the total alone; `false` is the default |
+| `_total` | `none`, `estimate` or `accurate` |
+
+A comma inside a value is an OR and a repeated parameter an AND. An empty
+parameter is ignored. A subject or an id the identity map does not know
+matches nothing, so the answer is an empty `searchset`, never a `404`, and no
+query reaches the CDR. A subject is read from the map and never echoed from
+the request.
+
+A parameter the type does not declare is a `400` with `not-supported` naming
+it. Send `Prefer: handling=lenient` and the facade ignores it instead, leaves it
+out of the `self` link and reports it in an `OperationOutcome` entry with
+`search.mode = outcome`. A modifier the facade does not support is a `400` in
+both modes, because R4 makes that a SHALL. So are a malformed value, the `ap`
+date prefix, and a string pattern carrying `*` or `?`, which AQL `LIKE` reads
+as wildcards with no escape (search it with `:exact`). Chained parameters and
+the `:identifier` modifier are not supported yet
+([issue #492](https://github.com/FerroHEALTH/FerroBRIDGE/issues/492)).
+
+### The searchset
+
+The answer is a `searchset` Bundle with an `id` and `meta.lastUpdated`. Each
+entry is one composition, with a unique `fullUrl` under the configured base and
+`search.mode = match`, mapped back through the context's program as a read
+maps it. `link[self]` names the parameters the search used with the page size,
+and `link[next]` appears when another page follows. Its `_cursor` is opaque:
+follow the link as answered, because a cursor pasted onto another search is a
+`400`.
+
+Each page reads one row past its size through the CDR's `offset` and `fetch`,
+so a `next` link is written only when a row is left. `Bundle.total` counts
+matches, never the page: a first page that holds every match carries it at no
+cost, `_total=accurate` or `estimate` runs a `COUNT(*)` query for a paged
+search, and `_total=none` leaves it out. `_count=0` and `_summary=count` run
+the count query alone and answer no entries and no `next` link.
+
+A search never answers an empty Bundle for a failed call. A CDR refusal reaches
+the wire through the status table above: a `5xx` or a `408` on the query is a
+`502` carrying the upstream status, and a `400` on it is a `500`, because the
+bridge wrote the AQL. A row the facade cannot read is a `502` naming the column,
+never the value.
 
 ## What the facade does not do
 

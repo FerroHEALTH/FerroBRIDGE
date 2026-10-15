@@ -208,6 +208,16 @@ pub fn load(directory: &Path, programs: &Programs) -> Result<Catalog, Declaratio
         let declared = bind(&file, written, programs)?;
         insert(&mut catalog, declared)?;
     }
+    tracing::info!(
+        lane = "facade",
+        types = catalog
+            .by_type
+            .keys()
+            .cloned()
+            .collect::<Vec<String>>()
+            .join(","),
+        "the FHIR facade searches these resource types"
+    );
     Ok(catalog)
 }
 

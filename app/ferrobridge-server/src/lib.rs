@@ -536,26 +536,11 @@ async fn build_facade(
         programs: programs.len(),
         templates: templates.len(),
     };
-    let search = facade::search::load(directory, &programs)
-        .context("reading the search declarations beside the mappings")?;
-    tracing::info!(
-        lane = "facade",
-        types = programs
-            .resource_types()
-            .iter()
-            .filter(|name| search.surface(name).is_some())
-            .cloned()
-            .collect::<Vec<String>>()
-            .join(","),
-        "the FHIR facade searches these resource types"
-    );
+    let search = facade::search::load(directory, &programs).context("reading the searches")?;
     let store = facade::identity::redb_store::RedbStore::open(&lane.identity_store)
         .with_context(|| format!("opening {}", lane.identity_store.display()))?;
-    Ok((
-        facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone())
-            .with_search(search, lane.search),
-        counts,
-    ))
+    let built = facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone());
+    Ok((built.with_search(search, lane.search), counts))
 }
 
 /// Returns the exit code a command-line refusal deserves.
