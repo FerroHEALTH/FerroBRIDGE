@@ -22,4 +22,5 @@ mod parse;
 mod seams;
 mod suite;
 mod support;
+mod types;
 mod ucum;

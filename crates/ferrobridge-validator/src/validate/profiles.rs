@@ -71,13 +71,19 @@ pub(crate) fn profiles_for(element: Option<&ElementDefinition>, code: &str) -> V
 }
 
 /// The profiles the types of `element` name for a resource of type `kind`:
-/// the types coded `kind`, `Resource` or `DomainResource`.
+/// the types coded `kind` or a type `kind` specializes, so `Resource` for
+/// any resource and `DomainResource` for one whose base chain reaches it.
 pub(crate) fn resource_profiles(element: Option<&ElementDefinition>, kind: &str) -> Vec<String> {
+    let schemas = &fhir_types::r4::schema::SCHEMAS;
     element
         .into_iter()
         .flat_map(|element| &element.r#type)
         .filter(|entry| {
-            matches!(entry.code.value.as_deref(), Some(code) if code == kind || code == "Resource" || code == "DomainResource")
+            entry
+                .code
+                .value
+                .as_deref()
+                .is_some_and(|code| schemas.specializes(kind, code))
         })
         .flat_map(|entry| &entry.profile)
         .filter_map(|profile| profile.value.clone())

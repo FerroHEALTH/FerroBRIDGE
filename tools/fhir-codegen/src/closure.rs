@@ -64,6 +64,7 @@ pub enum ClosureError {
 pub struct TypeClosure {
     structures: BTreeMap<String, ResolvedStructure>,
     element: ResolvedStructure,
+    bases: BTreeMap<String, ResolvedStructure>,
     roots: BTreeSet<String>,
     scopes: BTreeMap<String, RootScope>,
 }
@@ -88,7 +89,7 @@ impl TypeClosure {
         } else {
             structures.keys().cloned().collect()
         };
-        let scopes = structures
+        let mut scopes: BTreeMap<String, RootScope> = structures
             .keys()
             .map(|name| {
                 let scope = if terminology.contains(name) {
@@ -99,9 +100,12 @@ impl TypeClosure {
                 (name.clone(), scope)
             })
             .collect();
+        let element = resolve_named(package, ELEMENT_TYPE, "(the element table)")?;
+        let bases = base_chains(package, &structures, &element, &mut scopes)?;
         Ok(Self {
             structures,
-            element: resolve_named(package, ELEMENT_TYPE, "(the element table)")?,
+            element,
+            bases,
             roots: roots
                 .resources
                 .values()
@@ -121,6 +125,20 @@ impl TypeClosure {
     #[must_use]
     pub fn element(&self) -> &ResolvedStructure {
         &self.element
+    }
+
+    /// The abstract structures the closure's `baseDefinition` chains name and
+    /// the closure does not otherwise hold, keyed by type name: `Resource`,
+    /// `DomainResource` and `BackboneElement`, and from R5 `Base`, `DataType`
+    /// and `BackboneType` (<https://hl7.org/fhir/R5/types.html>), for the
+    /// table-only entries that let a consumer walk a type's base chain to its
+    /// root.
+    ///
+    /// A primitive's chain is not followed, because the element table carries
+    /// no primitive.
+    #[must_use]
+    pub fn bases(&self) -> &BTreeMap<String, ResolvedStructure> {
+        &self.bases
     }
 
     /// The names of the root resources.
@@ -165,6 +183,104 @@ fn walk<'a>(
         structures.insert(code, resolved);
     }
     Ok(structures)
+}
+
+/// The abstract bases of the closure, following every `baseDefinition` chain
+/// of a non-primitive structure, of `element`, and of `BackboneElement` when an
+/// element is typed with it, to its root.
+///
+/// Each base records in `scopes` the narrowest scope of a type that reaches
+/// it, so its entry carries the feature of its narrowest specialization.
+///
+/// # Errors
+///
+/// Returns [`ClosureError`] when a chain names a structure the package does
+/// not define or a profile, or when a snapshot does not resolve.
+fn base_chains(
+    package: &Package,
+    structures: &BTreeMap<String, ResolvedStructure>,
+    element: &ResolvedStructure,
+    scopes: &mut BTreeMap<String, RootScope>,
+) -> Result<BTreeMap<String, ResolvedStructure>, ClosureError> {
+    let lookup = |url: &str, referrer: &str| {
+        package
+            .structure_definitions()
+            .get(url)
+            .ok_or_else(|| ClosureError::UnknownType {
+                path: referrer.to_owned(),
+                code: url.to_owned(),
+            })
+    };
+    let mut pending: Vec<(&StructureDefinition, String, RootScope)> = Vec::new();
+    let mut backbone: Option<RootScope> = None;
+    for structure in structures
+        .values()
+        .filter(|structure| structure.kind != StructureKind::PrimitiveType)
+    {
+        let scope = scopes
+            .get(&structure.name)
+            .copied()
+            .unwrap_or(RootScope::Resources);
+        if let Some(url) = &structure.base_definition {
+            pending.push((lookup(url, &structure.name)?, structure.name.clone(), scope));
+        }
+        if structure.elements.iter().any(names_backbone_element) {
+            backbone = Some(backbone.map_or(scope, |held| held.min(scope)));
+        }
+    }
+    if let Some(url) = &element.base_definition {
+        pending.push((
+            lookup(url, ELEMENT_TYPE)?,
+            ELEMENT_TYPE.to_owned(),
+            RootScope::Terminology,
+        ));
+    }
+    if let Some(scope) = backbone {
+        let definition = package
+            .structure_definition_named(BACKBONE_ELEMENT)
+            .ok_or_else(|| ClosureError::UnknownType {
+                path: String::from("(an element typed BackboneElement)"),
+                code: BACKBONE_ELEMENT.to_owned(),
+            })?;
+        pending.push((definition, BACKBONE_ELEMENT.to_owned(), scope));
+    }
+    let mut bases: BTreeMap<String, ResolvedStructure> = BTreeMap::new();
+    while let Some((definition, referrer, scope)) = pending.pop() {
+        let name = &definition.name;
+        if structures.contains_key(name) || name == ELEMENT_TYPE {
+            continue;
+        }
+        if scopes.get(name).is_some_and(|held| *held <= scope) {
+            continue;
+        }
+        scopes.insert(name.clone(), scope);
+        let next = if let Some(resolved) = bases.get(name) {
+            resolved.base_definition.clone()
+        } else {
+            if definition.derivation == Some(Derivation::Constraint) {
+                return Err(ClosureError::ProfileAsType {
+                    path: referrer,
+                    code: name.clone(),
+                });
+            }
+            let resolved = ResolvedStructure::resolve(definition)?;
+            let next = resolved.base_definition.clone();
+            bases.insert(name.clone(), resolved);
+            next
+        };
+        if let Some(url) = next {
+            pending.push((lookup(&url, name)?, name.clone(), scope));
+        }
+    }
+    Ok(bases)
+}
+
+/// The base of every backbone element (<https://hl7.org/fhir/R4/backboneelement.html>).
+const BACKBONE_ELEMENT: &str = "BackboneElement";
+
+/// Whether `element` is typed `BackboneElement`.
+fn names_backbone_element(element: &ResolvedElement) -> bool {
+    matches!(&element.shape, ElementShape::Typed(types) if types.iter().any(|t| t.code == BACKBONE_ELEMENT))
 }
 
 /// The structure `code` names, refused when it is undefined or is a profile.
