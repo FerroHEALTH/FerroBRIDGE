@@ -46,13 +46,18 @@ use openehr_mapping_core::index::paths::FlatId;
 use crate::engine::context::CallContext;
 use crate::engine::family;
 use crate::engine::origin::Origin;
+use crate::engine::outcome::Location;
 use crate::engine::outcome::Outcome;
 use crate::engine::outcome::Warning;
 use crate::engine::rm::RmValue;
 use crate::engine::seam::Seams;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::Program;
+use crate::resolve::program::mapping::Mapping;
+use crate::resolve::program::target::FhirTarget;
+use crate::resolve::program::target::OpenehrTarget;
 use crate::tree::Occurrence;
+use crate::tree::locate::locate;
 
 use crate::tree::element::Table;
 
@@ -84,7 +89,8 @@ const PARTICIPATION_SCHEME: &str = "FHIR";
 /// `engine/defaults-for-fields.adoc` puts the composer and the context start
 /// time on the engine and the rest on "the project performing the mapping", so
 /// only those two carry a value here unless the caller sets more. Every field
-/// the engine fills is recorded as [`Warning::Defaulted`].
+/// the engine fills is recorded as a
+/// [`Loss::Defaulted`](crate::engine::outcome::Loss::Defaulted) warning.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Defaults {
     composer: String,
@@ -409,6 +415,52 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             fhir_pin: None,
         }
     }
+}
+
+impl<T: Table + ?Sized> Run<'_, T> {
+    /// Returns where a loss at `mapping` happened, its FHIR side at
+    /// `occurrence`.
+    ///
+    /// The FHIR occurrence a binding carries is the input occurrence going
+    /// into openEHR and the output occurrence coming out to FHIR, so the one
+    /// rule locates the element the loss concerns in both directions.
+    fn locate(&self, mapping: &Mapping, occurrence: &Occurrence) -> Location {
+        self.locate_targets(mapping.fhir(), occurrence, mapping.openehr())
+    }
+
+    /// Returns the location of a FHIR and an openEHR target, either absent.
+    fn locate_targets(
+        &self,
+        fhir: Option<&FhirTarget>,
+        occurrence: &Occurrence,
+        openehr: Option<&OpenehrTarget>,
+    ) -> Location {
+        let mut location = Location::default();
+        if let Some(target) = fhir {
+            location = location.with_fhir(locate(&self.fhir, target.resolved(), occurrence));
+        }
+        if let Some(target) = openehr {
+            location = location.with_openehr(openehr_path(target));
+        }
+        location
+    }
+}
+
+/// Returns the archetype path of an openEHR target: its node's `aqlPath` with
+/// the attribute tail appended.
+///
+/// The `aqlPath` carries the node ids and the names the template gives the
+/// node, so the path holds no value of the composition.
+fn openehr_path(target: &OpenehrTarget) -> String {
+    let mut path = String::from(target.node().aql_path().as_str());
+    for segment in &target.tail().segments {
+        path.push('/');
+        path.push_str(segment.attribute.as_str());
+    }
+    if path.is_empty() {
+        path.push('/');
+    }
+    path
 }
 
 /// A value written at a composition attribute the FLAT builder sets from the

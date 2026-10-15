@@ -20,6 +20,8 @@
 //! - [`read`] evaluates a resolved path over a document.
 //! - [`mod@write`] sets a value at a writable path, creating what the element
 //!   table's cardinality says to create.
+//! - [`locate`] names one element of a document as a FHIRPath in the simple
+//!   subset an `OperationOutcome` issue carries.
 //! - [`error`] holds the error types the four steps return.
 //!
 //! The JSON shape is the FHIR JSON representation
@@ -30,6 +32,7 @@
 
 pub mod element;
 pub mod error;
+pub mod locate;
 pub mod path;
 pub mod read;
 pub mod write;

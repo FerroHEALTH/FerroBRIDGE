@@ -33,9 +33,21 @@ error and an empty result are distinct outcomes.
 `htmlChecks()` reads the narrative rules of FHIR R4. `trace()` logs through
 `tracing` the name, the count and the item types, never a value.
 
-Quantities with the same unit, and calendar durations among themselves,
-compare and compute; other pairs of different UCUM units answer empty, as
-FHIRPath permits for an implementation without UCUM conversion.
+Quantities compare, convert and add across commensurable UCUM units, in the
+more granular of the two, and `toQuantity(unit)` converts to the unit asked
+for. The `ucum` module reads the UCUM 2.2 essence, embedded whole: prefixes,
+exponents, annotations, the `10*` and `10^` forms and parenthesized terms,
+with degree Celsius, degree Fahrenheit and degree Réaumur converted by their
+functions. Other special units and every arbitrary unit convert to nothing,
+and units of different dimensions answer empty. Calendar durations keep the
+FHIRPath rules: they convert among themselves and meet the UCUM time units
+only at and below the second.
+
+The UCUM essence is copyright 1999-2024, Regenstrief Institute, Inc., and
+ships under the UCUM Copyright Notice and License
+(<https://unitsofmeasure.org/license>) in `vendor/ucum/`, provided "AS IS",
+without warranties or conditions of any kind; it is not covered by the
+licence of this crate.
 
 ## Conformance
 

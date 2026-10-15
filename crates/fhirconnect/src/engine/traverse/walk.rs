@@ -9,6 +9,7 @@ use openehr_mapping_core::composition::RmPosition;
 use crate::engine::condition;
 use crate::engine::condition::ConditionError;
 use crate::engine::condition::Verdict;
+use crate::engine::outcome::Loss;
 use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
 use crate::engine::rm;
@@ -100,10 +101,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
         if let Some(only) = mapping.direction()
             && only != self.direction
         {
-            self.warnings.push(Warning::Skipped {
-                mapping: String::from(mapping.name()),
-                reason: SkipReason::Unidirectional,
-            });
+            let location = self.locate(mapping, &parent.fhir);
+            self.warnings.push(Warning::new(
+                Loss::Skipped {
+                    mapping: String::from(mapping.name()),
+                    reason: SkipReason::Unidirectional,
+                },
+                location,
+            ));
             return Ok(Ran::Gated);
         }
         let Some(admitted) = self.admits(mapping, parent)? else {
@@ -444,12 +449,16 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     if self.slot_admits(mapping, preprocessors, binding)? {
                         admitted.push(binding);
                     } else {
-                        self.warnings.push(Warning::Skipped {
-                            mapping: String::from(mapping.name()),
-                            reason: SkipReason::PreprocessorGate {
-                                model: name.clone(),
+                        let location = self.locate(mapping, &binding.fhir);
+                        self.warnings.push(Warning::new(
+                            Loss::Skipped {
+                                mapping: String::from(mapping.name()),
+                                reason: SkipReason::PreprocessorGate {
+                                    model: name.clone(),
+                                },
                             },
-                        });
+                            location,
+                        ));
                     }
                 }
                 // NOTE: HierarchyMappings.adoc, the hierarchy lives in the

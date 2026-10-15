@@ -7,16 +7,19 @@
 //! Units are compared case-sensitively. Two quantities with the same unit
 //! compare and compute; calendar durations convert among themselves by the
 //! factors of N1 §5.5.7; a calendar duration and a definite one meet only at
-//! the second and the millisecond (N1 §6.1.1, §6.2). Every other pair of
-//! different units needs UCUM conversion, which this crate does not carry,
-//! and answers empty as N1 §4.1.8 permits.
+//! the second and below (N1 §6.1.1, §6.2). Two different UCUM units convert
+//! by UCUM ([`crate::ucum`]) and are compared in the more granular one; a
+//! pair UCUM does not convert, an invalid unit among them, answers empty as
+//! N1 §6.1.1 says.
 
 use std::cmp::Ordering;
 use std::fmt;
 use std::sync::LazyLock;
 
 use regex::Regex;
-use rust_decimal::Decimal;
+use rust_decimal::{Decimal, RoundingStrategy};
+
+use crate::ucum::Canonical;
 
 /// A calendar duration keyword (N1 §4.1.8).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -140,17 +143,30 @@ impl Unit {
     pub fn from_code(code: String) -> Self {
         Calendar::from_keyword(&code).map_or(Self::Ucum(code), Self::Calendar)
     }
+}
 
-    /// The calendar keyword or definite time unit at and below the second,
-    /// where N1 §6.7 makes calendar and definite durations one.
-    fn subsecond(&self) -> Option<Calendar> {
+impl Unit {
+    /// The UCUM code of the unit: its own, or the definite unit of a calendar
+    /// keyword at and below the second.
+    fn definite(&self) -> Option<&str> {
         match self {
-            Self::Calendar(Calendar::Second) => Some(Calendar::Second),
-            Self::Calendar(Calendar::Millisecond) => Some(Calendar::Millisecond),
-            Self::Ucum(code) if code == "s" => Some(Calendar::Second),
-            Self::Ucum(code) if code == "ms" => Some(Calendar::Millisecond),
-            _ => None,
+            Self::Calendar(calendar) => calendar.subsecond(),
+            Self::Ucum(code) => Some(code),
         }
+    }
+
+    /// Whether the unit is a special UCUM unit, one on a scale other than a
+    /// ratio scale (UCUM §21).
+    fn is_special(&self) -> bool {
+        matches!(self, Self::Ucum(code) if ucum(code).is_some_and(|unit| unit.is_special()))
+    }
+}
+
+impl Calendar {
+    /// The definite UCUM unit of a calendar keyword at and below the second,
+    /// where N1 §6.7 makes calendar and definite durations one.
+    fn subsecond(self) -> Option<&'static str> {
+        matches!(self, Self::Second | Self::Millisecond).then(|| self.ucum())
     }
 }
 
@@ -174,12 +190,37 @@ pub struct Quantity {
 
 /// How two quantities line up for a comparison.
 enum Aligned {
-    /// Both values in one unit.
-    Values(Decimal, Decimal, Unit),
+    /// Both values in one unit, with the size of each operand's unit in it.
+    Values {
+        left: Decimal,
+        right: Decimal,
+        unit: Unit,
+        sizes: (Decimal, Decimal),
+    },
     /// A calendar duration above the second against a definite one.
     Calendrical,
-    /// Different units this crate cannot convert.
+    /// Units that do not convert.
     Unknown,
+}
+
+impl Aligned {
+    /// The pair with its operands exchanged.
+    fn swapped(self) -> Self {
+        match self {
+            Self::Values {
+                left,
+                right,
+                unit,
+                sizes: (left_size, right_size),
+            } => Self::Values {
+                left: right,
+                right: left,
+                unit,
+                sizes: (right_size, left_size),
+            },
+            other => other,
+        }
+    }
 }
 
 impl Quantity {
@@ -189,36 +230,56 @@ impl Quantity {
         Self { value, unit }
     }
 
-    /// Both values in the finer of the two units, when they convert.
+    /// Both values in the more granular of the two units, when they convert
+    /// (N1 §6.1.1: "the comparison will be made using the most granular unit
+    /// of either input").
     fn align(&self, other: &Self) -> Aligned {
         if self.unit == other.unit {
-            return Aligned::Values(self.value, other.value, self.unit.clone());
-        }
-        if let (Some(a), Some(b)) = (self.unit.subsecond(), other.unit.subsecond()) {
-            return calendar_aligned(self.value, a, other.value, b, |c| {
-                Unit::Ucum(String::from(c.ucum()))
-            });
+            return Aligned::Values {
+                left: self.value,
+                right: other.value,
+                unit: self.unit.clone(),
+                sizes: (Decimal::ONE, Decimal::ONE),
+            };
         }
         match (&self.unit, &other.unit) {
             (Unit::Calendar(a), Unit::Calendar(b)) => {
-                calendar_aligned(self.value, *a, other.value, *b, Unit::Calendar)
+                calendar_aligned(self.value, *a, other.value, *b)
             }
-            (Unit::Calendar(_), Unit::Ucum(code)) | (Unit::Ucum(code), Unit::Calendar(_))
-                if is_time_unit(code) =>
-            {
-                Aligned::Calendrical
+            (Unit::Ucum(a), Unit::Ucum(b)) => ucum_aligned(self.value, a, other.value, b),
+            (Unit::Calendar(calendar), Unit::Ucum(code)) => {
+                mixed_aligned(self.value, *calendar, other.value, code)
             }
-            // TODO(#459): convert between different UCUM units; until then
-            // such a pair answers empty, as N1 §4.1.8 permits.
-            _ => Aligned::Unknown,
+            (Unit::Ucum(code), Unit::Calendar(calendar)) => {
+                mixed_aligned(other.value, *calendar, self.value, code).swapped()
+            }
         }
+    }
+
+    /// The quantity in `unit` (N1 §5.5.7): calendar durations by its
+    /// factors, UCUM units by UCUM, and a calendar keyword and a UCUM unit
+    /// only at and below the second; `None` when they do not convert.
+    #[must_use]
+    pub fn convert(&self, unit: &Unit) -> Option<Self> {
+        if &self.unit == unit {
+            return Some(self.clone());
+        }
+        // NOTE: N1 §5.5.7 relates a calendar keyword to UCUM only as "1 second = 1 's'", so a
+        // calendar duration above the second converts to no UCUM unit.
+        let value = match (&self.unit, unit) {
+            (Unit::Calendar(from), Unit::Calendar(to)) => from.convert(self.value, *to)?,
+            (from, to) => ucum(from.definite()?)?
+                .convert(self.value, &ucum(to.definite()?)?)
+                .ok()?,
+        };
+        Some(Self::new(value, unit.clone()))
     }
 
     /// Whether two quantities are equal, `None` when unknown (N1 §6.1.1).
     #[must_use]
     pub fn equals(&self, other: &Self) -> Option<bool> {
         match self.align(other) {
-            Aligned::Values(a, b, _) => Some(a == b),
+            Aligned::Values { left, right, .. } => Some(left == right),
             Aligned::Calendrical => Some(false),
             Aligned::Unknown => None,
         }
@@ -234,13 +295,15 @@ impl Quantity {
             }
             Unit::Ucum(_) => q.clone(),
         };
-        match self.align(other) {
-            Aligned::Values(a, b, _) => Some(equivalent_decimals(a, b)),
-            Aligned::Calendrical => match definite(self).align(&definite(other)) {
-                Aligned::Values(a, b, _) => Some(equivalent_decimals(a, b)),
-                _ => None,
-            },
-            Aligned::Unknown => None,
+        let aligned = match self.align(other) {
+            Aligned::Calendrical => definite(self).align(&definite(other)),
+            aligned => aligned,
+        };
+        match aligned {
+            Aligned::Values {
+                left, right, sizes, ..
+            } => equivalent_in(self.value, other.value, left, right, sizes),
+            Aligned::Calendrical | Aligned::Unknown => None,
         }
     }
 
@@ -248,16 +311,26 @@ impl Quantity {
     #[must_use]
     pub fn compare(&self, other: &Self) -> Option<Ordering> {
         match self.align(other) {
-            Aligned::Values(a, b, _) => Some(a.cmp(&b)),
+            Aligned::Values { left, right, .. } => Some(left.cmp(&right)),
             Aligned::Calendrical | Aligned::Unknown => None,
         }
     }
 
     /// The sum or difference, in the finer unit (N1 §6.6.3, §6.6.4); `None`
-    /// when the units do not convert or the result overflows.
+    /// when the units do not convert, either is a special UCUM unit of
+    /// another unit than the other's (UCUM §22.1), or the result overflows.
     #[must_use]
     pub fn add(&self, other: &Self, subtract: bool) -> Option<Self> {
-        let Aligned::Values(a, b, unit) = self.align(other) else {
+        if self.unit != other.unit && (self.unit.is_special() || other.unit.is_special()) {
+            return None;
+        }
+        let Aligned::Values {
+            left: a,
+            right: b,
+            unit,
+            ..
+        } = self.align(other)
+        else {
             return None;
         };
         let value = if subtract {
@@ -327,26 +400,96 @@ fn group(unit: &str) -> String {
     }
 }
 
-/// Whether a UCUM code is one of the definite time units N1 §4.1.8 relates
-/// to a calendar keyword.
-fn is_time_unit(code: &str) -> bool {
-    ["a", "mo", "wk", "d", "h", "min", "s", "ms"].contains(&code)
+/// The canonical form of a UCUM code, `None` for a code UCUM refuses.
+// NOTE: N1 §6.1.1 makes an operation on "quantities with invalid units" empty, so a code UCUM
+// refuses is legitimately no unit here rather than an evaluation error.
+fn ucum(code: &str) -> Option<Canonical> {
+    Canonical::parse(code).ok()
 }
 
 /// Both values in the finer of two calendar units.
-fn calendar_aligned(
-    a: Decimal,
-    a_unit: Calendar,
-    b: Decimal,
-    b_unit: Calendar,
-    unit: impl Fn(Calendar) -> Unit,
-) -> Aligned {
+fn calendar_aligned(a: Decimal, a_unit: Calendar, b: Decimal, b_unit: Calendar) -> Aligned {
     let finer = a_unit.max(b_unit);
     let convert = |value: Decimal, from: Calendar| from.convert(value, finer);
-    match (convert(a, a_unit), convert(b, b_unit)) {
-        (Some(a), Some(b)) => Aligned::Values(a, b, unit(finer)),
+    let sizes = (convert(Decimal::ONE, a_unit), convert(Decimal::ONE, b_unit));
+    match (convert(a, a_unit), convert(b, b_unit), sizes) {
+        (Some(left), Some(right), (Some(a_size), Some(b_size))) => Aligned::Values {
+            left,
+            right,
+            unit: Unit::Calendar(finer),
+            sizes: (a_size, b_size),
+        },
         _ => Aligned::Unknown,
     }
+}
+
+/// Both values in the more granular of two UCUM units, when UCUM converts
+/// them.
+fn ucum_aligned(a: Decimal, a_code: &str, b: Decimal, b_code: &str) -> Aligned {
+    let (Some(a_unit), Some(b_unit)) = (ucum(a_code), ucum(b_code)) else {
+        return Aligned::Unknown;
+    };
+    let (unit, code) = match a_unit.compare_size(&b_unit) {
+        Ok(Ordering::Greater) => (&b_unit, b_code),
+        Ok(_) => (&a_unit, a_code),
+        Err(_) => return Aligned::Unknown,
+    };
+    let converted = (
+        a_unit.convert(a, unit),
+        b_unit.convert(b, unit),
+        a_unit.size_in(unit),
+        b_unit.size_in(unit),
+    );
+    match converted {
+        (Ok(left), Ok(right), Ok(a_size), Ok(b_size)) => Aligned::Values {
+            left,
+            right,
+            unit: Unit::Ucum(String::from(code)),
+            sizes: (a_size, b_size),
+        },
+        _ => Aligned::Unknown,
+    }
+}
+
+/// A calendar duration against a UCUM unit: at and below the second against
+/// a UCUM time unit no larger than a second they convert as UCUM units;
+/// otherwise against a UCUM time unit they are calendrical (N1 §6.1.1).
+fn mixed_aligned(a: Decimal, calendar: Calendar, b: Decimal, code: &str) -> Aligned {
+    let (Some(unit), Some(second)) = (ucum(code), ucum("s")) else {
+        return Aligned::Unknown;
+    };
+    match (calendar.subsecond(), unit.compare_size(&second)) {
+        (Some(definite), Ok(Ordering::Less | Ordering::Equal)) => {
+            ucum_aligned(a, definite, b, code)
+        }
+        (_, Ok(_)) => Aligned::Calendrical,
+        (_, Err(_)) => Aligned::Unknown,
+    }
+}
+
+/// Quantity equivalence (N1 §6.1.2): the values in one unit, each rounded
+/// to the precision of the less precise operand.
+// NOTE: N1 §6.1.2 is silent on precision across units; no specification governs this: our own
+// design, a quantity's precision is one step of its last digit in its own unit, carried across.
+fn equivalent_in(
+    a: Decimal,
+    b: Decimal,
+    left: Decimal,
+    right: Decimal,
+    (a_size, b_size): (Decimal, Decimal),
+) -> Option<bool> {
+    let step = |value: Decimal, size: Decimal| {
+        Decimal::try_new(1, value.normalize().scale())
+            .ok()
+            .and_then(|unit| unit.checked_mul(size))
+    };
+    let step = step(a, a_size)?.max(step(b, b_size)?);
+    let round = |value: Decimal| {
+        value
+            .checked_div(step)
+            .map(|steps| steps.round_dp_with_strategy(0, RoundingStrategy::MidpointNearestEven))
+    };
+    Some(round(left)? == round(right)?)
 }
 
 /// Decimal equivalence: equal after rounding to the precision of the less
@@ -415,9 +558,106 @@ mod tests {
     }
 
     #[test]
-    fn different_ucum_units_answer_unknown() {
+    fn commensurable_ucum_units_convert_and_others_answer_unknown() {
+        // N1 §6.1.1: the dimensions must be the same, not the unit.
         let gram = q(4, Unit::Ucum(String::from("g")));
-        assert_eq!(gram.equals(&q(4000, Unit::Ucum(String::from("mg")))), None);
+        assert_eq!(
+            gram.equals(&q(4000, Unit::Ucum(String::from("mg")))),
+            Some(true)
+        );
+        assert_eq!(gram.equals(&q(4000, Unit::Ucum(String::from("mL")))), None);
+        assert_eq!(gram.equals(&q(4, Unit::Ucum(String::from("gram")))), None);
+    }
+
+    #[test]
+    fn the_comparison_is_made_in_the_more_granular_unit() {
+        // N1 §6.6.3: 3 'm' + 3 'cm' is 303 'cm'.
+        let sum =
+            q(3, Unit::Ucum(String::from("m"))).add(&q(3, Unit::Ucum(String::from("cm"))), false);
+        assert_eq!(sum, Some(q(303, Unit::Ucum(String::from("cm")))));
+        let difference =
+            q(3, Unit::Ucum(String::from("m"))).add(&q(3, Unit::Ucum(String::from("cm"))), true);
+        assert_eq!(difference, Some(q(297, Unit::Ucum(String::from("cm")))));
+    }
+
+    #[test]
+    fn equivalence_rounds_to_the_less_precise_operand_in_its_own_unit() {
+        // N1 §6.1.2, the suite's testQuantity4: 4 'g' ~ 4040 'mg'.
+        let gram = q(4, Unit::Ucum(String::from("g")));
+        assert_eq!(
+            gram.equivalent(&q(4040, Unit::Ucum(String::from("mg")))),
+            Some(true)
+        );
+        assert_eq!(
+            gram.equivalent(&q(4600, Unit::Ucum(String::from("mg")))),
+            Some(false)
+        );
+        assert_eq!(
+            gram.equals(&q(4040, Unit::Ucum(String::from("mg")))),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn a_millisecond_meets_a_finer_ucum_time_unit_and_a_day_none() {
+        // N1 §6.1.1: calendar and definite durations are one at and below the second.
+        let millisecond = q(1, Unit::Calendar(Calendar::Millisecond));
+        assert_eq!(
+            millisecond.equals(&q(1000, Unit::Ucum(String::from("us")))),
+            Some(true)
+        );
+        let day = q(1, Unit::Calendar(Calendar::Day));
+        assert_eq!(
+            day.equals(&q(24, Unit::Ucum(String::from("h")))),
+            Some(false)
+        );
+        assert_eq!(day.compare(&q(24, Unit::Ucum(String::from("h")))), None);
+        assert_eq!(
+            day.equivalent(&q(24, Unit::Ucum(String::from("h")))),
+            Some(true)
+        );
+        assert_eq!(day.equals(&q(1, Unit::Ucum(String::from("g")))), None);
+    }
+
+    #[test]
+    fn convert_follows_ucum_and_the_calendar_factors() {
+        // N1 §5.5.7.
+        let inch = q(1, Unit::Ucum(String::from("[in_i]")));
+        let centimetres = Quantity::new(Decimal::new(254, 2), Unit::Ucum(String::from("cm")));
+        assert_eq!(
+            inch.convert(&Unit::Ucum(String::from("cm"))),
+            Some(centimetres)
+        );
+        let second = q(1, Unit::Calendar(Calendar::Second));
+        assert_eq!(
+            second.convert(&Unit::Ucum(String::from("ms"))),
+            Some(q(1000, Unit::Ucum(String::from("ms"))))
+        );
+        assert_eq!(
+            q(2, Unit::Calendar(Calendar::Year)).convert(&Unit::Calendar(Calendar::Month)),
+            Some(q(24, Unit::Calendar(Calendar::Month)))
+        );
+        assert_eq!(
+            q(1, Unit::Calendar(Calendar::Day)).convert(&Unit::Ucum(String::from("h"))),
+            None
+        );
+        assert_eq!(inch.convert(&Unit::Ucum(String::from("g"))), None);
+    }
+
+    #[test]
+    fn a_special_unit_compares_but_adds_only_to_itself() {
+        // UCUM §22.1: special units take part in no algebraic operation.
+        let celsius = Quantity::new(Decimal::new(37, 0), Unit::Ucum(String::from("Cel")));
+        let kelvin = Quantity::new(Decimal::new(31015, 2), Unit::Ucum(String::from("K")));
+        assert_eq!(celsius.equals(&kelvin), Some(true));
+        assert_eq!(celsius.add(&kelvin, false), None);
+        assert_eq!(
+            celsius.add(&celsius, false),
+            Some(Quantity::new(
+                Decimal::new(74, 0),
+                Unit::Ucum(String::from("Cel"))
+            ))
+        );
     }
 
     #[test]

@@ -12,6 +12,7 @@ use openehr_mapping_core::index::paths::FlatId;
 
 use crate::engine::fhir::FhirKind;
 use crate::engine::fhir::FhirValue;
+use crate::engine::outcome::Loss;
 use crate::engine::outcome::Warning;
 use crate::engine::recurrence::Cardinality;
 use crate::engine::recurrence::Placement;
@@ -234,10 +235,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let cardinality = Cardinality::of(axes.len() > bound);
         let placement = Placement::decide(inputs.len(), cardinality, 0);
         if placement.lossy() {
-            self.warnings.push(Warning::LastOfMany {
-                path: self.output_name(mapping),
-                dropped: placement.dropped(),
-            });
+            let location = self.locate(mapping, &parent.fhir);
+            self.warnings.push(Warning::new(
+                Loss::LastOfMany {
+                    path: self.output_name(mapping),
+                    dropped: placement.dropped(),
+                },
+                location,
+            ));
         }
         let mut bindings = Vec::with_capacity(inputs.len());
         for (position, input) in inputs.iter().enumerate() {

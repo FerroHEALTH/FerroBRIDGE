@@ -135,6 +135,8 @@ the testkit tool crate. Beside it:
   parser, exact decimals, dates and times that keep their precision, a static
   check of the paths against the context type, and `resolve()`, `memberOf()`,
   `conformsTo()` and the other outward functions over caller-supplied seams.
+  `ucum` converts quantities by UCUM, reading the UCUM essence embedded whole
+  from `vendor/ucum/` (#459).
   The HL7 FHIRPath R4 test suite under `docs/specs/fhirpath-tests/` is its
   `fhirpath-r4` corpus.
 - `crates/ferrobridge-validator`: the FHIR R4 profile validator (#432,

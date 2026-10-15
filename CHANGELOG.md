@@ -49,6 +49,18 @@ crates on crates.io.
   without its seam is an error naming the function. The HL7 FHIRPath test
   suite for R4 runs as the `fhirpath-r4` conformance corpus, and every
   invariant of the vendored FHIR packages parses.
+- `ferrobridge-fhirpath` converts quantities by UCUM (#459): `=`, `~`, the
+  comparisons, `+` and `-` work across commensurable units in the more
+  granular of the two, so `4 'g' = 4000 'mg'` is true and the R4 invariant
+  `rng-2` compares a low and a high in different units, and
+  `toQuantity(unit)` and `convertsToQuantity(unit)` convert to the unit
+  asked for. The new `ucum` module parses UCUM expressions (prefixes,
+  exponents, annotations, the `10*` and `10^` forms, parentheses) against
+  the UCUM 2.2 essence, which `scripts/vendor/ucum.sh` vendors and the crate
+  embeds whole with its licence. Degree Celsius, Fahrenheit and Réaumur
+  convert by their functions; other special units, arbitrary units and units
+  of different dimensions answer empty. Six more cases of the HL7 FHIRPath
+  suite pass.
 - `ferrobridge-validator`, the foundation of a FHIR R4 profile validator
   (#437). It reads FHIR packages offline from `.tgz` files and unpacked
   directories, refuses a set that lacks a dependency a manifest names, and
@@ -147,6 +159,27 @@ crates on crates.io.
   profile packages before the tests, and the profile validator's
   package-gated tests fail under CI when the packages are absent, where they
   returned early and passed (#503).
+- `fhirconnect` 0.1.110 locates every loss a run declares (#498). A
+  `fhirconnect::engine::outcome::Warning` is now a `Loss` (the former
+  variants: `Skipped`, `Defaulted`, `LastOfMany`, `OneWayFallback`,
+  `DeferredReference`) with a `Location`, read through `Warning::loss()` and
+  `Warning::location()`. `Location::fhir()` is the FHIRPath of the FHIR
+  element the loss concerns (the input going into openEHR, the output coming
+  out to FHIR), with an index on each repeating element and no function, so it
+  fits `OperationOutcome.issue.expression`; `Location::openehr()` is the
+  archetype path of the openEHR node. Neither carries a value from the input.
+  `operations::run::to_fhir_with_warnings` and `to_openehr_with_warnings`
+  return a `Transformed` that holds the answer and the typed warnings in the
+  order the engine raised them, so a consumer that logs each transformation no
+  longer parses issue text; `to_fhir` and `to_openehr` keep their signatures.
+  Each issue of a run's `OperationOutcome` sets `expression` to the FHIRPath
+  and carries the openEHR path as a `details.coding` in
+  `https://ferrobridge.eu/fhir/CodeSystem/openehr-path`
+  (`operations::issues::OPENEHR_PATH_SYSTEM`); `details.text` is unchanged.
+  `fhirconnect::tree::locate::locate` names one element of a document as such
+  a FHIRPath. A consumer that matched `Warning::Skipped { .. }` matches
+  `Loss::Skipped { .. }` on `warning.loss()`.
+
 - SonarQube Cloud analyses FerroBRIDGE under the FerroHEALTH organisation:
   organization `ferrohealth`, project key `FerroHEALTH_FerroBRIDGE`, in
   `sonar-project.properties`, the MCP server configuration and the README

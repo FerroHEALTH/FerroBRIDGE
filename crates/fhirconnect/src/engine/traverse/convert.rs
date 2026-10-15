@@ -156,7 +156,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     source: Box::new(source),
                 })?;
                 for taken in &produced.fallbacks {
-                    self.warnings.push(Warning::fallback(taken));
+                    self.warnings
+                        .push(Warning::fallback(taken, self.locate(mapping, input)));
                 }
                 self.put_openehr(mapping, binding, produced.value);
                 Ok(())

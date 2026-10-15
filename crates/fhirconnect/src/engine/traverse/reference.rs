@@ -8,6 +8,7 @@ use fhir_types::codec::Object;
 use fhir_types::codec::Value;
 
 use crate::engine::fhir::FhirKind;
+use crate::engine::outcome::Loss;
 use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
 use crate::engine::seam::IdentityRequest;
@@ -116,10 +117,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
         binding: &Binding,
     ) -> Result<(), EngineError> {
         let Some(literal) = self.reference_at(mapping, input)? else {
-            self.warnings.push(Warning::Skipped {
-                mapping: String::from(mapping.name()),
-                reason: SkipReason::EmptyReference,
-            });
+            let location = self.locate(mapping, input);
+            self.warnings.push(Warning::new(
+                Loss::Skipped {
+                    mapping: String::from(mapping.name()),
+                    reason: SkipReason::EmptyReference,
+                },
+                location,
+            ));
             return Ok(());
         };
         if self.references.contains(&literal) {
@@ -129,10 +134,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
             });
         }
         let Some(fetched) = self.resolve_reference(mapping, &literal, resource)? else {
-            self.warnings.push(Warning::Skipped {
-                mapping: String::from(mapping.name()),
-                reason: SkipReason::UnresolvedReference { reference: literal },
-            });
+            let location = self.locate(mapping, input);
+            self.warnings.push(Warning::new(
+                Loss::Skipped {
+                    mapping: String::from(mapping.name()),
+                    reason: SkipReason::UnresolvedReference { reference: literal },
+                },
+                location,
+            ));
             return Ok(());
         };
         let outer = core::mem::replace(&mut self.fhir, fetched);

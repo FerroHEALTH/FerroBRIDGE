@@ -371,6 +371,29 @@ fn per_1_compares_start_and_end_and_is_empty_across_precisions() {
 }
 
 #[test]
+fn rng_2_compares_low_and_high_across_ucum_units() {
+    // N1 §6.2: quantities of one dimension compare in the more granular unit;
+    // FHIR R4 §2.9.1.3: only a UCUM code makes a System.Quantity.
+    let patient = json(r#"{"resourceType": "Patient"}"#);
+    let range = |low: &str, high: &str| {
+        json(&format!(
+            r#"{{"low": {{"value": {low}, "system": "http://unitsofmeasure.org", "code": "mg"}},
+                "high": {{"value": {high}, "system": "http://unitsofmeasure.org", "code": "g"}}}}"#
+        ))
+    };
+    let ordered = range("500", "1");
+    let reversed = range("1500", "1");
+    let incommensurable = json(
+        r#"{"low": {"value": 1, "system": "http://unitsofmeasure.org", "code": "mg"},
+            "high": {"value": 1, "system": "http://unitsofmeasure.org", "code": "mL"}}"#,
+    );
+    let evaluate = |value| invariant("rng-2", Focus::element(value, "Range", &patient));
+    assert_eq!(truth(&evaluate(&ordered)), Some(true));
+    assert_eq!(truth(&evaluate(&reversed)), Some(false));
+    assert_eq!(truth(&evaluate(&incommensurable)), None);
+}
+
+#[test]
 fn txt_1_and_txt_2_read_the_narrative() {
     let patient = json(r#"{"resourceType": "Patient"}"#);
     let good = Value::String(String::from(

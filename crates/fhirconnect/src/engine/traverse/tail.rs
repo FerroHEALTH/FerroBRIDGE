@@ -68,7 +68,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 },
             )?;
             for taken in &produced.fallbacks {
-                self.warnings.push(Warning::fallback(taken));
+                self.warnings.push(Warning::fallback(
+                    taken,
+                    self.locate(mapping, &binding.fhir),
+                ));
             }
             let RmValue::Party(ref party) = produced.value else {
                 return Err(refuse_rm(RmError::UnknownClass {
@@ -109,7 +112,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 source: Box::new(source),
             })?;
             for taken in &produced.fallbacks {
-                self.warnings.push(Warning::fallback(taken));
+                self.warnings.push(Warning::fallback(
+                    taken,
+                    self.locate(mapping, &binding.fhir),
+                ));
             }
             produced.value.to_canonical().map_err(refuse_rm)?
         } else {

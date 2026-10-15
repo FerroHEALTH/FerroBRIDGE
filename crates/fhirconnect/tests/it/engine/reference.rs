@@ -10,8 +10,8 @@ use std::collections::BTreeMap;
 use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::outcome::SkipReason;
-use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::IdentityRequest;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::error::EngineError;
@@ -144,12 +144,13 @@ fn a_reference_that_resolves_to_nothing_is_a_declared_skip() -> Result<(), Box<d
         &CallContext::new(),
     )?;
     assert!(
-        inbound.warnings().contains(&Warning::Skipped {
-            mapping: String::from("evidence"),
-            reason: SkipReason::UnresolvedReference {
-                reference: String::from("Observation/absent"),
-            },
-        }),
+        inbound.warnings().iter().any(|warning| *warning.loss()
+            == Loss::Skipped {
+                mapping: String::from("evidence"),
+                reason: SkipReason::UnresolvedReference {
+                    reference: String::from("Observation/absent"),
+                },
+            }),
         "the unresolved reference is declared: {:?}",
         inbound.warnings()
     );
@@ -297,5 +298,77 @@ fn a_reference_chain_that_reaches_itself_refuses() -> Result<(), Box<dyn Error>>
         matches!(error, EngineError::ReferenceCycle { ref reference, .. } if reference == "Observation/synthetic-observation-1"),
         "the refusal names the reference: {error}"
     );
+    Ok(())
+}
+
+#[test]
+fn a_skipped_reference_is_located_at_the_element_holding_it_and_never_by_its_text()
+-> Result<(), Box<dyn Error>> {
+    // The location names the Reference element; the literal reference and the
+    // display it carries are identifying content no location repeats.
+    let program = compiled("ferrobridge_reference")?;
+    let index = template()?;
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &condition_with(serde_json::json!({
+            "evidence": [
+                {"detail": [{"display": "Synthetic evidence of Pietersen"}]},
+                {"detail": [
+                    {"reference": "Observation/absent"},
+                    {"reference": "Observation/synthetic-0099-absent"}
+                ]}
+            ]
+        }))?,
+        &Seams::default().with_references(&MapReferences::default()),
+        &defaults(),
+        &CallContext::new(),
+    )?;
+    let skips: Vec<(String, Option<&str>, Option<&str>)> = inbound
+        .warnings()
+        .iter()
+        .filter(|warning| matches!(*warning.loss(), Loss::Skipped { .. }))
+        .map(|warning| {
+            (
+                warning.to_string(),
+                warning.location().fhir(),
+                warning.location().openehr(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        skips,
+        [
+            (
+                String::from("the mapping evidence did not run: the Reference names no resource"),
+                Some("Condition.evidence[0].detail[0]"),
+                None
+            ),
+            (
+                String::from(
+                    "the mapping evidence did not run: the reference Observation/absent resolves to no resource"
+                ),
+                Some("Condition.evidence[1].detail[0]"),
+                None
+            ),
+            (
+                String::from(
+                    "the mapping evidence did not run: the reference Observation/synthetic-0099-absent resolves to no resource"
+                ),
+                Some("Condition.evidence[1].detail[1]"),
+                None
+            ),
+        ]
+    );
+    for warning in inbound.warnings() {
+        let location = format!("{:?}", warning.location());
+        for text in ["Pietersen", "absent", "Observation/"] {
+            assert!(
+                !location.contains(text),
+                "the location {location} carries {text}"
+            );
+        }
+    }
     Ok(())
 }
