@@ -155,6 +155,10 @@ crates on crates.io.
 
 ### Changed
 
+- The bridge builds on the `openehr-*` 0.0.86 crates, the release the
+  federation gateway pins, so a project on 0.0.86 that takes `fhirconnect`
+  0.1.111 or `openehr-mapping-core` 0.1.109 carries one copy of the openEHR
+  types.
 - The CI `test` lane and the SonarQube Cloud lane restore and fetch the
   profile packages before the tests, and the profile validator's
   package-gated tests fail under CI when the packages are absent, where they
