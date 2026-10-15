@@ -293,6 +293,19 @@ impl Error {
         }
     }
 
+    /// Returns the status the terminology server answered with, when the
+    /// failure is an answer: a `5xx`, a refused credential or a refused
+    /// operation. A call that never reached an answer has none.
+    #[must_use]
+    pub fn upstream_status(&self) -> Option<StatusCode> {
+        match self {
+            Self::ServerFailure { upstream, .. }
+            | Self::Unauthorized { upstream, .. }
+            | Self::Refused { upstream, .. } => Some(upstream.status()),
+            _ => None,
+        }
+    }
+
     /// Returns whether a retry of the same request could succeed.
     ///
     /// Only a failure that did not reach the server, or one the server

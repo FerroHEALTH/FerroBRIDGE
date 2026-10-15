@@ -6,7 +6,9 @@
 
 use crate::config::{Config, Credentials};
 use crate::error::{Error, UpstreamError};
-use crate::outcome::{BatchOutcome, LookupOutcome, Request, TranslateOutcome, ValidateOutcome};
+use crate::outcome::{
+    BatchOutcome, Coded, LookupOutcome, Request, TranslateOutcome, ValidateOutcome, Validation,
+};
 use backon::{ExponentialBuilder, Retryable};
 use http::header::{ACCEPT, CONTENT_TYPE, WWW_AUTHENTICATE};
 use http::{HeaderMap, Method, StatusCode};
@@ -224,13 +226,65 @@ impl Client {
         system: &str,
         code: &str,
     ) -> Result<ValidateOutcome, Error> {
-        let request = Request::ValidateCode {
+        self.validate(&Validation {
             value_set_url: value_set_url.to_owned(),
-            system: system.to_owned(),
-            code: code.to_owned(),
-        };
+            value_set_version: None,
+            coded: Coded::Code {
+                system: system.to_owned(),
+                code: code.to_owned(),
+                version: None,
+                display: None,
+            },
+        })
+        .await
+    }
+
+    /// Validates that the coded value of `validation` is a member of its
+    /// value set, in any of the three forms the operation accepts: a code
+    /// with its system, version and display, a `Coding`, or a
+    /// `CodeableConcept`
+    /// (<https://hl7.org/fhir/R4/valueset-operation-validate-code.html>).
+    ///
+    /// # Errors
+    /// Returns [`Error::Refused`] when the server refused the operation, and
+    /// [`Error`] otherwise when the call did not reach an answer or the answer
+    /// could not be decoded. A refusal is never an invalid code.
+    pub async fn validate(&self, validation: &Validation) -> Result<ValidateOutcome, Error> {
+        let request = Request::ValidateCode(validation.clone());
         let answer = self.operation(&request).await?;
         crate::decode::validate_code(self.config.wire_version, &answer)
+    }
+
+    /// Validates every one of `validations`, answering them by position: one
+    /// call for one validation, one `batch` `Bundle` for several.
+    ///
+    /// An entry the server refused is that entry's own typed error and leaves
+    /// the others alone, as in [`Client::batch`].
+    ///
+    /// # Errors
+    /// Returns [`Error::BatchArity`] when a batch answer holds a different
+    /// number of entries than were sent, and [`Error`] otherwise when the
+    /// batch itself did not reach an answer or its `Bundle` could not be
+    /// decoded.
+    pub async fn validate_all(
+        &self,
+        validations: &[Validation],
+    ) -> Result<Vec<Result<ValidateOutcome, Error>>, Error> {
+        match validations {
+            [] => Ok(Vec::new()),
+            [one] => Ok(vec![self.validate(one).await]),
+            several => {
+                let requests: Vec<Request> =
+                    several.iter().cloned().map(Request::ValidateCode).collect();
+                let version = self.config.wire_version;
+                Ok(self
+                    .batch_answers(&requests)
+                    .await?
+                    .into_iter()
+                    .map(|answer| crate::decode::validate_code(version, &answer))
+                    .collect())
+            }
+        }
     }
 
     /// Sends `requests` as one `batch` `Bundle` and answers them by position.
@@ -249,6 +303,17 @@ impl Client {
         &self,
         requests: &[Request],
     ) -> Result<Vec<Result<BatchOutcome, Error>>, Error> {
+        let version = self.config.wire_version;
+        Ok(requests
+            .iter()
+            .zip(self.batch_answers(requests).await?)
+            .map(|(request, answer)| crate::decode::batch_entry(version, request, &answer))
+            .collect())
+    }
+
+    /// Sends `requests` as one `batch` `Bundle` and returns each entry's
+    /// answer, in request order.
+    async fn batch_answers(&self, requests: &[Request]) -> Result<Vec<Answer>, Error> {
         let version = self.config.wire_version;
         let body =
             crate::wire::batch_body(version, requests).map_err(|source| Error::RequestBody {
@@ -277,16 +342,12 @@ impl Client {
                 answered: entries.len(),
             });
         }
-        Ok(requests
-            .iter()
-            .zip(entries)
-            .map(|(request, entry)| {
-                let answer = Answer {
-                    url: answer.url.clone(),
-                    status: entry.status,
-                    body: entry.body,
-                };
-                crate::decode::batch_entry(version, request, &answer)
+        Ok(entries
+            .into_iter()
+            .map(|entry| Answer {
+                url: answer.url.clone(),
+                status: entry.status,
+                body: entry.body,
             })
             .collect())
     }
