@@ -164,6 +164,24 @@ Common 1.1.0, `OBJECT_VERSION_ID`). A query that reads only each composition's
 latest version, such as one over `VERSION v[LATEST_VERSION]`, keeps a changed
 composition from being written twice.
 
+Read both queries over `VERSION v[LATEST_VERSION]`. A deleted composition's
+newest version holds no data (openEHR RM Common 1.1.0 §6.2.5), so that scope
+leaves it out, and a superseded version neither feeds a mapping nor widens a
+visit. AQL 1.1.0 names `LATEST_VERSION` and `ALL_VERSIONS` and does not say
+which scope a query without a `VERSION` gets, so the scope is written out:
+
+```text
+SELECT e/ehr_id/value AS ehr_id, v/uid/value AS version_uid, c AS composition
+FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c
+ORDER BY c/context/start_time/value
+```
+
+The query selects the composition whole, and the mappings read its leaves.
+Leave leaf paths through a repeated node, such as two values of one
+`events` list, out of the `SELECT`: AQL 1.1.0 does not define which node
+each of them comes from, and a CDR may pair values of two different nodes in
+one row.
+
 ## Checking a populated database with the Data Quality Dashboard
 
 The OHDSI Data Quality Dashboard runs its checks against a populated CDM
