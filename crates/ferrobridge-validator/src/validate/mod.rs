@@ -9,14 +9,19 @@
 //! which members an object may carry, their base cardinality, their types,
 //! and the hop a `contentReference` makes. The snapshot elements of the
 //! `StructureDefinitions` in play add the profile's constraints: cardinality,
-//! the types a choice may take, `fixed[x]`, `pattern[x]` and `maxLength`.
-//! Slicing, invariants, bindings and the profiles an element names are
-//! listed in the report as unevaluated.
+//! the types a choice may take, `fixed[x]`, `pattern[x]`, `maxLength`,
+//! slicing and the profiles an element's types name. Invariants, bindings,
+//! target profiles and claimed profiles are listed in the report as
+//! unevaluated.
 
+mod codes;
 mod extension;
 mod listing;
 mod matching;
 mod primitive;
+mod profiles;
+mod resolver;
+mod slicing;
 mod structure;
 mod walk;
 
@@ -31,7 +36,10 @@ use fhir_types::codec::Value;
 use crate::report::Report;
 use crate::set::PackageSet;
 use crate::set::ResolveError;
+use codes::Enumeration;
 use primitive::PrimitiveRule;
+use resolver::Contained;
+use resolver::Resolver;
 use structure::Structure;
 
 /// The canonical base of the definitions FHIR R4 core publishes.
@@ -43,6 +51,8 @@ pub struct Validator<'set> {
     set: &'set PackageSet,
     structures: Mutex<BTreeMap<String, Arc<Structure>>>,
     primitives: Mutex<BTreeMap<String, Arc<PrimitiveRule>>>,
+    codes: Mutex<BTreeMap<String, Arc<Enumeration>>>,
+    resolver: Box<dyn Resolver>,
 }
 
 /// Why a validation could not run to the end.
@@ -96,6 +106,8 @@ impl<'set> Validator<'set> {
             set,
             structures: Mutex::new(BTreeMap::new()),
             primitives: Mutex::new(BTreeMap::new()),
+            codes: Mutex::new(BTreeMap::new()),
+            resolver: Box::new(Contained),
         }
     }
 
@@ -149,6 +161,30 @@ impl<'set> Validator<'set> {
     /// Returns the core definition of the type `name`.
     fn core(&self, name: &str) -> Result<Arc<Structure>, ValidateError> {
         self.structure(&format!("{CORE}{name}"))
+    }
+
+    /// Returns the resolver a `resolve()` in a discriminator path uses.
+    fn resolver(&self) -> &dyn Resolver {
+        self.resolver.as_ref()
+    }
+
+    /// Returns the codes of the value set `canonical` names, when the
+    /// package set enumerates them.
+    fn codes(&self, canonical: &str) -> Result<Arc<Enumeration>, ValidateError> {
+        if let Some(found) = self
+            .codes
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(canonical)
+        {
+            return Ok(Arc::clone(found));
+        }
+        let enumeration = Arc::new(codes::enumerate(self.set, canonical)?);
+        self.codes
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(canonical.to_owned(), Arc::clone(&enumeration));
+        Ok(enumeration)
     }
 
     /// Returns the lexical rule of the primitive type `code`.

@@ -21,8 +21,9 @@ use std::sync::Arc;
 use serde::Deserialize;
 
 /// The resource types a package indexes, so the set can resolve them by
-/// canonical.
-const INDEXED: &[&str] = &["StructureDefinition"];
+/// canonical: the definitions, and the value sets and code systems a slice
+/// discriminator reads its codes from.
+const INDEXED: &[&str] = &["StructureDefinition", "ValueSet", "CodeSystem"];
 
 /// The manifest file of a package.
 const MANIFEST: &str = "package.json";

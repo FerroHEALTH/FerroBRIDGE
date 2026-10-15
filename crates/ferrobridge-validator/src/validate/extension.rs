@@ -27,7 +27,7 @@ pub(crate) enum Placement {
     Child,
 }
 
-impl Walk<'_, '_> {
+impl Walk<'_, '_, '_> {
     /// Returns the cursor an extension is walked with: the definition its
     /// `url` names, or the core `Extension` when the url does not resolve.
     pub(crate) fn extension_cursor(
@@ -57,7 +57,8 @@ impl Walk<'_, '_> {
                     format!("the extension url {url} is relative outside a complex extension"),
                 );
             }
-            // TODO(#438): resolve a child extension's relative url against the slices of its parent.
+            // NOTE: extensibility.html §2.5.0.1: a relative url names a child the complex extension
+            // defines, so the slice it is matched to by url holds it, never a definition of its own.
             return fallback(self);
         }
         let structure = match self.validator().structure(url) {

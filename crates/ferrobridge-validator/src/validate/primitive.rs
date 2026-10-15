@@ -86,7 +86,7 @@ fn integer_range(code: &str) -> Option<(i64, i64)> {
     }
 }
 
-impl Walk<'_, '_> {
+impl Walk<'_, '_, '_> {
     /// Checks one primitive value of the type `code`, which JSON carries as
     /// `kind`.
     pub(crate) fn primitive_value(

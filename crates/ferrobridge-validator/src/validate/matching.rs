@@ -16,7 +16,7 @@ use crate::validate::walk::Walk;
 
 /// The JSON value of `element`'s `fixed[x]` or `pattern[x]`, by its member
 /// name stem.
-fn value_of(
+pub(crate) fn value_of(
     element: &ElementDefinition,
     stem: &str,
 ) -> Result<Option<Value>, fhir_types::codec::EncodeError> {
@@ -34,7 +34,7 @@ fn value_of(
 ///
 /// ElementDefinition.fixed\[x\]: "all values must be an exact match" and
 /// "Missing elements/attributes must also be missing".
-fn equals_fixed(fixed: &Value, instance: &Value) -> bool {
+pub(crate) fn equals_fixed(fixed: &Value, instance: &Value) -> bool {
     match (fixed, instance) {
         (Value::Object(fixed), Value::Object(instance)) => {
             // NOTE: elementdefinition-definitions.html#ElementDefinition.fixed_x_ is silent on
@@ -72,7 +72,7 @@ fn ignorable(key: &str) -> bool {
 /// ElementDefinition.pattern\[x\]: a primitive matches exactly, each property
 /// of a complex pattern is present and matches recursively, and each item of
 /// a pattern array matches at least one item of the instance array.
-fn contains_pattern(pattern: &Value, instance: &Value) -> bool {
+pub(crate) fn contains_pattern(pattern: &Value, instance: &Value) -> bool {
     match (pattern, instance) {
         (Value::Object(pattern), Value::Object(instance)) => pattern.iter().all(|(key, value)| {
             instance
@@ -86,7 +86,7 @@ fn contains_pattern(pattern: &Value, instance: &Value) -> bool {
     }
 }
 
-impl Walk<'_, '_> {
+impl Walk<'_, '_, '_> {
     /// Matches one occurrence against `element`'s `fixed[x]` and
     /// `pattern[x]`.
     ///

@@ -33,6 +33,23 @@ pub enum Constraint {
     /// The slicing an element definition declares
     /// (<https://hl7.org/fhir/R4/profiling.html#slicing>).
     Slicing,
+    /// One discriminator of a slicing
+    /// (<https://hl7.org/fhir/R4/profiling.html#discriminator>).
+    Discriminator {
+        /// The discriminator type: `value`, `exists`, `pattern`, `type` or
+        /// `profile`.
+        kind: String,
+        /// The discriminator path.
+        path: String,
+    },
+    /// A `value` or `pattern` discriminator whose slice is told apart by a
+    /// required binding.
+    DiscriminatorValueSet {
+        /// The discriminator path.
+        path: String,
+        /// The value set the binding names.
+        value_set: String,
+    },
     /// An invariant (<https://hl7.org/fhir/R4/conformance-rules.html#constraints>).
     Invariant {
         /// The constraint key.
@@ -71,14 +88,34 @@ pub enum Constraint {
 /// Why a constraint was not evaluated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Reason {
-    /// The validator does not evaluate slicing.
-    Slicing,
+    /// The discriminator path is outside the simple FHIRPath subset
+    /// (<https://hl7.org/fhir/R4/fhirpath.html#simple>).
+    DiscriminatorPath,
+    /// The discriminator type is none of the five R4 defines.
+    DiscriminatorType,
+    /// The slice sets no value, pattern, required binding, cardinality, type
+    /// or profile at the discriminator path to tell it apart by.
+    NoDiscriminatorValue,
+    /// The value set of the binding cannot be enumerated from the package
+    /// set.
+    ValueSetNotEnumerated,
+    /// A reference the discriminator path resolves names no resource the
+    /// reference points into.
+    UnresolvedReference,
+    /// A reference the discriminator path resolves points outside the
+    /// resources the validator searches.
+    ReferenceOutOfScope,
+    /// The profile is not in the package set.
+    ProfileNotFound,
+    /// The profile declares a `@default` slice under rules other than
+    /// `closed`, which R4 does not allow, so the default slice is not used.
+    DefaultSliceNotClosed,
     /// The validator does not evaluate invariants.
     Invariants,
     /// The validator does not check terminology bindings.
     Bindings,
-    /// The validator does not validate against a profile an element or a
-    /// claim names.
+    /// The validator does not validate a reference's target against its
+    /// target profiles, or a resource against a profile it claims.
     Profiles,
     /// The validator does not check where an extension is used.
     ExtensionContext,
@@ -87,10 +124,27 @@ pub enum Reason {
 impl fmt::Display for Reason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::Slicing => "slicing is not evaluated",
+            Self::DiscriminatorPath => {
+                "the discriminator path is outside the FHIRPath subset discriminators use"
+            }
+            Self::DiscriminatorType => "the discriminator type is none R4 defines",
+            Self::NoDiscriminatorValue => {
+                "the slice sets nothing at the discriminator path to tell it apart by"
+            }
+            Self::ValueSetNotEnumerated => {
+                "the value set cannot be enumerated from the package set"
+            }
+            Self::UnresolvedReference => "a reference the discriminator resolves does not resolve",
+            Self::ReferenceOutOfScope => {
+                "a reference the discriminator resolves points outside the resources searched"
+            }
+            Self::ProfileNotFound => "the profile is not in the package set",
+            Self::DefaultSliceNotClosed => {
+                "the @default slice is not used, because the slicing rules are not closed"
+            }
             Self::Invariants => "invariants are not evaluated",
             Self::Bindings => "terminology bindings are not checked",
-            Self::Profiles => "the profiles an element or a claim names are not validated",
+            Self::Profiles => "target profiles and claimed profiles are not validated",
             Self::ExtensionContext => "extension contexts are not checked",
         })
     }
@@ -192,6 +246,26 @@ impl Collector {
             .or_insert_with(|| (location.to_owned(), reason));
     }
 
+    /// Answers whether no issue collected is an error or fatal.
+    pub(crate) fn is_valid(&self) -> bool {
+        self.first_error().is_none()
+    }
+
+    /// Returns the first issue collected that is an error or fatal.
+    pub(crate) fn first_error(&self) -> Option<&Issue> {
+        self.issues
+            .iter()
+            .find(|issue| matches!(issue.severity, Severity::Fatal | Severity::Error))
+    }
+
+    /// Adds the issues and unevaluated constraints `other` collected.
+    pub(crate) fn absorb(&mut self, other: Self) {
+        self.issues.extend(other.issues);
+        for (key, value) in other.unevaluated {
+            self.unevaluated.entry(key).or_insert(value);
+        }
+    }
+
     /// Finishes the report.
     pub(crate) fn finish(self) -> Report {
         Report {
@@ -256,6 +330,12 @@ impl From<&Report> for OperationOutcome {
 fn describe(unevaluated: &Unevaluated) -> String {
     let what = match &unevaluated.constraint {
         Constraint::Slicing => "the slicing".to_owned(),
+        Constraint::Discriminator { kind, path } => {
+            format!("the {kind} discriminator {path}")
+        }
+        Constraint::DiscriminatorValueSet { path, value_set } => {
+            format!("the discriminator {path} over the value set {value_set}")
+        }
         Constraint::Invariant { key, .. } => format!("the invariant {key}"),
         Constraint::Binding {
             strength,
