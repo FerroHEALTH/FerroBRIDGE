@@ -106,16 +106,7 @@ impl<'i> Walk<'_, '_, 'i> {
             }
             Kind::Resource => {
                 if let Some(value) = occurrence.value {
-                    let location = &occurrence.location;
-                    let kind = value.get("resourceType").and_then(Value::as_str);
-                    let profiles =
-                        kind.map_or_else(Vec::new, |kind| resource_profiles(target.element, kind));
-                    let subject = Subject::Resource { value };
-                    if profiles.is_empty()
-                        || self.type_profiles(cursor, target, subject, &profiles, location)?
-                    {
-                        self.resource(value, Some(location), None)?;
-                    }
+                    self.inner_resource(value, cursor, target, &occurrence.location)?;
                 }
             }
             Kind::Xhtml => match occurrence.value {
@@ -140,6 +131,62 @@ impl<'i> Walk<'_, '_, 'i> {
             Kind::Choice(_) => {}
         }
         Ok(())
+    }
+
+    /// Walks a resource inside another: its type against its element's types,
+    /// and its content against the profiles they name or its core definition.
+    fn inner_resource(
+        &mut self,
+        value: &'i Value,
+        cursor: &Cursor,
+        target: Held<'_>,
+        location: &str,
+    ) -> Result<(), ValidateError> {
+        let kind = value.get("resourceType").and_then(Value::as_str);
+        if let Some(kind) = kind {
+            self.resource_type(target, kind, location);
+        }
+        let profiles = kind.map_or_else(Vec::new, |kind| resource_profiles(target.element, kind));
+        let subject = Subject::Resource { value };
+        if profiles.is_empty()
+            || self.type_profiles(cursor, target, subject, &profiles, location)?
+        {
+            self.resource(value, Some(location), None)?;
+        }
+        Ok(())
+    }
+
+    /// Reports a resource of the type `kind` that none of the types of its
+    /// element names (ElementDefinition.type: "The data type or resource
+    /// that the value of this element is permitted to be").
+    fn resource_type(&mut self, target: Held<'_>, kind: &str, location: &str) {
+        let Some(element) = target.element else {
+            return;
+        };
+        let codes: Vec<&str> = element
+            .r#type
+            .iter()
+            .filter_map(|entry| entry.code.value.as_deref())
+            .collect();
+        // NOTE: no specification governs this reading: our own design until the abstract base
+        // types land (#458); `Resource` and `DomainResource` accept any concrete resource.
+        let allowed = codes.is_empty()
+            || codes
+                .iter()
+                .any(|code| *code == kind || *code == "Resource" || *code == "DomainResource");
+        if !allowed {
+            self.out.issue(
+                Severity::Error,
+                IssueType::Structure,
+                MessageId::ResourceTypeNotAllowed,
+                location,
+                format!(
+                    "{} allows the resource types {}, not {kind}",
+                    target.id,
+                    codes.join(", ")
+                ),
+            );
+        }
     }
 
     /// Walks an extension against the definition its url resolves to, or

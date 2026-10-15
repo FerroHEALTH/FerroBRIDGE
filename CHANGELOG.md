@@ -138,6 +138,9 @@ crates on crates.io.
 
 ### Fixed
 
+- The R4 profile validator refuses a resource of a type its element's types
+  do not name, where an element typed `Resource` or `DomainResource` still
+  takes any resource (#488).
 - Readiness no longer reports a CDR that refuses the configured credentials
   as up. The CDR check lists the ADL 1.4 templates through the ITS-REST
   Definition API with the configured credentials, filtered so the answer is

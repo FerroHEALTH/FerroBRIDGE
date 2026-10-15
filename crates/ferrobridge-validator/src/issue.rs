@@ -220,6 +220,8 @@ pub enum MessageId {
     UnresolvedReference,
     /// Content that conforms to none of the profiles its type names.
     TypeProfileMismatch,
+    /// A resource of a type none of its element's types names.
+    ResourceTypeNotAllowed,
     /// A constraint the validator does not evaluate.
     ConstraintUnevaluated,
     /// The instance raised no issue and every constraint was evaluated.
@@ -263,6 +265,7 @@ impl MessageId {
             Self::OverlappingSlices => "overlapping-slices",
             Self::UnresolvedReference => "unresolved-reference",
             Self::TypeProfileMismatch => "type-profile-mismatch",
+            Self::ResourceTypeNotAllowed => "resource-type-not-allowed",
             Self::ConstraintUnevaluated => "constraint-unevaluated",
             Self::AllOk => "all-ok",
         }

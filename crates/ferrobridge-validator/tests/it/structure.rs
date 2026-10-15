@@ -10,11 +10,14 @@ use ferrobridge_validator::issue::Severity;
 use ferrobridge_validator::set::PackageSet;
 use serde_json::json;
 
+use crate::support::BASE;
 use crate::support::TestResult;
 use crate::support::against_patient;
 use crate::support::core;
 use crate::support::locations;
 use crate::support::patient;
+use crate::support::profile;
+use crate::support::set_with;
 use crate::support::validate;
 
 #[test]
@@ -222,5 +225,45 @@ fn a_contained_resource_is_walked_against_its_own_type() -> TestResult {
         locations(&report, MessageId::UnknownElement),
         ["Patient.contained[0].colour"]
     );
+    Ok(())
+}
+
+/// A collection Bundle whose one entry holds `resource`.
+fn bundle_of(resource: &serde_json::Value) -> serde_json::Value {
+    json!({"resourceType": "Bundle", "type": "collection",
+           "entry": [{"fullUrl": "urn:uuid:00000000-0000-0000-0000-000000000001", "resource": resource}]})
+}
+
+#[test]
+fn a_resource_of_a_type_its_element_does_not_name_is_refused() -> TestResult {
+    let definition = profile(
+        "composition-bundle",
+        "Bundle",
+        &json!([
+            {"id": "Bundle", "path": "Bundle", "min": 0, "max": "*"},
+            {"id": "Bundle.entry.resource", "path": "Bundle.entry.resource", "min": 0, "max": "1",
+             "type": [{"code": "Composition"}]}
+        ]),
+    );
+    let (_synthetic, set) = set_with(&[definition])?;
+    let url = format!("{BASE}composition-bundle");
+    let report = validate(
+        &set,
+        &bundle_of(&json!({"resourceType": "Patient"})),
+        Some(&url),
+    )?;
+    assert_eq!(
+        locations(&report, MessageId::ResourceTypeNotAllowed),
+        ["Bundle.entry[0].resource"]
+    );
+    Ok(())
+}
+
+#[test]
+fn an_element_typed_resource_accepts_any_resource() -> TestResult {
+    let set = PackageSet::load([core()])?;
+    let report = validate(&set, &bundle_of(&json!({"resourceType": "Patient"})), None)?;
+    assert!(locations(&report, MessageId::ResourceTypeNotAllowed).is_empty());
+    assert!(report.is_valid(), "{:#?}", report.issues());
     Ok(())
 }
