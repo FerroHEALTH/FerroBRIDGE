@@ -1,0 +1,216 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
+//! The FHIR type model an evaluation navigates by.
+//!
+//! What an element is, whether it repeats, which types a choice admits and
+//! where a content reference lands all come from the generated element table
+//! of `fhir-types` (`fhir_types::schema::Schemas`); a version plugs in by
+//! implementing [`Model`] over its table. [`r4::R4`] is the R4 table.
+
+pub mod r4;
+
+use std::collections::BTreeMap;
+use std::fmt;
+
+use fhir_types::schema::{FieldSchema, Kind, Schemas, TypeSchema, ValueKind};
+
+/// A FHIR version's type model.
+pub trait Model: fmt::Debug + Send + Sync {
+    /// The version's element table.
+    fn schemas(&self) -> &'static Schemas;
+
+    /// The version's primitive types by name, read from the table.
+    fn primitives(&self) -> &BTreeMap<&'static str, TypeKind>;
+
+    /// The type `name` specializes, when the model knows it.
+    ///
+    /// The generated element table carries no base type, so the R4 model
+    /// answers `None` for every type.
+    // TODO(#436): emit each type's baseDefinition into the element table, so
+    // `is`, `as` and `ofType` see `Age` as a `Quantity` and every resource as
+    // a `DomainResource` and a `Resource`.
+    fn base(&self, _name: &str) -> Option<&'static str> {
+        None
+    }
+}
+
+/// What kind of FHIR type an element holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TypeKind {
+    /// A primitive, with the scalar its JSON value carries.
+    Primitive(ValueKind),
+    /// The XHTML narrative.
+    Xhtml,
+    /// A datatype or a backbone element, with its elements.
+    Complex(&'static TypeSchema),
+    /// A resource, with its elements.
+    Resource(&'static TypeSchema),
+}
+
+/// The FHIR type of a node.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FhirType {
+    /// The type name: a primitive code, a datatype, a resource, or for a
+    /// backbone element the table's name for it.
+    pub name: &'static str,
+    /// What kind of type it is.
+    pub kind: TypeKind,
+}
+
+impl FhirType {
+    /// The elements of a complex type or a resource.
+    #[must_use]
+    pub const fn schema(&self) -> Option<&'static TypeSchema> {
+        match self.kind {
+            TypeKind::Complex(schema) | TypeKind::Resource(schema) => Some(schema),
+            TypeKind::Primitive(_) | TypeKind::Xhtml => None,
+        }
+    }
+
+    /// Whether this is a backbone element, an anonymous type defined inside
+    /// another (N1 §10.2.4).
+    #[must_use]
+    pub fn is_backbone(&self) -> bool {
+        matches!(self.kind, TypeKind::Complex(schema) if schema.path != schema.name)
+    }
+
+    /// Whether this is a primitive type.
+    #[must_use]
+    pub const fn is_primitive(&self) -> bool {
+        matches!(self.kind, TypeKind::Primitive(_) | TypeKind::Xhtml)
+    }
+}
+
+/// The type of the resource named `name`.
+#[must_use]
+pub fn resource_type(model: &dyn Model, name: &str) -> Option<FhirType> {
+    let schemas = model.schemas();
+    let index = schemas.resources.binary_search(&name).ok()?;
+    let name = *schemas.resources.get(index)?;
+    let schema = schemas
+        .type_named(name)
+        .filter(|schema| schema.path == name)?;
+    Some(FhirType {
+        name,
+        kind: TypeKind::Resource(schema),
+    })
+}
+
+/// The type of the datatype, resource or primitive named `name`; backbone
+/// elements have no name of their own and are not found.
+#[must_use]
+pub fn named_type(model: &dyn Model, name: &str) -> Option<FhirType> {
+    if let Some(found) = resource_type(model, name) {
+        return Some(found);
+    }
+    if let Some(schema) = model
+        .schemas()
+        .type_named(name)
+        .filter(|schema| schema.path == schema.name)
+    {
+        return Some(FhirType {
+            name: schema.name,
+            kind: TypeKind::Complex(schema),
+        });
+    }
+    let (name, kind) = model.primitives().get_key_value(name)?;
+    Some(FhirType { name, kind: *kind })
+}
+
+/// The type a non-choice element holds, `None` for a resource-typed element,
+/// whose type each instance names.
+#[must_use]
+pub fn field_type(model: &dyn Model, field: &'static FieldSchema, kind: Kind) -> Option<FhirType> {
+    match kind {
+        Kind::Primitive(value) => Some(FhirType {
+            name: field.types.first().copied().unwrap_or("string"),
+            kind: TypeKind::Primitive(value),
+        }),
+        Kind::Attribute => Some(FhirType {
+            name: field.types.first().copied().unwrap_or("string"),
+            kind: TypeKind::Primitive(ValueKind::Text),
+        }),
+        Kind::Xhtml => Some(FhirType {
+            name: "xhtml",
+            kind: TypeKind::Xhtml,
+        }),
+        Kind::Complex(name) => model.schemas().type_named(name).map(|schema| FhirType {
+            name,
+            kind: TypeKind::Complex(schema),
+        }),
+        Kind::Resource | Kind::Choice(_) => None,
+    }
+}
+
+/// The type code a choice suffix names among an element's codes.
+#[must_use]
+pub fn choice_code(field: &'static FieldSchema, suffix: &str) -> Option<&'static str> {
+    field.types.iter().copied().find(|code| {
+        let mut chars = code.chars();
+        chars.next().is_some_and(|first| {
+            suffix.starts_with(first.to_ascii_uppercase())
+                && suffix.get(first.len_utf8()..) == Some(chars.as_str())
+        })
+    })
+}
+
+/// Every primitive type the table uses, with the scalar its JSON value
+/// carries.
+#[must_use]
+pub fn primitive_types(schemas: &'static Schemas) -> BTreeMap<&'static str, TypeKind> {
+    let mut types = BTreeMap::from([("xhtml", TypeKind::Xhtml)]);
+    let scalar = |kind: &Kind| match kind {
+        Kind::Primitive(value) => Some(*value),
+        Kind::Attribute => Some(ValueKind::Text),
+        _ => None,
+    };
+    for field in schemas.types.iter().flat_map(|schema| schema.fields) {
+        if let Some(value) = scalar(&field.kind)
+            && let Some(code) = field.types.first()
+        {
+            types.entry(*code).or_insert(TypeKind::Primitive(value));
+        }
+        if let Kind::Choice(variants) = field.kind {
+            for (suffix, kind) in variants {
+                if let Some(value) = scalar(kind)
+                    && let Some(code) = choice_code(field, suffix)
+                {
+                    types.entry(code).or_insert(TypeKind::Primitive(value));
+                }
+            }
+        }
+    }
+    types
+}
+
+/// The type an element path names, for evaluating an expression whose
+/// context is that element, as an `ElementDefinition.constraint` is
+/// (<https://hl7.org/fhir/R4/conformance-rules.html#constraints>).
+#[must_use]
+pub fn path_type(model: &dyn Model, path: &str) -> Option<FhirType> {
+    if !path.contains('.') {
+        return named_type(model, path);
+    }
+    let (_, field) = model.schemas().element(path)?;
+    field_type(model, field, field.kind)
+}
+
+/// Whether `name` is `ty` or a type `ty` specializes, as far as the model
+/// knows the hierarchy.
+#[must_use]
+pub fn is_a(model: &dyn Model, ty: &FhirType, name: &str) -> bool {
+    let mut current = Some(ty.name);
+    let mut hops = 0_u8;
+    while let Some(candidate) = current {
+        if candidate == name {
+            return true;
+        }
+        hops = hops.saturating_add(1);
+        if hops > 16 {
+            return false;
+        }
+        current = model.base(candidate);
+    }
+    false
+}

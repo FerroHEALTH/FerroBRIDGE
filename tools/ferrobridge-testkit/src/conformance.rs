@@ -61,11 +61,14 @@ pub enum Corpus {
     FhirR6,
     /// The FHIR R4 examples the facade serves, one case per context and file.
     FhirR4Facade,
+    /// The HL7 FHIRPath test suite for FHIR R4 through `ferrobridge-fhirpath`,
+    /// one case per test.
+    FhirpathR4,
 }
 
 impl Corpus {
     /// Every corpus, in the order the gate reports them.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::FhirconnectMappingLib,
         Self::Omocl,
         Self::Roundtrip,
@@ -77,6 +80,7 @@ impl Corpus {
         Self::FhirR5,
         Self::FhirR6,
         Self::FhirR4Facade,
+        Self::FhirpathR4,
     ];
 
     /// Returns the corpus identifier, which names its directory under
@@ -95,6 +99,7 @@ impl Corpus {
             Self::FhirR5 => "fhir-r5",
             Self::FhirR6 => "fhir-r6",
             Self::FhirR4Facade => "fhir-r4-facade",
+            Self::FhirpathR4 => "fhirpath-r4",
         }
     }
 
