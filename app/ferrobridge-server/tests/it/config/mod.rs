@@ -8,6 +8,7 @@ mod environment;
 mod facade;
 mod file;
 mod hl7v2;
+mod oauth;
 mod refusals;
 mod secrets;
 

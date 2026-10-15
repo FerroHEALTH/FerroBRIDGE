@@ -265,7 +265,7 @@ pub struct Cdr {
     /// The retry budget for idempotent calls.
     pub retry: Retry,
     /// The credentials the CDR expects.
-    pub credentials: Credentials,
+    pub credentials: CdrCredentials,
 }
 
 impl Default for Cdr {
@@ -274,7 +274,97 @@ impl Default for Cdr {
             base_url: String::new(),
             timeout_ms: 30_000,
             retry: Retry::default(),
-            credentials: Credentials::default(),
+            credentials: CdrCredentials::default(),
+        }
+    }
+}
+
+/// The credentials the CDR expects: the static schemes every upstream
+/// takes, or a token the bridge obtains for itself.
+///
+/// Every secret is reachable inline or through its `_file` sibling; setting
+/// both is a boot error, and so is a static scheme beside `oauth`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct CdrCredentials {
+    /// An RFC 6750 bearer token.
+    pub bearer_token: Option<String>,
+    /// A file holding the bearer token, read at boot.
+    pub bearer_token_file: Option<PathBuf>,
+    /// The user name of RFC 7617 basic authentication.
+    pub user: Option<String>,
+    /// A file holding the user name, read at boot.
+    pub user_file: Option<PathBuf>,
+    /// The password of RFC 7617 basic authentication.
+    pub password: Option<String>,
+    /// A file holding the password, read at boot.
+    pub password_file: Option<PathBuf>,
+    /// The OAuth 2.0 client credentials grant (RFC 6749 §4.4) the bridge
+    /// obtains its CDR token with.
+    pub oauth: Option<OAuthClient>,
+}
+
+impl CdrCredentials {
+    /// Returns the static schemes of this section, the ones every upstream
+    /// takes.
+    #[must_use]
+    pub fn static_schemes(&self) -> Credentials {
+        Credentials {
+            bearer_token: self.bearer_token.clone(),
+            bearer_token_file: self.bearer_token_file.clone(),
+            user: self.user.clone(),
+            user_file: self.user_file.clone(),
+            password: self.password.clone(),
+            password_file: self.password_file.clone(),
+        }
+    }
+}
+
+/// The OAuth 2.0 client credentials grant the bridge obtains its CDR token
+/// with (RFC 6749 §4.4).
+///
+/// Exactly one of `issuer` and `token_endpoint` is set.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct OAuthClient {
+    /// The issuer identifier whose metadata names the token endpoint
+    /// (RFC 8414 §2).
+    pub issuer: Option<String>,
+    /// The token endpoint, when it is not discovered (RFC 6749 §3.2).
+    pub token_endpoint: Option<String>,
+    /// The client identifier (RFC 6749 §2.2).
+    pub client_id: String,
+    /// The client secret.
+    pub client_secret: Option<String>,
+    /// A file holding the client secret, read at boot.
+    pub client_secret_file: Option<PathBuf>,
+    /// How the client authenticates: `client_secret_basic` or
+    /// `client_secret_post` (RFC 6749 §2.3.1).
+    pub client_auth: crate::cdr::oauth::ClientAuth,
+    /// The `scope` request parameter (RFC 6749 §3.3).
+    pub scope: Option<String>,
+    /// The `audience` request parameter, for an authorization server that
+    /// reads one.
+    pub audience: Option<String>,
+    /// The `resource` request parameter (RFC 8707 §2).
+    pub resource: Option<String>,
+    /// How long before the token expires a new one is fetched.
+    pub refresh_margin_ms: u64,
+}
+
+impl Default for OAuthClient {
+    fn default() -> Self {
+        Self {
+            issuer: None,
+            token_endpoint: None,
+            client_id: String::new(),
+            client_secret: None,
+            client_secret_file: None,
+            client_auth: crate::cdr::oauth::ClientAuth::default(),
+            scope: None,
+            audience: None,
+            resource: None,
+            refresh_margin_ms: 30_000,
         }
     }
 }

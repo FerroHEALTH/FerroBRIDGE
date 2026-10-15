@@ -153,6 +153,13 @@ pub enum CdrError {
         #[source]
         source: reqwest::Error,
     },
+    /// The HTTP engine of the token client could not be built.
+    #[error("the token client of the CDR client could not be built")]
+    TokenClient {
+        /// What the token client reported.
+        #[source]
+        source: crate::cdr::oauth::TokenError,
+    },
     /// The generated client refused the call, or the call reached no
     /// documented answer.
     #[error(
@@ -248,6 +255,7 @@ impl CdrError {
     pub fn kind(&self) -> &'static str {
         match self {
             Self::Build { .. } => "client-build",
+            Self::TokenClient { .. } => "token-client-build",
             Self::Client { source, .. } => client_kind(source),
             Self::Commit(HeaderError::Attribute { .. }) => "header-attribute",
             Self::Commit(_) | Self::HeaderValue { .. } => "header-value",
