@@ -49,6 +49,19 @@ crates on crates.io.
   refusal maps through the facade's status table, a query `400` to a `500` and
   a query `408` to a `502`. The `CapabilityStatement` names `search-type` and
   exactly the declared parameters with `_id`.
+- `fhir-types` 0.1.111 names each type's base type in the element table
+  (`TypeSchema::base`, from `StructureDefinition.baseDefinition`, and for a
+  backbone element the `BackboneElement` or `Element` its element names), in
+  every version, and carries the abstract types a base chain passes through
+  (`Resource`, `DomainResource`, `BackboneElement`, and from R5 `Base`,
+  `DataType` and `BackboneType`) as table-only entries.
+  `Schemas::base_of` and `Schemas::specializes` walk the chain.
+  `ferrobridge-fhirpath` reads it, so `is`, `as`, `ofType` and a leading type
+  name see `Age` as a `Quantity` and `Patient` as a `DomainResource` and a
+  `Resource`; the R4 profile validator takes a resource under an element typed
+  `DomainResource` only when its type specializes `DomainResource`, so a
+  `Binary` or a `Bundle` there is refused, and the same base chain decides the
+  profiles such an element applies and a `type` slicing discriminator (#458).
 - The R4 profile validator resolves references inside a Bundle by the method
   of the R4 Bundle page (absolute, relative against the entry's `fullUrl`,
   `urn:uuid:`, version-specific through `meta.versionId`), with a reference

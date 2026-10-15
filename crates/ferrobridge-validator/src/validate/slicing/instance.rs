@@ -190,11 +190,12 @@ fn children<'i>(node: &Node<'i>, name: &str) -> Vec<Node<'i>> {
     }
 }
 
-/// Answers whether `node` is of the type `name`.
-fn is_type(node: &Node<'_>, name: &str) -> bool {
+/// Answers whether `node` is of the type `name`; a resource is also of
+/// every type its base chain reaches (`DomainResource`, `Resource`).
+pub(super) fn is_type(node: &Node<'_>, name: &str) -> bool {
     node.type_name() == name
         || (matches!(node.kind, NodeKind::Resource(_))
-            && (name == "Resource" || name == "DomainResource"))
+            && SCHEMAS.specializes(node.type_name(), name))
 }
 
 impl<'i> Walk<'_, '_, 'i> {
