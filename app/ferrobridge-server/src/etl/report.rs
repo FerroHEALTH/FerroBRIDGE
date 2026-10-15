@@ -6,7 +6,8 @@
 //!
 //! The counts are the ones the architecture fixes for a run: rows per table,
 //! `concept_id = 0` assignments, `relationship_concept_id = 0` links, source
-//! fields no mapping wrote, and refusals. The report renders as text for a
+//! fields no mapping wrote, and refusals, beside the compositions checked for
+//! a deletion and the rows removed. The report renders as text for a
 //! person and as JSON for a machine. No specification governs its shape: our
 //! own design.
 
@@ -92,6 +93,32 @@ pub struct Derived {
     pub drug_era: u64,
 }
 
+/// The compositions an earlier run committed that this run's query did not
+/// answer, and what the CDR said of each.
+///
+/// The report names compositions by their versioned object id and counts
+/// rows; it never carries a clinical value.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct Deletions {
+    /// Compositions checked with the CDR.
+    pub checked: u64,
+    /// Checked compositions the CDR still holds, whose rows are kept.
+    pub extant: u64,
+    /// Compositions the CDR reports deleted, whose rows were removed.
+    pub removed: Vec<String>,
+    /// Compositions the CDR reports deleted, whose rows the `report` policy
+    /// kept.
+    pub kept: Vec<String>,
+    /// Checked compositions the CDR does not know (`404`), whose rows are
+    /// kept because no deletion is confirmed.
+    pub unknown: Vec<String>,
+    /// Confirmed deletions a commit of a newer version overtook, so nothing
+    /// was removed.
+    pub superseded: u64,
+    /// Rows removed, by table.
+    pub rows: BTreeMap<String, u64>,
+}
+
 /// What one ETL run did.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct RunReport {
@@ -109,6 +136,8 @@ pub struct RunReport {
     pub mappings: BTreeMap<String, MappingTotals>,
     /// The derived tables.
     pub derived: Derived,
+    /// The compositions checked for a deletion in the CDR.
+    pub deletions: Deletions,
     /// Every refused record.
     pub refusals: Vec<RefusalEntry>,
     /// Every source field no mapping wrote.
@@ -202,6 +231,18 @@ impl RunReport {
         *count = count.saturating_add(1);
     }
 
+    /// Adds a composition whose rows were removed because the CDR reports it
+    /// deleted, with the rows removed by table.
+    pub fn removed(&mut self, composition: String, rows: &BTreeMap<&'static str, u64>) {
+        for (table, count) in rows {
+            add(
+                self.deletions.rows.entry((*table).to_owned()).or_default(),
+                *count,
+            );
+        }
+        self.deletions.removed.push(composition);
+    }
+
     /// Adds a composition refused whole.
     pub fn composition_refused(&mut self, source: Option<&Source>, refusal: &Refusal) {
         self.compositions.refused = self.compositions.refused.saturating_add(1);
@@ -246,6 +287,29 @@ impl fmt::Display for RunReport {
             derived.condition_era,
             derived.drug_era
         )?;
+        let deletions = &self.deletions;
+        writeln!(
+            f,
+            "deletions: {} checked, {} extant, {} removed, {} deleted and kept, {} unknown to the CDR, {} superseded",
+            deletions.checked,
+            deletions.extant,
+            deletions.removed.len(),
+            deletions.kept.len(),
+            deletions.unknown.len(),
+            deletions.superseded
+        )?;
+        for (table, rows) in &deletions.rows {
+            writeln!(f, "removed rows {table}: {rows}")?;
+        }
+        for composition in &deletions.removed {
+            writeln!(f, "removed {composition}: deleted in the CDR")?;
+        }
+        for composition in &deletions.kept {
+            writeln!(f, "kept {composition}: deleted in the CDR, policy report")?;
+        }
+        for composition in &deletions.unknown {
+            writeln!(f, "kept {composition}: unknown to the CDR")?;
+        }
         for (mapping, totals) in &self.mappings {
             let rows = totals
                 .rows

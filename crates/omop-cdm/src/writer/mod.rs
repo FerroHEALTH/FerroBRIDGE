@@ -13,7 +13,8 @@
 //! last committed. [`CdmWriter::commit`] deletes the rows an earlier version
 //! of the composition wrote, writes the new ones under the same ids, and
 //! advances the watermark, all in one transaction, so a failure leaves the
-//! database as it was.
+//! database as it was. [`CdmWriter::remove`] deletes a composition's rows,
+//! links and watermark in one transaction the same way ([`removal`]).
 //!
 //! The rows cross into PostgreSQL through binary `COPY` into a temporary
 //! staging table whose `integer` columns are binary and whose other columns
@@ -26,6 +27,7 @@
 
 pub mod error;
 pub mod input;
+pub mod removal;
 pub mod side_table;
 pub mod stage;
 

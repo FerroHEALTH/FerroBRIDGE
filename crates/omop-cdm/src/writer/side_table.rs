@@ -247,14 +247,16 @@ pub(super) async fn earlier_rows(
 }
 
 /// Deletes the CDM rows, the links and the side table rows an earlier
-/// version of the composition wrote.
+/// version of the composition wrote, and returns the rows deleted by CDM
+/// table.
 pub(super) async fn delete_earlier(
     transaction: &Transaction<'_>,
     cdm: &SchemaName,
     bridge: &SchemaName,
     versioned_object_uid: &str,
     earlier: &Earlier,
-) -> Result<(), WriteError> {
+) -> Result<BTreeMap<&'static str, u64>, WriteError> {
+    let mut deleted = BTreeMap::new();
     let mut by_table: BTreeMap<&'static str, Vec<i32>> = BTreeMap::new();
     for (key, id) in &earlier.ids {
         by_table.entry(key.table).or_default().push(*id);
@@ -267,7 +269,7 @@ pub(super) async fn delete_earlier(
                 value: (*table).to_owned(),
             });
         };
-        transaction
+        let rows = transaction
             .execute(
                 &format!(
                     "DELETE FROM {cdm}.{} WHERE {} = ANY($1)",
@@ -278,8 +280,9 @@ pub(super) async fn delete_earlier(
             )
             .await
             .map_err(database(Step::Delete(table)))?;
+        deleted.insert(*table, rows);
     }
-    transaction
+    let links = transaction
         .execute(
             &format!(
                 "DELETE FROM {cdm}.fact_relationship AS f USING {bridge}.link AS l
@@ -294,6 +297,9 @@ pub(super) async fn delete_earlier(
         )
         .await
         .map_err(database(Step::Delete("fact_relationship")))?;
+    if links > 0 {
+        deleted.insert("fact_relationship", links);
+    }
     for table in ["link", "record"] {
         transaction
             .execute(
@@ -303,7 +309,7 @@ pub(super) async fn delete_earlier(
             .await
             .map_err(database(Step::Record))?;
     }
-    Ok(())
+    Ok(deleted)
 }
 
 /// Records the natural key and id of every row of `graph`.

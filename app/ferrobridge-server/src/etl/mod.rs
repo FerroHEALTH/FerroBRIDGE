@@ -15,11 +15,14 @@
 //! mapper or the writer refuses is rolled back and reported, and the run goes
 //! on; a CDR or database that stops answering ends the run with a typed
 //! error. A resumed run skips every composition whose watermark names the
-//! version the query answered. No specification governs the run: our own
-//! design, over openEHR ITS-REST 1.1.0 `POST /query/aql` with `offset` and
-//! `fetch` paging.
+//! version the query answered. After the compositions, every composition an
+//! earlier run committed and this run did not read is checked with the CDR,
+//! and one it reports deleted loses its rows ([`deletions`]). No
+//! specification governs the run: our own design, over openEHR ITS-REST
+//! 1.1.0 `POST /query/aql` with `offset` and `fetch` paging.
 
 pub mod aql;
+pub mod deletions;
 pub mod job;
 pub mod mapper;
 pub mod report;
@@ -29,6 +32,7 @@ pub mod visits;
 use crate::cdr::CdrClient;
 use crate::cdr::query::{PageSize, QueryPageError};
 use crate::etl::aql::{CheckedQuery, SINCE_PARAMETER};
+use crate::etl::deletions::{CheckError, DeletionPolicy, Sweep};
 use crate::etl::report::RunReport;
 use crate::etl::tie::{Tie, Windows};
 use futures_util::StreamExt;
@@ -41,7 +45,7 @@ use openehr_its::rest::generated::query::AdhocQueryExecute;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_rm::v1_2::common::archetyped::archetyped::Archetyped;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 use std::sync::Arc;
 
@@ -69,6 +73,8 @@ pub struct EtlSettings {
     pub observation_period_type_concept_id: i32,
     /// The visit derivation, when configured.
     pub visits: Option<VisitSettings>,
+    /// What the run does with a composition the CDR reports deleted.
+    pub deletions: DeletionPolicy,
 }
 
 /// What a mapper is handed besides the composition.
@@ -133,6 +139,16 @@ pub enum RunError {
     /// The CDR did not answer a template fetch.
     #[error("the CDR did not serve a template the compositions name")]
     Template(#[source] Box<crate::mappings::Error>),
+    /// The CDR could not say whether a composition an earlier run committed
+    /// is deleted.
+    #[error("the CDR did not say whether the composition {composition} is deleted")]
+    Deletion {
+        /// The versioned composition.
+        composition: String,
+        /// Why the check failed.
+        #[source]
+        source: Box<CheckError>,
+    },
     /// The CDM database refused the visits, a derivation, or a read, or its
     /// connection closed.
     #[error("the CDM database stopped the run")]
@@ -262,17 +278,19 @@ async fn rows(
     Ok(rows)
 }
 
-/// Runs the ETL once: the visits, every composition the query answers, then
-/// the derived tables.
+/// Runs the ETL once: the visits, every composition the query answers, the
+/// deletions the CDR confirms, then the derived tables.
 ///
 /// # Errors
 ///
 /// Returns [`RunError::Since`] when `--since` and the query disagree,
 /// [`RunError::Compositions`] and [`RunError::Visits`] when the CDR refuses a
 /// page, [`RunError::Template`] when it does not answer a template fetch,
-/// and [`RunError::Database`] when the CDM database refuses the visits, a
-/// watermark read or a derivation, or closes its connection. A composition
-/// refused on its own is reported and never ends the run.
+/// [`RunError::Deletion`] when it cannot say whether a composition is
+/// deleted, and [`RunError::Database`] when the CDM database refuses the
+/// visits, a watermark read, a removal or a derivation, or closes its
+/// connection. A composition refused on its own is reported and never ends
+/// the run.
 pub async fn run<M: Mapper>(
     settings: &EtlSettings,
     options: &RunOptions,
@@ -319,6 +337,7 @@ pub async fn run<M: Mapper>(
         type_concept_id: settings.type_concept_id,
     };
     let mut templates = Templates::new();
+    let mut seen = BTreeSet::new();
     let stream = cdr.query_aql_rows(request(query, options.since.as_deref()), settings.page_size);
     let mut stream = std::pin::pin!(stream);
     while let Some(row) = stream.next().await {
@@ -331,6 +350,7 @@ pub async fn run<M: Mapper>(
                 continue;
             }
         };
+        seen.insert(source.versioned_object_uid().value().to_owned());
         if options.resume
             && let Some(watermark) = writer
                 .watermark(source.versioned_object_uid())
@@ -368,6 +388,23 @@ pub async fn run<M: Mapper>(
         }
     }
 
+    let sweep = Sweep {
+        policy: settings.deletions,
+        batch: settings.page_size.get(),
+        seen: &seen,
+    };
+    deletions::sweep(&sweep, cdr, writer, &mut report).await?;
+    derive(settings, writer, &mut report).await?;
+    Ok(report)
+}
+
+/// Rebuilds the derived tables whole, after every commit and removal of the
+/// run.
+async fn derive(
+    settings: &EtlSettings,
+    writer: &mut CdmWriter,
+    report: &mut RunReport,
+) -> Result<(), RunError> {
     report.derived.observation_period =
         derived::observation_period(writer, settings.observation_period_type_concept_id)
             .await
@@ -378,7 +415,7 @@ pub async fn run<M: Mapper>(
     report.derived.drug_era = derived::drug_era(writer)
         .await
         .map_err(RunError::Database)?;
-    Ok(report)
+    Ok(())
 }
 
 /// One composition row and what the run knows when it maps it.
