@@ -1312,7 +1312,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-types"
-version = "0.1.108"
+version = "0.1.109"
 dependencies = [
  "quick-xml",
  "regex",
@@ -1322,7 +1322,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.108"
+version = "0.1.109"
 dependencies = [
  "ferrobridge-testkit",
  "fhir-types",

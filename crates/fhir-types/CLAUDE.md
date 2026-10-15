@@ -17,9 +17,11 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
   the complete closure of every type its roots reference, per version, and each
   emitted item carries the `cfg` of the narrowest feature that selects it.
   Never trim inside a closure.
-- The four version modules are behind `r4`, `r4b`, `r5` and `r6`; the default
-  feature set is every version plus `terminology`, which is the surface the
-  sibling terminology server consumes.
+- The five version modules are behind `stu3`, `r4`, `r4b`, `r5` and `r6`; the
+  default feature set is every version plus `terminology`, which is the
+  surface the sibling terminology server consumes. STU3 has no
+  `TerminologyCapabilities`, so its terminology root set is the other seven,
+  and the terminology ecosystem overlay is not applied to it.
 - The operation contracts stay the terminology set.
 - `schema::SCHEMAS` is the one element table per version: the XML codec and the
   path model read the same statics, so cardinality, the element path, the type
@@ -35,6 +37,8 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
   `Extension.url`) keeps the form of the FHIR type its own
   `structuredefinition-fhir-type` extension names, which differs per package.
   A primitive carried as a JSON number or a boolean keeps its scalar parse.
+  STU3 states a primitive value's type in its `_code` JSON-type extension and
+  its form in `structuredefinition-regex`; the emitter reads both.
 - `codec::Value` converts to `serde_json::Value` only when every number comes
   back in the text the document carried, and otherwise reports a
   `ValueConversionError` with the element path; `Value::from_serde_json` is the

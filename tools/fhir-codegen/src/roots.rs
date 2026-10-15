@@ -20,7 +20,7 @@ use crate::fhir::{Derivation, OperationDefinition, StructureDefinition, Structur
 use crate::package::Package;
 use crate::v2::corpus::{Corpus, Sourced, SourcedMessage};
 
-/// The resource types the terminology root set holds, by name.
+/// The resource types the terminology root set holds in R4 and later, by name.
 pub const ROOT_RESOURCES: [&str; 8] = [
     "Bundle",
     "CapabilityStatement",
@@ -31,6 +31,32 @@ pub const ROOT_RESOURCES: [&str; 8] = [
     "TerminologyCapabilities",
     "ValueSet",
 ];
+
+/// The resource types the terminology root set holds in STU3, by name.
+///
+/// STU3 defines no `TerminologyCapabilities`. Its `ExpansionProfile` stays in
+/// the resource set: `$expand` names one by its `uri` and no terminology
+/// operation exchanges the resource
+/// (<https://hl7.org/fhir/STU3/valueset-operations.html#expand>).
+pub const STU3_ROOT_RESOURCES: [&str; 7] = [
+    "Bundle",
+    "CapabilityStatement",
+    "CodeSystem",
+    "ConceptMap",
+    "OperationOutcome",
+    "Parameters",
+    "ValueSet",
+];
+
+/// The terminology root resources of the FHIR version `package` defines.
+#[must_use]
+pub fn root_resources(package: &Package) -> &'static [&'static str] {
+    if package.manifest().is_stu3() {
+        &STU3_ROOT_RESOURCES
+    } else {
+        &ROOT_RESOURCES
+    }
+}
 
 /// The resource types whose operations are terminology operations.
 pub const OPERATION_RESOURCES: [&str; 3] = ["CodeSystem", "ConceptMap", "ValueSet"];
@@ -90,7 +116,7 @@ impl<'a> RootSet<'a> {
     /// # Errors
     ///
     /// Returns [`MissingRoot`] when the package defines no structure for one
-    /// of [`ROOT_RESOURCES`].
+    /// of [`root_resources`].
     pub fn select(package: &'a Package) -> Result<Self, MissingRoot> {
         Self::select_scoped(package, RootScope::Terminology)
     }
@@ -106,11 +132,11 @@ impl<'a> RootSet<'a> {
     /// # Errors
     ///
     /// Returns [`MissingRoot`] when the package defines no structure for one
-    /// of [`ROOT_RESOURCES`].
+    /// of [`root_resources`].
     pub fn select_scoped(package: &'a Package, scope: RootScope) -> Result<Self, MissingRoot> {
         let mut resources = BTreeMap::new();
         let mut scopes = BTreeMap::new();
-        for name in ROOT_RESOURCES {
+        for name in root_resources(package).iter().copied() {
             let definition =
                 package
                     .structure_definition_named(name)

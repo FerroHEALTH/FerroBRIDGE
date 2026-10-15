@@ -75,15 +75,6 @@ macro_rules! lexical_form_cases {
             }
 
             #[test]
-            fn a_uri_holding_a_space_is_refused() {
-                let error =
-                    decode::<CodeSystem>(&code_system(r#""url":"http://example.org/a b","#), "CodeSystem")
-                        .expect_err("a uri holds no whitespace");
-                assert_eq!(error.kind, DecodeErrorKind::BadValue);
-                assert_eq!(error.path, "CodeSystem.url");
-            }
-
-            #[test]
             fn a_code_with_a_leading_space_is_refused() {
                 let text = format!(
                     r#"{{"resourceType":"CodeSystem","status":" active","content":"complete"}}"#
@@ -97,16 +88,60 @@ macro_rules! lexical_form_cases {
     };
 }
 
+/// The `uri` case per version whose package publishes a form for `uri.value`.
+macro_rules! uri_form_case {
+    ($version:ident, $module:ident) => {
+        mod $module {
+            use fhir_types::codec::DecodeErrorKind;
+            use fhir_types::$version::code_system::CodeSystem;
+
+            use super::{code_system, decode};
+
+            #[test]
+            fn a_uri_holding_a_space_is_refused() {
+                let error = decode::<CodeSystem>(
+                    &code_system(r#""url":"http://example.org/a b","#),
+                    "CodeSystem",
+                )
+                .expect_err("a uri holds no whitespace");
+                assert_eq!(error.kind, DecodeErrorKind::BadValue);
+                assert_eq!(error.path, "CodeSystem.url");
+            }
+        }
+    };
+}
+
+lexical_form_cases!(stu3);
 lexical_form_cases!(r4);
 lexical_form_cases!(r4b);
 lexical_form_cases!(r5);
 lexical_form_cases!(r6);
+uri_form_case!(r4, r4_uri);
+uri_form_case!(r4b, r4b_uri);
+uri_form_case!(r5, r5_uri);
+uri_form_case!(r6, r6_uri);
+
+/// 3.0.2 publishes no lexical form for `uri.value`, so the STU3 codec holds a
+/// `uri` to none: the form is read from each version's own package.
+#[test]
+fn stu3_publishes_no_uri_form() {
+    let decoded = decode::<fhir_types::stu3::code_system::CodeSystem>(
+        &code_system(r#""url":"http://example.org/a b","#),
+        "CodeSystem",
+    )
+    .expect("hl7.fhir.r3.core 3.0.2 states no structuredefinition-regex on uri.value");
+    assert_eq!(
+        decoded.url.and_then(|url| url.value).as_deref(),
+        Some("http://example.org/a b")
+    );
+}
 
 /// The resource id keeps the form the element's own type names, per package.
 ///
 /// The `structuredefinition-fhir-type` extension of a resource's `id` element
 /// names `id` in 4.3.0 and 5.0.0 and `string` in 4.0.1; 6.0.0-ballot5 names
-/// `string` on `CodeSystem.id` and `id` on `Bundle.id`. The emitter reads the
+/// `string` on `CodeSystem.id` and `id` on `Bundle.id`; 3.0.2 types
+/// `CodeSystem.id` with the code `id` itself. The emitter reads the
 /// element, so each version refuses exactly what its own package describes.
 #[test]
 fn a_resource_id_keeps_the_form_its_package_states() {
@@ -116,6 +151,8 @@ fn a_resource_id_keeps_the_form_its_package_states() {
             .expect_err("4.3.0 types CodeSystem.id as id"),
         decode::<fhir_types::r5::code_system::CodeSystem>(&code_system(body), "CodeSystem")
             .expect_err("5.0.0 types CodeSystem.id as id"),
+        decode::<fhir_types::stu3::code_system::CodeSystem>(&code_system(body), "CodeSystem")
+            .expect_err("3.0.2 types CodeSystem.id as id"),
     ] {
         assert_eq!(error.kind, DecodeErrorKind::BadValue);
         assert_eq!(error.path, "CodeSystem.id");
@@ -135,7 +172,7 @@ fn a_resource_id_keeps_the_form_its_package_states() {
 
 /// A `dateTime` carrying a time without an offset, as each package states it.
 ///
-/// 4.0.1, 4.3.0 and 6.0.0-ballot5 put the offset inside the time group of the
+/// 3.0.2, 4.0.1, 4.3.0 and 6.0.0-ballot5 put the offset inside the time group of the
 /// `dateTime` form, so a time without one is outside the form; 5.0.0 moves the
 /// offset out of that group and makes it optional, so the same value keeps the
 /// 5.0.0 form.
@@ -143,6 +180,8 @@ fn a_resource_id_keeps_the_form_its_package_states() {
 fn a_time_without_an_offset_follows_each_package() {
     let body = r#""date":"2001-06-15T12:00:00","#;
     for error in [
+        decode::<fhir_types::stu3::code_system::CodeSystem>(&code_system(body), "CodeSystem")
+            .expect_err("3.0.2 requires the offset"),
         decode::<fhir_types::r4::code_system::CodeSystem>(&code_system(body), "CodeSystem")
             .expect_err("4.0.1 requires the offset"),
         decode::<fhir_types::r4b::code_system::CodeSystem>(&code_system(body), "CodeSystem")

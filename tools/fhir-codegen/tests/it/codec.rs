@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use fhir_types::codec::Value;
 use fhir_types::codec::{DecodeErrorKind, Json, Path as ElementPath, expect_object};
 
+use fhir_codegen::package::without_byte_order_mark;
+
 use crate::vendor_dir;
 
 /// The resource files of a package whose type is in the root set.
@@ -42,7 +44,8 @@ pub(crate) fn root_set_files(package: &str) -> Vec<PathBuf> {
 
 fn round_trip<T: Json>(path: &Path, root: &str) -> Result<(), String> {
     let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let original: Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let original: Value =
+        serde_json::from_str(without_byte_order_mark(&text)).map_err(|e| e.to_string())?;
     let mut element_path = ElementPath::root(root);
     let object = expect_object(&original, &element_path).map_err(|e| e.to_string())?;
     let decoded =
@@ -125,6 +128,11 @@ fn round_trip_all<T: Json>(package: &str) {
 }
 
 #[test]
+fn every_stu3_root_set_resource_round_trips() {
+    round_trip_all::<fhir_types::stu3::resource::Resource>("hl7.fhir.r3.core");
+}
+
+#[test]
 fn every_r4_root_set_resource_round_trips() {
     round_trip_all::<fhir_types::r4::resource::Resource>("hl7.fhir.r4.core");
 }
@@ -197,6 +205,8 @@ fn a_clinical_resource_round_trips_in_every_version() {
     round_trip_text::<fhir_types::r5::patient::Patient>(PATIENT, "Patient");
     round_trip_text::<fhir_types::r6::observation::Observation>(OBSERVATION, "Observation");
     round_trip_text::<fhir_types::r6::patient::Patient>(PATIENT, "Patient");
+    round_trip_text::<fhir_types::stu3::observation::Observation>(OBSERVATION, "Observation");
+    round_trip_text::<fhir_types::stu3::patient::Patient>(PATIENT, "Patient");
 }
 
 fn decode_coding(

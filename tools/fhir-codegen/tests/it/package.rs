@@ -33,7 +33,7 @@ fn structure_definitions_are_keyed_by_canonical_url() {
         .get("http://hl7.org/fhir/StructureDefinition/ValueSet")
         .expect("ValueSet is defined");
     assert_eq!(value_set.name, "ValueSet");
-    assert_eq!(value_set.type_name, "ValueSet");
+    assert_eq!(value_set.type_name.as_deref(), Some("ValueSet"));
     assert_eq!(value_set.kind, StructureKind::Resource);
     assert_eq!(value_set.derivation, Some(Derivation::Specialization));
     assert!(!value_set.is_abstract);

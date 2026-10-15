@@ -37,8 +37,10 @@ pub struct StructureDefinition {
     #[serde(rename = "abstract")]
     pub is_abstract: bool,
     /// The type this structure describes or constrains.
+    // NOTE: StructureDefinition.type is 1..1 (https://hl7.org/fhir/STU3/structuredefinition.html),
+    // yet hl7.fhir.r3.core 3.0.2 omits it on the Definition, Event and Request logical models.
     #[serde(rename = "type")]
-    pub type_name: String,
+    pub type_name: Option<String>,
     /// The canonical URL of the definition this one derives from.
     pub base_definition: Option<String>,
     /// `specialization` (a new type) or `constraint` (a profile).
@@ -103,6 +105,9 @@ pub struct ElementDefinition {
     pub content_reference: Option<String>,
     /// The terminology binding for coded elements.
     pub binding: Option<Binding>,
+    /// How the element is represented in XML; `xmlAttr` makes it an attribute.
+    #[serde(default)]
+    pub representation: Vec<String>,
     /// Whether the element is part of the summary view.
     pub is_summary: Option<bool>,
     /// Whether the element modifies the meaning of its parent.
@@ -115,19 +120,54 @@ pub struct ElementDefinition {
 pub struct ElementType {
     /// The type code: a FHIR type name or a `FHIRPath` system type URL.
     ///
-    /// Absent in three R4 4.0.1 extension definitions (`structuredefinition-json-type`,
-    /// `-xml-type`, `-rdf-type`), whose value types carry only the `_code`
-    /// primitive extensions; a type without a code has no Rust shape.
+    /// Absent where the package types a value by its `_code` extensions
+    /// alone: every STU3 primitive's `value`, and `Extension.id` and
+    /// `Extension.url` of three R4 4.0.1 extension definitions.
     pub code: Option<String>,
-    /// Profiles the value must conform to.
-    #[serde(default)]
+    /// The extensions of `code`, which carry the `structuredefinition-json-type`
+    /// of a type without a code.
+    #[serde(rename = "_code")]
+    pub code_element: Option<PrimitiveElement>,
+    /// Profiles the value must conform to: one `uri` in STU3, a list from R4.
+    #[serde(default, deserialize_with = "one_or_many")]
     pub profile: Vec<String>,
-    /// Profiles a `Reference` or `canonical` target must conform to.
-    #[serde(default)]
+    /// Profiles a `Reference` or `canonical` target must conform to: one
+    /// `uri` in STU3, a list from R4.
+    #[serde(default, deserialize_with = "one_or_many")]
     pub target_profile: Vec<String>,
     /// Extensions on the type; primitives carry `structuredefinition-fhir-type` here.
     #[serde(default)]
     pub extension: Vec<Extension>,
+}
+
+/// The `_name` sibling of a primitive: its extensions
+/// (<https://hl7.org/fhir/STU3/json.html#primitive>).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimitiveElement {
+    /// The extensions on the primitive.
+    #[serde(default)]
+    pub extension: Vec<Extension>,
+}
+
+/// One value or a list of values.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum OneOrMany {
+    One(String),
+    Many(Vec<String>),
+}
+
+/// Reads an element that STU3 declares `0..1` and R4 widens to `0..*`.
+///
+/// `ElementDefinition.type.profile` and `targetProfile` are one `uri` in STU3
+/// (<https://hl7.org/fhir/STU3/elementdefinition.html>) and a list from R4
+/// (<https://hl7.org/fhir/R4/elementdefinition.html>).
+fn one_or_many<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<String>, D::Error> {
+    Ok(match OneOrMany::deserialize(deserializer)? {
+        OneOrMany::One(value) => vec![value],
+        OneOrMany::Many(values) => values,
+    })
 }
 
 /// A FHIR extension with a URL value, the only value form the loader reads.
@@ -148,10 +188,43 @@ pub struct Extension {
 pub struct Binding {
     /// `required`, `extensible`, `preferred`, or `example`.
     pub strength: String,
-    /// The bound value set, as a canonical URL, possibly with a `|version`.
+    /// The bound value set, as a canonical URL, possibly with a `|version` (R4 and later).
     pub value_set: Option<String>,
+    /// The bound value set as a URI (STU3, `valueSetUri`).
+    pub value_set_uri: Option<String>,
+    /// The bound value set as a reference (STU3, `valueSetReference`).
+    pub value_set_reference: Option<Reference>,
     /// A description of the binding.
     pub description: Option<String>,
+}
+
+impl Binding {
+    /// The bound value set, whichever form the package spells it in.
+    ///
+    /// STU3 states the value set as `valueSet[x]`, a `uri` or a
+    /// `Reference(ValueSet)` (<https://hl7.org/fhir/STU3/elementdefinition.html>);
+    /// R4 and later state it as the canonical `valueSet`.
+    #[must_use]
+    pub fn bound_value_set(&self) -> Option<&str> {
+        self.value_set
+            .as_deref()
+            .or(self.value_set_uri.as_deref())
+            .or_else(|| {
+                self.value_set_reference
+                    .as_ref()
+                    .and_then(|reference| reference.reference.as_deref())
+            })
+    }
+}
+
+/// A FHIR `Reference`, keeping the literal reference.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Reference {
+    /// The literal reference, a relative or absolute URL.
+    pub reference: Option<String>,
+    /// The text alternative for the resource.
+    pub display: Option<String>,
 }
 
 /// A FHIR `OperationDefinition` (<https://hl7.org/fhir/R4B/operationdefinition.html>).

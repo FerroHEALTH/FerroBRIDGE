@@ -29,6 +29,7 @@ mod precision;
 mod roots;
 mod serialize;
 mod snapshot;
+mod stu3;
 mod v2;
 mod v2_legacy;
 mod value_conversion;
@@ -76,10 +77,17 @@ static R5: LazyLock<Package> = LazyLock::new(|| {
         .expect("the vendored hl7.fhir.r5.core package should load")
 });
 
+/// The vendored STU3 core package, loaded once for every test.
+static STU3: LazyLock<Package> = LazyLock::new(|| {
+    Package::open(vendor_dir().join("hl7.fhir.r3.core"))
+        .expect("the vendored hl7.fhir.r3.core package should load")
+});
+
 /// Every vendored package: the version module name, its directory, and the
 /// loaded package.
-fn packages() -> [(&'static str, PathBuf, &'static Package); 4] {
+fn packages() -> [(&'static str, PathBuf, &'static Package); 5] {
     [
+        ("stu3", vendor_dir().join("hl7.fhir.r3.core"), &STU3),
         ("r4", vendor_dir().join("hl7.fhir.r4.core"), &R4),
         ("r4b", r4b_dir(), &R4B),
         ("r5", vendor_dir().join("hl7.fhir.r5.core"), &R5),

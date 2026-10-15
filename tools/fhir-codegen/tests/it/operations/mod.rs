@@ -4,6 +4,7 @@
 mod conversions;
 mod declared;
 mod overlay;
+mod stu3;
 mod wider_primitive_spellings;
 
 use fhir_codegen::closure::TypeClosure;

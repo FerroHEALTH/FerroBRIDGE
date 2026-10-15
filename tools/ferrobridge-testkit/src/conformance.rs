@@ -50,6 +50,8 @@ pub enum Corpus {
     Hl7v2,
     /// The HL7 v2 message sets fetched at build time, one case per message.
     Hl7v2Smoke,
+    /// The FHIR STU3 examples package through `fhir-types`, one case per file.
+    FhirStu3,
     /// The FHIR R4 examples package through `fhir-types`, one case per file.
     FhirR4,
     /// The FHIR R4B examples package through `fhir-types`, one case per file.
@@ -68,13 +70,14 @@ pub enum Corpus {
 
 impl Corpus {
     /// Every corpus, in the order the gate reports them.
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::FhirconnectMappingLib,
         Self::Omocl,
         Self::Roundtrip,
         Self::DraftRestApi,
         Self::Hl7v2,
         Self::Hl7v2Smoke,
+        Self::FhirStu3,
         Self::FhirR4,
         Self::FhirR4b,
         Self::FhirR5,
@@ -94,6 +97,7 @@ impl Corpus {
             Self::DraftRestApi => "draft-rest-api",
             Self::Hl7v2 => "hl7v2",
             Self::Hl7v2Smoke => "hl7v2-smoke",
+            Self::FhirStu3 => "fhir-stu3",
             Self::FhirR4 => "fhir-r4",
             Self::FhirR4b => "fhir-r4b",
             Self::FhirR5 => "fhir-r5",

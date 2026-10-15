@@ -46,6 +46,7 @@ fn round_trip<T: Json + Serialize>(decimal: &str, version: &str) {
 #[test]
 fn a_decimal_keeps_its_lexical_form_in_every_served_version() {
     for decimal in DECIMALS {
+        round_trip::<fhir_types::stu3::parameters::Parameters>(decimal, "STU3");
         round_trip::<fhir_types::r4::parameters::Parameters>(decimal, "R4");
         round_trip::<fhir_types::r4b::parameters::Parameters>(decimal, "R4B");
         round_trip::<fhir_types::r5::parameters::Parameters>(decimal, "R5");

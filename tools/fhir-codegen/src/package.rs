@@ -70,8 +70,23 @@ pub struct Manifest {
     /// The package version, for example `4.3.0`.
     pub version: String,
     /// The FHIR versions the package content targets.
-    #[serde(default)]
+    ///
+    /// The R4 and STU3 core packages spell the member `fhir-version-list`.
+    #[serde(default, alias = "fhir-version-list")]
     pub fhir_versions: Vec<String>,
+}
+
+impl Manifest {
+    /// Whether the package content targets FHIR STU3 (release 3.0).
+    ///
+    /// STU3 differs from R4 and later in what the generator declares for it:
+    /// the terminology root set and the terminology ecosystem overlay.
+    #[must_use]
+    pub fn is_stu3(&self) -> bool {
+        self.fhir_versions
+            .first()
+            .is_some_and(|version| version.starts_with("3.0."))
+    }
 }
 
 /// A loaded FHIR package: its manifest and the conformance resources.
@@ -266,10 +281,22 @@ fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, LoadError> 
 }
 
 fn parse_json<T: for<'de> Deserialize<'de>>(path: &Path, text: &str) -> Result<T, LoadError> {
-    serde_json::from_str(text).map_err(|source| LoadError::Json {
+    serde_json::from_str(without_byte_order_mark(text)).map_err(|source| LoadError::Json {
         path: path.to_path_buf(),
         source,
     })
+}
+
+/// The text of a JSON resource file without a leading UTF-8 byte order mark.
+///
+/// `serde_json` refuses a byte order mark, and 40 files of `hl7.fhir.r3.core`
+/// 3.0.2 begin with one; the file stays verbatim on disk and the reader skips
+/// the mark.
+#[must_use]
+pub fn without_byte_order_mark(text: &str) -> &str {
+    // NOTE: https://hl7.org/fhir/STU3/json.html says "The character encoding is always
+    // UTF-8" and is silent on a byte order mark: no specification governs this: our own design.
+    text.strip_prefix('\u{feff}').unwrap_or(text)
 }
 
 fn insert_unique<T>(

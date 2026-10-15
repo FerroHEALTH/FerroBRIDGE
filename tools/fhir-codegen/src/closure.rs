@@ -200,7 +200,7 @@ fn referenced(package: &Package, element: &ResolvedElement, pending: &mut Vec<(S
     match &element.shape {
         ElementShape::Typed(types) | ElementShape::Choice(types) => {
             for type_ref in types {
-                if type_ref.fhirpath_type.is_none() {
+                if !type_ref.is_scalar() {
                     pending.push((type_ref.code.clone(), element.path.clone()));
                 }
             }

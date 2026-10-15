@@ -131,6 +131,7 @@ done <<< "$WATCHED_COMMITS"
 # pinned by version, read against the `latest` dist-tag the FHIR package
 # registry publishes for it (the npm registry shape both registries speak).
 readonly WATCHED_PACKAGES="\
+hl7.fhir.r3.examples	https://packages.fhir.org/hl7.fhir.r3.examples
 hl7.fhir.r4.examples	https://packages.fhir.org/hl7.fhir.r4.examples
 hl7.fhir.r4b.examples	https://packages.fhir.org/hl7.fhir.r4b.examples
 hl7.fhir.r5.examples	https://packages.fhir.org/hl7.fhir.r5.examples

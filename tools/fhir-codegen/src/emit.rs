@@ -256,12 +256,17 @@ fn lower_models(
             &package.manifest().version,
         )?;
         let mut contracts = Vec::new();
+        // NOTE: no specification governs this: our own design; the overlay serves the
+        // R4 to R5 servers of the terminology ecosystem, and none speaks STU3 through it.
+        let overlaid = !package.manifest().is_stu3();
         for (url, operation) in &roots.operations {
             let source = r6.and_then(|roots| roots.operations.get(url).copied());
             for resource in &operation.resource {
-                contracts.push(OperationContract::lower_overlaid(
-                    operation, resource, &model, source,
-                )?);
+                contracts.push(if overlaid {
+                    OperationContract::lower_overlaid(operation, resource, &model, source)?
+                } else {
+                    OperationContract::lower(operation, resource, &model)?
+                });
             }
         }
         contracts.sort_by(|a, b| a.module.cmp(&b.module));

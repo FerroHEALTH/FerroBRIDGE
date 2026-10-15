@@ -34,7 +34,7 @@ fn failure<T: Json>(schemas: &Schemas, file: &Path) -> Option<String> {
         Ok(text) => text,
         Err(error) => return Some(format!("unreadable: {error}")),
     };
-    let original: Value = match serde_json::from_str(&text) {
+    let original: Value = match serde_json::from_str(without_byte_order_mark(&text)) {
         Ok(value) => value,
         Err(error) => return Some(format!("not JSON: {error}")),
     };
@@ -62,6 +62,16 @@ fn failure<T: Json>(schemas: &Schemas, file: &Path) -> Option<String> {
         Err(error) => return Some(format!("XML decode: {error}")),
     };
     difference(&encoded, &back, "").map(|at| format!("the XML round trip differs at {at}"))
+}
+
+/// Returns `text` without a leading UTF-8 byte order mark.
+///
+/// 19 files of `hl7.fhir.r3.examples` 3.0.2 begin with one, which `serde_json`
+/// refuses; the fetched files stay verbatim.
+fn without_byte_order_mark(text: &str) -> &str {
+    // NOTE: https://hl7.org/fhir/STU3/json.html says "The character encoding is always
+    // UTF-8" and is silent on a byte order mark: no specification governs this: our own design.
+    text.strip_prefix('\u{feff}').unwrap_or(text)
 }
 
 /// Returns the first place `after` departs from `before`, by element path.
@@ -153,6 +163,15 @@ fn measure<T: Json>(
         outcome.regressed
     );
     Ok(())
+}
+
+#[test]
+fn conformance_the_fhir_stu3_examples_hold_their_pass_list() -> Result<(), Box<dyn Error>> {
+    measure::<fhir_types::stu3::resource::Resource>(
+        Package::Stu3,
+        Corpus::FhirStu3,
+        &fhir_types::stu3::schema::SCHEMAS,
+    )
 }
 
 #[test]

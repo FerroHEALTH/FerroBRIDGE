@@ -20,6 +20,14 @@ const NARROW: usize = 128;
 fn a_choice_enum_is_no_wider_than_the_primitives_it_admits() {
     let widths = [
         (
+            "stu3 value[x]",
+            size_of::<fhir_types::stu3::parameters::ParametersParameterValue>(),
+        ),
+        (
+            "stu3 Extension.value[x]",
+            size_of::<fhir_types::stu3::extension::ExtensionValue>(),
+        ),
+        (
             "r4 value[x]",
             size_of::<fhir_types::r4::parameters::ParametersParameterValue>(),
         ),
@@ -66,6 +74,10 @@ fn a_parameter_costs_its_own_value_and_not_the_widest_one() {
     // Every output of an answer is one of these, so its width multiplies by the
     // number of parameters a `$lookup` writes (hundreds, for RxNorm).
     let widths = [
+        (
+            "stu3",
+            size_of::<fhir_types::stu3::parameters::ParametersParameter>(),
+        ),
         (
             "r4",
             size_of::<fhir_types::r4::parameters::ParametersParameter>(),
