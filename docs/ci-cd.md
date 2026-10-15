@@ -33,6 +33,7 @@ the committed guards, so both are live code from day one and both need a gate.
 | `hadolint` | every tracked Dockerfile under `.hadolint.yaml` (`failure-threshold: warning`) |
 | `comment-style` | `scripts/checks/comment-style.sh --all` |
 | `versions` | `scripts/checks/versions.sh` |
+| `profile-packages` | `scripts/vendor/profile-packages.sh` over a cache keyed on `--cache-key` (the profile packages fetched at build time and never committed, each checked at its pinned count and digest), then `--self-test` and `--check`: every `PROVENANCE.md` against its pin, no unpinned tree, and every `dependencies` entry of every fetched `package.json` pinned too |
 | `favicon-sync` | `scripts/checks/favicon-sync.sh` |
 | `file-length` | `scripts/checks/file-length.sh`: a hand-written Rust file stays at most 1000 lines |
 | `contribution-licence` | `scripts/checks/contribution-licence.sh` on a pull request: the licensing checkbox of the body is ticked |

@@ -29,7 +29,8 @@
 # through scripts/vendor/hl7v2-samples.sh --build-time (a no-op when they are
 # on disk at their pins). The four FHIR model corpora and the R4 facade corpus
 # read the HL7 examples packages (#373), fetched the same way through
-# scripts/vendor/fhir-packages.sh --build-time.
+# scripts/vendor/fhir-packages.sh --build-time. The R4 profile validator's
+# package set is fetched the same way through scripts/vendor/profile-packages.sh.
 #
 # Needs cargo, cargo-nextest, jq, and the tools that script needs. Exit 0 when
 # clean, 1 on a regression, (under --check) drift or no cargo on PATH, 2 on a
@@ -151,6 +152,13 @@ fi
 # same way at their pinned count and digest.
 if ! scripts/vendor/fhir-packages.sh --build-time; then
   echo "conformance: the FHIR examples packages could not be fetched" >&2
+  exit 2
+fi
+
+# The R4 profile validator's package set (#435), fetched at build time and
+# kept the same way, so the validator corpus finds it on disk.
+if ! scripts/vendor/profile-packages.sh; then
+  echo "conformance: the profile packages could not be fetched" >&2
   exit 2
 fi
 # One package per invocation, as the CI test lane runs them.
