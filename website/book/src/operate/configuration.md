@@ -166,6 +166,68 @@ For the CDR, the scheme becomes the `Authorization` header of every call the
 generated client sends: `Bearer <token>` for a token, and `Basic` over
 `user:password` for a user and a password.
 
+### `[cdr.credentials.oauth]`
+
+The bridge can obtain its CDR token itself with the OAuth 2.0 client
+credentials grant (RFC 6749 §4.4) and renew it before it expires. The bridge
+always reaches the CDR under its own token for the CDR's audience and never
+forwards a caller's token, because an access token names the resource server
+it is for (RFC 9068 §4). The section replaces the static schemes: setting it
+beside `bearer_token` or `user` is a boot error. Only the CDR takes it; under
+`[terminology.credentials]` it is an unknown key.
+
+| Key | Default | Secret | Meaning |
+|---|---|---|---|
+| `token_endpoint` | none | | The token endpoint URL (RFC 6749 §3.2) |
+| `issuer` | none | | The issuer identifier, an `https` URL with no query or fragment (RFC 8414 §2); the token endpoint is read from its metadata |
+| `client_id` | none, required | | The client identifier (RFC 6749 §2.2) |
+| `client_secret` | none, required | yes | The client secret; use `client_secret_file` to read it from a file |
+| `client_auth` | `client_secret_basic` | | `client_secret_basic` sends the id and the secret as HTTP Basic, `client_secret_post` sends them in the request body (RFC 6749 §2.3.1) |
+| `scope` | none | | The `scope` parameter, space-delimited scope tokens (RFC 6749 §3.3) |
+| `audience` | none | | An `audience` parameter, for an authorization server that reads one; no specification defines it for this grant |
+| `resource` | none | | The `resource` parameter, an absolute URI with no fragment (RFC 8707 §2) |
+| `refresh_margin_ms` | `30000` | | How long before the token expires a new one is fetched |
+
+Set exactly one of `token_endpoint` and `issuer`; both, or neither, is a boot
+error. With an `issuer`, the bridge reads the RFC 8414 metadata at
+`/.well-known/oauth-authorization-server` inserted before the issuer's path,
+and on a `404` the OpenID Connect discovery document at the issuer followed
+by `/.well-known/openid-configuration`. The document's `issuer` must equal
+the configured value exactly, or no token is requested (RFC 8414 §3.3).
+
+The bridge fetches the token on the first CDR call, not at boot, and every
+call shares it. It fetches a new one `refresh_margin_ms` before `expires_in`
+runs out; the margin is capped at half the token's lifetime, so a short-lived
+token is still reused. A token without `expires_in` is reused until the CDR
+refuses it. Calls that find no usable token at the same time share one
+request to the token endpoint. When the CDR answers `401`, the bridge drops
+the token, fetches a new one and sends the call once more, a `POST`
+included, since a `401` means the CDR applied nothing (RFC 9110 §15.5.2). A
+second `401` reaches the caller as any refused credential does.
+
+A token request that fails is an error naming the token endpoint's status
+and, when the body carries one, the OAuth `error` and `error_description`
+(RFC 6749 §5.2), for example `the token endpoint answered 401 Unauthorized:
+invalid_client (unknown client)`. A failed fetch is not cached: the next call
+asks again. The `cdr` readiness indicator reports down with that reason while
+no token can be obtained. The bridge sends bearer tokens only; a token
+response with another `token_type` is refused. Point `token_endpoint` and
+`issuer` at `https` URLs outside a network you control, because the client
+secret travels in the token request.
+
+```toml
+[cdr.credentials.oauth]
+issuer = "https://auth.example.org/realms/clinic"
+client_id = "ferrobridge"
+client_secret_file = "/run/secrets/cdr_client_secret"
+scope = "openehr"
+```
+
+As environment variables, the same section reads
+`FERROBRIDGE__CDR__CREDENTIALS__OAUTH__ISSUER`,
+`FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_ID` and
+`FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE`.
+
 ### `[terminology]`
 
 The FHIR terminology lane. Absent, the bridge holds no terminology client, and
@@ -431,11 +493,15 @@ a file never shows up in `docker inspect` or a process listing.
 ## What a bad configuration does
 
 The server refuses to start and prints one line on stderr naming the key, then
-exits 78, `EX_CONFIG`. Five things are refused:
+exits 78, `EX_CONFIG`. Six things are refused:
 
 - an unknown key or an unknown section;
 - a value of the wrong type, or one that is not a socket address, a URL, or a
   release name;
+- two credential schemes in one section, an OAuth section with both an
+  `issuer` and a `token_endpoint`, an `issuer` that is not an `https` URL
+  free of a query and a fragment, a `scope` that is not scope tokens, and a
+  `resource` with a fragment;
 - a `[cdm] url` that names no `sslmode`, or one that falls back to plaintext
   or is not a libpq mode, a `[cdm]` CA that holds no PEM certificate, and a
   `PGSSLROOTCERT`, `PGSSLCERT` or `PGSSLKEY` in the environment;

@@ -192,7 +192,13 @@ secrets:
     file: ${FERROBRIDGE_CDM_URL_FILE:-./secrets/cdm_url}
   # The CDR credential, for a CDR that takes an RFC 6750 bearer token. For RFC
   # 7617 basic authentication set FERROBRIDGE__CDR__CREDENTIALS__USER and point
-  # FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE at a secret of your own.
+  # FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE at a secret of your own. For
+  # a token the bridge obtains itself with the OAuth 2.0 client credentials
+  # grant, leave FERROBRIDGE__CDR__CREDENTIALS__BEARER_TOKEN_FILE unset, set
+  # FERROBRIDGE__CDR__CREDENTIALS__OAUTH__ISSUER (or __TOKEN_ENDPOINT) and
+  # __CLIENT_ID, and point
+  # FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE at a secret of
+  # your own.
   cdr_bearer_token:
     file: ${FERROBRIDGE_CDR_BEARER_TOKEN_FILE:-./secrets/cdr_bearer_token}
   # The password the CDM database is created with, read by the official image.
