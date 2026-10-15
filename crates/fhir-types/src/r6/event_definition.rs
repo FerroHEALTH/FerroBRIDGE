@@ -613,7 +613,9 @@ impl super::super::codec::Json for EventDefinition {
         }
         if !self.library.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.library)?;
-            object.insert(std::string::String::from("library"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("library"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_library"), elements);
             }

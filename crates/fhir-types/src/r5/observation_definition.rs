@@ -526,14 +526,18 @@ impl super::super::codec::Json for ObservationDefinition {
         if !self.derived_from_canonical.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.derived_from_canonical)?;
-            object.insert(std::string::String::from("derivedFromCanonical"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("derivedFromCanonical"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_derivedFromCanonical"), elements);
             }
         }
         if !self.derived_from_uri.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.derived_from_uri)?;
-            object.insert(std::string::String::from("derivedFromUri"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("derivedFromUri"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_derivedFromUri"), elements);
             }
@@ -575,7 +579,9 @@ impl super::super::codec::Json for ObservationDefinition {
         if !self.permitted_data_type.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.permitted_data_type)?;
-            object.insert(std::string::String::from("permittedDataType"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("permittedDataType"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_permittedDataType"), elements);
             }
@@ -1850,7 +1856,9 @@ impl super::super::codec::Json for ObservationDefinitionComponent {
         if !self.permitted_data_type.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.permitted_data_type)?;
-            object.insert(std::string::String::from("permittedDataType"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("permittedDataType"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_permittedDataType"), elements);
             }

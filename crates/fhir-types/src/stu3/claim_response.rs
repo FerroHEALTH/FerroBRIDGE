@@ -1258,7 +1258,9 @@ impl super::super::codec::Json for ClaimResponseAddItem {
         }
         if !self.sequence_link_id.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.sequence_link_id)?;
-            object.insert(std::string::String::from("sequenceLinkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("sequenceLinkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_sequenceLinkId"), elements);
             }
@@ -1301,7 +1303,9 @@ impl super::super::codec::Json for ClaimResponseAddItem {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -1774,7 +1778,9 @@ impl super::super::codec::Json for ClaimResponseAddItemDetail {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -2476,7 +2482,9 @@ impl super::super::codec::Json for ClaimResponseInsurance {
         }
         if !self.pre_auth_ref.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.pre_auth_ref)?;
-            object.insert(std::string::String::from("preAuthRef"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("preAuthRef"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_preAuthRef"), elements);
             }
@@ -2796,7 +2804,9 @@ impl super::super::codec::Json for ClaimResponseItem {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -3401,7 +3411,9 @@ impl super::super::codec::Json for ClaimResponseItemDetail {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -3709,7 +3721,9 @@ impl super::super::codec::Json for ClaimResponseItemDetailSubDetail {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }

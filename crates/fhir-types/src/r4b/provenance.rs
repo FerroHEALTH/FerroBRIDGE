@@ -231,7 +231,9 @@ impl super::super::codec::Json for Provenance {
         }
         if !self.policy.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.policy)?;
-            object.insert(std::string::String::from("policy"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("policy"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_policy"), elements);
             }

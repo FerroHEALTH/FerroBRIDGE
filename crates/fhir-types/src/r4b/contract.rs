@@ -495,7 +495,9 @@ impl super::super::codec::Json for Contract {
         }
         if !self.alias.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.alias)?;
-            object.insert(std::string::String::from("alias"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("alias"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_alias"), elements);
             }
@@ -4142,7 +4144,9 @@ impl super::super::codec::Json for ContractTermAction {
         );
         if !self.link_id.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.link_id)?;
-            object.insert(std::string::String::from("linkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("linkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_linkId"), elements);
             }
@@ -4159,7 +4163,9 @@ impl super::super::codec::Json for ContractTermAction {
         }
         if !self.context_link_id.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.context_link_id)?;
-            object.insert(std::string::String::from("contextLinkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("contextLinkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_contextLinkId"), elements);
             }
@@ -4188,7 +4194,9 @@ impl super::super::codec::Json for ContractTermAction {
         if !self.requester_link_id.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.requester_link_id)?;
-            object.insert(std::string::String::from("requesterLinkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("requesterLinkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_requesterLinkId"), elements);
             }
@@ -4220,7 +4228,9 @@ impl super::super::codec::Json for ContractTermAction {
         if !self.performer_link_id.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.performer_link_id)?;
-            object.insert(std::string::String::from("performerLinkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("performerLinkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_performerLinkId"), elements);
             }
@@ -4251,14 +4261,18 @@ impl super::super::codec::Json for ContractTermAction {
         }
         if !self.reason.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.reason)?;
-            object.insert(std::string::String::from("reason"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("reason"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_reason"), elements);
             }
         }
         if !self.reason_link_id.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.reason_link_id)?;
-            object.insert(std::string::String::from("reasonLinkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("reasonLinkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_reasonLinkId"), elements);
             }
@@ -4278,7 +4292,9 @@ impl super::super::codec::Json for ContractTermAction {
         if !self.security_label_number.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.security_label_number)?;
-            object.insert(std::string::String::from("securityLabelNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("securityLabelNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_securityLabelNumber"), elements);
             }
@@ -5497,7 +5513,9 @@ impl super::super::codec::Json for ContractTermAsset {
         }
         if !self.link_id.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.link_id)?;
-            object.insert(std::string::String::from("linkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("linkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_linkId"), elements);
             }
@@ -5517,7 +5535,9 @@ impl super::super::codec::Json for ContractTermAsset {
         if !self.security_label_number.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.security_label_number)?;
-            object.insert(std::string::String::from("securityLabelNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("securityLabelNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_securityLabelNumber"), elements);
             }
@@ -6478,7 +6498,9 @@ impl super::super::codec::Json for ContractTermAssetValuedItem {
         }
         if !self.link_id.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.link_id)?;
-            object.insert(std::string::String::from("linkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("linkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_linkId"), elements);
             }
@@ -6486,7 +6508,9 @@ impl super::super::codec::Json for ContractTermAssetValuedItem {
         if !self.security_label_number.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.security_label_number)?;
-            object.insert(std::string::String::from("securityLabelNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("securityLabelNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_securityLabelNumber"), elements);
             }
@@ -7212,7 +7236,9 @@ impl super::super::codec::Json for ContractTermOffer {
         }
         if !self.link_id.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.link_id)?;
-            object.insert(std::string::String::from("linkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("linkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_linkId"), elements);
             }
@@ -7220,7 +7246,9 @@ impl super::super::codec::Json for ContractTermOffer {
         if !self.security_label_number.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.security_label_number)?;
-            object.insert(std::string::String::from("securityLabelNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("securityLabelNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_securityLabelNumber"), elements);
             }
@@ -8483,7 +8511,9 @@ impl super::super::codec::Json for ContractTermSecurityLabel {
         }
         if !self.number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.number)?;
-            object.insert(std::string::String::from("number"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("number"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_number"), elements);
             }

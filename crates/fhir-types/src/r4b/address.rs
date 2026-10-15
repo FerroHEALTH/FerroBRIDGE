@@ -122,7 +122,9 @@ impl super::super::codec::Json for Address {
         }
         if !self.line.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.line)?;
-            object.insert(std::string::String::from("line"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("line"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_line"), elements);
             }

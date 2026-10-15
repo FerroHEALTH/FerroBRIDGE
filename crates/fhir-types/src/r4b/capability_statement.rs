@@ -437,14 +437,18 @@ impl super::super::codec::Json for CapabilityStatement {
         }
         if !self.instantiates.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.instantiates)?;
-            object.insert(std::string::String::from("instantiates"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("instantiates"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_instantiates"), elements);
             }
         }
         if !self.imports.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.imports)?;
-            object.insert(std::string::String::from("imports"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("imports"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_imports"), elements);
             }
@@ -469,14 +473,18 @@ impl super::super::codec::Json for CapabilityStatement {
         }
         if !self.format.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.format)?;
-            object.insert(std::string::String::from("format"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("format"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_format"), elements);
             }
         }
         if !self.patch_format.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.patch_format)?;
-            object.insert(std::string::String::from("patchFormat"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("patchFormat"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_patchFormat"), elements);
             }
@@ -484,7 +492,9 @@ impl super::super::codec::Json for CapabilityStatement {
         if !self.implementation_guide.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.implementation_guide)?;
-            object.insert(std::string::String::from("implementationGuide"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("implementationGuide"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_implementationGuide"), elements);
             }
@@ -2807,7 +2817,9 @@ impl super::super::codec::Json for CapabilityStatementRest {
         }
         if !self.compartment.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.compartment)?;
-            object.insert(std::string::String::from("compartment"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("compartment"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_compartment"), elements);
             }
@@ -3501,7 +3513,9 @@ impl super::super::codec::Json for CapabilityStatementRestResource {
         if !self.supported_profile.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.supported_profile)?;
-            object.insert(std::string::String::from("supportedProfile"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("supportedProfile"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_supportedProfile"), elements);
             }
@@ -3584,14 +3598,18 @@ impl super::super::codec::Json for CapabilityStatementRestResource {
         }
         if !self.reference_policy.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.reference_policy)?;
-            object.insert(std::string::String::from("referencePolicy"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("referencePolicy"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_referencePolicy"), elements);
             }
         }
         if !self.search_include.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.search_include)?;
-            object.insert(std::string::String::from("searchInclude"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("searchInclude"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_searchInclude"), elements);
             }
@@ -3599,7 +3617,9 @@ impl super::super::codec::Json for CapabilityStatementRestResource {
         if !self.search_rev_include.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.search_rev_include)?;
-            object.insert(std::string::String::from("searchRevInclude"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("searchRevInclude"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_searchRevInclude"), elements);
             }

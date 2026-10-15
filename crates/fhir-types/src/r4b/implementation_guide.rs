@@ -400,7 +400,9 @@ impl super::super::codec::Json for ImplementationGuide {
         }
         if !self.fhir_version.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.fhir_version)?;
-            object.insert(std::string::String::from("fhirVersion"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("fhirVersion"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_fhirVersion"), elements);
             }
@@ -2399,7 +2401,9 @@ impl super::super::codec::Json for ImplementationGuideDefinitionResource {
         );
         if !self.fhir_version.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.fhir_version)?;
-            object.insert(std::string::String::from("fhirVersion"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("fhirVersion"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_fhirVersion"), elements);
             }
@@ -3635,14 +3639,18 @@ impl super::super::codec::Json for ImplementationGuideManifest {
         }
         if !self.image.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.image)?;
-            object.insert(std::string::String::from("image"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("image"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_image"), elements);
             }
         }
         if !self.other.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.other)?;
-            object.insert(std::string::String::from("other"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("other"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_other"), elements);
             }
@@ -3960,7 +3968,9 @@ impl super::super::codec::Json for ImplementationGuideManifestPage {
         }
         if !self.anchor.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.anchor)?;
-            object.insert(std::string::String::from("anchor"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("anchor"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_anchor"), elements);
             }

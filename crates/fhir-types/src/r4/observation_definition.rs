@@ -247,7 +247,9 @@ impl super::super::codec::Json for ObservationDefinition {
         if !self.permitted_data_type.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.permitted_data_type)?;
-            object.insert(std::string::String::from("permittedDataType"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("permittedDataType"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_permittedDataType"), elements);
             }

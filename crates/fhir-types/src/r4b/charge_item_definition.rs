@@ -325,21 +325,27 @@ impl super::super::codec::Json for ChargeItemDefinition {
         }
         if !self.derived_from_uri.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.derived_from_uri)?;
-            object.insert(std::string::String::from("derivedFromUri"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("derivedFromUri"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_derivedFromUri"), elements);
             }
         }
         if !self.part_of.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.part_of)?;
-            object.insert(std::string::String::from("partOf"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("partOf"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_partOf"), elements);
             }
         }
         if !self.replaces.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.replaces)?;
-            object.insert(std::string::String::from("replaces"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("replaces"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_replaces"), elements);
             }

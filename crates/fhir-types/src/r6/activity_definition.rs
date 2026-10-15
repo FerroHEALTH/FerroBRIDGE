@@ -717,7 +717,9 @@ impl super::super::codec::Json for ActivityDefinition {
         }
         if !self.library.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.library)?;
-            object.insert(std::string::String::from("library"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("library"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_library"), elements);
             }
@@ -840,7 +842,9 @@ impl super::super::codec::Json for ActivityDefinition {
         if !self.specimen_requirement.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.specimen_requirement)?;
-            object.insert(std::string::String::from("specimenRequirement"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("specimenRequirement"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_specimenRequirement"), elements);
             }
@@ -848,7 +852,9 @@ impl super::super::codec::Json for ActivityDefinition {
         if !self.observation_requirement.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.observation_requirement)?;
-            object.insert(std::string::String::from("observationRequirement"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("observationRequirement"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(
                     std::string::String::from("_observationRequirement"),
@@ -859,10 +865,12 @@ impl super::super::codec::Json for ActivityDefinition {
         if !self.observation_result_requirement.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.observation_result_requirement)?;
-            object.insert(
-                std::string::String::from("observationResultRequirement"),
-                values,
-            );
+            if let Some(values) = values {
+                object.insert(
+                    std::string::String::from("observationResultRequirement"),
+                    values,
+                );
+            }
             if let Some(elements) = elements {
                 object.insert(
                     std::string::String::from("_observationResultRequirement"),
