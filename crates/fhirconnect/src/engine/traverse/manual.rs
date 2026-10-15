@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 use fhir_types::codec::Value;
 
 use crate::engine::condition;
+use crate::engine::outcome::Location;
+use crate::engine::outcome::Loss;
 use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
 use crate::engine::rm;
@@ -43,10 +45,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
         if let Some(only) = entry.direction()
             && only != self.direction
         {
-            self.warnings.push(Warning::Skipped {
-                mapping: format!("{}.{}", mapping.name(), entry.name()),
-                reason: SkipReason::Unidirectional,
-            });
+            let location = self.locate_entry(entry, binding);
+            self.warnings.push(Warning::new(
+                Loss::Skipped {
+                    mapping: format!("{}.{}", mapping.name(), entry.name()),
+                    reason: SkipReason::Unidirectional,
+                },
+                location,
+            ));
             return Ok(());
         }
         if !self.manual_admits(mapping, entry, binding)? {
@@ -56,6 +62,26 @@ impl<T: Table + ?Sized> Run<'_, T> {
             Direction::FhirToOpenehr => self.manual_openehr(mapping, entry, binding),
             Direction::OpenehrToFhir => self.manual_fhir(mapping, entry, binding),
         }
+    }
+
+    /// Returns where a loss of a manual entry happened: its first FHIR path at
+    /// the binding's occurrence and its first openEHR path.
+    ///
+    /// The paths of one entry build one element (`manual.adoc`), so the first
+    /// of each side names it.
+    fn locate_entry(&self, entry: &Manual, binding: &Binding) -> Location {
+        let fhir = entry.fhir().iter().find_map(|path| match *path.target() {
+            Target::Fhir(ref target) => Some(target.as_ref()),
+            Target::Openehr(_) => None,
+        });
+        let openehr = entry
+            .openehr()
+            .iter()
+            .find_map(|path| match *path.target() {
+                Target::Openehr(ref target) => Some(target.as_ref()),
+                Target::Fhir(_) => None,
+            });
+        self.locate_targets(fhir, &binding.fhir, openehr)
     }
 
     /// Returns whether the input-side conditions admit a manual entry.

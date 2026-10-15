@@ -122,6 +122,27 @@ crates on crates.io.
 
 ### Changed
 
+- `fhirconnect` 0.1.110 locates every loss a run declares (#498). A
+  `fhirconnect::engine::outcome::Warning` is now a `Loss` (the former
+  variants: `Skipped`, `Defaulted`, `LastOfMany`, `OneWayFallback`,
+  `DeferredReference`) with a `Location`, read through `Warning::loss()` and
+  `Warning::location()`. `Location::fhir()` is the FHIRPath of the FHIR
+  element the loss concerns (the input going into openEHR, the output coming
+  out to FHIR), with an index on each repeating element and no function, so it
+  fits `OperationOutcome.issue.expression`; `Location::openehr()` is the
+  archetype path of the openEHR node. Neither carries a value from the input.
+  `operations::run::to_fhir_with_warnings` and `to_openehr_with_warnings`
+  return a `Transformed` that holds the answer and the typed warnings in the
+  order the engine raised them, so a consumer that logs each transformation no
+  longer parses issue text; `to_fhir` and `to_openehr` keep their signatures.
+  Each issue of a run's `OperationOutcome` sets `expression` to the FHIRPath
+  and carries the openEHR path as a `details.coding` in
+  `https://ferrobridge.eu/fhir/CodeSystem/openehr-path`
+  (`operations::issues::OPENEHR_PATH_SYSTEM`); `details.text` is unchanged.
+  `fhirconnect::tree::locate::locate` names one element of a document as such
+  a FHIRPath. A consumer that matched `Warning::Skipped { .. }` matches
+  `Loss::Skipped { .. }` on `warning.loss()`.
+
 - SonarQube Cloud analyses FerroBRIDGE under the FerroHEALTH organisation:
   organization `ferrohealth`, project key `FerroHEALTH_FerroBRIDGE`, in
   `sonar-project.properties`, the MCP server configuration and the README

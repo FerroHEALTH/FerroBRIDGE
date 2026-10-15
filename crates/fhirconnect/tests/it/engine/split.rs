@@ -10,8 +10,8 @@ use std::collections::BTreeMap;
 use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::outcome::SkipReason;
-use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::IdentityRequest;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::error::EngineError;
@@ -106,8 +106,8 @@ fn a_split_into_openehr_creates_one_cluster_per_body_site() -> Result<(), Box<dy
         .warnings()
         .iter()
         .filter(|warning| {
-            **warning
-                == Warning::Skipped {
+            *warning.loss()
+                == Loss::Skipped {
                     mapping: String::from("subject"),
                     reason: SkipReason::Unidirectional,
                 }
