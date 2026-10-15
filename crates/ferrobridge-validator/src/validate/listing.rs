@@ -34,22 +34,5 @@ impl Walk<'_, '_, '_> {
                 Reason::Invariants,
             );
         }
-        for kind in &element.r#type {
-            let targets: Vec<String> = kind
-                .target_profile
-                .iter()
-                .filter_map(|profile| profile.value.clone())
-                .collect();
-            if !targets.is_empty() {
-                // TODO(#441): check the resolved target against its target profiles.
-                self.out().unevaluated(
-                    url,
-                    id,
-                    Constraint::TargetProfile { profiles: targets },
-                    location,
-                    Reason::Profiles,
-                );
-            }
-        }
     }
 }

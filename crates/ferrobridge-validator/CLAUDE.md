@@ -38,8 +38,11 @@ generated model cannot carry what a check needs, that is a generator change
   decides one discriminator), the profiles a type names (`profiles`),
   terminology (`terminology`: `index` holds a code system by code, `compose`
   decides membership in a value set three-valued, `binding` holds a value to
-  an element's binding) and the `resolve()` seam with its contained-resource
-  resolver (`resolver`).
+  an element's binding), the resolution seam with its contained-resource and
+  Bundle resolvers (`resolver`, bundle.html §2.36.4.1), the target profiles
+  and aggregation of a reference (`reference`), and the document rules
+  (`document`, documents.html §3.3.1). The claimed profiles sit in
+  `profiles`.
 - `terminology` (the public module): the `Terminology` seam over
   `ferrobridge-term`, the pending binding checks, and
   `Report::resolve_bindings`.
@@ -56,15 +59,15 @@ answered, and leaves a refused or failed one listed with
 
 ## Never a silent pass
 
-Every invariant, target profile, claimed profile and extension context the
-walk meets is listed as `Unevaluated` with its reason, once per declaring
+Every invariant and extension context the walk meets, every target profile
+whose target it cannot reach or whose profile the set lacks, and every claimed
+profile the set lacks, is listed as `Unevaluated` with its reason, once per declaring
 definition, element and constraint, and so is every binding the package set
 cannot decide, every discriminator the slicing cannot decide and every type
 profile the set does not carry. An item a discriminator cannot decide is
-placed in no slice and refused by no rule. The sibling issues fill these in:
-invariants #439 through `ferrobridge-fhirpath`, target and claimed profiles
-and Bundle resolution #441. A check that lands removes its listing in the
-same change.
+placed in no slice and refused by no rule. Invariants are #439's, through
+`ferrobridge-fhirpath`. A check that lands removes its listing in the same
+change.
 
 ## Settled decisions are `// NOTE:` comments at their site
 
@@ -87,7 +90,13 @@ valueset.html §4.9.5 over the `include.valueSet` definition's "union"); a
 `Coding` without a system is in no value set; subsumption filters need an
 `is-a` hierarchy meaning and the property `concept`; a display matches the
 concept's display or a designation exactly and a mismatch is a warning; a
-`deprecated` status under `compose.inactive` false is undecided. Change one
+`deprecated` status under `compose.inactive` false is undecided; an
+ambiguous Bundle reference is an error; a target failing every checked
+target profile is not refused while another is unknown; a target profile check under
+way further up the walk counts as passing (a reference cycle); every
+`meta.profile` claim is validated; the core `Resource` and
+`DomainResource` admit any target; the stylesheet `Binary` of a document is
+one whose `contentType` is `text/css`. Change one
 only with a citation.
 
 ## Tests
