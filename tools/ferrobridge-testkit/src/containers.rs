@@ -120,9 +120,9 @@ pub const POSTGRES: PinnedImage = PinnedImage {
 
 /// The reference openEHR CDR, which speaks ITS-REST 1.1.0.
 pub const CDR: PinnedImage = PinnedImage {
-    repository: "ghcr.io/rubentalstra/ferroehr",
-    tag: "4.2.5",
-    digest: "sha256:aa5a9e0447befadb396084fd19ce7a6d30ea1fb8e16806615071e9f1748125ca",
+    repository: "ghcr.io/ferrohealth/ferroehr",
+    tag: "4.3.6",
+    digest: "sha256:cd29d6526084c84e9a7fe2c9d7058bd4fe67abbfab51d07b124d84dc9805e5bb",
 };
 
 /// The PostgreSQL the reference CDR image documents as its database.
@@ -131,9 +131,9 @@ pub const CDR: PinnedImage = PinnedImage {
 /// the CDR's own migrations expect to find, so the CDR is started against it
 /// rather than against a bare PostgreSQL.
 pub const CDR_POSTGRES: PinnedImage = PinnedImage {
-    repository: "ghcr.io/rubentalstra/ferroehr-postgres",
-    tag: "4.2.5",
-    digest: "sha256:e094461744fa8510ca8c1c4ecde4460474befb00b310ba41f7d9ff6e67e181bc",
+    repository: "ghcr.io/ferrohealth/ferroehr-postgres",
+    tag: "4.3.6",
+    digest: "sha256:fc93ccffba5e1dc266169e3d22b7a2c57cbe35e1266b42ff6c819ca323c204c3",
 };
 
 /// The reference FHIR terminology server.
@@ -141,9 +141,9 @@ pub const CDR_POSTGRES: PinnedImage = PinnedImage {
 /// It serves each FHIR release under its own path prefix (`/r4`, `/r4b`,
 /// `/r5`, `/r6`), which is why [`Terminology::base_url`] takes the release.
 pub const TERMINOLOGY: PinnedImage = PinnedImage {
-    repository: "ghcr.io/rubentalstra/ferroterm",
-    tag: "0.1.3",
-    digest: "sha256:b1ef80382e03c2474bfec2ec57a698d83314e1290dd0cb5a2612ea208bde020c",
+    repository: "ghcr.io/ferrohealth/ferroterm",
+    tag: "0.1.6",
+    digest: "sha256:7ec4c9622e88e3028faf7c74a2384fb02e57dc3163c282b21274121a26aa3d5b",
 };
 
 /// A container could not be started, or did not become usable.
