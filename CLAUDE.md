@@ -79,7 +79,8 @@ the testkit tool crate. Beside it:
   the paged read, the `Mapper` the OMOCL engine fills (#90, `etl::mapper`
   compiles one program per template on first sight), the visits and the run
   report. `src/facade/` is the FHIR R4 facade (#85),
-  mounted under `/fhir` behind `[facade]`: the six interactions over the CDR,
+  mounted under `/fhir` behind `[facade]`: the six interactions over the CDR and search over the AQL projections a
+  `*.search.yml` file declares beside a context (#98),
   the `redb` identity store with the derivation
   `docs/architecture.md` §9 fixes, the one status table
   from a CDR answer to a FHIR answer, and the `CapabilityStatement` built from
