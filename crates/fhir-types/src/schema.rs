@@ -17,6 +17,13 @@
 //! primitive's `id` and `extension` in a sibling member named with a leading
 //! underscore (<https://hl7.org/fhir/R4/json.html>), and that member's shape is
 //! `Element`.
+//!
+//! Every type names its base type, and the table carries each abstract type a
+//! base chain passes through (`Resource`, `DomainResource`, `BackboneElement`,
+//! and from R5 `Base`, `DataType` and `BackboneType`), so
+//! [`Schemas::base_of`] walks every type to the root of the hierarchy. A
+//! primitive is not in the table, and neither is a constraint profile such as
+//! `SimpleQuantity`, which is no type of its own.
 
 /// The scalar a primitive's `value` attribute carries in JSON.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +98,12 @@ pub struct TypeSchema {
     pub path: &'static str,
     /// The elements, in definition order.
     pub fields: &'static [FieldSchema],
+    /// The name of the type this one specializes, its
+    /// `StructureDefinition.baseDefinition`
+    /// (<https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.baseDefinition>);
+    /// for a backbone element, the type its element names, `BackboneElement`
+    /// or `Element`. `None` at the root of the hierarchy.
+    pub base: Option<&'static str>,
 }
 
 /// A version's schema: every type, sorted by name, and the resource names.
@@ -110,6 +123,33 @@ impl Schemas {
             .binary_search_by(|t| t.name.cmp(name))
             .ok()
             .and_then(|i| self.types.get(i))
+    }
+
+    /// The name of the type `name` specializes, `None` for a type at the root
+    /// of the hierarchy and for a name the table does not carry.
+    #[must_use]
+    pub fn base_of(&self, name: &str) -> Option<&'static str> {
+        self.type_named(name).and_then(|schema| schema.base)
+    }
+
+    /// Whether the type `name` is `ancestor` or specializes it, directly or
+    /// through its base chain: `Age` specializes `Quantity`, and `Patient`
+    /// specializes `DomainResource` and `Resource`
+    /// (<https://hl7.org/fhir/R5/types.html>).
+    #[must_use]
+    pub fn specializes(&self, name: &str, ancestor: &str) -> bool {
+        if name == ancestor {
+            return true;
+        }
+        let mut current = self.base_of(name);
+        for _ in 0..self.types.len() {
+            match current {
+                Some(base) if base == ancestor => return true,
+                Some(base) => current = self.base_of(base),
+                None => return false,
+            }
+        }
+        false
     }
 
     /// The type and element a dotted element path names.

@@ -10,7 +10,9 @@
 //! (<https://hl7.org/fhir/R4/elementdefinition.html>), so the generated
 //! footprint stays one static per version over the types in `schema.rs`. It
 //! carries the table-only `Element` entry that a primitive's `_name` sibling
-//! resolves against (<https://hl7.org/fhir/R4/json.html>).
+//! resolves against (<https://hl7.org/fhir/R4/json.html>), and the table-only
+//! abstract bases each type's base chain passes through, so every entry's
+//! `base` names an entry.
 
 use std::fmt::{self, Write};
 
@@ -34,17 +36,25 @@ pub fn render_schema(model: &VersionModule) -> Result<String, fmt::Error> {
     out.push_str("use super::super::schema::{FieldSchema, Kind, TypeSchema, ValueKind};\n\n");
     out.push_str("/// The version's schema.\n");
     out.push_str("pub static SCHEMAS: Schemas = Schemas {\n    types: &[\n");
-    for ty in model.types.values() {
+    let mut entries: Vec<&TypeDef> = model
+        .types
+        .values()
+        .chain(model.abstract_types.values())
+        .filter(|ty| !ty.is_primitive)
+        .collect();
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+    for ty in entries {
         let TypeKind::Struct { fields } = &ty.kind else {
             continue;
         };
-        if ty.is_primitive {
-            continue;
-        }
         out.push_str(&ty.scope.cfg());
+        let base = ty
+            .base
+            .as_ref()
+            .map_or_else(|| String::from("None"), |base| format!("Some({base:?})"));
         writeln!(
             out,
-            "        TypeSchema {{\n            name: {:?},\n            path: {:?},\n            fields: &[",
+            "        TypeSchema {{\n            name: {:?},\n            path: {:?},\n            base: {base},\n            fields: &[",
             ty.name, ty.path
         )?;
         for field in fields {

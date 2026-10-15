@@ -25,10 +25,21 @@ use crate::validate::slicing::definition::Located;
 use crate::validate::slicing::definition::locate;
 use crate::validate::slicing::instance::Node;
 use crate::validate::slicing::instance::NodeKind;
+use crate::validate::slicing::instance::is_type;
 use crate::validate::structure::Structure;
 use crate::validate::terminology::Coded;
 use crate::validate::terminology::Membership;
 use crate::validate::walk::Walk;
+
+/// Whether `code` names an abstract resource type (`Resource`,
+/// `DomainResource`), one the element table carries with no resource of
+/// that name.
+fn is_abstract_resource(code: &str) -> bool {
+    let schemas = &fhir_types::r4::schema::SCHEMAS;
+    !schemas.is_resource(code)
+        && schemas.type_named(code).is_some()
+        && schemas.specializes(code, "Resource")
+}
 
 impl<'i> Walk<'_, '_, 'i> {
     /// Evaluates `discriminator` for the slice `slice_id` over `nodes`, the
@@ -84,11 +95,7 @@ impl<'i> Walk<'_, '_, 'i> {
                     Err(reason) => return Ok(unknown(reason)),
                 };
                 Ok(verdict(nodes.iter().any(|node| {
-                    allowed.iter().any(|name| {
-                        node.type_name() == name
-                            || (matches!(node.kind, NodeKind::Resource(_))
-                                && (name == "Resource" || name == "DomainResource"))
-                    })
+                    allowed.iter().any(|name| is_type(node, name))
                 })))
             }
             "profile" => {
@@ -215,7 +222,7 @@ impl<'i> Walk<'_, '_, 'i> {
             Located::Targets(targets) => profiled.extend(targets.iter().cloned()),
             Located::Element { .. } => {
                 for (code, profiles) in located.types() {
-                    if (code == "Resource" || code == "DomainResource") && !profiles.is_empty() {
+                    if is_abstract_resource(&code) && !profiles.is_empty() {
                         profiled.extend(profiles);
                     } else {
                         allowed.push(code);
