@@ -35,11 +35,12 @@ walked against their definition.
 
 Slicing is evaluated as FHIR R4 profiling defines it: the discriminator types
 `value`, `exists`, `pattern`, `type` and `profile` over paths in the simple
-FHIRPath subset (`resolve()` through contained resources, `extension(url)`,
-`ofType()` and `as()`), a required binding over a value set the package set
-enumerates, slicing without a discriminator, the rules `closed`, `open` and
-`openAtEnd`, ordered slicing, the `@default` slice, re-slicing, extension
-slices by `url`, and the cardinality of each slice and of the slicing entry.
+FHIRPath subset (`resolve()` through contained resources and Bundle entries,
+`extension(url)`, `ofType()` and `as()`), a required binding over a value set
+the package set enumerates, slicing without a discriminator, the rules
+`closed`, `open` and `openAtEnd`, ordered slicing, the `@default` slice,
+re-slicing, extension slices by `url`, and the cardinality of each slice and
+of the slicing entry.
 An item matched to a slice is held to the slice's own constraints. Content
 is validated against the profiles its type names and passes when it conforms
 to one of them.
@@ -59,10 +60,23 @@ terminology server through
 batch; without a server, or when the server fails, it stays listed with the
 reason.
 
-Invariants, target profiles and the profiles a resource claims are not
-evaluated yet, and neither is a discriminator the validator cannot decide (a
-path outside the subset, a reference outside the resource, a value set it
-cannot evaluate). Each one the validator meets is listed in the report and in
+References resolve to a contained resource by `#id` or to an entry of the
+Bundle around the resource, by the method of the R4 Bundle page (absolute,
+relative against the entry's `fullUrl`, `urn:uuid:`, version-specific
+through `meta.versionId`); a reference matching two entries is an error. The
+resolved target is held to the element's target profiles, passing when it
+conforms to one, and the reference to its aggregation (`contained`,
+`referenced`, `bundled`). Every Bundle entry is held to the profile its slice
+names, and every resource to each profile it claims in `meta.profile`. A
+document Bundle is held to the content rules R4 gives documents: the
+resources the Composition references are in the Bundle, and the Bundle holds
+only the Composition, what it references directly or indirectly, a CSS
+stylesheet `Binary` and the `Provenance` of what it includes.
+
+Invariants are not evaluated yet, and neither is a discriminator, target
+profile or aggregation the validator cannot decide (a path outside the
+subset, a reference outside the resources it holds, a value set it cannot
+evaluate, a profile the package set lacks). Each one the validator meets is listed in the report and in
 the `OperationOutcome` as a `warning` of type `not-supported`, never passed in
 silence.
 
