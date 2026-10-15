@@ -248,7 +248,9 @@ impl super::super::codec::Json for RequestGroup {
         if !self.instantiates_canonical.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.instantiates_canonical)?;
-            object.insert(std::string::String::from("instantiatesCanonical"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("instantiatesCanonical"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(
                     std::string::String::from("_instantiatesCanonical"),
@@ -258,7 +260,9 @@ impl super::super::codec::Json for RequestGroup {
         }
         if !self.instantiates_uri.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.instantiates_uri)?;
-            object.insert(std::string::String::from("instantiatesUri"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("instantiatesUri"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_instantiatesUri"), elements);
             }

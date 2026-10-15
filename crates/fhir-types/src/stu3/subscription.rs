@@ -731,7 +731,9 @@ impl super::super::codec::Json for SubscriptionChannel {
         }
         if !self.header.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.header)?;
-            object.insert(std::string::String::from("header"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("header"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_header"), elements);
             }

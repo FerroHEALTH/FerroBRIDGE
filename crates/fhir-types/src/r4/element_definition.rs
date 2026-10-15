@@ -297,7 +297,9 @@ impl super::super::codec::Json for ElementDefinition {
         }
         if !self.representation.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.representation)?;
-            object.insert(std::string::String::from("representation"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("representation"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_representation"), elements);
             }
@@ -378,7 +380,9 @@ impl super::super::codec::Json for ElementDefinition {
         }
         if !self.alias.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.alias)?;
-            object.insert(std::string::String::from("alias"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("alias"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_alias"), elements);
             }
@@ -508,7 +512,9 @@ impl super::super::codec::Json for ElementDefinition {
         }
         if !self.condition.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.condition)?;
-            object.insert(std::string::String::from("condition"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("condition"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_condition"), elements);
             }
@@ -10359,21 +10365,27 @@ impl super::super::codec::Json for ElementDefinitionType {
         }
         if !self.profile.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.profile)?;
-            object.insert(std::string::String::from("profile"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("profile"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_profile"), elements);
             }
         }
         if !self.target_profile.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.target_profile)?;
-            object.insert(std::string::String::from("targetProfile"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("targetProfile"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_targetProfile"), elements);
             }
         }
         if !self.aggregation.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.aggregation)?;
-            object.insert(std::string::String::from("aggregation"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("aggregation"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_aggregation"), elements);
             }

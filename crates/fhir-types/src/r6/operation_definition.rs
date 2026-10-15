@@ -540,7 +540,9 @@ impl super::super::codec::Json for OperationDefinition {
         }
         if !self.resource.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.resource)?;
-            object.insert(std::string::String::from("resource"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("resource"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_resource"), elements);
             }
@@ -1537,7 +1539,9 @@ impl super::super::codec::Json for OperationDefinitionOverload {
         }
         if !self.parameter_name.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.parameter_name)?;
-            object.insert(std::string::String::from("parameterName"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("parameterName"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_parameterName"), elements);
             }
@@ -1852,7 +1856,9 @@ impl super::super::codec::Json for OperationDefinitionParameter {
         }
         if !self.scope.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.scope)?;
-            object.insert(std::string::String::from("scope"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("scope"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_scope"), elements);
             }
@@ -1887,14 +1893,18 @@ impl super::super::codec::Json for OperationDefinitionParameter {
         }
         if !self.allowed_type.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.allowed_type)?;
-            object.insert(std::string::String::from("allowedType"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("allowedType"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_allowedType"), elements);
             }
         }
         if !self.target_profile.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.target_profile)?;
-            object.insert(std::string::String::from("targetProfile"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("targetProfile"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_targetProfile"), elements);
             }

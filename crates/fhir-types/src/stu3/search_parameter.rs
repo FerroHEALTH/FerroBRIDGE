@@ -383,7 +383,9 @@ impl super::super::codec::Json for SearchParameter {
         }
         if !self.base.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.base)?;
-            object.insert(std::string::String::from("base"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("base"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_base"), elements);
             }
@@ -434,28 +436,36 @@ impl super::super::codec::Json for SearchParameter {
         }
         if !self.target.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.target)?;
-            object.insert(std::string::String::from("target"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("target"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_target"), elements);
             }
         }
         if !self.comparator.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.comparator)?;
-            object.insert(std::string::String::from("comparator"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("comparator"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_comparator"), elements);
             }
         }
         if !self.modifier.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.modifier)?;
-            object.insert(std::string::String::from("modifier"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("modifier"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_modifier"), elements);
             }
         }
         if !self.chain.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.chain)?;
-            object.insert(std::string::String::from("chain"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("chain"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_chain"), elements);
             }

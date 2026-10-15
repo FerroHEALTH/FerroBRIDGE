@@ -2561,7 +2561,9 @@ impl super::super::codec::Json for ClaimInsurance {
         }
         if !self.pre_auth_ref.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.pre_auth_ref)?;
-            object.insert(std::string::String::from("preAuthRef"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("preAuthRef"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_preAuthRef"), elements);
             }
@@ -2991,7 +2993,9 @@ impl super::super::codec::Json for ClaimItem {
         if !self.care_team_sequence.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.care_team_sequence)?;
-            object.insert(std::string::String::from("careTeamSequence"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("careTeamSequence"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_careTeamSequence"), elements);
             }
@@ -2999,7 +3003,9 @@ impl super::super::codec::Json for ClaimItem {
         if !self.diagnosis_sequence.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.diagnosis_sequence)?;
-            object.insert(std::string::String::from("diagnosisSequence"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("diagnosisSequence"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_diagnosisSequence"), elements);
             }
@@ -3007,7 +3013,9 @@ impl super::super::codec::Json for ClaimItem {
         if !self.procedure_sequence.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.procedure_sequence)?;
-            object.insert(std::string::String::from("procedureSequence"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("procedureSequence"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_procedureSequence"), elements);
             }
@@ -3015,7 +3023,9 @@ impl super::super::codec::Json for ClaimItem {
         if !self.information_sequence.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.information_sequence)?;
-            object.insert(std::string::String::from("informationSequence"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("informationSequence"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_informationSequence"), elements);
             }

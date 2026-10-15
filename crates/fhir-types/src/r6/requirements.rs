@@ -443,7 +443,9 @@ impl super::super::codec::Json for Requirements {
         }
         if !self.derived_from.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.derived_from)?;
-            object.insert(std::string::String::from("derivedFrom"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("derivedFrom"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_derivedFrom"), elements);
             }
@@ -462,7 +464,9 @@ impl super::super::codec::Json for Requirements {
         }
         if !self.reference.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.reference)?;
-            object.insert(std::string::String::from("reference"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("reference"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_reference"), elements);
             }
@@ -1524,7 +1528,9 @@ impl super::super::codec::Json for RequirementsImports {
         }
         if !self.key.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.key)?;
-            object.insert(std::string::String::from("key"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("key"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_key"), elements);
             }
@@ -1833,7 +1839,9 @@ impl super::super::codec::Json for RequirementsStatement {
         }
         if !self.conformance.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.conformance)?;
-            object.insert(std::string::String::from("conformance"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("conformance"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_conformance"), elements);
             }
@@ -1878,14 +1886,18 @@ impl super::super::codec::Json for RequirementsStatement {
         }
         if !self.satisfied_by.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.satisfied_by)?;
-            object.insert(std::string::String::from("satisfiedBy"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("satisfiedBy"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_satisfiedBy"), elements);
             }
         }
         if !self.reference.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.reference)?;
-            object.insert(std::string::String::from("reference"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("reference"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_reference"), elements);
             }
@@ -1904,7 +1916,9 @@ impl super::super::codec::Json for RequirementsStatement {
         }
         if !self.actor.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.actor)?;
-            object.insert(std::string::String::from("actor"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("actor"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_actor"), elements);
             }

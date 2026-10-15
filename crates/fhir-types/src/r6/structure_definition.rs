@@ -548,7 +548,9 @@ impl super::super::codec::Json for StructureDefinition {
         if !self.context_invariant.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.context_invariant)?;
-            object.insert(std::string::String::from("contextInvariant"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("contextInvariant"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_contextInvariant"), elements);
             }

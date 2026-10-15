@@ -468,14 +468,18 @@ impl super::super::codec::Json for ActorDefinition {
         }
         if !self.reference.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.reference)?;
-            object.insert(std::string::String::from("reference"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("reference"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_reference"), elements);
             }
         }
         if !self.base_definition.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.base_definition)?;
-            object.insert(std::string::String::from("baseDefinition"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("baseDefinition"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_baseDefinition"), elements);
             }

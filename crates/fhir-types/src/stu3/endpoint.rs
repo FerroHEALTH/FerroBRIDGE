@@ -277,7 +277,9 @@ impl super::super::codec::Json for Endpoint {
         if !self.payload_mime_type.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.payload_mime_type)?;
-            object.insert(std::string::String::from("payloadMimeType"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("payloadMimeType"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_payloadMimeType"), elements);
             }
@@ -290,7 +292,9 @@ impl super::super::codec::Json for Endpoint {
         }
         if !self.header.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.header)?;
-            object.insert(std::string::String::from("header"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("header"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_header"), elements);
             }

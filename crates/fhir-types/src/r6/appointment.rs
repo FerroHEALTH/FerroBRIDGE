@@ -2044,7 +2044,9 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplate {
         }
         if !self.occurrence_date.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.occurrence_date)?;
-            object.insert(std::string::String::from("occurrenceDate"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("occurrenceDate"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_occurrenceDate"), elements);
             }
@@ -2069,7 +2071,9 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplate {
         }
         if !self.excluding_date.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.excluding_date)?;
-            object.insert(std::string::String::from("excludingDate"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("excludingDate"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_excludingDate"), elements);
             }
@@ -2077,7 +2081,9 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplate {
         if !self.excluding_recurrence_id.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.excluding_recurrence_id)?;
-            object.insert(std::string::String::from("excludingRecurrenceId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("excludingRecurrenceId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(
                     std::string::String::from("_excludingRecurrenceId"),
@@ -2812,7 +2818,9 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplateWeeklyTemplate {
         }
         if !self.days_of_week.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.days_of_week)?;
-            object.insert(std::string::String::from("daysOfWeek"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("daysOfWeek"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_daysOfWeek"), elements);
             }

@@ -104,21 +104,27 @@ impl super::super::codec::Json for HumanName {
         }
         if !self.given.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.given)?;
-            object.insert(std::string::String::from("given"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("given"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_given"), elements);
             }
         }
         if !self.prefix.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.prefix)?;
-            object.insert(std::string::String::from("prefix"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("prefix"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_prefix"), elements);
             }
         }
         if !self.suffix.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.suffix)?;
-            object.insert(std::string::String::from("suffix"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("suffix"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_suffix"), elements);
             }
