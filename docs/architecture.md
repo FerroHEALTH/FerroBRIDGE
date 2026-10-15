@@ -1847,14 +1847,12 @@ extension.
 | Crates | published, lockstep line, Trusted Publishing | owner decision 2026-09-05 | unpublished |
 | YAML parser | `serde-saphyr` 1.2.0 | anchors, aliases, merge keys, spans, maintained | `serde_yaml` (archived), `serde-yaml-ng`, `serde_yml` |
 | Bulk load | binary `COPY` via `tokio-postgres`, `sqlx` for checked queries | throughput; the reference engine's per-row persist is its ceiling | ORM-style inserts |
-| Demographics | in order: the patient-to-EHR link through `EHR_STATUS.subject.external_ref`; `Patient` from EHR-side person templates through FHIRconnect; the FHIRconnect demographics endpoint as our own port over the identity store; `PARTY` objects over the ITS-REST Demographic API behind a feature labelled DEVELOPMENT; party-rooted mappings as our own extension (#465) | the link and EHR-side templates rest on STABLE texts (RM Common IM §4.2.1.1, ITS-REST EHR); the Demographic API is `x-status: DEVELOPMENT` at 1.1.0 and on master and has no search; FHIRconnect `engine/demographics.adoc` defines no endpoint interface | AQL over `PARTY` (QUERY 1.1.0 §3.13.2 defines none, and both reference engines refuse it); demographics left outside |
+| Demographics | in order: the patient-to-EHR link through `EHR_STATUS.subject.external_ref`; `Patient` from EHR-side person templates through FHIRconnect; the FHIRconnect demographics endpoint as our own port over the identity store; `PARTY` objects over the ITS-REST Demographic API behind a feature labelled DEVELOPMENT; party-rooted mappings as our own extension; demographic AQL as Cadasto's experimental extension documents it, behind a feature labelled with that extension, backing demographic FHIR search (#465, #480) | the link and EHR-side templates rest on STABLE texts (RM Common IM §4.2.1.1, ITS-REST EHR); the Demographic API is `x-status: DEVELOPMENT` at 1.1.0 and on master and has no search; FHIRconnect `engine/demographics.adoc` defines no endpoint interface; AQL 1.1.0 defines no demographic semantics (QUERY §3.13.2), and the owner expects Cadasto's extension to become that specification (owner direction 2026-10-15) | demographics left outside |
 
 ## 16. What is deliberately outside, and what is recorded as an upstream report
 
-Outside: AQL over demographic objects (AQL 1.1.0 defines no semantics for a
-demographic root or an EHR-to-party join, section 15), FHIR
-Subscriptions (never mentioned), a materialised FHIR store, OMOP CDM versions
-other than 5.4, OMOP to openEHR (OMOCL has no construct for it), and the IHE
+Outside: FHIR Subscriptions (never mentioned), a materialised FHIR store, OMOP
+CDM versions other than 5.4, OMOP to openEHR (OMOCL has no construct for it), and the IHE
 audit and terminology-binding concerns that stay with the CDR (section 12).
 Each is a tracker issue, not silence.
 
