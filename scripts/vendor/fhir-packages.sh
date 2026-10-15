@@ -17,8 +17,8 @@
 # pages the package names without carrying, into <package>/repository/, so its
 # PROVENANCE.md records both licences and assumes neither.
 #
-# The four examples packages (#373) are the corpora of the fhir-types and
-# facade conformance tests. At about 600 MB unpacked, beside the 380 MB above,
+# The five examples packages (#373, #454) are the corpora of the fhir-types
+# and facade conformance tests. At about 680 MB unpacked, beside the 411 MB above,
 # they are fetched at build time into the ignored
 # tools/ferrobridge-testkit/vendor/<package>/package/, and only each
 # PROVENANCE.md is committed. Their pins carry the file count and tree digest
@@ -50,7 +50,7 @@ vendor_dir="tools/fhir-codegen/vendor"
 pins="docs/VERSIONS.md"
 default_packages=(hl7.fhir.r3.core hl7.fhir.r4.core hl7.fhir.r4b.core hl7.fhir.r5.core hl7.fhir.r6.core hl7.terminology hl7.fhir.uv.v2mappings)
 examples_dir="tools/ferrobridge-testkit/vendor"
-example_packages=(hl7.fhir.r4.examples hl7.fhir.r4b.examples hl7.fhir.r5.examples hl7.fhir.r6.examples)
+example_packages=(hl7.fhir.r3.examples hl7.fhir.r4.examples hl7.fhir.r4b.examples hl7.fhir.r5.examples hl7.fhir.r6.examples)
 ua="ferrobridge-vendor (scripts/vendor/fhir-packages.sh)"
 
 # The source repository of a package, where that repository states a licence
@@ -315,7 +315,9 @@ write_example_provenance() {
   local pkg="$1" ver="$2" meta_url="$3" tarball_url="$4" shasum="$5" sha256="$6" license="$7" files="$8" digest="$9"
   local dir="$examples_dir/$pkg/package" resources types
   resources="$(find "$dir" -maxdepth 1 -type f -name '*.json' ! -name package.json ! -name '.index.json' | wc -l | tr -d '[:space:]')"
-  types="$(find "$dir" -maxdepth 1 -type f -name '*.json' ! -name package.json ! -name '.index.json' -exec jq -r '.resourceType' {} + |
+  # One jq per file: jq reads its files as one stream, and a byte order mark
+  # that opens any file but the first is a parse error there (#454).
+  types="$(find "$dir" -maxdepth 1 -type f -name '*.json' ! -name package.json ! -name '.index.json' -exec jq -r '.resourceType' {} \; |
     LC_ALL=C sort -u | wc -l | tr -d '[:space:]')"
   cat > "$examples_dir/$pkg/PROVENANCE.md" << PROV
 <!-- This file describes third-party material fetched at build time; the bytes
@@ -346,8 +348,8 @@ edit one: change the pin in docs/VERSIONS.md, run the script with
 
 ## Why build time
 
-The four examples packages unpack to about 600 MB, which would more than
-double the 380 MB of FHIR packages that \`tools/fhir-codegen/vendor/\` commits,
+The five examples packages unpack to about 680 MB, which would more than
+double the 411 MB of FHIR packages that \`tools/fhir-codegen/vendor/\` commits,
 for corpora only the conformance tests read. The licence would permit
 vendoring; the size decides. CI restores the trees from a cache keyed on
 \`scripts/vendor/fhir-packages.sh --cache-key\`, and the script verifies the

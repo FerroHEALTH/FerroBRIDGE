@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# The conformance gate (#24): runs the twelve corpus tests, compares what they
+# The conformance gate (#24): runs the thirteen corpus tests, compares what they
 # measured with the committed pass lists under conformance/, and renders one
 # shields.io endpoint badge per corpus (https://shields.io/badges/endpoint-badge),
 # one per HL7 v2 message family and one per HL7 v2 version (#366), and the
@@ -27,7 +27,7 @@
 #
 # The hl7v2-smoke corpus reads the NIST and AIRA sets, which it fetches first
 # through scripts/vendor/hl7v2-samples.sh --build-time (a no-op when they are
-# on disk at their pins). The four FHIR model corpora and the R4 facade corpus
+# on disk at their pins). The five FHIR model corpora and the R4 facade corpus
 # read the HL7 examples packages (#373), fetched the same way through
 # scripts/vendor/fhir-packages.sh --build-time. The R4 profile validator's
 # package set is fetched the same way through scripts/vendor/profile-packages.sh.
@@ -45,7 +45,7 @@ fi
 cd "$(dirname "$0")/../.."
 
 readonly CORPORA=(fhirconnect-mapping-lib omocl roundtrip draft-rest-api hl7v2 hl7v2-smoke
-  fhir-r4 fhir-r4b fhir-r5 fhir-r6 fhir-r4-facade fhirpath-r4)
+  fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6 fhir-r4-facade fhirpath-r4)
 readonly OUT=target/conformance
 readonly BADGES=conformance/badges
 # The shields.io endpoint prefix every conformance badge file is read through.
@@ -81,6 +81,7 @@ label_of() {
     draft-rest-api) echo "FHIRconnect REST API (draft)" ;;
     hl7v2) echo "HL7 v2 message corpora" ;;
     hl7v2-smoke) echo "HL7 v2 smoke corpora (NIST, AIRA)" ;;
+    fhir-stu3) echo "FHIR STU3" ;;
     fhir-r4) echo "FHIR R4" ;;
     fhir-r4b) echo "FHIR R4B" ;;
     fhir-r5) echo "FHIR R5" ;;
@@ -269,7 +270,7 @@ render_block() {
   badge_link "$(label_of omocl)" omocl conformance/omocl/pass-list.txt
   echo
   echo 'FHIR, the model per version through fhir-types, then R4 through the mappings and the facade:'
-  for name in fhir-r4 fhir-r4b fhir-r5 fhir-r6 roundtrip fhir-r4-facade; do
+  for name in fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6 roundtrip fhir-r4-facade; do
     badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
   done
   echo

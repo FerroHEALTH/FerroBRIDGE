@@ -187,10 +187,11 @@ of every `PROVENANCE.md` below back against its row.
 
 ## FHIR examples packages (the conformance corpora, build time, never committed)
 
-HL7's examples package per FHIR version is the corpus of the four `fhir-types`
-conformance tests and of the R4 facade test (#373). Each is the version of the
-core package the table above pins, from the same registry: R4, R4B and R5 from
-packages.fhir.org, the R6 ballot from packages2.fhir.org. At about 600 MB
+HL7's examples package per FHIR version is the corpus of the five `fhir-types`
+conformance tests and of the R4 facade test (#373, #454). Each is the version
+of the core package the table above pins, from the same registry: STU3, R4,
+R4B and R5 from packages.fhir.org, the R6 ballot from packages2.fhir.org. At
+about 680 MB
 unpacked they are fetched at build time by
 `scripts/vendor/fhir-packages.sh --build-time` into the ignored
 `tools/ferrobridge-testkit/vendor/<package>/package/`, and only each
@@ -202,6 +203,7 @@ against the registry's `latest`.
 
 | Item | Pin | Repeated in |
 |---|---|---|
+| `hl7.fhir.r3.examples` | 3.0.2 files `8289` digest `e35e340680f49f88f6f91808f2691bce0bc20cd3faf2794edd2b98ceddb5803a` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r3.examples/PROVENANCE.md`, the same cache key |
 | `hl7.fhir.r4.examples` | 4.0.1 files `5311` digest `51f5c093f9f197fcab683ac1bc3380e44b1c7e37c6c74baeefff7fa3eb8b7c1e` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r4.examples/PROVENANCE.md`, the `test` and `conformance` jobs of `.github/workflows/ci.yml` and the coverage job of `.github/workflows/sonar.yml` (their cache key) |
 | `hl7.fhir.r4b.examples` | 4.3.0 files `2842` digest `7c42275e73bff53eef52c9f48e3bd82d3eaef66275ac00975a259828086be6b9` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r4b.examples/PROVENANCE.md`, the same cache key |
 | `hl7.fhir.r5.examples` | 5.0.0 files `2824` digest `afddb711d22bbf8c45158cb4be0a8936ecd458df1a2a99cf5debd5274a7bee47` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r5.examples/PROVENANCE.md`, the same cache key |

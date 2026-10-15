@@ -88,6 +88,12 @@ crates on crates.io.
   operation contracts carry exactly what 3.0.2 declares, without the
   terminology ecosystem overlay. `fhirconnect` steps to 0.1.109 with the
   requirement.
+- The STU3 examples package, `hl7.fhir.r3.examples` 3.0.2, runs as the
+  conformance corpus `fhir-stu3` with its README badge "FHIR STU3" (#454):
+  every one of its 8287 resources decodes through the `stu3` model,
+  re-encodes, and goes through the XML codec and back. It is fetched at build
+  time like the other examples packages, and the suite strips the byte order
+  mark 19 of its files begin with.
 - `omop_cdm::quality` runs the nine conformance checks of the OHDSI Data
   Quality Dashboard v2.9.0 (`cdmTable`, `cdmField`, `isRequired`,
   `cdmDatatype`, `isPrimaryKey`, `isForeignKey`, `fkDomain`, `fkClass`,

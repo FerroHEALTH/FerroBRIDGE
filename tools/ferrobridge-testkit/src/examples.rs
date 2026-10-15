@@ -25,6 +25,8 @@ const MANIFESTS: [&str; 2] = ["package.json", ".index.json"];
 /// One FHIR version's examples package.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Package {
+    /// `hl7.fhir.r3.examples`, the examples of FHIR 3.0.2 (STU3).
+    Stu3,
     /// `hl7.fhir.r4.examples`, the examples of FHIR 4.0.1.
     R4,
     /// `hl7.fhir.r4b.examples`, the examples of FHIR 4.3.0.
@@ -41,6 +43,7 @@ impl Package {
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
+            Self::Stu3 => "hl7.fhir.r3.examples",
             Self::R4 => "hl7.fhir.r4.examples",
             Self::R4b => "hl7.fhir.r4b.examples",
             Self::R5 => "hl7.fhir.r5.examples",
@@ -96,7 +99,13 @@ mod tests {
 
     #[test]
     fn each_package_lives_under_its_own_name() {
-        for package in [Package::R4, Package::R4b, Package::R5, Package::R6] {
+        for package in [
+            Package::Stu3,
+            Package::R4,
+            Package::R4b,
+            Package::R5,
+            Package::R6,
+        ] {
             assert!(
                 package
                     .directory()

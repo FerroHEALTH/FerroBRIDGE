@@ -26,8 +26,8 @@ edit one: change the pin in docs/VERSIONS.md, run the script with
 
 ## Why build time
 
-The four examples packages unpack to about 600 MB, which would more than
-double the 380 MB of FHIR packages that `tools/fhir-codegen/vendor/` commits,
+The five examples packages unpack to about 680 MB, which would more than
+double the 411 MB of FHIR packages that `tools/fhir-codegen/vendor/` commits,
 for corpora only the conformance tests read. The licence would permit
 vendoring; the size decides. CI restores the trees from a cache keyed on
 `scripts/vendor/fhir-packages.sh --cache-key`, and the script verifies the
