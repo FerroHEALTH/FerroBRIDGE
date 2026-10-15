@@ -25,6 +25,9 @@ use http::StatusCode;
 use http::Uri;
 use openehr_rm::v1_2::composition::composition::Composition;
 
+use crate::auth::Access;
+use crate::auth::compartment;
+use crate::auth::scope::Permission;
 use crate::facade::Facade;
 use crate::facade::ehr::Policy;
 use crate::facade::engine;
@@ -43,6 +46,7 @@ const VALIDATOR: &str = "the FerroBRIDGE mapping engine, the Web Template valida
 /// `POST [base]/{type}/$validate`.
 pub(crate) fn validate(
     facade: &Facade,
+    access: &Access,
     resource_type: &str,
     headers: &HeaderMap,
     uri: &Uri,
@@ -65,6 +69,15 @@ pub(crate) fn validate(
             ));
         }
     };
+    let admitted = [Permission::Create, Permission::Update]
+        .into_iter()
+        .any(|permission| {
+            compartment::admit_person(facade, access, permission, resource_type, Some(&person))
+                .is_ok()
+        });
+    if !admitted {
+        return Err(crate::auth::guard::forbidden());
+    }
     // NOTE: no specification governs this: our own design, one instant serves
     // every defaulted time of one run, and this one is discarded with the
     // composition it builds.

@@ -110,6 +110,8 @@ pub struct AppState {
     lanes: Vec<crate::startup::Lane>,
     /// Whether the HL7 v2 listener accepts, when the face runs.
     hl7v2: Option<crate::hl7v2::Listening>,
+    /// The resource server, when inbound authentication is on.
+    auth: Option<Arc<crate::auth::Authority>>,
 }
 
 impl AppState {
@@ -168,6 +170,7 @@ impl AppState {
             operations,
             lanes: Vec::new(),
             hl7v2: None,
+            auth: None,
         })
     }
 
@@ -182,6 +185,7 @@ impl AppState {
             operations: None,
             lanes: Vec::new(),
             hl7v2: None,
+            auth: None,
         }
     }
 
@@ -207,6 +211,20 @@ impl AppState {
             .and(Arc::new(indicators::Hl7v2Listener::new(listening.clone())));
         self.hl7v2 = Some(listening);
         self
+    }
+
+    /// Returns this state with `authority` checking the token of every FHIR
+    /// request.
+    #[must_use]
+    pub fn with_auth(mut self, authority: Arc<crate::auth::Authority>) -> Self {
+        self.auth = Some(authority);
+        self
+    }
+
+    /// Returns the resource server, when inbound authentication is on.
+    #[must_use]
+    pub const fn auth(&self) -> Option<&Arc<crate::auth::Authority>> {
+        self.auth.as_ref()
     }
 
     /// Returns whether the HL7 v2 listener accepts, when the face runs.

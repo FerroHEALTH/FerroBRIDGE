@@ -84,7 +84,7 @@ pub(super) fn resolve_oauth(section: &str, oauth: &OAuthClient) -> Result<OAuthC
 
 /// Returns whether `scope` is the `scope` of RFC 6749 §3.3: scope tokens of
 /// `%x21 / %x23-5B / %x5D-7E`, each separated by one space.
-fn is_scope(scope: &str) -> bool {
+pub(super) fn is_scope(scope: &str) -> bool {
     scope.split(' ').all(|token| {
         !token.is_empty()
             && token

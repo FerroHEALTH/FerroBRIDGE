@@ -55,7 +55,7 @@ impl std::fmt::Debug for TokenResponse {
 /// RFC 8414 §3.1 inserts the suffix between the host and the path, after
 /// removing a terminating `/`; `OpenID` Connect Discovery 1.0 §4 appends it to
 /// the issuer, after removing a terminating `/`.
-pub(super) fn metadata_locations(issuer: &Url) -> [Url; 2] {
+pub(crate) fn metadata_locations(issuer: &Url) -> [Url; 2] {
     let path = issuer.path().trim_end_matches('/');
     let mut oauth = issuer.clone();
     oauth.set_path(&format!("{OAUTH_METADATA}{path}"));
