@@ -105,8 +105,41 @@ run goes on.
 The run report counts, per mapping and in total, the rows written per table,
 the `concept_id = 0` assignments, the `FACT_RELATIONSHIP` rows written with
 `relationship_concept_id = 0`, the source fields no mapping wrote, and every
-refused record with its table, column and openEHR element. `etl run` prints it
-as text and as JSON.
+refused record with its table, column and openEHR element. It also counts the
+deletion checks below and lists each composition they removed, kept or could
+not find, by its versioned object id, never with a clinical value. `etl run`
+prints it as text and as JSON.
+
+## Deleted compositions
+
+A deletion in openEHR is a new version whose data is Void (openEHR RM Common
+1.1.0 §6.2.5), so the `LATEST_VERSION` query stops answering a deleted
+composition and the run never reads it again. ITS-REST 1.1.0 has no change
+feed, so after the compositions each run checks every composition an earlier
+run committed and this run's query did not answer. It reads the
+composition's latest version with `GET /ehr/{ehr_id}/composition/{versioned_object_uid}`
+and acts on the answer:
+
+| Answer | Meaning (`composition_get`) | What the run does |
+|---|---|---|
+| `204` | the composition is deleted | removes its rows, its `FACT_RELATIONSHIP` links and its watermark in one transaction (under `deletions = "remove"`), or lists it and keeps them (under `deletions = "report"`) |
+| `200` | the composition exists, and the query left it out | keeps the rows and counts it as extant |
+| `404` | the CDR knows no such EHR or composition | keeps the rows and lists it, because no deletion is confirmed |
+| anything else | no documented answer | ends the run with an error naming the composition |
+
+A composition missing from the query because the query changed is never
+removed: only the CDR's `204` removes rows. The EHR keeps its `person_id`.
+The checks run in batches of `page_size` watermarks with eight in flight, and
+a removal takes the same per-composition lock a commit takes. The derived
+tables are rebuilt after the removals, so the observation period and the eras
+of the person no longer count the deleted rows, and the visits come from the
+visit query, which no longer reads the deleted composition's context. A
+visit the visit query no longer answers at all keeps the row an earlier run
+wrote, and the observation period still spans it. A second run finds no watermark left for the composition and changes nothing.
+
+The CDM defines no deletion, so the removal is FerroBRIDGE's own design.
+With `--since`, the query answers only the changed compositions, so every
+other composition is checked each run.
 
 ## The derived tables
 

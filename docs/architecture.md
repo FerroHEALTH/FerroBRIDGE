@@ -1102,6 +1102,18 @@ because no concept exists. The reference engine has not moved since
   eGEMs 2016). The load replaces the rows of the compositions in the run by
   natural key and never appends blindly. The reference engine duplicates every
   clinical row on a re-run.
+- **A deletion at the source removes the rows, once the CDR confirms it.** A
+  logical deletion is a version whose data is Void (openEHR RM Common 1.1.0
+  §6.2.5), so a `LATEST_VERSION` query stops answering it. After the
+  compositions, each run reads, over ITS-REST 1.1.0 `composition_get` with the
+  versioned object id, every composition a watermark names and the query did
+  not answer: a `204` (`204_deleted_at_time`) removes its rows, links and
+  watermark in one transaction, a `200` or a `404` keeps them, and a call with
+  no documented answer is a typed error that ends the run, so "could not
+  check" never reads as "deleted". `[etl] deletions = "report"` keeps the rows
+  and lists the deletion. The CDM defines no deletion: our own design. The
+  change feed (this section, below) will carry deletions as events; the check
+  stays the conformant baseline.
 - **Results stream.** The AQL result set is paged and consumed as a stream, and
   rows reach PostgreSQL through binary `COPY` (`tokio-postgres`'s
   `BinaryCopyInWriter`), never a row-at-a-time insert. A national-scale
