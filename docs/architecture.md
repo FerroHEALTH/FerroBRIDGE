@@ -219,7 +219,9 @@ default branch.
 **Profile packages, the mapping targets.** No profile package is pinned for
 codegen; each is pinned as the target a context mapping names, and
 `docs/VERSIONS.md` gains a row per package the moment a context targeting it
-is authored. The candidates, read 2026-09-12, are in section 4.8.
+is authored. The candidates, read 2026-09-12, are in section 4.8. The R4
+profile validator's package set is pinned apart from them, as validator input
+and no mapping target (section 4.8, #435).
 
 ## 3. The openEHR side
 
@@ -909,12 +911,22 @@ from each guide's `package-list.json` and `ImplementationGuide` resource):
 
 | Target | Package | Version, status, FHIR | Order and reason |
 |---|---|---|---|
-| HL7 Europe Base and Core | `hl7.fhir.eu.base` | 2.0.0, STU 2 active, R4 4.0.1 (2026-04-27) | first: Laboratory, MPD and EPS all depend on it; the profiles every other guide reuses (`patient-eu-core`, `practitioner-eu-core`, `organization-eu-core`, `composition-eu-core`, `condition-eu-core`, `medicalTestResult-eu-core`) |
+| HL7 Europe Base and Core | `hl7.fhir.eu.base` | 2.0.1, STU 2 active, R4 4.0.1; pinned at 2.0.1 for the profile validator, with 2.0.0 (2026-04-27) beside it because EPS 1.0.0-ballot depends on that version | first: Laboratory, MPD and EPS all depend on it; the profiles every other guide reuses (`patient-eu-core`, `practitioner-eu-core`, `organization-eu-core`, `composition-eu-core`, `condition-eu-core`, `medicalTestResult-eu-core`) |
 | HL7 Europe Laboratory Report | `hl7.fhir.eu.laboratory` | 2.0.0, STU 2 active, R4 (2026-05-05) | second: the one category with a published non-ballot profile set, a published model map from the EHDS logical model, and an openEHR artefact already in the FHIRconnect library (`EHDS - Laboratory report.opt`, the `eehrxf_lab` context, pinned at Laboratory 0.1.1); upgrading that context is the cheapest first EU round trip |
 | HL7 Europe Medication Prescription and Dispense | `hl7.fhir.eu.mpd` | 1.0.0, STU 1 active, R4 (2026-05-11) | third: four profiles, covers both prescriptions and dispensations, the earlier obligation date |
-| HL7 Europe Patient Summary | `hl7.fhir.eu.eps` | 1.0.0-ballot, draft, R4 (2026-06-06); declares conformance with IPS 2.0.0 while IPS is at 2.0.1 (STU 2, R4, 2026-06-19) | planned, not pinned: the canonicals are stable enough to design against, the constraints will move before STU 1 |
+| HL7 Europe Patient Summary | `hl7.fhir.eu.eps` | 1.0.0-ballot, draft, R4 (2026-06-06); declares conformance with IPS 2.0.0 while IPS is at 2.0.1 (STU 2, R4, 2026-06-19) | pinned at 1.0.0-ballot for the profile validator, with IPS 2.0.0 as its package declares; no context mapping targets it yet: the canonicals are stable enough to design against, the constraints will move before STU 1 |
 | HL7 Europe Imaging Report | `hl7.fhir.eu.imaging` | 1.0.0-ballot, draft, R4 (2026-03-16); key-image selection profiled on `Basic` because R4 has no `ImagingSelection`; depends on `ihe.iti.mhd` and `fhir.dicom` | deferred: an R4 workaround set with two heavy dependencies |
 | HL7 Europe Hospital Discharge Report | `hl7.fhir.eu.hdr` | 0.1.0-ballot, draft, R4 (2025-06-03); depends on superseded Base 0.1.0-ballot, Laboratory 0.1.1 and IPS 1.1.0 | deferred outright: fifteen months stale, everything built on it would be rewritten |
+
+**The R4 profile validator's package set** is pinned ahead of any mapping
+(#435): EPS 1.0.0-ballot, EU Base 2.0.1 and IPS 2.0.0, with every package
+their `package.json` files name, transitively, at the version each dependent
+names (`docs/VERSIONS.md` "Profile packages"). The 17 package versions, about
+570 MB unpacked, are fetched at build time into the ignored
+`docs/specs/fhir-packages/` and never committed; only each `PROVENANCE.md`
+is. `hl7.fhir.r4.core` 4.0.1, which every one of them names, is read from the
+generator's committed tree. Pinning a package there is no conformance claim:
+the reasoning above still holds until the implementing act is adopted.
 
 **What the mapping library targets today** is the German core data set: 12
 contexts over seven Medizininformatik-Initiative modules, all at profile

@@ -6,7 +6,8 @@
 #   1. The workflow, shell, container and guard tier runs NOW, on a repository
 #      with no code: zizmor over .github, actionlint over .github/workflows,
 #      shellcheck over the tracked shell programs, hadolint over any
-#      Dockerfile, the committed comment-style and versions guards, and the
+#      Dockerfile, the committed comment-style and versions guards, the
+#      fetch and check of the profile package set, and the
 #      self-tests of the tracker helpers under scripts/gh. These
 #      keep this very file honest, so none of them may depend on Rust existing.
 #   2. The Rust tier is gated behind a detection job that looks for a root
@@ -227,6 +228,37 @@ jobs:
         with:
           persist-credentials: false
       - run: bash scripts/checks/versions.sh
+
+  # The profile validator's package set (#435), fetched at build time and
+  # never committed (docs/specs/fhir-packages/hl7.fhir.eu.eps#1.0.0-ballot/
+  # PROVENANCE.md). The cache is keyed on the pins, and the script verifies
+  # the count and digest of a restored tree as it does of a download. The
+  # closure check first proves on synthetic sets that it refuses a gap, then
+  # runs over every fetched package.json.
+  profile-packages:
+    name: profile-packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the pinned profile packages
+        id: profile-packages
+        run: echo "key=$(bash scripts/vendor/profile-packages.sh --cache-key)" >> "$GITHUB_OUTPUT"
+      - name: Restore the profile packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: docs/specs/fhir-packages/*/package
+          key: profile-packages-${{ steps.profile-packages.outputs.key }}
+      - name: Fetch and verify the profile packages
+        run: bash scripts/vendor/profile-packages.sh
+      - run: |
+          set -euo pipefail
+          bash scripts/vendor/profile-packages.sh --self-test
+          bash scripts/vendor/profile-packages.sh --check
 
   # The book theme favicons are copies of the brand mark, so the mark exists
   # twice and only this guard keeps the two byte-identical (#52).
@@ -451,9 +483,9 @@ jobs:
   # longer passes fails the job, and so does an unrecorded new pass or a badge
   # that disagrees with its list. The script runs one package per nextest
   # invocation, as the test lane does through cargo hack, so the generated
-  # giants never compile side by side, and fetches the build-time HL7 v2 sets
-  # and FHIR examples packages this job restores from the test lane's cache
-  # keys.
+  # giants never compile side by side, and fetches the build-time HL7 v2 sets,
+  # FHIR examples packages and profile packages this job restores from the
+  # cache keys of the test and profile-packages lanes.
   conformance:
     name: conformance
     needs: detect
@@ -494,6 +526,14 @@ jobs:
             tools/ferrobridge-testkit/vendor/hl7.fhir.r5.examples/package
             tools/ferrobridge-testkit/vendor/hl7.fhir.r6.examples/package
           key: fhir-examples-${{ steps.fhir-examples.outputs.key }}
+      - name: Read the pinned profile packages
+        id: profile-packages
+        run: echo "key=$(bash scripts/vendor/profile-packages.sh --cache-key)" >> "$GITHUB_OUTPUT"
+      - name: Restore the profile packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: docs/specs/fhir-packages/*/package
+          key: profile-packages-${{ steps.profile-packages.outputs.key }}
       - run: scripts/checks/conformance.sh --check
 
   # The container-backed lane. Every test behind the harness returns early
@@ -877,6 +917,7 @@ jobs:
       - comment-style
       - file-length
       - versions
+      - profile-packages
       - favicon-sync
       - tracker-helpers
       - detect

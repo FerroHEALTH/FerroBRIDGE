@@ -49,7 +49,11 @@
 #                          table against the Version line of its
 #                          tools/fhir-codegen/vendor/<package>/PROVENANCE.md,
 #                          and a package vendored with its source repository
-#                          records that repository's licence.
+#                          records that repository's licence; every row of
+#                          the Profile packages table against the Version,
+#                          Files and digest lines of its
+#                          docs/specs/fhir-packages/<package>#<version>/
+#                          PROVENANCE.md.
 #  11. licence            LICENSE is the Business Source License 1.1 and no
 #                          first-party file claims MIT or Apache-2.0 as its
 #                          own, crates/fhir-types and crates/hl7v2-types
@@ -616,6 +620,50 @@ if [ -f docs/VERSIONS.md ]; then
     bad "docs/VERSIONS.md has no FHIR-packages rows"
   elif [ "$agreed" -eq "$expected" ]; then
     note "OK: all $expected FHIR package provenance stamps record their pinned version"
+  fi
+else
+  note "no docs/VERSIONS.md yet, skipped"
+fi
+
+echo "== Profile packages (docs/specs/fhir-packages/*/PROVENANCE.md <-> docs/VERSIONS.md)"
+if [ -f docs/VERSIONS.md ]; then
+  # The rows of the Profile packages table: the package opens the Item cell,
+  # and the Pin cell is the version, then `files <count> digest <sha256>`. One
+  # package may have a row per version, so the tree is <package>#<version>.
+  profiles="$(awk -F'|' '
+    /^## / { on = ($0 ~ /^## Profile packages/); next }
+    on && NF >= 4 && $2 ~ /^[[:space:]]*`/ {
+      k = $2; v = $3
+      sub(/^[[:space:]]*`/, "", k); sub(/`.*/, "", k)
+      gsub(/`/, "", v); gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+      print k "|" v
+    }
+  ' docs/VERSIONS.md)"
+  agreed=0
+  expected=0
+  while IFS='|' read -r pkg cell; do
+    [ -n "$pkg" ] || continue
+    expected=$((expected + 1))
+    ver="$(awk '{ print $1; exit }' <<< "$cell")"
+    files="$(awk '{ for (i = 1; i < NF; i++) if ($i == "files") { print $(i + 1); exit } }' <<< "$cell")"
+    digest="$(awk '{ for (i = 1; i < NF; i++) if ($i == "digest") { print $(i + 1); exit } }' <<< "$cell")"
+    prov="docs/specs/fhir-packages/$pkg#$ver/PROVENANCE.md"
+    if [ ! -f "$prov" ]; then
+      bad "no $prov for the pinned profile package $pkg $ver (run scripts/vendor/profile-packages.sh --stamp)"
+    elif ! grep -qxF -- "- Version: $ver" "$prov"; then
+      bad "$prov does not record version $ver, which docs/VERSIONS.md pins for $pkg"
+    elif ! grep -qxF -- "- Files: $files" "$prov"; then
+      bad "$prov does not record the $files files docs/VERSIONS.md pins for $pkg $ver"
+    elif ! grep -qE '^[0-9a-f]{64}$' <<< "$digest" || ! grep -qF "$digest" "$prov"; then
+      bad "$prov does not name the digest '$digest' docs/VERSIONS.md pins for $pkg $ver"
+    else
+      agreed=$((agreed + 1))
+    fi
+  done <<< "$profiles"
+  if [ "$expected" -eq 0 ]; then
+    bad "docs/VERSIONS.md has no Profile packages rows"
+  elif [ "$agreed" -eq "$expected" ]; then
+    note "OK: all $expected profile package provenance stamps record their pinned version, count and digest"
   fi
 else
   note "no docs/VERSIONS.md yet, skipped"
