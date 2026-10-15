@@ -13,6 +13,7 @@ use crate::report::Constraint;
 use crate::report::Reason;
 use crate::set::ResolveError;
 use crate::validate::ValidateError;
+use crate::validate::structure::Structure;
 use crate::validate::walk::Cursor;
 use crate::validate::walk::Walk;
 
@@ -29,12 +30,14 @@ pub(crate) enum Placement {
 
 impl Walk<'_, '_, '_> {
     /// Returns the cursor an extension is walked with: the definition its
-    /// `url` names, or the core `Extension` when the url does not resolve.
+    /// `url` names, resolved as the definition `from` the walk holds the
+    /// extension's parent to, or the core `Extension` when the url does not
+    /// resolve.
     pub(crate) fn extension_cursor(
         &mut self,
         object: &Object,
         placement: Placement,
-        location: &str,
+        (location, from): (&str, &Structure),
     ) -> Result<Cursor, ValidateError> {
         let fallback = |walk: &Self| -> Result<Cursor, ValidateError> {
             Ok(Cursor::new(
@@ -61,7 +64,7 @@ impl Walk<'_, '_, '_> {
             // defines, so the slice it is matched to by url holds it, never a definition of its own.
             return fallback(self);
         }
-        let structure = match self.validator().structure(url) {
+        let structure = match self.validator().structure(url, Some(from)) {
             Ok(structure) => structure,
             Err(ValidateError::Resolve(ResolveError::NotFound { .. })) => {
                 // NOTE: extensibility.html §2.5.0.2 forbids processing an unknown modifier, while

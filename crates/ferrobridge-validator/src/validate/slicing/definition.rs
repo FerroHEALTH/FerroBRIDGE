@@ -39,6 +39,14 @@ pub(crate) enum Located {
 }
 
 impl Located {
+    /// Returns the snapshot the path ends in, when it ends at an element.
+    pub(crate) fn structure(&self) -> Option<&Structure> {
+        match self {
+            Self::Element { structure, .. } => Some(structure),
+            Self::Targets(_) | Self::Missing => None,
+        }
+    }
+
     /// Returns the element definition, when the path ends at one.
     pub(crate) fn element(&self) -> Option<&ElementDefinition> {
         match self {
@@ -111,7 +119,7 @@ pub(crate) fn locate(
             let [target] = targets.as_slice() else {
                 return Ok(Located::Missing);
             };
-            let Some(next) = resolved(validator, target)? else {
+            let Some(next) = resolved(validator, target, &structure)? else {
                 return Ok(Located::Missing);
             };
             next.type_name().clone_into(&mut id);
@@ -121,14 +129,14 @@ pub(crate) fn locate(
         }
         let mut found = within(&structure, &id, step)?;
         if found.is_none()
-            && let Some((next, root)) = hop(validator, &here)?
+            && let Some((next, root)) = hop(validator, &here, &structure)?
         {
             found = within(&next, &root, step)?;
             structure = next;
         }
         if found.is_none()
             && let Step::Extension(url) = step
-            && let Some(definition) = resolved(validator, url)?
+            && let Some(definition) = resolved(validator, url, &structure)?
         {
             found = Some(("Extension".to_owned(), None));
             structure = definition;
@@ -223,6 +231,7 @@ fn names_extension(
 fn hop(
     validator: &Validator<'_>,
     here: &Located,
+    from: &Structure,
 ) -> Result<Option<(Arc<Structure>, String)>, ValidateError> {
     let types = here.types();
     let [(code, profiles)] = types.as_slice() else {
@@ -233,18 +242,20 @@ fn hop(
         [profile] => profile.clone(),
         _ => return Ok(None),
     };
-    Ok(resolved(validator, &canonical)?.map(|structure| {
+    Ok(resolved(validator, &canonical, from)?.map(|structure| {
         let root = structure.type_name().to_owned();
         (structure, root)
     }))
 }
 
-/// Resolves `canonical`, `None` when the set does not carry it.
+/// Resolves `canonical` as the definition `from` names it, `None` when the
+/// set does not carry it.
 fn resolved(
     validator: &Validator<'_>,
     canonical: &str,
+    from: &Structure,
 ) -> Result<Option<Arc<Structure>>, ValidateError> {
-    match validator.structure(canonical) {
+    match validator.structure(canonical, Some(from)) {
         Ok(structure) => Ok(Some(structure)),
         Err(ValidateError::Resolve(
             ResolveError::NotFound { .. } | ResolveError::Fragment { .. },

@@ -10,6 +10,7 @@ use fhir_types::r4::element_definition::ElementDefinition;
 use fhir_types::r4::structure_definition::StructureDefinition;
 
 use super::ValidateError;
+use crate::set::PackageId;
 
 /// The snapshot of one `StructureDefinition`, its elements by id.
 ///
@@ -23,11 +24,15 @@ pub(crate) struct Structure {
     url: String,
     definition: Arc<StructureDefinition>,
     by_id: BTreeMap<String, usize>,
+    origin: PackageId,
 }
 
 impl Structure {
     /// Indexes `definition`, which SHALL carry a snapshot.
-    pub(crate) fn new(definition: Arc<StructureDefinition>) -> Result<Self, ValidateError> {
+    pub(crate) fn new(
+        definition: Arc<StructureDefinition>,
+        origin: PackageId,
+    ) -> Result<Self, ValidateError> {
         let url = definition.url.value.clone().unwrap_or_default();
         let Some(snapshot) = &definition.snapshot else {
             return Err(ValidateError::NoSnapshot { url });
@@ -48,7 +53,13 @@ impl Structure {
             url,
             definition,
             by_id,
+            origin,
         })
+    }
+
+    /// Returns the package that carries the definition.
+    pub(crate) const fn origin(&self) -> PackageId {
+        self.origin
     }
 
     /// Returns the canonical URL of the definition.

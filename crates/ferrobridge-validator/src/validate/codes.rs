@@ -12,6 +12,7 @@ use fhir_types::r4::code_system::CodeSystemConcept;
 use fhir_types::r4::value_set::ValueSetComposeInclude;
 use fhir_types::r4::value_set::ValueSetExpansionContains;
 
+use crate::set::PackageId;
 use crate::set::PackageSet;
 use crate::set::ResolveError;
 use crate::validate::ValidateError;
@@ -58,7 +59,8 @@ impl Enumeration {
     }
 }
 
-/// Enumerates the value set `canonical` names.
+/// Enumerates the value set `canonical` names, as a definition of the
+/// package `scope` references it.
 ///
 /// `compose` is read when every include lists its concepts or names a code
 /// system the set carries with `content` `complete`; otherwise an
@@ -69,9 +71,13 @@ impl Enumeration {
 ///
 /// Returns [`ValidateError::Resolve`] when a resource the set carries cannot
 /// be read or decoded.
-pub(crate) fn enumerate(set: &PackageSet, canonical: &str) -> Result<Enumeration, ValidateError> {
-    let value_set = match set.value_set(canonical) {
-        Ok(value_set) => value_set,
+pub(crate) fn enumerate(
+    set: &PackageSet,
+    canonical: &str,
+    scope: PackageId,
+) -> Result<Enumeration, ValidateError> {
+    let (value_set, origin) = match set.value_set_in(canonical, Some(scope)) {
+        Ok(found) => found,
         Err(ResolveError::NotFound { .. } | ResolveError::Fragment { .. }) => {
             return Ok(Enumeration::NotEnumerated);
         }
@@ -81,13 +87,13 @@ pub(crate) fn enumerate(set: &PackageSet, canonical: &str) -> Result<Enumeration
         let mut codes = BTreeSet::new();
         let mut whole = !compose.include.is_empty();
         for include in &compose.include {
-            match included(set, include)? {
+            match included(set, include, origin)? {
                 Some(found) => codes.extend(found),
                 None => whole = false,
             }
         }
         for exclude in &compose.exclude {
-            match included(set, exclude)? {
+            match included(set, exclude, origin)? {
                 Some(found) => codes.retain(|code| !found.contains(code)),
                 None => whole = false,
             }
@@ -121,6 +127,7 @@ pub(crate) fn enumerate(set: &PackageSet, canonical: &str) -> Result<Enumeration
 fn included(
     set: &PackageSet,
     include: &ValueSetComposeInclude,
+    origin: PackageId,
 ) -> Result<Option<BTreeSet<Code>>, ValidateError> {
     if !include.filter.is_empty() || !include.value_set.is_empty() {
         return Ok(None);
@@ -133,7 +140,7 @@ fn included(
         return Ok(None);
     };
     if include.concept.is_empty() {
-        return whole_code_system(set, &system);
+        return whole_code_system(set, &system, origin);
     }
     Ok(Some(
         include
@@ -150,9 +157,10 @@ fn included(
 fn whole_code_system(
     set: &PackageSet,
     system: &str,
+    origin: PackageId,
 ) -> Result<Option<BTreeSet<Code>>, ValidateError> {
-    let code_system = match set.code_system(system) {
-        Ok(code_system) => code_system,
+    let code_system = match set.code_system_in(system, Some(origin)) {
+        Ok((code_system, _)) => code_system,
         Err(ResolveError::NotFound { .. } | ResolveError::Fragment { .. }) => return Ok(None),
         Err(error) => return Err(error.into()),
     };

@@ -77,7 +77,7 @@ impl<'i> Walk<'_, '_, 'i> {
                 })
             }
             "type" => {
-                let allowed = match self.allowed_types(&located)? {
+                let allowed = match self.allowed_types(&located, structure)? {
                     Ok(allowed) if !allowed.is_empty() => allowed,
                     Ok(_) => return Ok(unknown(Reason::NoDiscriminatorValue)),
                     Err(reason) => return Ok(unknown(reason)),
@@ -103,7 +103,8 @@ impl<'i> Walk<'_, '_, 'i> {
                 if profiles.is_empty() {
                     return Ok(unknown(Reason::NoDiscriminatorValue));
                 }
-                self.conforms_to_any(nodes, &profiles, location, discriminator)
+                let from = located.structure().unwrap_or(structure);
+                self.conforms_to_any(nodes, (&profiles, from), location, discriminator)
             }
             _ => Ok(unknown(Reason::DiscriminatorType)),
         }
@@ -161,7 +162,13 @@ impl<'i> Walk<'_, '_, 'i> {
                 reason: Reason::NoDiscriminatorValue,
             }]));
         };
-        match &*self.validator().codes(&value_set)? {
+        let Some(from) = located.structure() else {
+            return Ok(Verdict::Unknown(vec![Unknown {
+                constraint: discriminator.constraint(),
+                reason: Reason::NoDiscriminatorValue,
+            }]));
+        };
+        match &*self.validator().codes(&value_set, from)? {
             Enumeration::NotEnumerated => Ok(Verdict::Unknown(vec![Unknown {
                 constraint: Constraint::DiscriminatorValueSet {
                     path: discriminator.path.clone(),
@@ -182,9 +189,11 @@ impl<'i> Walk<'_, '_, 'i> {
     fn allowed_types(
         &self,
         located: &Located,
+        slice: &Structure,
     ) -> Result<Result<Vec<String>, Reason>, ValidateError> {
+        let from = located.structure().unwrap_or(slice);
         let type_of = |canonical: &str| -> Result<Result<String, Reason>, ValidateError> {
-            match self.validator().structure(canonical) {
+            match self.validator().structure(canonical, Some(from)) {
                 Ok(structure) => Ok(Ok(structure.type_name().to_owned())),
                 Err(ValidateError::Resolve(
                     ResolveError::NotFound { .. } | ResolveError::Fragment { .. },
@@ -220,7 +229,7 @@ impl<'i> Walk<'_, '_, 'i> {
     fn conforms_to_any(
         &mut self,
         nodes: &[Node<'i>],
-        profiles: &[String],
+        (profiles, from): (&[String], &Structure),
         location: &str,
         discriminator: &Discriminator,
     ) -> Result<Verdict, ValidateError> {
@@ -241,7 +250,7 @@ impl<'i> Walk<'_, '_, 'i> {
                 }
             };
             for profile in profiles {
-                match self.conformance(subject, profile, location)? {
+                match self.conformance(subject, (profile, from), location)? {
                     Conformance::Checked(found) if found.is_valid() => return Ok(Verdict::Match),
                     Conformance::Checked(_) => {}
                     Conformance::Unknown(reason) => unknown.push(Unknown {

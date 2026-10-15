@@ -34,6 +34,7 @@ use fhir_types::codec::EncodeError;
 use fhir_types::codec::Value;
 
 use crate::report::Report;
+use crate::set::PackageId;
 use crate::set::PackageSet;
 use crate::set::ResolveError;
 use codes::Enumeration;
@@ -45,13 +46,16 @@ use structure::Structure;
 /// The canonical base of the definitions FHIR R4 core publishes.
 const CORE: &str = "http://hl7.org/fhir/StructureDefinition/";
 
+/// A canonical as one package references it: the cache key of a resolution.
+type Scoped = (String, Option<PackageId>);
+
 /// Validates R4 resources against the profiles of a package set.
 #[derive(Debug)]
 pub struct Validator<'set> {
     set: &'set PackageSet,
-    structures: Mutex<BTreeMap<String, Arc<Structure>>>,
+    structures: Mutex<BTreeMap<Scoped, Arc<Structure>>>,
     primitives: Mutex<BTreeMap<String, Arc<PrimitiveRule>>>,
-    codes: Mutex<BTreeMap<String, Arc<Enumeration>>>,
+    codes: Mutex<BTreeMap<Scoped, Arc<Enumeration>>>,
     resolver: Box<dyn Resolver>,
 }
 
@@ -140,27 +144,36 @@ impl<'set> Validator<'set> {
         walk::Walk::new(self).run(resource, Some(profile))
     }
 
-    /// Returns the indexed snapshot of the definition `canonical` names.
-    fn structure(&self, canonical: &str) -> Result<Arc<Structure>, ValidateError> {
+    /// Returns the indexed snapshot of the definition `canonical` names, as
+    /// the definition `from` references it: within the dependency closure of
+    /// `from`'s package first.
+    fn structure(
+        &self,
+        canonical: &str,
+        from: Option<&Structure>,
+    ) -> Result<Arc<Structure>, ValidateError> {
+        let scope = from.map(Structure::origin);
+        let key = (canonical.to_owned(), scope);
         if let Some(found) = self
             .structures
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .get(canonical)
+            .get(&key)
         {
             return Ok(Arc::clone(found));
         }
-        let structure = Arc::new(Structure::new(self.set.structure_definition(canonical)?)?);
+        let (definition, origin) = self.set.structure_definition_in(canonical, scope)?;
+        let structure = Arc::new(Structure::new(definition, origin)?);
         self.structures
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .insert(canonical.to_owned(), Arc::clone(&structure));
+            .insert(key, Arc::clone(&structure));
         Ok(structure)
     }
 
     /// Returns the core definition of the type `name`.
     fn core(&self, name: &str) -> Result<Arc<Structure>, ValidateError> {
-        self.structure(&format!("{CORE}{name}"))
+        self.structure(&format!("{CORE}{name}"), None)
     }
 
     /// Returns the resolver a `resolve()` in a discriminator path uses.
@@ -170,20 +183,21 @@ impl<'set> Validator<'set> {
 
     /// Returns the codes of the value set `canonical` names, when the
     /// package set enumerates them.
-    fn codes(&self, canonical: &str) -> Result<Arc<Enumeration>, ValidateError> {
+    fn codes(&self, canonical: &str, from: &Structure) -> Result<Arc<Enumeration>, ValidateError> {
+        let key = (canonical.to_owned(), Some(from.origin()));
         if let Some(found) = self
             .codes
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .get(canonical)
+            .get(&key)
         {
             return Ok(Arc::clone(found));
         }
-        let enumeration = Arc::new(codes::enumerate(self.set, canonical)?);
+        let enumeration = Arc::new(codes::enumerate(self.set, canonical, from.origin())?);
         self.codes
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .insert(canonical.to_owned(), Arc::clone(&enumeration));
+            .insert(key, Arc::clone(&enumeration));
         Ok(enumeration)
     }
 

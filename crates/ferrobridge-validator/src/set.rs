@@ -7,6 +7,7 @@
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -31,6 +32,8 @@ pub struct PackageSet {
     structures: BTreeMap<String, Vec<Entry<StructureDefinition>>>,
     value_sets: BTreeMap<String, Vec<Entry<ValueSet>>>,
     code_systems: BTreeMap<String, Vec<Entry<CodeSystem>>>,
+    /// The dependency closure of each package, by position.
+    closures: Vec<BTreeSet<PackageId>>,
 }
 
 /// One resource the set carries, decoded on first use.
@@ -40,16 +43,19 @@ struct Entry<T> {
     /// The package and file, as `name#version/file`.
     package: String,
     content: Content,
+    /// The package that carries it.
+    origin: PackageId,
     decoded: OnceLock<Arc<T>>,
 }
 
 impl<T> Entry<T> {
     /// Creates the entry of a resource not yet decoded.
-    fn new(version: Option<String>, package: String, content: Content) -> Self {
+    fn new(version: Option<String>, package: String, content: Content, origin: PackageId) -> Self {
         Self {
             version,
             package,
             content,
+            origin,
             decoded: OnceLock::new(),
         }
     }
@@ -208,8 +214,9 @@ impl PackageSet {
         let mut structures: BTreeMap<String, Vec<Entry<StructureDefinition>>> = BTreeMap::new();
         let mut value_sets: BTreeMap<String, Vec<Entry<ValueSet>>> = BTreeMap::new();
         let mut code_systems: BTreeMap<String, Vec<Entry<CodeSystem>>> = BTreeMap::new();
-        for package in &packages {
+        for (index, package) in packages.iter().enumerate() {
             let label = format!("{}#{}", package.name(), package.version());
+            let origin = PackageId(index);
             for resource in package.resources() {
                 let Some(url) = &resource.url else { continue };
                 let version = resource.version.clone();
@@ -219,24 +226,28 @@ impl PackageSet {
                     "StructureDefinition" => structures
                         .entry(url.clone())
                         .or_default()
-                        .push(Entry::new(version, source, content)),
+                        .push(Entry::new(version, source, content, origin)),
                     "ValueSet" => value_sets
                         .entry(url.clone())
                         .or_default()
-                        .push(Entry::new(version, source, content)),
+                        .push(Entry::new(version, source, content, origin)),
                     "CodeSystem" => code_systems
                         .entry(url.clone())
                         .or_default()
-                        .push(Entry::new(version, source, content)),
+                        .push(Entry::new(version, source, content, origin)),
                     _ => {}
                 }
             }
         }
+        let closures = (0..packages.len())
+            .map(|index| dependency_closure(&packages, index))
+            .collect();
         Ok(Self {
             packages,
             structures,
             value_sets,
             code_systems,
+            closures,
         })
     }
 
@@ -263,7 +274,8 @@ impl PackageSet {
         &self,
         canonical: &str,
     ) -> Result<Arc<StructureDefinition>, ResolveError> {
-        resolve(&self.structures, canonical, "StructureDefinition")
+        self.structure_definition_in(canonical, None)
+            .map(|(definition, _)| definition)
     }
 
     /// Resolves `canonical` to the `ValueSet` it names, by the rules of
@@ -273,7 +285,8 @@ impl PackageSet {
     ///
     /// Returns [`ResolveError`] as [`PackageSet::structure_definition`] does.
     pub fn value_set(&self, canonical: &str) -> Result<Arc<ValueSet>, ResolveError> {
-        resolve(&self.value_sets, canonical, "ValueSet")
+        self.value_set_in(canonical, None)
+            .map(|(value_set, _)| value_set)
     }
 
     /// Resolves `canonical` to the `CodeSystem` it names, by the rules of
@@ -283,16 +296,95 @@ impl PackageSet {
     ///
     /// Returns [`ResolveError`] as [`PackageSet::structure_definition`] does.
     pub fn code_system(&self, canonical: &str) -> Result<Arc<CodeSystem>, ResolveError> {
-        resolve(&self.code_systems, canonical, "CodeSystem")
+        self.code_system_in(canonical, None)
+            .map(|(code_system, _)| code_system)
+    }
+
+    /// Resolves `canonical` as referenced from the package `scope`, and
+    /// returns the definition with the package that carries it.
+    pub(crate) fn structure_definition_in(
+        &self,
+        canonical: &str,
+        scope: Option<PackageId>,
+    ) -> Result<(Arc<StructureDefinition>, PackageId), ResolveError> {
+        resolve(
+            &self.structures,
+            canonical,
+            "StructureDefinition",
+            self.closure(scope),
+        )
+    }
+
+    /// Resolves the `ValueSet` `canonical` names as referenced from `scope`.
+    pub(crate) fn value_set_in(
+        &self,
+        canonical: &str,
+        scope: Option<PackageId>,
+    ) -> Result<(Arc<ValueSet>, PackageId), ResolveError> {
+        resolve(&self.value_sets, canonical, "ValueSet", self.closure(scope))
+    }
+
+    /// Resolves the `CodeSystem` `canonical` names as referenced from `scope`.
+    pub(crate) fn code_system_in(
+        &self,
+        canonical: &str,
+        scope: Option<PackageId>,
+    ) -> Result<(Arc<CodeSystem>, PackageId), ResolveError> {
+        resolve(
+            &self.code_systems,
+            canonical,
+            "CodeSystem",
+            self.closure(scope),
+        )
+    }
+
+    /// Returns the dependency closure of the package `scope`.
+    fn closure(&self, scope: Option<PackageId>) -> Option<&BTreeSet<PackageId>> {
+        scope.and_then(|PackageId(index)| self.closures.get(index))
     }
 }
 
-/// Resolves `canonical` among `index`, the resources of type `kind`.
+/// One package of a set, by its position in [`PackageSet::packages`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct PackageId(usize);
+
+/// The dependency closure of the package at `start`: itself, and for every
+/// dependency a manifest names the highest version of the set that
+/// satisfies it, followed transitively.
+fn dependency_closure(packages: &[Package], start: usize) -> BTreeSet<PackageId> {
+    let mut seen = BTreeSet::new();
+    let mut pending = vec![start];
+    while let Some(index) = pending.pop() {
+        if !seen.insert(PackageId(index)) {
+            continue;
+        }
+        let Some(package) = packages.get(index) else {
+            continue;
+        };
+        for (dependency, wanted) in package.dependencies() {
+            let best = packages
+                .iter()
+                .enumerate()
+                .filter(|(_, candidate)| {
+                    candidate.name() == dependency && version_satisfies(candidate.version(), wanted)
+                })
+                .max_by(|(_, a), (_, b)| compare_versions(a.version(), b.version()));
+            if let Some((found, _)) = best {
+                pending.push(found);
+            }
+        }
+    }
+    seen
+}
+
+/// Resolves `canonical` among `index`, the resources of type `kind`, within
+/// `closure` when given.
 fn resolve<T: Json>(
     index: &BTreeMap<String, Vec<Entry<T>>>,
     canonical: &str,
     kind: &str,
-) -> Result<Arc<T>, ResolveError> {
+    closure: Option<&BTreeSet<PackageId>>,
+) -> Result<(Arc<T>, PackageId), ResolveError> {
     let parsed = Canonical::parse(canonical);
     if parsed.fragment().is_some() {
         return Err(ResolveError::Fragment {
@@ -302,7 +394,18 @@ fn resolve<T: Json>(
     let not_found = || ResolveError::NotFound {
         canonical: canonical.to_owned(),
     };
-    let entries = index.get(parsed.url()).ok_or_else(not_found)?;
+    let all = index.get(parsed.url()).ok_or_else(not_found)?;
+    let scoped: Vec<&Entry<T>> = all
+        .iter()
+        .filter(|entry| closure.is_none_or(|closure| closure.contains(&entry.origin)))
+        .collect();
+    // NOTE: packages.html names a package's dependencies and is silent on a canonical they do
+    // not carry; no specification governs this: our own design, it falls back to the whole set.
+    let entries: Vec<&Entry<T>> = if scoped.is_empty() || parsed.version().is_some() {
+        all.iter().collect()
+    } else {
+        scoped
+    };
     let wanted = if let Some(version) = parsed.version() {
         Some(version)
     } else {
@@ -315,11 +418,13 @@ fn resolve<T: Json>(
     };
     let matching: Vec<&Entry<T>> = entries
         .iter()
+        .copied()
         .filter(|entry| entry.version.as_deref() == wanted)
         .collect();
     let (entry, others) = matching.split_first().ok_or_else(not_found)?;
+    let origin = entry.origin;
     if let Some(decoded) = entry.decoded.get() {
-        return Ok(Arc::clone(decoded));
+        return Ok((Arc::clone(decoded), origin));
     }
     let bytes = read(canonical, entry)?;
     for other in others {
@@ -334,7 +439,7 @@ fn resolve<T: Json>(
         }
     }
     let decoded = Arc::new(decode(canonical, entry, &bytes, kind)?);
-    Ok(Arc::clone(entry.decoded.get_or_init(|| decoded)))
+    Ok((Arc::clone(entry.decoded.get_or_init(|| decoded)), origin))
 }
 
 /// Reads the bytes of the resource `entry` points at.
@@ -393,6 +498,10 @@ fn version_satisfies(version: &str, wanted: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
+    use super::PackageId;
+    use super::PackageSet;
     use super::version_satisfies;
 
     #[test]
@@ -401,5 +510,55 @@ mod tests {
         assert!(version_satisfies("4.0.1", "4.0.x"));
         assert!(!version_satisfies("4.1.0", "4.0.x"));
         assert!(!version_satisfies("4.0.1", "4.0.2"));
+    }
+
+    // scripts/vendor/profile-packages.sh fetches the EU trees at build time; the test
+    // returns early without them, as the other build-time corpora do.
+    #[test]
+    fn a_canonical_eps_names_resolves_to_the_eu_base_version_eps_depends_on() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/specs/fhir-packages");
+        if !root
+            .join("hl7.fhir.eu.eps#1.0.0-ballot/package/package.json")
+            .is_file()
+        {
+            return;
+        }
+        let mut paths = vec![
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tools/fhir-codegen/vendor/hl7.fhir.r4.core"),
+        ];
+        for entry in std::fs::read_dir(&root).expect("the fetched packages") {
+            let path = entry.expect("a fetched package").path();
+            if path.join("package/package.json").is_file() {
+                paths.push(path);
+            }
+        }
+        let set = PackageSet::load(paths).expect("the EU closure");
+        let eps = set
+            .packages()
+            .iter()
+            .position(|package| package.name() == "hl7.fhir.eu.eps")
+            .expect("the EPS package");
+        let canonical = "http://hl7.eu/fhir/base/StructureDefinition/patient-eu-core";
+        let (scoped, _) = set
+            .structure_definition_in(canonical, Some(PackageId(eps)))
+            .expect("patient-eu-core in the EPS closure");
+        assert_eq!(
+            scoped
+                .version
+                .as_ref()
+                .and_then(|version| version.value.as_deref()),
+            Some("2.0.0")
+        );
+        let latest = set
+            .structure_definition(canonical)
+            .expect("patient-eu-core");
+        assert_eq!(
+            latest
+                .version
+                .as_ref()
+                .and_then(|version| version.value.as_deref()),
+            Some("2.0.1")
+        );
     }
 }

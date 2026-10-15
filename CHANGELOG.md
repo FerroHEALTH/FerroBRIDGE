@@ -141,6 +141,11 @@ crates on crates.io.
 - The R4 profile validator refuses a resource of a type its element's types
   do not name, where an element typed `Resource` or `DomainResource` still
   takes any resource (#488).
+- The R4 profile validator resolves a version-less canonical a definition
+  names within the dependency closure of the package that carries the
+  definition, so a profile built against one version of a package no longer
+  gets another loaded beside it, and falls back to the whole set only when
+  that closure does not carry the canonical (#489).
 - Readiness no longer reports a CDR that refuses the configured credentials
   as up. The CDR check lists the ADL 1.4 templates through the ITS-REST
   Definition API with the configured credentials, filtered so the answer is

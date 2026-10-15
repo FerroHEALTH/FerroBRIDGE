@@ -145,16 +145,20 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         resource: &'i Value,
         profile: Option<&str>,
     ) -> Result<Report, ValidateError> {
+        let profile = profile
+            .map(|profile| self.validator.structure(profile, None))
+            .transpose()?;
         self.resource(resource, None, profile)?;
         Ok(self.out.finish())
     }
 
-    /// Validates one resource: the root, or one inside another.
+    /// Validates one resource: the root, or one inside another, against
+    /// `profile` or the core definition of its type.
     pub(crate) fn resource(
         &mut self,
         value: &'i Value,
         location: Option<&str>,
-        profile: Option<&str>,
+        profile: Option<Arc<Structure>>,
     ) -> Result<(), ValidateError> {
         let severity = if location.is_none() {
             Severity::Fatal
@@ -187,7 +191,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         };
         let location = location.unwrap_or(name).to_owned();
         let mut structure = match profile {
-            Some(profile) => self.validator.structure(profile)?,
+            Some(profile) => profile,
             None => self.validator.core(name)?,
         };
         if structure.type_name() != name {

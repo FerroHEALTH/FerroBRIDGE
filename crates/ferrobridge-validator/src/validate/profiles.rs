@@ -19,6 +19,7 @@ use crate::report::Constraint;
 use crate::report::Reason;
 use crate::set::ResolveError;
 use crate::validate::ValidateError;
+use crate::validate::structure::Structure;
 use crate::validate::walk::Cursor;
 use crate::validate::walk::Held;
 use crate::validate::walk::Occurrence;
@@ -83,14 +84,15 @@ pub(crate) fn resource_profiles(element: Option<&ElementDefinition>, kind: &str)
 }
 
 impl<'i> Walk<'_, '_, 'i> {
-    /// Validates `subject` against `profile` in a walk of its own.
+    /// Validates `subject` against `profile`, as the definition `from` names
+    /// it, in a walk of its own.
     pub(crate) fn conformance(
         &self,
         subject: Subject<'_, 'i>,
-        profile: &str,
+        (profile, from): (&str, &Structure),
         location: &str,
     ) -> Result<Conformance, ValidateError> {
-        let structure = match self.validator().structure(profile) {
+        let structure = match self.validator().structure(profile, Some(from)) {
             Ok(structure) => structure,
             Err(ValidateError::Resolve(
                 ResolveError::NotFound { .. } | ResolveError::Fragment { .. },
@@ -102,7 +104,7 @@ impl<'i> Walk<'_, '_, 'i> {
         let mut fork = self.fork();
         let name = match subject {
             Subject::Resource { value } => {
-                fork.resource(value, Some(location), Some(profile))?;
+                fork.resource(value, Some(location), Some(structure))?;
                 return Ok(Conformance::Checked(fork.into_out()));
             }
             Subject::Complex { name, .. } | Subject::Primitive { code: name, .. } => name,
@@ -154,7 +156,7 @@ impl<'i> Walk<'_, '_, 'i> {
     ) -> Result<bool, ValidateError> {
         let mut checked = Vec::new();
         for profile in profiles {
-            match self.conformance(subject, profile, location)? {
+            match self.conformance(subject, (profile, &cursor.structure), location)? {
                 Conformance::Checked(found) => checked.push((profile, found)),
                 Conformance::Unknown(reason) => self.out().unevaluated(
                     cursor.structure.url(),

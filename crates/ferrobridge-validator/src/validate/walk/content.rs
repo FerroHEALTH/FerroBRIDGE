@@ -201,7 +201,9 @@ impl<'i> Walk<'_, '_, 'i> {
         location: &str,
     ) -> Result<(), ValidateError> {
         let resolved = match value.as_object() {
-            Some(object) => self.extension_cursor(object, placement, location)?,
+            Some(object) => {
+                self.extension_cursor(object, placement, (location, &cursor.structure))?
+            }
             None => Cursor::new(self.validator.core("Extension")?, "Extension"),
         };
         // NOTE: profiling.html §5.1.0.11: extensions are sliced by url, so an extension
