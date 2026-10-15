@@ -530,7 +530,9 @@ fn condition_coded(id: &str, code: &str) -> Result<serde_json::Value, Box<dyn St
 /// Returns how many compositions the CDR holds, over AQL.
 async fn compositions(client: &CdrClient) -> Result<usize, Box<dyn StdError>> {
     let request = openehr_its::rest::generated::query::AdhocQueryExecute {
-        q: String::from("SELECT c/uid/value AS uid FROM EHR e CONTAINS COMPOSITION c"),
+        q: String::from(
+            "SELECT c/uid/value AS uid FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/uid/value",
+        ),
         offset: None,
         fetch: None,
         query_parameters: None,

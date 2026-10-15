@@ -12,7 +12,15 @@
 //! `components.parameters.offset`), which name row numbers, and row numbers
 //! only stay put across pages under a fixed order. No specification governs
 //! the aliases or the ordering rule: our own design.
+//!
+//! Every `COMPOSITION` a query reads sits below `VERSION [LATEST_VERSION]`.
+//! AQL 1.1.0 names `LATEST_VERSION` and `ALL_VERSIONS` (the `versionPredicate`
+//! rule, QUERY AQL §6) and leaves the scope of a query without a `VERSION`
+//! open, while a deleted composition is a version whose data is Void (openEHR
+//! RM Common 1.1.0 §6.2.5); under that scope neither a deleted composition
+//! nor a superseded version reaches a mapping or a visit.
 
+use openehr_query::ast::{ClassExprOperand, ContainsExpr, VersionPredicate};
 use openehr_query::lexer::{self, Token};
 use openehr_query::parser::{self, ParseError};
 use std::collections::BTreeMap;
@@ -72,6 +80,15 @@ pub enum AqlError {
     /// The query limits its own rows, which the runner pages.
     #[error("the {query} carries a LIMIT; the runner pages the result itself")]
     Limited {
+        /// Which query.
+        query: &'static str,
+    },
+    /// A `COMPOSITION` of the `FROM` sits below no `VERSION [LATEST_VERSION]`,
+    /// or the `FROM` reads none.
+    #[error(
+        "the {query} reads no COMPOSITION below VERSION v[LATEST_VERSION]; without that scope a deleted or superseded composition can come back"
+    )]
+    Unscoped {
         /// Which query.
         query: &'static str,
     },
@@ -151,6 +168,9 @@ impl CheckedQuery {
                 columns.insert(*projection, position);
             }
         }
+        if latest_scoped(&parsed.from, false) != Some(true) {
+            return Err(AqlError::Unscoped { query });
+        }
         let parameters = lexer::lex(text)
             .map_err(|source| AqlError::Parse {
                 query,
@@ -189,6 +209,45 @@ impl CheckedQuery {
     }
 }
 
+/// Returns whether every `COMPOSITION` that `expr` binds sits below a
+/// `VERSION [LATEST_VERSION]`, or `None` when it binds none.
+///
+/// `latest` says whether the nearest enclosing `VERSION` is `LATEST_VERSION`.
+/// A `NOT CONTAINS` branch binds no row, so it is not read.
+fn latest_scoped(expr: &ContainsExpr, latest: bool) -> Option<bool> {
+    match expr {
+        ContainsExpr::Contained { operand, contains } => {
+            let (own, inner) = match operand {
+                ClassExprOperand::Class { rm_type, .. } => (
+                    rm_type
+                        .eq_ignore_ascii_case("COMPOSITION")
+                        .then_some(latest),
+                    latest,
+                ),
+                ClassExprOperand::Version { predicate, .. } => {
+                    (None, matches!(predicate, Some(VersionPredicate::Latest)))
+                }
+            };
+            let below = contains
+                .as_deref()
+                .filter(|constraint| !constraint.negated)
+                .and_then(|constraint| latest_scoped(&constraint.expr, inner));
+            both(own, below)
+        }
+        ContainsExpr::And(left, right) | ContainsExpr::Or(left, right) => {
+            both(latest_scoped(left, latest), latest_scoped(right, latest))
+        }
+    }
+}
+
+/// Joins two answers of [`latest_scoped`].
+fn both(left: Option<bool>, right: Option<bool>) -> Option<bool> {
+    match (left, right) {
+        (Some(left), Some(right)) => Some(left && right),
+        (one, None) | (None, one) => one,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{AqlError, CheckedQuery, SINCE_PARAMETER};
@@ -197,7 +256,7 @@ mod tests {
     const COMPOSITIONS: &str = "SELECT e/ehr_id/value AS ehr_id, \
         v/uid/value AS version_uid, c AS composition, \
         vo/uid/value AS versioned_object_uid \
-        FROM EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v CONTAINS COMPOSITION c \
+        FROM EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
         ORDER BY v/commit_audit/time_committed/value";
 
     #[test]
@@ -218,7 +277,7 @@ mod tests {
     #[test]
     fn a_missing_projection_is_refused_by_name() {
         let error = CheckedQuery::compositions(
-            "SELECT e/ehr_id/value AS ehr_id, c AS composition FROM EHR e CONTAINS COMPOSITION c ORDER BY e/ehr_id/value",
+            "SELECT e/ehr_id/value AS ehr_id, c AS composition FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY e/ehr_id/value",
         )
         .expect_err("the version_uid is missing");
         assert!(
@@ -237,10 +296,64 @@ mod tests {
     fn a_query_without_the_versioned_object_uid_checks_and_reads_none() {
         let query = CheckedQuery::compositions(
             "SELECT e/ehr_id/value AS ehr_id, v/uid/value AS version_uid, c AS composition \
-             FROM EHR e CONTAINS VERSION v CONTAINS COMPOSITION c ORDER BY v/uid/value",
+             FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY v/uid/value",
         )
         .expect("the query checks");
         assert_eq!(Some(1), query.column("version_uid"));
         assert_eq!(None, query.column("versioned_object_uid"));
+    }
+
+    /// Returns the composition query over `from`, with the three projections.
+    fn over(from: &str) -> String {
+        format!(
+            "SELECT e/ehr_id/value AS ehr_id, v/uid/value AS version_uid, c AS composition \
+             FROM {from} ORDER BY v/uid/value"
+        )
+    }
+
+    // NOTE: QUERY AQL 1.1.0 §6 (`versionPredicate`) leaves the scope of a query
+    // without LATEST_VERSION open, and a deletion is a version with Void data
+    // (openEHR RM Common 1.1.0 §6.2.5), so each of these is refused.
+    #[test]
+    fn a_composition_below_no_latest_version_scope_is_refused() {
+        for from in [
+            "EHR e CONTAINS COMPOSITION c",
+            "EHR e CONTAINS VERSION v CONTAINS COMPOSITION c",
+            "EHR e CONTAINS VERSION v[ALL_VERSIONS] CONTAINS COMPOSITION c",
+            "EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v CONTAINS COMPOSITION c",
+            "EHR e CONTAINS (COMPOSITION d OR VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c)",
+            "EHR e CONTAINS VERSION v[LATEST_VERSION]",
+        ] {
+            let error = CheckedQuery::compositions(&over(from)).expect_err(from);
+            assert!(
+                matches!(error, AqlError::Unscoped { .. }),
+                "{from}: {error:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_visit_query_below_no_latest_version_scope_is_refused() {
+        let error = CheckedQuery::visits(
+            "SELECT e/ehr_id/value AS ehr_id, c/name/value AS visit_source, \
+             c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end \
+             FROM EHR e CONTAINS COMPOSITION c ORDER BY c/context/start_time/value",
+        )
+        .expect_err("the visit query is unscoped");
+        assert!(matches!(error, AqlError::Unscoped { .. }), "{error:?}");
+    }
+
+    #[test]
+    fn a_composition_below_a_latest_version_scope_checks() {
+        for from in [
+            "EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c",
+            "EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c",
+            "EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
+             CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.laboratory_test_result.v1]",
+            "EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
+             NOT CONTAINS COMPOSITION d",
+        ] {
+            CheckedQuery::compositions(&over(from)).expect(from);
+        }
     }
 }

@@ -160,9 +160,27 @@ The `[etl] aql` query selects each composition whole beside its `ehr_id` and
 may also select the `versioned_object_uid`; when it does, the bridge checks it
 against the version, and when it does not, the bridge reads it from the
 `version_uid`, whose first part names the versioned object (openEHR RM
-Common 1.1.0, `OBJECT_VERSION_ID`). A query that reads only each composition's
-latest version, such as one over `VERSION v[LATEST_VERSION]`, keeps a changed
-composition from being written twice.
+Common 1.1.0, `OBJECT_VERSION_ID`).
+
+Both queries read every `COMPOSITION` below `VERSION v[LATEST_VERSION]`, and
+the bridge refuses to load a query that reads one without that scope. A
+deleted composition's newest version holds no data (openEHR RM Common 1.1.0
+§6.2.5), so that scope leaves it out. A superseded version neither feeds a
+mapping nor widens a visit, so a changed composition is written once. AQL
+1.1.0 names `LATEST_VERSION` and `ALL_VERSIONS` and does not say which scope
+a query without a `VERSION` gets, so the scope is written out:
+
+```text
+SELECT e/ehr_id/value AS ehr_id, v/uid/value AS version_uid, c AS composition
+FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c
+ORDER BY c/context/start_time/value
+```
+
+The query selects the composition whole, and the mappings read its leaves.
+Leave leaf paths through a repeated node, such as two values of one
+`events` list, out of the `SELECT`: AQL 1.1.0 does not define which node
+each of them comes from, and a CDR may pair values of two different nodes in
+one row.
 
 ## Checking a populated database with the Data Quality Dashboard
 
