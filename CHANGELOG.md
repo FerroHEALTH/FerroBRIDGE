@@ -183,6 +183,15 @@ crates on crates.io.
 
 ### Changed
 
+- `[etl] aql` and `[etl.visits] aql` must read every `COMPOSITION` below
+  `VERSION v[LATEST_VERSION]`, and a configuration whose query reads one
+  without that scope (no `VERSION`, a bare `VERSION v`, or `ALL_VERSIONS`)
+  now refuses to load with an `etl.aql` or `etl.visits.aql` error (#494).
+  AQL 1.1.0 leaves the scope of a query without `LATEST_VERSION` open, and a
+  deleted composition's newest version holds no data (openEHR RM Common
+  1.1.0 §6.2.5), so the scope keeps deleted and superseded versions out of
+  the CDM. Add `CONTAINS VERSION v[LATEST_VERSION]` above `COMPOSITION c` in
+  an existing query.
 - The bridge builds on the `openehr-*` 0.0.86 crates, the release the
   federation gateway pins, so a project on 0.0.86 that takes `fhirconnect`
   0.1.111 or `openehr-mapping-core` 0.1.109 carries one copy of the openEHR
