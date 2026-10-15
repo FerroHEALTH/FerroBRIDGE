@@ -8,6 +8,7 @@
 //! derived tables. The rules are FerroBRIDGE's own (`docs/architecture.md`
 //! §5.1). The container-backed cases run only when `FERROBRIDGE_E2E=1`.
 
+mod cdr_aql;
 mod engine;
 mod run;
 mod visit;
@@ -35,13 +36,13 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 /// The composition query every case runs.
 const COMPOSITIONS: &str = "SELECT e/ehr_id/value AS ehr_id, \
     vo/uid/value AS versioned_object_uid, v/uid/value AS version_uid, c AS composition \
-    FROM EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v CONTAINS COMPOSITION c \
+    FROM EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
     ORDER BY v/uid/value";
 
 /// The visit query of the derivation case.
 const VISITS: &str = "SELECT e/ehr_id/value AS ehr_id, c/name/value AS visit_source, \
     c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end \
-    FROM EHR e CONTAINS COMPOSITION c ORDER BY c/context/start_time/value";
+    FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/context/start_time/value";
 
 /// The synthetic EHR.
 const EHR: &str = "7d44b88c-4199-4bad-97dc-d78268e01398";

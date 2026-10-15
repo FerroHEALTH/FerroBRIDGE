@@ -13,13 +13,13 @@ use std::error::Error as StdError;
 /// carries the four projections and an order.
 const ETL: &str = r#"
 [etl]
-aql = "SELECT e/ehr_id/value AS ehr_id, vo/uid/value AS versioned_object_uid, v/uid/value AS version_uid, c AS composition FROM EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v CONTAINS COMPOSITION c ORDER BY v/uid/value"
+aql = "SELECT e/ehr_id/value AS ehr_id, vo/uid/value AS versioned_object_uid, v/uid/value AS version_uid, c AS composition FROM EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY v/uid/value"
 type_concept_id = 32817
 observation_period_type_concept_id = 32880
 "#;
 
 /// A visit query with the four projections.
-const VISITS: &str = "SELECT e/ehr_id/value AS ehr_id, c/name/value AS visit_source, c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end FROM EHR e CONTAINS COMPOSITION c ORDER BY c/context/start_time/value";
+const VISITS: &str = "SELECT e/ehr_id/value AS ehr_id, c/name/value AS visit_source, c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/context/start_time/value";
 
 /// Resolves `text`, returning the refusal.
 fn refusal(text: &str) -> Result<Error, Box<dyn StdError>> {
@@ -114,6 +114,37 @@ fn a_composition_query_without_an_order_refuses_to_boot() -> Result<(), Box<dyn 
     match &error {
         Error::Aql { source, .. } => {
             assert!(matches!(**source, AqlError::Unordered { .. }), "{source:?}");
+        }
+        other => return Err(format!("expected an AQL refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+// NOTE: QUERY AQL 1.1.0 §6 leaves a query's version scope open without
+// LATEST_VERSION, and a deletion is a version with Void data (RM Common §6.2.5).
+#[test]
+fn a_composition_query_over_every_version_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    let error = refusal(&ETL.replace("VERSION v[LATEST_VERSION]", "VERSION v"))?;
+    match &error {
+        Error::Aql { key, source } => {
+            assert_eq!("etl.aql", key);
+            assert!(matches!(**source, AqlError::Unscoped { .. }), "{source:?}");
+        }
+        other => return Err(format!("expected an AQL refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_visit_query_over_every_version_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    let query = VISITS.replace("CONTAINS VERSION v[LATEST_VERSION] ", "");
+    let error = refusal(&format!(
+        "{ETL}\n[etl.visits]\naql = \"{query}\"\nvisit_concept_id = 9201\nvisit_type_concept_id = 32817\n"
+    ))?;
+    match &error {
+        Error::Aql { key, source } => {
+            assert_eq!("etl.visits.aql", key);
+            assert!(matches!(**source, AqlError::Unscoped { .. }), "{source:?}");
         }
         other => return Err(format!("expected an AQL refusal, got {other:?}").into()),
     }
