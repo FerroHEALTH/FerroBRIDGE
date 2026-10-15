@@ -42,6 +42,7 @@ readonly CRATES=(
   ferrobridge-term
   ferrobridge-hl7v2
   ferrobridge-fhirpath
+  ferrobridge-validator
 )
 
 # The `[package]` table's own `version` in one member's manifest.
