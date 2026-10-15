@@ -9,7 +9,7 @@ paths: ["crates/**", "scripts/release/**", ".github/workflows/publish-crates.yml
 
 The `crates/*` members are published on crates.io under plain names
 (`fhir-types`, `hl7v2-types`, `openehr-mapping-core`, `fhirconnect`, `omocl`,
-`omop-cdm`, `ferrobridge-term`, `ferrobridge-hl7v2`) so other projects can
+`omop-cdm`, `ferrobridge-term`, `ferrobridge-hl7v2`, `ferrobridge-fhirpath`) so other projects can
 depend on them. The server (`app/*`) and the tools (`tools/*`) are never
 published.
 Every member is BUSL-1.1 except the two generated crates, which are
