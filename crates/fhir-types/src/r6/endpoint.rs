@@ -334,7 +334,9 @@ impl super::super::codec::Json for Endpoint {
         }
         if !self.header.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.header)?;
-            object.insert(std::string::String::from("header"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("header"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_header"), elements);
             }
@@ -942,7 +944,9 @@ impl super::super::codec::Json for EndpointPayload {
         }
         if !self.mime_type.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.mime_type)?;
-            object.insert(std::string::String::from("mimeType"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("mimeType"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_mimeType"), elements);
             }
@@ -950,14 +954,18 @@ impl super::super::codec::Json for EndpointPayload {
         if !self.profile_canonical.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.profile_canonical)?;
-            object.insert(std::string::String::from("profileCanonical"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("profileCanonical"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_profileCanonical"), elements);
             }
         }
         if !self.profile_uri.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.profile_uri)?;
-            object.insert(std::string::String::from("profileUri"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("profileUri"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_profileUri"), elements);
             }

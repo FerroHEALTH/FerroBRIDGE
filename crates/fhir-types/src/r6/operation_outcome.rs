@@ -536,7 +536,9 @@ impl super::super::codec::Json for OperationOutcomeIssue {
         }
         if !self.expression.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.expression)?;
-            object.insert(std::string::String::from("expression"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("expression"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_expression"), elements);
             }

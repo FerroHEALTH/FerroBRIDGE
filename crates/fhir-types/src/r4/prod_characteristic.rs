@@ -162,14 +162,18 @@ impl super::super::codec::Json for ProdCharacteristic {
         }
         if !self.color.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.color)?;
-            object.insert(std::string::String::from("color"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("color"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_color"), elements);
             }
         }
         if !self.imprint.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.imprint)?;
-            object.insert(std::string::String::from("imprint"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("imprint"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_imprint"), elements);
             }

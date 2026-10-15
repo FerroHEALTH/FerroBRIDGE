@@ -746,8 +746,12 @@ pub fn element_entry<M: serde::ser::SerializeMap, P: Primitive>(
     Ok(())
 }
 
-/// Writes `key` with the value array of a repeating primitive, unless the list
-/// is empty.
+/// Writes `key` with the value array of a repeating primitive, when any
+/// position carries a value.
+///
+/// A list whose every position carries only an `id` or an `extension` is
+/// written as the `_name` array alone
+/// (<https://hl7.org/fhir/R4/json.html#primitive>).
 ///
 /// # Errors
 ///
@@ -757,7 +761,7 @@ pub fn value_list_entry<M: serde::ser::SerializeMap, P: Primitive>(
     key: &str,
     items: &[P],
 ) -> Result<(), M::Error> {
-    if !items.is_empty() {
+    if items.iter().any(Primitive::has_value) {
         map.serialize_entry(key, &PrimitiveValues(items))?;
     }
     Ok(())
@@ -959,22 +963,28 @@ pub fn pair_arrays<'a>(
         .collect())
 }
 
-/// Serializes a list of primitives as the value array and, when any carries
-/// an element object, the aligned `_name` array.
+/// Serializes a list of primitives as the value array, when any carries a
+/// value, and the aligned `_name` array, when any carries an element object.
+///
+/// A list whose every position carries only an `id` or an `extension` has no
+/// value array (<https://hl7.org/fhir/R4/json.html#primitive>).
 ///
 /// # Errors
 ///
 /// Returns [`EncodeError`] when a held value has no JSON form.
-pub fn primitive_arrays<P: Primitive>(items: &[P]) -> Result<(Value, Option<Value>), EncodeError> {
+pub fn primitive_arrays<P: Primitive>(
+    items: &[P],
+) -> Result<(Option<Value>, Option<Value>), EncodeError> {
     let mut values = Vec::with_capacity(items.len());
     let mut elements = Vec::with_capacity(items.len());
     for item in items {
         values.push(item.value_json()?.unwrap_or(Value::Null));
         elements.push(item.element_json()?.unwrap_or(Value::Null));
     }
+    let any_value = values.iter().any(|v| !v.is_null());
     let any_element = elements.iter().any(|e| !e.is_null());
     Ok((
-        Value::Array(values),
+        any_value.then_some(Value::Array(values)),
         any_element.then_some(Value::Array(elements)),
     ))
 }

@@ -503,10 +503,12 @@ impl super::super::codec::Json for DeviceDefinition {
         if !self.production_identifier_in_u_d_i.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.production_identifier_in_u_d_i)?;
-            object.insert(
-                std::string::String::from("productionIdentifierInUDI"),
-                values,
-            );
+            if let Some(values) = values {
+                object.insert(
+                    std::string::String::from("productionIdentifierInUDI"),
+                    values,
+                );
+            }
             if let Some(elements) = elements {
                 object.insert(
                     std::string::String::from("_productionIdentifierInUDI"),
@@ -2009,7 +2011,9 @@ impl super::super::codec::Json for DeviceDefinitionConformsTo {
         );
         if !self.version.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.version)?;
-            object.insert(std::string::String::from("version"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("version"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_version"), elements);
             }

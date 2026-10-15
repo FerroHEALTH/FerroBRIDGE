@@ -1148,7 +1148,9 @@ impl super::super::codec::Json for ArtifactAssessmentContent {
         }
         if !self.path.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.path)?;
-            object.insert(std::string::String::from("path"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("path"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_path"), elements);
             }
