@@ -219,6 +219,14 @@ crates on crates.io.
 
 ### Fixed
 
+- The facade's loss log records each declared loss as a value-free kind
+  (`skipped-unresolved-reference`, `deferred-reference`, `defaulted` and the
+  rest) with its FHIRPath and its openEHR path, where it logged the loss's
+  display text, which could carry a reference literal such as `Patient/123`.
+  The `$validate` dry run renders each loss as the operations lane does, with
+  its FHIRPath in `issue.expression` and its openEHR path as a
+  `details.coding`, severity `warning` and code `incomplete`, or
+  `information` and `informational` for a defaulted composition field (#509).
 - The R4 profile validator resolves a canonical that two versions of one
   package carry at one resource version to the higher package version, where
   it refused it as ambiguous; two different packages carrying one canonical
