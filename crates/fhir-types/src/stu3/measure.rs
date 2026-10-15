@@ -641,7 +641,9 @@ impl super::super::codec::Json for Measure {
         }
         if !self.definition.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.definition)?;
-            object.insert(std::string::String::from("definition"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("definition"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_definition"), elements);
             }

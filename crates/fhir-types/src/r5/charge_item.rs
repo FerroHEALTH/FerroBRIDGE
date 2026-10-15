@@ -275,7 +275,9 @@ impl super::super::codec::Json for ChargeItem {
         }
         if !self.definition_uri.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.definition_uri)?;
-            object.insert(std::string::String::from("definitionUri"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("definitionUri"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_definitionUri"), elements);
             }
@@ -283,7 +285,9 @@ impl super::super::codec::Json for ChargeItem {
         if !self.definition_canonical.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.definition_canonical)?;
-            object.insert(std::string::String::from("definitionCanonical"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("definitionCanonical"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_definitionCanonical"), elements);
             }

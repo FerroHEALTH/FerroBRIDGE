@@ -954,7 +954,9 @@ impl super::super::codec::Json for CompartmentDefinitionResource {
         }
         if !self.param.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.param)?;
-            object.insert(std::string::String::from("param"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("param"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_param"), elements);
             }

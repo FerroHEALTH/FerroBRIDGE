@@ -397,7 +397,9 @@ impl super::super::codec::Json for ExampleScenario {
         }
         if !self.workflow.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.workflow)?;
-            object.insert(std::string::String::from("workflow"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("workflow"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_workflow"), elements);
             }

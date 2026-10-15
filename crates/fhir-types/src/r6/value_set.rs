@@ -1601,7 +1601,9 @@ impl super::super::codec::Json for ValueSetCompose {
         }
         if !self.property.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.property)?;
-            object.insert(std::string::String::from("property"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("property"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_property"), elements);
             }
@@ -1967,7 +1969,9 @@ impl super::super::codec::Json for ValueSetComposeInclude {
         }
         if !self.value_set.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.value_set)?;
-            object.insert(std::string::String::from("valueSet"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("valueSet"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_valueSet"), elements);
             }

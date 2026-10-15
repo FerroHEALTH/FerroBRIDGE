@@ -241,7 +241,9 @@ impl super::super::codec::Json for MedicinalProduct {
         }
         if !self.special_measures.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.special_measures)?;
-            object.insert(std::string::String::from("specialMeasures"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("specialMeasures"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_specialMeasures"), elements);
             }

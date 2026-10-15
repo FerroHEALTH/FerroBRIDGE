@@ -2524,7 +2524,9 @@ impl super::super::codec::Json for ConsentVerification {
         if !self.verification_date.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.verification_date)?;
-            object.insert(std::string::String::from("verificationDate"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("verificationDate"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_verificationDate"), elements);
             }

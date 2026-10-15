@@ -1963,7 +1963,9 @@ impl super::super::codec::Json for TerminologyCapabilitiesCodeSystemVersion {
         }
         if !self.language.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.language)?;
-            object.insert(std::string::String::from("language"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("language"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_language"), elements);
             }
@@ -1982,7 +1984,9 @@ impl super::super::codec::Json for TerminologyCapabilitiesCodeSystemVersion {
         }
         if !self.property.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.property)?;
-            object.insert(std::string::String::from("property"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("property"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_property"), elements);
             }
@@ -2302,7 +2306,9 @@ impl super::super::codec::Json for TerminologyCapabilitiesCodeSystemVersionFilte
         }
         if !self.op.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.op)?;
-            object.insert(std::string::String::from("op"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("op"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_op"), elements);
             }

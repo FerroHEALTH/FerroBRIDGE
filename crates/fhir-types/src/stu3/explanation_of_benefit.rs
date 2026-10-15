@@ -2190,7 +2190,9 @@ impl super::super::codec::Json for ExplanationOfBenefitAddItem {
         }
         if !self.sequence_link_id.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.sequence_link_id)?;
-            object.insert(std::string::String::from("sequenceLinkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("sequenceLinkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_sequenceLinkId"), elements);
             }
@@ -2233,7 +2235,9 @@ impl super::super::codec::Json for ExplanationOfBenefitAddItem {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -2707,7 +2711,9 @@ impl super::super::codec::Json for ExplanationOfBenefitAddItemDetail {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -5401,7 +5407,9 @@ impl super::super::codec::Json for ExplanationOfBenefitInsurance {
         }
         if !self.pre_auth_ref.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.pre_auth_ref)?;
-            object.insert(std::string::String::from("preAuthRef"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("preAuthRef"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_preAuthRef"), elements);
             }
@@ -5738,7 +5746,9 @@ impl super::super::codec::Json for ExplanationOfBenefitItem {
         if !self.care_team_link_id.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.care_team_link_id)?;
-            object.insert(std::string::String::from("careTeamLinkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("careTeamLinkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_careTeamLinkId"), elements);
             }
@@ -5746,7 +5756,9 @@ impl super::super::codec::Json for ExplanationOfBenefitItem {
         if !self.diagnosis_link_id.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.diagnosis_link_id)?;
-            object.insert(std::string::String::from("diagnosisLinkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("diagnosisLinkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_diagnosisLinkId"), elements);
             }
@@ -5754,7 +5766,9 @@ impl super::super::codec::Json for ExplanationOfBenefitItem {
         if !self.procedure_link_id.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.procedure_link_id)?;
-            object.insert(std::string::String::from("procedureLinkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("procedureLinkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_procedureLinkId"), elements);
             }
@@ -5762,7 +5776,9 @@ impl super::super::codec::Json for ExplanationOfBenefitItem {
         if !self.information_link_id.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.information_link_id)?;
-            object.insert(std::string::String::from("informationLinkId"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("informationLinkId"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_informationLinkId"), elements);
             }
@@ -5897,7 +5913,9 @@ impl super::super::codec::Json for ExplanationOfBenefitItem {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -7145,7 +7163,9 @@ impl super::super::codec::Json for ExplanationOfBenefitItemDetail {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }
@@ -7822,7 +7842,9 @@ impl super::super::codec::Json for ExplanationOfBenefitItemDetailSubDetail {
         }
         if !self.note_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.note_number)?;
-            object.insert(std::string::String::from("noteNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("noteNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_noteNumber"), elements);
             }

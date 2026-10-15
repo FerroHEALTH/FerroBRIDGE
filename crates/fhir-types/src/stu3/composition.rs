@@ -940,7 +940,9 @@ impl super::super::codec::Json for CompositionAttester {
         }
         if !self.mode.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.mode)?;
-            object.insert(std::string::String::from("mode"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("mode"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_mode"), elements);
             }

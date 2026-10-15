@@ -447,7 +447,9 @@ impl super::super::codec::Json for ActorDefinition {
         }
         if !self.reference.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.reference)?;
-            object.insert(std::string::String::from("reference"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("reference"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_reference"), elements);
             }
@@ -462,7 +464,9 @@ impl super::super::codec::Json for ActorDefinition {
         }
         if !self.derived_from.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.derived_from)?;
-            object.insert(std::string::String::from("derivedFrom"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("derivedFrom"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_derivedFrom"), elements);
             }

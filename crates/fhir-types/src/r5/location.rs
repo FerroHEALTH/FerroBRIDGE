@@ -266,7 +266,9 @@ impl super::super::codec::Json for Location {
         }
         if !self.alias.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.alias)?;
-            object.insert(std::string::String::from("alias"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("alias"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_alias"), elements);
             }

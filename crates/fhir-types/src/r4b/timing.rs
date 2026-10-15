@@ -97,7 +97,9 @@ impl super::super::codec::Json for Timing {
         }
         if !self.event.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.event)?;
-            object.insert(std::string::String::from("event"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("event"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_event"), elements);
             }
@@ -497,21 +499,27 @@ impl super::super::codec::Json for TimingRepeat {
         }
         if !self.day_of_week.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.day_of_week)?;
-            object.insert(std::string::String::from("dayOfWeek"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("dayOfWeek"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_dayOfWeek"), elements);
             }
         }
         if !self.time_of_day.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.time_of_day)?;
-            object.insert(std::string::String::from("timeOfDay"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("timeOfDay"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_timeOfDay"), elements);
             }
         }
         if !self.when.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.when)?;
-            object.insert(std::string::String::from("when"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("when"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_when"), elements);
             }

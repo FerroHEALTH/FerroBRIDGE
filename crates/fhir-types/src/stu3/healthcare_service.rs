@@ -397,7 +397,9 @@ impl super::super::codec::Json for HealthcareService {
         }
         if !self.program_name.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.program_name)?;
-            object.insert(std::string::String::from("programName"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("programName"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_programName"), elements);
             }
@@ -1336,7 +1338,9 @@ impl super::super::codec::Json for HealthcareServiceAvailableTime {
         }
         if !self.days_of_week.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.days_of_week)?;
-            object.insert(std::string::String::from("daysOfWeek"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("daysOfWeek"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_daysOfWeek"), elements);
             }

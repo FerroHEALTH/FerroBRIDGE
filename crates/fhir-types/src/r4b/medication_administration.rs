@@ -266,7 +266,9 @@ impl super::super::codec::Json for MedicationAdministration {
         }
         if !self.instantiates.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.instantiates)?;
-            object.insert(std::string::String::from("instantiates"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("instantiates"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_instantiates"), elements);
             }
