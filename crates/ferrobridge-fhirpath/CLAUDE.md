@@ -19,9 +19,10 @@ without passing through a float. Never introduce a second JSON model.
 What an element is, which types a choice admits and where a content reference
 lands come from `fhir_types::schema::Schemas`; `model::r4::R4` is the R4
 table, and another version plugs in by implementing `Model` over its own.
-The table carries no base type, so `Model::base` answers `None` and `is`,
-`as` and `ofType` see no supertype (the `TODO(#436)` in `model`); a gap in
-the table is a generator change, never a constant here. A FHIR primitive maps
+`Model::base` reads each type's base from the table (`Schemas::base_of`), so
+`is`, `as` and `ofType` see `Age` as a `Quantity` and `Patient` as a
+`DomainResource` and a `Resource`, the abstract types included; a gap in the
+table is a generator change, never a constant here. A FHIR primitive maps
 onto the system types by the table of R4 §2.9.1.2: `date` is a
 `System.DateTime`, and every primitive is its own type for `is`.
 

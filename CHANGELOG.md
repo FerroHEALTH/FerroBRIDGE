@@ -25,6 +25,18 @@ crates on crates.io.
 
 ### Added
 
+- `fhir-types` 0.1.111 names each type's base type in the element table
+  (`TypeSchema::base`, from `StructureDefinition.baseDefinition`, and for a
+  backbone element the `BackboneElement` or `Element` its element names), in
+  every version, and carries the abstract types a base chain passes through
+  (`Resource`, `DomainResource`, `BackboneElement`, and from R5 `Base`,
+  `DataType` and `BackboneType`) as table-only entries.
+  `Schemas::base_of` and `Schemas::specializes` walk the chain.
+  `ferrobridge-fhirpath` reads it, so `is`, `as`, `ofType` and a leading type
+  name see `Age` as a `Quantity` and `Patient` as a `DomainResource` and a
+  `Resource`; the R4 profile validator takes a resource under an element typed
+  `DomainResource` only when its type specializes `DomainResource`, so a
+  `Binary` or a `Bundle` there is refused (#458).
 - `scripts/vendor/profile-packages.sh` fetches the package set of the R4
   profile validator at build time into the ignored
   `docs/specs/fhir-packages/<package>#<version>/package/` (#435), about
