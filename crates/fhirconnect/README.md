@@ -113,7 +113,13 @@ openEHR.
 - **A loss is a typed outcome, never a log line.** The declared set is a
   `unidirectional` skip, a defaulted composition field, the occurrences a
   `0..n` into a `0..1` dropped, a one-way data-type row, and a reference left
-  for the facade to resolve. Anything else refuses the unit.
+  for the facade to resolve. Anything else refuses the unit. Each `Warning`
+  pairs its `Loss` with a `Location`: the FHIRPath of the FHIR element, in the
+  simple subset `OperationOutcome.issue.expression` admits, and the archetype
+  path of the openEHR node, never a value. `run::to_fhir_with_warnings` and
+  `run::to_openehr_with_warnings` answer the typed losses beside the
+  operation's answer, and each `OperationOutcome` issue carries the FHIRPath
+  as its `expression` and the openEHR path as a `details.coding`.
 - **An occurrence is a structured index.** One entry per repeating element on
   the way to the target, so a `0..1` output is overwritten, a `0..n` output is
   appended to, and a child mapping writes under the occurrence its parent is

@@ -10,6 +10,7 @@ use std::sync::Arc;
 use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::outcome::SkipReason;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::Seams;
@@ -98,10 +99,11 @@ fn a_unidirectional_mapping_is_skipped_and_recorded() -> Result<(), Box<dyn Erro
         &CallContext::new(),
     )?;
     assert!(
-        inbound.warnings().contains(&Warning::Skipped {
-            mapping: String::from("recordedDateOutboundOnly"),
-            reason: SkipReason::Unidirectional,
-        }),
+        inbound.warnings().iter().any(|warning| *warning.loss()
+            == Loss::Skipped {
+                mapping: String::from("recordedDateOutboundOnly"),
+                reason: SkipReason::Unidirectional,
+            }),
         "the skipped set names the mapping: {:?}",
         inbound.warnings()
     );
@@ -115,8 +117,8 @@ fn a_unidirectional_mapping_is_skipped_and_recorded() -> Result<(), Box<dyn Erro
     )?;
     assert!(
         !outbound.warnings().iter().any(|warning| matches!(
-            *warning,
-            Warning::Skipped {
+            *warning.loss(),
+            Loss::Skipped {
                 reason: SkipReason::Unidirectional,
                 ..
             }
@@ -313,8 +315,8 @@ fn a_slotted_files_preprocessor_gate_skips_the_slot_when_it_closes() -> Result<(
     let written = "2026-01-02T03:04:05Z";
     let closed_gate = |warning: &Warning| {
         matches!(
-            *warning,
-            Warning::Skipped {
+            *warning.loss(),
+            Loss::Skipped {
                 reason: SkipReason::PreprocessorGate { .. },
                 ..
             }
@@ -354,12 +356,13 @@ fn a_slotted_files_preprocessor_gate_skips_the_slot_when_it_closes() -> Result<(
         "a coded bodySite closes the gate, so the slotted onset is not written"
     );
     assert!(
-        closed.warnings().contains(&Warning::Skipped {
-            mapping: String::from("slot"),
-            reason: SkipReason::PreprocessorGate {
-                model: String::from("ferrobridge_diagnose_minimal"),
-            },
-        }),
+        closed.warnings().iter().any(|warning| *warning.loss()
+            == Loss::Skipped {
+                mapping: String::from("slot"),
+                reason: SkipReason::PreprocessorGate {
+                    model: String::from("ferrobridge_diagnose_minimal"),
+                },
+            }),
         "the closed gate is a recorded skip: {:?}",
         closed.warnings()
     );

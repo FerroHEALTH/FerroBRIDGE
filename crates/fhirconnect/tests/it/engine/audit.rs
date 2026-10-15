@@ -9,7 +9,7 @@ use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::origin::Origin;
 use fhirconnect::engine::origin::SourceItem;
-use fhirconnect::engine::outcome::Warning;
+use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::Defaults;
 use fhirconnect::engine::traverse::to_openehr;
@@ -100,7 +100,7 @@ fn a_run_with_an_origin_records_it_in_the_feeder_audit() -> Result<(), Box<dyn E
 #[test]
 fn the_defaulted_warnings_and_the_feeder_audit_agree() -> Result<(), Box<dyn Error>> {
     // defaults-for-fields.adoc names the fields the engine fills; each one is
-    // a declared Warning::Defaulted and one feeder_system_item_ids entry, in
+    // a declared Loss::Defaulted and one feeder_system_item_ids entry, in
     // the same order.
     let program = compiled("ferrobridge_diagnose_minimal")?;
     let index = template()?;
@@ -116,8 +116,8 @@ fn the_defaulted_warnings_and_the_feeder_audit_agree() -> Result<(), Box<dyn Err
     let warned: Vec<&str> = inbound
         .warnings()
         .iter()
-        .filter_map(|warning| match *warning {
-            Warning::Defaulted { ref field } => Some(field.as_str()),
+        .filter_map(|warning| match *warning.loss() {
+            Loss::Defaulted { ref field } => Some(field.as_str()),
             _ => None,
         })
         .collect();

@@ -11,6 +11,7 @@ use openehr_rm::v1_2::paths::EhrUri;
 use crate::engine::family;
 use crate::engine::fhir::FhirKind;
 use crate::engine::origin::UNKNOWN_SOURCE;
+use crate::engine::outcome::Loss;
 use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
 use crate::model::ast::keyword::Direction;
@@ -64,10 +65,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         openehr: parent.openehr.clone(),
                     };
                     let Some(literal) = self.reference_at(mapping, input)? else {
-                        self.warnings.push(Warning::Skipped {
-                            mapping: String::from(mapping.name()),
-                            reason: SkipReason::EmptyReference,
-                        });
+                        let location = self.locate(mapping, input);
+                        self.warnings.push(Warning::new(
+                            Loss::Skipped {
+                                mapping: String::from(mapping.name()),
+                                reason: SkipReason::EmptyReference,
+                            },
+                            location,
+                        ));
                         bindings.push(binding);
                         continue;
                     };
@@ -163,10 +168,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         .and_then(|value| value.get("display"))
                         .and_then(Value::as_str);
                     let Some(literal) = literal else {
-                        self.warnings.push(Warning::Skipped {
-                            mapping: String::from(mapping.name()),
-                            reason: SkipReason::EmptyReference,
-                        });
+                        let location = self.locate(mapping, input);
+                        self.warnings.push(Warning::new(
+                            Loss::Skipped {
+                                mapping: String::from(mapping.name()),
+                                reason: SkipReason::EmptyReference,
+                            },
+                            location,
+                        ));
                         bindings.push(binding);
                         continue;
                     };

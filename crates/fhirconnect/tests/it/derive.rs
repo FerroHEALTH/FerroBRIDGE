@@ -19,6 +19,7 @@ use std::sync::Arc;
 use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::Defaults;
@@ -156,8 +157,8 @@ fn an_untyped_date_time_element_converts_through_the_date_time_pair() -> Result<
     )?;
     assert!(
         !warnings.iter().any(|warning| matches!(
-            *warning,
-            Warning::Defaulted { ref field } if field == "/context/start_time"
+            *warning.loss(),
+            Loss::Defaulted { ref field } if field == "/context/start_time"
         )),
         "the mapping wrote the start time: {warnings:?}"
     );
@@ -309,8 +310,8 @@ fn the_event_context_setting_is_a_declared_default() -> Result<(), Box<dyn Error
     let (composition, warnings) = inbound(&program, &index, &resource, &defaults())?;
     assert!(
         warnings.iter().any(|warning| matches!(
-            *warning,
-            Warning::Defaulted { ref field } if field == "/context/setting"
+            *warning.loss(),
+            Loss::Defaulted { ref field } if field == "/context/setting"
         )),
         "{warnings:?}"
     );

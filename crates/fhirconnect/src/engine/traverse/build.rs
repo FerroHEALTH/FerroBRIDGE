@@ -13,6 +13,8 @@ use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::support::terminology::openehr_terminology_group_identifiers::OpenehrTerminologyGroupIdentifiersData;
 
+use crate::engine::outcome::Location;
+use crate::engine::outcome::Loss;
 use crate::engine::outcome::Warning;
 use crate::engine::rm;
 use crate::engine::rm::RmError;
@@ -30,8 +32,9 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
     /// Fills the composition fields no mapping wrote.
     ///
     /// Returns the openEHR path of every field it filled, in the order it
-    /// filled them, which is the order of the [`Warning::Defaulted`] entries
-    /// it recorded. Which fields take a default is FHIRconnect's
+    /// filled them, which is the order of the
+    /// [`Loss::Defaulted`](crate::engine::outcome::Loss::Defaulted) warnings it
+    /// recorded. Which fields take a default is FHIRconnect's
     /// (`engine/defaults-for-fields.adoc`); every default travels as the `ctx/`
     /// key the FLAT builder resolves (Simplified Formats, master06 §Composer,
     /// §time, §setting, §Language and Territory). `ctx/setting` carries the
@@ -123,9 +126,12 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
 
     /// Records that the engine filled the field at `path`.
     fn defaulted(&mut self, filled: &mut Vec<String>, path: &str) {
-        self.warnings.push(Warning::Defaulted {
-            field: String::from(path),
-        });
+        self.warnings.push(Warning::new(
+            Loss::Defaulted {
+                field: String::from(path),
+            },
+            Location::default().with_openehr(path),
+        ));
         filled.push(String::from(path));
     }
 

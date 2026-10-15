@@ -577,3 +577,107 @@ fn a_template_pin_narrows_two_contexts_over_one_profile() -> Result<(), Box<dyn 
     );
     Ok(())
 }
+
+/// Asserts that `outcome` renders `warnings` one issue each, in order, with
+/// each FHIR location as the issue's expression.
+fn assert_outcome_of(
+    outcome: Option<&fhir_types::r4::operation_outcome::OperationOutcome>,
+    warnings: &[fhirconnect::engine::outcome::Warning],
+) {
+    let rendered: Vec<(Option<String>, Vec<String>)> = outcome
+        .map(|outcome| outcome.issue.as_slice())
+        .unwrap_or_default()
+        .iter()
+        .map(|issue| {
+            (
+                issue
+                    .details
+                    .as_ref()
+                    .and_then(|details| details.text.as_ref())
+                    .and_then(|text| text.value.clone()),
+                issue
+                    .expression
+                    .iter()
+                    .filter_map(|path| path.value.clone())
+                    .collect(),
+            )
+        })
+        .collect();
+    let expected: Vec<(Option<String>, Vec<String>)> = warnings
+        .iter()
+        .map(|warning| {
+            (
+                Some(warning.to_string()),
+                warning
+                    .location()
+                    .fhir()
+                    .map(String::from)
+                    .into_iter()
+                    .collect(),
+            )
+        })
+        .collect();
+    assert_eq!(rendered, expected, "one issue per typed loss, in order");
+}
+
+#[test]
+fn both_operations_answer_their_typed_losses_beside_the_outcome() -> Result<(), Box<dyn Error>> {
+    // rest-api.adoc (draft) §Reporting partial results: the gaps "MUST be made
+    // explicit through the OperationOutcome"; the typed losses are the same
+    // set, in the same order, each located.
+    let set = program_set(&["ferrobridge_split"])?;
+    let mut resource = condition("http://example.org/fhir/StructureDefinition/ferrobridge-split")?;
+    if let Some(object) = resource.as_object_mut() {
+        object.insert(
+            String::from("bodySite"),
+            serde_json::json!([{"text": "Left knee"}, {"text": "Right knee"}]),
+        );
+    }
+    let request = ToOpenehrRequest::new(bundle(vec![resource])?);
+    let inbound =
+        run::to_openehr_with_warnings(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let subject = inbound
+        .warnings()
+        .iter()
+        .find(|warning| warning.to_string().contains("subject"))
+        .ok_or("the unidirectional subject mapping is a declared skip")?;
+    assert_eq!(subject.location().fhir(), Some("Condition.subject"));
+    assert_eq!(subject.location().openehr(), None);
+    assert_outcome_of(inbound.response().outcome(), inbound.warnings());
+    assert_eq!(
+        inbound.response(),
+        &run::to_openehr(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?,
+        "the typed losses change nothing of the answer"
+    );
+
+    let mut built: serde_json::Value = serde_json::from_str(inbound.response().composition())?;
+    if let Some(object) = built.as_object_mut() {
+        object.insert(
+            String::from("uid"),
+            serde_json::json!({ "_type": "OBJECT_VERSION_ID", "value": COMPOSITION_UID }),
+        );
+    }
+    let request = ToFhirRequest::new(CompositionPayload::parse(&built.to_string())?);
+    let outbound =
+        run::to_fhir_with_warnings(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let outcome =
+        outbound
+            .response()
+            .bundle()
+            .entry
+            .iter()
+            .find_map(|entry| match entry.resource {
+                Some(Resource::OperationOutcome(ref outcome)) => Some(outcome.as_ref()),
+                _ => None,
+            });
+    assert_outcome_of(outcome, outbound.warnings());
+    let reported = outcome.is_some();
+    let (answer, warnings) = outbound.into_parts();
+    assert_eq!(
+        answer,
+        run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?,
+        "the typed losses change nothing of the answer"
+    );
+    assert_eq!(!warnings.is_empty(), reported);
+    Ok(())
+}

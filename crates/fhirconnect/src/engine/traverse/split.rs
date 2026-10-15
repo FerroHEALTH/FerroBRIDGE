@@ -8,6 +8,7 @@ use openehr_mapping_core::composition::PositionError;
 use openehr_mapping_core::composition::RmPosition;
 use openehr_mapping_core::index::paths::FlatId;
 
+use crate::engine::outcome::Loss;
 use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
 use crate::model::ast::keyword::Direction;
@@ -381,22 +382,25 @@ impl<T: Table + ?Sized> Run<'_, T> {
     }
 }
 
-/// Drops each group-independent warning declared from `start` on that an
-/// earlier warning from `start` on already declares.
+/// Drops each group-independent warning declared from `start` on whose loss
+/// an earlier warning from `start` on already declares.
+///
+/// The loss decides, so the declaration kept is the first group's, at the
+/// location the first group gave it.
 fn settle(warnings: &mut Vec<Warning>, start: usize) {
     let start = start.min(warnings.len());
     let declared = warnings.split_off(start);
     for warning in declared {
         let alike = matches!(
-            warning,
-            Warning::Skipped {
+            *warning.loss(),
+            Loss::Skipped {
                 reason: SkipReason::Unidirectional,
                 ..
             }
         );
         let seen = warnings
             .get(start..)
-            .is_some_and(|kept| kept.contains(&warning));
+            .is_some_and(|kept| kept.iter().any(|held| held.loss() == warning.loss()));
         if alike && seen {
             continue;
         }
@@ -407,22 +411,48 @@ fn settle(warnings: &mut Vec<Warning>, start: usize) {
 #[cfg(test)]
 mod tests {
     use super::settle;
+    use crate::engine::outcome::Location;
+    use crate::engine::outcome::Loss;
     use crate::engine::outcome::SkipReason;
     use crate::engine::outcome::Warning;
 
+    /// Returns a unidirectional skip of `subject` located at `fhir`.
+    fn skip_at(fhir: &str) -> Warning {
+        Warning::new(
+            Loss::Skipped {
+                mapping: String::from("subject"),
+                reason: SkipReason::Unidirectional,
+            },
+            Location::default().with_fhir(fhir),
+        )
+    }
+
+    #[test]
+    fn a_skip_declared_once_keeps_the_first_groups_location() {
+        let mut warnings = vec![
+            skip_at("Encounter.location[0]"),
+            skip_at("Encounter.location[1]"),
+        ];
+        settle(&mut warnings, 0);
+        assert_eq!(warnings, [skip_at("Encounter.location[0]")]);
+    }
+
     #[test]
     fn a_split_declares_a_group_independent_skip_once_and_keeps_the_rest() {
-        let skip = Warning::Skipped {
-            mapping: String::from("subject"),
-            reason: SkipReason::Unidirectional,
-        };
-        let dropped = Warning::LastOfMany {
-            path: String::from("/content"),
-            dropped: 1,
-        };
-        let before = Warning::Defaulted {
-            field: String::from("/composer"),
-        };
+        let skip = skip_at("Encounter.subject");
+        let dropped = Warning::new(
+            Loss::LastOfMany {
+                path: String::from("/content"),
+                dropped: 1,
+            },
+            Location::default().with_openehr("/content"),
+        );
+        let before = Warning::new(
+            Loss::Defaulted {
+                field: String::from("/composer"),
+            },
+            Location::default().with_openehr("/composer"),
+        );
         let mut warnings = vec![
             before.clone(),
             skip.clone(),

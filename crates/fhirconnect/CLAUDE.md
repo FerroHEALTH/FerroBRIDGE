@@ -95,6 +95,13 @@ A skipped element is a typed outcome carried to the caller, never a log line,
 and the declared set of losses is closed: the round-trip tests assert it
 exactly. An element the program cannot map refuses the unit.
 
+Every warning carries the `Location` the engine knew when it raised it: the
+FHIR target rendered by `tree::locate` at the binding's FHIR occurrence (the
+input going in, the output coming out) and the openEHR node's `aqlPath` with
+its tail. No value of either document enters a location, so a consumer can
+log it; a new warning site passes one, and the tests in
+`tests/it/locations.rs` pin each kind both ways.
+
 The concept-type methods that create or resolve a document are the one place
 each direction has a branch of its own, because the specification names a
 different act per side: `hierarchy.split` runs `split.fhir` going out of
@@ -110,7 +117,7 @@ The engine makes no call of its own. `engine::seam::Seams` carries the
 from, and the `IdentitySink` that names every resource a run creates;
 `Seams::default()` registers nothing, resolves nothing and derives ids by a
 digest over the `IdentityRequest`, so the same composition yields the same
-ids. A reference that resolves to nothing is a `Warning::Skipped`, never a
+ids. A reference that resolves to nothing is a `Loss::Skipped` warning, never a
 silent nothing; a reference chain that reaches itself refuses. Created
 resources travel as `Outcome::created`: the operations lane answers them as
 Bundle entries and the facade carries them as contained resources with `#id`
@@ -134,7 +141,7 @@ builder takes no `|raw` on a `_`-prefixed family (the `TODO(#241)` in
 run whose `Defaults` carry
 an `engine::origin::Origin` records the originating system, the source
 resource and every defaulted field in the composition's
-`FEEDER_AUDIT`, in the same order as the `Warning::Defaulted` entries. A
+`FEEDER_AUDIT`, in the same order as the `Loss::Defaulted` warnings. A
 `link` target must be an `ehr:` URI, because `LINK.target` is a `DV_EHR_URI`;
 the linked composition of a `link` whose FHIR side is no reference is
 refused, since one run produces one composition.

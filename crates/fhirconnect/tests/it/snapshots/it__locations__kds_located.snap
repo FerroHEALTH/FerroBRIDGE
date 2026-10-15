@@ -1,0 +1,20 @@
+---
+source: crates/fhirconnect/tests/it/locations.rs
+expression: "serde_json::json!({\n    \"first_leg\": rows(inbound.warnings()), \"second_leg\":\n    rows(outbound.warnings()),\n})"
+---
+{
+  "first_leg": [
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way | Condition.code | /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0002,'Kodierte Diagnose']/value",
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way | Condition.onset.start.extension[0] | /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.lebensphase.v0]/items[at0001]/value",
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way | Condition.bodySite[0] | /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0001]/value",
+    "the mapping metaURL did not run: its unidirectional marker names the other direction | Condition.meta | -",
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way | Condition.clinicalStatus | /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0003,'Klinischer Status']/value",
+    "the engine filled /composer | - | /composer",
+    "the engine filled /context/setting | - | /context/setting",
+    "the engine filled /language | - | /language",
+    "the engine filled /territory | - | /territory"
+  ],
+  "second_leg": [
+    "the mapping problemDiagnose.coding.codeIcd10Diagnosesicherheit.extensionValueText did not run: its unidirectional marker names the other direction | Condition.code.coding[0].extension[0].value | /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0073,'Diagnosesicherheit']/value"
+  ]
+}

@@ -27,6 +27,7 @@ use openehr_mapping_core::index::WebTemplateIndex;
 use crate::engine::context::CallContext;
 use crate::engine::origin::Origin;
 use crate::engine::origin::SourceItem;
+use crate::engine::outcome::Warning;
 use crate::engine::seam::BundleReferences;
 use crate::engine::seam::NoReferences;
 use crate::engine::seam::Seams;
@@ -112,11 +113,52 @@ impl Settings {
     }
 }
 
+/// What one run answered, with the losses it declared.
+///
+/// The losses are the typed [`Warning`]s the engine raised, in the order it
+/// raised them, each with the [`crate::engine::outcome::Location`] it happened
+/// at, so a consumer that records every transformation reads them here and
+/// never parses the `OperationOutcome` text. They are the same losses the
+/// answer's `OperationOutcome` renders, one issue each, in the same order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Transformed<R> {
+    response: R,
+    warnings: Vec<Warning>,
+}
+
+impl<R> Transformed<R> {
+    /// Returns the operation's answer.
+    #[must_use]
+    pub const fn response(&self) -> &R {
+        &self.response
+    }
+
+    /// Returns the losses the run declared, in the order the engine raised
+    /// them.
+    #[must_use]
+    pub fn warnings(&self) -> &[Warning] {
+        &self.warnings
+    }
+
+    /// Returns the operation's answer, consuming the result.
+    #[must_use]
+    pub fn into_response(self) -> R {
+        self.response
+    }
+
+    /// Returns the answer and the losses, consuming the result.
+    #[must_use]
+    pub fn into_parts(self) -> (R, Vec<Warning>) {
+        (self.response, self.warnings)
+    }
+}
+
 /// Runs `$tofhir`: one openEHR composition to one FHIR Bundle.
 ///
 /// The Bundle carries the mapped resources, exactly one `Provenance` covering
 /// every one of them, and an `OperationOutcome` entry when the run declared a
-/// loss.
+/// loss. [`to_fhir_with_warnings`] answers the same Bundle with the typed
+/// losses beside it.
 ///
 /// # Errors
 ///
@@ -131,6 +173,22 @@ pub fn to_fhir<T: Table + ?Sized>(
     settings: &Settings,
     request: &ToFhirRequest,
 ) -> Result<ToFhirResponse, OperationError> {
+    to_fhir_with_warnings(programs, table, functions, settings, request)
+        .map(Transformed::into_response)
+}
+
+/// Runs `$tofhir` and answers the Bundle with the typed losses of the run.
+///
+/// # Errors
+///
+/// Returns [`OperationError`] exactly where [`to_fhir`] does.
+pub fn to_fhir_with_warnings<T: Table + ?Sized>(
+    programs: &ProgramSet,
+    table: &T,
+    functions: &dyn MappingFunctions,
+    settings: &Settings,
+    request: &ToFhirRequest,
+) -> Result<Transformed<ToFhirResponse>, OperationError> {
     let template = template_of(request)?;
     let index = programs
         .template(&template)
@@ -188,14 +246,20 @@ pub fn to_fhir<T: Table + ?Sized>(
     if let Some(reported) = issues::of_warnings(outcome.warnings()) {
         entry.push(entry_of(Resource::OperationOutcome(Box::new(reported))));
     }
-    Ok(ToFhirResponse::new(Bundle {
-        r#type: Code::from(BUNDLE_TYPE),
-        entry,
-        ..Bundle::default()
-    }))
+    Ok(Transformed {
+        response: ToFhirResponse::new(Bundle {
+            r#type: Code::from(BUNDLE_TYPE),
+            entry,
+            ..Bundle::default()
+        }),
+        warnings: outcome.warnings().to_vec(),
+    })
 }
 
 /// Runs `$toopenehr`: one FHIR Bundle to one openEHR composition.
+///
+/// [`to_openehr_with_warnings`] answers the same composition with the typed
+/// losses beside it.
 ///
 /// # Errors
 ///
@@ -209,6 +273,23 @@ pub fn to_openehr<T: Table + ?Sized>(
     settings: &Settings,
     request: &ToOpenehrRequest,
 ) -> Result<ToOpenehrResponse, OperationError> {
+    to_openehr_with_warnings(programs, table, functions, settings, request)
+        .map(Transformed::into_response)
+}
+
+/// Runs `$toopenehr` and answers the composition with the typed losses of the
+/// run.
+///
+/// # Errors
+///
+/// Returns [`OperationError`] exactly where [`to_openehr`] does.
+pub fn to_openehr_with_warnings<T: Table + ?Sized>(
+    programs: &ProgramSet,
+    table: &T,
+    functions: &dyn MappingFunctions,
+    settings: &Settings,
+    request: &ToOpenehrRequest,
+) -> Result<Transformed<ToOpenehrResponse>, OperationError> {
     let entries = entry_objects(request.bundle())?;
     refuse_several_subjects(&entries)?;
     let program = select(programs, &entries, request.template_id())?;
@@ -242,9 +323,13 @@ pub fn to_openehr<T: Table + ?Sized>(
     })?;
     let serialized = serialize(index, outcome.value(), request.format())?;
     let answer = ToOpenehrResponse::new(serialized);
-    Ok(match issues::of_warnings(outcome.warnings()) {
+    let response = match issues::of_warnings(outcome.warnings()) {
         Some(reported) => answer.with_outcome(reported),
         None => answer,
+    };
+    Ok(Transformed {
+        response,
+        warnings: outcome.warnings().to_vec(),
     })
 }
 

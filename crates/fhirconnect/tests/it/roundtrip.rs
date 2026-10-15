@@ -106,7 +106,7 @@ fn kds_set() -> Result<MappingSet, Box<dyn Error>> {
 }
 
 /// Compiles the project context against the published template.
-fn kds_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
+pub(crate) fn kds_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
     let index = kds_template()?;
     let set = kds_set()?;
     let program = compile(
@@ -419,7 +419,7 @@ fn a_value_flipped_between_the_getput_legs_breaks_the_law() -> Result<(), Box<dy
 }
 
 /// Returns the synthetic Condition shaped like the MII Diagnose profile.
-fn kds_condition() -> Result<serde_json::Value, Box<dyn Error>> {
+pub(crate) fn kds_condition() -> Result<serde_json::Value, Box<dyn Error>> {
     Ok(serde_json::from_str(
         ferrobridge_testkit::fixtures::KDS_DIAGNOSE_CONDITION,
     )?)
