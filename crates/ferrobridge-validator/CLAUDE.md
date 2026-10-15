@@ -75,7 +75,8 @@ fixed value lacks; an example binding is not listed; a bare canonical resolves
 to the latest version by Semantic Versioning precedence, within the
 dependency closure of the package whose definition names it and in the whole
 set when that closure does not carry it; one definition carried
-byte for byte by two packages is no conflict; a leading byte-order mark is
+byte for byte by two packages is no conflict; one canonical carried by two
+versions of one package resolves to the higher package version; a leading byte-order mark is
 stripped; a discriminator path may use `ofType()` or `as()` (#443); an item
 matching two slices is an error and counts in the first; an item in no slice
 may sit between ordered open slices; a `@default` slice under rules other

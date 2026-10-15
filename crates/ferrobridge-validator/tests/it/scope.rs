@@ -111,3 +111,67 @@ fn a_canonical_outside_the_closure_resolves_in_the_whole_set() -> TestResult {
     );
     Ok(())
 }
+
+/// The base package `example.base` at `version`, carrying `flag` at the
+/// resource version 1.0.0 with a value of `value_type`.
+fn base_at_one_version(version: &str, value_type: &str) -> TestResult<Synthetic> {
+    let mut flag = extension("flag", value_type, false);
+    flag["version"] = json!("1.0.0");
+    package(
+        "example.base",
+        version,
+        &[("hl7.fhir.r4.core", "4.0.1")],
+        &[flag],
+    )
+}
+
+#[test]
+fn one_canonical_in_two_versions_of_one_package_resolves_to_the_higher_package() -> TestResult {
+    let old = base_at_one_version("2.0.0", "boolean")?;
+    let new = base_at_one_version("2.0.1", "string")?;
+    let left = package(
+        "example.left",
+        "1.0.0",
+        &[("hl7.fhir.r4.core", "4.0.1"), ("example.base", "2.0.0")],
+        &[],
+    )?;
+    let right = package(
+        "example.right",
+        "1.0.0",
+        &[("hl7.fhir.r4.core", "4.0.1"), ("example.base", "2.0.1")],
+        &[],
+    )?;
+    let profiles = package(
+        "example.profiles",
+        "0.1.0",
+        &[
+            ("hl7.fhir.r4.core", "4.0.1"),
+            ("example.left", "1.0.0"),
+            ("example.right", "1.0.0"),
+        ],
+        &[flagged_patient()],
+    )?;
+    let set = PackageSet::load([
+        core(),
+        old.path().to_owned(),
+        new.path().to_owned(),
+        left.path().to_owned(),
+        right.path().to_owned(),
+        profiles.path().to_owned(),
+    ])?;
+    let report = validate(&set, &flagged(), Some(&format!("{BASE}scoped-patient")))?;
+    assert_eq!(
+        locations(&report, MessageId::ChoiceTypeNotAllowed),
+        ["Patient.extension[0].value.ofType(boolean)"],
+        "both base versions are in the closure, and the one of 2.0.1 defines a string flag"
+    );
+    let unscoped = set.structure_definition(&format!("{BASE}flag"))?;
+    let value = unscoped
+        .snapshot
+        .as_ref()
+        .and_then(|snapshot| snapshot.element.last())
+        .and_then(|element| element.r#type.first())
+        .and_then(|kind| kind.code.value.clone());
+    assert_eq!(value.as_deref(), Some("string"));
+    Ok(())
+}

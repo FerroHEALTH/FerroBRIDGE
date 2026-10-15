@@ -178,6 +178,10 @@ crates on crates.io.
 
 ### Fixed
 
+- The R4 profile validator resolves a canonical that two versions of one
+  package carry at one resource version to the higher package version, where
+  it refused it as ambiguous; two different packages carrying one canonical
+  at one version with different content stay ambiguous (#502).
 - The R4 profile validator refuses a resource of a type its element's types
   do not name, where an element typed `Resource` or `DomainResource` still
   takes any resource (#488).
