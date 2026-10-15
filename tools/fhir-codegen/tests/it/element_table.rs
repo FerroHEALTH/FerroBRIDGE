@@ -454,3 +454,115 @@ fn every_version_carries_the_element_entry_a_primitive_s_sibling_resolves_agains
         );
     }
 }
+
+/// The base a table entry should name, read from the package: the
+/// `baseDefinition` of the structure at the entry's root, or for a backbone
+/// element the type code of the element that introduces it.
+fn expected_base(package: &Package, schema: &TypeSchema) -> Option<String> {
+    let root = schema.path.split('.').next().expect("a path has a root");
+    if schema.path == root {
+        let definition = package
+            .structure_definition_named(root)
+            .expect("the package defines the entry's structure");
+        return definition
+            .base_definition
+            .as_deref()
+            .and_then(|url| url.rsplit('/').next())
+            .map(str::to_owned);
+    }
+    let elements = snapshot_elements(package, root);
+    let element = elements
+        .iter()
+        .find(|element| element["path"].as_str() == Some(schema.path))
+        .expect("the backbone's element is in the snapshot");
+    let first = element
+        .get("type")
+        .and_then(|types| types.get(0))
+        .expect("a backbone element has a type");
+    Some(type_code(schema.path, first))
+}
+
+#[test]
+fn every_entry_names_the_base_its_definition_states_and_the_table_carries_it() {
+    for ((module, _, package), (named, schemas)) in packages().into_iter().zip(tables()) {
+        assert_eq!(module, named, "the tables follow the package order");
+        for schema in schemas.types {
+            assert_eq!(
+                schema.base.map(str::to_owned),
+                expected_base(package, schema),
+                "{module}: the base of {}",
+                schema.path
+            );
+            if let Some(base) = schema.base {
+                assert!(
+                    schemas.type_named(base).is_some(),
+                    "{module}: {} names {base}, which the table carries",
+                    schema.path
+                );
+            }
+        }
+    }
+}
+
+/// The abstract types every version's base chains pass through
+/// (<https://hl7.org/fhir/R4/resource.html>, <https://hl7.org/fhir/R4/domainresource.html>,
+/// <https://hl7.org/fhir/R4/backboneelement.html>).
+const ABSTRACT_TYPES: [&str; 4] = ["BackboneElement", "DomainResource", "Element", "Resource"];
+
+#[test]
+fn every_version_carries_the_abstract_types_and_walks_a_type_to_them() {
+    for (module, schemas) in tables() {
+        for name in ABSTRACT_TYPES {
+            assert!(
+                schemas
+                    .type_named(name)
+                    .is_some_and(|schema| schema.path == name),
+                "{module} carries {name}"
+            );
+            assert!(!schemas.is_resource(name), "{module}: {name} is abstract");
+        }
+        assert_eq!(schemas.base_of("Age"), Some("Quantity"), "{module}: Age");
+        assert!(
+            schemas.specializes("Age", "Quantity"),
+            "{module}: Age is a Quantity"
+        );
+        assert!(
+            schemas.specializes("Age", "Element"),
+            "{module}: Age is an Element"
+        );
+        assert!(
+            !schemas.specializes("Quantity", "Age"),
+            "{module}: Quantity is no Age"
+        );
+        assert_eq!(
+            schemas.base_of("Patient"),
+            Some("DomainResource"),
+            "{module}"
+        );
+        assert!(schemas.specializes("Patient", "DomainResource"), "{module}");
+        assert!(schemas.specializes("Patient", "Resource"), "{module}");
+        assert!(!schemas.specializes("Bundle", "DomainResource"), "{module}");
+        assert!(schemas.specializes("Bundle", "Resource"), "{module}");
+        assert!(
+            schemas.specializes("PatientContact", "BackboneElement"),
+            "{module}: a backbone element"
+        );
+        assert_eq!(
+            schemas.type_named("SimpleQuantity"),
+            None,
+            "{module}: a profile"
+        );
+    }
+}
+
+#[test]
+fn the_root_of_the_hierarchy_is_element_and_resource_until_r5_adds_base() {
+    for (module, schemas) in tables() {
+        let root = match module {
+            "stu3" | "r4" | "r4b" => None,
+            _ => Some("Base"),
+        };
+        assert_eq!(schemas.base_of("Element"), root, "{module}: Element");
+        assert_eq!(schemas.base_of("Resource"), root, "{module}: Resource");
+    }
+}

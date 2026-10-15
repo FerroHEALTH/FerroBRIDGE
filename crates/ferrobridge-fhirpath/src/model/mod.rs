@@ -23,15 +23,15 @@ pub trait Model: fmt::Debug + Send + Sync {
     /// The version's primitive types by name, read from the table.
     fn primitives(&self) -> &BTreeMap<&'static str, TypeKind>;
 
-    /// The type `name` specializes, when the model knows it.
+    /// The type `name` specializes, read from the element table.
     ///
-    /// The generated element table carries no base type, so the R4 model
-    /// answers `None` for every type.
-    // TODO(#458): emit each type's baseDefinition into the element table, so
-    // `is`, `as` and `ofType` see `Age` as a `Quantity` and every resource as
-    // a `DomainResource` and a `Resource`.
-    fn base(&self, _name: &str) -> Option<&'static str> {
-        None
+    /// `Age` is a `Quantity`, and every resource is a `DomainResource` or a
+    /// `Resource`; R4 §2.9.1.1 lets a type name name such a supertype.
+    ///
+    /// A primitive has no base here, because R4 §2.9.1.5 considers every
+    /// primitive an independent type.
+    fn base(&self, name: &str) -> Option<&'static str> {
+        self.schemas().base_of(name)
     }
 }
 
@@ -104,14 +104,19 @@ pub fn named_type(model: &dyn Model, name: &str) -> Option<FhirType> {
     if let Some(found) = resource_type(model, name) {
         return Some(found);
     }
-    if let Some(schema) = model
-        .schemas()
+    let schemas = model.schemas();
+    if let Some(schema) = schemas
         .type_named(name)
         .filter(|schema| schema.path == schema.name)
     {
+        let kind = if schemas.specializes(schema.name, "Resource") {
+            TypeKind::Resource(schema)
+        } else {
+            TypeKind::Complex(schema)
+        };
         return Some(FhirType {
             name: schema.name,
-            kind: TypeKind::Complex(schema),
+            kind,
         });
     }
     let (name, kind) = model.primitives().get_key_value(name)?;

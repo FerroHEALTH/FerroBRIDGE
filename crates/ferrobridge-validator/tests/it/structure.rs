@@ -259,6 +259,46 @@ fn a_resource_of_a_type_its_element_does_not_name_is_refused() -> TestResult {
     Ok(())
 }
 
+/// A profile on Bundle whose entries are typed `DomainResource`.
+fn domain_resource_bundle() -> serde_json::Value {
+    profile(
+        "domain-resource-bundle",
+        "Bundle",
+        &json!([
+            {"id": "Bundle", "path": "Bundle", "min": 0, "max": "*"},
+            {"id": "Bundle.entry.resource", "path": "Bundle.entry.resource", "min": 0, "max": "1",
+             "type": [{"code": "DomainResource"}]}
+        ]),
+    )
+}
+
+#[test]
+fn an_element_typed_domain_resource_accepts_a_resource_that_specializes_it() -> TestResult {
+    let (_synthetic, set) = set_with(&[domain_resource_bundle()])?;
+    let url = format!("{BASE}domain-resource-bundle");
+    let report = validate(
+        &set,
+        &bundle_of(&json!({"resourceType": "Patient"})),
+        Some(&url),
+    )?;
+    assert!(locations(&report, MessageId::ResourceTypeNotAllowed).is_empty());
+    Ok(())
+}
+
+#[test]
+fn an_element_typed_domain_resource_refuses_a_resource_that_does_not_specialize_it() -> TestResult {
+    // NOTE: Binary specializes Resource and not DomainResource (https://hl7.org/fhir/R4/binary.html).
+    let (_synthetic, set) = set_with(&[domain_resource_bundle()])?;
+    let url = format!("{BASE}domain-resource-bundle");
+    let binary = json!({"resourceType": "Binary", "contentType": "text/plain"});
+    let report = validate(&set, &bundle_of(&binary), Some(&url))?;
+    assert_eq!(
+        locations(&report, MessageId::ResourceTypeNotAllowed),
+        ["Bundle.entry[0].resource"]
+    );
+    Ok(())
+}
+
 #[test]
 fn an_element_typed_resource_accepts_any_resource() -> TestResult {
     let set = PackageSet::load([core()])?;

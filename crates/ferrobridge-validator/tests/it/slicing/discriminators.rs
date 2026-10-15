@@ -315,3 +315,53 @@ fn a_discriminator_type_r4_does_not_define_is_named() -> TestResult {
     );
     Ok(())
 }
+
+/// A closed slicing of `Bundle.entry` by the type of its resource, with one
+/// slice whose resource is typed `DomainResource`.
+fn domain_resource_entries() -> serde_json::Value {
+    crate::support::profile(
+        "domain-resource-entries",
+        "Bundle",
+        &json!([
+            {"id": "Bundle", "path": "Bundle", "min": 0, "max": "*"},
+            {"id": "Bundle.entry", "path": "Bundle.entry", "min": 0, "max": "*",
+             "slicing": {"discriminator": [{"type": "type", "path": "resource"}], "rules": "closed"}},
+            {"id": "Bundle.entry:domain", "path": "Bundle.entry", "sliceName": "domain",
+             "min": 0, "max": "*"},
+            {"id": "Bundle.entry:domain.resource", "path": "Bundle.entry.resource",
+             "min": 1, "max": "1", "type": [{"code": "DomainResource"}]}
+        ]),
+    )
+}
+
+/// A collection Bundle whose one entry holds `resource`.
+fn bundle_of(resource: &serde_json::Value) -> serde_json::Value {
+    json!({"resourceType": "Bundle", "type": "collection",
+           "entry": [{"fullUrl": "urn:uuid:00000000-0000-0000-0000-000000000001", "resource": resource}]})
+}
+
+#[test]
+fn a_type_discriminator_matches_a_resource_that_specializes_the_slice_type() -> TestResult {
+    // NOTE: Patient specializes DomainResource (https://hl7.org/fhir/R4/patient.html).
+    let url = format!("{}domain-resource-entries", crate::support::BASE);
+    let report = super::against(
+        &[domain_resource_entries()],
+        &bundle_of(&json!({"resourceType": "Patient"})),
+        &url,
+    )?;
+    assert!(locations(&report, MessageId::UnmatchedSliceItem).is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_type_discriminator_does_not_match_a_resource_outside_the_slice_type() -> TestResult {
+    // NOTE: Binary specializes Resource and not DomainResource (https://hl7.org/fhir/R4/binary.html).
+    let url = format!("{}domain-resource-entries", crate::support::BASE);
+    let binary = json!({"resourceType": "Binary", "contentType": "text/plain"});
+    let report = super::against(&[domain_resource_entries()], &bundle_of(&binary), &url)?;
+    assert_eq!(
+        locations(&report, MessageId::UnmatchedSliceItem),
+        ["Bundle.entry[0]"]
+    );
+    Ok(())
+}
