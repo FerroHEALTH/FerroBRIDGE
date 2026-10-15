@@ -426,6 +426,54 @@ facade consumed. No clinical content is written into it. Back it up with the
 CDR, because a lost map means the next create writes a second composition for a
 resource the CDR already holds.
 
+### `[auth]`
+
+Inbound authentication: the FHIR routes as a SMART App Launch 2.x resource
+server. It is off until `enabled` is true. **While it is off, the facade
+authenticates no caller and serves every request that reaches it**, reads and
+writes of patient data included, and the server logs a warning saying so at
+start-up. Keep an unauthenticated bridge on a network only trusted callers
+reach. The [FHIR facade](../integrate/fhir-facade.md#security) page says what
+a caller sends and what each refusal looks like.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether every FHIR request needs a bearer access token |
+| `issuer` | none, required | The authorization server's issuer identifier, an `https` URL with no query or fragment (RFC 8414 §2); every token's `iss` must equal it |
+| `audience` | none, required | The audience every token's `aud` must contain, normally the facade's `base_url` (RFC 9068 §4) |
+| `algorithms` | `["RS256", "ES256"]` | The signature algorithms a token may use: `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384` or `EdDSA`; a symmetric `HS*` algorithm and `none` are refused |
+| `token_profile` | `rfc9068` | `rfc9068` requires the JWT access token profile (`typ` of `at+jwt`, and `iss`, `exp`, `aud`, `sub`, `client_id`, `iat` and `jti`); `jwt` accepts any `typ` and needs only `iss`, `exp`, `aud` and `sub`, for an authorization server that does not issue RFC 9068 tokens |
+| `clock_skew_seconds` | `60` | The leeway `exp`, `nbf` and `iat` are checked with |
+| `jwks_refresh_interval_ms` | `60000` | The shortest time between two reads of the key set that a token naming an unknown `kid` triggers |
+| `timeout_ms` | `10000` | How long one call to the authorization server may take |
+| `scopeless_subjects` | `[]` | The `sub` values whose token gets system-wide access when it names no SMART clinical scope, such as a backend service whose authorization server issues no scope; any other scopeless token is refused with `403` |
+| `operator_scope` | `ferrobridge.operator` | The scope that guards the operator API; SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own |
+| `capabilities` | `[]` | SMART capabilities the discovery document lists beside the four the facade enforces (`permission-v1`, `permission-v2`, `permission-patient`, `permission-user`), such as `launch-standalone` or `client-confidential-asymmetric`, which describe the authorization server |
+
+At start-up the server reads the issuer's metadata, at
+`/.well-known/oauth-authorization-server` inserted before the issuer's path and
+on a `404` at the issuer followed by `/.well-known/openid-configuration`, and
+the key set its `jwks_uri` names. Metadata naming another issuer, metadata
+without a `jwks_uri` or a `token_endpoint`, and a key set that cannot be read
+each refuse the start. A token whose `kid` the key set does not hold makes the
+server read the key set once more, which is how a key rotation arrives, and
+never more often than `jwks_refresh_interval_ms`.
+
+```toml
+[auth]
+enabled = true
+issuer = "https://auth.example.org/realms/clinic"
+audience = "https://bridge.example.org/fhir"
+algorithms = ["RS256"]
+scopeless_subjects = ["service-account-ferrofed"]
+```
+
+As environment variables, the same section reads
+`FERROBRIDGE__AUTH__ENABLED`, `FERROBRIDGE__AUTH__ISSUER`,
+`FERROBRIDGE__AUTH__AUDIENCE` and `FERROBRIDGE__AUTH__ALGORITHMS`. The section
+holds no secret: the resource server checks signatures with the issuer's
+public keys.
+
 ### `[hl7v2]`
 
 The HL7 v2 face: an MLLP listener whose messages are written into the CDR
@@ -502,6 +550,9 @@ exits 78, `EX_CONFIG`. Six things are refused:
   `issuer` and a `token_endpoint`, an `issuer` that is not an `https` URL
   free of a query and a fragment, a `scope` that is not scope tokens, and a
   `resource` with a fragment;
+- an `[auth]` algorithm that is symmetric or unknown, a `token_profile`
+  other than `rfc9068` and `jwt`, and an `operator_scope` or a capability
+  that is not one scope token;
 - a `[cdm] url` that names no `sslmode`, or one that falls back to plaintext
   or is not a libpq mode, a `[cdm]` CA that holds no PEM certificate, and a
   `PGSSLROOTCERT`, `PGSSLCERT` or `PGSSLKEY` in the environment;
@@ -538,4 +589,9 @@ identity_store = "/var/lib/ferrobridge/identity.redb"
 subject_namespace = "https://example.org/fhir/sid/patient"
 composition_language = "en"
 composition_territory = "GB"
+
+[auth]
+enabled = true
+issuer = "https://auth.example.org/realms/clinic"
+audience = "https://bridge.example.org/fhir"
 ```
