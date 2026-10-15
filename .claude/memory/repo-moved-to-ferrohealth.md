@@ -22,8 +22,10 @@ retired.
   `sonar-project.properties`, `.mcp.json`, the README badge and
   `.claude/rules/ai-code-review.md`; the `SONAR_TOKEN` secret and the
   `SONARQUBE_TOKEN` of the MCP server must be tokens of that organisation.
-- Still under the user account (do not rewrite): the FerroEHR 4.2.5 and
-  FerroTERM image pins under `ghcr.io/rubentalstra`, personal handles
+- The FerroEHR and FerroTERM images moved to `ghcr.io/ferrohealth` too, and
+  the user-account copies stopped answering anonymous pulls by 2026-10-15, so
+  the testkit pins name the organisation (#450).
+- Still under the user account (do not rewrite): personal handles
   (CODEOWNERS, FUNDING, the roster), the released changelog sections.
 - Releases up to v0.0.4 were signed as `rubentalstra/FerroBRIDGE` and their
   images live under `ghcr.io/rubentalstra/ferrobridge`; `SECURITY.md` says so.
