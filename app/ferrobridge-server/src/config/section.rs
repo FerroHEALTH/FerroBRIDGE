@@ -61,6 +61,11 @@ pub struct Facade {
     pub composition_language: String,
     /// The `COMPOSITION.territory` every commit carries, ISO 3166-1.
     pub composition_territory: String,
+    /// The page size of a search that names no `_count`.
+    pub search_count: u32,
+    /// The largest page one search answers; a larger `_count` is answered
+    /// with this many.
+    pub search_count_max: u32,
 }
 
 impl Default for Facade {
@@ -74,6 +79,8 @@ impl Default for Facade {
             system_id: String::from("FerroBRIDGE"),
             composition_language: String::new(),
             composition_territory: String::new(),
+            search_count: crate::facade::search::Limits::default().default_count,
+            search_count_max: crate::facade::search::Limits::default().max_count,
         }
     }
 }

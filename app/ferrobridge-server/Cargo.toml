@@ -65,6 +65,8 @@ redb.workspace = true
 reqwest.workspace = true
 secrecy.workspace = true
 serde.workspace = true
+# The search declarations beside the context mappings are YAML.
+serde-saphyr.workspace = true
 serde_json.workspace = true
 # The connection options `cdm init` opens the CDM pool with.
 sqlx.workspace = true

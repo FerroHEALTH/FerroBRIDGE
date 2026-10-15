@@ -536,10 +536,24 @@ async fn build_facade(
         programs: programs.len(),
         templates: templates.len(),
     };
+    let search = facade::search::load(directory, &programs)
+        .context("reading the search declarations beside the mappings")?;
+    tracing::info!(
+        lane = "facade",
+        types = programs
+            .resource_types()
+            .iter()
+            .filter(|name| search.surface(name).is_some())
+            .cloned()
+            .collect::<Vec<String>>()
+            .join(","),
+        "the FHIR facade searches these resource types"
+    );
     let store = facade::identity::redb_store::RedbStore::open(&lane.identity_store)
         .with_context(|| format!("opening {}", lane.identity_store.display()))?;
     Ok((
-        facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone()),
+        facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone())
+            .with_search(search, lane.search),
         counts,
     ))
 }

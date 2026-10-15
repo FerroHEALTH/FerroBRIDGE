@@ -332,7 +332,10 @@ async fn fetch(client: &crate::cdr::CdrClient, template: &str) -> Result<Templat
 
 /// Reads and validates the mapping files under `directory`.
 fn read_mappings(directory: &Path) -> Result<MappingSet, Error> {
-    let mapping_files = files(directory, &MAPPING_EXTENSIONS)?;
+    let mapping_files: Vec<PathBuf> = files(directory, &MAPPING_EXTENSIONS)?
+        .into_iter()
+        .filter(|path| !crate::facade::search::declaration::is_declaration(path))
+        .collect();
     if mapping_files.is_empty() {
         return Err(Error::Empty {
             path: directory.to_path_buf(),

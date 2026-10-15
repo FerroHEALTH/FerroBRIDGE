@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The interactions: metadata, create, read, vread, update, transaction,
-//! `$validate`.
+//! The interactions: metadata, create, search, read, vread, update,
+//! transaction, `$validate`.
 //!
 //! Each handler is the same shape. It checks the media types and the query
 //! parameters, resolves the program the request runs, calls the engine and the
@@ -16,6 +16,7 @@ mod complete;
 mod conditional;
 mod read;
 mod render;
+mod search;
 mod transaction;
 mod validate;
 mod write;
@@ -67,6 +68,32 @@ pub async fn create_route(
     body: Bytes,
 ) -> Response {
     write::create(&facade, &resource_type, &headers, &uri, &body)
+        .await
+        .unwrap_or_else(Refusal::into_response)
+}
+
+/// `GET [base]/{type}?…`: search the type over its declared AQL projections.
+pub async fn search_route(
+    State(facade): State<Arc<Facade>>,
+    Path(resource_type): Path<String>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> Response {
+    search::search_get(&facade, &resource_type, &headers, &uri)
+        .await
+        .unwrap_or_else(Refusal::into_response)
+}
+
+/// `POST [base]/{type}/_search`: the same search, its parameters in a form
+/// body.
+pub async fn search_form_route(
+    State(facade): State<Arc<Facade>>,
+    Path(resource_type): Path<String>,
+    headers: HeaderMap,
+    uri: Uri,
+    body: Bytes,
+) -> Response {
+    search::search_post(&facade, &resource_type, &headers, &uri, &body)
         .await
         .unwrap_or_else(Refusal::into_response)
 }
@@ -157,6 +184,7 @@ fn metadata(
     guard(headers, uri, Body::Absent)?;
     let statement = capability::statement_with(
         facade.programs(),
+        facade.search(),
         &facade.settings().base_url,
         operations,
         hl7v2,

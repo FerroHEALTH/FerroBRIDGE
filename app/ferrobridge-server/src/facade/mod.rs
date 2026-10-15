@@ -29,6 +29,7 @@ pub mod outcome;
 pub mod programs;
 pub mod reply;
 pub mod request;
+pub mod search;
 pub mod status;
 
 use std::sync::Arc;
@@ -88,12 +89,16 @@ pub struct Facade {
     client: CdrClient,
     /// What the deployment configured.
     settings: Settings,
+    /// The search declarations, by resource type.
+    search: search::Catalog,
+    /// The page sizes a search answers with.
+    limits: search::Limits,
 }
 
 impl Facade {
     /// Returns a facade over `programs`, `store` and `client`.
     #[must_use]
-    pub const fn new(
+    pub fn new(
         programs: Programs,
         store: Arc<dyn Store>,
         client: CdrClient,
@@ -105,7 +110,33 @@ impl Facade {
             claims: Claims::new(),
             client,
             settings,
+            search: search::Catalog::default(),
+            limits: search::Limits::default(),
         }
+    }
+
+    /// Returns this facade answering search as `catalog` declares, with the
+    /// page sizes of `limits`.
+    ///
+    /// A facade built without it answers no search, and its
+    /// `CapabilityStatement` declares none.
+    #[must_use]
+    pub fn with_search(mut self, catalog: search::Catalog, limits: search::Limits) -> Self {
+        self.search = catalog;
+        self.limits = limits;
+        self
+    }
+
+    /// Returns the search declarations.
+    #[must_use]
+    pub const fn search(&self) -> &search::Catalog {
+        &self.search
+    }
+
+    /// Returns the page sizes a search answers with.
+    #[must_use]
+    pub const fn search_limits(&self) -> search::Limits {
+        self.limits
     }
 
     /// Returns the compiled programs.
@@ -186,10 +217,11 @@ impl Facade {
 
 /// Returns the facade's routes, mounted under [`BASE_PATH`].
 ///
-/// Only what this milestone implements is mounted: the conformance statement,
-/// a type-level create, `$validate`, an instance read and update, a vread, and
-/// a system-level transaction. Search and batch have no route, so a request for
-/// either answers `404` (<https://hl7.org/fhir/R4/http.html>). `operations`
+/// Only what is implemented is mounted: the conformance statement, a
+/// type-level create and search (`GET` and `POST _search`), `$validate`, an
+/// instance read and update, a vread, and a system-level transaction. Batch has
+/// no route, so a request for it answers `404`
+/// (<https://hl7.org/fhir/R4/http.html>). `operations`
 /// is whether the same router serves the FHIRconnect operations, which the
 /// conformance statement declares only then, and `hl7v2` whether the HL7 v2
 /// face runs, which the statement's implementation description names only
@@ -213,7 +245,11 @@ pub fn routes(
         .route(BASE_PATH, post(handlers::transaction_route))
         .route(
             &format!("{BASE_PATH}/{{resource_type}}"),
-            post(handlers::create_route),
+            post(handlers::create_route).get(handlers::search_route),
+        )
+        .route(
+            &format!("{BASE_PATH}/{{resource_type}}/_search"),
+            post(handlers::search_form_route),
         )
         .route(
             &format!("{BASE_PATH}/{{resource_type}}/$validate"),

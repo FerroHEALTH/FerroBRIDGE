@@ -228,6 +228,16 @@ pub enum Error {
         /// The value it holds.
         value: String,
     },
+    /// A search page size outside the range a search can answer.
+    #[error("{key} is {value}; {reason}")]
+    SearchCount {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: u32,
+        /// Why it is refused.
+        reason: &'static str,
+    },
     /// A page size that would never advance.
     #[error("{key} is 0; a page holds at least one row")]
     PageSize {
@@ -481,6 +491,8 @@ pub struct FacadeSettings {
     pub settings: crate::facade::Settings,
     /// The file the identity map is kept in.
     pub identity_store: PathBuf,
+    /// The page sizes a search answers with.
+    pub search: crate::facade::search::Limits,
 }
 
 /// The HL7 v2 face, resolved.
