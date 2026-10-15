@@ -182,7 +182,7 @@ fn the_outcome_encodes_as_r4_json() -> TestResult {
 }
 
 #[test]
-fn the_target_profiles_of_a_reference_reached_are_named_unevaluated() -> TestResult {
+fn the_target_profiles_of_a_reference_outside_the_resource_are_named_unevaluated() -> TestResult {
     let set = PackageSet::load([core()])?;
     let mut resource = patient();
     resource["generalPractitioner"] = json!([{"reference": "Practitioner/p1"}]);
@@ -199,7 +199,7 @@ fn the_target_profiles_of_a_reference_reached_are_named_unevaluated() -> TestRes
         matches!(&target.constraint, Constraint::TargetProfile { profiles } if profiles.len() == 3),
         "{target:#?}"
     );
-    assert_eq!(target.reason, Reason::Profiles);
+    assert_eq!(target.reason, Reason::ReferenceOutOfScope);
     Ok(())
 }
 

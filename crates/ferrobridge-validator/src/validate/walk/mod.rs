@@ -5,7 +5,10 @@
 //! element table, every member's occurrences counted per parent, and every
 //! element definition in play applied to each occurrence.
 
+use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::rc::Rc;
 use std::sync::Arc;
 
 mod content;
@@ -19,16 +22,15 @@ use fhir_types::schema::FieldSchema;
 use fhir_types::schema::Kind;
 use fhir_types::schema::TypeSchema;
 
-use crate::canonical::Canonical;
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
 use crate::report::Collector;
-use crate::report::Constraint;
-use crate::report::Reason;
 use crate::report::Report;
 use crate::validate::ValidateError;
 use crate::validate::Validator;
+use crate::validate::reference::Memo;
+use crate::validate::reference::address;
 use crate::validate::slicing::Item;
 use crate::validate::slicing::Site;
 use crate::validate::structure::Structure;
@@ -92,6 +94,15 @@ pub(crate) struct Held<'a> {
     pub(crate) slices: &'a [String],
 }
 
+/// What every walk of one validation shares, its forks included.
+#[derive(Debug, Default)]
+struct Shared {
+    /// The target checks, by the address of the resource and of the profile.
+    targets: BTreeMap<(usize, usize), Memo>,
+    /// The entries of a Bundle each entry references, by address.
+    links: BTreeMap<usize, BTreeSet<usize>>,
+}
+
 /// One validation in progress.
 #[derive(Debug)]
 pub(crate) struct Walk<'v, 'set, 'i> {
@@ -101,6 +112,10 @@ pub(crate) struct Walk<'v, 'set, 'i> {
     scope: Vec<&'i Value>,
     /// The locations whose coding display was already checked.
     displayed: BTreeSet<String>,
+    /// Whether a resource is validated against the profiles it claims.
+    claims: bool,
+    /// The state every walk of this validation shares.
+    shared: Rc<RefCell<Shared>>,
 }
 
 impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
@@ -111,6 +126,8 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             out: Collector::default(),
             scope: Vec::new(),
             displayed: BTreeSet::new(),
+            claims: true,
+            shared: Rc::default(),
         }
     }
 
@@ -122,7 +139,54 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             out: Collector::default(),
             scope: self.scope.clone(),
             displayed: BTreeSet::new(),
+            claims: self.claims,
+            shared: Rc::clone(&self.shared),
         }
+    }
+
+    /// Starts a speculative validation as [`Walk::fork`] does, in which a
+    /// resource is not validated against the profiles it claims.
+    pub(crate) fn fork_unclaimed(&self) -> Self {
+        Self {
+            claims: false,
+            ..self.fork()
+        }
+    }
+
+    /// Answers whether a resource is validated against the profiles it
+    /// claims.
+    pub(crate) const fn follows_claims(&self) -> bool {
+        self.claims
+    }
+
+    /// Returns the state of the target check `key`.
+    pub(crate) fn memo(&self, key: (usize, usize)) -> Option<Memo> {
+        self.shared.borrow().targets.get(&key).cloned()
+    }
+
+    /// Records the state of the target check `key`.
+    pub(crate) fn remember(&self, key: (usize, usize), memo: Memo) {
+        self.shared.borrow_mut().targets.insert(key, memo);
+    }
+
+    /// Records that the entry `from` references the entry `to`.
+    pub(crate) fn link(&self, from: &Value, to: &Value) {
+        self.shared
+            .borrow_mut()
+            .links
+            .entry(address(from))
+            .or_default()
+            .insert(address(to));
+    }
+
+    /// Returns the addresses of the entries the entry at `from` references.
+    pub(crate) fn links(&self, from: usize) -> Vec<usize> {
+        self.shared
+            .borrow()
+            .links
+            .get(&from)
+            .map(|to| to.iter().copied().collect())
+            .unwrap_or_default()
     }
 
     /// Returns the validator.
@@ -220,40 +284,20 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             );
             structure = self.validator.core(name)?;
         }
-        self.claims(object, &structure, name, &location);
         self.scope.push(value);
         let walked = self.object(
             object,
             schema,
-            &Cursor::new(structure, name),
+            &Cursor::new(Arc::clone(&structure), name),
             &location,
             true,
         );
         self.scope.pop();
-        walked
-    }
-
-    /// Lists each profile the resource claims and is not validated against.
-    fn claims(&mut self, object: &Object, structure: &Structure, name: &str, location: &str) {
-        let claimed = object
-            .get("meta")
-            .and_then(|meta| meta.get("profile"))
-            .and_then(Value::as_array)
-            .unwrap_or_default();
-        for url in claimed.iter().filter_map(Value::as_str) {
-            if Canonical::parse(url).url() != structure.url() {
-                // TODO(#441): validate the resource against every profile it claims.
-                self.out.unevaluated(
-                    url,
-                    name,
-                    Constraint::ClaimedProfile {
-                        url: url.to_owned(),
-                    },
-                    location,
-                    Reason::Profiles,
-                );
-            }
+        walked?;
+        if name == "Bundle" {
+            self.document(value, &location);
         }
+        self.claims(value, &structure, name, &location)
     }
 
     /// Walks one object of the type `schema` against `cursor`.
@@ -439,10 +483,11 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         structure: &Structure,
         id: &str,
         element: &ElementDefinition,
-        occurrence: &Occurrence<'_>,
+        occurrence: &Occurrence<'i>,
         code: Option<&str>,
     ) -> Result<(), ValidateError> {
         self.list(structure, id, element, &occurrence.location);
+        self.targets(structure, id, element, occurrence, code)?;
         if let (Some(code), Some(value)) = (code, occurrence.value.and_then(Bound::of)) {
             self.binding(structure, (id, element), code, value, &occurrence.location)?;
         }

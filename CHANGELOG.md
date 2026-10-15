@@ -25,6 +25,20 @@ crates on crates.io.
 
 ### Added
 
+- The R4 profile validator resolves references inside a Bundle by the method
+  of the R4 Bundle page (absolute, relative against the entry's `fullUrl`,
+  `urn:uuid:`, version-specific through `meta.versionId`), with a reference
+  that matches two entries an error, so a `resolve()` discriminator reaches
+  across entries (#441). It holds the resolved target to the element's
+  `type.targetProfile`, any of them, and the reference to its
+  `type.aggregation`; validates every resource against each profile it
+  claims in `meta.profile`, reporting a claim the package set lacks; and
+  holds a document Bundle to the content rules of R4 documents §3.3.1: every
+  resource the Composition references is in the Bundle, and the Bundle holds
+  only the Composition, what it references directly or indirectly, a CSS
+  stylesheet `Binary` and the `Provenance` of what it includes. Target and
+  claimed profiles are no longer listed as unevaluated when the validator
+  can check them.
 - `scripts/vendor/profile-packages.sh` fetches the package set of the R4
   profile validator at build time into the ignored
   `docs/specs/fhir-packages/<package>#<version>/package/` (#435), about
