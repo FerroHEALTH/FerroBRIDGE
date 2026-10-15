@@ -5,6 +5,7 @@
 //! "the content must conform to at least one of them"
 //! (<https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.type.profile>).
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use fhir_types::codec::Value;
@@ -203,6 +204,73 @@ impl<'i> Walk<'_, '_, 'i> {
             );
         }
         Ok(true)
+    }
+
+    /// Validates `value`, the resource of the type `name` at `location`,
+    /// against every profile it claims in `meta.profile` other than
+    /// `structure`, which the walk validated it against.
+    ///
+    /// The findings of each claim join the report, and a claim the resource
+    /// fails is an error naming it. A claim the set does not carry is listed
+    /// as unevaluated.
+    pub(crate) fn claims(
+        &mut self,
+        value: &'i Value,
+        structure: &Structure,
+        name: &str,
+        location: &str,
+    ) -> Result<(), ValidateError> {
+        if !self.follows_claims() {
+            return Ok(());
+        }
+        let claimed = value
+            .get("meta")
+            .and_then(|meta| meta.get("profile"))
+            .and_then(Value::as_array)
+            .unwrap_or_default();
+        let mut seen = BTreeSet::new();
+        for url in claimed.iter().filter_map(Value::as_str) {
+            if Canonical::parse(url).url() == structure.url() || !seen.insert(url) {
+                continue;
+            }
+            // NOTE: Meta.profile: "It is up to the server and/or other infrastructure of policy
+            // to determine whether/how these claims are verified"; our own design checks each.
+            let claim = match self.validator().structure(url, None) {
+                Ok(claim) => claim,
+                Err(ValidateError::Resolve(
+                    ResolveError::NotFound { .. } | ResolveError::Fragment { .. },
+                )) => {
+                    self.out().unevaluated(
+                        url,
+                        name,
+                        Constraint::ClaimedProfile {
+                            url: url.to_owned(),
+                        },
+                        location,
+                        Reason::ProfileNotFound,
+                    );
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
+            let mut fork = self.fork_unclaimed();
+            fork.resource(value, Some(location), Some(Arc::clone(&claim)))?;
+            let found = fork.into_out();
+            if !found.is_valid() {
+                self.out().issue(
+                    Severity::Error,
+                    IssueType::Structure,
+                    MessageId::ClaimedProfileMismatch,
+                    location,
+                    format!(
+                        "the resource does not conform to {}, a profile it claims",
+                        claim.url()
+                    ),
+                );
+            }
+            self.out().absorb_new(found);
+        }
+        Ok(())
     }
 
     /// Validates an extension against the profiles its element names when

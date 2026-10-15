@@ -15,6 +15,7 @@
 )]
 
 mod bindings;
+mod bundles;
 mod cardinality;
 mod eu;
 mod extensions;
