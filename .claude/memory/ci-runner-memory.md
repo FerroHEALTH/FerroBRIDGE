@@ -14,9 +14,9 @@ failed; the `msrv` job compiling the same crates through `cargo hack check`
 passed every time.
 
 **Why:** the hosted runner has seven gigabytes. A workspace-wide `cargo check`
-or `cargo clippy` schedules `fhir-types` (four versions) and `openehr-am` (the
+or `cargo clippy` schedules `fhir-types` (five versions) and `openehr-am` (the
 AM 2.4 model behind the ITS-REST client) at the same time; per package they
-never meet. The all-features union of `fhir-types` (four versions, every
+never meet. The all-features union of `fhir-types` (five versions, every
 resource, one crate) is larger still and no consumer builds it.
 
 **How to apply:** CI lints with `cargo hack clippy --workspace --all-targets

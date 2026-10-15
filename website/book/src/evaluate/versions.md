@@ -34,7 +34,8 @@ OHDSI vocabulary.
 ## The two model crates
 
 The FHIR model is the `fhir-types` crate, generated in this repository from the
-HL7 FHIR packages (R4 4.0.1, R4B 4.3.0, R5 5.0.0, R6 6.0.0-ballot5, THO 7.3.0)
+HL7 FHIR packages (STU3 3.0.2, R4 4.0.1, R4B 4.3.0, R5 5.0.0, R6 6.0.0-ballot5,
+THO 7.3.0)
 and published to crates.io; its version line continues the one the sibling
 project published up to 0.1.97 before the crate moved here, and the current
 pin is the `fhir-types` row of `docs/VERSIONS.md`. The openEHR model comes

@@ -401,7 +401,9 @@ fn read_resources(package: &Path) -> Result<Vec<serde_json::Value>, BundleError>
         })?;
         // NOTE: a package directory holds non-resource JSON (package.json,
         // .index.json), which is not a parse failure of a resource.
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(
+            crate::package::without_byte_order_mark(&text),
+        ) else {
             continue;
         };
         if value.get("resourceType").is_some() {

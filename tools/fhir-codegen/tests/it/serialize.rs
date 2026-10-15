@@ -12,6 +12,7 @@
 use std::fs;
 use std::path::Path;
 
+use fhir_codegen::package::without_byte_order_mark;
 use fhir_types::codec::{Json, Object, Path as ElementPath, Value, expect_object};
 use proptest::prelude::*;
 
@@ -90,10 +91,15 @@ fn parity_over_package<T: Json + serde::Serialize>(package: &str) {
 /// it (those files are the package's own violations and have no typed form).
 fn decode<T: Json>(file: &Path) -> Option<T> {
     let text = fs::read_to_string(file).ok()?;
-    let value: Value = serde_json::from_str(&text).ok()?;
+    let value: Value = serde_json::from_str(without_byte_order_mark(&text)).ok()?;
     let mut path = ElementPath::root("Resource");
     let object = expect_object(&value, &path).ok()?;
     T::from_json(object, &mut path).ok()
+}
+
+#[test]
+fn every_stu3_root_set_resource_writes_the_same_bytes() {
+    parity_over_package::<fhir_types::stu3::resource::Resource>("hl7.fhir.r3.core");
 }
 
 #[test]
@@ -129,6 +135,7 @@ fn parity_of_parameters<T: Json + serde::Serialize>(object: &Object) -> Result<(
 
 /// The same document through every version's `Parameters`.
 fn parity_of_every_version(object: &Object) -> Result<(), String> {
+    parity_of_parameters::<fhir_types::stu3::parameters::Parameters>(object)?;
     parity_of_parameters::<fhir_types::r4::parameters::Parameters>(object)?;
     parity_of_parameters::<fhir_types::r4b::parameters::Parameters>(object)?;
     parity_of_parameters::<fhir_types::r5::parameters::Parameters>(object)?;
@@ -272,6 +279,10 @@ fn direct_bytes<T: Json + serde::Serialize>(object: &Object) -> String {
 #[test]
 fn the_direct_path_writes_the_ordered_bytes_in_every_version() {
     let object = ordered_source();
+    assert_eq!(
+        direct_bytes::<fhir_types::stu3::parameters::Parameters>(&object),
+        ORDERED_BYTES
+    );
     assert_eq!(
         direct_bytes::<fhir_types::r4::parameters::Parameters>(&object),
         ORDERED_BYTES

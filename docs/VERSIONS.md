@@ -177,6 +177,7 @@ of every `PROVENANCE.md` below back against its row.
 
 | Item | Pin | Repeated in |
 |---|---|---|
+| `hl7.fhir.r3.core` | 3.0.2 | `tools/fhir-codegen/vendor/hl7.fhir.r3.core/PROVENANCE.md` |
 | `hl7.fhir.r4.core` | 4.0.1 | `tools/fhir-codegen/vendor/hl7.fhir.r4.core/PROVENANCE.md` |
 | `hl7.fhir.r4b.core` | 4.3.0 | `tools/fhir-codegen/vendor/hl7.fhir.r4b.core/PROVENANCE.md` |
 | `hl7.fhir.r5.core` | 5.0.0 | `tools/fhir-codegen/vendor/hl7.fhir.r5.core/PROVENANCE.md` |
@@ -272,7 +273,7 @@ at the line's current value.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `fhir-types` | 0.1.108 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
+| `fhir-types` | 0.1.109 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
 
 ## Language and runtime
 

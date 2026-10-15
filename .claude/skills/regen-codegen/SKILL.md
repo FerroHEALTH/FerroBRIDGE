@@ -17,7 +17,7 @@ generator or its override map and regenerate here. Full discipline:
 ## Steps
 
 1. **Confirm the inputs are the pinned packages.** The vendored FHIR packages
-   (`hl7.fhir.r4.core`, `hl7.fhir.r4b.core`, `hl7.fhir.r5.core`,
+   (`hl7.fhir.r3.core`, `hl7.fhir.r4.core`, `hl7.fhir.r4b.core`, `hl7.fhir.r5.core`,
    `hl7.fhir.r6.core`, `hl7.terminology`) live under
    `tools/fhir-codegen/vendor/` with a `PROVENANCE.md` each. They are fetched
    only by `scripts/vendor/fhir-packages.sh`, which reads its pins from

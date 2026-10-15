@@ -6,9 +6,12 @@ use std::fs;
 use std::path::Path;
 
 use fhir_codegen::fhir::ParameterUse;
-use fhir_codegen::roots::{OPERATION_RESOURCES, ROOT_RESOURCES, RootScope, RootSet};
+use fhir_codegen::package::without_byte_order_mark;
+use fhir_codegen::roots::{
+    OPERATION_RESOURCES, ROOT_RESOURCES, RootScope, RootSet, STU3_ROOT_RESOURCES, root_resources,
+};
 
-use crate::{R4B, packages};
+use crate::{R4, R4B, STU3, packages};
 
 /// The concrete resource types `dir` defines, read straight from the package
 /// JSON: a `StructureDefinition` of kind `resource` that is neither abstract
@@ -24,7 +27,8 @@ fn concrete_resources(dir: &Path) -> BTreeSet<String> {
             continue;
         }
         let text = fs::read_to_string(&path).expect("the file reads");
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(without_byte_order_mark(&text))
+        else {
             continue;
         };
         let field = |name: &str| value.get(name).and_then(serde_json::Value::as_str);
@@ -51,7 +55,7 @@ fn the_wide_root_set_is_every_concrete_resource_the_package_defines() {
             RootSet::select_scoped(package, RootScope::Resources).expect("root set selects");
         let selected: BTreeSet<String> = roots.resources.keys().map(|n| (*n).to_owned()).collect();
         assert_eq!(selected, concrete_resources(&dir), "{module}");
-        for name in ROOT_RESOURCES {
+        for name in root_resources(package).iter().copied() {
             assert_eq!(
                 roots.scope(name),
                 Some(RootScope::Terminology),
@@ -61,6 +65,10 @@ fn the_wide_root_set_is_every_concrete_resource_the_package_defines() {
         // The R4 resource count the widening was declared with (#120).
         if module == "r4" {
             assert_eq!(selected.len(), 146, "the R4 concrete resource count");
+        }
+        // The STU3 resource list (https://hl7.org/fhir/STU3/resourcelist.html).
+        if module == "stu3" {
+            assert_eq!(selected.len(), 117, "the STU3 concrete resource count");
         }
     }
 }
@@ -73,7 +81,7 @@ fn the_terminology_root_set_is_a_subset_of_the_wide_one() {
             RootSet::select_scoped(package, RootScope::Resources).expect("wide root set selects");
         assert_eq!(
             narrow.resources.keys().copied().collect::<Vec<_>>(),
-            ROOT_RESOURCES.to_vec(),
+            root_resources(package).to_vec(),
             "{module}"
         );
         assert!(!narrow.holds(RootScope::Resources), "{module}");
@@ -98,7 +106,7 @@ fn the_eight_root_resources_are_found() {
     );
     for (name, definition) in &roots.resources {
         assert_eq!(&definition.name, name);
-        assert_eq!(&definition.type_name, name);
+        assert_eq!(definition.type_name.as_deref(), Some(*name));
     }
 }
 
@@ -169,4 +177,52 @@ fn operations_are_looked_up_by_resource_and_code() {
     );
     assert!(roots.operation("ValueSet", "lookup").is_none());
     assert!(roots.operation("Resource", "validate").is_none());
+}
+
+#[test]
+fn the_root_set_is_declared_per_version() {
+    assert_eq!(root_resources(&R4), ROOT_RESOURCES.as_slice());
+    assert_eq!(root_resources(&R4B), ROOT_RESOURCES.as_slice());
+    assert_eq!(root_resources(&STU3), STU3_ROOT_RESOURCES.as_slice());
+    // STU3 defines no TerminologyCapabilities
+    // (https://hl7.org/fhir/STU3/resourcelist.html), which R4 introduced.
+    assert!(
+        STU3.structure_definition_named("TerminologyCapabilities")
+            .is_none()
+    );
+    let roots = RootSet::select(&STU3).expect("the STU3 terminology root set selects");
+    assert_eq!(
+        roots.resources.keys().copied().collect::<Vec<_>>(),
+        STU3_ROOT_RESOURCES.to_vec()
+    );
+    let expanded: Vec<&str> = ROOT_RESOURCES
+        .iter()
+        .copied()
+        .filter(|name| *name != "TerminologyCapabilities")
+        .collect();
+    assert_eq!(STU3_ROOT_RESOURCES.to_vec(), expanded);
+}
+
+#[test]
+fn the_stu3_terminology_operations_are_selected() {
+    let roots = RootSet::select(&STU3).expect("the STU3 terminology root set selects");
+    let ids = roots
+        .operations
+        .values()
+        .map(|operation| format!("{}${}", operation.resource.join(","), operation.code))
+        .collect::<Vec<_>>();
+    // The STU3 operations defined on CodeSystem, ValueSet, and ConceptMap
+    // (https://hl7.org/fhir/STU3/operationslist.html).
+    assert_eq!(
+        ids,
+        vec![
+            "CodeSystem$compose",
+            "CodeSystem$lookup",
+            "CodeSystem$subsumes",
+            "ConceptMap$closure",
+            "ConceptMap$translate",
+            "ValueSet$expand",
+            "ValueSet$validate-code",
+        ]
+    );
 }

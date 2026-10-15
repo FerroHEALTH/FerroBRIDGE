@@ -19,12 +19,29 @@ const FHIRPATH_SYSTEM_PREFIX: &str = "http://hl7.org/fhirpath/System.";
 const FHIR_TYPE_EXTENSION: &str =
     "http://hl7.org/fhir/StructureDefinition/structuredefinition-fhir-type";
 
-/// The extension carrying the lexical form of a primitive's value.
+/// The extension carrying the lexical form of a primitive's value, from R4.
 const REGEX_EXTENSION: &str = "http://hl7.org/fhir/StructureDefinition/regex";
+
+/// The extension carrying the lexical form of a primitive's value in STU3.
+const STU3_REGEX_EXTENSION: &str =
+    "http://hl7.org/fhir/StructureDefinition/structuredefinition-regex";
+
+/// The `_code` extension naming the JSON type of a type without a code.
+const JSON_TYPE_EXTENSION: &str =
+    "http://hl7.org/fhir/StructureDefinition/structuredefinition-json-type";
+
+/// The FHIR primitives an XML attribute carries as a JSON string.
+const STRING_ATTRIBUTE_TYPES: [&str; 4] = ["code", "id", "string", "uri"];
 
 /// A failure while resolving a snapshot.
 #[derive(Debug, thiserror::Error)]
 pub enum ResolveError {
+    /// The structure states no type, so its root element cannot be named.
+    #[error("{url} states no type")]
+    NoType {
+        /// The structure's canonical URL.
+        url: String,
+    },
     /// The structure has no snapshot to resolve.
     #[error("{url} has no snapshot")]
     NoSnapshot {
@@ -56,6 +73,24 @@ pub enum ResolveError {
         url: String,
         /// The element path.
         path: String,
+    },
+    /// A type entry carries neither a code nor a `structuredefinition-json-type`.
+    #[error("a type of {path} in {url} has neither a code nor a structuredefinition-json-type")]
+    UntypedType {
+        /// The structure's canonical URL.
+        url: String,
+        /// The element path.
+        path: String,
+    },
+    /// An XML attribute is typed with a primitive whose JSON form is no string.
+    #[error("{path} in {url} is an XML attribute typed {code}, which has no JSON member form")]
+    AttributeType {
+        /// The structure's canonical URL.
+        url: String,
+        /// The element path.
+        path: String,
+        /// The type code.
+        code: String,
     },
     /// A content reference names an element the snapshot does not contain.
     #[error("{path} in {url} references {target}, which is not in the snapshot")]
@@ -96,59 +131,159 @@ pub struct TypeRef {
     pub code: String,
     /// The `FHIRPath` system type a primitive's value element carries, if any.
     pub fhirpath_type: Option<String>,
+    /// The JSON type a value carries where the package states one in place of
+    /// a type code (STU3), or where an XML attribute becomes a JSON member value.
+    pub json_type: Option<String>,
     /// Profiles the value must conform to.
     pub profiles: Vec<String>,
     /// Profiles a `Reference` or `canonical` target must conform to.
     pub target_profiles: Vec<String>,
-    /// The lexical form the value keeps, as the `regex` extension spells it
+    /// The lexical form the value keeps, as the `regex` extension (R4 and
+    /// later) or the `structuredefinition-regex` extension (STU3) spells it
     /// (<https://hl7.org/fhir/R5/datatypes.html#primitive>).
     pub regex: Option<String>,
 }
 
 impl TypeRef {
-    /// The type reference, or `None` for a type without a code (the three R4
-    /// extension definitions whose value types carry only `_code` extensions).
-    fn from_element_type(raw: &ElementType) -> Option<Self> {
-        let code = raw.code.as_deref()?;
+    /// Whether the value is a JSON scalar the generator maps itself, so no
+    /// FHIR type of the package backs it.
+    #[must_use]
+    pub fn is_scalar(&self) -> bool {
+        self.fhirpath_type.is_some() || self.json_type.is_some()
+    }
+
+    /// The type reference of one `ElementDefinition.type` entry of `element`.
+    fn from_element_type(
+        url: &str,
+        element: &ElementDefinition,
+        raw: &ElementType,
+    ) -> Result<Self, ResolveError> {
+        let regex = raw
+            .extension
+            .iter()
+            .find(|extension| {
+                extension.url == REGEX_EXTENSION || extension.url == STU3_REGEX_EXTENSION
+            })
+            .and_then(|extension| extension.value_string.clone());
+        let Some(code) = raw.code.as_deref() else {
+            return Self::from_json_type(url, element, raw, regex);
+        };
         let system = code.strip_prefix(FHIRPATH_SYSTEM_PREFIX);
         let fhir_type = raw
             .extension
             .iter()
             .find(|extension| extension.url == FHIR_TYPE_EXTENSION)
             .and_then(|extension| extension.value_url.clone());
-        let regex = raw
-            .extension
-            .iter()
-            .find(|extension| extension.url == REGEX_EXTENSION)
-            .and_then(|extension| extension.value_string.clone());
-        Some(match (system, fhir_type) {
-            (Some(system), Some(fhir_type)) => Self {
-                code: fhir_type,
-                fhirpath_type: Some(system.to_owned()),
-                profiles: raw.profile.clone(),
-                target_profiles: raw.target_profile.clone(),
-                regex,
-            },
+        let (code, fhirpath_type) = match (system, fhir_type) {
+            (Some(system), Some(fhir_type)) => (fhir_type, Some(system.to_owned())),
             // NOTE: no spec names a FHIR type for a bare System.* value type; keep the
             // `FHIRPath` name as the code so the emitter sees exactly what the package says.
-            (Some(system), None) => Self {
-                code: code.to_owned(),
-                fhirpath_type: Some(system.to_owned()),
-                profiles: raw.profile.clone(),
-                target_profiles: raw.target_profile.clone(),
-                regex,
-            },
-            (None, _) => Self {
-                code: code.to_owned(),
-                fhirpath_type: None,
-                profiles: raw.profile.clone(),
-                target_profiles: raw.target_profile.clone(),
-                regex,
-            },
+            (Some(system), None) => (code.to_owned(), Some(system.to_owned())),
+            (None, _) => (code.to_owned(), None),
+        };
+        let json_type = if fhirpath_type.is_none() && is_attribute(element) {
+            // NOTE: https://hl7.org/fhir/STU3/json.html: "Composites can have id attributes,
+            // which are converted to JSON member values", so an attribute is a plain string.
+            if !STRING_ATTRIBUTE_TYPES.contains(&code.as_str()) {
+                return Err(ResolveError::AttributeType {
+                    url: url.to_owned(),
+                    path: element.path.clone(),
+                    code,
+                });
+            }
+            Some(String::from("string"))
+        } else {
+            None
+        };
+        Ok(Self {
+            code,
+            fhirpath_type,
+            json_type,
+            profiles: raw.profile.clone(),
+            target_profiles: raw.target_profile.clone(),
+            regex,
         })
+    }
+
+    /// The type reference of an entry the package types by its `_code`
+    /// `structuredefinition-json-type` extension alone.
+    ///
+    /// A primitive's `value` takes the primitive's own name as its code, the
+    /// name R4 states in its `structuredefinition-fhir-type` extension; any
+    /// other element takes the JSON type.
+    fn from_json_type(
+        url: &str,
+        element: &ElementDefinition,
+        raw: &ElementType,
+        regex: Option<String>,
+    ) -> Result<Self, ResolveError> {
+        let json_type = raw
+            .code_element
+            .iter()
+            .flat_map(|code| &code.extension)
+            .find(|extension| extension.url == JSON_TYPE_EXTENSION)
+            .and_then(|extension| extension.value_string.clone())
+            .ok_or_else(|| ResolveError::UntypedType {
+                url: url.to_owned(),
+                path: element.path.clone(),
+            })?;
+        let code = element
+            .path
+            .strip_suffix(".value")
+            .filter(|owner| !owner.contains('.'))
+            .map_or_else(|| json_type.clone(), str::to_owned);
+        Ok(Self {
+            code,
+            fhirpath_type: None,
+            json_type: Some(json_type),
+            profiles: raw.profile.clone(),
+            target_profiles: raw.target_profile.clone(),
+            regex,
+        })
+    }
+
+    /// Folds `other`, an entry with the same code, into this one: the union
+    /// of the profiles, each kept once in the order first stated.
+    fn merge(&mut self, other: Self) {
+        for profile in other.profiles {
+            if !self.profiles.contains(&profile) {
+                self.profiles.push(profile);
+            }
+        }
+        for profile in other.target_profiles {
+            if !self.target_profiles.contains(&profile) {
+                self.target_profiles.push(profile);
+            }
+        }
     }
 }
 
+/// Whether `element` is an XML attribute other than a primitive's value.
+fn is_attribute(element: &ElementDefinition) -> bool {
+    element.representation.iter().any(|r| r == "xmlAttr")
+        && element
+            .path
+            .rsplit_once('.')
+            .is_some_and(|(_, last)| last != "value")
+}
+
+/// The type references of `element`, one per type code.
+///
+/// STU3 states one target profile per type entry, so `Observation.subject`
+/// lists `Reference` four times (<https://hl7.org/fhir/STU3/elementdefinition.html>);
+/// the entries of one code merge into one carrying every profile, the shape
+/// R4 states directly.
+fn type_refs(url: &str, element: &ElementDefinition) -> Result<Vec<TypeRef>, ResolveError> {
+    let mut types: Vec<TypeRef> = Vec::with_capacity(element.types.len());
+    for raw in &element.types {
+        let type_ref = TypeRef::from_element_type(url, element, raw)?;
+        match types.iter_mut().find(|known| known.code == type_ref.code) {
+            Some(known) => known.merge(type_ref),
+            None => types.push(type_ref),
+        }
+    }
+    Ok(types)
+}
 /// What an element holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ElementShape {
@@ -241,7 +376,7 @@ impl ResolvedStructure {
     ///
     /// # Errors
     ///
-    /// Returns a [`ResolveError`] when the snapshot is missing, an element has
+    /// Returns a [`ResolveError`] when the structure states no type, the snapshot is missing, an element has
     /// no cardinality or an invalid `max`, a non-root element has neither a
     /// type nor a content reference, or a content reference dangles.
     pub fn resolve(definition: &StructureDefinition) -> Result<Self, ResolveError> {
@@ -251,7 +386,12 @@ impl ResolvedStructure {
             .ok_or_else(|| ResolveError::NoSnapshot {
                 url: definition.url.clone(),
             })?;
-        let root_path = definition.type_name.as_str();
+        let root_path = definition
+            .type_name
+            .as_deref()
+            .ok_or_else(|| ResolveError::NoType {
+                url: definition.url.clone(),
+            })?;
         let mut elements = Vec::with_capacity(snapshot.element.len());
         for (index, element) in snapshot.element.iter().enumerate() {
             elements.push(resolve_element(
@@ -320,11 +460,7 @@ fn resolve_element(
         max: max.to_owned(),
     })?;
     let is_root = is_first && element.path == root_path;
-    let types: Vec<TypeRef> = element
-        .types
-        .iter()
-        .filter_map(TypeRef::from_element_type)
-        .collect();
+    let types = type_refs(url, element)?;
     let shape = match (&element.content_reference, types.is_empty(), is_root) {
         (_, _, true) => ElementShape::Root,
         (Some(reference), _, false) => content_reference(url, reference),

@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 
-use fhir_codegen::package::Package;
+use fhir_codegen::package::{Package, without_byte_order_mark};
 use fhir_types::schema::{Kind, Schemas, TypeSchema, ValueKind};
 use serde_json::Value;
 
@@ -38,8 +38,9 @@ struct Expected {
 }
 
 /// The emitted table of each version, in the order [`packages`] lists them.
-fn tables() -> [(&'static str, &'static Schemas); 4] {
+fn tables() -> [(&'static str, &'static Schemas); 5] {
     [
+        ("stu3", &fhir_types::stu3::schema::SCHEMAS),
         ("r4", &fhir_types::r4::schema::SCHEMAS),
         ("r4b", &fhir_types::r4b::schema::SCHEMAS),
         ("r5", &fhir_types::r5::schema::SCHEMAS),
@@ -61,7 +62,8 @@ fn snapshot_elements(package: &Package, type_name: &str) -> Vec<Value> {
         .source_of("StructureDefinition", &definition.url)
         .unwrap_or_else(|| panic!("{type_name} was loaded from a file"));
     let text = fs::read_to_string(file).expect("the structure file reads");
-    let raw: Value = serde_json::from_str(&text).expect("the structure file parses");
+    let raw: Value =
+        serde_json::from_str(without_byte_order_mark(&text)).expect("the structure file parses");
     raw.get("snapshot")
         .and_then(|snapshot| snapshot.get("element"))
         .and_then(Value::as_array)
@@ -69,15 +71,23 @@ fn snapshot_elements(package: &Package, type_name: &str) -> Vec<Value> {
         .unwrap_or_else(|| panic!("{type_name} has a snapshot"))
 }
 
-/// The FHIR type code of one `ElementDefinition.type` entry.
+/// The FHIR type code of one `ElementDefinition.type` entry of the element at `path`.
 ///
 /// A `FHIRPath` system type names its FHIR type in the `structuredefinition-fhir-type`
-/// extension (<https://hl7.org/fhir/R4/elementdefinition.html>).
-fn type_code(entry: &Value) -> String {
-    let code = entry
-        .get("code")
-        .and_then(Value::as_str)
-        .expect("a type entry carries a code");
+/// extension (<https://hl7.org/fhir/R4/elementdefinition.html>). An STU3
+/// primitive's `value` carries no code, only its `_code` JSON type, and takes
+/// the primitive's own name, the code R4 states for the same element.
+fn type_code(path: &str, entry: &Value) -> String {
+    let Some(code) = entry.get("code").and_then(Value::as_str) else {
+        assert!(
+            entry.get("_code").is_some(),
+            "{path}: a type entry without a code carries its _code extensions"
+        );
+        return path
+            .strip_suffix(".value")
+            .expect("only a primitive's value is typed without a code")
+            .to_owned();
+    };
     if !code.starts_with(SYSTEM_PREFIX) {
         return code.to_owned();
     }
@@ -127,13 +137,14 @@ fn children_of(elements: &[Value], parent: &str) -> Vec<Expected> {
                     .and_then(|min| u32::try_from(min).ok())
                     .expect("an element carries a min"),
                 max: max_of(element),
-                types: element
-                    .get("type")
-                    .and_then(Value::as_array)
-                    .into_iter()
-                    .flatten()
-                    .map(type_code)
-                    .collect(),
+                types: distinct(
+                    element
+                        .get("type")
+                        .and_then(Value::as_array)
+                        .into_iter()
+                        .flatten()
+                        .map(|entry| type_code(path, entry)),
+                ),
                 content_reference: element.get("contentReference").and_then(Value::as_str).map(
                     |reference| {
                         reference
@@ -153,6 +164,19 @@ fn children_of(elements: &[Value], parent: &str) -> Vec<Expected> {
             })
         })
         .collect()
+}
+
+/// The codes in their first-stated order, each once: STU3 repeats a code once
+/// per target profile (<https://hl7.org/fhir/STU3/elementdefinition.html>),
+/// and the element still takes one value of that type.
+fn distinct(codes: impl Iterator<Item = String>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for code in codes {
+        if !out.contains(&code) {
+            out.push(code);
+        }
+    }
+    out
 }
 
 /// The JSON name of a choice alternative: the stem with the type name appended,
@@ -390,9 +414,11 @@ type Member<'a> = (&'a str, Kind, u32, Option<u32>, &'a [&'a str]);
 
 /// The FHIR type each package names behind `Element.id`'s `System.String`.
 ///
-/// The 4.3.0 package types it `id` where the other three type it `string`, so
-/// the emitted table carries the package's own answer per version.
-const ELEMENT_ID_TYPE: [(&str, &str); 4] = [
+/// The 4.3.0 package types it `id` where the other four type it `string`
+/// (3.0.2 with the code itself), so the emitted table carries the package's
+/// own answer per version.
+const ELEMENT_ID_TYPE: [(&str, &str); 5] = [
+    ("stu3", "string"),
     ("r4", "string"),
     ("r4b", "id"),
     ("r5", "string"),

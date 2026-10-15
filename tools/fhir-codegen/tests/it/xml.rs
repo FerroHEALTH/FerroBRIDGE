@@ -8,6 +8,7 @@
 use std::fs;
 use std::path::PathBuf;
 
+use fhir_codegen::package::without_byte_order_mark;
 use fhir_types::codec::Value;
 use fhir_types::codec::{DecodeErrorKind, Json, expect_object};
 use fhir_types::schema::Schemas;
@@ -49,7 +50,7 @@ fn root_set_files(package: &str) -> Vec<PathBuf> {
 /// The canonical JSON of a file the JSON codec accepts, `None` when it refuses it.
 fn canonical<T: Json>(path: &std::path::Path) -> Option<Value> {
     let text = fs::read_to_string(path).ok()?;
-    let original: Value = serde_json::from_str(&text).ok()?;
+    let original: Value = serde_json::from_str(without_byte_order_mark(&text)).ok()?;
     let mut element_path = fhir_types::codec::Path::root("Resource");
     let object = expect_object(&original, &element_path).ok()?;
     let decoded = T::from_json(object, &mut element_path).ok()?;
@@ -106,6 +107,14 @@ fn round_trip_all<T: Json>(package: &str, schemas: &Schemas) {
     assert!(
         unknown_resources < 20,
         "{package}: {unknown_resources} bundles carry resources outside the root set"
+    );
+}
+
+#[test]
+fn every_stu3_root_set_resource_round_trips_through_xml() {
+    round_trip_all::<fhir_types::stu3::resource::Resource>(
+        "hl7.fhir.r3.core",
+        &fhir_types::stu3::schema::SCHEMAS,
     );
 }
 

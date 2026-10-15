@@ -90,7 +90,8 @@ the testkit tool crate. Beside it:
   commit outcome (`hl7v2::answer`).
 
 - `crates/fhir-types`: the generated FHIR model, Apache-2.0, emitted whole by
-  the generator below and never hand-edited.
+  the generator below and never hand-edited: one module per version, STU3,
+  R4, R4B, R5 and R6, each behind its feature.
 - `crates/hl7v2-types`: the generated HL7 v2 tables (#253), Apache-2.0,
   emitted whole by the `v2` root set of the generator below from the fetched
   v2 definitions: every message structure's segment-group tree, the field
@@ -147,9 +148,10 @@ the testkit tool crate. Beside it:
   extensions by `url`. `report` holds typed issues and every slicing,
   invariant, binding and profile it met and did not evaluate, and converts to
   an R4 `OperationOutcome`.
-- `tools/fhir-codegen`: the generator, with the six vendored HL7 FHIR packages
-  under `vendor/` (380 MB, a `PROVENANCE.md` each; the sixth is the v2-to-FHIR
-  guide, #252), the HL7 v2 definitions fetched at build time into the
+- `tools/fhir-codegen`: the generator, with the seven vendored HL7 FHIR
+  packages under `vendor/` (411 MB, a `PROVENANCE.md` each; one is the
+  v2-to-FHIR guide, #252, and one the STU3 core package behind the `stu3`
+  module, #453), the HL7 v2 definitions fetched at build time into the
   ignored `vendor/hl7-v2ig/`, and the IGAMT export of HL7's v2 database
   fetched the same way into `vendor/hl7-v2-legacy/` (#303; of each only the
   `PROVENANCE.md` is committed) as its inputs.

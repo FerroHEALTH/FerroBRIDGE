@@ -197,6 +197,7 @@ default branch.
 | FHIRconnect REST API (draft) | specification pull request #93, head `2bf2a2fe91bae2ae659cda1665826567ea81b4af` (`engine/rest-api.adoc`, the `ToFhir` and `ToOpenEhr` FSH operation definitions) | an unmerged chapter the reference engine already implements (openFHIR 3.0.0); FerroBRIDGE implements it as a draft, pinned by commit, and re-adjudicates on merge (section 4.7) |
 | FHIRconnect mapping library | `SevKohler/FHIRconnect-mapping-lib` at `6bd4c19a2f96821c04fbeed3c6f6c190fd85825b` (2026-06-05), 107 YAML mapping files (52 `model`, 55 `projects`) | the conformance corpus, never an oracle: 24 files fail the published schema, 5 cross-references dangle, 6 files share one `metadata.name`; the 12 German KDS contexts pin profile version 2025.0.0 and every module has moved past it; the one EEHRxF context pins Laboratory 0.1.1 against a published 2.0.0 and declares a `sem_ver` its own OPT contradicts (section 4.8) |
 | FHIR | R4 (4.0.1), package `hl7.fhir.r4.core` 4.0.1 (CC0) | the only value the FHIRconnect schemas admit for `spec.version`; the mapping library targets R4; every EHDS-category HL7 Europe guide has an R4 line (section 4.8) |
+| FHIR STU3, the model only | 3.0.2, package `hl7.fhir.r3.core` 3.0.2 (CC0, registry shasum `173cc0eec749a68bff90cccae7631f2c72a4f2ac`) | the `stu3` module of `fhir-types` (section 4.1, #452); the facade and FHIRconnect stay on R4, because FHIRconnect v1.0.0 admits only R4 |
 | OMOCL | v1.0.0 (grammar `OMOCL/v1.0.0`; corpus `SevKohler/OMOCL` at `c082db8ed81a062a574a2c058366045f600c2ed7`, 2026-09-19, 208 files, Apache-2.0) | the only released grammar. The git tag `v1.0.0` carries pre-grammar files headed `engine: EOS/v0.0.62`; the grammar string first appears at tag `v1.0.1`, so the corpus is pinned by commit. No JSON schema is published; the grammar is two railroad images and four syntax tables |
 | OMOP CDM | v5.4 (`OHDSI/CommonDataModel` tag `v5.4.3`, 2026-08-04; licence Apache License 2.0 per `DESCRIPTION`, the repository has no `LICENSE` file) | the only version OMOCL files declare (`spec.system: OMOP`, `spec.version: 5.4`) and the only one the reference engine supports; the CSV table and field definitions and the rendered PostgreSQL DDL are the machine-readable input. v5.5.0 shipped 2026-08-25 and is tracked, never assumed |
 | OHDSI Data Quality Dashboard | v2.9.0 (`OHDSI/DataQualityDashboard` tag `v2.9.0`, commit `b9d2a9b4a4736f7ea81415d974c72119b6f0bd11`, 2026-10-06; licence Apache License 2.0 per `DESCRIPTION`, the repository has no `LICENSE` file) | the newest release and the OMOP acceptance gate of section 11. Its CDM v5.4 check catalogue, thresholds and SQL templates are the oracle of the Rust port; the templates are SQL Server dialect, so their PostgreSQL form is FerroBRIDGE's own translation. Its v5.4 field thresholds disagree with the CDM v5.4.3 definitions on primary keys, foreign keys and concept domains, and the vendored CDM DDL sides with the CDM, so the field set comes from the CDM definitions and the thresholds from the Dashboard |
@@ -211,7 +212,7 @@ default branch.
 | `openehr-query` | 0.0.84 (BUSL-1.1) | the AQL 1.1.0 parser and canonical printer. `openehr-term` (Apache-2.0 AND CC-BY-SA-3.0) and `openehr-lang` arrive transitively |
 | `openehr-am` | 0.0.84 (Apache-2.0) | the generated AM 2.4 model: the AOM2 `OPERATIONAL_TEMPLATE` and `ARCHETYPE_HRID` types an ADL 2 template decodes into (section 3); taken directly because the bridge names those types |
 | `openehr-adl` | not taken in the first cut (0.0.84, BUSL-1.1) | the ADL 2 text parser, flattener and OPT2 generator; the bridge fetches an ADL 2 template as AOM2 canonical JSON, so it never parses ADL source (section 3); taken later only if a CDR serves ADL 2 templates as text alone |
-| `fhir-types` | 0.1.108 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
+| `fhir-types` | 0.1.109 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
 | openFHIR, the FHIRconnect reference engine | 3.0.1 (2026-09-09), read for behaviour only | never an oracle; section 4.4 records the 3.0.0 behaviour changes and what the bridge takes |
 | Eos, the OMOCL reference engine | 0.0.62 (2024-03-20), last commit 2026-03-09 | never an oracle; dormant, so its behaviour is prior art with no expected movement |
 | FHIR terminology operations | R4, R4B tolerant | `CodeSystem/$lookup`, `ConceptMap/$translate`, `ValueSet/$validate-code`; a server may answer R4 or R4B; the reference server selects the version by path (section 6) |
@@ -479,6 +480,57 @@ resources, one author, a five-way licence disjunction, and the owner's own
 read of its code quality); `fhir-model` 0.13.0 (R4B and R5 oriented, no
 element table; the reference CDR's connector used it and is dropping it);
 `helios-fhir` 0.2.1; every FHIRPath evaluator as a model source.
+
+**Decision (#452, 2026-10-15): `fhir-types` carries FHIR STU3 (3.0.2) as a
+fifth version module, `stu3`, behind a feature of that name in the default
+set.** HL7 names the release STU3 (<https://hl7.org/fhir/STU3/>), so the
+module does too. The generator reads `hl7.fhir.r3.core` 3.0.2 like the other
+core packages, and every shape 3.0.2 states differently from R4 is read from
+the package, never assumed:
+
+- 40 files begin with a UTF-8 byte order mark, which the loader strips on
+  read. The JSON page says "The character encoding is always UTF-8"
+  (<https://hl7.org/fhir/STU3/json.html>) and nothing about a mark, so this is
+  our own design; the files stay verbatim on disk.
+- `ElementDefinition.type.profile` and `targetProfile` are a single `uri`
+  (<https://hl7.org/fhir/STU3/elementdefinition.html>), so a `Reference` to
+  four targets is four type entries. Entries with one code merge into one
+  carrying the union of their profiles, the shape R4 states directly, and
+  entries whose codes differ on a non-choice element stay a refusal.
+- A primitive's `value` carries no type code, only `_code` with the
+  `structuredefinition-json-type` extension. That JSON type makes the value a
+  scalar, and a type entry with neither a code nor that extension is a typed
+  error, never a dropped element. The lexical form is read from
+  `structuredefinition-regex` as well as R4's `regex`, and a binding from
+  `valueSetReference` and `valueSetUri` as well as `valueSet`.
+- `Element.id` and `Extension.url` are typed with the primitive codes
+  `string` and `uri` and `representation: [xmlAttr]`. An attribute is a JSON
+  member value ("Composites can have id attributes, which are converted to
+  JSON member values", <https://hl7.org/fhir/STU3/json.html>), so it is a
+  plain string, the Rust shape R4 gives the same elements.
+- The Definition, Event and Request logical models omit
+  `StructureDefinition.type`, which is 1..1
+  (<https://hl7.org/fhir/STU3/structuredefinition.html>); none is a root, and
+  resolving one is a typed error.
+- STU3 has no `TerminologyCapabilities`, so the root sets are declared per
+  version and the STU3 terminology set is the other seven. `ExpansionProfile`
+  stays in the resource set: `$expand` names one by a `uri` parameter and no
+  terminology operation exchanges the resource
+  (<https://hl7.org/fhir/STU3/valueset-operations.html#expand>).
+- The terminology ecosystem overlay is not applied to STU3. It pre-adopts R6
+  parameters for the servers that consume the R4 to R5 models, its types
+  include `canonical`, which STU3 lacks, and no consumer speaks STU3
+  terminology through it. The STU3 contracts carry exactly what 3.0.2
+  declares: `$validate-code` takes one `version`, `$expand` takes `profile`
+  as a `uri`, and `$lookup` types `property.value` as `code`.
+
+The STU3 examples package, `hl7.fhir.r3.examples` 3.0.2, runs as the
+`fhir-stu3` conformance corpus beside the other four model corpora. The
+terminology client speaking STU3 and the profile validator holding STU3
+profiles are each their own issue. The facade and FHIRconnect stay R4,
+because FHIRconnect v1.0.0 "was designed based on R4" and both schemas
+restrict `spec.version` to `R4`; taking STU3 there needs a decision of its
+own.
 
 `fhir-terminology` is struck from the design. It is a terminology server over
 a code-system provider seam and its manifest pulls in the SNOMED, ICD-11 and
@@ -1495,9 +1547,9 @@ Code is generated where a machine-readable source exists, hand-written
 everywhere else, under `.claude/rules/codegen.md`.
 
 **Generated by FerroBRIDGE, the FHIR model:** `fhir-types`, by `tools/fhir-codegen`
-from the vendored `hl7.fhir.r4.core` 4.0.1, `hl7.fhir.r4b.core` 4.3.0,
-`hl7.fhir.r5.core` 5.0.0, `hl7.fhir.r6.core` 6.0.0-ballot5 and `hl7.terminology`
-7.3.0 packages (CC0), fetched from the FHIR package registry with checksum
+from the vendored `hl7.fhir.r3.core` 3.0.2, `hl7.fhir.r4.core` 4.0.1,
+`hl7.fhir.r4b.core` 4.3.0, `hl7.fhir.r5.core` 5.0.0, `hl7.fhir.r6.core`
+6.0.0-ballot5 and `hl7.terminology` 7.3.0 packages (CC0), fetched from the FHIR package registry with checksum
 verification. Root set per version: every `kind: resource` StructureDefinition
 behind the `resources` feature, the terminology root set otherwise, each with
 the complete closure of the datatypes and primitives it references, plus the
@@ -1617,7 +1669,7 @@ FHIRconnect schemas; the draft REST API chapter and its FSH operation
 definitions at the pinned pull-request commit; the FHIRconnect mapping
 library; the OMOCL corpus; the CDM CSV definitions and PostgreSQL DDL; the
 three `STABLE` ITS-REST OpenAPI documents (read by the client's contract
-tests); the six HL7 packages the FHIR generator reads; and, when a context
+tests); the seven HL7 packages the FHIR generator reads; and, when a context
 targeting it is authored, the HL7 Europe and MII profile packages of section
 4.8, each pinned by version in `docs/VERSIONS.md`.
 

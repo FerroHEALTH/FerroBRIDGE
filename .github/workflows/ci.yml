@@ -359,10 +359,10 @@ jobs:
           tool: cargo-hack
       # One package at a time, the way the msrv job compiles and passes: a
       # workspace-wide check schedules the two generated giants (fhir-types with
-      # its four versions, openehr-am behind the client) side by side and the
+      # its five versions, openehr-am behind the client) side by side and the
       # runner's seven gigabytes run out; per package they never meet. Default
       # features here; the per-version `resources` surface of fhir-types is
-      # linted by clippy-fhir-types below, and the all-features union (four
+      # linted by clippy-fhir-types below, and the all-features union (five
       # versions, every resource, one crate) is no consumer's surface.
       - run: cargo hack clippy --workspace --all-targets --locked -- -D warnings
 
@@ -377,7 +377,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: [r4, r4b, r5, r6]
+        version: [stu3, r4, r4b, r5, r6]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

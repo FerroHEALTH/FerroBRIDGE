@@ -388,7 +388,7 @@ fn lower_typed(
             count: types.len(),
         });
     }
-    if only.fhirpath_type.is_some() {
+    if only.is_scalar() {
         // NOTE: a primitive's JSON scalar follows the primitive's own name
         // (<https://hl7.org/fhir/R4/json.html#primitive>); the 4.0.1 package
         // tags unsignedInt.value and positiveInt.value as `string`.

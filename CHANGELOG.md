@@ -75,6 +75,19 @@ crates on crates.io.
   validator cannot decide (a path outside the subset, a reference outside the
   resource, a value set it cannot enumerate) is named as `not-supported`, and
   a `#id` reference that resolves to nothing is a warning.
+- `fhir-types` 0.1.109 carries FHIR STU3 (3.0.2) as the `stu3` module, behind
+  a feature of that name in the default set, emitted from `hl7.fhir.r3.core`
+  3.0.2 (#453). The generator reads the shapes STU3 states differently from
+  R4: it strips a UTF-8 byte order mark on read, decodes the single and the
+  list form of `profile` and `targetProfile` and merges type entries of one
+  code into one, takes a primitive value's type from its `_code` JSON type and
+  refuses a type entry with neither, reads `structuredefinition-regex` and
+  both STU3 binding forms, and gives `Element.id` and `Extension.url` the
+  plain-string shape they have in R4. STU3 has no `TerminologyCapabilities`,
+  so its terminology root set is the other seven resources, and its
+  operation contracts carry exactly what 3.0.2 declares, without the
+  terminology ecosystem overlay. `fhirconnect` steps to 0.1.109 with the
+  requirement.
 - `omop_cdm::quality` runs the nine conformance checks of the OHDSI Data
   Quality Dashboard v2.9.0 (`cdmTable`, `cdmField`, `isRequired`,
   `cdmDatatype`, `isPrimaryKey`, `isForeignKey`, `fkDomain`, `fkClass`,
