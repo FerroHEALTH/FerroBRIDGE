@@ -158,7 +158,12 @@ the testkit tool crate. Beside it:
   corpus with a `PROVENANCE.md`, fetched by `scripts/vendor/*.sh` from the pins
   in `docs/VERSIONS.md`: FHIRconnect with its schemas and the draft REST API
   chapter, the FHIRconnect mapping library, OMOCL, the OMOP CDM v5.4
-  definitions and PostgreSQL DDL, and the ITS-REST OpenAPI documents.
+  definitions and PostgreSQL DDL, and the ITS-REST OpenAPI documents. Beside
+  them, `fhir-packages/` holds the R4 profile validator's package set (#435),
+  one `<package>#<version>` tree per pin, fetched at build time by
+  `scripts/vendor/profile-packages.sh` into the ignored `package/` and never
+  committed (only each `PROVENANCE.md` is); its `--check` asserts the
+  dependency closure is complete.
 - `docker/Dockerfile`: the container recipe (#22), one stage on distroless
   static pinned by index digest, copying the binary the release lane stages
   under `dist/<os>_<arch>/`; it compiles nothing.

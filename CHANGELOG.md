@@ -25,6 +25,21 @@ crates on crates.io.
 
 ### Added
 
+- `scripts/vendor/profile-packages.sh` fetches the package set of the R4
+  profile validator at build time into the ignored
+  `docs/specs/fhir-packages/<package>#<version>/package/` (#435), about
+  570 MB that is never committed; only each `PROVENANCE.md` is. The set is the HL7 Europe Patient Summary `hl7.fhir.eu.eps` 1.0.0-ballot, HL7
+  Europe Base `hl7.fhir.eu.base` 2.0.1 and the International Patient Summary
+  `hl7.fhir.uv.ips` 2.0.0, with every package their `package.json` files name,
+  transitively, at the version each dependent names: 17 package versions,
+  among them EU Base 2.0.0 (the version EPS names) and five versions of
+  `hl7.terminology.r4`. `hl7.fhir.r4.core` 4.0.1 is read from the generator's
+  tree. Each tarball is checked against the registry shasum, and each tree
+  against the file count and digest `docs/VERSIONS.md` pins, a cache-restored
+  tree included. The CI job `profile-packages` fetches the set over a cache
+  keyed on the pins and runs `--check`, which fails when a dependency of a
+  pinned package is not pinned too; `scripts/checks/conformance.sh` fetches
+  the set beside the other build-time inputs.
 - `omop_cdm::quality` runs the nine conformance checks of the OHDSI Data
   Quality Dashboard v2.9.0 (`cdmTable`, `cdmField`, `isRequired`,
   `cdmDatatype`, `isPrimaryKey`, `isForeignKey`, `fkDomain`, `fkClass`,
