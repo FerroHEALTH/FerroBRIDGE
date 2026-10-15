@@ -15,6 +15,9 @@
 )]
 
 mod conformance;
+mod constraints;
 mod evaluate;
+mod parse;
+mod seams;
 mod suite;
 mod support;

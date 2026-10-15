@@ -1152,6 +1152,7 @@ dependencies = [
  "quick-xml",
  "regex",
  "rust_decimal",
+ "serde",
  "serde_json",
  "thiserror",
  "tracing",

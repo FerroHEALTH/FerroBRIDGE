@@ -25,14 +25,13 @@ pub(crate) fn suite_dir() -> PathBuf {
 
 /// Reads a FHIR resource in XML or JSON into the lexical document model.
 pub(crate) fn load(path: &Path) -> Result<Value, String> {
-    let text =
-        std::fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))?;
+    let text = std::fs::read_to_string(path).map_err(|error| format!("{error}"))?;
     if path.extension().is_some_and(|extension| extension == "xml") {
         fhir_types::xml::from_xml(&fhir_types::r4::schema::SCHEMAS, &text)
             .map(Value::Object)
-            .map_err(|error| format!("{}: {error}", path.display()))
+            .map_err(|error| format!("{error}"))
     } else {
-        serde_json::from_str(&text).map_err(|error| format!("{}: {error}", path.display()))
+        serde_json::from_str(&text).map_err(|error| format!("{error}"))
     }
 }
 

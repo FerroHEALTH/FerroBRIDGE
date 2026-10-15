@@ -41,6 +41,7 @@ readonly CRATES=(
   omop-cdm
   ferrobridge-term
   ferrobridge-hl7v2
+  ferrobridge-fhirpath
 )
 
 # The `[package]` table's own `version` in one member's manifest.

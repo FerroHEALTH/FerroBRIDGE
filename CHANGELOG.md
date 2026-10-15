@@ -40,6 +40,15 @@ crates on crates.io.
   keyed on the pins and runs `--check`, which fails when a dependency of a
   pinned package is not pinned too; `scripts/checks/conformance.sh` fetches
   the set beside the other build-time inputs.
+- `ferrobridge-fhirpath`, a FHIRPath evaluator for FHIRPath Normative
+  Release 2.0.0 with the FHIR R4 additions (#436): parse an expression once,
+  check its paths against the context type, and evaluate it on a resource or
+  an element with exact decimals and dates that keep their precision.
+  `resolve()`, `memberOf()`, `subsumes()`, `conformsTo()`,
+  `elementDefinition()` and `slice()` call seams you supply, and a call
+  without its seam is an error naming the function. The HL7 FHIRPath test
+  suite for R4 runs as the `fhirpath-r4` conformance corpus, and every
+  invariant of the vendored FHIR packages parses.
 - `omop_cdm::quality` runs the nine conformance checks of the OHDSI Data
   Quality Dashboard v2.9.0 (`cdmTable`, `cdmField`, `isRequired`,
   `cdmDatatype`, `isPrimaryKey`, `isForeignKey`, `fkDomain`, `fkClass`,

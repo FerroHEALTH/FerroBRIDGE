@@ -1176,6 +1176,7 @@ published `openehr-*` crates do.
 | `omop-cdm` | CDM v5.4 row types and column metadata generated from the OHDSI field definitions; the OHDSI PostgreSQL DDL vendored verbatim and embedded; `graph`, the record graph the OMOCL engine emits and the writer commits; behind the default `database` feature, the vocabulary loader and concept resolver, the derived-table runners and the `COPY` writer, so a metadata-only consumer (`omocl`) takes the crate with `default-features = false` and builds no database client | generated plus hand-written | yes |
 | `ferrobridge-term` | the FHIR terminology client over `fhir-types` | hand-written | yes |
 | `ferrobridge-hl7v2` | the HL7 v2 face (#254): `mllp` (the MLLP Release 1 frame codec on `tokio-util` and the listener), `decode` (MSH-18 through `encoding_rs`, a byte outside the declared set refused), `parse` (positional split, escape decoding, the grouping by the `hl7v2-types` structure tree), `ack` (original-mode `AA`, `AE`, `AR`), `inbound` (one message through those steps), `map` (the interpreter of the `hl7.fhir.uv.v2mappings` ConceptMaps, read from a directory at run time, writing through `fhirconnect::tree` and translating every table value through `ferrobridge-term`; conditions and target notation on `logos` and `chumsky`) | hand-written | yes (0.0.0 reservation) |
+| `ferrobridge-fhirpath` | the FHIRPath evaluator (#436): FHIRPath Normative Release 2.0.0 with the FHIR R4 additions over the `fhir-types` `Value` tree, typed by the element table behind a version trait (`model::r4::R4`); a `logos` and `chumsky` parser, exact decimals, dates and times with their precision, a static path check against the context type, and the outward functions (`resolve()`, `memberOf()`, `conformsTo()` and the rest) over caller-supplied seams | hand-written | yes (0.0.0; the name is not yet reserved on crates.io) |
 | `app/ferrobridge-server` | the one binary, `ferrobridge`: `serve` (the FHIR facade, the FHIRconnect operations, the ETL job API), `etl` (a batch run), `cdm init` (apply the DDL), `vocab load`, `mapping check`; thin `main.rs` over a `lib.rs`; the `cdr` module over the generated ITS-REST client of `openehr-its` (the commit headers, the kept upstream answer, the ids an `ETag` names, the template fetch, the AQL paging); the `redb` identity store; the `hl7v2` face beside the FHIR facade (the `[hl7v2]` MLLP listener, each message written through the facade's ingest service, the acknowledgment chosen from the commit outcome); the change-feed adapter | hand-written | no |
 | `tools/fhir-codegen` | the FHIR generator moved from the sibling, with its `emit --check` drift gate and its vendored packages | hand-written | no |
 | `tools/omop-cdm-codegen` | the CDM generator with its `emit --check` drift gate | hand-written | no |
@@ -1196,6 +1197,7 @@ flowchart BT
     HL["ferrobridge-hl7v2<br/>(the HL7 v2 face)"] --> HV
     HL --> FC
     HL --> TC
+    FP["ferrobridge-fhirpath<br/>(the FHIRPath evaluator)"] --> FT
     SV["app/ferrobridge-server<br/>(the one binary)"] --> FC
     SV --> OM
     SV --> OC

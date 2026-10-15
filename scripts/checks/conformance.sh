@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# The conformance gate (#24): runs the eleven corpus tests, compares what they
+# The conformance gate (#24): runs the twelve corpus tests, compares what they
 # measured with the committed pass lists under conformance/, and renders one
 # shields.io endpoint badge per corpus (https://shields.io/badges/endpoint-badge),
 # one per HL7 v2 message family and one per HL7 v2 version (#366), and the
@@ -45,7 +45,7 @@ fi
 cd "$(dirname "$0")/../.."
 
 readonly CORPORA=(fhirconnect-mapping-lib omocl roundtrip draft-rest-api hl7v2 hl7v2-smoke
-  fhir-r4 fhir-r4b fhir-r5 fhir-r6 fhir-r4-facade)
+  fhir-r4 fhir-r4b fhir-r5 fhir-r6 fhir-r4-facade fhirpath-r4)
 readonly OUT=target/conformance
 readonly BADGES=conformance/badges
 # The shields.io endpoint prefix every conformance badge file is read through.
@@ -86,6 +86,7 @@ label_of() {
     fhir-r5) echo "FHIR R5" ;;
     fhir-r6) echo "FHIR R6" ;;
     fhir-r4-facade) echo "FHIR R4 facade" ;;
+    fhirpath-r4) echo "FHIRPath R4 test suite" ;;
     *) return 1 ;;
   esac
 }
@@ -162,7 +163,7 @@ if ! scripts/vendor/profile-packages.sh; then
   exit 2
 fi
 # One package per invocation, as the CI test lane runs them.
-for package in fhirconnect omocl ferrobridge-hl7v2 ferrobridge-testkit ferrobridge-server; do
+for package in fhirconnect omocl ferrobridge-hl7v2 ferrobridge-testkit ferrobridge-server ferrobridge-fhirpath; do
   if ! cargo nextest run --locked -p "$package" --no-tests=fail --no-fail-fast \
     -E 'test(/conformance_/)'; then
     echo "conformance: a $package corpus test failed; a case its list records no longer passes"
@@ -271,6 +272,9 @@ render_block() {
   for name in fhir-r4 fhir-r4b fhir-r5 fhir-r6 roundtrip fhir-r4-facade; do
     badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
   done
+  echo
+  echo 'FHIRPath 2.0.0 with the FHIR R4 additions:'
+  badge_link "$(label_of fhirpath-r4)" fhirpath-r4 conformance/fhirpath-r4/pass-list.txt
   echo
   echo 'HL7 v2, by corpus, then by message family and by version across both corpora:'
   badge_link "$(label_of hl7v2)" hl7v2 conformance/hl7v2/pass-list.txt

@@ -55,7 +55,7 @@ v0.0.4 (OMOP). Nothing is scaffolded before its issues are filed.
 ## Repo map
 
 The Cargo workspace (#107) holds the root manifests with the full lint set,
-eight library crates (five at 0.0.0, the version that holds their crates.io
+nine library crates (six at 0.0.0, the version that holds their crates.io
 names until a first publish, and `fhir-types`, `openehr-mapping-core` and
 `fhirconnect` on the published crate line), and
 the testkit tool crate. Beside it:
@@ -128,6 +128,14 @@ the testkit tool crate. Beside it:
   at run time, writing FHIR R4 through `fhirconnect::tree` and translating
   every table value through `ferrobridge-term`, with every condition, target
   or value it cannot carry a counted outcome.
+- `crates/ferrobridge-fhirpath`: the FHIRPath evaluator (#436), FHIRPath
+  Normative Release 2.0.0 with the FHIR R4 additions over the `fhir-types`
+  `Value` tree and element table (`model::r4::R4`): a `logos` and `chumsky`
+  parser, exact decimals, dates and times that keep their precision, a static
+  check of the paths against the context type, and `resolve()`, `memberOf()`,
+  `conformsTo()` and the other outward functions over caller-supplied seams.
+  The HL7 FHIRPath R4 test suite under `docs/specs/fhirpath-tests/` is its
+  `fhirpath-r4` corpus.
 - `tools/fhir-codegen`: the generator, with the six vendored HL7 FHIR packages
   under `vendor/` (380 MB, a `PROVENANCE.md` each; the sixth is the v2-to-FHIR
   guide, #252), the HL7 v2 definitions fetched at build time into the
@@ -180,9 +188,10 @@ the testkit tool crate. Beside it:
   bump rule; `favicon-sync.sh`, the book theme favicon against the brand mark;
   `pin-freshness.sh`, every pin no ecosystem watches against its newest
   upstream release; and `conformance.sh`, the pass-list gate over the six
-  corpora under `conformance/` (eleven: the two mapping libraries, the
+  corpora under `conformance/` (twelve: the two mapping libraries, the
   round-trip laws, the REST API draft, the two HL7 v2 message sets, the four
-  FHIR examples packages per version, and the R4 facade) (a regression fails, a new pass asks for the
+  FHIR examples packages per version, the R4 facade, and the HL7 FHIRPath
+  test suite for R4) (a regression fails, a new pass asks for the
   list, `--update` rewrites the lists and the shields.io badge JSON).
 - `.github/`: issue and pull-request templates, CODEOWNERS, Dependabot, and
   ten workflows (CI, Docs, Scorecard, CodeQL, SonarQube Cloud, Release,
