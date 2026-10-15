@@ -113,7 +113,7 @@ pub(crate) fn unevaluated_discriminators(report: &Report) -> Vec<(Constraint, Re
         .map(|entry| {
             (
                 entry.constraint.clone(),
-                entry.reason,
+                entry.reason.clone(),
                 entry.location.clone(),
             )
         })

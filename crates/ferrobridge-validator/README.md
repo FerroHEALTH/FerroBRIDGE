@@ -44,12 +44,27 @@ An item matched to a slice is held to the slice's own constraints. Content
 is validated against the profiles its type names and passes when it conforms
 to one of them.
 
-Invariants, terminology bindings, target profiles and the profiles a
-resource claims are not evaluated yet, and neither is a discriminator the
-validator cannot decide (a path outside the subset, a reference outside the
-resource, a value set it cannot enumerate). Each one the validator meets is
-listed in the report and in the `OperationOutcome` as a `warning` of type
-`not-supported`, never passed in silence.
+Terminology bindings are checked on `code`, `string`, `uri`, `Coding`,
+`CodeableConcept` and quantity units. A value with no code from the value set
+is an error under a `required` binding and under the maximum value set of the
+`elementdefinition-maxValueSet` extension, a warning under `extensible` and
+information under `preferred`; `example` is not checked. Membership is read
+from the package set: listed concepts, whole code systems, excludes, imported
+value sets, version pins, the subsumption and property filters a carried code
+system supports, and complete expansions. A coding whose display is none its
+code system gives the code is a warning. A binding the package set cannot
+decide is kept as a pending check, which `Report::resolve_bindings` sends to a
+terminology server through
+[`ferrobridge-term`](https://docs.rs/ferrobridge-term) as one call or one
+batch; without a server, or when the server fails, it stays listed with the
+reason.
+
+Invariants, target profiles and the profiles a resource claims are not
+evaluated yet, and neither is a discriminator the validator cannot decide (a
+path outside the subset, a reference outside the resource, a value set it
+cannot evaluate). Each one the validator meets is listed in the report and in
+the `OperationOutcome` as a `warning` of type `not-supported`, never passed in
+silence.
 
 ## Message ids
 

@@ -6,6 +6,7 @@
 //! `OperationOutcome`.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fmt;
 
 use fhir_types::r4::codeable_concept::CodeableConcept;
@@ -13,12 +14,14 @@ use fhir_types::r4::coding::Coding;
 use fhir_types::r4::operation_outcome::OperationOutcome;
 use fhir_types::r4::operation_outcome::OperationOutcomeIssue;
 use fhir_types::r4::primitives;
+use http::StatusCode;
 
 use crate::issue::Issue;
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Rule;
 use crate::issue::Severity;
+use crate::terminology::PendingBinding;
 
 /// The system of the `details.coding` that carries a message id.
 ///
@@ -64,6 +67,12 @@ pub enum Constraint {
         /// The value set, when the binding names one.
         value_set: Option<String>,
     },
+    /// The maximum value set of a binding, the R4 extension
+    /// `elementdefinition-maxValueSet`, held as a required binding.
+    MaxValueSet {
+        /// The value set the extension names.
+        value_set: String,
+    },
     /// The profiles a type of the element names (`type.profile`).
     TypeProfile {
         /// The profile canonicals.
@@ -86,7 +95,7 @@ pub enum Constraint {
 }
 
 /// Why a constraint was not evaluated.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Reason {
     /// The discriminator path is outside the simple FHIRPath subset
     /// (<https://hl7.org/fhir/R4/fhirpath.html#simple>).
@@ -96,8 +105,7 @@ pub enum Reason {
     /// The slice sets no value, pattern, required binding, cardinality, type
     /// or profile at the discriminator path to tell it apart by.
     NoDiscriminatorValue,
-    /// The value set of the binding cannot be enumerated from the package
-    /// set.
+    /// The value set of the binding cannot be evaluated from the package set.
     ValueSetNotEnumerated,
     /// A reference the discriminator path resolves names no resource the
     /// reference points into.
@@ -112,8 +120,47 @@ pub enum Reason {
     DefaultSliceNotClosed,
     /// The validator does not evaluate invariants.
     Invariants,
-    /// The validator does not check terminology bindings.
-    Bindings,
+    /// The value set, the one bound or one it imports, is not in the package
+    /// set.
+    ValueSetNotFound(String),
+    /// The code system, as `url` or `url|version`, is not in the package set.
+    CodeSystemNotFound(String),
+    /// The package set carries two different definitions of the value set or
+    /// code system under one URL and version.
+    AmbiguousDefinition(String),
+    /// The code system is in the package set without `content` `complete`,
+    /// and the answer needs what it leaves out.
+    CodeSystemIncomplete(String),
+    /// The code system declares no `is-a` hierarchy meaning, so its
+    /// subsumption filters cannot be used
+    /// (<https://hl7.org/fhir/R4/codesystem.html#hierarchy>).
+    HierarchyNotDeclared(String),
+    /// A value set filter the validator does not evaluate from the package
+    /// set, as `property op value`.
+    FilterNotEvaluated(String),
+    /// The value set leaves inactive codes out, and the status of the concept
+    /// in the code system does not say whether it is inactive.
+    ConceptStatus(String),
+    /// The value set imports itself, directly or through other imports.
+    ImportCycle(String),
+    /// A code without a system cannot be sent to a terminology server, and
+    /// the value set names no single system it could come from.
+    NoCodeSystem,
+    /// The binding names no value set, only a description.
+    BindingWithoutValueSet,
+    /// The binding strength is none of the four R4 defines.
+    BindingStrength(String),
+    /// The binding is on an element of a type the validator does not check
+    /// bindings on.
+    BindingType(String),
+    /// The terminology server did not answer the validation.
+    TerminologyFailed {
+        /// The failure class, for example `server-failure` or `refused`.
+        kind: &'static str,
+        /// The status the server answered with, when the failure is an
+        /// answer.
+        status: Option<StatusCode>,
+    },
     /// The validator does not validate a reference's target against its
     /// target profiles, or a resource against a profile it claims.
     Profiles,
@@ -123,30 +170,73 @@ pub enum Reason {
 
 impl fmt::Display for Reason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::DiscriminatorPath => {
-                "the discriminator path is outside the FHIRPath subset discriminators use"
-            }
-            Self::DiscriminatorType => "the discriminator type is none R4 defines",
-            Self::NoDiscriminatorValue => {
-                "the slice sets nothing at the discriminator path to tell it apart by"
-            }
+        match self {
+            Self::DiscriminatorPath => f.write_str(
+                "the discriminator path is outside the FHIRPath subset discriminators use",
+            ),
+            Self::DiscriminatorType => f.write_str("the discriminator type is none R4 defines"),
+            Self::NoDiscriminatorValue => f.write_str(
+                "the slice sets nothing at the discriminator path to tell it apart by",
+            ),
             Self::ValueSetNotEnumerated => {
-                "the value set cannot be enumerated from the package set"
+                f.write_str("the value set cannot be evaluated from the package set")
             }
-            Self::UnresolvedReference => "a reference the discriminator resolves does not resolve",
-            Self::ReferenceOutOfScope => {
-                "a reference the discriminator resolves points outside the resources searched"
+            Self::UnresolvedReference => {
+                f.write_str("a reference the discriminator resolves does not resolve")
             }
-            Self::ProfileNotFound => "the profile is not in the package set",
-            Self::DefaultSliceNotClosed => {
-                "the @default slice is not used, because the slicing rules are not closed"
+            Self::ReferenceOutOfScope => f.write_str(
+                "a reference the discriminator resolves points outside the resources searched",
+            ),
+            Self::ProfileNotFound => f.write_str("the profile is not in the package set"),
+            Self::DefaultSliceNotClosed => f.write_str(
+                "the @default slice is not used, because the slicing rules are not closed",
+            ),
+            Self::Invariants => f.write_str("invariants are not evaluated"),
+            Self::ValueSetNotFound(url) => {
+                write!(f, "the value set {url} is not in the package set")
             }
-            Self::Invariants => "invariants are not evaluated",
-            Self::Bindings => "terminology bindings are not checked",
-            Self::Profiles => "target profiles and claimed profiles are not validated",
-            Self::ExtensionContext => "extension contexts are not checked",
-        })
+            Self::CodeSystemNotFound(url) => {
+                write!(f, "the code system {url} is not in the package set")
+            }
+            Self::AmbiguousDefinition(url) => write!(
+                f,
+                "the package set carries different definitions of {url} under one version"
+            ),
+            Self::CodeSystemIncomplete(url) => write!(
+                f,
+                "the package set does not carry the code system {url} complete"
+            ),
+            Self::HierarchyNotDeclared(url) => write!(
+                f,
+                "the code system {url} declares no is-a hierarchy, so its subsumption filters cannot be used"
+            ),
+            Self::FilterNotEvaluated(filter) => write!(
+                f,
+                "the value set filter {filter} is not evaluated from the package set"
+            ),
+            Self::ConceptStatus(url) => write!(
+                f,
+                "the value set leaves inactive codes out, and the concept status in {url} does not say whether the code is inactive"
+            ),
+            Self::ImportCycle(url) => write!(f, "the value set {url} imports itself"),
+            Self::NoCodeSystem => f.write_str(
+                "the code carries no system, and the value set names no single system to ask a terminology server with",
+            ),
+            Self::BindingWithoutValueSet => f.write_str("the binding names no value set"),
+            Self::BindingStrength(strength) => {
+                write!(f, "the binding strength {strength} is none R4 defines")
+            }
+            Self::BindingType(code) => write!(f, "bindings on the type {code} are not checked"),
+            Self::TerminologyFailed { kind, status } => match status {
+                Some(status) => write!(
+                    f,
+                    "the terminology server did not answer ({kind}, {status})"
+                ),
+                None => write!(f, "the terminology server did not answer ({kind})"),
+            },
+            Self::Profiles => f.write_str("target profiles and claimed profiles are not validated"),
+            Self::ExtensionContext => f.write_str("extension contexts are not checked"),
+        }
     }
 }
 
@@ -165,11 +255,19 @@ pub struct Unevaluated {
     pub reason: Reason,
 }
 
+/// The key an unevaluated constraint is listed under: the declaring
+/// `StructureDefinition`, the element id and the constraint.
+pub(crate) type Key = (String, String, Constraint);
+
 /// The outcome of one validation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Report {
-    issues: Vec<Issue>,
-    unevaluated: Vec<Unevaluated>,
+    pub(crate) issues: Vec<Issue>,
+    pub(crate) unevaluated: Vec<Unevaluated>,
+    /// The binding checks only a terminology server can answer.
+    pub(crate) pending: Vec<PendingBinding>,
+    /// The keys listed for a reason no terminology server can lift.
+    pub(crate) held: BTreeSet<Key>,
 }
 
 impl Report {
@@ -184,6 +282,16 @@ impl Report {
     #[must_use]
     pub fn unevaluated(&self) -> &[Unevaluated] {
         &self.unevaluated
+    }
+
+    /// Returns the binding checks the package set could not decide and a
+    /// terminology server could, which
+    /// [`Report::resolve_bindings`](crate::report::Report::resolve_bindings)
+    /// sends. Each is also listed in [`Report::unevaluated`] until it is
+    /// resolved.
+    #[must_use]
+    pub fn pending_bindings(&self) -> &[PendingBinding] {
+        &self.pending
     }
 
     /// Answers whether no issue is an error or fatal.
@@ -210,7 +318,9 @@ impl Report {
 #[derive(Debug, Default)]
 pub(crate) struct Collector {
     issues: Vec<Issue>,
-    unevaluated: BTreeMap<(String, String, Constraint), (String, Reason)>,
+    unevaluated: BTreeMap<Key, (String, Reason)>,
+    pending: Vec<PendingBinding>,
+    held: BTreeSet<Key>,
 }
 
 impl Collector {
@@ -232,6 +342,11 @@ impl Collector {
         });
     }
 
+    /// Records an issue built elsewhere.
+    pub(crate) fn push(&mut self, issue: Issue) {
+        self.issues.push(issue);
+    }
+
     /// Records a constraint not evaluated, keeping its first location.
     pub(crate) fn unevaluated(
         &mut self,
@@ -241,9 +356,20 @@ impl Collector {
         location: &str,
         reason: Reason,
     ) {
+        let key = (structure.to_owned(), element.to_owned(), constraint);
+        self.held.insert(key.clone());
         self.unevaluated
-            .entry((structure.to_owned(), element.to_owned(), constraint))
+            .entry(key)
             .or_insert_with(|| (location.to_owned(), reason));
+    }
+
+    /// Records a binding check only a terminology server can decide, listed
+    /// as unevaluated for `reason` until it is resolved.
+    pub(crate) fn pending(&mut self, pending: PendingBinding, reason: Reason) {
+        self.unevaluated
+            .entry(pending.key.clone())
+            .or_insert_with(|| (pending.location.clone(), reason));
+        self.pending.push(pending);
     }
 
     /// Answers whether no issue collected is an error or fatal.
@@ -258,12 +384,15 @@ impl Collector {
             .find(|issue| matches!(issue.severity, Severity::Fatal | Severity::Error))
     }
 
-    /// Adds the issues and unevaluated constraints `other` collected.
+    /// Adds the issues, unevaluated constraints and pending checks `other`
+    /// collected.
     pub(crate) fn absorb(&mut self, other: Self) {
         self.issues.extend(other.issues);
         for (key, value) in other.unevaluated {
             self.unevaluated.entry(key).or_insert(value);
         }
+        self.pending.extend(other.pending);
+        self.held.extend(other.held);
     }
 
     /// Finishes the report.
@@ -283,6 +412,8 @@ impl Collector {
                     },
                 )
                 .collect(),
+            pending: self.pending,
+            held: self.held,
         }
     }
 }
@@ -344,6 +475,9 @@ fn describe(unevaluated: &Unevaluated) -> String {
             Some(value_set) => format!("the {strength} binding to {value_set}"),
             None => format!("the {strength} binding"),
         },
+        Constraint::MaxValueSet { value_set } => {
+            format!("the maximum value set {value_set}")
+        }
         Constraint::TypeProfile { profiles } => {
             format!("the type profiles {}", profiles.join(", "))
         }

@@ -14,6 +14,7 @@
     reason = "test assertions"
 )]
 
+mod bindings;
 mod cardinality;
 mod eu;
 mod extensions;

@@ -476,7 +476,7 @@ impl<'i> Walk<'_, '_, 'i> {
                 Some(Err(reason)) => {
                     unknown.push(Unknown {
                         constraint: discriminator.constraint(),
-                        reason: *reason,
+                        reason: reason.clone(),
                     });
                     continue;
                 }

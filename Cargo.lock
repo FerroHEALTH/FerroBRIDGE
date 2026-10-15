@@ -1272,14 +1272,19 @@ name = "ferrobridge-validator"
 version = "0.0.0"
 dependencies = [
  "ferrobridge-fhirpath",
+ "ferrobridge-term",
+ "ferrobridge-testkit",
  "fhir-types",
  "flate2",
+ "http",
  "regex",
  "serde",
  "serde_json",
  "tar",
  "tempfile",
  "thiserror",
+ "tokio",
+ "wiremock",
 ]
 
 [[package]]

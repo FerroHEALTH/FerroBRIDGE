@@ -13,7 +13,6 @@ use crate::report::Constraint;
 use crate::report::Reason;
 use crate::set::ResolveError;
 use crate::validate::ValidateError;
-use crate::validate::codes::Enumeration;
 use crate::validate::matching::contains_pattern;
 use crate::validate::matching::equals_fixed;
 use crate::validate::matching::value_of;
@@ -27,6 +26,8 @@ use crate::validate::slicing::definition::locate;
 use crate::validate::slicing::instance::Node;
 use crate::validate::slicing::instance::NodeKind;
 use crate::validate::structure::Structure;
+use crate::validate::terminology::Coded;
+use crate::validate::terminology::Membership;
 use crate::validate::walk::Walk;
 
 impl<'i> Walk<'_, '_, 'i> {
@@ -168,20 +169,27 @@ impl<'i> Walk<'_, '_, 'i> {
                 reason: Reason::NoDiscriminatorValue,
             }]));
         };
-        match &*self.validator().codes(&value_set, from)? {
-            Enumeration::NotEnumerated => Ok(Verdict::Unknown(vec![Unknown {
+        let mut undecided = false;
+        for node in nodes {
+            let Some(coded) = node.value.and_then(Coded::infer) else {
+                continue;
+            };
+            match self.validator().holds(&value_set, from.origin(), &coded)? {
+                Membership::Member => return Ok(Verdict::Match),
+                Membership::NotMember => {}
+                Membership::Unknown(_) => undecided = true,
+            }
+        }
+        if undecided {
+            return Ok(Verdict::Unknown(vec![Unknown {
                 constraint: Constraint::DiscriminatorValueSet {
                     path: discriminator.path.clone(),
                     value_set,
                 },
                 reason: Reason::ValueSetNotEnumerated,
-            }])),
-            codes @ Enumeration::Codes(_) => {
-                Ok(verdict(nodes.iter().any(|node| {
-                    node.value.is_some_and(|held| codes.holds(held))
-                })))
-            }
+            }]));
         }
+        Ok(verdict(false))
     }
 
     /// The type names a `type` discriminator admits for the slice, `Err`

@@ -10,11 +10,12 @@
 //! and the hop a `contentReference` makes. The snapshot elements of the
 //! `StructureDefinitions` in play add the profile's constraints: cardinality,
 //! the types a choice may take, `fixed[x]`, `pattern[x]`, `maxLength`,
-//! slicing and the profiles an element's types name. Invariants, bindings,
-//! target profiles and claimed profiles are listed in the report as
-//! unevaluated.
+//! slicing, the profiles an element's types name and terminology bindings.
+//! Invariants, target profiles and claimed profiles are listed in the report
+//! as unevaluated, and so is every binding the package set cannot decide,
+//! which [`crate::report::Report::resolve_bindings`] can send to a
+//! terminology server.
 
-mod codes;
 mod extension;
 mod listing;
 mod matching;
@@ -23,6 +24,7 @@ mod profiles;
 mod resolver;
 mod slicing;
 mod structure;
+mod terminology;
 mod walk;
 
 use std::collections::BTreeMap;
@@ -33,15 +35,16 @@ use std::sync::PoisonError;
 use fhir_types::codec::EncodeError;
 use fhir_types::codec::Value;
 
+use crate::report::Reason;
 use crate::report::Report;
 use crate::set::PackageId;
 use crate::set::PackageSet;
 use crate::set::ResolveError;
-use codes::Enumeration;
 use primitive::PrimitiveRule;
 use resolver::Contained;
 use resolver::Resolver;
 use structure::Structure;
+use terminology::index::CodeIndex;
 
 /// The canonical base of the definitions FHIR R4 core publishes.
 const CORE: &str = "http://hl7.org/fhir/StructureDefinition/";
@@ -55,7 +58,7 @@ pub struct Validator<'set> {
     set: &'set PackageSet,
     structures: Mutex<BTreeMap<Scoped, Arc<Structure>>>,
     primitives: Mutex<BTreeMap<String, Arc<PrimitiveRule>>>,
-    codes: Mutex<BTreeMap<Scoped, Arc<Enumeration>>>,
+    code_systems: Mutex<BTreeMap<Scoped, Result<Arc<CodeIndex>, Reason>>>,
     resolver: Box<dyn Resolver>,
 }
 
@@ -110,7 +113,7 @@ impl<'set> Validator<'set> {
             set,
             structures: Mutex::new(BTreeMap::new()),
             primitives: Mutex::new(BTreeMap::new()),
-            codes: Mutex::new(BTreeMap::new()),
+            code_systems: Mutex::new(BTreeMap::new()),
             resolver: Box::new(Contained),
         }
     }
@@ -179,26 +182,6 @@ impl<'set> Validator<'set> {
     /// Returns the resolver a `resolve()` in a discriminator path uses.
     fn resolver(&self) -> &dyn Resolver {
         self.resolver.as_ref()
-    }
-
-    /// Returns the codes of the value set `canonical` names, when the
-    /// package set enumerates them.
-    fn codes(&self, canonical: &str, from: &Structure) -> Result<Arc<Enumeration>, ValidateError> {
-        let key = (canonical.to_owned(), Some(from.origin()));
-        if let Some(found) = self
-            .codes
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .get(&key)
-        {
-            return Ok(Arc::clone(found));
-        }
-        let enumeration = Arc::new(codes::enumerate(self.set, canonical, from.origin())?);
-        self.codes
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .insert(key, Arc::clone(&enumeration));
-        Ok(enumeration)
     }
 
     /// Returns the lexical rule of the primitive type `code`.

@@ -35,21 +35,36 @@ generated model cannot carry what a check needs, that is a generator change
   (`structure`), slicing (`slicing`: `path` holds a discriminator path to the
   FHIRPath subset through `ferrobridge-fhirpath`'s parser, `instance` and
   `definition` follow it through the item and the slice, `discriminate`
-  decides one discriminator), the profiles a type names (`profiles`), the
-  codes of an enumerated value set (`codes`) and the `resolve()` seam with
-  its contained-resource resolver (`resolver`).
+  decides one discriminator), the profiles a type names (`profiles`),
+  terminology (`terminology`: `index` holds a code system by code, `compose`
+  decides membership in a value set three-valued, `binding` holds a value to
+  an element's binding) and the `resolve()` seam with its contained-resource
+  resolver (`resolver`).
+- `terminology` (the public module): the `Terminology` seam over
+  `ferrobridge-term`, the pending binding checks, and
+  `Report::resolve_bindings`.
+
+## The sync walk and the async server
+
+The walk stays synchronous and reads only the package set. A binding it
+cannot decide becomes a `PendingBinding` in the report and is listed as
+unevaluated with its local reason. `Report::resolve_bindings(&terminology)`
+is the one async step: it sends the distinct questions as one call or one
+batch, turns answers into issues, lifts the listing of each binding it
+answered, and leaves a refused or failed one listed with
+`Reason::TerminologyFailed`. A slicing discriminator never asks a server.
 
 ## Never a silent pass
 
-Every invariant, binding, target profile, claimed profile and extension
-context the walk meets is listed as `Unevaluated` with its reason, once per
-declaring definition, element and constraint, and so is every discriminator
-the slicing cannot decide and every type profile the set does not carry. An
-item a discriminator cannot decide is placed in no slice and refused by no
-rule. The sibling issues fill these in: invariants #439 through
-`ferrobridge-fhirpath`, bindings #440 through `ferrobridge-term`, target and
-claimed profiles and Bundle resolution #441. A check that lands removes its
-listing in the same change.
+Every invariant, target profile, claimed profile and extension context the
+walk meets is listed as `Unevaluated` with its reason, once per declaring
+definition, element and constraint, and so is every binding the package set
+cannot decide, every discriminator the slicing cannot decide and every type
+profile the set does not carry. An item a discriminator cannot decide is
+placed in no slice and refused by no rule. The sibling issues fill these in:
+invariants #439 through `ferrobridge-fhirpath`, target and claimed profiles
+and Bundle resolution #441. A check that lands removes its listing in the
+same change.
 
 ## Settled decisions are `// NOTE:` comments at their site
 
@@ -65,7 +80,14 @@ stripped; a discriminator path may use `ofType()` or `as()` (#443); an item
 matching two slices is an error and counts in the first; an item in no slice
 may sit between ordered open slices; a `@default` slice under rules other
 than `closed` is named and not used; an unresolvable `#id` under `resolve()`
-is a warning and leaves the item undecided. Change one only with a citation.
+is a warning and leaves the item undecided; an extensible binding missed is a
+warning and a preferred one information; imported value sets intersect (R4
+valueset.html §4.9.5 over the `include.valueSet` definition's "union"); a
+`Coding` without a system is in no value set; subsumption filters need an
+`is-a` hierarchy meaning and the property `concept`; a display matches the
+concept's display or a designation exactly and a mismatch is a warning; a
+`deprecated` status under `compose.inactive` false is undecided. Change one
+only with a citation.
 
 ## Tests
 

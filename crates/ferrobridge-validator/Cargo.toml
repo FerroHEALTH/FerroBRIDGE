@@ -20,6 +20,9 @@ publish = true
 include = ["src/**", "README.md", "LICENSE"]
 
 [dependencies]
+# A binding the package set cannot decide goes to a terminology server as
+# ValueSet/$validate-code.
+ferrobridge-term.workspace = true
 # A slice discriminator's path is parsed as FHIRPath and held to the simple
 # subset R4 allows (fhirpath.html section 2.9.2).
 ferrobridge-fhirpath.workspace = true
@@ -28,6 +31,8 @@ flate2.workspace = true
 # StructureDefinitions decode into the generated R4 model, and the R4 element
 # table is the base structure an instance is walked over.
 fhir-types = { workspace = true, features = ["r4", "resources"] }
+# The upstream status a failed terminology call carries.
+http.workspace = true
 # The lexical form of a primitive: the `regex` extension of its definition.
 regex.workspace = true
 serde.workspace = true
@@ -38,7 +43,10 @@ tar.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+ferrobridge-testkit.workspace = true
 tempfile.workspace = true
+tokio = { workspace = true, features = ["rt", "macros"] }
+wiremock.workspace = true
 
 [lints]
 workspace = true

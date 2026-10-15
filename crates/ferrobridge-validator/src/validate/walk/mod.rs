@@ -5,6 +5,7 @@
 //! element table, every member's occurrences counted per parent, and every
 //! element definition in play applied to each occurrence.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 mod content;
@@ -31,6 +32,7 @@ use crate::validate::Validator;
 use crate::validate::slicing::Item;
 use crate::validate::slicing::Site;
 use crate::validate::structure::Structure;
+use crate::validate::terminology::binding::Bound;
 use members::forms;
 use members::knows;
 
@@ -97,6 +99,8 @@ pub(crate) struct Walk<'v, 'set, 'i> {
     out: Collector,
     /// The resources the walk is inside, the outermost first.
     scope: Vec<&'i Value>,
+    /// The locations whose coding display was already checked.
+    displayed: BTreeSet<String>,
 }
 
 impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
@@ -106,6 +110,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             validator,
             out: Collector::default(),
             scope: Vec::new(),
+            displayed: BTreeSet::new(),
         }
     }
 
@@ -116,6 +121,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             validator: self.validator,
             out: Collector::default(),
             scope: self.scope.clone(),
+            displayed: BTreeSet::new(),
         }
     }
 
@@ -132,6 +138,12 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
     /// Returns the collector, ending the walk.
     pub(crate) fn into_out(self) -> Collector {
         self.out
+    }
+
+    /// Answers whether the display at `location` is not yet checked, and
+    /// marks it checked.
+    pub(crate) fn first_display(&mut self, location: &str) -> bool {
+        self.displayed.insert(location.to_owned())
     }
 
     /// Returns the resources the walk is inside, the outermost first.
@@ -265,6 +277,11 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         }
         if let Some(element) = cursor.structure.element(&cursor.prefix) {
             self.list(&cursor.structure, &cursor.prefix, element, location);
+            if !cursor.prefix.contains('.') && schema.name == cursor.structure.type_name() {
+                let held = (cursor.prefix.as_str(), element);
+                let bound = Bound::Object(object);
+                self.binding(&cursor.structure, held, schema.name, bound, location)?;
+            }
         }
         for key in object.keys() {
             if resource && key == "resourceType" {
@@ -389,16 +406,20 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         held: Held<'_>,
     ) -> Result<(), ValidateError> {
         let structure = Arc::clone(&cursor.structure);
+        let code = form.choice.or_else(|| match form.kind {
+            Kind::Complex(name) => Some(name),
+            _ => field.types.first().copied(),
+        });
         let mut content = held.id;
         let mut element = held.element;
         if let Some(base) = held.element {
-            self.checks(&structure, held.id, base, occurrence)?;
+            self.checks(&structure, held.id, base, occurrence, code)?;
         }
         for slice in held.slices {
             let Some(defined) = structure.element(slice) else {
                 continue;
             };
-            self.checks(&structure, slice, defined, occurrence)?;
+            self.checks(&structure, slice, defined, occurrence, code)?;
             element = Some(defined);
             if structure.has_children(slice) {
                 content = slice;
@@ -419,8 +440,12 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         id: &str,
         element: &ElementDefinition,
         occurrence: &Occurrence<'_>,
+        code: Option<&str>,
     ) -> Result<(), ValidateError> {
         self.list(structure, id, element, &occurrence.location);
+        if let (Some(code), Some(value)) = (code, occurrence.value.and_then(Bound::of)) {
+            self.binding(structure, (id, element), code, value, &occurrence.location)?;
+        }
         self.fixed_and_pattern(
             element,
             structure.url(),
