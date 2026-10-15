@@ -4,6 +4,7 @@
 //! The search interaction over a `wiremock` CDR: the declared parameters,
 //! the AQL they write, the searchset Bundle, and every refusal.
 
+mod correlation;
 mod load;
 mod paging;
 mod parameters;
@@ -77,7 +78,7 @@ fn result_set(rows: &[serde_json::Value]) -> serde_json::Value {
 fn is_count(request: &wiremock::Request) -> bool {
     serde_json::from_slice::<serde_json::Value>(&request.body)
         .ok()
-        .and_then(|body| body["q"].as_str().map(|text| text.contains("COUNT(*)")))
+        .and_then(|body| body["q"].as_str().map(|text| text.contains("COUNT(")))
         .unwrap_or(false)
 }
 

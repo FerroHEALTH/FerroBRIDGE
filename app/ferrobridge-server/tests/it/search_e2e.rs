@@ -119,6 +119,191 @@ async fn a_patient_search_pages_the_committed_conditions_back_from_a_real_cdr()
     Ok(())
 }
 
+/// The declaration of the KDS search case: the coded diagnosis, read under
+/// the repeated `problem_diagnosis` entry.
+const KDS_SEARCH: &str = "context: ferrobridge_kds_diagnose.context\nparameters:\n  code:\n    type: token\n    node: { class: EVALUATION, archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1 }\n    path: \"data[at0001]/items[at0002,'Kodierte Diagnose']/value\"\n";
+
+#[tokio::test]
+async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
+-> Result<(), Box<dyn StdError>> {
+    // #526 and R4 search.html#token: `[system]|[code]` matches one Coding, so a
+    // composition holding diagnosis 1 (S1, X) and diagnosis 2 (S2, Y) answers
+    // `S2|X` with nothing, and a composition matching on both is one entry.
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let cdr = containers::cdr().await?;
+    crate::facade_e2e::upload_kds_template(cdr.base_url()).await?;
+    let client = CdrClient::new(&CdrConfig::new(cdr.base_url().parse()?))?;
+    let directory = tempfile::tempdir()?;
+    crate::kds::write_mappings(directory.path())?;
+    std::fs::write(directory.path().join("kds.search.yml"), KDS_SEARCH)?;
+    let set = programs::read_set(directory.path())?;
+    let templates = programs::fetch_templates(&set, &client).await?;
+    let compiled = programs::compile_set(&set, &templates)?;
+    let catalog = search::load(directory.path(), &compiled)?;
+    let memory = Arc::new(MemoryStore::new());
+    let store: Arc<dyn Store> = memory.clone();
+    let facade = Arc::new(
+        Facade::new(
+            compiled,
+            store,
+            client.clone(),
+            Settings {
+                base_url: String::from(BASE.trim_end_matches('/')),
+                ehr_policy: Policy::CreateOnFirstWrite,
+                subject_namespace: String::from(NAMESPACE),
+                system_id: String::from("ferrobridge.e2e"),
+                language: String::from("de"),
+                territory: String::from("DE"),
+            },
+        )
+        .with_search(catalog, search::Limits::default()),
+    );
+
+    let input: serde_json::Value = serde_json::from_str(fixtures::KDS_DIAGNOSE_CONDITION)?;
+    let (status, created) = call(
+        app(&facade),
+        Request::post("/fhir/Condition")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(input.to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::CREATED, status, "{created}");
+    let id = ferrobridge_server::facade::identity::FhirResourceId::new(
+        created["id"].as_str().ok_or("the create carries an id")?,
+    )?;
+    let binding = memory
+        .binding_of("Condition", &id)?
+        .ok_or("the create recorded its binding")?;
+    let ehr_id = ferrobridge_server::cdr::ids::EhrId::new(&binding.ehr_id)?;
+    let (system_one, code_one) =
+        commit_two_diagnoses(&client, &ehr_id, &binding.versioned_object_uid).await?;
+
+    let search = |system: &str, code: &str| {
+        let query = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("code", &format!("{system}|{code}"))
+            .finish();
+        format!("Condition?{query}")
+    };
+    let (status, crossed) = get(&facade, &search("SYNTHETIC-B", &code_one)).await?;
+    assert_eq!(StatusCode::OK, status, "{crossed}");
+    assert_eq!(
+        Some(0),
+        crossed["total"].as_u64(),
+        "the crossed pair matched: {crossed}"
+    );
+    let (status, own) = get(&facade, &search("SYNTHETIC-B", "SYN-B2")).await?;
+    assert_eq!(StatusCode::OK, status, "{own}");
+    assert_eq!(Some(1), own["total"].as_u64(), "{own}");
+    let (status, both) = get(&facade, &search(&system_one, &code_one)).await?;
+    assert_eq!(StatusCode::OK, status, "{both}");
+    assert_eq!(Some(2), both["total"].as_u64(), "{both}");
+    let either = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("code", &format!("{code_one},SYN-B2"))
+        .finish();
+    let (status, either) = get(&facade, &format!("Condition?{either}")).await?;
+    assert_eq!(StatusCode::OK, status, "{either}");
+    assert_eq!(
+        Some(2),
+        either["total"].as_u64(),
+        "a composition matching on two nodes is one entry: {either}"
+    );
+    assert_eq!(2, matched(&either).len(), "{either}");
+    Ok(())
+}
+
+/// Reads the composition `versioned_object_uid` holds, commits a copy that
+/// adds a second diagnosis coded `SYNTHETIC-B|SYN-B2`, and returns the first
+/// diagnosis's terminology id and code.
+async fn commit_two_diagnoses(
+    client: &CdrClient,
+    ehr_id: &ferrobridge_server::cdr::ids::EhrId,
+    versioned_object_uid: &str,
+) -> Result<(String, String), Box<dyn StdError>> {
+    let answered = client
+        .composition(
+            ehr_id,
+            &openehr_base::v1_3::base_types::identification::uid_based_id::UidBasedId::HierObjectId(
+                openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId::new(
+                    versioned_object_uid,
+                )?,
+            ),
+            None,
+        )
+        .await?;
+    let openehr_its::rest::generated::ehr::client::CompositionGetOutcome::Ok { body, .. } =
+        answered.outcome
+    else {
+        return Err("the committed composition reads back".into());
+    };
+    let mut document: serde_json::Value =
+        serde_json::from_str(&openehr_its::json::to_canonical_json(&body))?;
+    let first = document["content"][0].clone();
+    let (system_one, code_one) = coded(&first).ok_or("the first diagnosis is coded")?;
+    let mut second = first.clone();
+    recode(&mut second, "SYNTHETIC-B", "SYN-B2").ok_or("the second diagnosis is coded")?;
+    if let Some(content) = document["content"].as_array_mut() {
+        content.push(second);
+    }
+    if let Some(object) = document.as_object_mut() {
+        object.remove("uid");
+    }
+    let two = openehr_its::json::from_canonical_json::<
+        openehr_rm::v1_2::composition::composition::Composition,
+    >(&document.to_string())?;
+    let commit = ferrobridge_server::facade::commit::context(
+        ferrobridge_server::facade::commit::Change::Creation,
+        "ferrobridge.e2e",
+        fixtures::KDS_DIAGNOSE_TEMPLATE_ID,
+    )?;
+    let committed = client
+        .create_composition(
+            ehr_id,
+            &two,
+            &commit,
+            ferrobridge_server::cdr::Prefer::Minimal,
+        )
+        .await?;
+    assert!(
+        matches!(
+            committed.outcome,
+            openehr_its::rest::generated::ehr::client::CompositionCreateOutcome::Created { .. }
+        ),
+        "the CDR refused the composition with two diagnoses"
+    );
+    Ok((system_one, code_one))
+}
+
+/// Returns the item of a diagnosis entry that carries the coded diagnosis.
+fn diagnosis(entry: &serde_json::Value) -> Option<&serde_json::Value> {
+    entry["data"]["items"]
+        .as_array()?
+        .iter()
+        .find(|item| item["archetype_node_id"].as_str() == Some("at0002"))
+}
+
+/// Returns the terminology id and the code of a diagnosis entry.
+fn coded(entry: &serde_json::Value) -> Option<(String, String)> {
+    let code = &diagnosis(entry)?["value"]["defining_code"];
+    Some((
+        code["terminology_id"]["value"].as_str()?.to_owned(),
+        code["code_string"].as_str()?.to_owned(),
+    ))
+}
+
+/// Recodes a diagnosis entry to `system` and `code`.
+fn recode(entry: &mut serde_json::Value, system: &str, code: &str) -> Option<()> {
+    let items = entry["data"]["items"].as_array_mut()?;
+    let item = items
+        .iter_mut()
+        .find(|item| item["archetype_node_id"].as_str() == Some("at0002"))?;
+    item["value"]["defining_code"]["terminology_id"]["value"] = serde_json::json!(system);
+    item["value"]["defining_code"]["code_string"] = serde_json::json!(code);
+    item["value"]["value"] = serde_json::json!("Synthetic diagnosis two");
+    Some(())
+}
+
 /// Returns a create of the synthetic `Condition` under the sender id
 /// `sender`, coded `code`, its subject a literal reference.
 fn post_condition(sender: &str, code: &str) -> Result<Request<Body>, Box<dyn StdError>> {

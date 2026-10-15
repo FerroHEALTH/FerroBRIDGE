@@ -86,20 +86,31 @@ async fn a_declaration_naming_no_loaded_context_refuses_the_start() {
 #[tokio::test]
 async fn a_path_that_does_not_parse_refuses_the_start() {
     let harness = harness().await;
-    for (path, name) in [
-        ("c/content[", "a path that does not parse"),
-        ("x/value", "a path over an unbound alias"),
-        ("c/a, c/b", "two paths"),
+    for (path, name, placed) in [
+        (
+            "context/start_time/value[",
+            "a path that does not parse",
+            true,
+        ),
+        ("context/start_time/value, c/b", "two paths", true),
+        ("nowhere/value", "a path the template does not hold", false),
     ] {
         let text = format!(
-            "context: {CONTEXT}\nparameters:\n  note:\n    type: string\n    path: \"{path}\"\n"
+            "context: {CONTEXT}\nparameters:\n  when:\n    type: date\n    path: \"{path}\"\n"
         );
         let error = load(harness.facade.programs(), &[("x.search.yml", &text)])
             .expect_err("the path is refused");
-        assert!(
-            matches!(error, DeclarationError::Path { .. }),
-            "{name}: {error:?}"
-        );
+        if placed {
+            assert!(
+                matches!(error, DeclarationError::Path { .. }),
+                "{name}: {error:?}"
+            );
+        } else {
+            assert!(
+                matches!(error, DeclarationError::Template { .. }),
+                "{name}: {error:?}"
+            );
+        }
     }
     let error = load(
         harness.facade.programs(),
@@ -110,6 +121,38 @@ async fn a_path_that_does_not_parse_refuses_the_start() {
     )
     .expect_err("an order path that does not parse is refused");
     assert!(matches!(error, DeclarationError::Path { .. }), "{error:?}");
+}
+
+#[tokio::test]
+async fn a_token_whose_code_and_system_cannot_be_read_from_one_node_refuses_the_start() {
+    // #526: the anatomical location cluster is unbounded in the fixture
+    // template, so below the bound entry its coded value is one per cluster,
+    // and a code and a system read through it could come from two clusters.
+    let harness = harness().await;
+    for node in [
+        "    node: { class: EVALUATION, archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1 }\n",
+        "",
+    ] {
+        let text = format!(
+            "context: {CONTEXT}\nparameters:\n  site:\n    type: token\n{node}    path: \"{}data[at0001]/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0002]/value\"\n",
+            if node.is_empty() {
+                "content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/"
+            } else {
+                ""
+            }
+        );
+        let error = load(harness.facade.programs(), &[("x.search.yml", &text)])
+            .expect_err("the cluster repeats");
+        assert!(
+            matches!(error, DeclarationError::Template { .. }),
+            "{node}: {error:?}"
+        );
+    }
+    let bound = format!(
+        "context: {CONTEXT}\nparameters:\n  site:\n    type: token\n    node: {{ class: CLUSTER, archetype: openEHR-EHR-CLUSTER.anatomical_location.v1 }}\n    path: items[at0002]/value\n"
+    );
+    load(harness.facade.programs(), &[("x.search.yml", &bound)])
+        .expect("bound at the repeated cluster, code and system are one node's");
 }
 
 #[tokio::test]

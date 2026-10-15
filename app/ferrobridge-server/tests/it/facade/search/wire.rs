@@ -241,6 +241,7 @@ async fn the_capability_statement_names_exactly_the_declared_parameters()
         vec![
             ("_id", "token"),
             ("code", "token"),
+            ("context-start", "date"),
             ("diagnosis-name", "string"),
             ("onset-date", "date"),
             ("patient", "reference"),

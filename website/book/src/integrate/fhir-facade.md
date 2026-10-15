@@ -313,30 +313,50 @@ order:                                 # the total order every page is read in
 parameters:
   code:
     type: token
-    code: c/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value/defining_code/code_string
-    system: c/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value/defining_code/terminology_id/value
+    node: { class: EVALUATION, archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1 }
+    path: data[at0001]/items[at0002]/value      # the coded text, relative to the node
     systems:
       "http://snomed.info/sct": SNOMED-CT
   onset-date:
     type: date
-    path: c/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0077]/value/value
+    node: { class: EVALUATION, archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1 }
+    path: data[at0001]/items[at0077]/value/value
+  recorded:
+    type: date
+    path: context/start_time/value             # no node: read under the composition
 ```
+
+A parameter names the node it is read under with `node`, the RM class and
+the archetype id of an archetype root, and gives its `path` relative to that
+node. A parameter with no `node` is read under the composition. A `token`
+names the coded value itself, a `DV_CODED_TEXT`, a `DV_TEXT` or a
+`CODE_PHRASE`, and the facade reads its code and its system from that one
+value, so `[system]|[code]` never pairs the system of one diagnosis with the
+code of another. A `string` or a `date` names a data value, with any
+attribute below it.
 
 The facade writes the query itself:
 `SELECT e/ehr_id/value, v/uid/value, c FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c`,
 restricted to the context's template through
-`c/archetype_details/template_id/value`. So a row is always one composition,
-and a declaration contributes paths only, rooted at `e`, `v` or `c`. Every
-search value travels as a bound AQL parameter and never as query text.
+`c/archetype_details/template_id/value`. Each occurrence of a parameter read
+under a node binds that node in the `FROM`, as
+`CONTAINS EVALUATION n0[openEHR-EHR-EVALUATION.problem_diagnosis.v1]`, so
+the conditions of one occurrence read one node, while a repeated parameter
+(an AND) may match a node of its own. Every search value travels as a bound
+AQL parameter and never as query text.
 
-The declaration is checked when the server starts, and any of these refuses
-the start with the file named: an unknown key, a context no loaded mapping
-compiles, a parameter type other than `token`, `string` or `date`, a name
-under the `_` prefix R4 reserves, a path that is not one AQL path over the
-three aliases, a query that does not parse as AQL, two declarations of one
+The declaration is checked when the server starts, against the template the
+context maps, and any of these refuses the start with the file named: an
+unknown key, a context no loaded mapping compiles, a parameter type other
+than `token`, `string` or `date`, a name under the `_` prefix R4 reserves, a
+node the template does not hold, a path the template does not hold, a path
+that crosses a node which may occur more than once below the bound one (bind
+that node instead), a token over a value that is not coded, a path that is not
+one AQL path, a query that does not parse as AQL, two declarations of one
 resource type over one template, and two declarations of one type that state
 different parameters. `order` defaults to the commit time and then the version
-uid; set it when your CDR orders better by something else.
+uid; set it when your CDR orders better by something else, and end it with a
+key that is unique per composition.
 
 ### What a search answers
 
@@ -348,7 +368,7 @@ uid; set it when your CDR orders better by something else.
 | `patient`, `subject` (as declared) | `[id]`, `Patient/[id]`, an absolute URL on this server, or the `:Patient` modifier, resolved through the identity map to the EHR |
 | `_id` | a logical id, resolved through the identity map to its composition |
 | `_count` | the page size, capped at `[facade] search_count_max`; `0` answers the total alone |
-| `_sort` | declared parameters, `-` for descending, ahead of the declared order |
+| `_sort` | declared parameters read under the composition, `-` for descending, ahead of the declared order; a parameter read under a node is refused, because it has a value per node |
 | `_summary` | `count` answers the total alone; `false` is the default |
 | `_total` | `none`, `estimate` or `accurate` |
 
@@ -378,11 +398,16 @@ and `link[next]` appears when another page follows. Its `_cursor` is opaque:
 follow the link as answered, because a cursor pasted onto another search is a
 `400`.
 
-Each page reads one row past its size through the CDR's `offset` and `fetch`,
-so a `next` link is written only when a row is left. `Bundle.total` counts
-matches, never the page: a first page that holds every match carries it at no
-cost, `_total=accurate` or `estimate` runs a `COUNT(*)` query for a paged
-search, and `_total=none` leaves it out. `_count=0` and `_summary=count` run
+A query that binds a node answers a row per matching node, so the facade
+reads one entry per composition: the rows of one composition sit together
+under the order, and a further row of a composition the page holds is passed
+over. Each page reads one row past its room through the CDR's `offset` and
+`fetch`, and a `next` link is written only when another composition is left,
+its cursor at that composition's first row. `Bundle.total` counts matching
+compositions, never the page and never the nodes: a first page that holds every
+match carries it at no cost, `_total=accurate` or `estimate` runs a count
+query for a paged search (`COUNT(DISTINCT v/uid/value)` when a node is bound,
+`COUNT(*)` otherwise), and `_total=none` leaves it out. `_count=0` and `_summary=count` run
 the count query alone and answer no entries and no `next` link.
 
 A search never answers an empty Bundle for a failed call. A CDR refusal reaches

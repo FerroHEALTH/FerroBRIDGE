@@ -13,6 +13,8 @@
 //! through the status table: a search never answers an empty Bundle for a
 //! failed call (`docs/architecture.md` §9).
 
+use std::collections::BTreeSet;
+
 use axum::response::Response;
 use http::HeaderMap;
 use http::StatusCode;
@@ -286,11 +288,15 @@ fn resolve(facade: &Facade, resource_type: &str, criteria: &Criteria) -> Result<
     Ok(resolved)
 }
 
-/// Reads one page, starting at `start`, of at most `size` matches.
+/// Reads one page, starting at `start`, of at most `size` compositions.
 ///
-/// Each query asks one row more than the page still has room for: a row
-/// beyond the room is where the next page starts, and a declaration that
-/// answers no such row hands over to the next one at its first row.
+/// A query that binds a node answers a row per matching node, so the rows of
+/// one composition sit together under the composition-level order, and the
+/// page reads one entry per composition: a row of a composition the page
+/// already holds is passed over. Each query asks one row more than the page
+/// still has room for. The first row of a composition the page has no room
+/// for is where the next page starts, and a declaration that runs out hands
+/// over to the next one at its first row.
 async fn page(
     facade: &Facade,
     client: &CdrClient,
@@ -299,35 +305,54 @@ async fn page(
     size: u32,
 ) -> Result<(Vec<Match>, Option<Position>), Refusal> {
     let mut matches = Vec::new();
-    let mut room = i64::from(size);
+    let mut room = usize::try_from(size).unwrap_or(usize::MAX);
     let mut offset = start.offset;
     for (index, plan) in plans.iter().enumerate().skip(start.declaration) {
         let Some(conditions) = plan.conditions.as_ref() else {
             offset = 0;
             continue;
         };
-        let request = aql::rows_request(conditions, &plan.order, offset, room.saturating_add(1));
-        let rows = rows_of(client, &request).await?;
-        let fetched = i64::try_from(rows.len()).unwrap_or(i64::MAX);
-        for (position, row) in rows.iter().enumerate() {
-            if i64::try_from(position).unwrap_or(i64::MAX) >= room {
+        let mut held: BTreeSet<String> = BTreeSet::new();
+        loop {
+            let fetch = i64::try_from(room.saturating_add(1)).unwrap_or(i64::MAX);
+            let request = aql::rows_request(conditions, &plan.order, offset, fetch);
+            let rows = rows_of(client, &request).await?;
+            for (position, row) in rows.iter().enumerate() {
+                let version = version_of(row, position)?;
+                if held.contains(version) {
+                    continue;
+                }
+                if room == 0 {
+                    let skipped = i64::try_from(position).unwrap_or(i64::MAX);
+                    return Ok((
+                        matches,
+                        Some(Position {
+                            declaration: index,
+                            offset: offset.saturating_add(skipped),
+                        }),
+                    ));
+                }
+                held.insert(version.to_owned());
+                matches.push(render_row(facade, client, plan.declared, row, position)?);
+                room = room.saturating_sub(1);
+            }
+            let fetched = i64::try_from(rows.len()).unwrap_or(i64::MAX);
+            if fetched < fetch {
                 break;
             }
-            matches.push(render_row(facade, client, plan.declared, row, position)?);
+            offset = offset.saturating_add(fetched);
         }
-        if fetched > room {
-            return Ok((
-                matches,
-                Some(Position {
-                    declaration: index,
-                    offset: offset.saturating_add(room),
-                }),
-            ));
-        }
-        room = room.saturating_sub(fetched);
         offset = 0;
     }
     Ok((matches, None))
+}
+
+/// Returns the version uid one row names, or the `502` a row without one
+/// answers.
+fn version_of(row: &ResultSetRow, position: usize) -> Result<&str, Refusal> {
+    row.get(aql::column::VERSION_UID)
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| malformed_row(position, "version_uid"))
 }
 
 /// Returns the `Bundle.total` of one page, when it is known or asked for.

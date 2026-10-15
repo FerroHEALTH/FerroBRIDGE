@@ -24,6 +24,7 @@ pub mod criteria;
 pub mod cursor;
 pub mod declaration;
 pub mod plan;
+pub mod template;
 pub mod value;
 
 use std::collections::BTreeMap;
@@ -246,7 +247,8 @@ pub fn bind(
         .as_ref()
         .map(|scope| scope.names.clone())
         .unwrap_or_default();
-    let parameters = declaration::check_parameters(file, &written.parameters, &patient_names)?;
+    let parameters =
+        declaration::check_parameters(file, &written.parameters, &patient_names, loaded.index())?;
     let order = written.order.unwrap_or_else(|| {
         aql::DEFAULT_ORDER
             .iter()
@@ -319,16 +321,26 @@ fn check_paths(declared: &Declared) -> Result<(), DeclarationError> {
     let mut conditions = Conditions::new(&declared.template_id);
     let mut order: Vec<OrderKey> = Vec::new();
     for (name, parameter) in &declared.parameters {
-        for path in parameter.paths() {
-            aql::check_path(path).map_err(|reason| refuse(name, path, reason))?;
+        let probe = if parameter.node().is_some() {
+            aql::NODE_ALIAS
+        } else {
+            "c"
+        };
+        for path in parameter.paths(probe) {
+            aql::check_path(&path).map_err(|reason| refuse(name, &path, reason))?;
+        }
+        let alias = conditions.alias(parameter.node());
+        for path in parameter.paths(&alias) {
             let bound = conditions.bind("probe");
             conditions.push(format!("{path} = {bound}"));
             conditions.push(format!("NOT EXISTS {path}"));
         }
-        order.push(OrderKey {
-            path: parameter.sort_path().to_owned(),
-            descending: true,
-        });
+        if parameter.sortable() {
+            order.push(OrderKey {
+                path: parameter.value_path("c"),
+                descending: true,
+            });
+        }
     }
     order.extend(declared.order.iter().map(|path| OrderKey {
         path: path.clone(),
@@ -366,6 +378,7 @@ fn insert(catalog: &mut Catalog, declared: Declared) -> Result<(), DeclarationEr
     }
     if let Some(first) = entries.first()
         && (first.surface() != declared.surface()
+            || sortability(first) != sortability(&declared)
             || first.patient.as_ref().map(PatientScope::required)
                 != declared.patient.as_ref().map(PatientScope::required))
     {
@@ -378,4 +391,13 @@ fn insert(catalog: &mut Catalog, declared: Declared) -> Result<(), DeclarationEr
     entries.push(declared);
     entries.sort_by(|left, right| left.context.cmp(&right.context));
     Ok(())
+}
+
+/// Returns which declared parameters `_sort` may order by, by name.
+fn sortability(declared: &Declared) -> BTreeMap<&str, bool> {
+    declared
+        .parameters
+        .iter()
+        .map(|(name, parameter)| (name.as_str(), parameter.sortable()))
+        .collect()
 }

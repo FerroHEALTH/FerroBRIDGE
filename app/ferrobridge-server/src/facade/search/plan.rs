@@ -22,6 +22,7 @@ use crate::facade::search::criteria::CriteriaError;
 use crate::facade::search::criteria::Filter;
 use crate::facade::search::criteria::Test;
 use crate::facade::search::declaration::Parameter;
+use crate::facade::search::declaration::ParameterType;
 use crate::facade::search::value::DateValue;
 use crate::facade::search::value::Prefix;
 use crate::facade::search::value::System;
@@ -93,16 +94,23 @@ pub fn conditions(
 
 /// Returns the `ORDER BY` of `declared` for `criteria`: the `_sort` keys,
 /// then the declaration's total order.
+///
+/// Only a parameter read under the composition sorts, so every key is one
+/// value per composition and the rows of one composition stay together.
 #[must_use]
 pub fn order(declared: &Declared, criteria: &Criteria) -> Vec<OrderKey> {
     let mut keys: Vec<OrderKey> = criteria
         .sort
         .iter()
         .filter_map(|(name, descending)| {
-            declared.parameters().get(name).map(|parameter| OrderKey {
-                path: parameter.sort_path().to_owned(),
-                descending: *descending,
-            })
+            declared
+                .parameters()
+                .get(name)
+                .filter(|parameter| parameter.sortable())
+                .map(|parameter| OrderKey {
+                    path: parameter.value_path("c"),
+                    descending: *descending,
+                })
         })
         .collect();
     keys.extend(declared.order().iter().map(|path| OrderKey {
@@ -113,31 +121,32 @@ pub fn order(declared: &Declared, criteria: &Criteria) -> Vec<OrderKey> {
 }
 
 /// Returns the condition one filter writes over its parameter's paths.
+///
+/// A parameter read under a node binds a fresh alias for this occurrence, so
+/// every alternative of the occurrence reads the one node the alias names.
 fn condition(
     conditions: &mut Conditions,
     filter: &Filter,
     parameter: &Parameter,
 ) -> Result<String, CriteriaError> {
-    let alternatives: Vec<String> = match (&filter.test, parameter) {
-        (
-            Test::Token(values),
-            Parameter::Token {
-                code,
-                system,
-                systems,
-            },
-        ) => values
-            .iter()
-            .map(|token| {
-                token_condition(
-                    conditions,
-                    token,
-                    (code, system.as_deref(), systems),
-                    &filter.name,
-                )
-            })
-            .collect::<Result<Vec<String>, CriteriaError>>()?,
-        (Test::Text { matching, values }, Parameter::String { path }) => values
+    let alias = conditions.alias(parameter.node());
+    let path = parameter.value_path(&alias);
+    let alternatives: Vec<String> = match (&filter.test, parameter.kind()) {
+        (Test::Token(values), ParameterType::Token) => {
+            let system = parameter.system_path(&alias);
+            values
+                .iter()
+                .map(|token| {
+                    token_condition(
+                        conditions,
+                        token,
+                        (&path, system.as_deref(), parameter.systems()),
+                        &filter.name,
+                    )
+                })
+                .collect::<Result<Vec<String>, CriteriaError>>()?
+        }
+        (Test::Text { matching, values }, ParameterType::String) => values
             .iter()
             .map(
                 |text| match crate::facade::search::value::like_pattern(text, *matching) {
@@ -150,9 +159,9 @@ fn condition(
                 },
             )
             .collect::<Result<Vec<String>, CriteriaError>>()?,
-        (Test::Date(values), Parameter::Date { path }) => values
+        (Test::Date(values), ParameterType::Date) => values
             .iter()
-            .map(|value| date_condition(conditions, path, value))
+            .map(|value| date_condition(conditions, &path, value))
             .collect(),
         _ => {
             return Err(CriteriaError::Invalid {
@@ -169,6 +178,9 @@ fn condition(
 }
 
 /// Returns the condition of one token value.
+///
+/// The code and the system paths are read under one alias, so both compare
+/// parts of one coded value (<https://hl7.org/fhir/R4/search.html#token>).
 fn token_condition(
     conditions: &mut Conditions,
     token: &Token,

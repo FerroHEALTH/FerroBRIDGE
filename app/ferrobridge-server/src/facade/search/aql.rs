@@ -4,14 +4,19 @@
 //! The AQL a search runs, built from a declaration and checked at load.
 //!
 //! The facade writes the `SELECT`, the `FROM` and the template condition
-//! itself, so a row is always one composition: the latest version of every
-//! composition of the context's template, in one EHR, with nothing contained
-//! below it to repeat a row. A declaration contributes paths only, each
-//! compared against a bound `$` parameter and never spliced in as a value
-//! (QUERY AQL §3.5). The paging is the `offset` and `fetch` of ITS-REST 1.1.0
-//! (`query-codegen.openapi.yaml`, `components.parameters.offset`), which name
-//! row numbers, so every query carries the declaration's total order. No
-//! specification governs the shape: our own design.
+//! itself: the latest version of every composition of the context's template.
+//! A parameter read under a repeated node binds that node in the `FROM`, one
+//! alias per parameter occurrence, so the conditions of one occurrence read
+//! one node, and two occurrences (an `AND`) may each match a node of their
+//! own. A row is then one composition with one node per bound alias, so one
+//! composition may answer several rows: the count query counts distinct
+//! version uids, and the facade reads one entry per composition. A
+//! declaration contributes paths only, each compared against a bound `$`
+//! parameter and never spliced in as a value (QUERY AQL §3.5). The paging is
+//! the `offset` and `fetch` of ITS-REST 1.1.0 (`query-codegen.openapi.yaml`,
+//! `components.parameters.offset`), which name row numbers, so every query
+//! carries the declaration's total order. No specification governs the shape:
+//! our own design.
 
 use openehr_its::rest::generated::query::AdhocQueryExecute;
 use openehr_its::rest::generated::query::QueryParameters;
@@ -19,11 +24,16 @@ use openehr_query::ast::ColumnExpr;
 use openehr_query::parser;
 use openehr_query::parser::ParseError;
 
+use crate::facade::search::declaration::Node;
+
 /// The aliases the facade's `FROM` binds: the EHR, the version and the
 /// composition.
 pub const ALIASES: [&str; 3] = ["e", "v", "c"];
 
-/// The `FROM` every search query reads.
+/// The alias the first bound node takes, as a path is checked at load.
+pub const NODE_ALIAS: &str = "n0";
+
+/// The `FROM` every search query reads, before any bound node.
 ///
 /// `LATEST_VERSION` is the AQL version predicate for the newest version of
 /// each versioned object (QUERY AQL, the `versionPredicate` rule), which is
@@ -55,11 +65,12 @@ pub mod column {
 /// The order a declaration with no `order` key pages in.
 ///
 /// The commit time first and the version uid second, so two commits in one
-/// instant still have a fixed order (no specification governs the default:
-/// our own design).
+/// instant still have a fixed order and the rows of one composition sit
+/// together (no specification governs the default: our own design).
 pub const DEFAULT_ORDER: [&str; 2] = ["v/commit_audit/time_committed/value", "v/uid/value"];
 
-/// The `WHERE` conditions of one query and the parameters they bind.
+/// The `WHERE` conditions of one query, the nodes it binds, and the
+/// parameters they bind.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Conditions {
     /// The conditions, each joined to the rest with `AND`.
@@ -68,6 +79,8 @@ pub struct Conditions {
     parameters: QueryParameters,
     /// The number the next bound parameter is named with.
     next: usize,
+    /// The nodes the `FROM` binds below the composition, in alias order.
+    nodes: Vec<Node>,
 }
 
 impl Conditions {
@@ -83,6 +96,7 @@ impl Conditions {
             clauses: vec![format!("{TEMPLATE_PATH} = ${TEMPLATE_PARAMETER}")],
             parameters,
             next: 0,
+            nodes: Vec::new(),
         }
     }
 
@@ -95,9 +109,47 @@ impl Conditions {
         format!("${name}")
     }
 
+    /// Binds `node` under the composition with a fresh alias and returns the
+    /// alias, or returns `c` when the paths are read under the composition.
+    pub fn alias(&mut self, node: Option<&Node>) -> String {
+        let Some(node) = node else {
+            return String::from("c");
+        };
+        let alias = format!("n{}", self.nodes.len());
+        self.nodes.push(node.clone());
+        alias
+    }
+
+    /// Whether the `FROM` binds a node, so one composition may answer more
+    /// than one row.
+    #[must_use]
+    pub fn binds_nodes(&self) -> bool {
+        !self.nodes.is_empty()
+    }
+
     /// Adds `clause`, which every row must also satisfy.
     pub fn push(&mut self, clause: String) {
         self.clauses.push(clause);
+    }
+
+    /// Returns the `FROM` expression with every bound node.
+    ///
+    /// Two bound nodes are two class expressions joined with `AND` under the
+    /// composition (QUERY AQL, the `containsExpr` rule). The archetype id is
+    /// one the template holds as the node's root, checked when the
+    /// declaration loaded, so it is written as the class predicate.
+    fn from(&self) -> String {
+        let bound: Vec<String> = self
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(index, node)| format!("{} n{index}[{}]", node.class, node.archetype))
+            .collect();
+        match bound.as_slice() {
+            [] => String::from(FROM),
+            [one] => format!("{FROM} CONTAINS {one}"),
+            many => format!("{FROM} CONTAINS ({})", many.join(" AND ")),
+        }
     }
 
     /// Returns the `WHERE` expression, each condition parenthesised.
@@ -134,19 +186,28 @@ pub fn rows_text(conditions: &Conditions, order: &[OrderKey]) -> String {
         .collect::<Vec<String>>()
         .join(", ");
     format!(
-        "SELECT {COLUMNS} FROM {FROM} WHERE {} ORDER BY {keys}",
+        "SELECT {COLUMNS} FROM {} WHERE {} ORDER BY {keys}",
+        conditions.from(),
         conditions.text()
     )
 }
 
 /// Returns the count query `conditions` describe.
 ///
-/// `COUNT(*)` counts every row (QUERY AQL §3.9.1.1), and a row is one
-/// composition, so the count is the number of matches.
+/// `COUNT(*)` counts every row and `COUNT(DISTINCT expression)` every
+/// distinct value (QUERY AQL §3.9.1.1). With no bound node a row is one
+/// composition; with one, the count is of distinct version uids, so either
+/// way it is the number of matching compositions.
 #[must_use]
 pub fn count_text(conditions: &Conditions) -> String {
+    let counted = if conditions.binds_nodes() {
+        "COUNT(DISTINCT v/uid/value)"
+    } else {
+        "COUNT(*)"
+    };
     format!(
-        "SELECT COUNT(*) AS total FROM {FROM} WHERE {}",
+        "SELECT {counted} AS total FROM {} WHERE {}",
+        conditions.from(),
         conditions.text()
     )
 }
@@ -190,7 +251,7 @@ pub fn parses(text: &str) -> Result<(), ParseError> {
 }
 
 /// Checks that `path` is one AQL identified path rooted at one of
-/// [`ALIASES`], and returns why when it is not.
+/// [`ALIASES`] or at [`NODE_ALIAS`], and returns why when it is not.
 ///
 /// The path is parsed as the one column of a query over the facade's `FROM`,
 /// so anything that is not a single path (a second column, a literal, a
@@ -200,8 +261,10 @@ pub fn parses(text: &str) -> Result<(), ParseError> {
 ///
 /// Returns the reason the path is refused.
 pub fn check_path(path: &str) -> Result<(), String> {
-    let query = parser::parse_str(&format!("SELECT {path} FROM {FROM}"))
-        .map_err(|error| format!("it does not parse as an AQL path: {error}"))?;
+    let query = parser::parse_str(&format!(
+        "SELECT {path} FROM {FROM} CONTAINS CLUSTER {NODE_ALIAS}[openEHR-EHR-CLUSTER.probe.v1]"
+    ))
+    .map_err(|error| format!("it does not parse as an AQL path: {error}"))?;
     let [column] = query.select.columns.as_slice() else {
         return Err(String::from("it is more than one AQL path"));
     };
@@ -209,9 +272,13 @@ pub fn check_path(path: &str) -> Result<(), String> {
         return Err(String::from("it carries an alias"));
     }
     match column.column {
-        ColumnExpr::Path(ref identified) if ALIASES.contains(&identified.root.as_str()) => Ok(()),
+        ColumnExpr::Path(ref identified)
+            if ALIASES.contains(&identified.root.as_str()) || identified.root == NODE_ALIAS =>
+        {
+            Ok(())
+        }
         ColumnExpr::Path(ref identified) => Err(format!(
-            "it is rooted at `{}`; a search path is rooted at e (the EHR), v (the version) or c (the composition)",
+            "it is rooted at `{}`; a search path is rooted at e (the EHR), v (the version), c (the composition) or the bound node",
             identified.root
         )),
         _ => Err(String::from("it is no AQL identified path")),
@@ -275,6 +342,47 @@ mod tests {
         order.extend(default_order());
         parses(&rows_text(&conditions, &order)).expect("the row query parses");
         parses(&count_text(&conditions)).expect("the count query parses");
+    }
+
+    #[test]
+    fn a_bound_node_reads_code_and_system_from_one_node_and_counts_compositions() {
+        // #526: the code and the system of one token value are read under one
+        // alias the FROM binds, never as two leaves through the repeated node.
+        let node = crate::facade::search::declaration::Node {
+            class: String::from("EVALUATION"),
+            archetype: String::from("openEHR-EHR-EVALUATION.problem_diagnosis.v1"),
+        };
+        let mut conditions = Conditions::new("t");
+        let first = conditions.alias(Some(&node));
+        let system = conditions.bind("SNOMED-CT");
+        let code = conditions.bind("44054006");
+        conditions.push(format!(
+            "{first}/data[at0001]/items[at0002]/value/defining_code/terminology_id/value = {system} AND {first}/data[at0001]/items[at0002]/value/defining_code/code_string = {code}"
+        ));
+        let rows = rows_text(&conditions, &default_order());
+        assert!(
+            rows.contains(
+                "CONTAINS COMPOSITION c CONTAINS EVALUATION n0[openEHR-EHR-EVALUATION.problem_diagnosis.v1] WHERE"
+            ),
+            "{rows}"
+        );
+        parses(&rows).expect("the row query parses");
+        let count = count_text(&conditions);
+        assert!(count.contains("COUNT(DISTINCT v/uid/value)"), "{count}");
+        parses(&count).expect("the count query parses");
+
+        let second = conditions.alias(Some(&node));
+        assert_eq!("n1", second);
+        assert_eq!("c", conditions.alias(None));
+        let rows = rows_text(&conditions, &default_order());
+        assert!(
+            rows.contains(
+                "CONTAINS (EVALUATION n0[openEHR-EHR-EVALUATION.problem_diagnosis.v1] AND EVALUATION n1[openEHR-EHR-EVALUATION.problem_diagnosis.v1])"
+            ),
+            "{rows}"
+        );
+        parses(&rows).expect("two bound nodes parse");
+        assert!(count_text(&Conditions::new("t")).contains("COUNT(*)"));
     }
 
     #[test]

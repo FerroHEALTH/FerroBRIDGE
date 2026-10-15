@@ -28,8 +28,13 @@ crates on crates.io.
 - The FHIR facade answers search (#98): `GET [base]/{type}?…` and
   `POST [base]/{type}/_search` over an AQL projection declared beside the
   context mapping, in a `<name>.search.yml` file that names the context, the
-  subject parameters, the `token`, `string` and `date` parameters with the AQL
-  path each compares, and the total order pages are read in. FHIRconnect leaves
+  subject parameters, the `token`, `string` and `date` parameters with the
+  repeated node each is read under and its path relative to that node, and
+  the total order pages are read in. The query binds that node in its `FROM`
+  once per parameter occurrence, so a token's code and system always come
+  from one coded value (#526), a path crossing a node the template lets repeat
+  below the bound one is refused at load, and a composition matching on
+  several nodes is one entry, counted once. FHIRconnect leaves
   search out, so the format is FerroBRIDGE's own. Every declaration is checked
   and every query it can build is parsed at boot, and a declaration that does
   not parse refuses the start. A search answers a `searchset` Bundle with an

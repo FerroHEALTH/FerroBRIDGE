@@ -23,19 +23,17 @@ use super::queries;
 use super::row;
 use super::searching;
 
-/// The path the fixture declares for the code of `code`.
-const CODE: &str = "c/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value/defining_code/code_string";
+/// The path of the code of `code`, under the first bound node.
+const CODE: &str = "n0/data[at0001]/items[at0002]/value/defining_code/code_string";
 
-/// The path the fixture declares for the system of `code`.
-const SYSTEM: &str = "c/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value/defining_code/terminology_id/value";
+/// The path of the system of `code`, under the first bound node.
+const SYSTEM: &str = "n0/data[at0001]/items[at0002]/value/defining_code/terminology_id/value";
 
-/// The path the fixture declares for `onset-date`.
-const ONSET: &str =
-    "c/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0077]/value/value";
+/// The path of `onset-date`, under the first bound node.
+const ONSET: &str = "n0/data[at0001]/items[at0077]/value/value";
 
-/// The path the fixture declares for `diagnosis-name`.
-const NAME: &str =
-    "c/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value/value";
+/// The path of `diagnosis-name`, under the first bound node.
+const NAME: &str = "n0/data[at0001]/items[at0002]/value/value";
 
 /// Runs `query` against an empty CDR and returns the one row query it sent.
 async fn query_of(query: &str) -> Result<serde_json::Value, Box<dyn StdError>> {
@@ -79,10 +77,24 @@ async fn a_token_with_an_empty_system_asks_for_no_system() -> Result<(), Box<dyn
 async fn comma_values_are_alternatives_and_repeats_are_all_required()
 -> Result<(), Box<dyn StdError>> {
     // R4 search.html §3.1.1.4.17: a comma is OR, a repeated parameter AND.
+    // Each occurrence binds a node of its own, so `code=a&code=b` may match
+    // two entries, and the alternatives of one occurrence share its node.
     let query = query_of("code=a,b&code=c").await?;
     let text = query["q"].as_str().unwrap_or_default();
     assert!(text.contains(") OR ("), "{text}");
-    assert_eq!(3, text.matches(&format!("{CODE} = $")).count(), "{text}");
+    assert_eq!(2, text.matches(&format!("{CODE} = $")).count(), "{text}");
+    assert_eq!(
+        1,
+        text.matches("n1/data[at0001]/items[at0002]/value/defining_code/code_string = $")
+            .count(),
+        "{text}"
+    );
+    assert!(
+        text.contains(
+            "CONTAINS (EVALUATION n0[openEHR-EHR-EVALUATION.problem_diagnosis.v1] AND EVALUATION n1[openEHR-EHR-EVALUATION.problem_diagnosis.v1])"
+        ),
+        "{text}"
+    );
     Ok(())
 }
 
@@ -133,14 +145,27 @@ async fn a_string_starts_contains_or_matches_exactly() -> Result<(), Box<dyn Std
 async fn sort_orders_by_the_declared_paths_before_the_total_order() -> Result<(), Box<dyn StdError>>
 {
     // R4 search.html §3.1.1.5.1: `-` orders a key downward.
-    let query = query_of("_sort=-onset-date,code").await?;
+    let query = query_of("_sort=-context-start").await?;
     let text = query["q"].as_str().unwrap_or_default();
     assert!(
-        text.contains(&format!(
-            "ORDER BY {ONSET} DESC, {CODE} ASC, v/commit_audit/time_committed/value ASC, v/uid/value ASC"
-        )),
+        text.contains(
+            "ORDER BY c/context/start_time/value DESC, v/commit_audit/time_committed/value ASC, v/uid/value ASC"
+        ),
         "{text}"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn sort_on_a_parameter_read_under_a_repeated_node_is_refused() -> Result<(), Box<dyn StdError>>
+{
+    // A parameter read under a bound node has one value per node, so it
+    // gives a composition no single place in an order.
+    let harness = searching().await;
+    let (status, body) = get(&harness, "Condition?_sort=code").await?;
+    assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");
+    assert_eq!(Some("not-supported"), first_issue(&body)["code"].as_str());
+    assert!(queries(&harness).await.is_empty());
     Ok(())
 }
 

@@ -7,15 +7,21 @@
 //! specification governs this file: our own design. One file per context,
 //! named `<anything>.search.yml` (or `.search.yaml`) anywhere in the mapping
 //! tree, states which search parameters the context's resource type answers
-//! and the AQL path each one compares. Every key is checked when the file is
-//! read: an unknown key, a parameter type outside [`ParameterType`], a path
-//! that is not one AQL identified path rooted at `e`, `v` or `c`, or a context
-//! no loaded program compiled is a boot refusal naming the file.
+//! and the AQL path each one compares. A parameter read under a repeated
+//! node names that node, an RM class and an archetype id, and the query binds
+//! it in its `FROM`, so every path of one parameter is read from one node: a
+//! token's code and system are always one coded value's two parts. Every key
+//! is checked when the file is read, and each path is placed in the context's
+//! template: an unknown key, a parameter type outside [`ParameterType`], a
+//! node the template does not hold, a path crossing a node that may occur
+//! more than once below the bound one, a token over no coded value, or a
+//! context no loaded program compiled is a boot refusal naming the file.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 
+use openehr_mapping_core::index::WebTemplateIndex;
 use serde::Deserialize;
 
 /// The suffixes a search declaration's file name ends in.
@@ -73,16 +79,27 @@ pub struct ParameterFile {
     /// The FHIR search parameter type.
     #[serde(rename = "type")]
     pub kind: String,
-    /// The AQL path a `string` or `date` parameter compares.
-    pub path: Option<String>,
-    /// The AQL path of a `token` parameter's code.
-    pub code: Option<String>,
-    /// The AQL path of a `token` parameter's code system.
-    pub system: Option<String>,
+    /// The repeated node the path is read under, bound in the query's
+    /// `FROM`; absent, the path is read under the composition.
+    pub node: Option<NodeFile>,
+    /// The AQL path compared, relative to the node: for a `token`, the coded
+    /// text or code phrase whose code and system it compares.
+    pub path: String,
     /// The FHIR system URI to openEHR terminology id table of a `token`
     /// parameter.
     #[serde(default)]
     pub systems: BTreeMap<String, String>,
+}
+
+/// The node a parameter is read under, as written: an RM class and the
+/// archetype id of its root.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NodeFile {
+    /// The RM class of the archetype root, `EVALUATION` or `CLUSTER`.
+    pub class: String,
+    /// The archetype id of the root.
+    pub archetype: String,
 }
 
 /// The FHIR search parameter types a declaration may name.
@@ -119,63 +136,99 @@ impl ParameterType {
 /// them.
 const DECLARABLE: &str = "token, string, date";
 
-/// One checked parameter.
+/// A node one parameter is read under, checked against the template.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Node {
+    /// The RM class of the archetype root.
+    pub class: String,
+    /// The archetype id of the root.
+    pub archetype: String,
+}
+
+/// The RM type a token's coded value carries, which places its code and its
+/// system.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Coded {
+    /// A `DV_TEXT` or `DV_CODED_TEXT`: `defining_code/code_string` and
+    /// `defining_code/terminology_id/value`.
+    Text,
+    /// A `CODE_PHRASE`: `code_string` and `terminology_id/value`.
+    Phrase,
+}
+
+/// One checked parameter: where it is read and what it compares.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Parameter {
-    /// A `token` over a code path and an optional system path.
-    Token {
-        /// The AQL path of the code.
-        code: String,
-        /// The AQL path of the code system.
-        system: Option<String>,
-        /// The FHIR system URI to openEHR terminology id table.
-        systems: BTreeMap<String, String>,
-    },
-    /// A `string` over one path.
-    String {
-        /// The AQL path compared.
-        path: String,
-    },
-    /// A `date` over one path.
-    Date {
-        /// The AQL path compared.
-        path: String,
-    },
+pub struct Parameter {
+    /// The FHIR type.
+    kind: ParameterType,
+    /// The node the path is read under, `None` for the composition.
+    node: Option<Node>,
+    /// The path, relative to the node or to the composition.
+    path: String,
+    /// The coded value's type, for a `token`.
+    coded: Option<Coded>,
+    /// The FHIR system URI to openEHR terminology id table of a `token`.
+    systems: BTreeMap<String, String>,
 }
 
 impl Parameter {
     /// Returns the FHIR type of this parameter.
     #[must_use]
     pub const fn kind(&self) -> ParameterType {
-        match *self {
-            Self::Token { .. } => ParameterType::Token,
-            Self::String { .. } => ParameterType::String,
-            Self::Date { .. } => ParameterType::Date,
+        self.kind
+    }
+
+    /// Returns the node the paths are read under, `None` for the
+    /// composition.
+    #[must_use]
+    pub const fn node(&self) -> Option<&Node> {
+        self.node.as_ref()
+    }
+
+    /// Returns the FHIR system URI to openEHR terminology id table.
+    #[must_use]
+    pub const fn systems(&self) -> &BTreeMap<String, String> {
+        &self.systems
+    }
+
+    /// Whether `_sort` may order by this parameter.
+    ///
+    /// A parameter read under a repeated node has a value per node, so it
+    /// gives a composition no single position in an order.
+    #[must_use]
+    pub const fn sortable(&self) -> bool {
+        self.node.is_none()
+    }
+
+    /// Returns the compared path relative to `alias`: the one path of a
+    /// `string` or a `date`, the code path of a `token`.
+    #[must_use]
+    pub fn value_path(&self, alias: &str) -> String {
+        match self.coded {
+            Some(Coded::Text) => format!("{alias}/{}/defining_code/code_string", self.path),
+            Some(Coded::Phrase) => format!("{alias}/{}/code_string", self.path),
+            None => format!("{alias}/{}", self.path),
         }
     }
 
-    /// Returns the path `_sort` orders this parameter by.
+    /// Returns the system path of a `token` relative to `alias`.
     #[must_use]
-    pub fn sort_path(&self) -> &str {
-        match *self {
-            Self::Token { ref code, .. } => code,
-            Self::String { ref path } | Self::Date { ref path } => path,
+    pub fn system_path(&self, alias: &str) -> Option<String> {
+        match self.coded? {
+            Coded::Text => Some(format!(
+                "{alias}/{}/defining_code/terminology_id/value",
+                self.path
+            )),
+            Coded::Phrase => Some(format!("{alias}/{}/terminology_id/value", self.path)),
         }
     }
 
-    /// Returns every AQL path this parameter compares.
+    /// Returns every path this parameter compares, relative to `alias`.
     #[must_use]
-    pub fn paths(&self) -> Vec<&str> {
-        match *self {
-            Self::Token {
-                ref code,
-                ref system,
-                ..
-            } => std::iter::once(code.as_str())
-                .chain(system.as_deref())
-                .collect(),
-            Self::String { ref path } | Self::Date { ref path } => vec![path.as_str()],
-        }
+    pub fn paths(&self, alias: &str) -> Vec<String> {
+        std::iter::once(self.value_path(alias))
+            .chain(self.system_path(alias))
+            .collect()
     }
 }
 
@@ -274,6 +327,16 @@ pub enum DeclarationError {
         /// What is missing or out of place.
         reason: &'static str,
     },
+    /// A path the template does not hold, or holds under a repeated node.
+    #[error("the search declaration {} cannot place `{name}` in the template: {reason}", file.display())]
+    Template {
+        /// The file.
+        file: PathBuf,
+        /// The parameter.
+        name: String,
+        /// Why it cannot be placed.
+        reason: String,
+    },
     /// A path that is not one AQL identified path over the query's aliases.
     #[error("the search declaration {} gives `{name}` the path `{path}`: {reason}", file.display())]
     Path {
@@ -355,7 +418,8 @@ pub fn parse(file: &Path, text: &str) -> Result<DeclarationFile, DeclarationErro
     })
 }
 
-/// Checks the parameter section of one declaration.
+/// Checks the parameter section of one declaration against the template
+/// `index` its context maps.
 ///
 /// `patient_names` are the names the `patient` section takes, which no
 /// declared parameter may repeat.
@@ -367,6 +431,7 @@ pub fn check_parameters(
     file: &Path,
     parameters: &BTreeMap<String, ParameterFile>,
     patient_names: &[String],
+    index: &WebTemplateIndex,
 ) -> Result<BTreeMap<String, Parameter>, DeclarationError> {
     let mut checked = BTreeMap::new();
     for (name, written) in parameters {
@@ -378,7 +443,7 @@ pub fn check_parameters(
                 reason: "the patient section already takes this name",
             });
         }
-        checked.insert(name.clone(), check_parameter(file, name, written)?);
+        checked.insert(name.clone(), check_parameter(file, name, written, index)?);
     }
     Ok(checked)
 }
@@ -404,74 +469,77 @@ pub fn check_name(file: &Path, name: &str) -> Result<(), DeclarationError> {
     })
 }
 
-/// Checks one parameter's keys against its type.
+/// Checks one parameter's keys against its type and its path against the
+/// template.
 fn check_parameter(
     file: &Path,
     name: &str,
     written: &ParameterFile,
+    index: &WebTemplateIndex,
 ) -> Result<Parameter, DeclarationError> {
-    let shape = |kind: &'static str, reason: &'static str| DeclarationError::Shape {
-        file: file.to_path_buf(),
-        name: name.to_owned(),
-        kind,
-        reason,
+    let kind = match written.kind.as_str() {
+        "token" => ParameterType::Token,
+        "string" => ParameterType::String,
+        "date" => ParameterType::Date,
+        other => {
+            return Err(DeclarationError::UnsupportedType {
+                file: file.to_path_buf(),
+                name: name.to_owned(),
+                kind: other.to_owned(),
+            });
+        }
     };
-    match written.kind.as_str() {
-        "token" => {
-            if written.path.is_some() {
-                return Err(shape(
-                    "token",
-                    "a token compares `code` and `system`, never `path`",
-                ));
-            }
-            let code = written
-                .code
-                .clone()
-                .ok_or_else(|| shape("token", "a token needs the `code` path"))?;
-            if written.system.is_none() && !written.systems.is_empty() {
-                return Err(shape(
-                    "token",
-                    "`systems` translates the `system` path, which is absent",
-                ));
-            }
-            Ok(Parameter::Token {
-                code,
-                system: written.system.clone(),
-                systems: written.systems.clone(),
-            })
-        }
-        kind @ ("string" | "date") => {
-            let label = if kind == "string" { "string" } else { "date" };
-            if written.code.is_some() || written.system.is_some() || !written.systems.is_empty() {
-                return Err(shape(
-                    label,
-                    "only a token takes `code`, `system` and `systems`",
-                ));
-            }
-            let path = written
-                .path
-                .clone()
-                .ok_or_else(|| shape(label, "the parameter needs its `path`"))?;
-            Ok(if kind == "string" {
-                Parameter::String { path }
-            } else {
-                Parameter::Date { path }
-            })
-        }
-        other => Err(DeclarationError::UnsupportedType {
+    if kind != ParameterType::Token && !written.systems.is_empty() {
+        return Err(DeclarationError::Shape {
             file: file.to_path_buf(),
             name: name.to_owned(),
-            kind: other.to_owned(),
-        }),
+            kind: kind.as_str(),
+            reason: "only a token translates code systems through `systems`",
+        });
     }
+    let node = written.node.as_ref().map(|node| Node {
+        class: node.class.clone(),
+        archetype: node.archetype.clone(),
+    });
+    let coded = crate::facade::search::template::locate(index, node.as_ref(), &written.path, kind)
+        .map_err(|reason| DeclarationError::Template {
+            file: file.to_path_buf(),
+            name: name.to_owned(),
+            reason,
+        })?;
+    Ok(Parameter {
+        kind,
+        node,
+        path: written.path.clone(),
+        coded,
+        systems: written.systems.clone(),
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{DeclarationError, Parameter, check_parameters, is_declaration, parse};
+    use super::{Coded, DeclarationError, ParameterType, check_parameters, is_declaration, parse};
+    use openehr_mapping_core::index::WebTemplateIndex;
+    use openehr_mapping_core::template::TemplateSource;
     use std::path::Path;
 
     const FILE: &str = "condition.search.yml";
+
+    /// The node every token case below is read under.
+    const NODE: &str =
+        "    node: { class: EVALUATION, archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1 }\n";
+
+    fn index() -> WebTemplateIndex {
+        let source = TemplateSource::opt14(ferrobridge_testkit::fixtures::DIAGNOSE_OPT)
+            .expect("the fixture template parses");
+        WebTemplateIndex::build(&source).expect("the fixture template indexes")
+    }
+
+    fn check(text: &str) -> Result<super::Parameter, DeclarationError> {
+        let declared = parse(Path::new(FILE), text).expect("the declaration parses");
+        check_parameters(Path::new(FILE), &declared.parameters, &[], &index())
+            .map(|mut checked| checked.pop_first().expect("one parameter").1)
+    }
 
     #[test]
     fn only_the_search_suffixes_name_a_declaration() {
@@ -483,9 +551,13 @@ mod tests {
 
     #[test]
     fn an_unknown_key_is_refused() {
-        let error = parse(Path::new(FILE), "context: c\nfrom: EHR e\n")
-            .expect_err("`from` is no declaration key");
-        assert!(matches!(error, DeclarationError::Yaml { .. }), "{error:?}");
+        for text in [
+            "context: c\nfrom: EHR e\n",
+            "context: c\nparameters:\n  code:\n    type: token\n    code: c/x\n    path: c/x\n",
+        ] {
+            let error = parse(Path::new(FILE), text).expect_err("the key is refused");
+            assert!(matches!(error, DeclarationError::Yaml { .. }), "{error:?}");
+        }
     }
 
     #[test]
@@ -496,30 +568,75 @@ mod tests {
     }
 
     #[test]
-    fn the_three_declarable_types_check() {
-        let declared = parse(
-            Path::new(FILE),
-            "context: c\nparameters:\n  code:\n    type: token\n    code: c/x/code_string\n    system: c/x/terminology_id/value\n    systems:\n      http://snomed.info/sct: SNOMED-CT\n  note:\n    type: string\n    path: c/y/value\n  onset:\n    type: date\n    path: c/z/value\n",
+    fn a_token_reads_code_and_system_under_one_bound_node() {
+        let token = check(&format!(
+            "context: c\nparameters:\n  code:\n    type: token\n{NODE}    path: data[at0001]/items[at0002]/value\n"
+        ))
+        .expect("the token checks");
+        assert_eq!(ParameterType::Token, token.kind());
+        assert_eq!(Some(Coded::Text), token.coded);
+        assert_eq!(
+            "n0/data[at0001]/items[at0002]/value/defining_code/code_string",
+            token.value_path("n0")
+        );
+        assert_eq!(
+            Some(String::from(
+                "n0/data[at0001]/items[at0002]/value/defining_code/terminology_id/value"
+            )),
+            token.system_path("n0")
+        );
+        assert!(!token.sortable());
+    }
+
+    #[test]
+    fn a_composition_level_date_checks_and_sorts() {
+        let date = check("context: c\nparameters:\n  recorded:\n    type: date\n    path: context/start_time/value\n")
+            .expect("a composition-level date checks");
+        assert!(date.sortable());
+        assert_eq!("c/context/start_time/value", date.value_path("c"));
+    }
+
+    #[test]
+    fn a_path_crossing_a_repeated_node_is_refused() {
+        // The anatomical location cluster is unbounded in the fixture
+        // template, so a path through it has one value per cluster.
+        let error = check(&format!(
+            "context: c\nparameters:\n  site:\n    type: token\n{NODE}    path: data[at0001]/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0002]/value\n"
+        ))
+        .expect_err("the cluster repeats");
+        assert!(
+            matches!(error, DeclarationError::Template { ref reason, .. } if reason.contains("more than once")),
+            "{error:?}"
+        );
+    }
+
+    #[test]
+    fn a_token_over_no_coded_value_is_refused() {
+        let error = check(&format!(
+            "context: c\nparameters:\n  onset:\n    type: token\n{NODE}    path: data[at0001]/items[at0077]/value\n"
+        ))
+        .expect_err("a date-time carries no code");
+        assert!(
+            matches!(error, DeclarationError::Template { .. }),
+            "{error:?}"
+        );
+    }
+
+    #[test]
+    fn a_node_the_template_does_not_hold_is_refused() {
+        let error = check(
+            "context: c\nparameters:\n  code:\n    type: token\n    node: { class: OBSERVATION, archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1 }\n    path: data[at0001]/items[at0002]/value\n",
         )
-        .expect("the declaration parses");
-        let checked = check_parameters(Path::new(FILE), &declared.parameters, &[])
-            .expect("the parameters check");
-        assert!(matches!(checked.get("code"), Some(Parameter::Token { .. })));
-        assert!(matches!(
-            checked.get("note"),
-            Some(Parameter::String { .. })
-        ));
-        assert!(matches!(checked.get("onset"), Some(Parameter::Date { .. })));
+        .expect_err("the class does not match the archetype root");
+        assert!(
+            matches!(error, DeclarationError::Template { .. }),
+            "{error:?}"
+        );
     }
 
     #[test]
     fn a_type_outside_the_declarable_set_is_refused_by_name() {
-        let declared = parse(
-            Path::new(FILE),
-            "context: c\nparameters:\n  value:\n    type: quantity\n    path: c/q\n",
-        )
-        .expect("the declaration parses");
-        let error = check_parameters(Path::new(FILE), &declared.parameters, &[])
+        let error = check("context: c\nparameters:\n  value:\n    type: quantity\n    path: c/q\n")
             .expect_err("quantity is not declarable");
         assert!(
             matches!(error, DeclarationError::UnsupportedType { ref kind, .. } if kind == "quantity"),
@@ -530,11 +647,10 @@ mod tests {
     #[test]
     fn a_reserved_or_malformed_name_is_refused() {
         for name in ["_lastUpdated", "code:exact", "patient.identifier", "9code"] {
-            let text =
-                format!("context: c\nparameters:\n  {name}:\n    type: string\n    path: c/p\n");
-            let declared = parse(Path::new(FILE), &text).expect("the declaration parses");
-            let error = check_parameters(Path::new(FILE), &declared.parameters, &[])
-                .expect_err("the name is refused");
+            let text = format!(
+                "context: c\nparameters:\n  {name}:\n    type: date\n    path: context/start_time/value\n"
+            );
+            let error = check(&text).expect_err("the name is refused");
             assert!(
                 matches!(error, DeclarationError::Name { .. }),
                 "{name}: {error:?}"
@@ -543,14 +659,11 @@ mod tests {
     }
 
     #[test]
-    fn a_token_without_its_code_path_is_refused() {
-        let declared = parse(
-            Path::new(FILE),
-            "context: c\nparameters:\n  code:\n    type: token\n    path: c/p\n",
+    fn systems_on_a_parameter_other_than_a_token_are_refused() {
+        let error = check(
+            "context: c\nparameters:\n  recorded:\n    type: date\n    path: context/start_time/value\n    systems: { a: b }\n",
         )
-        .expect("the declaration parses");
-        let error = check_parameters(Path::new(FILE), &declared.parameters, &[])
-            .expect_err("a token compares code and system");
+        .expect_err("only a token translates systems");
         assert!(matches!(error, DeclarationError::Shape { .. }), "{error:?}");
     }
 
@@ -558,13 +671,14 @@ mod tests {
     fn a_parameter_repeating_a_patient_name_is_refused() {
         let declared = parse(
             Path::new(FILE),
-            "context: c\nparameters:\n  patient:\n    type: string\n    path: c/p\n",
+            "context: c\nparameters:\n  patient:\n    type: date\n    path: context/start_time/value\n",
         )
         .expect("the declaration parses");
         let error = check_parameters(
             Path::new(FILE),
             &declared.parameters,
             &[String::from("patient")],
+            &index(),
         )
         .expect_err("the patient section takes the name");
         assert!(matches!(error, DeclarationError::Name { .. }), "{error:?}");

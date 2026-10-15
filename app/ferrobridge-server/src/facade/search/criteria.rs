@@ -331,14 +331,19 @@ impl Reader<'_> {
                 Some(rest) => (true, rest),
                 None => (false, item),
             };
-            if self.declared.parameters().contains_key(parameter) {
+            if self
+                .declared
+                .parameters()
+                .get(parameter)
+                .is_some_and(crate::facade::search::declaration::Parameter::sortable)
+            {
                 self.criteria.sort.push((parameter.to_owned(), descending));
                 kept.push(item.to_owned());
             } else {
                 self.unsupported(
                     "_sort",
                     format!(
-                        "`{parameter}` is no parameter {} sorts on; _sort names a declared token, string or date parameter",
+                        "`{parameter}` is no parameter {} sorts on; _sort names a declared parameter read under the composition, which has one value per composition",
                         self.declared.resource_type()
                     ),
                 );
