@@ -257,8 +257,11 @@ impl<'i> Walk<'_, '_, 'i> {
             return Err(Reason::ReferenceOutOfScope);
         };
         match self.validator().resolver().resolve(reference, self.scope()) {
-            Resolution::Found(value) => node_of_resource(value).ok_or(Reason::UnresolvedReference),
+            Resolution::Found { target, .. } => {
+                node_of_resource(target).ok_or(Reason::UnresolvedReference)
+            }
             Resolution::OutOfScope => Err(Reason::ReferenceOutOfScope),
+            Resolution::Ambiguous => Err(Reason::AmbiguousReference),
             Resolution::Missing => {
                 self.out().issue(
                     Severity::Warning,
@@ -266,7 +269,7 @@ impl<'i> Walk<'_, '_, 'i> {
                     MessageId::UnresolvedReference,
                     location,
                     format!(
-                        "the reference {reference} resolves to nothing, so the discriminator {path} is not evaluated"
+                        "the reference resolves to nothing, so the discriminator {path} is not evaluated"
                     ),
                 );
                 Err(Reason::UnresolvedReference)

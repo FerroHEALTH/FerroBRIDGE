@@ -74,6 +74,9 @@ impl<'i> Walk<'_, '_, 'i> {
                     return Ok(());
                 };
                 let location = &occurrence.location;
+                if name == "Reference" {
+                    self.reference(value, location);
+                }
                 if field.content_reference.is_none() && name == "Extension" {
                     let placement = if field.name == "modifierExtension" {
                         Placement::Modifier
