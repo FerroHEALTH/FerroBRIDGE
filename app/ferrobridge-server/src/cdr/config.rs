@@ -4,8 +4,8 @@
 //! How the CDR client is pointed at one CDR: its base URL, its budget, and its
 //! credentials, as `[cdr]` resolves them.
 //!
-//! No specification governs the timeout, the retry budget or the credential
-//! form: our own design. ITS-REST 1.1.0 declares `security: []` on every
+//! No specification governs the timeout, the retry budget or the static
+//! credential form: our own design. ITS-REST 1.1.0 declares `security: []` on every
 //! document and leaves authentication to the deployment.
 
 use std::time::Duration;
@@ -13,6 +13,19 @@ use std::time::Duration;
 use openehr_its::rest::client::Credentials;
 use openehr_its::rest::client::RetryPolicy;
 use url::Url;
+
+use crate::cdr::oauth::OAuthConfig;
+
+/// How the bridge authenticates to the CDR.
+#[derive(Debug, Clone)]
+pub enum CdrCredentials {
+    /// One credential presented on every call: a bearer token, or a user and a
+    /// password.
+    Static(Credentials),
+    /// A token the bridge obtains with the OAuth 2.0 client credentials grant
+    /// (RFC 6749 §4.4) and renews before it expires.
+    OAuth(Box<OAuthConfig>),
+}
 
 /// Everything one [`CdrClient`](crate::cdr::CdrClient) needs about one CDR.
 ///
@@ -27,10 +40,10 @@ pub struct CdrConfig {
     pub timeout: Duration,
     /// The retry budget for idempotent calls.
     pub retry: RetryPolicy,
-    /// The credentials, when the deployment needs them. The secret half is a
+    /// The credentials, when the deployment needs them. Every secret is a
     /// `SecretString`, so neither a `Debug` rendering of the settings nor a log
     /// line can carry it.
-    pub credentials: Option<Credentials>,
+    pub credentials: Option<CdrCredentials>,
 }
 
 impl CdrConfig {
@@ -65,7 +78,15 @@ impl CdrConfig {
     /// Returns this configuration with `credentials` presented on every call.
     #[must_use]
     pub fn with_credentials(mut self, credentials: Credentials) -> Self {
-        self.credentials = Some(credentials);
+        self.credentials = Some(CdrCredentials::Static(credentials));
+        self
+    }
+
+    /// Returns this configuration obtaining its token with the client
+    /// credentials grant `oauth` describes.
+    #[must_use]
+    pub fn with_oauth(mut self, oauth: OAuthConfig) -> Self {
+        self.credentials = Some(CdrCredentials::OAuth(Box::new(oauth)));
         self
     }
 }

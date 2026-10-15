@@ -1,4 +1,4 @@
-<!-- SPDX-FileCopyrightText: Ruben Talstra -->
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 # Changelog
@@ -166,6 +166,20 @@ crates on crates.io.
   the `openehr-*` 0.0.84 crates, so a project on that release, such as the
   family's federation gateway, runs FHIRconnect mappings in process with one
   copy of the openEHR types.
+- The bridge obtains its CDR token with the OAuth 2.0 client credentials
+  grant (RFC 6749 §4.4) and renews it before it expires (#421).
+  `[cdr.credentials.oauth]` takes a `token_endpoint`, or an `issuer` whose
+  RFC 8414 metadata (or OpenID Connect discovery document) names it, a
+  `client_id`, a `client_secret` or `client_secret_file`, `client_auth`
+  (`client_secret_basic` or `client_secret_post`), and an optional `scope`,
+  `audience` and RFC 8707 `resource`. The token is fetched on the first CDR
+  call, shared by every call, and fetched again `refresh_margin_ms` (30
+  seconds by default) before `expires_in` runs out; concurrent calls share
+  one fetch. A CDR `401` drops the token and the call is sent once more
+  under a new one, and a second `401` reaches the caller as before. A
+  refused grant is an error carrying the token endpoint's status and its
+  OAuth `error` and `error_description`, and a token that cannot be
+  obtained takes the `cdr` readiness indicator down with that reason.
 
 ### Changed
 
