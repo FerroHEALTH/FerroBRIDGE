@@ -33,7 +33,7 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
     ///
     /// Returns the openEHR path of every field it filled, in the order it
     /// filled them, which is the order of the
-    /// [`Loss::Defaulted`](crate::engine::outcome::Loss::Defaulted) warnings it
+    /// [`Loss::Defaulted`] warnings it
     /// recorded. Which fields take a default is FHIRconnect's
     /// (`engine/defaults-for-fields.adoc`); every default travels as the `ctx/`
     /// key the FLAT builder resolves (Simplified Formats, master06 §Composer,

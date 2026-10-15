@@ -403,7 +403,9 @@ impl super::super::codec::Json for ImplementationGuide {
         }
         if !self.binary.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.binary)?;
-            object.insert(std::string::String::from("binary"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("binary"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_binary"), elements);
             }
@@ -2303,14 +2305,18 @@ impl super::super::codec::Json for ImplementationGuidePage {
         }
         if !self.r#type.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.r#type)?;
-            object.insert(std::string::String::from("type"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("type"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_type"), elements);
             }
         }
         if !self.package.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.package)?;
-            object.insert(std::string::String::from("package"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("package"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_package"), elements);
             }

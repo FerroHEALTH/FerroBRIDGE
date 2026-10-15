@@ -104,7 +104,9 @@ impl super::super::codec::Json for DataRequirement {
         }
         if !self.profile.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.profile)?;
-            object.insert(std::string::String::from("profile"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("profile"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_profile"), elements);
             }
@@ -120,7 +122,9 @@ impl super::super::codec::Json for DataRequirement {
         }
         if !self.must_support.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.must_support)?;
-            object.insert(std::string::String::from("mustSupport"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("mustSupport"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_mustSupport"), elements);
             }

@@ -353,7 +353,9 @@ impl super::super::codec::Json for SubscriptionTopic {
         }
         if !self.derived_from.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.derived_from)?;
-            object.insert(std::string::String::from("derivedFrom"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("derivedFrom"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_derivedFrom"), elements);
             }
@@ -1449,14 +1451,18 @@ impl super::super::codec::Json for SubscriptionTopicCanFilterBy {
         }
         if !self.comparator.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.comparator)?;
-            object.insert(std::string::String::from("comparator"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("comparator"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_comparator"), elements);
             }
         }
         if !self.modifier.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.modifier)?;
-            object.insert(std::string::String::from("modifier"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("modifier"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_modifier"), elements);
             }
@@ -2068,14 +2074,18 @@ impl super::super::codec::Json for SubscriptionTopicNotificationShape {
         }
         if !self.include.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.include)?;
-            object.insert(std::string::String::from("include"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("include"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_include"), elements);
             }
         }
         if !self.rev_include.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.rev_include)?;
-            object.insert(std::string::String::from("revInclude"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("revInclude"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_revInclude"), elements);
             }
@@ -2370,7 +2380,9 @@ impl super::super::codec::Json for SubscriptionTopicResourceTrigger {
         if !self.supported_interaction.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.supported_interaction)?;
-            object.insert(std::string::String::from("supportedInteraction"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("supportedInteraction"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_supportedInteraction"), elements);
             }

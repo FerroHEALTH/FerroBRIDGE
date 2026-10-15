@@ -309,14 +309,18 @@ impl super::super::codec::Json for ProcessRequest {
         }
         if !self.include.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.include)?;
-            object.insert(std::string::String::from("include"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("include"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_include"), elements);
             }
         }
         if !self.exclude.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.exclude)?;
-            object.insert(std::string::String::from("exclude"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("exclude"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_exclude"), elements);
             }

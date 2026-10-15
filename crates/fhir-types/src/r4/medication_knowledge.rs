@@ -280,7 +280,9 @@ impl super::super::codec::Json for MedicationKnowledge {
         }
         if !self.synonym.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.synonym)?;
-            object.insert(std::string::String::from("synonym"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("synonym"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_synonym"), elements);
             }
@@ -1974,7 +1976,9 @@ impl super::super::codec::Json
         }
         if !self.value.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.value)?;
-            object.insert(std::string::String::from("value"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("value"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_value"), elements);
             }

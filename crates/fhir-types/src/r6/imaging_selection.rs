@@ -1139,7 +1139,9 @@ impl super::super::codec::Json for ImagingSelectionImageRegion3D {
         }
         if !self.coordinate.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.coordinate)?;
-            object.insert(std::string::String::from("coordinate"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("coordinate"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_coordinate"), elements);
             }
@@ -1436,7 +1438,9 @@ impl super::super::codec::Json for ImagingSelectionInstance {
         }
         if !self.frame_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.frame_number)?;
-            object.insert(std::string::String::from("frameNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("frameNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_frameNumber"), elements);
             }
@@ -1444,10 +1448,12 @@ impl super::super::codec::Json for ImagingSelectionInstance {
         if !self.referenced_content_item_identifier.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.referenced_content_item_identifier)?;
-            object.insert(
-                std::string::String::from("referencedContentItemIdentifier"),
-                values,
-            );
+            if let Some(values) = values {
+                object.insert(
+                    std::string::String::from("referencedContentItemIdentifier"),
+                    values,
+                );
+            }
             if let Some(elements) = elements {
                 object.insert(
                     std::string::String::from("_referencedContentItemIdentifier"),
@@ -1457,7 +1463,9 @@ impl super::super::codec::Json for ImagingSelectionInstance {
         }
         if !self.segment_number.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.segment_number)?;
-            object.insert(std::string::String::from("segmentNumber"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("segmentNumber"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_segmentNumber"), elements);
             }
@@ -1465,7 +1473,9 @@ impl super::super::codec::Json for ImagingSelectionInstance {
         if !self.region_of_interest.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.region_of_interest)?;
-            object.insert(std::string::String::from("regionOfInterest"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("regionOfInterest"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_regionOfInterest"), elements);
             }
@@ -1473,7 +1483,9 @@ impl super::super::codec::Json for ImagingSelectionInstance {
         if !self.wave_form_channel.is_empty() {
             let (values, elements) =
                 super::super::codec::primitive_arrays(&self.wave_form_channel)?;
-            object.insert(std::string::String::from("waveFormChannel"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("waveFormChannel"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_waveFormChannel"), elements);
             }
@@ -1914,7 +1926,9 @@ impl super::super::codec::Json for ImagingSelectionInstanceImageRegion2D {
         }
         if !self.coordinate.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.coordinate)?;
-            object.insert(std::string::String::from("coordinate"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("coordinate"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_coordinate"), elements);
             }
