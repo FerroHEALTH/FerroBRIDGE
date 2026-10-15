@@ -14,6 +14,7 @@ mod examples;
 mod read;
 mod reconcile;
 mod replay;
+mod search;
 pub(crate) mod stub;
 mod transaction;
 mod validate;
@@ -201,6 +202,21 @@ async fn harness() -> Harness {
 
 /// Returns a harness whose facade runs with `facade_settings`.
 async fn harness_with(facade_settings: Settings) -> Harness {
+    harness_built(facade_settings, None).await
+}
+
+/// Returns a harness whose facade answers search as the declarations in
+/// [`FIXTURES`] state, with the page sizes of `limits`.
+async fn search_harness(limits: ferrobridge_server::facade::search::Limits) -> Harness {
+    harness_built(settings(), Some(limits)).await
+}
+
+/// Returns a harness whose facade runs with `facade_settings`, answering
+/// search when `search` carries its page sizes.
+async fn harness_built(
+    facade_settings: Settings,
+    search: Option<ferrobridge_server::facade::search::Limits>,
+) -> Harness {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(
@@ -219,12 +235,16 @@ async fn harness_with(facade_settings: Settings) -> Harness {
         .expect("the template fetch answers");
     let compiled = programs::compile_set(&set, &templates).expect("the mapping set compiles");
     let store = Arc::new(MemoryStore::new());
-    let facade = Arc::new(Facade::new(
-        compiled,
-        handle(&store),
-        client(&cdr),
-        facade_settings,
-    ));
+    let mut built = Facade::new(compiled, handle(&store), client(&cdr), facade_settings);
+    if let Some(limits) = search {
+        let catalog = ferrobridge_server::facade::search::load(
+            std::path::Path::new(FIXTURES),
+            built.programs(),
+        )
+        .expect("the search declarations load");
+        built = built.with_search(catalog, limits);
+    }
+    let facade = Arc::new(built);
     Harness { cdr, store, facade }
 }
 
