@@ -537,14 +537,18 @@ impl super::super::codec::Json for OperationOutcomeIssue {
         }
         if !self.location.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.location)?;
-            object.insert(std::string::String::from("location"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("location"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_location"), elements);
             }
         }
         if !self.expression.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.expression)?;
-            object.insert(std::string::String::from("expression"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("expression"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_expression"), elements);
             }

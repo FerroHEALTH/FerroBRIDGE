@@ -1717,49 +1717,63 @@ impl super::super::codec::Json for MolecularSequenceQualityRoc {
         }
         if !self.score.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.score)?;
-            object.insert(std::string::String::from("score"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("score"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_score"), elements);
             }
         }
         if !self.num_t_p.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.num_t_p)?;
-            object.insert(std::string::String::from("numTP"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("numTP"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_numTP"), elements);
             }
         }
         if !self.num_f_p.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.num_f_p)?;
-            object.insert(std::string::String::from("numFP"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("numFP"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_numFP"), elements);
             }
         }
         if !self.num_f_n.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.num_f_n)?;
-            object.insert(std::string::String::from("numFN"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("numFN"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_numFN"), elements);
             }
         }
         if !self.precision.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.precision)?;
-            object.insert(std::string::String::from("precision"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("precision"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_precision"), elements);
             }
         }
         if !self.sensitivity.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.sensitivity)?;
-            object.insert(std::string::String::from("sensitivity"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("sensitivity"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_sensitivity"), elements);
             }
         }
         if !self.f_measure.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.f_measure)?;
-            object.insert(std::string::String::from("fMeasure"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("fMeasure"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_fMeasure"), elements);
             }

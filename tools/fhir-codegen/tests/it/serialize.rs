@@ -300,3 +300,53 @@ fn the_direct_path_writes_the_ordered_bytes_in_every_version() {
         ORDERED_BYTES
     );
 }
+
+/// A repeating primitive whose every position carries only an element object.
+fn element_only_source() -> Object {
+    let text = r#"{
+        "resourceType": "Parameters",
+        "meta": {"_profile": [{"id": "p1"}, {"id": "p2"}]}
+    }"#;
+    serde_json::from_str(text).expect("the source document parses")
+}
+
+/// With an `id` or `extension` and no value, only the `_` property is written
+/// (<https://hl7.org/fhir/R4/json.html#primitive>,
+/// <https://hl7.org/fhir/STU3/json.html#primitive>), so a list with no value
+/// at any position has no value array.
+const ELEMENT_ONLY_BYTES: &str =
+    r#"{"meta":{"_profile":[{"id":"p1"},{"id":"p2"}]},"resourceType":"Parameters"}"#;
+
+/// Both paths' bytes for `object`, decoded as `T`, asserted equal.
+fn agreed_bytes<T: Json + serde::Serialize>(object: &Object) -> String {
+    let mut path = ElementPath::root("Parameters");
+    let typed = T::from_json(object, &mut path).expect("the document decodes");
+    let (document, direct) = both_paths(&typed).expect("the typed resource writes");
+    assert_eq!(document, direct, "{}", first_difference(&document, &direct));
+    String::from_utf8(direct).expect("JSON is UTF-8")
+}
+
+#[test]
+fn a_repeating_primitive_with_no_value_writes_only_its_element_array_in_every_version() {
+    let object = element_only_source();
+    assert_eq!(
+        agreed_bytes::<fhir_types::stu3::parameters::Parameters>(&object),
+        ELEMENT_ONLY_BYTES
+    );
+    assert_eq!(
+        agreed_bytes::<fhir_types::r4::parameters::Parameters>(&object),
+        ELEMENT_ONLY_BYTES
+    );
+    assert_eq!(
+        agreed_bytes::<fhir_types::r4b::parameters::Parameters>(&object),
+        ELEMENT_ONLY_BYTES
+    );
+    assert_eq!(
+        agreed_bytes::<fhir_types::r5::parameters::Parameters>(&object),
+        ELEMENT_ONLY_BYTES
+    );
+    assert_eq!(
+        agreed_bytes::<fhir_types::r6::parameters::Parameters>(&object),
+        ELEMENT_ONLY_BYTES
+    );
+}

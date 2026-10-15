@@ -355,7 +355,9 @@ impl super::super::codec::Json for MessageDefinition {
         }
         if !self.replaces.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.replaces)?;
-            object.insert(std::string::String::from("replaces"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("replaces"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_replaces"), elements);
             }
@@ -466,7 +468,9 @@ impl super::super::codec::Json for MessageDefinition {
         }
         if !self.parent.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.parent)?;
-            object.insert(std::string::String::from("parent"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("parent"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_parent"), elements);
             }

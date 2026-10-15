@@ -431,7 +431,9 @@ impl super::super::codec::Json for StructureMap {
         }
         if !self.import.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.import)?;
-            object.insert(std::string::String::from("import"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("import"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_import"), elements);
             }
@@ -3293,7 +3295,9 @@ impl super::super::codec::Json for StructureMapGroupRuleTarget {
         }
         if !self.list_mode.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.list_mode)?;
-            object.insert(std::string::String::from("listMode"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("listMode"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_listMode"), elements);
             }

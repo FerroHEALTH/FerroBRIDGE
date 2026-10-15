@@ -264,7 +264,9 @@ impl super::super::codec::Json for CoverageEligibilityResponse {
         }
         if !self.purpose.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.purpose)?;
-            object.insert(std::string::String::from("purpose"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("purpose"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_purpose"), elements);
             }
@@ -1031,7 +1033,9 @@ impl super::super::codec::Json for CoverageEligibilityResponseError {
         );
         if !self.expression.is_empty() {
             let (values, elements) = super::super::codec::primitive_arrays(&self.expression)?;
-            object.insert(std::string::String::from("expression"), values);
+            if let Some(values) = values {
+                object.insert(std::string::String::from("expression"), values);
+            }
             if let Some(elements) = elements {
                 object.insert(std::string::String::from("_expression"), elements);
             }
