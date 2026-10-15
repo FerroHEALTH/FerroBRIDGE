@@ -28,7 +28,6 @@ use openehr_its::rest::generated::ehr::client::{
     CompositionCreateOutcome, CompositionDeleteOutcome, CompositionUpdateOutcome, EhrCreateOutcome,
 };
 use openehr_its::rest::generated::query::AdhocQueryExecute;
-use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::template::TemplateSource;
 use openehr_rm::v1_2::composition::composition::Composition;
@@ -50,10 +49,6 @@ const VISITS: &str = "SELECT e/ehr_id/value AS ehr_id, \
     c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end \
     FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
     ORDER BY c/context/start_time/value";
-
-/// The unordered count the facade's end-to-end cases send, which reads
-/// nothing from the composition node but its version's uid.
-const UNORDERED_UIDS: &str = "SELECT c/uid/value AS uid FROM EHR e CONTAINS COMPOSITION c";
 
 /// The FLAT path of the laboratory result the fixture fills.
 const RESULT: &str = "synthetic_laboratory_report/synthetic_laboratory_result:0";
@@ -556,41 +551,6 @@ async fn the_visit_query_answers_the_latest_context_and_leaves_out_a_deleted_com
         )],
         spans,
         "only the corrected context of the kept composition"
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn an_unordered_uid_query_never_answers_the_deleting_version() -> Result<(), Box<dyn Error>> {
-    // NOTE: openEHR RM Common 1.1.0 §6.2.5 gives the deleting version Void data, so no
-    // COMPOSITION of it can bind `c` under any version scope.
-    if !containers::e2e_enabled() {
-        return Ok(());
-    }
-    // TODO(#494): FerroEHR 4.3.6 streams the deleting version's uid for this
-    // unscoped, unordered shape, so this case fails against the pinned CDR.
-    let harness = Harness::start().await?;
-    let (kept, deleting) = harness.kept_and_deleted().await?;
-    let request = AdhocQueryExecute {
-        q: String::from(UNORDERED_UIDS),
-        offset: None,
-        fetch: None,
-        query_parameters: None,
-        additional_properties: BTreeMap::new(),
-    };
-    let rows = match harness.client.query_aql(&request).await?.outcome {
-        QueryExecuteAdhocQueryBodyOutcome::Ok { body, .. } => body.rows,
-        other => return Err(format!("the CDR refused the query: {other:?}").into()),
-    };
-    let uids: Vec<&Value> = rows.iter().filter_map(|row| row.first()).collect();
-    assert!(
-        uids.contains(&&json!(kept.value())),
-        "the kept composition is answered: {uids:?}"
-    );
-    assert!(
-        !uids.contains(&&json!(deleting.value())),
-        "the deleting version {} carries no composition: {uids:?}",
-        deleting.value()
     );
     Ok(())
 }

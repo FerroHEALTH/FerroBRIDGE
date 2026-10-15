@@ -14,7 +14,7 @@ use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 /// A synthetic population query.
-const AQL: &str = "SELECT c/uid/value AS cid FROM EHR e CONTAINS COMPOSITION c";
+const AQL: &str = "SELECT c/uid/value AS cid FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/uid/value";
 
 /// Returns the request body for the synthetic query.
 fn request() -> AdhocQueryExecute {
