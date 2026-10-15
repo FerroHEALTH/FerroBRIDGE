@@ -129,7 +129,7 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
     })?;
     let scratch_src = scratch.path().join("src");
     write_tree(&scratch_src, &files)?;
-    rustfmt(&scratch_src, &files, &options.crate_dir)?;
+    rustfmt(&scratch_src, &options.crate_dir)?;
     let formatted = read_tree(&scratch_src, &files)?;
 
     let module_names: Vec<&str> = models.iter().map(|m| m.name.as_str()).collect();
@@ -303,32 +303,26 @@ pub(crate) fn read_tree(
 
 /// Formats the rendered tree with the pinned `rustfmt`.
 ///
-/// The union tree holds thousands of files, more than one command line holds,
-/// so the paths go in batches (<https://doc.rust-lang.org/std/process/struct.Command.html>).
-pub(crate) fn rustfmt(
-    root: &Path,
-    files: &BTreeMap<String, String>,
-    crate_dir: &Path,
-) -> Result<(), EmitError> {
-    const BATCH: usize = 256;
+/// `rustfmt` formats a file together with every out-of-line module it
+/// declares, so the tree is formatted once, from its crate root, which every
+/// rendered file is reachable from. Naming the other files as well would
+/// format each `mod.rs` subtree again (#433).
+pub(crate) fn rustfmt(root: &Path, crate_dir: &Path) -> Result<(), EmitError> {
     let config = crate_dir.join("../../rustfmt.toml");
-    let paths: Vec<PathBuf> = files.keys().map(|relative| root.join(relative)).collect();
-    for batch in paths.chunks(BATCH) {
-        let mut command = Command::new("rustfmt");
-        command.arg("--edition").arg("2024");
-        if config.is_file() {
-            command.arg("--config-path").arg(&config);
-        }
-        command.args(batch);
-        let output = command.output().map_err(|source| EmitError::Io {
-            path: PathBuf::from("rustfmt"),
-            source,
-        })?;
-        if !output.status.success() {
-            return Err(EmitError::Rustfmt {
-                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-            });
-        }
+    let mut command = Command::new("rustfmt");
+    command.arg("--edition").arg("2024");
+    if config.is_file() {
+        command.arg("--config-path").arg(&config);
+    }
+    command.arg(root.join("lib.rs"));
+    let output = command.output().map_err(|source| EmitError::Io {
+        path: PathBuf::from("rustfmt"),
+        source,
+    })?;
+    if !output.status.success() {
+        return Err(EmitError::Rustfmt {
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
     }
     Ok(())
 }
