@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # The FerroBRIDGE image: one static binary on distroless static, per platform.
 # Nothing is compiled here. The release lane builds and attests the musl
 # binaries and stages them under dist/<os>_<arch>/ferrobridge before this file
