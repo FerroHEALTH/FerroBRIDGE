@@ -116,7 +116,7 @@ impl Walk<'_, '_> {
             );
         }
         if !structure.definition().context.is_empty() {
-            // TODO(#432): check the contexts StructureDefinition.context allows an extension in.
+            // TODO(#481): check the contexts StructureDefinition.context allows an extension in.
             self.out().unevaluated(
                 structure.url(),
                 "Extension",
