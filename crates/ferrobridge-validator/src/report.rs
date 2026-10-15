@@ -84,6 +84,11 @@ pub enum Constraint {
         /// The profile canonicals.
         profiles: Vec<String>,
     },
+    /// The ways a reference may aggregate its target (`type.aggregation`).
+    Aggregation {
+        /// The aggregation modes, any of which the reference may take.
+        modes: Vec<String>,
+    },
     /// A profile the instance claims in `meta.profile`.
     ClaimedProfile {
         /// The profile canonical.
@@ -161,9 +166,23 @@ pub enum Reason {
         /// answer.
         status: Option<StatusCode>,
     },
-    /// The validator does not validate a reference's target against its
-    /// target profiles, or a resource against a profile it claims.
-    Profiles,
+    /// The reference matches more than one entry of the Bundle around it
+    /// (<https://hl7.org/fhir/R4/bundle.html#references>).
+    AmbiguousReference,
+    /// The `Reference` carries no literal `reference`, only a logical
+    /// identifier or a display, so it names no resource the validator can
+    /// resolve.
+    NoLiteralReference,
+    /// The aggregation allows only `bundled`, and no Bundle is around the
+    /// resource.
+    NoBundle,
+    /// The target of a `canonical` is not resolved: the validator resolves
+    /// references to resources only.
+    CanonicalTarget,
+    /// The target profile constrains the abstract `Resource` or
+    /// `DomainResource`, which the validator holds no resource to beyond
+    /// the core definitions.
+    AbstractProfile,
     /// The validator does not check where an extension is used.
     ExtensionContext,
 }
@@ -234,7 +253,17 @@ impl fmt::Display for Reason {
                 ),
                 None => write!(f, "the terminology server did not answer ({kind})"),
             },
-            Self::Profiles => f.write_str("target profiles and claimed profiles are not validated"),
+            Self::AmbiguousReference => {
+                f.write_str("the reference matches more than one entry of the Bundle")
+            }
+            Self::NoLiteralReference => {
+                f.write_str("the reference carries no literal reference to resolve")
+            }
+            Self::NoBundle => f.write_str("no Bundle is around the resource"),
+            Self::CanonicalTarget => f.write_str("the target of a canonical is not resolved"),
+            Self::AbstractProfile => {
+                f.write_str("a profile on Resource or DomainResource is not validated against")
+            }
             Self::ExtensionContext => f.write_str("extension contexts are not checked"),
         }
     }
@@ -395,6 +424,29 @@ impl Collector {
         self.held.extend(other.held);
     }
 
+    /// Adds what `other` collected, leaving out each issue this collector
+    /// already holds: a second walk of one resource against another profile
+    /// finds the base findings again.
+    pub(crate) fn absorb_new(&mut self, other: Self) {
+        let Self {
+            issues,
+            unevaluated,
+            pending,
+            held,
+        } = other;
+        for issue in issues {
+            if !self.issues.contains(&issue) {
+                self.issues.push(issue);
+            }
+        }
+        self.absorb(Self {
+            issues: Vec::new(),
+            unevaluated,
+            pending,
+            held,
+        });
+    }
+
     /// Finishes the report.
     pub(crate) fn finish(self) -> Report {
         Report {
@@ -483,6 +535,9 @@ fn describe(unevaluated: &Unevaluated) -> String {
         }
         Constraint::TargetProfile { profiles } => {
             format!("the target profiles {}", profiles.join(", "))
+        }
+        Constraint::Aggregation { modes } => {
+            format!("the aggregation {}", modes.join(", "))
         }
         Constraint::ClaimedProfile { url } => format!("the claimed profile {url}"),
         Constraint::ExtensionContext => "the extension context".to_owned(),

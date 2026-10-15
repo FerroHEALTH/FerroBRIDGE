@@ -10,17 +10,22 @@
 //! and the hop a `contentReference` makes. The snapshot elements of the
 //! `StructureDefinitions` in play add the profile's constraints: cardinality,
 //! the types a choice may take, `fixed[x]`, `pattern[x]`, `maxLength`,
-//! slicing, the profiles an element's types name and terminology bindings.
-//! Invariants, target profiles and claimed profiles are listed in the report
-//! as unevaluated, and so is every binding the package set cannot decide,
-//! which [`crate::report::Report::resolve_bindings`] can send to a
-//! terminology server.
+//! slicing, the profiles an element's types name, the target profiles and
+//! aggregation of a reference, and terminology bindings. A reference resolves
+//! to a contained resource or to an entry of the Bundle around it, every
+//! profile a resource claims is validated against, and a document Bundle is
+//! held to the content rules of documents.html §3.3.1. Invariants are listed
+//! in the report as unevaluated, and so is every binding the package set
+//! cannot decide, which [`crate::report::Report::resolve_bindings`] can send
+//! to a terminology server.
 
+mod document;
 mod extension;
 mod listing;
 mod matching;
 mod primitive;
 mod profiles;
+mod reference;
 mod resolver;
 mod slicing;
 mod structure;
@@ -41,7 +46,7 @@ use crate::set::PackageId;
 use crate::set::PackageSet;
 use crate::set::ResolveError;
 use primitive::PrimitiveRule;
-use resolver::Contained;
+use resolver::Bundled;
 use resolver::Resolver;
 use structure::Structure;
 use terminology::index::CodeIndex;
@@ -114,13 +119,14 @@ impl<'set> Validator<'set> {
             structures: Mutex::new(BTreeMap::new()),
             primitives: Mutex::new(BTreeMap::new()),
             code_systems: Mutex::new(BTreeMap::new()),
-            resolver: Box::new(Contained),
+            resolver: Box::new(Bundled),
         }
     }
 
     /// Validates `resource` against the core definition of its type.
     ///
-    /// Each profile the resource claims in `meta.profile` is listed as
+    /// The resource is also validated against each profile it claims in
+    /// `meta.profile`; a claim the package set lacks is listed as
     /// unevaluated.
     ///
     /// # Errors

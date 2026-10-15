@@ -134,16 +134,23 @@ fn an_eps_bundle_matches_its_entries_by_type_and_profile() -> TestResult {
     let Some(set) = eu_set()? else { return Ok(()) };
     let sections =
         ["11450-4", "48765-2", "10160-0", "47519-4", "46264-8"].map(|code| section(code, &[]));
+    // documents.html §3.3.1: the subject and the author the Composition
+    // references SHALL be in the document Bundle, so they name its entries.
+    let mut composition = composition(&sections);
+    composition["subject"] = json!({"reference": "urn:uuid:00000000-0000-0000-0000-000000000004"});
+    composition["author"] = json!([{"reference": "urn:uuid:00000000-0000-0000-0000-000000000005"}]);
     let resource = json!({
         "resourceType": "Bundle",
         "identifier": {"system": "urn:ietf:rfc:3986", "value": "urn:uuid:00000000-0000-0000-0000-000000000002"},
         "type": "document",
         "timestamp": "2026-01-01T00:00:00Z",
         "entry": [
-            {"fullUrl": "urn:uuid:00000000-0000-0000-0000-000000000003", "resource": composition(&sections)},
+            {"fullUrl": "urn:uuid:00000000-0000-0000-0000-000000000003", "resource": composition},
             {"fullUrl": "urn:uuid:00000000-0000-0000-0000-000000000004", "resource": {
                 "resourceType": "Patient", "identifier": [{"system": "urn:example:patients", "value": "1"}],
-                "name": [{"family": "Doe", "given": ["Ada"]}], "gender": "female", "birthDate": "1970-01-01"}}
+                "name": [{"family": "Doe", "given": ["Ada"]}], "gender": "female", "birthDate": "1970-01-01"}},
+            {"fullUrl": "urn:uuid:00000000-0000-0000-0000-000000000005", "resource": {
+                "resourceType": "Practitioner", "name": [{"family": "Smith", "given": ["Eve"]}]}}
         ]
     });
     let report = validate(&set, &resource, Some(BUNDLE))?;
