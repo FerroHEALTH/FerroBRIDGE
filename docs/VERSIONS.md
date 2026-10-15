@@ -55,6 +55,7 @@ its pin from this table, and `scripts/checks/versions.sh` reads each vendored
 | HL7 v2 samples: AIRA MQE (build time, never committed) | `immregistries/mqe` commit `8b8a4274e1830cdb78ff5c8627763e1625caeac7` path `examples` files `9` digest `1fbda5ede288bdaf9ea53b16ded2149f11627cf4b0b39d2837299ab5803972b7` | `scripts/vendor/hl7v2-samples.sh --build-time`, `crates/ferrobridge-hl7v2/vendor/aira-mqe/PROVENANCE.md`, the same cache key |
 | FHIRPath test suite (R4) | `FHIR/fhir-test-cases` commit `9b57d9564f3f7e0343c020942155df13e56ef7a7` path `r4/fhirpath/tests-fhir-r4.xml` and the inputs it names files `13` digest `af9848ea9d046b288289adf64f199d4b4d0bdfebf6c000496b6e7f69a4b0dc48` | `scripts/vendor/fhirpath-tests.sh`, `docs/specs/fhirpath-tests/PROVENANCE.md`, `conformance/fhirpath-r4/PROVENANCE.md` |
 | HL7 v2+ licence page | `HL7/v2plus` commit `1a8fbb7e198047d71b9b13ceb582aaded4fa19f3` path `license.html` sha256 `48e2d1108ab38faafb9993342a9626b52d673ce2e683ef123716950564d76efd` | `scripts/vendor/v2ig.sh` and `scripts/vendor/v2-legacy.sh` (quoted verbatim in `tools/fhir-codegen/vendor/hl7-v2ig/PROVENANCE.md` and `tools/fhir-codegen/vendor/hl7-v2-legacy/PROVENANCE.md`) |
+| UCUM essence | `ucum-org/ucum` tag `v2.2` commit `d060c6d3dfe3b0deb196c190b8024d95385e0b92` path `ucum-essence.xml` sha256 `dfccea1b5dc284245ebae97edd1dc03c45864da4e87df55bc9851797b4fd0b61` | `scripts/vendor/ucum.sh`, `crates/ferrobridge-fhirpath/vendor/ucum/PROVENANCE.md` (embedded whole in the `ferrobridge-fhirpath` crate) |
 
 ## openEHR model crates (crates.io)
 

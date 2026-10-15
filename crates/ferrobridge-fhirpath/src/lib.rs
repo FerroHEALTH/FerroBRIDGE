@@ -47,4 +47,5 @@ pub mod parse;
 pub mod quantity;
 pub mod seam;
 pub mod temporal;
+pub mod ucum;
 pub mod value;

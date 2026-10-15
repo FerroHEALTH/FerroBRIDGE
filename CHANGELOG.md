@@ -49,6 +49,18 @@ crates on crates.io.
   without its seam is an error naming the function. The HL7 FHIRPath test
   suite for R4 runs as the `fhirpath-r4` conformance corpus, and every
   invariant of the vendored FHIR packages parses.
+- `ferrobridge-fhirpath` converts quantities by UCUM (#459): `=`, `~`, the
+  comparisons, `+` and `-` work across commensurable units in the more
+  granular of the two, so `4 'g' = 4000 'mg'` is true and the R4 invariant
+  `rng-2` compares a low and a high in different units, and
+  `toQuantity(unit)` and `convertsToQuantity(unit)` convert to the unit
+  asked for. The new `ucum` module parses UCUM expressions (prefixes,
+  exponents, annotations, the `10*` and `10^` forms, parentheses) against
+  the UCUM 2.2 essence, which `scripts/vendor/ucum.sh` vendors and the crate
+  embeds whole with its licence. Degree Celsius, Fahrenheit and Réaumur
+  convert by their functions; other special units, arbitrary units and units
+  of different dimensions answer empty. Six more cases of the HL7 FHIRPath
+  suite pass.
 - `ferrobridge-validator`, the foundation of a FHIR R4 profile validator
   (#437). It reads FHIR packages offline from `.tgz` files and unpacked
   directories, refuses a set that lacks a dependency a manifest names, and
