@@ -143,6 +143,10 @@ crates on crates.io.
 
 ### Changed
 
+- The CI `test` lane and the SonarQube Cloud lane restore and fetch the
+  profile packages before the tests, and the profile validator's
+  package-gated tests fail under CI when the packages are absent, where they
+  returned early and passed (#503).
 - SonarQube Cloud analyses FerroBRIDGE under the FerroHEALTH organisation:
   organization `ferrohealth`, project key `FerroHEALTH_FerroBRIDGE`, in
   `sonar-project.properties`, the MCP server configuration and the README

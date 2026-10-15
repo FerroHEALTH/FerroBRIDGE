@@ -541,7 +541,8 @@ mod tests {
     }
 
     // scripts/vendor/profile-packages.sh fetches the EU trees at build time; the test
-    // returns early without them, as the other build-time corpora do.
+    // returns early without them, and fails under CI as tests/it/support.rs
+    // `profile_packages` does, since a unit test cannot reach that module.
     #[test]
     fn a_canonical_eps_names_resolves_to_the_eu_base_version_eps_depends_on() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/specs/fhir-packages");
@@ -549,6 +550,11 @@ mod tests {
             .join("hl7.fhir.eu.eps#1.0.0-ballot/package/package.json")
             .is_file()
         {
+            assert_ne!(
+                std::env::var("CI").as_deref(),
+                Ok("true"),
+                "the profile packages are absent under CI; run scripts/vendor/profile-packages.sh"
+            );
             return;
         }
         let mut paths = vec![

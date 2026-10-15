@@ -4,10 +4,8 @@
 //! A real profile: HL7 Europe Base `patient-eu-core` 2.0.1, read with its
 //! dependency closure from the packages `scripts/vendor/profile-packages.sh`
 //! fetches into the ignored `docs/specs/fhir-packages/`. Each test returns
-//! early when the trees are absent, as the other build-time corpora do.
-
-use std::path::Path;
-use std::path::PathBuf;
+//! early when the trees are absent, and fails under CI
+//! ([`crate::support::profile_packages`]).
 
 use ferrobridge_validator::issue::MessageId;
 use ferrobridge_validator::set::PackageSet;
@@ -16,26 +14,18 @@ use serde_json::json;
 use crate::support::TestResult;
 use crate::support::core;
 use crate::support::locations;
+use crate::support::profile_packages;
 use crate::support::validate;
 
 /// The profile under test.
 const PATIENT_EU_CORE: &str = "http://hl7.eu/fhir/base/StructureDefinition/patient-eu-core|2.0.1";
 
-/// The directory the profile packages are fetched into.
-fn fetched() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/specs/fhir-packages")
-}
-
 /// The package set of every fetched profile package and R4 core, `None`
-/// when the packages are not fetched.
+/// when the packages are not fetched outside CI.
 pub(crate) fn eu_set() -> TestResult<Option<PackageSet>> {
-    let root = fetched();
-    if !root
-        .join("hl7.fhir.eu.base#2.0.1/package/package.json")
-        .is_file()
-    {
+    let Some(root) = profile_packages()? else {
         return Ok(None);
-    }
+    };
     let mut paths = vec![core()];
     for entry in std::fs::read_dir(&root)? {
         let path = entry?.path();

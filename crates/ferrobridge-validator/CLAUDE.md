@@ -96,4 +96,9 @@ only with a citation.
 written into temporary directories, with the vendored R4 core package beside
 them. `eu.rs` validates against HL7 Europe `patient-eu-core` 2.0.1 when
 `scripts/vendor/profile-packages.sh` has fetched the profile packages, and
-returns early otherwise. Fixtures are synthetic.
+returns early otherwise; so do the EPS slicing and binding suites and the
+scoped-resolution unit test in `set`. Under CI (`CI=true`) an absent tree
+fails them instead, through `support::profile_packages`, the one helper every
+package-gated integration test goes through (the unit test repeats its
+check), and the CI `test` lane and the Sonar lane fetch the packages first.
+Fixtures are synthetic.
