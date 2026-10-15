@@ -8,6 +8,7 @@
 //! derived tables. The rules are FerroBRIDGE's own (`docs/architecture.md`
 //! §5.1). The container-backed cases run only when `FERROBRIDGE_E2E=1`.
 
+mod cdr_aql;
 mod engine;
 mod run;
 mod visit;
