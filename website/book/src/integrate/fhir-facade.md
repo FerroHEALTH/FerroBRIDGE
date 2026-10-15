@@ -94,7 +94,7 @@ on the resource type in the path or in the entry:
 
 | Interaction | Needs |
 |---|---|
-| create | `c` |
+| create | `c`, and `u` too when the create revises a resource the facade already holds (a new `meta.versionId` of a known `id`); a replay that changes nothing needs `c` only |
 | read, vread | `r` |
 | update | `u` |
 | `$validate` | `c` or `u` |

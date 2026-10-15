@@ -35,7 +35,8 @@ crates on crates.io.
   `system/` with `cruds`, v1 `.read` and `.write` included) do not permit
   the request answers `403`, neither naming a claim or a scope. A
   `patient/` token reaches only its patient's compartment, a transaction is
-  authorised entry by entry and fails whole, a scopeless token gets system
+  authorised entry by entry and fails whole, a create that revises a
+  resource the facade holds needs `u` beside `c`, a scopeless token gets system
   rights only for a listed subject, and every FHIR request leaves one audit
   line on the `ferrobridge::audit` target without the token or the body.
   The `CapabilityStatement` carries `rest.security` with the SMART service

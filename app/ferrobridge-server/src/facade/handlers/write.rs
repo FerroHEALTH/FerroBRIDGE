@@ -90,6 +90,9 @@ pub(crate) async fn create(
         Recognised::Revised(known) => {
             let ehr_id = EhrId::new(&known.ehr_id).map_err(|error| store_identifier(&error))?;
             compartment::admit_ehr(facade, access, Permission::Create, resource_type, &ehr_id)?;
+            // NOTE: SMART App Launch 2.x scopes-and-launch-context maps `u` to update, and a
+            // create that revises a known resource is an update in effect (our own design).
+            compartment::admit_ehr(facade, access, Permission::Update, resource_type, &ehr_id)?;
             return resend(facade, &ingest, program, &inbound, &known, headers).await;
         }
         Recognised::Unknown => {}

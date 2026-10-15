@@ -34,11 +34,15 @@ use crate::facade::Harness;
 use crate::facade::VALIDATE;
 use crate::facade::VERSION_ONE;
 use crate::facade::condition;
+use crate::facade::condition_at;
 use crate::facade::harness;
 use crate::facade::post_condition;
 use crate::facade::raw;
 use crate::facade::stub::mount_create;
 use crate::facade::stub::mount_ehr;
+use crate::facade::stub::mount_read;
+use crate::facade::stub::mount_version_two;
+use crate::facade::writes;
 
 /// One case: the issuer, its key, the facade and the resource server.
 struct Case {
@@ -246,5 +250,54 @@ async fn a_fhirconnect_operation_needs_a_token() -> Result<(), Box<dyn StdError>
         .body(Body::from(condition().to_string()))?;
     let response = raw(app, request).await?;
     assert_eq!(StatusCode::UNAUTHORIZED, response.status());
+    Ok(())
+}
+
+/// Returns a case whose CDR also answers the read and the update a revision
+/// sends, with the fixture Condition created at `meta.versionId` 1.
+async fn created_at_one() -> Result<Case, Box<dyn StdError>> {
+    let case = Case::new().await;
+    mount_read(&case.harness.cdr, VERSION_ONE, &case.harness.composition()).await;
+    mount_version_two(&case.harness).await;
+    let (status, _, body) = case
+        .send(post_condition(&condition_at("1")), "system/Condition.c")
+        .await?;
+    assert_eq!(StatusCode::CREATED, status, "{body}");
+    Ok(case)
+}
+
+#[tokio::test]
+async fn a_create_that_revises_a_known_resource_needs_u_too() -> Result<(), Box<dyn StdError>> {
+    let case = created_at_one().await?;
+    assert_forbidden(
+        &case
+            .send(post_condition(&condition_at("2")), "system/Condition.c")
+            .await?,
+    );
+    assert_eq!(
+        (1, 0, 0),
+        writes(&case.harness).await,
+        "the refused revision committed nothing"
+    );
+    let (status, _, body) = case
+        .send(post_condition(&condition_at("2")), "system/Condition.cu")
+        .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!((1, 1, 0), writes(&case.harness).await, "one update PUT");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_create_that_replays_needs_only_c() -> Result<(), Box<dyn StdError>> {
+    let case = created_at_one().await?;
+    let (status, _, body) = case
+        .send(post_condition(&condition_at("1")), "system/Condition.c")
+        .await?;
+    assert_eq!(StatusCode::OK, status, "a replay answers 200 OK: {body}");
+    assert_eq!(
+        (1, 0, 0),
+        writes(&case.harness).await,
+        "nothing more written"
+    );
     Ok(())
 }
