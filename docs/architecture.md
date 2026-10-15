@@ -954,6 +954,55 @@ Foundation position on the exchange format was found, and no HL7 Europe guide
 or Xt-EHR deliverable references openEHR; the library's laboratory OPT is the
 one concrete openEHR-to-EEHRxF artefact.
 
+### 4.9 Profile validation
+
+FHIR R4 lists what validating a resource checks: structure, cardinality,
+value domains, coding bindings, invariants and the rules of profiles
+(<https://hl7.org/fhir/R4/validation.html> §7.5, informative). The FerroHEALTH
+products that receive FHIR content need all of it against the profiles the
+content claims, FerroFED first with the HL7 Europe patient summary, and the
+family had no validator (#432).
+
+**Decision: validation lives in FerroBRIDGE**, as the published crate
+`ferrobridge-validator` (owner direction 2026-10-15, on FerroFED#808). The
+bridge already holds the generated FHIR model, the element table, the
+terminology client and the FHIRPath evaluator a validator is built from, and
+FHIR belongs here; a consumer pins the crate.
+
+**Profiles are read at run time, never generated.** A profile set is data
+that changes per deployment and per guide version, so the validator reads
+FHIR packages offline from `.tgz` files or unpacked directories
+(<https://hl7.org/fhir/packages.html> §2.1.10), refuses a set whose
+manifests name a dependency it does not hold, and resolves a canonical by
+`url|version`, or by `url` alone to the latest version
+(<https://hl7.org/fhir/R4/references.html#canonical> §2.3.0.5). Each
+StructureDefinition decodes into the generated `fhir_types::r4` model, so the
+profile is never modelled twice, and the validator reads its `snapshot`
+(profiling.html §5.1.0.9: "StructureDefinition resources used in operational
+systems should always have the snapshot view populated"); a profile without
+one is refused by name. The instance is the lexical `Value` document, walked
+over the R4 element table for its base structure and held to the snapshot
+for the profile's constraints. The lexical form of a primitive is the `regex`
+extension of its own definition in the package set: the regexes are
+informative (datatypes.html §2.24.0.1), and the package form is the one the
+version publishes.
+
+**FHIRPath is the hand-written `ferrobridge-fhirpath`** (#436): invariants
+are FHIRPath expressions (conformance-rules.html), no FHIRPath crate was
+adopted (section 7), and the evaluator's seams (`resolve()`, `memberOf()`,
+`conformsTo()`) are where the validator supplies Bundle resolution, the
+terminology client and the package set.
+
+**Nothing is passed in silence.** R4 defines no validator messages, so the
+message ids are the crate's own vocabulary; the report converts into an R4
+`OperationOutcome` (<https://hl7.org/fhir/R4/operationoutcome.html>), and
+every constraint the validator meets and cannot evaluate is an issue of its
+own, a `warning` of type `not-supported`. The foundation (#437) carries the
+package set, the issue model and the structural checks; slicing (#438),
+invariants (#439), bindings (#440) and Bundle and entry profiles (#441) fill
+in what it lists as unevaluated, and agreement with the HL7 FHIR Validator,
+prior art and never the oracle, is #442.
+
 ## 5. The OMOP side
 
 OMOP is a relational analytics schema, not an API: the deliverable is rows in
@@ -1177,6 +1226,7 @@ published `openehr-*` crates do.
 | `ferrobridge-term` | the FHIR terminology client over `fhir-types` | hand-written | yes |
 | `ferrobridge-hl7v2` | the HL7 v2 face (#254): `mllp` (the MLLP Release 1 frame codec on `tokio-util` and the listener), `decode` (MSH-18 through `encoding_rs`, a byte outside the declared set refused), `parse` (positional split, escape decoding, the grouping by the `hl7v2-types` structure tree), `ack` (original-mode `AA`, `AE`, `AR`), `inbound` (one message through those steps), `map` (the interpreter of the `hl7.fhir.uv.v2mappings` ConceptMaps, read from a directory at run time, writing through `fhirconnect::tree` and translating every table value through `ferrobridge-term`; conditions and target notation on `logos` and `chumsky`) | hand-written | yes (0.0.0 reservation) |
 | `ferrobridge-fhirpath` | the FHIRPath evaluator (#436): FHIRPath Normative Release 2.0.0 with the FHIR R4 additions over the `fhir-types` `Value` tree, typed by the element table behind a version trait (`model::r4::R4`); a `logos` and `chumsky` parser, exact decimals, dates and times with their precision, a static path check against the context type, and the outward functions (`resolve()`, `memberOf()`, `conformsTo()` and the rest) over caller-supplied seams | hand-written | yes (0.0.0; the name is not yet reserved on crates.io) |
+| `ferrobridge-validator` | the FHIR R4 profile validator (#432, section 4.9): `package` (a FHIR package from a `.tgz` through `flate2` and `tar`, or an unpacked directory), `set` (the dependency closure and canonical resolution into the generated `fhir_types::r4` model), `validate` (the walk over the element table and the profile snapshot), `issue` and `report` (typed issues, the unevaluated list, the R4 `OperationOutcome`) | hand-written | yes (0.0.0; the name is not yet reserved on crates.io) |
 | `app/ferrobridge-server` | the one binary, `ferrobridge`: `serve` (the FHIR facade, the FHIRconnect operations, the ETL job API), `etl` (a batch run), `cdm init` (apply the DDL), `vocab load`, `mapping check`; thin `main.rs` over a `lib.rs`; the `cdr` module over the generated ITS-REST client of `openehr-its` (the commit headers, the kept upstream answer, the ids an `ETag` names, the template fetch, the AQL paging); the `redb` identity store; the `hl7v2` face beside the FHIR facade (the `[hl7v2]` MLLP listener, each message written through the facade's ingest service, the acknowledgment chosen from the commit outcome); the change-feed adapter | hand-written | no |
 | `tools/fhir-codegen` | the FHIR generator moved from the sibling, with its `emit --check` drift gate and its vendored packages | hand-written | no |
 | `tools/omop-cdm-codegen` | the CDM generator with its `emit --check` drift gate | hand-written | no |
@@ -1198,6 +1248,7 @@ flowchart BT
     HL --> FC
     HL --> TC
     FP["ferrobridge-fhirpath<br/>(the FHIRPath evaluator)"] --> FT
+    VA["ferrobridge-validator<br/>(the R4 profile validator)"] --> FT
     SV["app/ferrobridge-server<br/>(the one binary)"] --> FC
     SV --> OM
     SV --> OC
@@ -1280,6 +1331,11 @@ WHATWG label decodes as windows-1252), and `logos` 0.16.1 with `chumsky`
 0.13.0 for the condition and target grammars of the v2-to-FHIR ConceptMaps,
 the pair `openehr-query` builds its AQL parser on. `hl7-mllp-codec` and the
 other v2 crates stay out.
+
+The profile validator (#437), verified against crates.io on 2026-10-15,
+takes `flate2` 1.1.10 on its pure-Rust `rust_backend` and `tar` 0.4.46
+without its default `xattr` feature for the `.tgz` form of a FHIR package,
+the pair FerroFED reads its packages with.
 
 ## 8. What each seam carries
 
@@ -1842,6 +1898,7 @@ extension.
 | Incremental mode | a change-feed adapter over a configured stream, after the batch round trip, running the same per-composition commit | ITS-REST defines no feed; the reference CDR's outbox is the reference source | polling AQL by time; a bespoke feed |
 | Local codes | rubrics and bindings from the Web Template and OPT; only external systems go to the terminology server | the bridge holds the OPT; no specification defines a canonical for archetype-local terminology | `$lookup` for every code |
 | Profile targets | HL7 Europe Base and Core, Laboratory, MPD in that order; EPS planned, imaging and discharge deferred; authored here, never a conformance claim | R4 lines exist for every category; Laboratory has a published model map and an openEHR artefact; the legal pin does not exist (section 4.8) | waiting for the implementing act; pinning ballots |
+| Profile validation | `ferrobridge-validator` in this repository; profiles read at run time from FHIR packages into the generated R4 model; FHIRPath through `ferrobridge-fhirpath`; every unevaluated constraint named (section 4.9) | owner direction 2026-10-15; the model, element table, terminology client and FHIRPath evaluator live here; a profile set is per-deployment data | a validator per consumer; profiles generated into Rust; the HL7 FHIR Validator as a runtime dependency |
 | Tenancy | one bridge per tenant; one mapping tree and one identity store per configured CDR | a file tree has no row-level security; the retired connector's scoping was a database property | a tenant column in the identity store |
 | One binary or two | one binary with subcommands | PID 1 and `args:` in Kubernetes; half the attestation surface | a server and an ETL binary |
 | Crates | published, lockstep line, Trusted Publishing | owner decision 2026-09-05 | unpublished |

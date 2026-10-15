@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+[package]
+name = "ferrobridge-validator"
+description = "A FHIR R4 profile validator over packages read offline, the generated fhir-types model and its element table"
+# 0.0.0 holds the name until the first publish; the crate line is the fhir-types line (docs/VERSIONS.md).
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+documentation = "https://docs.rs/ferrobridge-validator"
+readme = "README.md"
+keywords = ["fhir", "validation", "profile", "healthcare", "hl7"]
+categories = ["science"]
+# The crate line is published on crates.io; include is the packaged content.
+publish = true
+include = ["src/**", "README.md", "LICENSE"]
+
+[dependencies]
+# The `.tgz` form of a FHIR package.
+flate2.workspace = true
+# StructureDefinitions decode into the generated R4 model, and the R4 element
+# table is the base structure an instance is walked over.
+fhir-types = { workspace = true, features = ["r4", "resources"] }
+# The lexical form of a primitive: the `regex` extension of its definition.
+regex.workspace = true
+serde.workspace = true
+# package.json and .index.json of a package; resources go through the
+# fhir-types document model.
+serde_json.workspace = true
+tar.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

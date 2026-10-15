@@ -147,6 +147,13 @@ encoding_rs = "0.8.42"
 # Verified against crates.io on 2026-09-25.
 logos = "0.16.1"
 chumsky = "0.13.0"
+# The `.tgz` form of a FHIR package the profile validator reads offline
+# (https://hl7.org/fhir/packages.html): flate2 on its pure-Rust backend and tar
+# without its extended-attribute feature, which reads nothing a package
+# carries. FerroFED reads its packages with the same pair. Verified against
+# crates.io on 2026-10-15.
+flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
+tar = { version = "0.4.46", default-features = false }
 # Test-only.
 wiremock = "0.6.5"
 # The end-to-end lane's container harness and the PostgreSQL client the CDM

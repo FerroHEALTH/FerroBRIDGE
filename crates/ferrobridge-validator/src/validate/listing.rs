@@ -1,0 +1,93 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
+//! The constraints of an element definition the validator does not evaluate,
+//! each listed in the report rather than passed in silence.
+
+use fhir_types::r4::element_definition::ElementDefinition;
+
+use crate::report::Constraint;
+use crate::report::Reason;
+use crate::validate::structure::Structure;
+use crate::validate::walk::Walk;
+
+impl Walk<'_, '_> {
+    /// Lists the constraints of `element` this validator does not evaluate.
+    pub(crate) fn list(
+        &mut self,
+        structure: &Structure,
+        id: &str,
+        element: &ElementDefinition,
+        location: &str,
+    ) {
+        let url = structure.url();
+        for constraint in &element.constraint {
+            // TODO(#439): evaluate each invariant with ferrobridge-fhirpath.
+            self.out().unevaluated(
+                url,
+                id,
+                Constraint::Invariant {
+                    key: constraint.key.value.clone().unwrap_or_default(),
+                    severity: constraint.severity.value.clone().unwrap_or_default(),
+                },
+                location,
+                Reason::Invariants,
+            );
+        }
+        if let Some(binding) = &element.binding {
+            let strength = binding.strength.value.clone().unwrap_or_default();
+            // NOTE: terminologies.html#strength: an example binding is no conformance
+            // requirement, so there is nothing to evaluate or to list.
+            if strength != "example" {
+                // TODO(#440): check the binding locally or through ferrobridge-term.
+                self.out().unevaluated(
+                    url,
+                    id,
+                    Constraint::Binding {
+                        strength,
+                        value_set: binding.value_set.as_ref().and_then(|set| set.value.clone()),
+                    },
+                    location,
+                    Reason::Bindings,
+                );
+            }
+        }
+        if element.slicing.is_some() {
+            // TODO(#438): evaluate the slicing.
+            self.out()
+                .unevaluated(url, id, Constraint::Slicing, location, Reason::Slicing);
+        }
+        for kind in &element.r#type {
+            let profiles: Vec<String> = kind
+                .profile
+                .iter()
+                .filter_map(|profile| profile.value.clone())
+                .collect();
+            if !profiles.is_empty() {
+                // TODO(#438): validate the element against the profiles its type names.
+                self.out().unevaluated(
+                    url,
+                    id,
+                    Constraint::TypeProfile { profiles },
+                    location,
+                    Reason::Profiles,
+                );
+            }
+            let targets: Vec<String> = kind
+                .target_profile
+                .iter()
+                .filter_map(|profile| profile.value.clone())
+                .collect();
+            if !targets.is_empty() {
+                // TODO(#441): check the resolved target against its target profiles.
+                self.out().unevaluated(
+                    url,
+                    id,
+                    Constraint::TargetProfile { profiles: targets },
+                    location,
+                    Reason::Profiles,
+                );
+            }
+        }
+    }
+}
