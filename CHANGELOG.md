@@ -117,6 +117,12 @@ crates on crates.io.
   as one domain name, and the quality checks read the list instead of
   splitting the cell (#414).
 
+### Security
+
+- The TLS stack moves to `rustls` 0.23.46, which fixes RUSTSEC-2026-0346,
+  RUSTSEC-2026-0347, RUSTSEC-2026-0348 and RUSTSEC-2026-0349 in the CDR,
+  terminology and CDM database connections (#447).
+
 ## [0.0.5] - 2026-10-01
 
 ### Changed

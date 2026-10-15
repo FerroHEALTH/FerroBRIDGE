@@ -158,7 +158,7 @@ tokio-postgres = "0.7.18"
 # sqlx trusts when no CA file is configured. Verified against crates.io on
 # 2026-09-25.
 tokio-postgres-rustls = { version = "0.14.0", default-features = false, features = ["aws-lc-rs"] }
-rustls = { version = "0.23.45", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
+rustls = { version = "0.23.46", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
 webpki-roots = "1.0.9"
 # The concept resolver's SQL over the loaded OHDSI vocabulary, checked at
 # compile time against the vendored DDL through the committed `.sqlx/` query
