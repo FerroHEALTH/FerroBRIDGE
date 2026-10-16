@@ -546,9 +546,13 @@ its room through the CDR's `offset` and `fetch`, and a `next` link is written
 only when another entry is left, its cursor at the first row of that entry's
 composition with the number of its entries already answered. `Bundle.total`
 counts matching entries, never the page and never the nodes: a first page
-that holds every match carries it at no cost, `_total=accurate` or `estimate`
-reads the rows of a paged search and counts each entry once, and
-`_total=none` leaves it out. `_count=0` and `_summary=count` answer the total
+that holds every match carries it at no cost, and `_total=accurate` on a
+paged search costs one AQL count of the entries, which reads no composition.
+The count binds the entry as `CONTAINS <class> x[<archetype>]`, and AQL
+`CONTAINS` also finds an entry nested in a `SECTION`, so a search that binds
+a node or an `_id`, or a template that nests the entry, reads the rows and
+counts each entry once instead. `_total=estimate` always answers from one
+count query, and `_total=none` leaves the total out. `_count=0` and `_summary=count` answer the total
 alone, with no entries and no `next` link.
 
 A search never answers an empty Bundle for a failed call. A CDR refusal reaches

@@ -15,9 +15,11 @@ use super::super::VERSION_ONE;
 use super::super::first_issue;
 use super::AQL;
 use super::OTHER_CONTAINER;
+use super::counts;
 use super::get;
 use super::link;
 use super::matches;
+use super::mount_count;
 use super::mount_rows;
 use super::queries;
 use super::result_set;
@@ -69,7 +71,8 @@ async fn count_zero_answers_the_total_with_no_entries_and_no_next_link()
     // treated the same as _summary=count: the server returns a bundle that
     // reports the total number of resources that match in Bundle.total, but
     // with no entries, and no prev/next/last links".
-    // The total counts entries (#658), so it reads the rows, never a COUNT.
+    // The total counts entries (#658) with one count query that reads no
+    // composition (#661).
     for query in [
         "Condition?patient=p-1&_count=0",
         "Condition?patient=p-1&_summary=count",
@@ -82,18 +85,19 @@ async fn count_zero_answers_the_total_with_no_entries_and_no_next_link()
             &[row(VERSION_ONE, &composition), row(&second, &composition)],
         )
         .await;
+        mount_count(&harness.cdr, &[composition.clone(), composition]).await;
         let (status, body) = get(&harness, query).await?;
         assert_eq!(StatusCode::OK, status, "{query}: {body}");
         assert_eq!(Some(2), body["total"].as_u64(), "{query}: {body}");
         assert!(matches(&body).is_empty(), "{query}: {body}");
         assert_eq!(None, link(&body, "next"), "{query}");
         let sent = queries(&harness).await;
-        assert_eq!(1, sent.len(), "{query}: one read of the rows counts them");
-        assert!(
-            sent.iter().all(|query| query["q"]
-                .as_str()
-                .is_some_and(|text| !text.contains("COUNT("))),
-            "{query}: no count query runs"
+        assert_eq!(1, sent.len(), "{query}: one count query: {sent:?}");
+        assert_eq!(1, counts(&sent).len(), "{query}: no row read: {sent:?}");
+        assert_eq!(
+            None,
+            sent.first().and_then(|query| query["fetch"].as_i64()),
+            "{query}: a count is no page"
         );
     }
     Ok(())
@@ -187,6 +191,7 @@ async fn total_accurate_counts_the_rows_of_a_paged_search() -> Result<(), Box<dy
         &[row(VERSION_ONE, &composition), row(&second, &composition)],
     )
     .await;
+    mount_count(&harness.cdr, &[composition.clone(), composition]).await;
     let (status, body) = get(&harness, "Condition?patient=p-1&_count=1&_total=accurate").await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     assert_eq!(
@@ -201,19 +206,53 @@ async fn total_accurate_counts_the_rows_of_a_paged_search() -> Result<(), Box<dy
         body["total"].as_u64(),
         "_total=none asks for no total"
     );
-    // A count reads the rows a page at the cap (100); a page of the search
-    // itself asks for its size plus one, so only the accurate search counted.
+    // Only the accurate search counted, with one count query (#661), and no
+    // query read the rows at the cap (100) to count them.
     let sent = queries(&harness).await;
-    let counted = sent
-        .iter()
-        .filter(|query| query["fetch"].as_i64() == Some(100))
-        .count();
-    assert_eq!(1, counted, "only the accurate search counted: {sent:?}");
+    assert_eq!(
+        1,
+        counts(&sent).len(),
+        "only the accurate search counted: {sent:?}"
+    );
     assert!(
-        sent.iter().all(|query| query["q"]
-            .as_str()
-            .is_some_and(|text| !text.contains("COUNT("))),
-        "no count query runs"
+        sent.iter()
+            .all(|query| query["fetch"].as_i64() != Some(100)),
+        "no count read the rows: {sent:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn total_estimate_never_reads_a_composition_to_count() -> Result<(), Box<dyn StdError>> {
+    // R4 search.html §3.1.1.5.2: _total=estimate, "a rough estimate of the
+    // number of matching resources is sufficient"; a node search answers its
+    // row count (#661).
+    let harness = searching().await;
+    let composition = harness.composition();
+    let node = super::diagnosis(&composition);
+    let second = format!("{OTHER_CONTAINER}::ferrobridge.test::1");
+    mount_rows(
+        &harness.cdr,
+        &[
+            super::node_row(VERSION_ONE, &composition, &node),
+            super::node_row(&second, &composition, &node),
+        ],
+    )
+    .await;
+    mount_count(&harness.cdr, &[composition.clone(), composition]).await;
+    let (status, body) = get(&harness, "Condition?code=SYN-001&_count=1&_total=estimate").await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(Some(2), body["total"].as_u64(), "{body}");
+    let sent = queries(&harness).await;
+    let counted = counts(&sent);
+    assert_eq!(1, counted.len(), "{sent:?}");
+    let text = counted.first().copied().ok_or("the count ran")?;
+    assert!(text.contains("CONTAINS EVALUATION n0["), "{text}");
+    assert!(!text.contains("AS composition"), "{text}");
+    assert_eq!(
+        2,
+        sent.len(),
+        "the page and the count are the only queries: {sent:?}"
     );
     Ok(())
 }

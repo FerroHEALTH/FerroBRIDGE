@@ -317,6 +317,16 @@ crates on crates.io.
 
 ### Changed
 
+- A facade search total costs one AQL count query that reads no composition
+  (#661). A search that binds no node and no `_id`, over a template that
+  places the context's entry only among the composition's own `content`
+  items, counts the entries with
+  `SELECT COUNT(*) … CONTAINS COMPOSITION c CONTAINS <class> x[<archetype>]`,
+  which equals the entries the search answers. `_total=estimate` always
+  answers from that count, or from the row count of a search that binds a
+  node. `_total=accurate`, `_count=0` and `_summary=count` read the rows only
+  for a search that binds a node or an `_id`, or a template that nests the
+  entry in a `SECTION`, where AQL `CONTAINS` also finds nested entries.
 - `fhir-types` documents `UnknownResource`, in every FHIR version, as the
   carrier of any resource's JSON body, a root-set type such as
   `MedicationRequest` included, so a relay can write another server's resource
