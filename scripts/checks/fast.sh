@@ -20,10 +20,11 @@
 #                  pins; without them those tests skip locally)
 #   --dry-run      print the plan and run nothing
 #
-# Each package is linted and tested on its own, as the CI lanes run them
-# through cargo hack, so a feature one package forgets is not lent to it by
-# another. Exit 0 when every step passed, 1 when one failed, 2 on a usage
-# error.
+# Each step is one cargo invocation over the whole reached set, so a shared
+# dependency builds once under one feature set. Features therefore unify
+# across the set; the CI lanes run each package on its own through cargo
+# hack and catch a feature one package forgets. Cargo picks the job count.
+# Exit 0 when every step passed, 1 when one failed, 2 on a usage error.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -33,7 +34,7 @@ die() {
 }
 
 usage() {
-  sed -n '/^# Usage:/,/^# Each package/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//' >&2
+  sed -n '/^# Usage:/,/^# Each step/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//' >&2
   exit 2
 }
 
@@ -103,19 +104,19 @@ fi
 args=()
 for package in $packages; do args+=(-p "$package"); done
 run cargo fmt --check "${args[@]}"
-for package in $packages; do
-  run cargo clippy --locked -p "$package" --all-targets -- -D warnings
-done
-for package in $packages; do
-  run cargo nextest run --locked -p "$package" --no-tests=pass
-done
+run cargo clippy --locked "${args[@]}" --all-targets -- -D warnings
+run cargo nextest run --locked "${args[@]}" --no-tests=pass
+# `cargo test --doc` refuses a package without a library target.
 libraries="$(cargo metadata --no-deps --format-version 1 --locked |
-  jq -r '.packages[] | select(any(.targets[]; any(.kind[]; . == "lib"))) | .name')"
+  jq -r '.packages[] | select(any(.targets[]; any(.kind[]; . == "lib"))) | .name' |
+  tr '\n' ' ')"
+docs=()
 for package in $packages; do
-  if has "$(tr '\n' ' ' <<<"$libraries")" "$package"; then
-    run cargo test --doc --locked -p "$package"
-  fi
+  if has "$libraries" "$package"; then docs+=(-p "$package"); fi
 done
+if [ "${#docs[@]}" -gt 0 ]; then
+  run cargo test --doc --locked "${docs[@]}"
+fi
 
 # The full-emit tests, in the profile the CI lane uses; the rest of the
 # fhir-codegen suite ran above.

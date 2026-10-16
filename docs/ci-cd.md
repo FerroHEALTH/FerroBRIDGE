@@ -131,9 +131,14 @@ is the complement of the first two, so a test runs in exactly one shard.
 
 **The local gate.** `scripts/checks/fast.sh` reads the same reach, measured
 from the merge base with `origin/main` to the working tree, and runs
-rustfmt, clippy, nextest and the doctests on the reached packages one at a
-time, the full-emit tests when `fhir-codegen` is reached, and the
-`omop-cdm-codegen` drift check when that is. It treats the CI configuration
+rustfmt, clippy, nextest and the doctests on the reached packages, each as
+one cargo invocation over the whole set with cargo's default job count, the
+full-emit tests when `fhir-codegen` is reached, and the `omop-cdm-codegen`
+drift check when that is. One invocation builds a shared dependency once,
+where a run per package rebuilt it under each package's feature set; the
+cost is that features unify across the set, so a feature one package
+forgets is caught by the CI lanes, which run each package on its own
+through cargo hack. It treats the CI configuration
 and its own pair as inert, since they change no cargo result. CI stays the
 full gate.
 
