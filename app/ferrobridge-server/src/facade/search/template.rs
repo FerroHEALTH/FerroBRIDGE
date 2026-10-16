@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! Placing a declared parameter in the context's template.
+//! Placing a declared parameter, and the context's entry, in the context's
+//! template.
 //!
 //! AQL 1.1.0 defines no answer to which node a path through a multi-valued
 //! attribute yields, and two `WHERE` conditions on two such paths need not
@@ -127,6 +128,43 @@ fn place(
     }
 }
 
+/// Where the template places the entries of a context's archetype.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Placement {
+    /// The RM class and the archetype id of the entry.
+    pub entry: Node,
+    /// Whether every placement is a `content` item of the composition itself.
+    pub top_level: bool,
+}
+
+/// Returns where the template places the nodes carrying `archetype`, or
+/// `None` when it holds none or gives them two RM classes.
+///
+/// A search answers the entries of the archetype among the composition's own
+/// `content` items, and an AQL `CONTAINS` also finds one nested in a
+/// `SECTION`: QUERY AQL 1.1.0 §3.13.2.2 defines no direct-child form. So a
+/// count over `CONTAINS` agrees with the search only when every placement
+/// is top-level (no specification governs the count: our own design).
+#[must_use]
+pub fn placement(index: &WebTemplateIndex, archetype: &str) -> Option<Placement> {
+    let placed: Vec<&ResolvedNode> = index
+        .nodes()
+        .filter(|node| node.node_id() == Some(archetype))
+        .collect();
+    let first = placed.first()?;
+    if placed.iter().any(|node| node.rm_type() != first.rm_type()) {
+        return None;
+    }
+    let top = index.root().children();
+    Some(Placement {
+        entry: Node {
+            class: first.rm_type().to_owned(),
+            archetype: archetype.to_owned(),
+        },
+        top_level: placed.iter().all(|node| top.contains(node.flat_id())),
+    })
+}
+
 /// Whether `node` is `target` or one of its ancestors, at a segment boundary.
 fn leads_to(node: &str, target: &str) -> bool {
     target
@@ -136,7 +174,80 @@ fn leads_to(node: &str, target: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use openehr_mapping_core::index::WebTemplateIndex;
+    use openehr_mapping_core::template::Generation;
+    use openehr_mapping_core::template::TemplateSource;
+    use openehr_mapping_core::template::web_template;
+    use openehr_sdt::flat::webtemplate::model::WebTemplate;
+    use openehr_sdt::flat::webtemplate::model::WebTemplateNode;
+
     use super::leads_to;
+    use super::placement;
+
+    /// The archetype of the diagnosis entry the fixture template holds.
+    const DIAGNOSIS: &str = "openEHR-EHR-EVALUATION.problem_diagnosis.v1";
+
+    /// Returns the Web Template of the fixture diagnosis template.
+    fn diagnose() -> WebTemplate {
+        let opt = openehr_its::opt14::from_xml(ferrobridge_testkit::fixtures::DIAGNOSE_OPT)
+            .expect("the fixture template reads");
+        web_template(&TemplateSource::Opt14(Box::new(opt))).expect("the fixture template builds")
+    }
+
+    /// Moves the diagnosis entry of `built` into a synthetic `SECTION`, and
+    /// with `keep` leaves a copy at the top level too.
+    fn sectioned(mut built: WebTemplate, keep: bool) -> WebTemplate {
+        let at = built
+            .tree
+            .children
+            .iter()
+            .position(|child| child.node_id.as_deref() == Some(DIAGNOSIS))
+            .expect("the template holds the diagnosis at the top level");
+        let entry = if keep {
+            built
+                .tree
+                .children
+                .get(at)
+                .cloned()
+                .expect("the position holds")
+        } else {
+            built.tree.children.remove(at)
+        };
+        let mut section: WebTemplateNode = entry.clone();
+        section.id = String::from("synthetic_section");
+        section.rm_type = String::from("SECTION");
+        section.node_id = Some(String::from("openEHR-EHR-SECTION.adhoc.v1"));
+        section.aql_path = String::from("/content[openEHR-EHR-SECTION.adhoc.v1]");
+        section.children = vec![entry];
+        built.tree.children.push(section);
+        built
+    }
+
+    #[test]
+    fn a_top_level_entry_is_counted_over_contains() {
+        let index = WebTemplateIndex::over(diagnose(), Generation::Adl14).expect("it indexes");
+        let found = placement(&index, DIAGNOSIS).expect("the template places the entry");
+        assert_eq!("EVALUATION", found.entry.class);
+        assert_eq!(DIAGNOSIS, found.entry.archetype);
+        assert!(found.top_level);
+    }
+
+    #[test]
+    fn an_entry_nested_in_a_section_is_not_top_level() {
+        for keep in [false, true] {
+            let index = WebTemplateIndex::over(sectioned(diagnose(), keep), Generation::Adl14)
+                .expect("it indexes");
+            let found = placement(&index, DIAGNOSIS).expect("the template places the entry");
+            assert_eq!("EVALUATION", found.entry.class);
+            assert!(!found.top_level, "keep={keep}");
+        }
+    }
+
+    #[test]
+    fn an_archetype_the_template_lacks_has_no_placement() {
+        let index = WebTemplateIndex::over(diagnose(), Generation::Adl14).expect("it indexes");
+        assert_eq!(None, placement(&index, "openEHR-EHR-EVALUATION.absent.v1"));
+    }
 
     #[test]
     fn a_prefix_counts_only_at_a_segment_boundary() {

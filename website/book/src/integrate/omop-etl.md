@@ -118,6 +118,14 @@ foreign key to `PERSON` (CDM v5.4), so every `person_id` a run writes names a
    `person_id`. Several compositions of one EHR may write it; the one
    committed last rewrites the columns, and the row stays while any of them
    or any row of the person remains.
+   The corpus file reads gender at `items[at0019]` of
+   `openEHR-EHR-EVALUATION.gender.v1`, a node the KDS person template
+   (`KDS_Person`) does not carry, so on KDS data every person takes
+   `gender_concept_id` 0. For KDS data, use FerroBRIDGE's own file
+   `crates/omocl/tests/fixtures/projects/ferrobridge/kds_person/kds_person_data.yml`
+   in place of the corpus file: it reads the administrative gender at
+   `items[at0022]`, resolves its code through the loaded vocabulary and keeps
+   the code in `gender_source_value`.
 2. Otherwise, `[cdm] person_policy`:
    - `create_on_first_sight`, the default, writes a placeholder row the first
      time a row or a visit names the EHR: `gender_concept_id`,

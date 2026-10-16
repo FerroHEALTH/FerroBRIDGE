@@ -120,18 +120,65 @@ async fn mount_rows(cdr: &MockServer, rows: &[serde_json::Value]) {
         .await;
 }
 
-/// Answers every count query with `count`.
-async fn mount_count(cdr: &MockServer, count: u64) {
+/// Answers every count query over `compositions` as a CDR evaluates it.
+///
+/// A count that binds the entry as `x[<archetype>]` counts every node of that
+/// archetype each composition contains, at any depth, as AQL `CONTAINS` finds
+/// it (QUERY AQL §3.13.2.2); any other count counts the compositions. The
+/// stub evaluates no `WHERE`.
+async fn mount_count(cdr: &MockServer, compositions: &[serde_json::Value]) {
+    let compositions = compositions.to_vec();
     Mock::given(matchers::method("POST"))
         .and(matchers::path(AQL))
         .and(is_count)
-        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-            "q": "synthetic",
-            "columns": [{ "name": "total" }],
-            "rows": [[count]]
-        })))
+        .respond_with(move |request: &wiremock::Request| {
+            let text = serde_json::from_slice::<serde_json::Value>(&request.body)
+                .ok()
+                .and_then(|body| body["q"].as_str().map(str::to_owned))
+                .unwrap_or_default();
+            let entry = text
+                .split_once(" x[")
+                .and_then(|(_, rest)| rest.split_once(']'))
+                .map(|(archetype, _)| archetype.to_owned());
+            let count = match entry {
+                Some(archetype) => compositions
+                    .iter()
+                    .map(|composition| contained(composition, &archetype))
+                    .sum(),
+                None => compositions.len(),
+            };
+            ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "q": "synthetic",
+                "columns": [{ "name": "total" }],
+                "rows": [[count]]
+            }))
+        })
         .mount(cdr)
         .await;
+}
+
+/// Returns how many nodes of `archetype` `value` is or holds, at any depth.
+fn contained(value: &serde_json::Value, archetype: &str) -> usize {
+    let own = usize::from(value["archetype_node_id"].as_str() == Some(archetype));
+    let below: usize = match value {
+        serde_json::Value::Object(members) => members
+            .values()
+            .map(|child| contained(child, archetype))
+            .sum(),
+        serde_json::Value::Array(items) => {
+            items.iter().map(|child| contained(child, archetype)).sum()
+        }
+        _ => 0,
+    };
+    own + below
+}
+
+/// Returns the AQL text of every count query among `sent`.
+fn counts(sent: &[serde_json::Value]) -> Vec<&str> {
+    sent.iter()
+        .filter_map(|query| query["q"].as_str())
+        .filter(|text| text.contains("COUNT("))
+        .collect()
 }
 
 /// Returns the body of every AQL request the CDR received, in order.

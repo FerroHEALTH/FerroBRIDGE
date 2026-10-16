@@ -320,6 +320,7 @@ fn settings(visits: bool) -> Result<EtlSettings, Box<dyn Error>> {
             None
         },
         deletions: DeletionPolicy::Remove,
+        aliases: omocl::engine::concept::VocabularyAliases::default(),
     })
 }
 
