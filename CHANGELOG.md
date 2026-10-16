@@ -38,6 +38,14 @@ crates on crates.io.
   crash-looping. A documented refusal, such as a `404` for a template the CDR
   does not hold, still stops the start.
 
+### Security
+
+- An inline secret in the configuration file (`bearer_token`, `password`,
+  `client_secret`, the `[cdm] url`) is a `SecretString` from the moment the
+  file is parsed, so a `Debug` rendering of the configuration tree redacts it
+  and its memory is zeroed when it is dropped (#309). A `_file` sibling's
+  text is wrapped the same way as soon as it is read.
+
 ## [0.0.6] - 2026-10-17
 
 ### Added
