@@ -21,6 +21,12 @@ order:
 3. A `context` file as the entry point, naming the profile, the template, the
    archetypes, the extensions, and the `start` mapping.
 
+Beside a context you may add a search declaration, a file whose name ends in
+`.search.yml`, stating which FHIR search parameters the facade answers for it
+and the AQL path each one compares. It is FerroBRIDGE's own format, because
+FHIRconnect leaves search out, and the FHIRconnect loader skips it.
+[The FHIR facade](fhir-facade.md#search) describes it.
+
 On the OMOP side you supply OMOCL files: a flat list of records keyed by CDM
 target, each record's keys drawn from OMOCL's own column vocabulary (`value`,
 `unit`, `concept_id`, `measurement_date`) with ordered `alternatives`.
