@@ -238,7 +238,7 @@ impl Inbound {
     /// EHR lookup takes. A `subject.identifier` carries both halves; a literal
     /// `subject.reference` carries one, so `fallback` is the namespace a
     /// deployment gives its own references. A `Patient` is the subject itself
-    /// and is keyed as [`person_by_identifier`] keys it. No specification
+    /// and is keyed as `person_by_identifier` keys it. No specification
     /// fixes the mapping from a FHIR subject to an openEHR subject: our own
     /// design.
     ///
