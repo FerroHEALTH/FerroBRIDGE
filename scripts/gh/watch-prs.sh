@@ -6,8 +6,9 @@
 # Usage: scripts/gh/watch-prs.sh <pr> [<pr>...]   (run it in the background)
 #
 # - BEHIND: updates the branch.
-# - DIRTY with CHANGELOG.md as the only conflict: merges origin/main keeping
-#   both sides, pushes, and keeps watching (CI re-runs on the push).
+# - DIRTY in CHANGELOG.md or only in version lines: merges origin/main
+#   (both changelog sides, the branch's higher versions, a fresh Cargo.lock,
+#   the crate bump guard passing), pushes, and keeps watching.
 # - DIRTY elsewhere, or a red required check with nothing pending: stops
 #   (exit 2 or 3) so the session fixes it. Advisory analyzers never stop it.
 set -u
@@ -16,7 +17,11 @@ if [ $# -eq 0 ]; then
   exit 64
 fi
 repo=$(git rev-parse --show-toplevel) || exit 1
-resolve_changelog() {
+# A conflict this script resolves on its own: CHANGELOG.md keeps both sides,
+# and a version line (a crate manifest, the root manifest, the pin tables)
+# keeps the branch's side when the two sides differ only in their version
+# numbers. Cargo.lock is regenerated, and the crate bump guard must pass.
+resolve_merge() {
   local p=$1 b tmp
   b=$(gh pr view "$p" --json headRefName --jq .headRefName)
   tmp=$(mktemp -d)
@@ -25,11 +30,22 @@ resolve_changelog() {
   (
     cd "$tmp" || exit 1
     git merge --no-edit origin/main >/dev/null 2>&1
-    conflicts=$(git diff --name-only --diff-filter=U)
-    [ "$conflicts" = "CHANGELOG.md" ] || { git merge --abort; exit 1; }
-    perl -0pi -e 's/<<<<<<< HEAD\n(.*?)=======\n(.*?)>>>>>>> origin\/main\n/$1$2/gs' CHANGELOG.md
-    if grep -q '^<<<<<<<\|^>>>>>>>\|^=======$' CHANGELOG.md; then git merge --abort; exit 1; fi
-    git add CHANGELOG.md && git commit -q --no-edit && git push -q origin "HEAD:$b"
+    for f in $(git diff --name-only --diff-filter=U); do
+      case $f in
+        CHANGELOG.md)
+          perl -0pi -e 's/<<<<<<< HEAD\n(.*?)=======\n(.*?)>>>>>>> origin\/main\n/$1$2/gs' "$f" ;;
+        Cargo.lock)
+          git checkout --theirs Cargo.lock ;;
+        Cargo.toml | crates/*/Cargo.toml | docs/VERSIONS.md | docs/architecture.md)
+          perl -0pi -e 's{<<<<<<< HEAD\n(.*?)=======\n(.*?)>>>>>>> origin/main\n}{ (my $o = $1) =~ s/\d+\.\d+\.\d+/V/g; (my $t = $2) =~ s/\d+\.\d+\.\d+/V/g; $o eq $t ? $1 : $& }gse' "$f" ;;
+        *) git merge --abort; exit 1 ;;
+      esac
+      if grep -q '^<<<<<<<\|^>>>>>>>' "$f"; then git merge --abort; exit 1; fi
+    done
+    cargo update -w -q || { git merge --abort; exit 1; }
+    git add -A
+    scripts/checks/crate-version-guard.sh origin/main WORKTREE >/dev/null 2>&1 || { git merge --abort; exit 1; }
+    git commit -q --no-edit && git push -q origin "HEAD:$b"
   )
   local rc=$?
   git -C "$repo" worktree remove --force "$tmp" >/dev/null 2>&1
@@ -50,7 +66,7 @@ while [ ${#left[@]} -gt 0 ]; do
     case $ms in
       BEHIND) gh pr update-branch "$p" >/dev/null 2>&1 && echo "updated #$p" ;;
       DIRTY)
-        if resolve_changelog "$p"; then echo "resolved changelog #$p"; next+=("$p"); continue
+        if resolve_merge "$p"; then echo "resolved merge #$p"; next+=("$p"); continue
         else echo "CONFLICT #$p"; exit 2; fi ;;
     esac
     c=$(gh pr checks "$p" 2>&1)
