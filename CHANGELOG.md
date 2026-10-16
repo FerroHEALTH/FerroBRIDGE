@@ -393,6 +393,15 @@ crates on crates.io.
   took the local name and ignored the prefix, so
   `<x:Parameters xmlns:x="http://example.org/other">` read as a FHIR
   `Parameters` (#555).
+- `fhir-types` 0.1.113 holds the narrative `div` to the XHTML namespace
+  (R4 xml.html §2.6.1: "the only other namespace that occurs in FHIR
+  resources is the XHTML namespace"; R5 §2.1.6.3.3: "a root `<div>` element
+  in the xhtml namespace") and refuses it as `UnknownElement` at
+  `Resource.text.div` otherwise. A declaration of the XML Schema instance
+  namespace on the `div` or on any element inside it is refused as in the
+  rest of the resource (R4 xml.html §2.6.1.1). The reader copied the
+  narrative's attributes raw with no check. The content is otherwise carried
+  verbatim (#556).
 - `fhir_types::xml::from_xml` refuses a resource that declares the XML Schema
   instance namespace on any of its elements, naming the declaring attribute
   (`Resource.xmlns:xsi`), because exchanged content "SHALL NOT specify the

@@ -365,6 +365,82 @@ fn a_prefixed_attribute_outside_the_fhir_namespace_is_refused() {
     }
 }
 
+/// A synthetic Basic resource with the narrative `div` given.
+fn with_narrative(div: &str) -> String {
+    format!(
+        r#"<Basic xmlns="http://hl7.org/fhir"><text><status value="generated"/>{div}</text><code><text value="synthetic"/></code></Basic>"#
+    )
+}
+
+/// The narrative is "a root `<div>` element in the xhtml namespace" (R5
+/// xml.html §2.1.6.3.3; R4 xml.html §2.6.1: "the only other namespace that
+/// occurs in FHIR resources is the XHTML namespace"), and its content is
+/// carried verbatim.
+#[test]
+fn the_narrative_div_is_held_to_the_xhtml_namespace() {
+    for schemas in namespace_versions() {
+        for div in [
+            "<div><p>synthetic</p></div>",
+            r#"<div xmlns="http://example.org/other"><p>synthetic</p></div>"#,
+            r#"<x:div xmlns:x="http://example.org/other"><p>synthetic</p></x:div>"#,
+            r#"<h:div xmlns:h="http://hl7.org/fhir"><p>synthetic</p></h:div>"#,
+        ] {
+            let xml = with_narrative(div);
+            let refused = from_xml(schemas, &xml).expect_err(div);
+            assert_eq!(refused.kind, DecodeErrorKind::UnknownElement, "{div}");
+            assert_eq!(refused.path, "Resource.text.div", "{div}");
+        }
+        for div in [
+            r#"<div xmlns="http://www.w3.org/1999/xhtml"><p>synthetic <b>text</b></p></div>"#,
+            r#"<h:div xmlns:h="http://www.w3.org/1999/xhtml"><h:p>synthetic</h:p></h:div>"#,
+        ] {
+            let read = from_xml(schemas, &with_narrative(div)).expect(div);
+            let text = member(&Value::Object(read), "text").clone();
+            assert_eq!(member(&text, "div").as_str(), Some(div));
+        }
+    }
+}
+
+/// Exchanged content SHALL NOT "contain the schema instance namespace in the
+/// resource itself" (R4 xml.html §2.6.1.1), the narrative included.
+#[test]
+fn the_schema_instance_namespace_is_refused_in_the_narrative() {
+    for schemas in namespace_versions() {
+        for (div, path) in [
+            (
+                r#"<div xmlns="http://www.w3.org/1999/xhtml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><p>synthetic</p></div>"#,
+                "Resource.text.div.xmlns:xsi",
+            ),
+            (
+                r#"<div xmlns="http://www.w3.org/1999/xhtml"><p xmlns:s="http://www.w3.org/2001/XMLSchema-instance">synthetic</p></div>"#,
+                "Resource.text.div.xmlns:s",
+            ),
+            (
+                r#"<div xmlns="http://www.w3.org/1999/xhtml"><p><span xmlns="http://www.w3.org/2001/XMLSchema-instance"/></p></div>"#,
+                "Resource.text.div.xmlns",
+            ),
+        ] {
+            let refused = from_xml(schemas, &with_narrative(div)).expect_err(div);
+            assert_eq!(refused.kind, DecodeErrorKind::UnknownProperty, "{div}");
+            assert_eq!(refused.path, path, "{div}");
+        }
+    }
+}
+
+/// The writer carries the narrative as it was read.
+#[test]
+fn the_writer_carries_the_narrative_unchanged() {
+    let div =
+        r#"<div xmlns="http://www.w3.org/1999/xhtml"><p>synthetic &amp; <b>text</b></p></div>"#;
+    for schemas in namespace_versions() {
+        let read = from_xml(schemas, &with_narrative(div)).expect("reads");
+        let xml = to_xml(schemas, &read).expect("writes");
+        assert!(xml.contains(div), "{xml}");
+        let again = from_xml(schemas, &xml).expect("reads back");
+        assert_eq!(again, read);
+    }
+}
+
 /// The writer declares the FHIR namespace and nothing of XML Schema
 /// (R4 xml.html §2.6.1 and §2.6.1.1).
 #[test]
