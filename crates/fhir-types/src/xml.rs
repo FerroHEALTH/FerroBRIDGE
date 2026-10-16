@@ -919,7 +919,9 @@ fn read_wrapped_resource(
 /// is "a root `<div>` element in the xhtml namespace" (R5 xml.html §2.1.6.3.3,
 /// <https://hl7.org/fhir/R4/narrative.html#xhtml>). A declaration of the XML
 /// Schema instance namespace on it or on any element inside it is refused as
-/// in the rest of the resource (R4 xml.html §2.6.1.1). The content is
+/// in the rest of the resource (R4 xml.html §2.6.1.1). Each attribute of the
+/// start tag keeps its escaped source text and is written in double quotes
+/// (XML 1.0 §2.3, <https://www.w3.org/TR/xml/#NT-AttValue>). The content is
 /// otherwise carried verbatim.
 fn read_xhtml(
     reader: &mut NsReader<&[u8]>,
@@ -942,7 +944,9 @@ fn read_xhtml(
         raw.push(' ');
         raw.push_str(attr.key.as_ref());
         raw.push_str("=\"");
-        raw.push_str(attr.value.as_ref());
+        // NOTE: XML 1.0 §2.3 `AttValue`: the value is written in double quotes,
+        // so a `"` a single-quoted source value held is escaped (§4.6).
+        raw.push_str(&attr.value.replace('"', "&quot;"));
         raw.push('"');
     }
     if empty {

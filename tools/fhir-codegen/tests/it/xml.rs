@@ -401,6 +401,31 @@ fn the_narrative_div_is_held_to_the_xhtml_namespace() {
     }
 }
 
+/// The `div` string of the narrative `xml` reads to.
+fn narrative_of(schemas: &Schemas, xml: &str) -> String {
+    let read = from_xml(schemas, xml).expect(xml);
+    let text = member(&Value::Object(read), "text").clone();
+    member(&text, "div")
+        .as_str()
+        .expect("the div is a string")
+        .to_owned()
+}
+
+/// An attribute value is written in double quotes, so a `"` it holds is
+/// escaped (XML 1.0 §2.3 `AttValue`, §4.6): a single-quoted value with a
+/// double quote reads to a well-formed string that reads back equal.
+#[test]
+fn a_single_quoted_narrative_attribute_is_escaped_for_double_quotes() {
+    let source =
+        r#"<div xmlns="http://www.w3.org/1999/xhtml" title='a "b" &amp; c'><p>synthetic</p></div>"#;
+    let expected = r#"<div xmlns="http://www.w3.org/1999/xhtml" title="a &quot;b&quot; &amp; c"><p>synthetic</p></div>"#;
+    for schemas in namespace_versions() {
+        let div = narrative_of(schemas, &with_narrative(source));
+        assert_eq!(div, expected);
+        assert_eq!(narrative_of(schemas, &with_narrative(&div)), div);
+    }
+}
+
 /// Exchanged content SHALL NOT "contain the schema instance namespace in the
 /// resource itself" (R4 xml.html §2.6.1.1), the narrative included.
 #[test]

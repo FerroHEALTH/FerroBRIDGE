@@ -429,6 +429,11 @@ crates on crates.io.
   rest of the resource (R4 xml.html §2.6.1.1). The reader copied the
   narrative's attributes raw with no check. The content is otherwise carried
   verbatim (#556).
+- `fhir-types` 0.1.114 writes every attribute of the narrative `div` it reads
+  from XML in double quotes with a `"` the value holds escaped as `&quot;`
+  (XML 1.0 §2.3 `AttValue`, §4.6), so `title='a "b"'` yields a well-formed
+  `div` string that reads back equal. The reader wrapped the raw value in
+  double quotes whatever quote the source used (#575).
 - `fhir_types::xml::from_xml` refuses a resource that declares the XML Schema
   instance namespace on any of its elements, naming the declaring attribute
   (`Resource.xmlns:xsi`), because exchanged content "SHALL NOT specify the
