@@ -84,7 +84,7 @@ ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2" }
 # The FHIRconnect language crate: the facade, the operations surface and the
 # published ferrobridge-hl7v2 consume it, so the requirement carries both a
 # path and a version.
-fhirconnect = { path = "crates/fhirconnect", version = "0.1.119" }
+fhirconnect = { path = "crates/fhirconnect", version = "0.1.121" }
 # The OMOCL language crate: the ETL runner is its one in-process consumer, so
 # the requirement is path-only too.
 omocl = { path = "crates/omocl" }
