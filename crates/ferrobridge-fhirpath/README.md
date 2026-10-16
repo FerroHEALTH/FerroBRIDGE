@@ -35,7 +35,8 @@ error and an empty result are distinct outcomes.
 
 Quantities compare, convert and add across commensurable UCUM units, in the
 more granular of the two, and `toQuantity(unit)` converts to the unit asked
-for. The `ucum` module reads the UCUM 2.2 essence, embedded whole: prefixes,
+for. A product or a quotient carries the UCUM unit with identical units
+merged (`12 'cm' * 3 'cm'` is `36 'cm2'`). The `ucum` module reads the UCUM 2.2 essence, embedded whole: prefixes,
 exponents, annotations, the `10*` and `10^` forms and parenthesized terms,
 with degree Celsius, degree Fahrenheit and degree Réaumur converted by their
 functions. Other special units and every arbitrary unit convert to nothing,
