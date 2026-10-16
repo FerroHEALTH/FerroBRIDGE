@@ -305,7 +305,7 @@ crates on crates.io.
 
 ### Changed
 
-- The `openehr-*` crates move to 0.0.87, the line the federation gateway pins; `fhirconnect` 0.1.116 and `openehr-mapping-core` 0.1.111 build on it.
+- The `openehr-*` crates move to 0.0.87, the line the federation gateway pins; `fhirconnect` 0.1.117 and `openehr-mapping-core` 0.1.111 build on it.
 - `[etl] aql` and `[etl.visits] aql` must read every `COMPOSITION` below
   `VERSION v[LATEST_VERSION]`, and a configuration whose query reads one
   without that scope (no `VERSION`, a bare `VERSION v`, or `ALL_VERSIONS`)
