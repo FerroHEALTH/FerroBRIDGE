@@ -269,7 +269,9 @@ The library crates are published to crates.io on one crate version line,
 distinct from the product version (owner decision 2026-09-05). The line is
 `fhir-types`' own: the sibling published 0.1.97 on 2026-09-12, the first
 release from here was 0.1.98, and the line moves one patch with every change
-to the crate's packaged content (`.claude/rules/crates-publishing.md`).
+to the crate's packaged content (`.claude/rules/crates-publishing.md`). A
+change that breaks a public API is a patch too, so a consumer pins a crate of
+the line exactly (owner decision 2026-10-17, #510).
 `openehr-mapping-core` and `fhirconnect` joined the line at 0.1.108 with their
 first publish (#397). Every other library crate holds its name with a 0.0.0
 placeholder (#107), outside the line until its first publish, when it joins
