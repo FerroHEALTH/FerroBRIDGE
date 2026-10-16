@@ -232,8 +232,9 @@ impl TokenError {
 
 /// The CDR refused a token (`401`) and no new one could be obtained.
 ///
-/// It reaches a caller as the source of the generated client's transport
-/// refusal, because the renewal runs inside the call's engine.
+/// It reaches a caller as the source of
+/// [`crate::cdr::error::CdrError::Renewal`]: the renewal runs inside the
+/// call's engine, which records it and leaves the `401` standing.
 #[derive(Debug, thiserror::Error)]
 #[error("the CDR refused the token (401) and no new token could be obtained")]
 pub struct RenewalError {
