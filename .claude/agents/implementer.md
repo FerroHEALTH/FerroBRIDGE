@@ -92,6 +92,11 @@ Non-negotiables (violations are rejected at review):
   poll with `pgrep -f` on a string your own wait command contains: the loop
   matches itself and never ends. At most one wait per output
   (`.claude/memory/worker-wait-loops.md`).
+- Push as soon as the change is committed and its own new tests pass with
+  `scripts/checks/fast.sh`: CI is the full gate. Never hold a finished branch
+  to re-run wider local checks (the codegen drift check, the conformance gate,
+  the whole workspace); CI runs them in parallel in minutes
+  (`.claude/memory/worker-wait-loops.md`).
 - The docs gate is CI's form: `RUSTDOCFLAGS="-D warnings" cargo doc --locked
   --no-deps --document-private-items -p <each touched crate>`; a bare URL in a
   doc comment fails it, so write `<https://...>` or a code span.
