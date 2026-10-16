@@ -9,6 +9,8 @@ use std::cmp::Ordering;
 use ferrobridge_fhirpath::ucum::{Canonical, UcumError};
 use rust_decimal::Decimal;
 
+use ferrobridge_fhirpath::value::Item;
+
 use super::support::{eval_none, truth};
 
 fn unit(code: &str) -> Canonical {
@@ -251,4 +253,46 @@ fn to_quantity_converts_to_the_unit_asked_for() {
         eval_none("1 'mg'.toQuantity('mL')").expect("evaluates"),
         Vec::new()
     );
+}
+
+/// The string form of the single quantity `expression` answers.
+fn quantity(expression: &str) -> String {
+    match eval_none(expression).expect("evaluates").as_slice() {
+        [Item::Quantity(found)] => found.to_string(),
+        other => panic!("{expression}: expected one quantity, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_product_carries_the_normalised_ucum_unit() {
+    // N1 §6.6.1: `12 'cm' * 3 'cm'` is `36 'cm2'` and `3 'cm' * 12 'cm2'`
+    // is `36 'cm3'`.
+    assert_eq!(quantity("12 'cm' * 3 'cm'"), "36 'cm2'");
+    assert_eq!(quantity("3 'cm' * 12 'cm2'"), "36 'cm3'");
+    assert_eq!(quantity("2.0 'cm' * 2.0 'm'"), "4.00 'cm.m'");
+    assert_eq!(quantity("2 'kg.m/s2' * 3 's'"), "6 'kg.m/s'");
+}
+
+#[test]
+fn a_quotient_carries_the_normalised_ucum_unit() {
+    // N1 §6.6.2: `12 'cm2' / 3 'cm'` is `4.0 'cm'`.
+    assert_eq!(quantity("12 'cm2' / 3 'cm'"), "4 'cm'");
+    assert_eq!(quantity("4.0 'g' / 2.0 'm'"), "2 'g/m'");
+    assert_eq!(quantity("6 'kg' / 2 'm.s2'"), "3 'kg/m/s2'");
+    assert_eq!(quantity("6 'm2' / 2 'cm'"), "3 'm2/cm'");
+}
+
+#[test]
+fn a_quotient_whose_units_cancel_is_unity() {
+    // N1 §6.6.2 and UCUM §7: a unit divided by itself is the unity '1'.
+    assert_eq!(quantity("1.0 'm' / 1.0 'm'"), "1 '1'");
+    assert_eq!(quantity("6 'm.s' / 2 's.m'"), "3 '1'");
+}
+
+#[test]
+fn a_unit_with_no_merged_form_is_composed() {
+    // UCUM §6.2: an annotation is no part of a unit's meaning, so an
+    // annotated unit keeps its text and the two are joined (UCUM §7, §10).
+    assert_eq!(quantity("2 'mg{total}' * 3 'mg'"), "6 'mg{total}.mg'");
+    assert_eq!(quantity("6 'mg{total}' / 2 'g/L'"), "3 'mg{total}/(g/L)'");
 }

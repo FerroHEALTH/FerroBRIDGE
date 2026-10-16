@@ -87,3 +87,42 @@ fn untypable_paths_pass() {
     assert_eq!(check("descendants().anything", "Patient"), Ok(()));
     assert_eq!(check("contained.anything", "Patient"), Ok(()));
 }
+
+#[test]
+fn a_cast_of_a_choice_narrows_to_the_named_type() {
+    // N1 §6.3.3: `as` gives the value as the named type, here one of the
+    // two types RiskAssessment.prediction.probability[x] admits.
+    assert_eq!(
+        check("(probability as Range).low", "RiskAssessment.prediction"),
+        Ok(())
+    );
+    assert_eq!(
+        check("probability.as(Range).high", "RiskAssessment.prediction"),
+        Ok(())
+    );
+    assert!(matches!(
+        check("(probability as decimal).low", "RiskAssessment.prediction"),
+        Err(SemanticError::UnknownElement { .. })
+    ));
+}
+
+#[test]
+fn of_type_narrows_what_follows() {
+    // N1 §5.2.4: ofType() keeps the items of the named type, so what follows
+    // navigates that type alone.
+    assert_eq!(
+        check("prediction.probability.ofType(Range).low", "RiskAssessment"),
+        Ok(())
+    );
+    assert!(matches!(
+        check(
+            "prediction.probability.ofType(decimal).low",
+            "RiskAssessment"
+        ),
+        Err(SemanticError::UnknownElement { .. })
+    ));
+    assert!(matches!(
+        check("value.ofType(Period).unit", "Observation"),
+        Err(SemanticError::UnknownElement { .. })
+    ));
+}

@@ -14,6 +14,7 @@
 //! [`UcumError::UnsupportedSpecial`]. An arbitrary unit converts to nothing
 //! (§24, §25).
 
+pub mod algebra;
 mod essence;
 mod magnitude;
 mod parse;
