@@ -16,7 +16,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use testcontainers::core::{AccessMode, Healthcheck, IntoContainerPort, Mount, WaitFor};
 use testcontainers::runners::AsyncRunner;
-use testcontainers::{ContainerAsync, GenericImage, ImageExt};
+use testcontainers::{ContainerAsync, ContainerRequest, GenericImage, ImageExt};
 
 /// The environment variable that admits the container-backed tests.
 pub const E2E_GATE: &str = "FERROBRIDGE_E2E";
@@ -459,19 +459,14 @@ pub async fn cdr() -> Result<Cdr, HarnessError> {
     let dsn = format!(
         "postgres://{CDR_DATABASE_ROLE}:{CDR_DATABASE_ROLE}@{database_name}:{POSTGRES_PORT}/{CDR_DATABASE_ROLE}"
     );
-    let cdr = CDR
-        .image()
-        .with_wait_for(WaitFor::message_on_stdout("ferroehr-rest listening"))
-        .with_exposed_port(CDR_PORT.tcp())
-        .with_network(network)
-        .with_env_var("FERROEHR__DB__URL", dsn)
-        .with_env_var("FERROEHR__AUTH__ENABLED", "false")
-        .start()
-        .await
-        .map_err(|source| HarnessError::Container {
-            image: CDR.repository,
-            source,
-        })?;
+    let cdr =
+        cdr_request(dsn, network)
+            .start()
+            .await
+            .map_err(|source| HarnessError::Container {
+                image: CDR.repository,
+                source,
+            })?;
 
     let host = cdr
         .get_host()
@@ -495,6 +490,22 @@ pub async fn cdr() -> Result<Cdr, HarnessError> {
         database,
         base_url: format!("{origin}/ferroehr/rest/openehr/v1"),
     })
+}
+
+/// Returns the request that starts the reference CDR against `dsn` on
+/// `network`.
+///
+/// The usage report is switched off: a container does not inherit the CI
+/// runner's environment, so the CDR's own CI detection cannot see that it runs
+/// in a test, and every run would report itself as an installation.
+fn cdr_request(dsn: String, network: String) -> ContainerRequest<GenericImage> {
+    CDR.image()
+        .with_wait_for(WaitFor::message_on_stdout("ferroehr-rest listening"))
+        .with_exposed_port(CDR_PORT.tcp())
+        .with_network(network)
+        .with_env_var("FERROEHR__DB__URL", dsn)
+        .with_env_var("FERROEHR__AUTH__ENABLED", "false")
+        .with_env_var("FERROEHR__USAGE_REPORT__ENABLED", "false")
 }
 
 /// Returns the health check that answers when PostgreSQL accepts TCP
@@ -541,7 +552,7 @@ async fn await_readiness(url: &str) -> Result<(), HarnessError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CDR, CDR_POSTGRES, POSTGRES, PinnedImage, TERMINOLOGY};
+    use super::{CDR, CDR_POSTGRES, POSTGRES, PinnedImage, TERMINOLOGY, cdr_request};
 
     #[test]
     fn every_pin_names_a_tag_and_a_digest() {
@@ -563,5 +574,19 @@ mod tests {
             digest: "sha256:0000",
         };
         assert_eq!("postgres:16.15@sha256:0000", image.reference());
+    }
+
+    #[test]
+    fn the_cdr_starts_with_its_usage_report_off() {
+        let request = cdr_request("postgres://cdr".to_owned(), "net".to_owned());
+        let usage_report = request
+            .env_vars()
+            .find(|(name, _)| name == "FERROEHR__USAGE_REPORT__ENABLED")
+            .map(|(_, value)| value.into_owned());
+        assert_eq!(
+            Some("false".to_owned()),
+            usage_report,
+            "a test CDR must not send a usage report"
+        );
     }
 }

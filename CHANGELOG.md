@@ -379,6 +379,11 @@ crates on crates.io.
 
 ### Fixed
 
+- The container harness starts the reference CDR with
+  `FERROEHR__USAGE_REPORT__ENABLED=false` (#582). A container does not
+  inherit the CI runner's environment, so FerroEHR's own CI detection never
+  fired, and each "e2e (containers)" run reported itself to FerroPULSE as an
+  installation.
 - An invariant on a choice element reads every type the choice admits
   (#563). The FHIRPath evaluator checks an expression whose context is a
   choice element against all of its types, and on an occurrence of a choice
