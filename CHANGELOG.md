@@ -25,6 +25,22 @@ crates on crates.io.
 
 ### Added
 
+- FHIR `Patient` from the KDS person template through FHIRconnect (#468).
+  The published KDS person chain of the FHIRconnect mapping library compiles
+  against the published `KDS_Person` operational template, which
+  `scripts/vendor/kds-person-opt.sh` vendors from the openFHIR test resources,
+  under a FerroBRIDGE project context, and a synthetic MII Person `Patient`
+  holds both lens laws through it. The published files that do not load,
+  compile or convert are replaced by stand-ins, each refusal pinned by file
+  and line; the defects are recorded on #475 and #468. Seven library files
+  join the mapping-library pass list and the chain joins the round-trip one.
+  `fhirconnect` 0.1.114 adds the `DV_DATE` against `date` and `DV_BOOLEAN`
+  against `boolean` cells, reads `value` on a primitive as the primitive
+  itself, the form FHIRconnect writes in a condition, and writes the
+  context's `health_care_facility` as the `_health_care_facility` family. The
+  facade keys a `Patient` by its first identifier with a value, so a
+  `Patient` written through it is stored as the `KDS_Person` composition of
+  its own EHR and reads back.
 - `fhir-types` 0.1.111 names each type's base type in the element table
   (`TypeSchema::base`, from `StructureDefinition.baseDefinition`, and for a
   backbone element the `BackboneElement` or `Element` its element names), in
@@ -269,6 +285,11 @@ crates on crates.io.
 
 ### Fixed
 
+- `openehr-mapping-core` 0.1.110 compares a name predicate the `aqlPath` of a
+  Web Template node carries on an ancestor segment, so a mapping path below
+  one of two sibling clusters that share a node id (the `Straßenanschrift` and
+  `Postfach` addresses of `KDS_Person`) names the node below that cluster
+  alone (#468).
 - `fhir-types` 0.1.110 writes a repeating primitive whose every position
   carries only an `id` or an `extension` as the `_name` array alone, in every
   version, where it wrote a value array of nulls beside it (`"event": [null]`);
