@@ -7,7 +7,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use crate::ast::Expr;
-use crate::check::{SemanticError, check};
+use crate::check::{SemanticError, check, check_any};
 use crate::eval::error::EvalError;
 use crate::eval::{Environment, Focus, evaluate};
 use crate::model::{FhirType, Model};
@@ -57,6 +57,19 @@ impl Expression {
     /// refuses.
     pub fn check(&self, model: &dyn Model, context: FhirType) -> Result<(), SemanticError> {
         check(&self.tree, model, context)
+    }
+
+    /// Checks the expression against a context that may hold any of the
+    /// types `contexts`, as an occurrence of a choice element does (R4
+    /// §2.9.1.1, [`crate::model::path_types`]): a member is accepted when one
+    /// of them defines it, and refused when none does.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SemanticError`] for the first member or type name the model
+    /// refuses.
+    pub fn check_any(&self, model: &dyn Model, contexts: &[FhirType]) -> Result<(), SemanticError> {
+        check_any(&self.tree, model, contexts)
     }
 
     /// Evaluates the expression in `env` on `focus`.

@@ -36,6 +36,14 @@ defined here: N1 is the version R4 cites. Navigation over system values,
 untyped nodes and the results of `children()`, `descendants()` and
 `resolve()` stays lenient, as N1 §11 says a compiler cannot type them.
 
+A choice element is typed by every type it admits (R4 §2.9.1.1). The static
+check of a path from a choice element, or of an expression whose context is
+one (`Expression::check_any` over `model::path_types`), accepts a member any
+admitted type defines. On an occurrence of a choice element, reached through
+it or named with `Focus::defined_by`, a member another admitted type defines
+and its own type lacks navigates to empty (N1 §3.2 "all kinds of value", §4.4);
+a member no admitted type defines stays the N1 §3 error.
+
 `Expression::check` is the static half: it follows the reachable FHIR types
 and refuses what the model refuses, and passes anything it cannot type.
 

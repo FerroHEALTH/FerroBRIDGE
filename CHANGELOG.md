@@ -378,6 +378,15 @@ crates on crates.io.
 
 ### Fixed
 
+- An invariant on a choice element reads every type the choice admits
+  (#563). The FHIRPath evaluator checks an expression whose context is a
+  choice element against all of its types, and on an occurrence of a choice
+  a member only another of its types defines is empty, as
+  `Observation.value.unit` is on a string value (FHIRPath N1 §3.2). R4
+  `ras-1` now holds on a decimal `RiskAssessment.prediction.probability`
+  where the R4 profile validator listed it as unevaluable, and the
+  core-constraint sweep checks the 191 invariants on choice elements it
+  skipped. A member no type of the choice defines is still refused.
 - The R4 profile validator reports an extension whose `url` the package set
   cannot resolve to a definition (a `#` fragment, or two definitions under
   one canonical) as an unknown extension at that extension, a warning or an

@@ -18,7 +18,10 @@ use fhir_types::schema::{FieldSchema, Kind};
 
 use super::{Collection, Item};
 use crate::eval::error::EvalError;
-use crate::model::{FhirType, Model, TypeKind, choice_code, field_type, resource_type};
+use crate::model::{
+    FhirType, Model, TypeKind, choice_element, choice_types, defines, field_type, resource_type,
+    variant_type,
+};
 
 /// A JSON value of the document, borrowed from the input or owned when a
 /// seam returned it.
@@ -159,6 +162,13 @@ impl<'a> Node<'a> {
         }
     }
 
+    /// The node as an occurrence of the element defined at `path`, a
+    /// path the element table holds.
+    pub(crate) const fn with_definition(mut self, path: &'static str) -> Self {
+        self.definition = Some(path);
+        self
+    }
+
     /// The FHIR type, `None` for a resource whose type the model does not
     /// know.
     #[must_use]
@@ -221,7 +231,9 @@ impl<'a> Node<'a> {
     /// defines it, `None` when it does not.
     ///
     /// A primitive's members are `id` and `extension`, from the table's
-    /// `Element`. A node with no type answers every member from its JSON.
+    /// `Element`. A node with no type answers every member from its JSON. An
+    /// occurrence of a choice element answers `Some` and empty for a member
+    /// another type of the choice defines and its own type does not.
     ///
     /// # Errors
     ///
@@ -245,7 +257,14 @@ impl<'a> Node<'a> {
             }
         };
         let Some(field) = schema.fields.iter().find(|field| field.name == name) else {
-            return Ok(None);
+            // NOTE: N1 §3.2 lets a path over a polymorphic item ignore its type ("all kinds of
+            // value"), and N1 §4.4 makes an absent member no node, so the choice's types bound it.
+            let admitted = self
+                .definition
+                .and_then(|path| choice_element(model, path))
+                .and_then(|choice| choice_types(model, choice))
+                .is_some_and(|types| types.iter().any(|ty| defines(model, ty, name)));
+            return Ok(admitted.then(Vec::new));
         };
         let Some(object) = self.object() else {
             return Ok(Some(Vec::new()));
@@ -321,13 +340,7 @@ fn read_field<'a>(
             let mut items = Vec::new();
             for (suffix, kind) in variants {
                 let key = format!("{}{suffix}", field.name);
-                let code = choice_code(field, suffix);
-                let ty = match code {
-                    Some(code) if !matches!(kind, Kind::Complex(_) | Kind::Resource) => {
-                        field_type(model, field, *kind).map(|ty| FhirType { name: code, ..ty })
-                    }
-                    _ => field_type(model, field, *kind),
-                };
+                let ty = variant_type(model, field, suffix, *kind);
                 items.extend(read_key(model, object, &key, field, ty)?);
             }
             Ok(items)

@@ -192,6 +192,8 @@ pub fn primitive_types(schemas: &'static Schemas) -> BTreeMap<&'static str, Type
 /// The type an element path names, for evaluating an expression whose
 /// context is that element, as an `ElementDefinition.constraint` is
 /// (<https://hl7.org/fhir/R4/conformance-rules.html#constraints>).
+///
+/// A choice element names no one type; [`path_types`] answers its types.
 #[must_use]
 pub fn path_type(model: &dyn Model, path: &str) -> Option<FhirType> {
     if !path.contains('.') {
@@ -199,6 +201,73 @@ pub fn path_type(model: &dyn Model, path: &str) -> Option<FhirType> {
     }
     let (_, field) = model.schemas().element(path)?;
     field_type(model, field, field.kind)
+}
+
+/// The type one alternative of a choice element holds.
+///
+/// A primitive alternative is named by its own type code (`dateTime` behind
+/// `valueDateTime`), a complex one by its datatype, and a resource-typed one
+/// has no type here.
+#[must_use]
+pub fn variant_type(
+    model: &dyn Model,
+    field: &'static FieldSchema,
+    suffix: &str,
+    kind: Kind,
+) -> Option<FhirType> {
+    let found = field_type(model, field, kind)?;
+    Some(match (kind, choice_code(field, suffix)) {
+        (Kind::Complex(_), _) | (_, None) => found,
+        (_, Some(code)) => FhirType {
+            name: code,
+            ..found
+        },
+    })
+}
+
+/// Every type a choice element admits (R4 §2.9.1.1), in definition order;
+/// `None` when `field` is no choice element or an alternative has no type of
+/// its own here.
+#[must_use]
+pub fn choice_types(model: &dyn Model, field: &'static FieldSchema) -> Option<Vec<FhirType>> {
+    let Kind::Choice(variants) = field.kind else {
+        return None;
+    };
+    variants
+        .iter()
+        .map(|(suffix, kind)| variant_type(model, field, suffix, *kind))
+        .collect()
+}
+
+/// The types an element path admits, for checking an expression whose
+/// context is that element: every type of a choice element (R4 §2.9.1.1),
+/// the one type [`path_type`] names otherwise.
+#[must_use]
+pub fn path_types(model: &dyn Model, path: &str) -> Option<Vec<FhirType>> {
+    if let Some(field) = choice_element(model, path) {
+        return choice_types(model, field);
+    }
+    path_type(model, path).map(|ty| vec![ty])
+}
+
+/// The choice element an element path names, in its base form
+/// (`Observation.value[x]`) or an expanded one (`Observation.valueQuantity`).
+#[must_use]
+pub fn choice_element(model: &dyn Model, path: &str) -> Option<&'static FieldSchema> {
+    if !path.contains('.') {
+        return None;
+    }
+    let (_, field) = model.schemas().element(path)?;
+    matches!(field.kind, Kind::Choice(_)).then_some(field)
+}
+
+/// Whether the type `ty` defines the member `name`; a primitive's members
+/// are those of `Element`.
+#[must_use]
+pub fn defines(model: &dyn Model, ty: &FhirType, name: &str) -> bool {
+    ty.schema()
+        .or_else(|| model.schemas().type_named("Element"))
+        .is_some_and(|schema| schema.fields.iter().any(|field| field.name == name))
 }
 
 /// Whether `name` is `ty` or a type `ty` specializes, as far as the model

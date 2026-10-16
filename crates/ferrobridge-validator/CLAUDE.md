@@ -104,7 +104,9 @@ way further up the walk counts as passing (a reference cycle); every
 `meta.profile` claim is validated; the core `Resource` and
 `DomainResource` admit any target; the stylesheet `Binary` of a document is
 one whose `contentType` is `text/css`; an invariant whose expression answers
-empty is listed, neither passed nor failed; a Bundle entry is its own `%rootResource`; an invariant the
+empty is listed, neither passed nor failed; an invariant on a choice element
+is checked against every type the base choice admits and evaluated on the
+occurrence named as one of it; a Bundle entry is its own `%rootResource`; an invariant the
 snapshot repeats is evaluated once per location, key and declaring
 canonical; `resolve()` from the Bundle element reaches entries by an
 absolute reference. Change one only with a citation.
