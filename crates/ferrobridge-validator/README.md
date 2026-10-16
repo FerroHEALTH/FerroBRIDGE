@@ -73,11 +73,28 @@ resources the Composition references are in the Bundle, and the Bundle holds
 only the Composition, what it references directly or indirectly, a CSS
 stylesheet `Binary` and the `Provenance` of what it includes.
 
-Invariants are not evaluated yet, and neither is a discriminator, target
-profile or aggregation the validator cannot decide (a path outside the
-subset, a reference outside the resources it holds, a value set it cannot
-evaluate, a profile the package set lacks). Each one the validator meets is listed in the report and in
-the `OperationOutcome` as a `warning` of type `not-supported`, never passed in
+Every invariant on every element in play, of the core definitions and of
+each profile, is evaluated with
+[`ferrobridge-fhirpath`](https://docs.rs/ferrobridge-fhirpath) on each
+occurrence of its element: the focus is the element, `%resource` the
+resource holding it, and `%rootResource` its container when it is contained.
+A failed invariant is an issue of type `invariant` carrying its key and the
+canonical that declares it, with the constraint's own severity; a
+best-practice invariant is a warning unless
+`Validator::with_best_practice(BestPractice::Error)` asks for errors. An
+empty result is listed as unevaluated: the expression "must evaluate to true"
+(conformance-rules.html §2.1.0.6), and empty is neither true nor false. `resolve()` reaches contained resources
+and Bundle entries, `memberOf()` reads the value sets of the package set, and
+`conformsTo()` validates against a profile of it; `subsumes()`,
+`elementDefinition()` and `slice()` are not answered.
+
+An invariant whose expression does not parse, does not fit its element's
+type or does not evaluate, a call the run cannot answer included, is not
+evaluated, and neither is a discriminator, target profile or aggregation the
+validator cannot decide (a path outside the subset, a reference outside the
+resources it holds, a value set it cannot evaluate, a profile the package set
+lacks). Each one the validator meets is listed in the report and in the
+`OperationOutcome` as a `warning` of type `not-supported`, never passed in
 silence.
 
 ## Message ids

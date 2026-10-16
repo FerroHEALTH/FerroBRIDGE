@@ -235,6 +235,17 @@ impl<'a> Focus<'a> {
         }
     }
 
+    /// Names the resources `%resource` and `%rootResource` stand for,
+    /// replacing what the constructor set (FHIR R4 §2.9.1.4): an element of
+    /// a contained resource has that resource as `%resource` and its
+    /// container as `%rootResource`, and `None` leaves a variable empty.
+    #[must_use]
+    pub fn within(mut self, resource: Option<&'a Value>, root: Option<&'a Value>) -> Self {
+        self.resource = resource;
+        self.root = root;
+        self
+    }
+
     /// No context at all: every path is empty.
     #[must_use]
     pub const fn none() -> Self {
