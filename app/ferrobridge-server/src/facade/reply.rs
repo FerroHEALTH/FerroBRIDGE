@@ -15,6 +15,7 @@ use axum::response::IntoResponse;
 use axum::response::Response;
 use fhir_types::codec::Json;
 use fhir_types::codec::Object;
+use fhir_types::r4::operation_outcome::OperationOutcome;
 use http::HeaderName;
 use http::HeaderValue;
 use http::StatusCode;
@@ -92,7 +93,14 @@ pub fn resource(status: StatusCode, body: &Object, headers: &[Header]) -> Respon
 /// Returns the response carrying `issues` under `status`, with `headers`.
 #[must_use]
 pub fn issues(status: StatusCode, issues: &[Issue], headers: &[Header]) -> Response {
-    match outcome(issues).to_json() {
+    built(status, &outcome(issues), headers)
+}
+
+/// Returns the response carrying the built `outcome` under `status`, with
+/// `headers`.
+#[must_use]
+pub fn built(status: StatusCode, outcome: &OperationOutcome, headers: &[Header]) -> Response {
+    match outcome.to_json() {
         Ok(object) => resource(status, &object, headers),
         Err(error) => {
             tracing::error!(
