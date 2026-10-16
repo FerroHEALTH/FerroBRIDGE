@@ -346,6 +346,55 @@ async fn an_update_of_one_entry_naming_a_stale_composition_version_is_four_hundr
 }
 
 #[tokio::test]
+async fn a_replayed_create_of_the_second_entry_writes_nothing_and_answers_that_entry()
+-> Result<(), Box<dyn StdError>> {
+    // A create of a known source with no `meta.versionId` whose mapping is the
+    // entry as it stands is a replay, judged against that entry alone.
+    let harness = searching().await;
+    let (composition, first, second) = two_diagnoses(&harness);
+    let (_first_id, second_id) = entry_ids(&harness, &composition, &first, &second).await?;
+    mount_read(&harness.cdr, VERSION_ONE, &composition).await;
+    Mock::given(matchers::method("PUT"))
+        .and(matchers::path(container_path()))
+        .respond_with(EchoUpdate)
+        .mount(&harness.cdr)
+        .await;
+    let source = revised(&second_id, "SYN-003");
+    let (status, body) = call(harness.app(), put(&second_id, &source, None)?).await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let sent = updated(&harness).await?;
+    mount_version_two_read(&harness, &sent).await;
+
+    let (status, body) = call(
+        harness.app(),
+        Request::post("/fhir/Condition")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(source.to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(Some(second_id.as_str()), body["id"].as_str(), "{body}");
+    assert_eq!(
+        Some("SYN-003"),
+        body["code"]["coding"][0]["code"].as_str(),
+        "the replay answers the entry the source produced: {body}"
+    );
+    assert_eq!(
+        1,
+        harness.received("PUT", &container_path()).await,
+        "the replay committed a new version"
+    );
+    assert_eq!(
+        0,
+        harness
+            .received("POST", &format!("/ehr/{EHR_ID}/composition"))
+            .await,
+        "the replay created a composition"
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_create_revising_the_source_of_the_second_entry_keeps_the_first()
 -> Result<(), Box<dyn StdError>> {
     // A create of a source id the map consumed at another `meta.versionId`

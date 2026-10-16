@@ -399,6 +399,12 @@ crates on crates.io.
 
 ### Fixed
 
+- A create with no `meta.versionId` of a source the facade already holds as
+  one entry of a multi-entry composition is recognised as a replay when its
+  mapping is that entry as it stands, and commits nothing (#667). The replay
+  check compares what a revision would commit, that entry spliced into the
+  standing composition, with the composition the CDR holds, and the replay
+  answers that entry.
 - The facade `CapabilityStatement` declares `conditionalUpdate: false`
   (#666). R4 `CapabilityStatement.rest.resource.conditionalUpdate` names the
   `PUT [type]?[search parameters]` interaction (http.html#cond-update), which
