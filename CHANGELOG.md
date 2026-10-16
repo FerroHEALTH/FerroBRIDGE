@@ -418,6 +418,17 @@ crates on crates.io.
 
 ### Fixed
 
+- The KDS diagnosis project context keeps a diagnosis code system outside
+  ICD-10-GM when it reads a Condition back (#379). The `coding` method of the
+  `icd10ProblemDiagnose` append was gated by a `fhirCondition` only, which
+  FHIRconnect applies to FHIR input alone, so out of openEHR it wrote the
+  ICD-10-GM system over a SNOMED CT or any other coding. It now carries an
+  `openehrCondition` on the stored terminology as well.
+- A KDS diagnosis read no longer carries an
+  `icd-10-gm-diagnosesicherheit` extension with a url and no value, which
+  FHIR R4 ext-1 forbids (#629). The extension method of the same append had
+  the same one-sided gate, so its url manual ran for every read; it now runs
+  only when the composition holds a diagnostic certainty.
 - A facade search that matches a composition's second entry answers that
   entry (#530). Each entry of the archetype a context maps is a resource with
   an id of its own, derived from the composition and the entry's place among
