@@ -19,6 +19,7 @@
 
 pub mod capability;
 pub mod commit;
+pub mod edge;
 pub mod ehr;
 pub mod engine;
 pub mod handlers;

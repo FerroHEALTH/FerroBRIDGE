@@ -77,8 +77,12 @@ pub enum IssueType {
     Conflict,
     /// A required precondition failed.
     BusinessRule,
+    /// The content is too long, a denial-of-service protection.
+    TooLong,
     /// A transient issue: the operation may succeed on a retry.
     Transient,
+    /// An internal timeout occurred.
+    Timeout,
     /// An upstream system did not answer usefully.
     Exception,
     /// The processing failed for a reason with no better code.
@@ -104,7 +108,9 @@ impl IssueType {
             Self::Duplicate => "duplicate",
             Self::Conflict => "conflict",
             Self::BusinessRule => "business-rule",
+            Self::TooLong => "too-long",
             Self::Transient => "transient",
+            Self::Timeout => "timeout",
             Self::Exception => "exception",
             Self::Processing => "processing",
             Self::Informational => "informational",
@@ -285,6 +291,8 @@ mod tests {
         assert_eq!("not-supported", IssueType::NotSupported.as_str());
         assert_eq!("not-found", IssueType::NotFound.as_str());
         assert_eq!("business-rule", IssueType::BusinessRule.as_str());
+        assert_eq!("too-long", IssueType::TooLong.as_str());
+        assert_eq!("timeout", IssueType::Timeout.as_str());
         assert_eq!("error", Severity::Error.as_str());
     }
 
