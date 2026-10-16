@@ -11,6 +11,7 @@
 
 mod audit;
 mod chain;
+mod composer;
 mod conditions;
 mod functions;
 mod links;
