@@ -67,7 +67,10 @@ crates on crates.io.
   line on the `ferrobridge::audit` target without the token or the body.
   The `CapabilityStatement` carries `rest.security` with the SMART service
   and the `oauth-uris` extension. With `[auth]` off the facade stays open,
-  and the server warns at start-up.
+  and the server warns at start-up. The guard classifies every route under
+  `/fhir` by name, and a route it does not classify answers `403` without
+  reaching a handler, so a route added without a classification fails closed
+  (#547).
 - `fhir-types` 0.1.111 names each type's base type in the element table
   (`TypeSchema::base`, from `StructureDefinition.baseDefinition`, and for a
   backbone element the `BackboneElement` or `Element` its element names), in

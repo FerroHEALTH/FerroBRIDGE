@@ -88,11 +88,20 @@ clock skew. Under the default `rfc9068` profile it also carries `typ: at+jwt`,
 | `401` | No bearer token, or a token in another scheme | `Bearer` |
 | `401` | A token that does not hold, whatever the reason, including a token of another issuer or for another audience | `Bearer error="invalid_token"` |
 | `403` | A valid token whose scopes do not permit the request | `Bearer error="insufficient_scope"` |
+| `403` | Any request to a route under `/fhir` the guard does not classify, before the token is read | `Bearer error="insufficient_scope"` |
 | `503` | A token naming a key the server cannot fetch because the key set does not answer | none |
 
 Each refusal carries an `OperationOutcome`, `login` for a `401` and
 `forbidden` for a `403`. Neither names the claim that failed or the scope
 that was missing.
+
+The guard classifies every route it admits by name: the interactions in the
+table below, the two FHIRconnect operations and their direct forms, the
+`CapabilityStatement` and the discovery document. A route under `/fhir` that
+it does not name fails closed with `403` and reaches no handler and no CDR,
+so a route added without a classification is refused rather than open to any
+token. A test reads every route the server mounts under `/fhir` and fails
+when one has no classification. With `[auth]` off the facade stays open.
 
 The permission each interaction needs follows the SMART v2 `cruds` letters,
 on the resource type in the path or in the entry:

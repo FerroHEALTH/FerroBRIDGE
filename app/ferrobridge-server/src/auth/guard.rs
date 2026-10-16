@@ -92,10 +92,13 @@ pub enum Interaction {
     Search,
     /// `POST [base]`.
     Transaction,
-    /// A FHIRconnect operation or any other route under the base.
+    /// A FHIRconnect operation, `$tofhir` or `$toopenehr`, or its direct form.
     Operation,
     /// The SMART discovery document.
     Discovery,
+    /// A route under the base that [`CLASSIFIED`] does not name, which a
+    /// guarded deployment refuses.
+    Unclassified,
 }
 
 impl Interaction {
@@ -116,6 +119,7 @@ impl Interaction {
             Self::Transaction => "transaction",
             Self::Operation => "operation",
             Self::Discovery => "smart-configuration",
+            Self::Unclassified => "unclassified",
         }
     }
 
@@ -131,7 +135,11 @@ impl Interaction {
             Self::Update => &[Permission::Update],
             Self::Validate => &[Permission::Create, Permission::Update],
             Self::Search => &[Permission::Search],
-            Self::Capabilities | Self::Transaction | Self::Operation | Self::Discovery => &[],
+            Self::Capabilities
+            | Self::Transaction
+            | Self::Operation
+            | Self::Discovery
+            | Self::Unclassified => &[],
         }
     }
 
@@ -173,14 +181,21 @@ pub async fn guard(State(gate): State<Gate>, mut request: Request, next: Next) -
     let request_id = crate::request_id::of(request.headers())
         .unwrap_or_default()
         .to_owned();
-    let (access, response) = match authenticate(&gate, &target, request.headers()).await {
-        Err(refusal) => (None, refusal.into_response()),
-        Ok(access) => {
-            if let Err(refusal) = authorize(&access, &target) {
-                (Some(access), refusal.into_response())
-            } else {
-                request.extensions_mut().insert(access.clone());
-                (Some(access), next.run(request).await)
+    // NOTE: no specification governs this: our own design, a route the guard
+    // cannot classify needs no permission it could check, so it fails closed.
+    let refused = gate.authority.is_some() && target.interaction == Interaction::Unclassified;
+    let (access, response) = if refused {
+        (None, forbidden().into_response())
+    } else {
+        match authenticate(&gate, &target, request.headers()).await {
+            Err(refusal) => (None, refusal.into_response()),
+            Ok(access) => {
+                if let Err(refusal) = authorize(&access, &target) {
+                    (Some(access), refusal.into_response())
+                } else {
+                    request.extensions_mut().insert(access.clone());
+                    (Some(access), next.run(request).await)
+                }
             }
         }
     };
@@ -300,6 +315,42 @@ pub fn forbidden() -> Refusal {
     ))
 }
 
+/// Every route under the FHIR base the guard admits: the method, the route
+/// template relative to the base, and the interaction it is.
+///
+/// A route under the base that this table does not name is
+/// [`Interaction::Unclassified`], which a guarded deployment refuses, so a
+/// route mounted without a classification fails closed (no specification
+/// governs the table: our own design).
+pub const CLASSIFIED: [(Method, &str, Interaction); 14] = [
+    (Method::GET, "/metadata", Interaction::Capabilities),
+    (Method::GET, SMART_CONFIGURATION, Interaction::Discovery),
+    (Method::POST, "", Interaction::Transaction),
+    (Method::POST, "/{resource_type}", Interaction::Create),
+    (Method::GET, "/{resource_type}", Interaction::Search),
+    (
+        Method::POST,
+        "/{resource_type}/_search",
+        Interaction::Search,
+    ),
+    (
+        Method::POST,
+        "/{resource_type}/$validate",
+        Interaction::Validate,
+    ),
+    (Method::GET, "/{resource_type}/{id}", Interaction::Read),
+    (Method::PUT, "/{resource_type}/{id}", Interaction::Update),
+    (
+        Method::GET,
+        "/{resource_type}/{id}/_history/{vid}",
+        Interaction::Vread,
+    ),
+    (Method::POST, "/$tofhir", Interaction::Operation),
+    (Method::POST, "/$toopenehr", Interaction::Operation),
+    (Method::POST, "/tofhir", Interaction::Operation),
+    (Method::POST, "/toopenehr", Interaction::Operation),
+];
+
 /// Returns what `method` on `template` is, or `None` for a route outside the
 /// FHIR base.
 fn classify(method: &Method, template: &str, path: &str) -> Option<Target> {
@@ -307,6 +358,12 @@ fn classify(method: &Method, template: &str, path: &str) -> Option<Target> {
     if !relative.is_empty() && !relative.starts_with('/') {
         return None;
     }
+    let interaction = CLASSIFIED
+        .iter()
+        .find(|(listed, listed_template, _)| listed == method && *listed_template == relative)
+        .map_or(Interaction::Unclassified, |(_, _, interaction)| {
+            *interaction
+        });
     let mut segments = path
         .strip_prefix(BASE_PATH)
         .unwrap_or_default()
@@ -314,37 +371,19 @@ fn classify(method: &Method, template: &str, path: &str) -> Option<Target> {
         .filter(|segment| !segment.is_empty());
     let first = segments.next().map(str::to_owned);
     let second = segments.next().map(str::to_owned);
-    let typed = |interaction, id| Target {
-        interaction,
-        resource_type: first.clone(),
-        id,
-    };
-    let interaction = match (method, relative) {
-        (&Method::GET, "/metadata") => Interaction::Capabilities,
-        (&Method::GET, SMART_CONFIGURATION) => Interaction::Discovery,
-        (&Method::POST, "") => Interaction::Transaction,
-        (&Method::POST, "/{resource_type}") => return Some(typed(Interaction::Create, None)),
-        (&Method::GET, "/{resource_type}") | (&Method::POST, "/{resource_type}/_search") => {
-            return Some(typed(Interaction::Search, None));
-        }
-        (&Method::POST, "/{resource_type}/$validate") => {
-            return Some(typed(Interaction::Validate, None));
-        }
-        (&Method::GET, "/{resource_type}/{id}") => {
-            return Some(typed(Interaction::Read, second));
-        }
-        (&Method::PUT, "/{resource_type}/{id}") => {
-            return Some(typed(Interaction::Update, second));
-        }
-        (&Method::GET, "/{resource_type}/{id}/_history/{vid}") => {
-            return Some(typed(Interaction::Vread, second));
-        }
-        _ => Interaction::Operation,
+    let (resource_type, id) = match interaction {
+        Interaction::Create | Interaction::Search | Interaction::Validate => (first, None),
+        Interaction::Read | Interaction::Update | Interaction::Vread => (first, second),
+        Interaction::Capabilities
+        | Interaction::Transaction
+        | Interaction::Operation
+        | Interaction::Discovery
+        | Interaction::Unclassified => (None, None),
     };
     Some(Target {
         interaction,
-        resource_type: None,
-        id: None,
+        resource_type,
+        id,
     })
 }
 
