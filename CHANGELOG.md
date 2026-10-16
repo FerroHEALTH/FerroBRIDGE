@@ -317,6 +317,13 @@ crates on crates.io.
   refuses the row, also when the person map knows the EHR but its `PERSON`
   row is gone. The run report counts the `PERSON` rows and the placeholders
   (`persons`).
+- A second composition of an EHR writing the `PERSON` row another
+  composition of the EHR already writes commits, where the bridge's side
+  table refused it and the commit failed (#540). Each writer is recorded,
+  the one committed last rewrites the columns, and the row stays while any
+  writer or any row of the person remains; every other table keeps its
+  one-row-per-id guarantee. Run `ferrobridge cdm init` once after upgrading
+  to bring an existing bridge schema to this shape.
 - The facade's loss log records each declared loss as a value-free kind
   (`skipped-unresolved-reference`, `deferred-reference`, `defaulted` and the
   rest) with its FHIRPath and its openEHR path, where it logged the loss's

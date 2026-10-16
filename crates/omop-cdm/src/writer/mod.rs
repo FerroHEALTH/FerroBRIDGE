@@ -210,7 +210,8 @@ impl CdmWriter {
     }
 
     /// Creates the bridge schema, its tables and one id sequence per CDM
-    /// table, leaving whatever already exists.
+    /// table, leaving whatever already exists and bringing a bridge schema an
+    /// earlier release created to this release's shape.
     ///
     /// # Errors
     ///

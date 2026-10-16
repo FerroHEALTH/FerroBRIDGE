@@ -1255,7 +1255,12 @@ from one of two sources, in this order:
   composition of the person carries one. The OMOCL corpus has one such file,
   `person_data/person_data_v0.yml` over `openEHR-EHR-ADMIN_ENTRY.person_data.v0`,
   and a composition that commits a `PERSON` row replaces whatever row the
-  person held.
+  person held. Several compositions of one EHR may write it: the side table
+  records each writer, the `(cdm_table, surrogate_id)` uniqueness holds for
+  every other table, and the composition committed last rewrites the
+  columns (our own design; the CDM defines one row per person and no merge
+  rule). `cdm init` brings a bridge schema an earlier release created to
+  this shape.
 - **Otherwise, the policy `[cdm] person_policy` decides.** No specification
   governs a person with no demographic source, so both values are our own
   design:

@@ -115,7 +115,9 @@ foreign key to `PERSON` (CDM v5.4), so every `person_id` a run writes names a
    `openEHR-EHR-ADMIN_ENTRY.person_data.v0` archetype to `PERSON`
    (`person_data/person_data_v0.yml`); when one of the person's compositions
    carries it, its row replaces whatever row the person held, keeping the
-   `person_id`.
+   `person_id`. Several compositions of one EHR may write it; the one
+   committed last rewrites the columns, and the row stays while any of them
+   or any row of the person remains.
 2. Otherwise, `[cdm] person_policy`:
    - `create_on_first_sight`, the default, writes a placeholder row the first
      time a row or a visit names the EHR: `gender_concept_id`,

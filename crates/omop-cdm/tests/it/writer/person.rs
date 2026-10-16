@@ -5,8 +5,9 @@
 //! composition that wrote it keeps it while any row of the person remains,
 //! because OMOP CDM v5.4 makes `person_id` a foreign key to `PERSON` in every
 //! clinical table (<https://ohdsi.github.io/CommonDataModel/cdm54.html>).
-//! Which writer's columns win, and the placeholder row of a person with no
-//! `PERSON` source, are FerroBRIDGE's own design.
+//! Which writer's columns win when several compositions write the row, and
+//! the placeholder row of a person with no `PERSON` source, are
+//! FerroBRIDGE's own design.
 
 use ferrobridge_testkit::containers;
 use omop_cdm::graph::{
@@ -348,5 +349,178 @@ async fn the_existing_policy_refuses_a_person_whose_row_is_gone() -> Result<(), 
         "{error:?}"
     );
     assert_eq!(0, count(&client, "cdm.measurement").await?);
+    Ok(())
+}
+
+/// Returns the watermark of the composition `uid`.
+async fn committed_of(
+    writer: &omop_cdm::writer::CdmWriter,
+    uid: &str,
+) -> Result<omop_cdm::writer::removal::Committed, Box<dyn Error>> {
+    Ok(writer
+        .watermarks_after(None, 10)
+        .await?
+        .into_iter()
+        .find(|committed| committed.versioned_object_uid().value() == uid)
+        .ok_or("the composition's watermark")?)
+}
+
+/// Returns the number of compositions the side table records as writers of
+/// a `PERSON` row.
+async fn person_writers(client: &tokio_postgres::Client) -> Result<i64, Box<dyn Error>> {
+    count(client, "ferrobridge.record WHERE cdm_table = 'person'").await
+}
+
+#[tokio::test]
+async fn two_compositions_of_one_ehr_both_write_the_person_and_the_newest_wins()
+-> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
+    let run = RunId::new("run-1")?;
+    database
+        .writer
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .await?;
+    database
+        .writer
+        .commit(&graph(OTHER, 1, Some(1980))?, &run)
+        .await?;
+    let client = reader(&database.postgres).await?;
+    assert_eq!(
+        2,
+        person_writers(&client).await?,
+        "both writers are recorded"
+    );
+    assert_eq!(
+        vec![1980],
+        births(&client).await?,
+        "the composition committed last rewrites the columns"
+    );
+
+    database
+        .writer
+        .commit(&graph(COMPOSITION, 2, Some(1971))?, &run)
+        .await?;
+    assert_eq!(
+        vec![1971],
+        births(&client).await?,
+        "a newer version of either writer rewrites them"
+    );
+    assert_eq!(2, person_writers(&client).await?);
+    assert_eq!(
+        Persons {
+            total: 1,
+            placeholders: 0,
+        },
+        database.writer.persons().await?
+    );
+    assert_eq!(0, orphans_in_every_table(&client).await?);
+    Ok(())
+}
+
+#[tokio::test]
+async fn removing_either_writer_keeps_the_person_and_removing_both_removes_it()
+-> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    for first in [COMPOSITION, OTHER] {
+        let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
+        let run = RunId::new("run-1")?;
+        database
+            .writer
+            .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+            .await?;
+        database
+            .writer
+            .commit(&graph(OTHER, 1, Some(1980))?, &run)
+            .await?;
+        let client = reader(&database.postgres).await?;
+        let second = if first == COMPOSITION {
+            OTHER
+        } else {
+            COMPOSITION
+        };
+
+        let removal = database
+            .writer
+            .remove(&committed_of(&database.writer, first).await?)
+            .await?;
+        let Removal::Removed(rows) = removal else {
+            return Err(format!("expected a removal, got {removal:?}").into());
+        };
+        assert_eq!(None, rows.get("person"), "{second} still writes the person");
+        assert_eq!(1, births(&client).await?.len(), "removing {first} keeps it");
+        assert_eq!(1, person_writers(&client).await?);
+        assert_eq!(0, orphans_in_every_table(&client).await?);
+
+        let removal = database
+            .writer
+            .remove(&committed_of(&database.writer, second).await?)
+            .await?;
+        let Removal::Removed(rows) = removal else {
+            return Err(format!("expected a removal, got {removal:?}").into());
+        };
+        assert_eq!(Some(&1), rows.get("person"), "no writer and no row remain");
+        assert!(births(&client).await?.is_empty());
+        assert_eq!(0, person_writers(&client).await?);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_bridge_schema_of_an_earlier_release_takes_several_writers_after_init()
+-> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
+    let client = reader(&database.postgres).await?;
+    client
+        .batch_execute(
+            "DROP TABLE ferrobridge.record;
+             CREATE TABLE ferrobridge.record (
+                versioned_object_uid text NOT NULL,
+                archetype_root_path text NOT NULL,
+                occurrence_path text NOT NULL,
+                cdm_table text NOT NULL,
+                ehr_id text NOT NULL,
+                mapping text NOT NULL,
+                entry integer NOT NULL,
+                branch integer NOT NULL,
+                surrogate_id integer NOT NULL,
+                PRIMARY KEY (versioned_object_uid, archetype_root_path, occurrence_path,
+                    mapping, entry, branch, cdm_table),
+                UNIQUE (cdm_table, surrogate_id))",
+        )
+        .await?;
+    database.writer.init().await?;
+    database.writer.init().await?;
+    let run = RunId::new("run-1")?;
+    database
+        .writer
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .await?;
+    database
+        .writer
+        .commit(&graph(OTHER, 1, Some(1980))?, &run)
+        .await?;
+    assert_eq!(2, person_writers(&client).await?);
+    assert_eq!(vec![1980], births(&client).await?);
+
+    let duplicate = client
+        .execute(
+            "INSERT INTO ferrobridge.record SELECT versioned_object_uid, '/other',
+                occurrence_path, cdm_table, ehr_id, mapping, entry, branch, surrogate_id
+             FROM ferrobridge.record WHERE cdm_table = 'measurement' LIMIT 1",
+            &[],
+        )
+        .await;
+    assert!(
+        duplicate.is_err(),
+        "an id stays unique in every table other than person"
+    );
     Ok(())
 }

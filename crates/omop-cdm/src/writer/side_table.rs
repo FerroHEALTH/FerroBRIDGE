@@ -46,6 +46,11 @@ pub(super) async fn allocate(
 }
 
 /// The tables and sequences of the bridge schema.
+///
+/// Every statement leaves what already exists, and a schema an earlier
+/// release created is brought to this shape: `record` loses the uniqueness of
+/// `(cdm_table, surrogate_id)` for `person`, the one table several
+/// compositions write the same row of.
 pub(super) fn bridge_ddl(bridge: &SchemaName) -> String {
     let mut statements = vec![
         format!("CREATE SCHEMA IF NOT EXISTS {bridge}"),
@@ -66,8 +71,20 @@ pub(super) fn bridge_ddl(bridge: &SchemaName) -> String {
                 branch integer NOT NULL,
                 surrogate_id integer NOT NULL,
                 PRIMARY KEY (versioned_object_uid, archetype_root_path, occurrence_path,
-                    mapping, entry, branch, cdm_table),
-                UNIQUE (cdm_table, surrogate_id))"
+                    mapping, entry, branch, cdm_table))"
+        ),
+        // NOTE: no specification governs this: our own design; every composition of a
+        // person may write its PERSON row, so an id is unique in every other table only.
+        format!(
+            "ALTER TABLE {bridge}.record DROP CONSTRAINT IF EXISTS record_cdm_table_surrogate_id_key"
+        ),
+        format!(
+            "CREATE UNIQUE INDEX IF NOT EXISTS record_surrogate_id
+                ON {bridge}.record (cdm_table, surrogate_id) WHERE cdm_table <> 'person'"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS record_person_writer
+                ON {bridge}.record (surrogate_id) WHERE cdm_table = 'person'"
         ),
         format!(
             "CREATE TABLE IF NOT EXISTS {bridge}.link (

@@ -299,7 +299,9 @@ before it applies anything:
 | every CDM v5.4 table | Applies nothing, prints that the schema is already initialised with the `cdm_version` its `CDM_SOURCE` rows record, and exits 0 |
 | some of the tables | Applies nothing and exits 1, naming every missing table |
 
-It then creates the bridge schema, which is safe to repeat. Tables outside the
+It then creates the bridge schema, which is safe to repeat, and brings a
+bridge schema an earlier release created to the current shape, so run it once
+after an upgrade. Tables outside the
 CDM's 39 are left alone and do not count. The check reads table names only,
 so a schema whose tables exist without their keys or indices counts as
 initialised.
