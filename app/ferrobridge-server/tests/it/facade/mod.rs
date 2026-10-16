@@ -55,6 +55,10 @@ use stub::mount_ehr;
 /// The fixture directory this suite loads its mapping set from.
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures");
 
+/// The fixture directory whose model holds a mapping that runs out of openEHR
+/// only, so an inbound run declares a loss on a FHIR element.
+const ONE_WAY_FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/one_way");
+
 /// The profile the fixture context claims.
 const PROFILE: &str = "http://example.org/fhir/StructureDefinition/ferrobridge-facade-diagnosis";
 
@@ -202,18 +206,25 @@ async fn harness() -> Harness {
 
 /// Returns a harness whose facade runs with `facade_settings`.
 async fn harness_with(facade_settings: Settings) -> Harness {
-    harness_built(facade_settings, None).await
+    harness_over(FIXTURES, facade_settings).await
+}
+
+/// Returns a harness whose facade runs the mapping set under `fixtures` with
+/// `facade_settings`.
+async fn harness_over(fixtures: &str, facade_settings: Settings) -> Harness {
+    harness_built(fixtures, facade_settings, None).await
 }
 
 /// Returns a harness whose facade answers search as the declarations in
 /// [`FIXTURES`] state, with the page sizes of `limits`.
 async fn search_harness(limits: ferrobridge_server::facade::search::Limits) -> Harness {
-    harness_built(settings(), Some(limits)).await
+    harness_built(FIXTURES, settings(), Some(limits)).await
 }
 
-/// Returns a harness whose facade runs with `facade_settings`, answering
-/// search when `search` carries its page sizes.
+/// Returns a harness whose facade runs the mapping set under `fixtures` with
+/// `facade_settings`, answering search when `search` carries its page sizes.
 async fn harness_built(
+    fixtures: &str,
     facade_settings: Settings,
     search: Option<ferrobridge_server::facade::search::Limits>,
 ) -> Harness {
@@ -229,7 +240,7 @@ async fn harness_built(
         )
         .mount(&cdr)
         .await;
-    let set = programs::read_set(std::path::Path::new(FIXTURES)).expect("the mapping set loads");
+    let set = programs::read_set(std::path::Path::new(fixtures)).expect("the mapping set loads");
     let templates = programs::fetch_templates(&set, &client(&cdr))
         .await
         .expect("the template fetch answers");
@@ -238,7 +249,7 @@ async fn harness_built(
     let mut built = Facade::new(compiled, handle(&store), client(&cdr), facade_settings);
     if let Some(limits) = search {
         let catalog = ferrobridge_server::facade::search::load(
-            std::path::Path::new(FIXTURES),
+            std::path::Path::new(fixtures),
             built.programs(),
         )
         .expect("the search declarations load");

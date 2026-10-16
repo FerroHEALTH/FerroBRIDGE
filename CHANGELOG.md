@@ -293,6 +293,14 @@ crates on crates.io.
 
 ### Fixed
 
+- The facade's loss log records each declared loss as a value-free kind
+  (`skipped-unresolved-reference`, `deferred-reference`, `defaulted` and the
+  rest) with its FHIRPath and its openEHR path, where it logged the loss's
+  display text, which could carry a reference literal such as `Patient/123`.
+  The `$validate` dry run renders each loss as the operations lane does, with
+  its FHIRPath in `issue.expression` and its openEHR path as a
+  `details.coding`, severity `warning` and code `incomplete`, or
+  `information` and `informational` for a defaulted composition field (#509).
 - `fhir-types` 0.1.110 writes a repeating primitive whose every position
   carries only an `id` or an `extension` as the `_name` array alone, in every
   version, where it wrote a value array of nulls beside it (`"event": [null]`);
