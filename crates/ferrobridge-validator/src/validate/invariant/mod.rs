@@ -23,8 +23,9 @@ use ferrobridge_fhirpath::eval::Environment;
 use ferrobridge_fhirpath::eval::Focus;
 use ferrobridge_fhirpath::eval::convert;
 use ferrobridge_fhirpath::expression::Expression;
+use ferrobridge_fhirpath::model::choice_element;
 use ferrobridge_fhirpath::model::named_type;
-use ferrobridge_fhirpath::model::path_type;
+use ferrobridge_fhirpath::model::path_types;
 use ferrobridge_fhirpath::model::r4::R4;
 use fhir_types::codec::Value;
 use fhir_types::r4::element_definition::ElementDefinition;
@@ -157,19 +158,22 @@ impl Validator<'_> {
             .clone()
     }
 
-    /// Checks `expression` against the type `type_name` once, answering the
-    /// first member or type name the R4 model refuses.
-    fn check(&self, expression: &Expression, type_name: &str) -> Result<(), String> {
-        let Some(context) = path_type(&R4, type_name).or_else(|| named_type(&R4, type_name)) else {
+    /// Checks `expression` once against `context`, a type name, the element
+    /// path of a backbone element or of a choice element, answering the first
+    /// member or type name the R4 model refuses.
+    fn check(&self, expression: &Expression, context: &str) -> Result<(), String> {
+        let Some(contexts) =
+            path_types(&R4, context).or_else(|| named_type(&R4, context).map(|ty| vec![ty]))
+        else {
             return Ok(());
         };
-        let key = (expression.source().to_owned(), type_name.to_owned());
+        let key = (expression.source().to_owned(), context.to_owned());
         let mut cache = self.checked.lock().unwrap_or_else(PoisonError::into_inner);
         cache
             .entry(key)
             .or_insert_with(|| {
                 expression
-                    .check(&R4, context)
+                    .check_any(&R4, &contexts)
                     .map_err(|error| chain(&error))
             })
             .clone()
@@ -225,7 +229,7 @@ impl<'i> Walk<'_, '_, 'i> {
         if !self.first_invariant(subject.location, key, source) {
             return;
         }
-        match self.answer(constraint, structure, subject) {
+        match self.answer(element, constraint, structure, subject) {
             Ok(true) => {}
             Ok(false) => {
                 let issue = self.failure(constraint, source, subject.location);
@@ -248,10 +252,11 @@ impl<'i> Walk<'_, '_, 'i> {
         }
     }
 
-    /// Answers `constraint` on `subject`: the Boolean its expression
-    /// evaluates to, or why it was not evaluated.
+    /// Answers `constraint`, a constraint of `element`, on `subject`: the
+    /// Boolean its expression evaluates to, or why it was not evaluated.
     fn answer(
         &self,
+        element: &ElementDefinition,
         constraint: &ElementDefinitionConstraint,
         structure: &Structure,
         subject: &Subject<'_, 'i>,
@@ -271,23 +276,32 @@ impl<'i> Walk<'_, '_, 'i> {
             .validator()
             .expression(text)
             .map_err(|error| refuse(InvariantStage::Parse, error))?;
+        // NOTE: fhirpath.html §2.9.1.1 and N1 §11: an invariant on a choice element is written
+        // against the choice, so it is checked against every type the choice admits.
+        let choice = element
+            .path
+            .value
+            .as_deref()
+            .filter(|path| choice_element(&R4, path).is_some());
         self.validator()
-            .check(&expression, subject.type_name)
+            .check(&expression, choice.unwrap_or(subject.type_name))
             .map_err(|error| refuse(InvariantStage::Check, error))?;
         // NOTE: conformance-rules.html §2.1.0.6 asks for "true" and N1 §6.2 and §6.5 carry empty
         // as the unknown of three-valued logic, so an empty answer neither meets nor breaks it.
-        self.evaluate(&expression, structure, subject)
+        self.evaluate(&expression, structure, subject, choice)
             .map_err(|error| refuse(InvariantStage::Evaluate, error))?
             .ok_or(Reason::InvariantEmpty)
     }
 
-    /// Evaluates `expression` on `subject` as a Boolean (N1 §4.5): `None`
+    /// Evaluates `expression` on `subject`, an occurrence of the choice
+    /// element at `choice` when one is named, as a Boolean (N1 §4.5): `None`
     /// for an empty result, or the error with its causes.
     fn evaluate(
         &self,
         expression: &Expression,
         structure: &Structure,
         subject: &Subject<'_, 'i>,
+        choice: Option<&str>,
     ) -> Result<Option<bool>, String> {
         let scope = self.scope();
         let resource = scope.last().copied();
@@ -297,12 +311,15 @@ impl<'i> Walk<'_, '_, 'i> {
         let Some(anchor) = subject.value.or(subject.element) else {
             return Err("the occurrence carries nothing to evaluate on".to_owned());
         };
-        let focus = if subject.resource {
+        let mut focus = if subject.resource {
             Focus::resource(anchor)
         } else {
             Focus::primitive(subject.value, subject.element, subject.type_name, anchor)
         }
         .within(resource, root);
+        if let Some(path) = choice {
+            focus = focus.defined_by(path);
+        }
         let references = References::new(self.validator(), scope);
         let terminology = Terminology::new(self.validator(), structure.origin());
         let conformance = Conformance::new(self.validator(), self.depth());
