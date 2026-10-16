@@ -40,9 +40,11 @@ generated model cannot carry what a check needs, that is a generator change
   decides membership in a value set three-valued, `binding` holds a value to
   an element's binding), the resolution seam with its contained-resource and
   Bundle resolvers (`resolver`, bundle.html §2.36.4.1), the target profiles
-  and aggregation of a reference (`reference`), and the document rules
-  (`document`, documents.html §3.3.1). The claimed profiles sit in
-  `profiles`.
+  and aggregation of a reference (`reference`), the document rules
+  (`document`, documents.html §3.3.1), and the invariants (`invariant`: the
+  evaluation on each occurrence, the expression and check caches on the
+  `Validator`, and `seams`, which fills `resolve()`, `memberOf()` and
+  `conformsTo()` from the walk). The claimed profiles sit in `profiles`.
 - `terminology` (the public module): the `Terminology` seam over
   `ferrobridge-term`, the pending binding checks, and
   `Report::resolve_bindings`.
@@ -59,20 +61,25 @@ answered, and leaves a refused or failed one listed with
 
 ## Never a silent pass
 
-Every invariant and extension context the walk meets, every target profile
-whose target it cannot reach or whose profile the set lacks, and every claimed
-profile the set lacks, is listed as `Unevaluated` with its reason, once per declaring
-definition, element and constraint, and so is every binding the package set
-cannot decide, every discriminator the slicing cannot decide and every type
-profile the set does not carry. An item a discriminator cannot decide is
-placed in no slice and refused by no rule. Invariants are #439's, through
-`ferrobridge-fhirpath`. A check that lands removes its listing in the same
+Every extension context the walk meets, every invariant whose expression
+does not parse, check or evaluate (a seam the run cannot answer included),
+every target profile whose target it cannot reach or whose profile the set
+lacks, and every claimed profile the set lacks, is listed as `Unevaluated`
+with its reason, once per declaring definition, element and constraint, and
+so is every binding the package set cannot decide, every discriminator the
+slicing cannot decide and every type profile the set does not carry. An item
+a discriminator cannot decide is placed in no slice and refused by no rule.
+A published invariant with a known defect (`cid-0`, `inv-1`, `dom-3`) is
+evaluated like any other and listed with its error and upstream report, never
+special-cased to pass. A check that lands removes its listing in the same
 change.
 
 ## Settled decisions are `// NOTE:` comments at their site
 
 The lexical forms are the package's informative regexes, compiled anchored
-with Unicode mode off; an unknown non-modifier extension is a warning; a
+with Unicode mode off; an unknown non-modifier extension is a warning, and an
+extension url the set cannot resolve (absent, a `#` fragment, two
+definitions under one canonical) is unknown and never ends the run; a
 `fixed[x]` comparison ignores an instance `id`, `extension` or `_` sibling the
 fixed value lacks; an example binding is not listed; a bare canonical resolves
 to the latest version by Semantic Versioning precedence, within the
@@ -96,8 +103,11 @@ target profile is not refused while another is unknown; a target profile check u
 way further up the walk counts as passing (a reference cycle); every
 `meta.profile` claim is validated; the core `Resource` and
 `DomainResource` admit any target; the stylesheet `Binary` of a document is
-one whose `contentType` is `text/css`. Change one
-only with a citation.
+one whose `contentType` is `text/css`; an invariant whose expression answers
+empty is listed, neither passed nor failed; a Bundle entry is its own `%rootResource`; an invariant the
+snapshot repeats is evaluated once per location, key and declaring
+canonical; `resolve()` from the Bundle element reaches entries by an
+absolute reference. Change one only with a citation.
 
 ## Tests
 

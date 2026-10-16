@@ -124,7 +124,10 @@ fn a_null_no_aligned_array_needs_is_refused() -> TestResult {
 fn a_null_paired_with_a_sibling_entry_is_accepted() -> TestResult {
     let mut resource = patient();
     resource["name"][0]["given"] = json!(["Ada", null]);
-    resource["name"][0]["_given"] = json!([null, {"id": "g2"}]);
+    // R4 ele-1: a primitive without a value carries a child other than its id.
+    resource["name"][0]["_given"] = json!([null, {"id": "g2", "extension": [
+        {"url": format!("{BASE}label"), "valueString": "unknown"}
+    ]}]);
     let report = against_patient(&resource)?;
     assert!(report.is_valid(), "{:#?}", report.issues());
     Ok(())

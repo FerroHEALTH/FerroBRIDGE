@@ -66,7 +66,14 @@ impl Walk<'_, '_, '_> {
         }
         let structure = match self.validator().structure(url, Some(from)) {
             Ok(structure) => structure,
-            Err(ValidateError::Resolve(ResolveError::NotFound { .. })) => {
+            // A url of the instance that names no definition the set resolves (absent, a `#`
+            // fragment, two definitions under one canonical) is the instance's unknown extension;
+            // a definition the set carries and cannot read stays an error of the package set.
+            Err(ValidateError::Resolve(
+                error @ (ResolveError::NotFound { .. }
+                | ResolveError::Fragment { .. }
+                | ResolveError::Ambiguous { .. }),
+            )) => {
                 // NOTE: extensibility.html §2.5.0.2 forbids processing an unknown modifier, while
                 // §2.5.0.3 says to ignore other unknown extensions; the warning is our own design.
                 let (severity, id) = if placement == Placement::Modifier {
@@ -74,12 +81,18 @@ impl Walk<'_, '_, '_> {
                 } else {
                     (Severity::Warning, MessageId::UnknownExtension)
                 };
+                let why = match error {
+                    ResolveError::Ambiguous { .. } => {
+                        "the package set carries different definitions of the extension"
+                    }
+                    _ => "the package set defines no extension",
+                };
                 self.out().issue(
                     severity,
                     IssueType::Extension,
                     id,
                     location,
-                    format!("the package set defines no extension {url}"),
+                    format!("{why} {url}"),
                 );
                 return fallback(self);
             }
