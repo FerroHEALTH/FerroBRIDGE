@@ -15,7 +15,7 @@ use std::borrow::Cow;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
-use quick_xml::{NsReader, Reader, Writer, XmlVersion};
+use quick_xml::{NsReader, Writer, XmlVersion};
 
 use super::codec::{DecodeError, DecodeErrorKind, EncodeError, Number, Object, Path, Value};
 use super::schema::{FieldSchema, Kind, Schemas, TypeSchema, ValueKind};
@@ -906,78 +906,59 @@ fn read_wrapped_resource(
     resource.ok_or_else(|| path.error(DecodeErrorKind::Empty))
 }
 
-/// Reads an XHTML element as the text FHIR JSON carries: its start tag, its
-/// raw content, and its end tag.
+/// Reads the narrative `div` as the self-contained XHTML string FHIR JSON
+/// carries.
 ///
-/// The element is refused as [`DecodeErrorKind::UnknownElement`] unless it
-/// is in the XHTML namespace: "the only other namespace that occurs in FHIR
-/// resources is the XHTML namespace" (R4 xml.html §2.6.1), and the narrative
-/// is "a root `<div>` element in the xhtml namespace" (R5 xml.html §2.1.6.3.3,
-/// <https://hl7.org/fhir/R4/narrative.html#xhtml>). A declaration of the XML
-/// Schema instance namespace on it or on any element inside it is refused as
-/// in the rest of the resource (R4 xml.html §2.6.1.1). The content is
-/// otherwise carried verbatim.
+/// The JSON form is "a single escaped string of XHTML" whose root "needs to be
+/// a `<div>` in the xhtml namespace" (R4 json.html §2.6.2.1 and §2.6.2.4,
+/// <https://hl7.org/fhir/R4/json.html>), and the characters between its first
+/// `>` and last `<` are the content a browser takes as `innerHTML` (R4
+/// narrative.html §2.4.0, <https://hl7.org/fhir/R4/narrative.html#xhtml>).
+/// The string is therefore written in the default-namespace form the R4 JSON
+/// example shows, `<div xmlns="http://www.w3.org/1999/xhtml">`: every element
+/// loses its prefix, every prefixed namespace declaration is dropped, and the
+/// root declares the XHTML namespace when the source declared it on an
+/// ancestor. Each attribute value keeps its escaped source text and is written
+/// in double quotes, with a `"` it held escaped as `&quot;` (XML 1.0 §2.3
+/// `AttValue`, §4.6, <https://www.w3.org/TR/xml/#NT-AttValue>). Text,
+/// references, CDATA sections and comments are copied verbatim.
+///
+/// An element outside the XHTML namespace, the `div` or any element inside
+/// it, is refused as [`DecodeErrorKind::UnknownElement`]: "the only other
+/// namespace that occurs in FHIR resources is the XHTML namespace" (R4 xml.html
+/// §2.6.1), and the narrative is "a root `<div>` element in the xhtml
+/// namespace" (R5 xml.html §2.1.6.3.3). A prefixed attribute other than one in
+/// the `xml` namespace is refused as [`DecodeErrorKind::UnknownProperty`] for
+/// the same reason. A declaration of the XML Schema instance namespace on any
+/// of these elements is refused as in the rest of the resource (R4 xml.html
+/// §2.6.1.1).
 fn read_xhtml(
     reader: &mut NsReader<&[u8]>,
     start: &BytesStart<'_>,
     empty: bool,
     path: &mut Path,
 ) -> Result<String, DecodeError> {
-    if !in_namespace(reader, start, XHTML_NAMESPACE) {
-        return Err(path.error(DecodeErrorKind::UnknownElement));
-    }
-    let name = start.name().as_ref().to_owned();
-    let mut raw = format!("<{name}");
-    for attr in start.attributes() {
-        let attr = attr.map_err(|e| {
-            path.error(DecodeErrorKind::MalformedXml {
-                reason: e.to_string(),
-            })
-        })?;
-        refuse_schema_instance(&attr, path)?;
-        raw.push(' ');
-        raw.push_str(attr.key.as_ref());
-        raw.push_str("=\"");
-        raw.push_str(attr.value.as_ref());
-        raw.push('"');
-    }
+    let mut raw = String::new();
+    write_xhtml_tag(reader, start, true, empty, &mut raw, path)?;
     if empty {
-        raw.push_str("/>");
         return Ok(raw);
     }
-    raw.push('>');
-    let inner: Cow<'_, str> = reader
-        .read_text(start.name())
-        .map_err(|e| {
-            path.error(DecodeErrorKind::MalformedXml {
-                reason: e.to_string(),
-            })
-        })?
-        .into_inner();
-    refuse_schema_instance_within(&inner, path)?;
-    raw.push_str(&inner);
-    raw.push_str("</");
-    raw.push_str(&name);
-    raw.push('>');
-    Ok(raw)
+    // NOTE: R4 narrative.html §2.4.0: the content is the characters between
+    // the first `>` and the last `<`, so its whitespace is carried untrimmed.
+    reader.config_mut().trim_text(false);
+    let copied = copy_xhtml_content(reader, &mut raw, path);
+    reader.config_mut().trim_text(true);
+    copied.map(|()| raw)
 }
 
-/// Refuses `attribute` when it declares the XML Schema instance namespace.
-fn refuse_schema_instance(attribute: &Attribute<'_>, path: &mut Path) -> Result<(), DecodeError> {
-    let value = attribute
-        .normalized_value(XmlVersion::Explicit1_0)
-        .map_err(|e| {
-            path.error(DecodeErrorKind::MalformedXml {
-                reason: e.to_string(),
-            })
-        })?;
-    namespace_declaration(attribute.key.as_ref(), &value, path).map(drop)
-}
-
-/// Refuses a declaration of the XML Schema instance namespace on any element
-/// of `content`, the raw content of an XHTML element.
-fn refuse_schema_instance_within(content: &str, path: &mut Path) -> Result<(), DecodeError> {
-    let mut reader = Reader::from_str(content);
+/// Copies the content of the XHTML element whose start tag `raw` holds, up to
+/// and including its end tag.
+fn copy_xhtml_content(
+    reader: &mut NsReader<&[u8]>,
+    raw: &mut String,
+    path: &mut Path,
+) -> Result<(), DecodeError> {
+    let mut depth: usize = 1;
     loop {
         let event = reader.read_event().map_err(|e| {
             path.error(DecodeErrorKind::MalformedXml {
@@ -985,18 +966,127 @@ fn refuse_schema_instance_within(content: &str, path: &mut Path) -> Result<(), D
             })
         })?;
         match event {
-            Event::Eof => return Ok(()),
-            Event::Start(element) | Event::Empty(element) => {
-                for attr in element.attributes() {
-                    let attr = attr.map_err(|e| {
-                        path.error(DecodeErrorKind::MalformedXml {
-                            reason: e.to_string(),
-                        })
-                    })?;
-                    refuse_schema_instance(&attr, path)?;
+            Event::Start(element) => {
+                write_xhtml_tag(reader, &element, false, false, raw, path)?;
+                depth = depth.saturating_add(1);
+            }
+            Event::Empty(element) => write_xhtml_tag(reader, &element, false, true, raw, path)?,
+            Event::End(element) => {
+                raw.push_str("</");
+                raw.push_str(&local_name(element.name().as_ref()));
+                raw.push('>');
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Ok(());
                 }
             }
-            _ => {}
+            Event::Text(text) => raw.push_str(&text),
+            Event::GeneralRef(reference) => {
+                raw.push('&');
+                raw.push_str(&reference);
+                raw.push(';');
+            }
+            Event::CData(data) => {
+                raw.push_str("<![CDATA[");
+                raw.push_str(&data);
+                raw.push_str("]]>");
+            }
+            Event::Comment(comment) => {
+                raw.push_str("<!--");
+                raw.push_str(&comment);
+                raw.push_str("-->");
+            }
+            Event::PI(instruction) => {
+                raw.push_str("<?");
+                raw.push_str(&instruction);
+                raw.push_str("?>");
+            }
+            Event::Decl(_) | Event::DocType(_) => {
+                return Err(path.error(DecodeErrorKind::UnexpectedText));
+            }
+            Event::Eof => {
+                return Err(path.error(DecodeErrorKind::MalformedXml {
+                    reason: String::from("the document ends inside an element"),
+                }));
+            }
         }
     }
+}
+
+/// Writes the start tag of `element`, an XHTML element the reader has just
+/// read, in the default-namespace form [`read_xhtml`] describes.
+fn write_xhtml_tag(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    root: bool,
+    empty: bool,
+    raw: &mut String,
+    path: &mut Path,
+) -> Result<(), DecodeError> {
+    let mut attributes = Vec::new();
+    for attr in element.attributes() {
+        let attr = attr.map_err(|e| {
+            path.error(DecodeErrorKind::MalformedXml {
+                reason: e.to_string(),
+            })
+        })?;
+        refuse_schema_instance(&attr, path)?;
+        attributes.push(attr);
+    }
+    if !in_namespace(reader, element, XHTML_NAMESPACE) {
+        return Err(path.error(DecodeErrorKind::UnknownElement));
+    }
+    let mut tag = String::new();
+    let mut declared = false;
+    for attr in &attributes {
+        let key = attr.key.as_ref();
+        if key == "xmlns" {
+            if attribute_value(attr, path)? != XHTML_NAMESPACE {
+                continue;
+            }
+            declared = true;
+        } else if key.starts_with("xmlns:") {
+            continue;
+        } else if key.contains(':') && !key.starts_with("xml:") {
+            return path.with(
+                key,
+                |path| Err(path.error(DecodeErrorKind::UnknownProperty)),
+            );
+        }
+        tag.push(' ');
+        tag.push_str(key);
+        tag.push_str("=\"");
+        tag.push_str(&attr.value.replace('"', "&quot;"));
+        tag.push('"');
+    }
+    raw.push('<');
+    raw.push_str(&local_name(element.name().as_ref()));
+    if root && !declared {
+        raw.push_str(" xmlns=\"");
+        raw.push_str(XHTML_NAMESPACE);
+        raw.push('"');
+    }
+    raw.push_str(&tag);
+    raw.push_str(if empty { "/>" } else { ">" });
+    Ok(())
+}
+
+/// The unescaped, normalized value of `attribute`.
+fn attribute_value<'a>(
+    attribute: &'a Attribute<'_>,
+    path: &Path,
+) -> Result<Cow<'a, str>, DecodeError> {
+    attribute
+        .normalized_value(XmlVersion::Explicit1_0)
+        .map_err(|e| {
+            path.error(DecodeErrorKind::MalformedXml {
+                reason: e.to_string(),
+            })
+        })
+}
+
+/// Refuses `attribute` when it declares the XML Schema instance namespace.
+fn refuse_schema_instance(attribute: &Attribute<'_>, path: &mut Path) -> Result<(), DecodeError> {
+    let value = attribute_value(attribute, path)?;
+    namespace_declaration(attribute.key.as_ref(), &value, path).map(drop)
 }
