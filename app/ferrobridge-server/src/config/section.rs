@@ -514,6 +514,9 @@ pub struct Etl {
     pub observation_period_type_concept_id: Option<i32>,
     /// The visit derivation, off until its section is present.
     pub visits: Option<EtlVisits>,
+    /// What a run does with a composition the CDR reports deleted: `remove`
+    /// or `report`.
+    pub deletions: String,
 }
 
 impl Default for Etl {
@@ -524,6 +527,9 @@ impl Default for Etl {
             type_concept_id: None,
             observation_period_type_concept_id: None,
             visits: None,
+            // NOTE: no specification governs this: our own design; keeping the rows of a
+            // record the source deleted is the defect, so a confirmed deletion removes them.
+            deletions: String::from("remove"),
         }
     }
 }

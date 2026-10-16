@@ -408,6 +408,16 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
             })
         })
         .transpose()?;
+    let deletions = match etl.deletions.as_str() {
+        "remove" => crate::etl::deletions::DeletionPolicy::Remove,
+        "report" => crate::etl::deletions::DeletionPolicy::Report,
+        _ => {
+            return Err(Error::Deletions {
+                key: String::from("etl.deletions"),
+                value: etl.deletions.clone(),
+            });
+        }
+    };
     Ok(crate::etl::EtlSettings {
         compositions,
         page_size,
@@ -417,6 +427,7 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
             etl.observation_period_type_concept_id,
         )?,
         visits,
+        deletions,
     })
 }
 
