@@ -5,6 +5,7 @@
 //! the AQL they write, the searchset Bundle, and every refusal.
 
 mod correlation;
+mod entries;
 mod load;
 mod paging;
 mod parameters;
@@ -59,6 +60,32 @@ async fn searching_with(limits: Limits) -> Harness {
 /// Returns one result row: the EHR, the version and the composition.
 fn row(version: &str, composition: &serde_json::Value) -> serde_json::Value {
     serde_json::json!([EHR_ID, version, composition])
+}
+
+/// Returns one result row of a query binding one node: the EHR, the
+/// version, the composition and the node that matched.
+fn node_row(
+    version: &str,
+    composition: &serde_json::Value,
+    node: &serde_json::Value,
+) -> serde_json::Value {
+    serde_json::json!([EHR_ID, version, composition, node])
+}
+
+/// The archetype of the diagnosis entry the fixture context maps.
+const DIAGNOSIS: &str = "openEHR-EHR-EVALUATION.problem_diagnosis.v1";
+
+/// Returns the first diagnosis entry of `composition`.
+fn diagnosis(composition: &serde_json::Value) -> serde_json::Value {
+    composition["content"]
+        .as_array()
+        .and_then(|content| {
+            content
+                .iter()
+                .find(|item| item["archetype_node_id"].as_str() == Some(DIAGNOSIS))
+        })
+        .cloned()
+        .expect("the composition holds a diagnosis")
 }
 
 /// Returns the ITS-REST result set carrying `rows`.
