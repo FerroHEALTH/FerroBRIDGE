@@ -296,6 +296,7 @@ pub fn diagnostics(status: StatusCode, body: &ErrorBody) -> String {
 pub fn of_client_error(error: &CdrError) -> Answer {
     match *error {
         CdrError::Client { ref source, .. } => of_generated_error(source),
+        CdrError::Renewal { ref source, .. } => renewal_answer(source),
         _ => Answer::new(
             INTERNAL,
             format!("the openEHR client refused this call ({})", error.kind()),
@@ -347,19 +348,10 @@ fn of_generated_error(error: &ClientError) -> Answer {
                 crate::facade::outcome::chain(source)
             ),
         ),
-        ClientError::Transport { ref source, .. } => match renewal_of(source) {
-            Some(renewal) => Answer::new(
-                CREDENTIALS,
-                format!(
-                    "no credential for the openEHR service could be obtained: {}",
-                    crate::facade::outcome::chain(renewal)
-                ),
-            ),
-            None => Answer::new(
-                UPSTREAM,
-                String::from("the openEHR service could not be reached"),
-            ),
-        },
+        ClientError::Transport { .. } => Answer::new(
+            UPSTREAM,
+            String::from("the openEHR service could not be reached"),
+        ),
         ClientError::AnswerTooLarge { status, limit, .. } => Answer::new(
             UPSTREAM,
             format!(
@@ -385,20 +377,18 @@ fn of_generated_error(error: &ClientError) -> Answer {
     }
 }
 
-/// Returns the token renewal failure in the cause chain of `error`, when a
-/// refused CDR token could not be renewed.
+/// Returns the answer a refused CDR token that could not be renewed maps to.
 ///
-/// The renewal runs inside the call's engine, so its failure reaches the
-/// generated client as the source of a transport error.
-fn renewal_of<'e>(error: &'e (dyn core::error::Error + 'static)) -> Option<&'e RenewalError> {
-    let mut cause = Some(error);
-    while let Some(current) = cause {
-        if let Some(renewal) = current.downcast_ref::<RenewalError>() {
-            return Some(renewal);
-        }
-        cause = current.source();
-    }
-    None
+/// The diagnostics walk the token error, which carries the status and the
+/// OAuth error and never the secret.
+fn renewal_answer(renewal: &RenewalError) -> Answer {
+    Answer::new(
+        CREDENTIALS,
+        format!(
+            "no credential for the openEHR service could be obtained: {}",
+            crate::facade::outcome::chain(renewal)
+        ),
+    )
 }
 
 #[cfg(test)]
@@ -527,18 +517,10 @@ mod tests {
             }),
             body: String::new(),
         };
-        let error = CdrError::client(
-            ClientError::Transport {
-                method: Method::GET,
-                path: String::from("/ehr"),
-                source: openehr_its::rest::client::TransportError::Send {
-                    source: Box::new(crate::cdr::oauth::RenewalError::new(std::sync::Arc::new(
-                        refused,
-                    ))),
-                },
-            },
-            None,
-        );
+        let error = CdrError::Renewal {
+            source: crate::cdr::oauth::RenewalError::new(std::sync::Arc::new(refused)),
+            upstream: None,
+        };
         let answer = of_client_error(&error);
         assert_eq!(CREDENTIALS, answer.row());
         let diagnostics = answer.issue().diagnostics().unwrap_or_default();
