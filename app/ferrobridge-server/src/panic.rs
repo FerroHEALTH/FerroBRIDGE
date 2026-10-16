@@ -1,18 +1,25 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! A handler panic becomes a `500` with a JSON body, never a dropped
-//! connection.
+//! A handler panic becomes a `500` with a body, never a dropped connection.
 //!
 //! The release profile pins `panic = "unwind"`, which is what lets
 //! `std::panic::catch_unwind` turn an unwound handler into a response
 //! (<https://doc.rust-lang.org/cargo/reference/profiles.html#panic>). The
-//! panic message reaches the log and never the body. No specification governs
-//! the body shape: our own design.
+//! panic message reaches the log and never the body, since a handler may have
+//! panicked over clinical content. Under the FHIR base the body is an
+//! `OperationOutcome` with the `exception` issue, because R4 asks a server to
+//! answer an error with one (<https://hl7.org/fhir/R4/http.html>, §3.1.0.4);
+//! every other route answers a JSON object, whose shape no specification
+//! governs: our own design.
 
+use axum::extract::Request;
+use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use http::{StatusCode, header};
 use std::any::Any;
+
+use crate::facade::outcome::{Issue, IssueType};
 
 /// The marker a caught panic leaves on its response.
 ///
@@ -42,8 +49,11 @@ pub fn caught(payload: Box<dyn Any + Send + 'static>) -> Response {
 ///
 /// It runs outside the layer that propagates the request id, so the header is
 /// already on the response and the body, the log line and the client's own
-/// trace name the same request.
-pub async fn render(response: Response) -> Response {
+/// trace name the same request. A request under the FHIR base answers an
+/// `OperationOutcome`, every other request the plain JSON body.
+pub async fn render(request: Request, next: Next) -> Response {
+    let fhir = crate::facade::edge::on_fhir_route(request.uri().path());
+    let response = next.run(request).await;
     let Some(panicked) = response.extensions().get::<Panicked>().cloned() else {
         return response;
     };
@@ -55,15 +65,35 @@ pub async fn render(response: Response) -> Response {
         panic = panicked.0.as_str(),
         "the request handler panicked"
     );
-    let mut rendered = body(response.status(), "internal", &request_id).into_response();
+    let (mut rendered, media) = if fhir {
+        let mut outcome = outcome(response.status(), &request_id);
+        let media = outcome.headers_mut().remove(header::CONTENT_TYPE);
+        (outcome, media)
+    } else {
+        (
+            body(response.status(), "internal", &request_id).into_response(),
+            None,
+        )
+    };
     // The request id header the propagate layer set is on the old response;
     // carry it so the client sees the same value the body names.
     *rendered.headers_mut() = response.headers().clone();
     rendered.headers_mut().insert(
         header::CONTENT_TYPE,
-        header::HeaderValue::from_static("application/json"),
+        media.unwrap_or(header::HeaderValue::from_static("application/json")),
     );
     rendered
+}
+
+/// Returns the `OperationOutcome` a panicked FHIR request answers, naming the
+/// request id and never the panic message.
+fn outcome(status: StatusCode, request_id: &str) -> Response {
+    crate::facade::reply::issue(
+        status,
+        Issue::error(IssueType::Exception).diagnosing(format!(
+            "the server failed while handling this request; request id {request_id}"
+        )),
+    )
 }
 
 /// Returns the JSON body this server answers an internal failure with.

@@ -99,7 +99,7 @@ pub async fn render(State(edge): State<Edge>, request: Request, next: Next) -> R
 }
 
 /// Returns whether `path` is under [`BASE_PATH`].
-fn on_fhir_route(path: &str) -> bool {
+pub(crate) fn on_fhir_route(path: &str) -> bool {
     path.strip_prefix(BASE_PATH)
         .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
 }

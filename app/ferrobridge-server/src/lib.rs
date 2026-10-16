@@ -540,7 +540,8 @@ pub fn router(state: Arc<AppState>, server: &ServerSettings) -> Router {
 /// request log, the panic catcher, the FHIR edge renderer, the request timeout
 /// and the body-size ceiling. The renderer sits outside the propagate layer
 /// because it reads the id from the response the propagate layer has just
-/// stamped. The edge renderer turns the timeout's and the ceiling's answer on
+/// stamped, and it answers a `/fhir` route with an `OperationOutcome`
+/// ([`panic::render`]). The edge renderer turns the timeout's and the ceiling's answer on
 /// a `/fhir` route into an `OperationOutcome` ([`facade::edge`]). The log sits
 /// outside the catcher, the timeout and the ceiling so a caught panic, a
 /// timeout and a `413` each leave their one request line like every other
@@ -562,7 +563,7 @@ pub fn with_middleware(router: Router, state: Arc<AppState>, server: &ServerSett
             request_log::log,
         ))
         .layer(PropagateRequestIdLayer::new(request_id::HEADER))
-        .layer(axum::middleware::map_response(panic::render))
+        .layer(axum::middleware::from_fn(panic::render))
         .layer(SetRequestIdLayer::new(request_id::HEADER, request_id::Mint))
         .layer(axum::middleware::map_request(request_id::strip_illegal))
 }
