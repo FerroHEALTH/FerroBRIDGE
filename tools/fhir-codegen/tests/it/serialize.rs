@@ -9,14 +9,10 @@
 //! path is correct only when it produces exactly the bytes the document path
 //! produces, over every resource the operations answer with, per version.
 
-use std::fs;
-use std::path::Path;
-
-use fhir_codegen::package::without_byte_order_mark;
-use fhir_types::codec::{Json, Object, Path as ElementPath, Value, expect_object};
+use fhir_types::codec::{Json, Object, Path as ElementPath, Value};
 use proptest::prelude::*;
 
-use crate::codec::root_set_files;
+use crate::codec::{decode_file, root_set_files};
 
 /// The two paths' bytes for one decoded resource.
 fn both_paths<T: Json + serde::Serialize>(typed: &T) -> Result<(Vec<u8>, Vec<u8>), String> {
@@ -48,16 +44,21 @@ fn first_difference(left: &[u8], right: &[u8]) -> String {
     )
 }
 
-/// Both paths over one package's resources, skipping the files the codec
-/// refuses (the package's own violations, pinned in `codec.rs`).
+/// Both paths over one package's resources, skipping only the files the codec
+/// refuses as the package's own violations, listed in `codec.rs`.
 fn parity_over_package<T: Json + serde::Serialize>(package: &str) {
     let files = root_set_files(package);
     assert!(files.len() > 1000, "{package}: {} files", files.len());
     let mut compared = 0_usize;
     let mut failures = Vec::new();
     for file in &files {
-        let Some(typed) = decode::<T>(file) else {
-            continue;
+        let typed = match decode_file::<T>(package, file) {
+            Ok(Some(typed)) => typed,
+            Ok(None) => continue,
+            Err(e) => {
+                failures.push(e);
+                continue;
+            }
         };
         match both_paths(&typed) {
             Ok((document, direct)) if document == direct => compared += 1,
@@ -85,16 +86,6 @@ fn parity_over_package<T: Json + serde::Serialize>(package: &str) {
         compared > 1000,
         "{package}: only {compared} resources compared"
     );
-}
-
-/// One resource file as the typed value, `None` when the strict codec refuses
-/// it (those files are the package's own violations and have no typed form).
-fn decode<T: Json>(file: &Path) -> Option<T> {
-    let text = fs::read_to_string(file).ok()?;
-    let value: Value = serde_json::from_str(without_byte_order_mark(&text)).ok()?;
-    let mut path = ElementPath::root("Resource");
-    let object = expect_object(&value, &path).ok()?;
-    T::from_json(object, &mut path).ok()
 }
 
 #[test]

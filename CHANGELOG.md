@@ -357,6 +357,21 @@ crates on crates.io.
   one canonical) as an unknown extension at that extension, a warning or an
   error under `modifierExtension`, and goes on, where it ended the whole
   validation with a resolution error (#550).
+- `fhir_types::xml::from_xml` refuses a resource that declares the XML Schema
+  instance namespace on any of its elements, naming the declaring attribute
+  (`Resource.xmlns:xsi`), because exchanged content "SHALL NOT specify the
+  schema or even contain the schema instance namespace in the resource
+  itself" (R4 xml.html §2.6.1.1, the same rule in STU3 and R5). It ignored
+  the declaration and refused only the `xsi:schemaLocation` attribute, as an
+  unknown property. The writer declares the FHIR namespace alone. The five
+  FHIRPath suite cases on `parameters-example-types.xml`, which declares
+  both, fail with that rule as their reason (#457).
+- `fhir-codegen terminology` fails with the file's path when a package file
+  cannot be read or is not JSON, where it skipped the file and bundled
+  without it. The manifest and the index a package carries are told apart by
+  having no `resourceType`. The generator's corpus tests fail the same way on
+  a file that does not parse, and skip only a refusal they list with its
+  citation (#487).
 - `openehr-mapping-core` 0.1.110 compares a name predicate the `aqlPath` of a
   Web Template node carries on an ancestor segment, so a mapping path below
   one of two sibling clusters that share a node id (the `Straßenanschrift` and
