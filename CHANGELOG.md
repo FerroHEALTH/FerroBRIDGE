@@ -399,6 +399,14 @@ crates on crates.io.
 
 ### Fixed
 
+- A facade search that matches a composition's second entry answers that
+  entry (#530). Each entry of the archetype a context maps is a resource with
+  an id of its own, derived from the composition and the entry's place among
+  the entries of its archetype; the first entry keeps the id it had alone. A
+  search reads which entry a row matched from the node it selects, so a
+  composition with two matching diagnoses answers two `Condition`s, each
+  carrying its own code, and `Bundle.total` and the paging count entries. A
+  read, a vread and an `_id` search of an entry's id answer that entry.
 - Removing a person's newest `PERSON` writer hands the row to the writer
   that remains (#561). When several compositions of one EHR write the
   person's `PERSON` row and the newest of them is deleted in the CDR, or a
