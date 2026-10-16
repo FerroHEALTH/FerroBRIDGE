@@ -203,7 +203,7 @@ the testkit tool crate. Beside it:
   profiles over the pinned PostgreSQL.
 - `.claude/`: the working discipline. `rules/` (the path-scoped and standing
   rules), `hooks/`, `skills/`, `agents/`, `memory/`.
-- `scripts/gh/`: the tracker helpers (`rel.sh`, `project.sh`, `fields.sh`,
+- `scripts/gh/`: the tracker helpers (`rel.sh`, `project.sh`, `fields.sh`, `watch-prs.sh`,
   `labels.sh`, `migrate-fields.sh`).
 - `scripts/checks/`: the committed guards. `comment-style.sh`; `versions.sh`,
   which fails when a file disagrees with the `docs/VERSIONS.md` pin matrix or

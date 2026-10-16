@@ -73,3 +73,6 @@
 - [FerroHEALTH is the mother name](ferrohealth-umbrella.md) — family-level docs (manufacturer, EHDS system, CRA overview, licensing) go to the FerroHEALTH book
 - [PR licence box](pr-licence-box.md) — tick the contribution-licence checkbox in every pull request body; owner standing consent 2026-10-08
 - [Native issue types and fields](native-issue-types-and-priority.md): type, priority and effort are the native issue type and the FerroHEALTH Priority and Effort fields, set with scripts/gh/fields.sh; bug, enhancement and P0 to P3 retired; owner 2026-10-08 (#416)
+- [Remove worktrees after merge](remove-worktrees-after-merge.md) — remove each agent worktree and its branches as soon as its PR merges; owner 2026-10-15
+- [PR merge watch](pr-merge-watch.md) — watch every PR until merged with scripts/gh/watch-prs.sh; fix red checks, conflicts and BEHIND at once; owner 2026-10-15
+- [Worker wait loops](worker-wait-loops.md) — worker briefs forbid self-matching pgrep waits; find and kill stuck shells by working directory; owner 2026-10-16
