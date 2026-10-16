@@ -1,4 +1,14 @@
 ferrobridge_facade/Condition-example.json
 ferrobridge_facade/Condition-example2.json
 ferrobridge_facade/Condition-stroke.json
+kds_diagnose/Condition-example.json
+kds_diagnose/Condition-f001.json
+kds_diagnose/Condition-f002.json
+kds_diagnose/Condition-f003.json
+kds_diagnose/Condition-f202.json
+kds_diagnose/Condition-f203.json
+kds_diagnose/Condition-f204.json
+kds_diagnose/Condition-f205.json
+kds_diagnose/Condition-family-history.json
+kds_diagnose/Condition-stroke.json
 total 24
