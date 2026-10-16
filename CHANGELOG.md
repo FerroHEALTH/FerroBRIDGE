@@ -25,6 +25,15 @@ crates on crates.io.
 
 ### Added
 
+- A FerroBRIDGE OMOCL `Person` mapping for the KDS person template (#568),
+  `crates/omocl/tests/fixtures/projects/ferrobridge/kds_person/kds_person_data.yml`.
+  The corpus file `person_data/person_data_v0.yml` reads gender at
+  `items[at0019]`, which `KDS_Person` does not carry, so every KDS person
+  took `gender_concept_id` 0. This file reads the administrative gender at
+  `items[at0022]`: its code resolves through the loaded OHDSI vocabulary
+  into `gender_concept_id` and is kept in `gender_source_value`, and a person
+  with no gender, or a code with no standard concept, takes concept 0. Point
+  `[mappings] omocl` at a directory holding it in place of the corpus file.
 - The FHIR facade answers `batch` Bundles on `POST [base]` (#531). Each entry
   runs as the read, vread, search, create or update its `request` names,
   through the same handler as the single interaction, with `ifMatch` and
