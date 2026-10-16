@@ -36,16 +36,12 @@ fn relayed() -> (Bundle, Value) {
 
 /// The `resource` of the entry at `index` in a written Bundle document.
 fn entry_resource(document: &Value, index: usize) -> &Value {
-    let Value::Object(bundle) = document else {
-        panic!("the bundle is an object");
-    };
-    let Some(Value::Array(entries)) = bundle.get("entry") else {
-        panic!("the bundle carries entries");
-    };
-    let Some(Value::Object(entry)) = entries.get(index) else {
-        panic!("entry {index} is an object");
-    };
-    entry.get("resource").expect("the entry carries a resource")
+    document
+        .get("entry")
+        .and_then(Value::as_array)
+        .and_then(|entries| entries.get(index))
+        .and_then(|entry| entry.get("resource"))
+        .expect("the written bundle carries a resource at the entry")
 }
 
 #[test]
