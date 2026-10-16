@@ -133,3 +133,21 @@ fn the_omocl_directory_is_read_from_the_mappings_section() -> Result<(), Box<dyn
     );
     Ok(())
 }
+
+#[test]
+fn the_terminology_lane_accepts_each_release_the_client_speaks() -> Result<(), Box<dyn StdError>> {
+    for (spelled, expected) in [
+        ("stu3", ferrobridge_term::config::WireVersion::Stu3),
+        ("STU3", ferrobridge_term::config::WireVersion::Stu3),
+        ("r4", ferrobridge_term::config::WireVersion::R4),
+        ("r4b", ferrobridge_term::config::WireVersion::R4B),
+    ] {
+        let text = format!(
+            "[terminology]\nbase_url = \"http://tx.invalid/fhir\"\nwire_version = \"{spelled}\"\n"
+        );
+        let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+        let terminology = settings.terminology.as_ref().ok_or("the lane is on")?;
+        assert_eq!(expected, terminology.wire_version, "{spelled}");
+    }
+    Ok(())
+}

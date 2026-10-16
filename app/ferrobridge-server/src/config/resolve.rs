@@ -271,6 +271,7 @@ pub(super) fn resolve_terminology(
 ) -> Result<ferrobridge_term::config::Config, Error> {
     let base_url = url_of("terminology.base_url", &terminology.base_url)?;
     let wire_version = match terminology.wire_version.to_ascii_lowercase().as_str() {
+        "stu3" => ferrobridge_term::config::WireVersion::Stu3,
         "r4" => ferrobridge_term::config::WireVersion::R4,
         "r4b" => ferrobridge_term::config::WireVersion::R4B,
         _ => {
