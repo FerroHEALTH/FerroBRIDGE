@@ -1966,11 +1966,17 @@ flowchart LR
     A["v0.0.2<br/>foundation:<br/>fhir-types move, core,<br/>clients, testkit, server shape,<br/>container, release lane"] --> B["v0.0.3<br/>FHIR round trip:<br/>fhirconnect, $tofhir and $toopenehr,<br/>facade, identity store"]
     A --> C["v0.0.4<br/>OMOP round trip:<br/>omocl, vocabulary, COPY writer,<br/>etl and cdm init, conformance gate"]
     B --> D["v0.0.5<br/>FHIR breadth:<br/>full lens matrix, reference,<br/>split, LINKED, batch, PROGRAMMED"]
-    C --> E["v0.0.6<br/>OMOP breadth:<br/>all targets, run report,<br/>Data Quality Dashboard port"]
-    D --> F["v0.0.7<br/>search over AQL projections"]
-    D --> G["v0.0.8<br/>EU profile targets:<br/>Base and Core, Laboratory, MPD"]
-    E --> H["v0.0.9<br/>change-feed adapter:<br/>incremental OMOP, outbound FHIR"]
-    B --> H
+    C --> E["v0.0.6<br/>STU3, FHIRPath,<br/>validator foundation,<br/>search, SMART"]
+    D --> E
+    E --> F["v0.0.7<br/>facade hardening"]
+    E --> G["v0.0.8<br/>profile validator<br/>finished"]
+    F --> H["v0.0.9<br/>openEHR demographics"]
+    E --> I["v0.0.10<br/>FHIRconnect breadth,<br/>HL7 v2 outcomes"]
+    C --> J["v0.0.11<br/>OMOP breadth,<br/>data quality"]
+    F --> K["v0.0.12<br/>security"]
+    G --> L["v0.0.13<br/>EU profile targets"]
+    J --> M["v0.0.14<br/>change-feed adapter"]
+    F --> N["v0.0.15<br/>operator viewer image"]
 ```
 
 **v0.0.2, the foundation.** The workspace with every lint (#20); the vendor
@@ -2007,16 +2013,43 @@ cycle protection; batch; the PROGRAMMED registry with the eight library codes;
 terminology display resolution; the full library compiles or every failure is
 a recorded library defect; the OBSERVATION-with-events round trip.
 
-**v0.0.6, OMOP breadth.** The remaining eight OMOCL targets; the full
-key-to-column projection; domain validation over the whole library; the run
-report; the Rust port of the Data Quality Dashboard checks; the whole corpus
-loads or every failure is a recorded defect.
+**Small releases from v0.0.6 on.** A milestone holds one theme of 5 to 25
+issues and is cut when its theme is done, so a release never waits on an
+unrelated theme. An issue found while working a milestone joins that
+milestone.
 
-**v0.0.7, search.** FHIR search over AQL projections declared beside the
-context mapping, the `CapabilityStatement` declaring exactly what is
-supported, labelled as FerroBRIDGE's extension.
+**v0.0.6.** FHIR STU3 beside R4 to R6; the FHIRPath evaluator with UCUM; the
+profile validator's foundation, slicing, bindings, bundles and invariants;
+FHIR search over AQL projections declared beside the context mapping,
+labelled as FerroBRIDGE's extension; SMART App Launch on the facade and OAuth
+toward the CDR; the OMOP PERSON rows and the deletion check.
 
-**v0.0.8, the EU profile targets.** HL7 Europe Base and Core, then the
+**v0.0.7, facade hardening.** Search answers the entry that matched; every
+error, the body ceiling and the timeout included, answers an
+`OperationOutcome`; the identity store's repair paths; references the request
+does not carry and resources the engine creates; the operator documentation.
+
+**v0.0.8, the profile validator finished.** Agreement with the HL7 FHIR
+Validator on a shared corpus, the extension context and reference versioning
+checks, and the `fhir-types` gaps the validator found.
+
+**v0.0.9, openEHR demographics.** The patient-to-EHR link, demographic AQL as
+Cadasto's experimental extension documents it, the FHIRconnect demographics
+endpoint, and Patient, Practitioner and Organization over the Demographic API.
+
+**v0.0.10, FHIRconnect breadth.** The full data-type matrix, the remaining
+concept types and `mappingCode` functions, the published contexts compiling
+in-tree, and the open outcomes of the HL7 v2 face.
+
+**v0.0.11, OMOP breadth.** The remaining eight OMOCL targets and the full
+key-to-column projection; the Athena vocabulary loader; domain validation, the
+run report and the Rust port of the Data Quality Dashboard checks; FHIR to OMOP
+with no CDR.
+
+**v0.0.12, security.** The caller's identity reaching the CDR, token
+introspection, and `private_key_jwt` client authentication.
+
+**v0.0.13, the EU profile targets.** HL7 Europe Base and Core, then the
 Laboratory Report (upgrading the library's EEHRxF context from 0.1.1 to
 2.0.0), then Medication Prescription and Dispense, each a context with
 extensions and a round trip asserting profile elements; the readiness matrix
@@ -2024,11 +2057,15 @@ per priority category published from generated metadata; the profile
 packages pinned in `docs/VERSIONS.md`. Patient Summary follows when its guide
 leaves ballot.
 
-**v0.0.9, the change feed.** The change-feed adapter of section 5.1 with the
+**v0.0.14, the change feed.** The change-feed adapter of section 5.1 with the
 reference CDR's outbox stream as its first source, driving the incremental
 OMOP load and the outbound FHIR lane, with a durable dead-letter store, a
 retraction message, and delivery at least once. Labelled as FerroBRIDGE's
 extension.
+
+**v0.0.15, the operator viewer image.** A separate image beside the server:
+engine state, a transform playground, and the mapping files viewed and
+edited.
 
 ## 15. Decision register
 
