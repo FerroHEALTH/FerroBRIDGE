@@ -399,6 +399,12 @@ crates on crates.io.
 
 ### Fixed
 
+- The KDS diagnosis project context keeps a diagnosis code system outside
+  ICD-10-GM when it reads a Condition back (#379). The `coding` method of the
+  `icd10ProblemDiagnose` append was gated by a `fhirCondition` only, which
+  FHIRconnect applies to FHIR input alone, so out of openEHR it wrote the
+  ICD-10-GM system over a SNOMED CT or any other coding. It now carries an
+  `openehrCondition` on the stored terminology as well.
 - Removing a person's newest `PERSON` writer hands the row to the writer
   that remains (#561). When several compositions of one EHR write the
   person's `PERSON` row and the newest of them is deleted in the CDR, or a

@@ -10,6 +10,7 @@
 mod corpus;
 mod derive;
 mod engine;
+mod kds_coding;
 mod laws;
 mod locations;
 mod model;

@@ -47,6 +47,8 @@ program ferrobridge_kds_diagnose.context
       derived anchor
       fhirCondition one of [http://fhir.de/CodeSystem/bfarm/icd-10-gm] on fhir $resource.code.coding -> CodeableConcept.coding complex writable (element)
         attribute fhir $resource.code.coding.system -> Coding.system primitive writable
+      openehrCondition one of [http://fhir.de/CodeSystem/bfarm/icd-10-gm] on openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose'] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose'] EVALUATION occurrences [diagnose/diagnose] (element)
+        attribute openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0002]/defining_code/terminology_id/value -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0002,'Kodierte Diagnose']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [diagnose/diagnose]
       mapping problemDiagnose.coding.codingSystem from ferrobridge_kds_problem_diagnose
         fhir $resource.code.coding -> CodeableConcept.coding complex writable
         manual system
