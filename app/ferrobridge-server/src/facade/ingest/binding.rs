@@ -256,15 +256,42 @@ impl Ingest<'_> {
                 ),
             )
         })?;
+        self.bind_entry(program, resource_type, ehr_id, version, composition, &entry)
+    }
+
+    /// Records the identity binding of one entry of a committed composition,
+    /// and returns the resource id and the binding that stand.
+    ///
+    /// Each entry of the program's archetype is a resource of its own, keyed
+    /// by the composition and [`engine::Entry::identity_path`].
+    pub(crate) fn bind_entry(
+        &self,
+        program: &Loaded,
+        resource_type: &str,
+        ehr_id: &EhrId,
+        version: &ObjectVersionId,
+        composition: &CanonicalComposition,
+        entry: &engine::Entry,
+    ) -> Result<(FhirResourceId, CompositionBinding), Refused> {
         // NOTE: no specification governs this: our own design, the facade serves the
         // first resource of a split and carries every further one as contained, so
         // the entry's identity is its first occurrence.
-        let key = EntryKey::new(versioned_object_uid(version), entry.path(), 0);
+        let path = entry.identity_path();
+        let key = EntryKey::new(versioned_object_uid(version), path.as_str(), 0);
         let map_key = derive::map_key(&key);
-        let recorded = self
+        let mut recorded = self
             .store
             .internal_of(resource_type, &map_key)
             .map_err(|error| store_refusal(&error))?;
+        if recorded.is_none() && entry.path() != path {
+            // The map wins once written: an id recorded under the positional
+            // path of the entry still stands.
+            let positional = EntryKey::new(versioned_object_uid(version), entry.path(), 0);
+            recorded = self
+                .store
+                .internal_of(resource_type, &derive::map_key(&positional))
+                .map_err(|error| store_refusal(&error))?;
+        }
         let id = if let Some(known) = recorded {
             known
         } else {
@@ -278,7 +305,7 @@ impl Ingest<'_> {
             versioned_object_uid: String::from(versioned_object_uid(version).value()),
             template_id: String::from(composition.template_id()),
             resource_type: String::from(resource_type),
-            entry_path: String::from(entry.path()),
+            entry_path: path,
             split: key.split(),
             context: program.program().context().to_string(),
         };
