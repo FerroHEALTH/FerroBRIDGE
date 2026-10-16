@@ -11,8 +11,7 @@ of its own.
 The facade runs. It is off until `[facade] enabled` turns it on, and a disabled
 facade mounts no route, so a request answers `404` rather than `403`. What this
 page describes is what the server answers today: conformance, create, read,
-vread, update, search, transaction and `$validate`. Batch is later work, and the
-`CapabilityStatement` leaves it out rather than claiming it.
+vread, update, search, transaction, batch and `$validate`.
 
 <!-- toc -->
 
@@ -41,19 +40,18 @@ for `spec.version`. The service base is `/fhir`.
 | `GET /fhir/{type}/{id}` | Read one resource back out of its composition |
 | `GET /fhir/{type}/{id}/_history/{vid}` | Vread: read the version a write's `Location` named |
 | `PUT /fhir/{type}/{id}` | Update, with `If-Match` |
-| `POST /fhir` | A `transaction` Bundle, all or nothing |
+| `POST /fhir` | A `transaction` Bundle, all or nothing, or a `batch` Bundle, each entry on its own |
 | `GET /fhir/.well-known/smart-configuration` | The SMART discovery document, with `[auth]` on |
 
 A type no loaded program maps is absent from the `CapabilityStatement` and
-answers `404` with a `not-supported` `OperationOutcome` on the wire. A batch
-Bundle answers `422` with `not-supported`. A search on a type no search
+answers `404` with a `not-supported` `OperationOutcome` on the wire. A search on a type no search
 declaration answers is a `404` with `not-supported`, and a `_count` that is not
 a non-negative integer is a `400` with `invalid`, so a client never reads a
 page it did not ask for.
 
 The `CapabilityStatement` names exactly the resource types the loaded programs
-map, with `create`, `read`, `vread` and `update` per type, `transaction` at system
-level, the `$validate` operation, `updateCreate: false`, `conditionalCreate`
+map, with `create`, `read`, `vread` and `update` per type, `transaction` and
+`batch` at system level, the `$validate` operation, `updateCreate: false`, `conditionalCreate`
 and `conditionalUpdate` true, and `fhirVersion: 4.0.1`. A type a search
 declaration answers also names `search-type` and, in `searchParam`, exactly
 `_id` and the parameters the declaration states; every other type names no
@@ -114,6 +112,7 @@ on the resource type in the path or in the entry:
 | update | `u` |
 | `$validate` | `c` or `u` |
 | transaction | the permission of each entry's `request.method`: `c` for `POST`, `u` for `PUT`, `r` for `GET`, `d` for `DELETE` |
+| batch | per entry, the permission of the interaction its `request` names: `c` for a create, `u` for an update, `r` for a read or vread, `s` for a search |
 | `$tofhir`, `$toopenehr` | a valid token, no clinical scope: they transform the request body and reach no CDR |
 
 A scope reads `patient/`, `user/` or `system/`, then a resource type or `*`,
@@ -141,15 +140,19 @@ a patient-scoped token is refused for it. A `patient/` scope without a
 
 A transaction is authorised entry by entry before anything is mapped, and one
 entry the token does not cover refuses the whole Bundle with `403`, because a
-transaction succeeds or fails as one unit. Batch has no route yet, so there
-is no per-entry answer inside a batch response.
+transaction succeeds or fails as one unit. A batch is authorised entry by
+entry too, and an entry the token does not cover, or one outside a
+`patient/` token's compartment, answers `403 Forbidden` inside the
+`batch-response` while the other entries run.
 
 Every request under `/fhir` leaves one audit line on the `ferrobridge::audit`
 log target: the time, the token's `sub` and `client_id`, the method, the
 interaction, the resource type and id, the status and the duration. A
 refused token is recorded as `unauthenticated`, and with `[auth]` off the
-subject reads `-`. The line never carries the token, another claim, a query
-value or a body.
+subject reads `-`. A batch leaves one line per entry, carrying the entry's
+interaction, resource type, id and status and its position in the Bundle as
+`entry`, then the request's own line with the interaction `batch`. The line
+never carries the token, another claim, a query value or a body.
 
 The bridge reaches the CDR with its own credential
 ([`[cdr.credentials.oauth]`](../operate/configuration.md#cdrcredentialsoauth)),
@@ -308,6 +311,34 @@ A delivery that arrives while another delivery of the same Bundle or resource
 is still in flight is refused with `409` and commits nothing; retry it after
 the first one answers. The redelivery rule is on the
 [failure and identity](../operate/failure-and-identity.md) page.
+
+A `batch` Bundle runs each entry as the single interaction its `request`
+names, and answers `200` with a `batch-response` Bundle, one entry per request
+entry in the same order (R4 http.html §3.1.0.11). The entries run in the order
+R4 gives for a transaction, every `POST` before every `PUT` and every `GET`
+last, and the answer keeps the Bundle's order.
+
+| Entry `request` | Runs as |
+|---|---|
+| `GET [type]/[id]` | read |
+| `GET [type]/[id]/_history/[vid]` | vread |
+| `GET [type]?…` | search |
+| `POST [type]` | create, with `ifNoneExist` as its `If-None-Exist` |
+| `PUT [type]/[id]` | update, with `ifMatch` as its `If-Match` |
+
+Each entry's `response` carries the status the single interaction answers,
+with its `location` and `etag`. A successful entry carries its resource, or
+none under `Prefer: return=minimal`, which reaches every entry, and a failed
+entry carries its `OperationOutcome` in `response.outcome`. A CDR refusal of
+one entry is that entry's status through the status table, and the other
+entries still run. A `DELETE`, `PATCH` or `HEAD` entry answers `405`, a
+`request.url` the facade routes no interaction for answers `404`, and an
+absolute `request.url` under another server's base answers `400`. An entry
+whose resource references another entry's `fullUrl` answers `400 invalid`,
+because R4 calls such a batch non-conformant; the other entries run. A Bundle
+with an entry that carries no `request`, or a `POST` or `PUT` entry with no
+resource, is refused whole with `400`, naming each such entry, and nothing
+runs.
 
 An HL7 v2 message that the [HL7 v2 face](../operate/hl7v2-face.md) receives
 goes through this same path as a transaction of its Bundle's entries, so the

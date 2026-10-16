@@ -248,13 +248,15 @@ pub fn statement_of(
                 .iter()
                 .map(|name| resource(name, search))
                 .collect(),
-            // NOTE: `transaction` is a system-level interaction of
-            // `http://hl7.org/fhir/ValueSet/system-restful-interaction`; batch
-            // is absent because this milestone does not implement it.
-            interaction: vec![CapabilityStatementRestInteraction {
-                code: "transaction".into(),
-                ..CapabilityStatementRestInteraction::default()
-            }],
+            // NOTE: `transaction` and `batch` are the system-level interactions of
+            // `http://hl7.org/fhir/ValueSet/system-restful-interaction` this route answers.
+            interaction: ["transaction", "batch"]
+                .into_iter()
+                .map(|code| CapabilityStatementRestInteraction {
+                    code: code.into(),
+                    ..CapabilityStatementRestInteraction::default()
+                })
+                .collect(),
             operation: system_operations(operations),
             security: shape.security.as_ref().map(security),
             ..CapabilityStatementRest::default()
@@ -452,7 +454,7 @@ mod tests {
     }
 
     #[test]
-    fn the_system_level_interaction_is_transaction_and_never_batch() {
+    fn the_system_level_interactions_are_transaction_and_batch() {
         let built = statement(
             &Programs::default(),
             "http://localhost:8080/fhir",
@@ -466,7 +468,7 @@ mod tests {
             .iter()
             .filter_map(|entry| entry.code.value.as_deref())
             .collect();
-        assert_eq!(vec!["transaction"], codes);
+        assert_eq!(vec!["transaction", "batch"], codes);
     }
 
     #[test]

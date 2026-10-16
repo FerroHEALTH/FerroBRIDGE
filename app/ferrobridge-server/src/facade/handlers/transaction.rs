@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! `POST [base]`: a `transaction` Bundle, all or nothing.
+//! `POST [base]`: a `transaction` Bundle, all or nothing, or a `batch`
+//! Bundle, which [`super::batch`] answers entry by entry.
 //!
 //! A transaction Bundle that cannot be mapped in full is refused with one
 //! `OperationOutcome` naming every failing entry and nothing is committed
@@ -16,10 +17,6 @@
 //! without a second commit. An entry carrying a new `meta.versionId` of a
 //! resource the identity map knows commits a later version of its
 //! composition inside the same CONTRIBUTION.
-//!
-//! `batch` has no implementation in this milestone and the
-//! `CapabilityStatement` does not declare it, so a `batch` Bundle is refused
-//! with `not-supported` (<https://hl7.org/fhir/R4/http.html#transaction>).
 
 use fhir_types::codec::Json as _;
 use fhir_types::codec::Value;
@@ -49,7 +46,7 @@ use crate::facade::request::Inbound;
 /// The `Bundle.type` this route commits.
 const TRANSACTION: &str = "transaction";
 
-/// The `Bundle.type` this milestone refuses.
+/// The `Bundle.type` [`super::batch`] answers.
 const BATCH: &str = "batch";
 
 /// The `Bundle.type` a committed transaction answers with.
@@ -71,19 +68,14 @@ pub(crate) async fn transaction(
         .and_then(Value::as_str)
         .unwrap_or_default();
     if kind == BATCH {
-        return Err(reply::refusal(
-            StatusCode::UNPROCESSABLE_ENTITY,
-            Issue::error(IssueType::NotSupported).diagnosing(
-                "this server commits a transaction Bundle; batch is not among the interactions its CapabilityStatement declares",
-            ),
-        ));
+        return super::batch::batch(facade, access, headers, bundle.document()).await;
     }
     if kind != TRANSACTION {
         return Err(reply::refusal(
             StatusCode::UNPROCESSABLE_ENTITY,
             Issue::error(IssueType::NotSupported)
                 .diagnosing(format!(
-                    "Bundle.type is `{kind}`; this route commits a transaction Bundle"
+                    "Bundle.type is `{kind}`; this route answers a transaction or a batch Bundle"
                 ))
                 .at("Bundle.type"),
         ));

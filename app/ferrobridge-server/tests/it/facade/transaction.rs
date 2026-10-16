@@ -396,19 +396,3 @@ async fn a_transaction_carrying_one_id_at_two_versions_is_refused_naming_both()
     assert_eq!(None, harness.store.consumed(&condition_source_at("1")?)?);
     Ok(())
 }
-
-#[tokio::test]
-async fn a_batch_bundle_is_not_supported_in_this_milestone() -> Result<(), Box<dyn StdError>> {
-    let harness = harness().await;
-    // FHIR JSON forbids an empty array (<https://hl7.org/fhir/R4/json.html>),
-    // so a batch Bundle with no entry omits the element rather than sending
-    // one the strict codec would refuse before the batch check runs.
-    let bundle = serde_json::json!({ "resourceType": "Bundle", "type": "batch" });
-    let request = Request::post("/fhir")
-        .header(header::CONTENT_TYPE, "application/fhir+json")
-        .body(Body::from(bundle.to_string()))?;
-    let (status, body) = call(harness.app(), request).await?;
-    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status);
-    assert_eq!(Some("not-supported"), first_issue(&body)["code"].as_str());
-    Ok(())
-}
