@@ -26,6 +26,9 @@ use super::schema::{FieldSchema, Kind, Schemas, TypeSchema, ValueKind};
 /// The FHIR XML namespace.
 pub const FHIR_NAMESPACE: &str = "http://hl7.org/fhir";
 
+/// The XML Schema instance namespace, which a resource never declares.
+const XML_SCHEMA_INSTANCE_NAMESPACE: &str = "http://www.w3.org/2001/XMLSchema-instance";
+
 /// Writes `object`, a resource in the JSON object model, as FHIR XML.
 ///
 /// # Errors
@@ -324,7 +327,8 @@ fn write_primitive(
 /// # Errors
 ///
 /// Returns [`DecodeError`] for malformed XML, a root element that is no
-/// resource the schema knows, an unknown element or attribute, text where an
+/// resource the schema knows, an unknown element or attribute, a declaration
+/// of the XML Schema instance namespace (R4 xml.html §2.6.1.1), text where an
 /// element belongs, or a `value` that is not of the primitive's kind.
 pub fn from_xml(schemas: &Schemas, text: &str) -> Result<Object, DecodeError> {
     let mut reader = Reader::from_str(text);
@@ -380,9 +384,18 @@ fn read_resource(
 
 /// The attribute's local name and unescaped value; `None` for a namespace
 /// declaration.
+///
+/// A declaration of the XML Schema instance namespace is refused as
+/// [`DecodeErrorKind::UnknownProperty`] at the declaring attribute's name:
+/// exchanged content "SHALL NOT specify the schema or even contain the schema
+/// instance namespace in the resource itself" (R4 xml.html §2.6.1.1, the same
+/// rule in STU3 §2.6.1.1 and R5 §2.1.6.3.4,
+/// <https://hl7.org/fhir/R4/xml.html>). An `xsi:` attribute such as
+/// `xsi:schemaLocation` cannot be written without that declaration, so it is
+/// refused with it.
 fn attribute(
     attribute: Result<Attribute<'_>, quick_xml::events::attributes::AttrError>,
-    path: &Path,
+    path: &mut Path,
 ) -> Result<Option<(String, String)>, DecodeError> {
     let attribute = attribute.map_err(|e| {
         path.error(DecodeErrorKind::MalformedXml {
@@ -390,9 +403,6 @@ fn attribute(
         })
     })?;
     let key = attribute.key.as_ref();
-    if key == "xmlns" || key.starts_with("xmlns:") {
-        return Ok(None);
-    }
     let value = attribute
         .normalized_value(XmlVersion::Explicit1_0)
         .map_err(|e| {
@@ -400,6 +410,15 @@ fn attribute(
                 reason: e.to_string(),
             })
         })?;
+    if key == "xmlns" || key.starts_with("xmlns:") {
+        if value == XML_SCHEMA_INSTANCE_NAMESPACE {
+            return path.with(
+                key,
+                |path| Err(path.error(DecodeErrorKind::UnknownProperty)),
+            );
+        }
+        return Ok(None);
+    }
     Ok(Some((local_name(key), value.into_owned())))
 }
 

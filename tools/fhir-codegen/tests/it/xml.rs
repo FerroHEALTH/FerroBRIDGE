@@ -209,6 +209,58 @@ fn xml_refusals_name_the_element() {
     );
 }
 
+/// Exchanged content "SHALL NOT specify the schema or even contain the schema
+/// instance namespace in the resource itself" (R4 xml.html §2.6.1.1, STU3
+/// §2.6.1.1, R5 §2.1.6.3.4).
+#[test]
+fn the_schema_instance_namespace_is_refused_in_a_resource() {
+    let declared = r#"<Parameters xmlns="http://hl7.org/fhir" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://hl7.org/fhir fhir-single.xsd"><id value="synthetic"/></Parameters>"#;
+    for schemas in [
+        &fhir_types::stu3::schema::SCHEMAS,
+        &fhir_types::r4::schema::SCHEMAS,
+        &fhir_types::r5::schema::SCHEMAS,
+    ] {
+        let refused = from_xml(schemas, declared).expect_err("the root declares xsi");
+        assert_eq!(refused.kind, DecodeErrorKind::UnknownProperty);
+        assert_eq!(refused.path, "Resource.xmlns:xsi");
+    }
+    let schemas = &fhir_types::r4::schema::SCHEMAS;
+    let nested = from_xml(
+        schemas,
+        r#"<Parameters xmlns="http://hl7.org/fhir"><parameter xmlns:s="http://www.w3.org/2001/XMLSchema-instance"><name value="n"/></parameter></Parameters>"#,
+    )
+    .expect_err("a nested element declares the namespace under another prefix");
+    assert_eq!(nested.kind, DecodeErrorKind::UnknownProperty);
+    assert_eq!(nested.path, "Resource.parameter.xmlns:s");
+    let undeclared = from_xml(
+        schemas,
+        r#"<Parameters xmlns="http://hl7.org/fhir" xsi:schemaLocation="http://hl7.org/fhir fhir-single.xsd"/>"#,
+    )
+    .expect_err("schemaLocation is no FHIR property");
+    assert_eq!(undeclared.kind, DecodeErrorKind::UnknownProperty);
+    assert_eq!(undeclared.path, "Resource.schemaLocation");
+}
+
+/// The writer declares the FHIR namespace and nothing of XML Schema
+/// (R4 xml.html §2.6.1 and §2.6.1.1).
+#[test]
+fn the_writer_declares_no_schema_instance_namespace() {
+    let schemas = &fhir_types::r4::schema::SCHEMAS;
+    let read = from_xml(
+        schemas,
+        r#"<f:Parameters xmlns:f="http://hl7.org/fhir"><f:id value="synthetic"/><f:parameter><f:name value="n"/><f:valueString value="v"/></f:parameter></f:Parameters>"#,
+    )
+    .expect("reads");
+    let xml = to_xml(schemas, &read).expect("writes");
+    assert!(
+        xml.starts_with(r#"<Parameters xmlns="http://hl7.org/fhir">"#),
+        "{xml}"
+    );
+    assert!(!xml.contains("XMLSchema-instance"), "{xml}");
+    assert!(!xml.contains("schemaLocation"), "{xml}");
+    assert_eq!(xml.matches("xmlns").count(), 1, "{xml}");
+}
+
 fn coding(system: &str, code: &str, display: Option<String>) -> Value {
     let mut object = fhir_types::codec::Object::new();
     object.insert("system".into(), Value::String(system.into()));

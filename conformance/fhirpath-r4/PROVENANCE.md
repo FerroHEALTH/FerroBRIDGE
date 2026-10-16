@@ -20,4 +20,8 @@ resources, at the pin `docs/VERSIONS.md` records and
 - The language is FHIRPath Normative Release 2.0.0 with the FHIR R4
   additions; a test of a later FHIRPath release fails with that reason, and
   every failing test records its reason in the result the gate reads.
+- An input the FHIR specification refuses fails every test that reads it,
+  with the rule it breaks: `parameters-example-types.xml` declares the XML
+  Schema instance namespace and `xsi:schemaLocation` on its root, which R4
+  xml.html §2.6.1.1 forbids in a resource.
 - Never edit the list by hand.
