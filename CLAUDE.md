@@ -302,7 +302,7 @@ ships):
   clear spec (wiring handlers, DTO impls, client plumbing, test scaffolding),
   file-heavy investigation, and codebase analysis, which would otherwise burn
   the orchestrator's context. Fan out several concurrently in one message (max
-  2 implementation workers, an owner cap). Opus 5's 1M-token window means one
+  4 implementation workers, the owner cap since 2026-10-16). Opus 5's 1M-token window means one
   worker can hold a whole subsystem, so prefer one worker with the full spec up
   front over splitting a coherent task. Prompt-tune for Opus 5: it self-verifies,
   so drop "double-check your work" scaffolding from worker prompts; it also
