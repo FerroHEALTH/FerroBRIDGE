@@ -279,6 +279,26 @@ jobs:
           persist-credentials: false
       - run: bash scripts/checks/favicon-sync.sh
 
+  # Every TODO(#N) and every issue a pending subcommand names must still be
+  # open on the tracker (#614). The job token reads the issues and nothing
+  # else.
+  todo-issues:
+    name: todo-issues
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Every pending-work pointer names an open issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: bash scripts/checks/todo-issues.sh
+
   # The tracker helpers that carry a self-test. Their real branches run only
   # against the live tracker: the fallback of fields.sh needs a token that
   # cannot read the organisation's issue types, and the migration and the
@@ -1073,6 +1093,7 @@ jobs:
       - versions
       - profile-packages
       - favicon-sync
+      - todo-issues
       - tracker-helpers
       - detect
       - fmt

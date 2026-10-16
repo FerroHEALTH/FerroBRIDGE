@@ -116,7 +116,7 @@ impl Command {
         match self {
             Self::Serve | Self::Cdm { .. } | Self::Etl { .. } => None,
             Self::Vocab { .. } => Some(233),
-            Self::Mapping { .. } => Some(82),
+            Self::Mapping { .. } => Some(595),
         }
     }
 
@@ -293,7 +293,7 @@ mod tests {
             "the loader waits on the observed export format"
         );
         assert_eq!(
-            Some(82),
+            Some(595),
             Command::Mapping {
                 command: Mapping::Check
             }

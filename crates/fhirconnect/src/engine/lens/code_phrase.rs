@@ -143,7 +143,7 @@ pub fn terminology_parts<'value>(
 ///
 /// An empty version is the absent `(version)` suffix, which is what makes
 /// `version_id` the empty string the `CODE_PHRASE` table asks for.
-// TODO(#241): build the id through an openehr-base constructor from a name
+// TODO(#618): build the id through an openehr-base constructor from a name
 // and a version once one exists (sibling request S4); the readers `name` and
 // `version_id` do.
 #[must_use]

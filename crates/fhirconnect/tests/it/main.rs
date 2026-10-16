@@ -20,4 +20,5 @@ mod pins;
 mod resolve;
 mod roundtrip;
 mod support;
+mod term_mapping;
 mod tree;

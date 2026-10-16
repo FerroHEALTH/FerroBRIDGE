@@ -20,8 +20,12 @@ use crate::engine::lens::Fallback;
 use crate::engine::lens::Lens;
 use crate::engine::lens::LensError;
 use crate::engine::lens::code_phrase::text_of;
+use crate::engine::lens::term_mapping::EQUIVALENT;
+use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::lens::term_mapping::coding_of;
-use crate::engine::lens::term_mapping::mapping_of;
+use crate::engine::lens::term_mapping::equivalents;
+use crate::engine::lens::term_mapping::mappings_of;
+use crate::engine::lens::term_mapping::withheld;
 use crate::model::ast::keyword::Direction;
 
 /// The name the `string` cell carries in a diagnostic.
@@ -74,7 +78,7 @@ impl Lens<DvTextData, CodeableConcept> for TextLens {
 
     fn get(&self, source: &DvTextData) -> Result<CodeableConcept, LensError> {
         let mut codings = Vec::new();
-        for mapping in source.mappings.iter().flatten() {
+        for mapping in equivalents(source.mappings.iter().flatten()) {
             codings.push(coding_of(mapping, CODEABLE_CONCEPT_CELL)?);
         }
         Ok(CodeableConcept {
@@ -96,10 +100,7 @@ impl Lens<DvTextData, CodeableConcept> for TextLens {
                 direction: Direction::FhirToOpenehr,
             })?;
         let held = existing.and_then(|text| text.mappings.as_deref());
-        let mut mappings = Vec::with_capacity(view.coding.len());
-        for (index, coding) in view.coding.iter().enumerate() {
-            mappings.push(mapping_of(coding, held.and_then(|held| held.get(index)))?);
-        }
+        let mappings = mappings_of(&view.coding, held)?;
         Ok(DvTextData {
             value: String::from(value),
             mappings: NonEmptyVec::new(mappings).ok(),
@@ -110,6 +111,10 @@ impl Lens<DvTextData, CodeableConcept> for TextLens {
     fn fallbacks(&self, _view: &CodeableConcept) -> Vec<Fallback> {
         Vec::new()
     }
+
+    fn withheld(&self, source: &DvTextData) -> Vec<Withheld> {
+        withheld(source.mappings.iter().flatten())
+    }
 }
 
 impl Lens<DvTextData, Coding> for TextLens {
@@ -118,13 +123,13 @@ impl Lens<DvTextData, Coding> for TextLens {
     }
 
     fn get(&self, source: &DvTextData) -> Result<Coding, LensError> {
-        let mut codings = source.mappings.iter().flatten();
+        let mut codings = equivalents(source.mappings.iter().flatten());
         let first = codings.next();
         if codings.next().is_some() {
             return Err(LensError::Shape {
                 cell: CODING_CELL,
                 attribute: "DV_TEXT.mappings",
-                found: String::from("more than one term mapping"),
+                found: String::from("more than one `=` term mapping"),
                 reason: "one Coding carries one code, so the extra mappings have nowhere to go",
                 direction: Direction::OpenehrToFhir,
             });
@@ -145,31 +150,35 @@ impl Lens<DvTextData, Coding> for TextLens {
                 direction: Direction::FhirToOpenehr,
             },
         )?;
-        let held = existing
-            .and_then(|text| text.mappings.as_deref())
-            .and_then(<[openehr_rm::v1_2::data_types::text::term_mapping::TermMapping]>::first);
+        let held = existing.and_then(|text| text.mappings.as_deref());
+        let preferred = equivalents(held.unwrap_or_default())
+            .next()
+            .and_then(|mapping| mapping.target.preferred_term.clone());
         let coded = text_of(view.system.as_ref().map(|uri| &uri.value)).is_some()
             || text_of(view.code.as_ref().map(|code| &code.value)).is_some();
-        let mappings = if coded {
-            let mut mapping = mapping_of(view, held)?;
-            // NOTE: DV_TEXT.adoc §Coding pairs `display` with `value`, so the
-            // display is the rubric here and the target's preferred term,
-            // which FHIR has nowhere to put, comes from the held mapping.
-            mapping.target.preferred_term =
-                held.and_then(|held| held.target.preferred_term.clone());
-            NonEmptyVec::new(vec![mapping]).ok()
-        } else {
-            None
-        };
+        let mut mappings = mappings_of(coded.then_some(view), held)?;
+        // NOTE: DV_TEXT.adoc §Coding pairs `display` with `value`, so the
+        // display is the rubric here and the target's preferred term,
+        // which FHIR has nowhere to put, comes from the held mapping.
+        if let Some(written) = mappings
+            .iter_mut()
+            .find(|mapping| mapping.r#match == EQUIVALENT)
+        {
+            written.target.preferred_term = preferred;
+        }
         Ok(DvTextData {
             value: String::from(value),
-            mappings,
+            mappings: NonEmptyVec::new(mappings).ok(),
             ..carried(existing)
         })
     }
 
     fn fallbacks(&self, _view: &Coding) -> Vec<Fallback> {
         Vec::new()
+    }
+
+    fn withheld(&self, source: &DvTextData) -> Vec<Withheld> {
+        withheld(source.mappings.iter().flatten())
     }
 }
 
@@ -342,5 +351,122 @@ mod tests {
             source.mappings.is_none(),
             "a coding with no code annotates nothing"
         );
+    }
+
+    /// A `TERM_MAPPING` with `relation` to `code` of `system`.
+    fn term(relation: char, system: &str, code: &str) -> TermMapping {
+        TermMapping {
+            r#match: relation,
+            purpose: None,
+            target: CodePhrase {
+                terminology_id: terminology_id(system, ""),
+                code_string: String::from(code),
+                preferred_term: None,
+            },
+        }
+    }
+
+    /// A `DV_TEXT` annotated with `mappings`.
+    fn annotated(mappings: Vec<TermMapping>) -> DvTextData {
+        DvTextData {
+            value: String::from("Fever"),
+            hyperlink: None,
+            formatting: None,
+            mappings: NonEmptyVec::new(mappings).ok(),
+            language: None,
+            encoding: None,
+        }
+    }
+
+    /// Returns the codes a list of codings carries.
+    fn codes(codings: &[Coding]) -> Vec<Option<&str>> {
+        codings
+            .iter()
+            .map(|coding| coding.code.as_ref().and_then(|code| code.value.as_deref()))
+            .collect()
+    }
+
+    // TERM_MAPPING.adoc: `match` is "hard coded to `=`, other operators not mappable
+    // to FHIR", so the mapping writes no coding and the rest of the value converts.
+    #[test]
+    fn a_concept_leaves_out_a_term_mapping_fhir_cannot_carry() {
+        for relation in ['>', '<', '?'] {
+            let source = annotated(vec![
+                term(relation, "http://snomed.info/sct", "386661006"),
+                term('=', "http://loinc.org", "LP74849-8"),
+            ]);
+            let view: CodeableConcept = TextLens.get(&source).expect("the mapping is withheld");
+            assert_eq!(
+                codes(&view.coding),
+                [Some("LP74849-8")],
+                "only the `=` mapping travels past `{relation}`"
+            );
+            let taken = Lens::<DvTextData, CodeableConcept>::withheld(&TextLens, &source);
+            let rows: Vec<(char, &str, &str)> = taken
+                .iter()
+                .map(|term| (term.match_code(), term.terminology(), term.code()))
+                .collect();
+            assert_eq!(rows, [(relation, "http://snomed.info/sct", "386661006")]);
+            let back = TextLens
+                .put(&view, Some(&source))
+                .expect("the view carries a text");
+            assert_eq!(back, source, "GetPut holds past `{relation}`");
+        }
+    }
+
+    #[test]
+    fn a_coding_leaves_out_a_term_mapping_fhir_cannot_carry() {
+        for relation in ['>', '<', '?'] {
+            let source = annotated(vec![
+                term('=', "http://loinc.org", "LP74849-8"),
+                term(relation, "http://snomed.info/sct", "386661006"),
+            ]);
+            let view: Coding = TextLens
+                .get(&source)
+                .expect("one `=` mapping is one coding");
+            assert_eq!(
+                codes(core::slice::from_ref(&view)),
+                [Some("LP74849-8")],
+                "the `=` mapping is the coding past `{relation}`"
+            );
+            assert_eq!(
+                Lens::<DvTextData, Coding>::withheld(&TextLens, &source).len(),
+                1,
+                "the `{relation}` mapping is withheld"
+            );
+            let back = TextLens
+                .put(&view, Some(&source))
+                .expect("the coding carries a display");
+            assert_eq!(back, source, "GetPut holds past `{relation}`");
+        }
+    }
+
+    #[test]
+    fn a_coding_of_only_a_withheld_mapping_carries_the_rubric() {
+        let source = annotated(vec![term('<', "http://snomed.info/sct", "386661006")]);
+        let view: Coding = TextLens.get(&source).expect("the mapping is withheld");
+        assert_eq!(view.code, None, "no code travels");
+        assert_eq!(
+            view.display
+                .as_ref()
+                .and_then(|display| display.value.as_deref()),
+            Some("Fever"),
+            "the rubric is the display"
+        );
+        let back = TextLens
+            .put(&view, Some(&source))
+            .expect("the coding carries a display");
+        assert_eq!(back, source, "the held mapping returns");
+    }
+
+    #[test]
+    fn equivalent_term_mappings_are_withheld_from_nothing() {
+        let source = annotated(vec![
+            term('=', "http://snomed.info/sct", "386661006"),
+            term('=', "http://loinc.org", "LP74849-8"),
+        ]);
+        let view: CodeableConcept = TextLens.get(&source).expect("both mappings travel");
+        assert_eq!(codes(&view.coding), [Some("386661006"), Some("LP74849-8")]);
+        assert!(Lens::<DvTextData, CodeableConcept>::withheld(&TextLens, &source).is_empty());
     }
 }

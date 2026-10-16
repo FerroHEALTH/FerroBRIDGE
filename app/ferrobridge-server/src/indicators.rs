@@ -13,7 +13,7 @@ use http::StatusCode;
 
 use crate::health::{Check, HealthIndicator, IndicatorState};
 
-// TODO(#91): the CDM indicator, once the writer owns the database connection.
+// TODO(#615): the CDM database indicator when `[cdm]` is configured.
 
 /// The openEHR CDR probe.
 #[derive(Debug, Clone)]

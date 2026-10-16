@@ -28,12 +28,16 @@
 //! not have.
 //!
 //! A value whose meaning the target would **falsify** is refused with a typed
-//! [`LensError`]. A `TERM_MAPPING` whose `match` is `<` says the target term
-//! is narrower; rendering it as a plain `Coding` beside the defining one
-//! asserts an equivalence the data denies, so it is refused rather than
-//! flattened. This is the strict-coercion rule of `docs/architecture.md`
+//! [`LensError`]. This is the strict-coercion rule of `docs/architecture.md`
 //! §4.4, and the line between the two cases is FerroBRIDGE's own: no
 //! specification governs it.
+//!
+//! A `TERM_MAPPING` whose `match` is not `=` sits between the two. Its page
+//! calls the other operators "not mappable to FHIR", so [`Lens::get`] writes
+//! no `Coding` for it, which would assert an equivalence the data denies, and
+//! [`Lens::withheld`] names it so the engine declares the loss; the rest of
+//! the value converts, and [`Lens::put`] carries the mapping back from the
+//! value the target holds.
 
 pub mod boolean;
 pub mod code_phrase;
@@ -48,6 +52,7 @@ pub mod text;
 
 use core::fmt;
 
+use crate::engine::lens::term_mapping::Withheld;
 use crate::model::ast::keyword::Direction;
 
 /// One data-type cell of the specification's chapter, run both ways.
@@ -88,6 +93,17 @@ pub trait Lens<O, F> {
     /// engine records each one in its outcome rather than leaving the loss
     /// silent (`docs/architecture.md` §4.4).
     fn fallbacks(&self, view: &F) -> Vec<Fallback>;
+
+    /// The term mappings [`Lens::get`] leaves out of the FHIR element.
+    ///
+    /// A `TERM_MAPPING` whose `match` is not `=` is "not mappable to FHIR"
+    /// (`types-of-mappings/data-type/TERM_MAPPING.adoc`), so a cell that
+    /// carries `mappings` writes no `Coding` for it and names it here; the
+    /// engine records each one as a declared loss. A cell that carries no
+    /// `mappings` answers none.
+    fn withheld(&self, _source: &O) -> Vec<Withheld> {
+        Vec::new()
+    }
 }
 
 /// One rule a lens applied that runs in one direction only.
