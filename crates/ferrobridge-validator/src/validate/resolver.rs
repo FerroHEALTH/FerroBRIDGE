@@ -68,21 +68,11 @@ impl Resolver for Contained {
         let Some(id) = reference.strip_prefix('#') else {
             return Resolution::OutOfScope;
         };
-        let Some((&innermost, outer)) = scope.split_last() else {
-            return Resolution::Missing;
-        };
         // NOTE: references.html §2.3.0.8: `#id` names a resource the container holds and `#`
         // the container, which is the resource that lists the innermost one, or that one.
-        let container = outer
-            .iter()
-            .rev()
-            .copied()
-            .find(|candidate| {
-                contained(candidate)
-                    .iter()
-                    .any(|item| std::ptr::eq(item, innermost))
-            })
-            .unwrap_or(innermost);
+        let Some(container) = container(scope) else {
+            return Resolution::Missing;
+        };
         let found = if id.is_empty() {
             Some(container)
         } else {
@@ -124,31 +114,56 @@ impl Resolver for Bundled {
             // not RESTful "has no defined meaning within this specification".
             return Resolution::OutOfScope;
         };
-        // NOTE: bundle.html §2.36.4.1: a version-specific reference drops its version to match
-        // the fullUrl, "and then match the version based on Resource.meta.versionId".
-        let found: Vec<&'i Value> = entries(bundle)
-            .iter()
-            .filter(|entry| entry.get("fullUrl").and_then(Value::as_str) == Some(url.as_str()))
-            .filter_map(|entry| entry.get("resource"))
-            .filter(|resource| version.is_none_or(|version| version_id(resource) == Some(version)))
-            .collect();
-        match found.as_slice() {
-            [target] => Resolution::Found {
-                target,
-                via: Via::Entry { from },
-            },
-            // NOTE: bundle.html §2.36.4.1: with no match, "if the URI is a URL that can be
-            // resolved (e.g. if an http: URL), try accessing it directly"; any other is broken.
-            [] if url.starts_with("http://") || url.starts_with("https://") => {
-                Resolution::OutOfScope
-            }
-            [] => Resolution::Missing,
-            _ => Resolution::Ambiguous,
-        }
+        lookup(bundle, &url, version, from)
     }
 
     fn bundle<'i>(&self, scope: &[&'i Value]) -> Option<&'i Value> {
         context(scope).map(|(bundle, _)| bundle)
+    }
+}
+
+/// Resolves a reference that carries a URI scheme against the entries of
+/// `bundle` itself, from outside every entry: an invariant on an element of
+/// the Bundle reaches references that no entry around the walk holds.
+///
+/// A relative reference has no entry `fullUrl` to resolve against here, so
+/// it is out of scope.
+pub(crate) fn from_bundle<'i>(bundle: &'i Value, reference: &str) -> Resolution<'i> {
+    if !has_scheme(reference) {
+        return Resolution::OutOfScope;
+    }
+    match absolute(reference, None) {
+        Some((url, version)) => lookup(bundle, &url, version, bundle),
+        None => Resolution::OutOfScope,
+    }
+}
+
+/// The entry of `bundle` whose `fullUrl` is `url`, at `version` when one is
+/// given, reached from the entry resource `from`.
+fn lookup<'i>(
+    bundle: &'i Value,
+    url: &str,
+    version: Option<&str>,
+    from: &'i Value,
+) -> Resolution<'i> {
+    // NOTE: bundle.html §2.36.4.1: a version-specific reference drops its version to match
+    // the fullUrl, "and then match the version based on Resource.meta.versionId".
+    let found: Vec<&'i Value> = entries(bundle)
+        .iter()
+        .filter(|entry| entry.get("fullUrl").and_then(Value::as_str) == Some(url))
+        .filter_map(|entry| entry.get("resource"))
+        .filter(|resource| version.is_none_or(|version| version_id(resource) == Some(version)))
+        .collect();
+    match found.as_slice() {
+        [target] => Resolution::Found {
+            target,
+            via: Via::Entry { from },
+        },
+        // NOTE: bundle.html §2.36.4.1: with no match, "if the URI is a URL that can be
+        // resolved (e.g. if an http: URL), try accessing it directly"; any other is broken.
+        [] if url.starts_with("http://") || url.starts_with("https://") => Resolution::OutOfScope,
+        [] => Resolution::Missing,
+        _ => Resolution::Ambiguous,
     }
 }
 
@@ -176,6 +191,24 @@ fn context<'i>(scope: &[&'i Value]) -> Option<(&'i Value, &'i Value)> {
         }
     }
     None
+}
+
+/// The container of the innermost resource of `scope`: the resource whose
+/// `contained` lists it, or the innermost resource itself when none does.
+pub(crate) fn container<'i>(scope: &[&'i Value]) -> Option<&'i Value> {
+    let (&innermost, outer) = scope.split_last()?;
+    Some(
+        outer
+            .iter()
+            .rev()
+            .copied()
+            .find(|candidate| {
+                contained(candidate)
+                    .iter()
+                    .any(|item| std::ptr::eq(item, innermost))
+            })
+            .unwrap_or(innermost),
+    )
 }
 
 /// The entries of `bundle`.

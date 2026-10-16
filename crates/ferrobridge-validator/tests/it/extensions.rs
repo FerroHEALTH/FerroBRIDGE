@@ -25,6 +25,41 @@ fn a_known_extension_with_the_type_it_defines_raises_no_error() -> TestResult {
 }
 
 #[test]
+fn an_extension_url_with_a_fragment_is_an_unknown_extension_and_the_walk_goes_on() -> TestResult {
+    // extensibility.html §2.5.0.3: an extension the processor does not know is ignored; a
+    // fragment names no StructureDefinition the package set resolves.
+    let mut resource = patient();
+    resource["extension"] =
+        json!([{"url": "http://example.org/fhir/extensions#part", "valueString": "x"}]);
+    resource["gender"] = json!("male");
+    let report = against_patient(&resource)?;
+    let unknown = issues(&report, MessageId::UnknownExtension);
+    assert_eq!(unknown.len(), 1, "{:#?}", report.issues());
+    assert_eq!(unknown[0].expression, "Patient.extension[0]");
+    assert_eq!(unknown[0].severity, Severity::Warning);
+    assert_eq!(
+        locations(&report, MessageId::FixedMismatch),
+        ["Patient.gender"],
+        "the walk continues past the extension"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_modifier_extension_url_with_a_fragment_is_an_unknown_modifier_error() -> TestResult {
+    // extensibility.html §2.5.0.2: an unknown modifier extension is not processed.
+    let mut resource = patient();
+    resource["modifierExtension"] =
+        json!([{"url": "http://example.org/fhir/extensions#stop", "valueBoolean": true}]);
+    let report = against_patient(&resource)?;
+    let unknown = issues(&report, MessageId::UnknownModifierExtension);
+    assert_eq!(unknown.len(), 1, "{:#?}", report.issues());
+    assert_eq!(unknown[0].expression, "Patient.modifierExtension[0]");
+    assert_eq!(unknown[0].severity, Severity::Error);
+    Ok(())
+}
+
+#[test]
 fn an_extension_value_of_a_type_its_definition_does_not_allow_is_refused() -> TestResult {
     let mut resource = patient();
     resource["extension"] = json!([{"url": format!("{BASE}flag"), "valueString": "yes"}]);
