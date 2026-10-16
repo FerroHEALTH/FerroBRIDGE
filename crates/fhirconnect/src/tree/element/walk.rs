@@ -34,10 +34,24 @@ const ELEMENT_TYPE: &str = "Element";
 /// The element name of the extension list every element carries.
 const EXTENSION_ELEMENT: &str = "extension";
 
+/// The element name of a primitive's own value.
+///
+/// Every primitive type defines it beside `id` and `extension` (R4
+/// `StructureDefinition-code`, `code.value`, "Primitive value for code"), and
+/// the JSON representation carries it as the member itself
+/// (<https://hl7.org/fhir/R4/json.html#primitive>). FHIRconnect reads a code
+/// that way in a condition (`basics/Conditions.adoc` §not of).
+const PRIMITIVE_VALUE: &str = "value";
+
 impl<T: Table + ?Sized> Walk<'_, T> {
     /// Takes one step, answering whether the walk is finished.
     pub(super) fn take(&mut self, step: &Step, rest: &[Step]) -> Result<bool, ResolveError> {
         match step {
+            Step::Element { name }
+                if name == PRIMITIVE_VALUE && matches!(self.location, Location::Primitive(_)) =>
+            {
+                self.primitive_value(rest).map(|()| false)
+            }
             Step::Element { name } => self.element(name).map(|()| false),
             Step::Type { name, .. } => self.type_filter(name, rest),
             Step::Extension { url } => self.extension(url).map(|()| false),
@@ -72,6 +86,28 @@ impl<T: Table + ?Sized> Walk<'_, T> {
             Location::Deferred => Err(ResolveError::NoChildren {
                 element: self.owner.clone(),
                 name: String::from(name),
+            }),
+        }
+    }
+
+    /// Steps onto the value of the primitive the walk stands on.
+    ///
+    /// The value is the primitive member itself, so the walk stays where it
+    /// is and adds no move; nothing lies below it, so a further step is
+    /// refused.
+    fn primitive_value(&self, rest: &[Step]) -> Result<(), ResolveError> {
+        match rest.first() {
+            None => Ok(()),
+            Some(next) => Err(ResolveError::NoChildren {
+                element: format!("{}.{PRIMITIVE_VALUE}", self.owner),
+                name: match next {
+                    Step::Element { name } | Step::Type { name, .. } => name.clone(),
+                    Step::Extension { .. } => String::from(EXTENSION_ELEMENT),
+                    Step::Resolve => String::from("resolve()"),
+                    Step::Ordinal(_) | Step::Index(_) | Step::Predicate { .. } => {
+                        String::from(PRIMITIVE_VALUE)
+                    }
+                },
             }),
         }
     }

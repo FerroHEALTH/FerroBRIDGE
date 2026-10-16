@@ -188,7 +188,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     // travels as text takes it; no specification governs this:
                     // our own design.
                     Leaf::Scalar(ref text) => match kind {
-                        FhirKind::String | FhirKind::DateTime => {
+                        FhirKind::String | FhirKind::Date | FhirKind::DateTime => {
                             let element = target.resolved().leaf();
                             FhirValue::read(kind, element, &Value::String(text.clone())).map_err(
                                 |source| EngineError::Fhir {
@@ -198,7 +198,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
                                 },
                             )?
                         }
-                        FhirKind::Coding
+                        FhirKind::Boolean
+                        | FhirKind::Coding
                         | FhirKind::CodeableConcept
                         | FhirKind::Period
                         | FhirKind::Reference
