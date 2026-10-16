@@ -30,6 +30,9 @@ use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
 
+use crate::auth::Access;
+use crate::auth::compartment;
+use crate::auth::scope::Permission;
 use crate::facade::Facade;
 use crate::facade::commit::Change;
 use crate::facade::handlers::Body;
@@ -41,6 +44,7 @@ use crate::facade::ingest::UnmappedEntries;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
+use crate::facade::request::Inbound;
 
 /// The `Bundle.type` this route commits.
 const TRANSACTION: &str = "transaction";
@@ -54,6 +58,7 @@ const RESPONSE: &str = "transaction-response";
 /// `POST [base]`.
 pub(crate) async fn transaction(
     facade: &Facade,
+    access: &Access,
     headers: &HeaderMap,
     uri: &Uri,
     body: &[u8],
@@ -83,6 +88,7 @@ pub(crate) async fn transaction(
                 .at("Bundle.type"),
         ));
     }
+    admit_entries(facade, access, bundle.document())?;
     let ingested = facade
         .ingest(facade.client_for(headers))
         .ingest_bundle(
@@ -101,6 +107,47 @@ pub(crate) async fn transaction(
         )
     })?;
     Ok(reply::resource(StatusCode::OK, &body, &[]))
+}
+
+/// Checks every entry of `bundle` against `access`, before anything is
+/// mapped or committed.
+///
+/// A transaction "SHALL be processed as a single unit" and fails whole when
+/// any entry fails (<https://hl7.org/fhir/R4/http.html#transaction>), so one
+/// entry the token does not cover refuses the Bundle with the guard's `403`,
+/// which names neither the entry nor the scope. Each entry needs the
+/// permission of the method its `request` names, `create` for a `POST` and a
+/// request-less entry, and a `patient/` grant reaches only an entry whose
+/// subject is the patient in the launch context.
+fn admit_entries(facade: &Facade, access: &Access, bundle: &Value) -> Result<(), Refusal> {
+    let entries = bundle
+        .get("entry")
+        .and_then(Value::as_array)
+        .unwrap_or_default();
+    for entry in entries {
+        let method = entry
+            .get("request")
+            .and_then(|request| request.get("method"))
+            .and_then(Value::as_str)
+            .unwrap_or("POST");
+        let permission = match method {
+            "GET" | "HEAD" => Permission::Read,
+            "PUT" | "PATCH" => Permission::Update,
+            "DELETE" => Permission::Delete,
+            _ => Permission::Create,
+        };
+        // NOTE: an entry with no readable resource refuses the whole Bundle
+        // in the mapping and commits nothing (R4 http.html#transaction), so it
+        // is legitimately skipped here rather than authorised.
+        let Some(Ok(inbound)) = entry
+            .get("resource")
+            .map(|resource| Inbound::of(resource.clone(), ""))
+        else {
+            continue;
+        };
+        compartment::admit_inbound(facade, access, permission, &inbound)?;
+    }
+    Ok(())
 }
 
 /// Returns the `transaction-response` Bundle of one ingested transaction.

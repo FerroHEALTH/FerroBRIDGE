@@ -11,6 +11,12 @@
 //! the one table of [`crate::facade::status`], so a status is never invented
 //! at a call site. Create, update and transaction write through
 //! [`crate::facade::ingest`], so the handlers keep only the HTTP half.
+//!
+//! Every handler but metadata reads the [`Access`] the guard of
+//! [`crate::auth::guard`] left on the request and holds a `patient/` token to
+//! its patient's compartment ([`crate::auth::compartment`]). A request that
+//! reaches a handler without one never passed the guard, and axum refuses it
+//! with `500`.
 
 mod complete;
 mod conditional;
@@ -22,6 +28,7 @@ mod write;
 
 use std::sync::Arc;
 
+use axum::Extension;
 use axum::body::Bytes;
 use axum::extract::Path;
 use axum::extract::State;
@@ -31,6 +38,9 @@ use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
 
+use crate::auth::Access;
+use crate::auth::compartment;
+use crate::auth::scope::Permission;
 use crate::facade::Facade;
 use crate::facade::capability;
 use crate::facade::media;
@@ -43,30 +53,30 @@ pub(crate) use crate::facade::reply::Refusal;
 
 /// `GET [base]/metadata`: the `CapabilityStatement` of the loaded programs.
 ///
-/// `operations` says whether the router serves the FHIRconnect operations
-/// beside the facade, so the statement declares them only then, and `hl7v2`
-/// whether the HL7 v2 face runs, so the statement names it only then.
+/// `shape` says whether the router serves the FHIRconnect operations beside
+/// the facade, whether the HL7 v2 face runs, and which authorization server
+/// guards the facade, so the statement declares each only then.
 #[must_use]
 pub fn metadata_route(
     facade: &Facade,
     headers: &HeaderMap,
     uri: &Uri,
-    operations: capability::Operations,
-    hl7v2: capability::Hl7v2,
+    shape: &capability::Shape,
 ) -> Response {
-    metadata(facade, headers, uri, operations, hl7v2).unwrap_or_else(Refusal::into_response)
+    metadata(facade, headers, uri, shape).unwrap_or_else(Refusal::into_response)
 }
 
 /// `POST [base]/{type}`: create, conditional and idempotent by source
 /// identity.
 pub async fn create_route(
     State(facade): State<Arc<Facade>>,
+    Extension(access): Extension<Access>,
     Path(resource_type): Path<String>,
     headers: HeaderMap,
     uri: Uri,
     body: Bytes,
 ) -> Response {
-    write::create(&facade, &resource_type, &headers, &uri, &body)
+    write::create(&facade, &access, &resource_type, &headers, &uri, &body)
         .await
         .unwrap_or_else(Refusal::into_response)
 }
@@ -74,10 +84,14 @@ pub async fn create_route(
 /// `GET [base]/{type}/{id}`: read one mapped resource back out of the CDR.
 pub async fn read_route(
     State(facade): State<Arc<Facade>>,
+    Extension(access): Extension<Access>,
     Path((resource_type, id)): Path<(String, String)>,
     headers: HeaderMap,
     uri: Uri,
 ) -> Response {
+    if let Err(refusal) = admit_existing(&facade, &access, Permission::Read, &resource_type, &id) {
+        return refusal.into_response();
+    }
     read::read(
         &facade,
         &facade.client_for(&headers),
@@ -94,10 +108,14 @@ pub async fn read_route(
 /// resource back out of the CDR.
 pub async fn vread_route(
     State(facade): State<Arc<Facade>>,
+    Extension(access): Extension<Access>,
     Path((resource_type, id, vid)): Path<(String, String, String)>,
     headers: HeaderMap,
     uri: Uri,
 ) -> Response {
+    if let Err(refusal) = admit_existing(&facade, &access, Permission::Read, &resource_type, &id) {
+        return refusal.into_response();
+    }
     read::vread(
         &facade,
         &facade.client_for(&headers),
@@ -112,38 +130,75 @@ pub async fn vread_route(
 /// `PUT [base]/{type}/{id}`: update a resource the identity map knows.
 pub async fn update_route(
     State(facade): State<Arc<Facade>>,
+    Extension(access): Extension<Access>,
     Path((resource_type, id)): Path<(String, String)>,
     headers: HeaderMap,
     uri: Uri,
     body: Bytes,
 ) -> Response {
-    write::update(&facade, &resource_type, &id, &headers, &uri, &body)
-        .await
-        .unwrap_or_else(Refusal::into_response)
+    if let Err(refusal) = admit_existing(&facade, &access, Permission::Update, &resource_type, &id)
+    {
+        return refusal.into_response();
+    }
+    write::update(
+        &facade,
+        &access,
+        (&resource_type, &id),
+        &headers,
+        &uri,
+        &body,
+    )
+    .await
+    .unwrap_or_else(Refusal::into_response)
 }
 
 /// `POST [base]/{type}/$validate`: the dry run that commits nothing.
 pub async fn validate_route(
     State(facade): State<Arc<Facade>>,
+    Extension(access): Extension<Access>,
     Path(resource_type): Path<String>,
     headers: HeaderMap,
     uri: Uri,
     body: Bytes,
 ) -> Response {
-    validate::validate(&facade, &resource_type, &headers, &uri, &body)
+    validate::validate(&facade, &access, &resource_type, &headers, &uri, &body)
         .unwrap_or_else(Refusal::into_response)
 }
 
 /// `POST [base]`: a `transaction` Bundle, all or nothing.
 pub async fn transaction_route(
     State(facade): State<Arc<Facade>>,
+    Extension(access): Extension<Access>,
     headers: HeaderMap,
     uri: Uri,
     body: Bytes,
 ) -> Response {
-    transaction::transaction(&facade, &headers, &uri, &body)
+    transaction::transaction(&facade, &access, &headers, &uri, &body)
         .await
         .unwrap_or_else(Refusal::into_response)
+}
+
+/// Checks that `access` reaches the composition the identity map binds to
+/// `resource_type`/`id`.
+///
+/// An id the map does not know passes, so the handler answers its `404` as
+/// it does for any caller.
+fn admit_existing(
+    facade: &Facade,
+    access: &Access,
+    permission: Permission,
+    resource_type: &str,
+    id: &str,
+) -> Result<(), Refusal> {
+    let Ok(internal) = crate::facade::identity::FhirResourceId::new(id) else {
+        return Ok(());
+    };
+    let Some(binding) = read::binding(facade, resource_type, &internal)? else {
+        return Ok(());
+    };
+    let ehr = crate::cdr::ids::EhrId::new(&binding.ehr_id)
+        .map_err(|error| read::stored_identifier(&error))?;
+    compartment::admit_ehr(facade, access, permission, resource_type, &ehr)
 }
 
 /// Answers the `CapabilityStatement`.
@@ -151,16 +206,10 @@ fn metadata(
     facade: &Facade,
     headers: &HeaderMap,
     uri: &Uri,
-    operations: capability::Operations,
-    hl7v2: capability::Hl7v2,
+    shape: &capability::Shape,
 ) -> Result<Response, Refusal> {
     guard(headers, uri, Body::Absent)?;
-    let statement = capability::statement_with(
-        facade.programs(),
-        &facade.settings().base_url,
-        operations,
-        hl7v2,
-    );
+    let statement = capability::statement_of(facade.programs(), &facade.settings().base_url, shape);
     let encoded = statement.to_json().map_err(|error| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,

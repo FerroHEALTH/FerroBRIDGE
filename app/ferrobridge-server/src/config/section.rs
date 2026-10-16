@@ -78,6 +78,61 @@ impl Default for Facade {
     }
 }
 
+/// Inbound authentication: the FHIR routes as a SMART App Launch 2.x
+/// resource server.
+///
+/// Off until `enabled` is set. Off, the facade authenticates no caller and
+/// serves every request it receives, so a deployment keeps it on a network
+/// only trusted callers reach. On, the issuer's metadata and key set are
+/// read at boot.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Auth {
+    /// Whether every FHIR request needs a bearer access token.
+    pub enabled: bool,
+    /// The issuer identifier, an `https` URL (RFC 8414 §2).
+    pub issuer: String,
+    /// The audience every token must name: this deployment's FHIR base.
+    pub audience: String,
+    /// The signature algorithms a token may use, asymmetric only.
+    pub algorithms: Vec<String>,
+    /// The claims a token must carry: `rfc9068` or `jwt`.
+    pub token_profile: String,
+    /// The clock skew `exp`, `nbf` and `iat` are checked with, in seconds.
+    pub clock_skew_seconds: u64,
+    /// The shortest time between two reads of the key set an unknown `kid`
+    /// triggers.
+    pub jwks_refresh_interval_ms: u64,
+    /// How long one call to the authorization server may take.
+    pub timeout_ms: u64,
+    /// The subjects a token with no clinical scope gets system-wide access
+    /// for.
+    pub scopeless_subjects: Vec<String>,
+    /// The scope that guards the operator API.
+    pub operator_scope: String,
+    /// SMART capabilities the discovery document adds, such as
+    /// `launch-standalone`.
+    pub capabilities: Vec<String>,
+}
+
+impl Default for Auth {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            issuer: String::new(),
+            audience: String::new(),
+            algorithms: vec![String::from("RS256"), String::from("ES256")],
+            token_profile: String::from("rfc9068"),
+            clock_skew_seconds: 60,
+            jwks_refresh_interval_ms: 60_000,
+            timeout_ms: 10_000,
+            scopeless_subjects: Vec::new(),
+            operator_scope: String::from(crate::auth::OPERATOR_SCOPE),
+            capabilities: Vec::new(),
+        }
+    }
+}
+
 /// The HL7 v2 face: an MLLP listener whose messages enter the facade's
 /// ingest service.
 ///

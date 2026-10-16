@@ -32,6 +32,9 @@ use http::header;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 
+use crate::auth::Access;
+use crate::auth::compartment;
+use crate::auth::scope::Permission;
 use crate::facade::Facade;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::Refusal;
@@ -56,6 +59,7 @@ use crate::facade::status;
 /// `POST [base]/{type}`.
 pub(crate) async fn create(
     facade: &Facade,
+    access: &Access,
     resource_type: &str,
     headers: &HeaderMap,
     uri: &Uri,
@@ -64,6 +68,7 @@ pub(crate) async fn create(
     crate::facade::handlers::guard(headers, uri, Body::Present)?;
     crate::facade::handlers::supported(facade, resource_type)?;
     let inbound = read::parse(body, resource_type)?;
+    compartment::admit_inbound(facade, access, Permission::Create, &inbound)?;
     let program = select_program(facade, &inbound, headers)?;
     let ingest = facade.ingest(facade.client_for(headers));
     let claim = ingest.claim_resource(&inbound)?;
@@ -73,9 +78,21 @@ pub(crate) async fn create(
         .await?
     {
         Recognised::Replayed(written) => {
+            compartment::admit_ehr(
+                facade,
+                access,
+                Permission::Create,
+                resource_type,
+                &written.ehr_id,
+            )?;
             return answer(facade, program, &written, headers, StatusCode::OK);
         }
         Recognised::Revised(known) => {
+            let ehr_id = EhrId::new(&known.ehr_id).map_err(|error| store_identifier(&error))?;
+            compartment::admit_ehr(facade, access, Permission::Create, resource_type, &ehr_id)?;
+            // NOTE: SMART App Launch 2.x scopes-and-launch-context maps `u` to update, and a
+            // create that revises a known resource is an update in effect (our own design).
+            compartment::admit_ehr(facade, access, Permission::Update, resource_type, &ehr_id)?;
             return resend(facade, &ingest, program, &inbound, &known, headers).await;
         }
         Recognised::Unknown => {}
@@ -98,8 +115,8 @@ pub(crate) async fn create(
 /// `PUT [base]/{type}/{id}`.
 pub(crate) async fn update(
     facade: &Facade,
-    resource_type: &str,
-    id: &str,
+    access: &Access,
+    (resource_type, id): (&str, &str),
     headers: &HeaderMap,
     uri: &Uri,
     body: &[u8],
@@ -119,6 +136,7 @@ pub(crate) async fn update(
         )
     })?;
     let inbound = read::parse(body, resource_type)?;
+    compartment::admit_inbound(facade, access, Permission::Update, &inbound)?;
     let program = select_program(facade, &inbound, headers)?;
     let known = ConsumedSource {
         ehr_id: binding.ehr_id.clone(),
