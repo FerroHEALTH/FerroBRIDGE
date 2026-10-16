@@ -176,6 +176,8 @@ v2-to-FHIR ConceptMaps for the HL7 v2 face (#251), and the script takes the
 `LICENSE` of its source repository beside it because that licence differs
 from the package's own. `scripts/checks/versions.sh` reads the `Version` line
 of every `PROVENANCE.md` below back against its row.
+`scripts/checks/pin-freshness.sh` reads each version against the registry's
+`latest`.
 
 | Item | Pin | Repeated in |
 |---|---|---|

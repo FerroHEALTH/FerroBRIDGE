@@ -307,6 +307,7 @@ mechanism here.
 | the workspace dependency table in the root `Cargo.toml` | Dependabot, `cargo` ecosystem |
 | the digest-pinned `FROM` of `docker/Dockerfile` | Dependabot, `docker` ecosystem at `/docker` |
 | the analyzer versions in `ci.yml` and the documentation toolchain in `.github/actions/docs-toolchain` | `pin-freshness.yml`, weekly |
+| the commit-pinned corpora and the version-pinned FHIR packages of `docs/VERSIONS.md` | `pin-freshness.yml`, weekly |
 | the container image tags in `compose.yaml` and the harness constants | `scripts/checks/versions.sh` against `docs/VERSIONS.md` |
 
 All three Dependabot ecosystems resolve something today. The `cargo` and
@@ -330,8 +331,13 @@ digest.
 
 `scripts/checks/pin-freshness.sh` reads each of those pins from
 `docs/VERSIONS.md` and compares it with the newest release of the upstream
-project, which is the tag the image and the installer both carry. The workflow
-runs it every Monday and on dispatch. When a pin is behind it opens one issue
+project, which is the tag the image and the installer both carry. A corpus
+pinned by commit on a repository with no releases is compared with the head of
+the branch it follows, and a FHIR package (the core packages, THO, the
+v2-to-FHIR guide, the examples packages and the two profile-set roots that
+carry a `latest` tag) with the `latest` dist-tag of its registry. The two KDS
+fixture rows pin one file each and the UCUM row a release tag, so the script
+leaves them out. The workflow runs it every Monday and on dispatch. When a pin is behind it opens one issue
 carrying the report, and when an open issue already carries that report it adds
 nothing. The issue goes through `scripts/gh/fields.sh new` as a Task at Low
 priority and Low effort. The job's default token may not read the
