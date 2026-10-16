@@ -12,6 +12,7 @@ use serde_json::json;
 
 use super::bundle;
 use super::patient;
+use crate::eu::empty_reason;
 use crate::eu::eu_set;
 use crate::support::TestResult;
 use crate::support::core;
@@ -66,9 +67,15 @@ fn complete() -> Vec<(&'static str, serde_json::Value)> {
 }
 
 /// Validates the document of `entries` against the core definitions.
+///
+/// The Bundle carries the identifier and the timestamp R4 `bdl-9` and
+/// `bdl-10` require of a document.
 fn document(entries: &[(&str, serde_json::Value)]) -> TestResult<Report> {
     let set = PackageSet::load([core()])?;
-    validate(&set, &bundle("document", entries), None)
+    let mut document = bundle("document", entries);
+    document["identifier"] = json!({"system": "urn:ietf:rfc:3986", "value": "urn:uuid:4a1e8f9e-0000-4000-8000-00000000003b"});
+    document["timestamp"] = json!("2026-01-01T00:00:00Z");
+    validate(&set, &document, None)
 }
 
 #[test]
@@ -147,7 +154,8 @@ fn an_eps_document_whose_patient_breaks_its_slice_profile_is_reported_at_that_en
             json!({
                 "title": code,
                 "code": {"coding": [{"system": "http://loinc.org", "code": code}]},
-                "text": {"status": "generated", "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">x</div>"}
+                "text": {"status": "generated", "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">x</div>"},
+                "emptyReason": empty_reason()
             })
         })
         .collect();

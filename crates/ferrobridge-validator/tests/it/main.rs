@@ -19,6 +19,7 @@ mod bundles;
 mod cardinality;
 mod eu;
 mod extensions;
+mod invariants;
 mod outcome;
 mod packages;
 mod resolve;
