@@ -77,6 +77,14 @@ Non-negotiables (violations are rejected at review):
 - No AI or Claude attribution anywhere. You do not commit unless the prompt
   says to, and then on a conventional-type branch with a descriptive subject.
 - Do NOT spawn your own subagents; do the work directly.
+- Run a long command (a build, `nextest`, a codegen emit, the conformance
+  gate) in the background and wait for its completion notification. Never
+  poll with `pgrep -f` on a string your own wait command contains: the loop
+  matches itself and never ends. At most one wait per output
+  (`.claude/memory/worker-wait-loops.md`).
+- The docs gate is CI's form: `RUSTDOCFLAGS="-D warnings" cargo doc --locked
+  --no-deps --document-private-items -p <each touched crate>`; a bare URL in a
+  doc comment fails it, so write `<https://...>` or a code span.
 
 Your final message reports: what changed (files), test and clippy evidence, any
 `// NOTE:`s added, and anything you were forced to leave open.

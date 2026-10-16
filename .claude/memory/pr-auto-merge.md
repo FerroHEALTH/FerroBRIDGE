@@ -54,3 +54,6 @@ and a commit is made with named paths (`git add <files>`), never `git add
 -A` from the root after a local build in an excluded crate: the fuzz build
 tree (a gigabyte of objects) was swept into a commit that way and GitHub
 refused the push on file size.
+
+Arming auto-merge does not finish the job: every PR is then watched until it
+is merged ([[pr-merge-watch]]).
