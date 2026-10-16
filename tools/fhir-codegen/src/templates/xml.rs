@@ -14,13 +14,17 @@ use std::borrow::Cow;
 
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
-use quick_xml::{Reader, Writer, XmlVersion};
+use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::{NsReader, Reader, Writer, XmlVersion};
 
 use super::codec::{DecodeError, DecodeErrorKind, EncodeError, Number, Object, Path, Value};
 use super::schema::{FieldSchema, Kind, Schemas, TypeSchema, ValueKind};
 
 /// The FHIR XML namespace.
 pub const FHIR_NAMESPACE: &str = "http://hl7.org/fhir";
+
+/// The XHTML namespace, the one the narrative `div` is in.
+const XHTML_NAMESPACE: &str = "http://www.w3.org/1999/xhtml";
 
 /// The XML Schema instance namespace, which a resource never declares.
 const XML_SCHEMA_INSTANCE_NAMESPACE: &str = "http://www.w3.org/2001/XMLSchema-instance";
@@ -323,11 +327,13 @@ fn write_primitive(
 /// # Errors
 ///
 /// Returns [`DecodeError`] for malformed XML, a root element that is no
-/// resource the schema knows, an unknown element or attribute, a declaration
-/// of the XML Schema instance namespace (R4 xml.html §2.6.1.1), text where an
-/// element belongs, or a `value` that is not of the primitive's kind.
+/// resource the schema knows, an unknown element or attribute, an element
+/// outside the FHIR namespace or a prefixed attribute outside it (R4 xml.html
+/// §2.6.1), a narrative `div` outside the XHTML namespace, a declaration of the XML Schema instance namespace (R4 xml.html
+/// §2.6.1.1) anywhere, the narrative included, text where an element belongs, or a `value` that is not of the
+/// primitive's kind.
 pub fn from_xml(schemas: &Schemas, text: &str) -> Result<Object, DecodeError> {
-    let mut reader = Reader::from_str(text);
+    let mut reader = NsReader::from_str(text);
     reader.config_mut().trim_text(true);
     let mut path = Path::root("Resource");
     let malformed = |path: &Path, e: quick_xml::Error| {
@@ -361,9 +367,30 @@ fn local_name(name: &str) -> String {
     name.rsplit(':').next().unwrap_or(name).to_owned()
 }
 
+/// Whether `start`, the element the reader has just read, is in `namespace`
+/// once its prefix, or the default namespace in scope, is resolved.
+///
+/// The namespace decides and the prefix never does: `<f:Patient
+/// xmlns:f="http://hl7.org/fhir">` is a FHIR element, and `<x:Patient
+/// xmlns:x="http://example.org">` or an unprefixed element with no default
+/// namespace in scope is not (R4 xml.html §2.6.1,
+/// <https://hl7.org/fhir/R4/xml.html>).
+fn in_namespace(reader: &NsReader<&[u8]>, start: &BytesStart<'_>, namespace: &str) -> bool {
+    matches!(
+        reader.resolver().resolve_element(start.name()).0,
+        ResolveResult::Bound(Namespace(bound)) if bound == namespace
+    )
+}
+
+/// Reads one resource element.
+///
+/// A root or nested resource element outside the FHIR namespace is refused
+/// as [`DecodeErrorKind::WrongRoot`]: "FHIR elements are always in the
+/// namespace `http://hl7.org/fhir`" (R4 xml.html §2.6.1, the same rule in STU3
+/// §2.6.1 and R5 §2.1.6.3, <https://hl7.org/fhir/R4/xml.html>).
 fn read_resource(
     schemas: &Schemas,
-    reader: &mut Reader<&[u8]>,
+    reader: &mut NsReader<&[u8]>,
     start: &BytesStart<'_>,
     empty: bool,
     path: &mut Path,
@@ -372,6 +399,7 @@ fn read_resource(
     let schema = schemas
         .type_named(&name)
         .filter(|_| schemas.is_resource(&name))
+        .filter(|_| in_namespace(reader, start, FHIR_NAMESPACE))
         .ok_or_else(|| path.error(DecodeErrorKind::WrongRoot))?;
     let mut object = read_complex(schemas, reader, schema, start, empty, path)?;
     object.insert(String::from("resourceType"), Value::String(name));
@@ -389,7 +417,15 @@ fn read_resource(
 /// <https://hl7.org/fhir/R4/xml.html>). An `xsi:` attribute such as
 /// `xsi:schemaLocation` cannot be written without that declaration, so it is
 /// refused with it.
+///
+/// FHIR's own attributes (`value`, `id`, `url`) are unprefixed; a prefixed
+/// attribute is read only when its prefix resolves to the FHIR namespace, and
+/// one in any other namespace, or under a prefix with no binding in scope, is
+/// refused as [`DecodeErrorKind::UnknownProperty`] at its local name: "the
+/// only other namespace that occurs in FHIR resources is the XHTML namespace"
+/// (R4 xml.html §2.6.1), and XHTML belongs only inside the narrative.
 fn attribute(
+    reader: &NsReader<&[u8]>,
     attribute: Result<Attribute<'_>, quick_xml::events::attributes::AttrError>,
     path: &mut Path,
 ) -> Result<Option<(String, String)>, DecodeError> {
@@ -406,21 +442,40 @@ fn attribute(
                 reason: e.to_string(),
             })
         })?;
-    if key == "xmlns" || key.starts_with("xmlns:") {
-        if value == XML_SCHEMA_INSTANCE_NAMESPACE {
-            return path.with(
-                key,
-                |path| Err(path.error(DecodeErrorKind::UnknownProperty)),
-            );
-        }
+    if namespace_declaration(key, &value, path)? {
         return Ok(None);
+    }
+    match reader.resolver().resolve_attribute(QName(key)).0 {
+        ResolveResult::Unbound => {}
+        ResolveResult::Bound(Namespace(bound)) if bound == FHIR_NAMESPACE => {}
+        ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            return path.with(&local_name(key), |path| {
+                Err(path.error(DecodeErrorKind::UnknownProperty))
+            });
+        }
     }
     Ok(Some((local_name(key), value.into_owned())))
 }
 
+/// Whether the attribute `key` with the unescaped `value` is a namespace
+/// declaration, refusing a declaration of the XML Schema instance namespace
+/// as [`DecodeErrorKind::UnknownProperty`] at `key` (R4 xml.html §2.6.1.1).
+fn namespace_declaration(key: &str, value: &str, path: &mut Path) -> Result<bool, DecodeError> {
+    if key != "xmlns" && !key.starts_with("xmlns:") {
+        return Ok(false);
+    }
+    if value == XML_SCHEMA_INSTANCE_NAMESPACE {
+        return path.with(
+            key,
+            |path| Err(path.error(DecodeErrorKind::UnknownProperty)),
+        );
+    }
+    Ok(true)
+}
+
 fn read_complex(
     schemas: &Schemas,
-    reader: &mut Reader<&[u8]>,
+    reader: &mut NsReader<&[u8]>,
     schema: &TypeSchema,
     start: &BytesStart<'_>,
     empty: bool,
@@ -428,7 +483,7 @@ fn read_complex(
 ) -> Result<Object, DecodeError> {
     let mut object = Object::new();
     for attr in start.attributes() {
-        let Some((key, value)) = attribute(attr, path)? else {
+        let Some((key, value)) = attribute(reader, attr, path)? else {
             continue;
         };
         let known = schema
@@ -634,7 +689,7 @@ fn field_of(schema: &TypeSchema, name: &str) -> Option<(&'static FieldSchema, St
 
 fn read_child(
     schemas: &Schemas,
-    reader: &mut Reader<&[u8]>,
+    reader: &mut NsReader<&[u8]>,
     schema: &TypeSchema,
     child: &BytesStart<'static>,
     empty: bool,
@@ -642,7 +697,11 @@ fn read_child(
     collector: &mut Collector,
 ) -> Result<(), DecodeError> {
     let name = local_name(child.name().as_ref());
-    let Some((_, key, kind)) = field_of(schema, &name) else {
+    // NOTE: R4 xml.html §2.6.1: "FHIR elements are always in the namespace
+    // http://hl7.org/fhir"; the narrative `div` is XHTML and `read_xhtml` reads it.
+    let field = field_of(schema, &name)
+        .filter(|(_, _, kind)| *kind == Kind::Xhtml || in_namespace(reader, child, FHIR_NAMESPACE));
+    let Some((_, key, kind)) = field else {
         return path.with(&name, |path| {
             Err(path.error(DecodeErrorKind::UnknownElement))
         });
@@ -677,7 +736,7 @@ fn read_child(
 
 fn read_primitive(
     schemas: &Schemas,
-    reader: &mut Reader<&[u8]>,
+    reader: &mut NsReader<&[u8]>,
     start: &BytesStart<'_>,
     empty: bool,
     kind: ValueKind,
@@ -686,7 +745,7 @@ fn read_primitive(
     let mut value = None;
     let mut element = Object::new();
     for attr in start.attributes() {
-        let Some((key, text)) = attribute(attr, path)? else {
+        let Some((key, text)) = attribute(reader, attr, path)? else {
             continue;
         };
         match key.as_str() {
@@ -765,7 +824,7 @@ fn read_primitive(
 /// Reads one `extension` child of a primitive element.
 fn read_extension(
     schemas: &Schemas,
-    reader: &mut Reader<&[u8]>,
+    reader: &mut NsReader<&[u8]>,
     schema: &TypeSchema,
     child: &BytesStart<'static>,
     empty: bool,
@@ -773,7 +832,7 @@ fn read_extension(
     index: usize,
 ) -> Result<Object, DecodeError> {
     let name = local_name(child.name().as_ref());
-    if name != "extension" {
+    if name != "extension" || !in_namespace(reader, child, FHIR_NAMESPACE) {
         return path.with(&name, |path| {
             Err(path.error(DecodeErrorKind::UnknownElement))
         });
@@ -805,7 +864,7 @@ fn primitive_value(kind: ValueKind, text: &str, path: &Path) -> Result<Value, De
 /// Reads the one resource inside a wrapper element such as `contained`.
 fn read_wrapped_resource(
     schemas: &Schemas,
-    reader: &mut Reader<&[u8]>,
+    reader: &mut NsReader<&[u8]>,
     empty: bool,
     path: &mut Path,
 ) -> Result<Object, DecodeError> {
@@ -849,12 +908,24 @@ fn read_wrapped_resource(
 
 /// Reads an XHTML element as the text FHIR JSON carries: its start tag, its
 /// raw content, and its end tag.
+///
+/// The element is refused as [`DecodeErrorKind::UnknownElement`] unless it
+/// is in the XHTML namespace: "the only other namespace that occurs in FHIR
+/// resources is the XHTML namespace" (R4 xml.html §2.6.1), and the narrative
+/// is "a root `<div>` element in the xhtml namespace" (R5 xml.html §2.1.6.3.3,
+/// <https://hl7.org/fhir/R4/narrative.html#xhtml>). A declaration of the XML
+/// Schema instance namespace on it or on any element inside it is refused as
+/// in the rest of the resource (R4 xml.html §2.6.1.1). The content is
+/// otherwise carried verbatim.
 fn read_xhtml(
-    reader: &mut Reader<&[u8]>,
+    reader: &mut NsReader<&[u8]>,
     start: &BytesStart<'_>,
     empty: bool,
-    path: &Path,
+    path: &mut Path,
 ) -> Result<String, DecodeError> {
+    if !in_namespace(reader, start, XHTML_NAMESPACE) {
+        return Err(path.error(DecodeErrorKind::UnknownElement));
+    }
     let name = start.name().as_ref().to_owned();
     let mut raw = format!("<{name}");
     for attr in start.attributes() {
@@ -863,6 +934,7 @@ fn read_xhtml(
                 reason: e.to_string(),
             })
         })?;
+        refuse_schema_instance(&attr, path)?;
         raw.push(' ');
         raw.push_str(attr.key.as_ref());
         raw.push_str("=\"");
@@ -882,9 +954,49 @@ fn read_xhtml(
             })
         })?
         .into_inner();
+    refuse_schema_instance_within(&inner, path)?;
     raw.push_str(&inner);
     raw.push_str("</");
     raw.push_str(&name);
     raw.push('>');
     Ok(raw)
+}
+
+/// Refuses `attribute` when it declares the XML Schema instance namespace.
+fn refuse_schema_instance(attribute: &Attribute<'_>, path: &mut Path) -> Result<(), DecodeError> {
+    let value = attribute
+        .normalized_value(XmlVersion::Explicit1_0)
+        .map_err(|e| {
+            path.error(DecodeErrorKind::MalformedXml {
+                reason: e.to_string(),
+            })
+        })?;
+    namespace_declaration(attribute.key.as_ref(), &value, path).map(drop)
+}
+
+/// Refuses a declaration of the XML Schema instance namespace on any element
+/// of `content`, the raw content of an XHTML element.
+fn refuse_schema_instance_within(content: &str, path: &mut Path) -> Result<(), DecodeError> {
+    let mut reader = Reader::from_str(content);
+    loop {
+        let event = reader.read_event().map_err(|e| {
+            path.error(DecodeErrorKind::MalformedXml {
+                reason: e.to_string(),
+            })
+        })?;
+        match event {
+            Event::Eof => return Ok(()),
+            Event::Start(element) | Event::Empty(element) => {
+                for attr in element.attributes() {
+                    let attr = attr.map_err(|e| {
+                        path.error(DecodeErrorKind::MalformedXml {
+                            reason: e.to_string(),
+                        })
+                    })?;
+                    refuse_schema_instance(&attr, path)?;
+                }
+            }
+            _ => {}
+        }
+    }
 }
