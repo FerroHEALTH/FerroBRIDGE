@@ -67,6 +67,15 @@ crates on crates.io.
   facade keys a `Patient` by its first identifier with a value, so a
   `Patient` written through it is stored as the `KDS_Person` composition of
   its own EHR and reads back.
+- The terminology client speaks FHIR STU3 (3.0.2) beside R4 and R4B (#455).
+  `[terminology] wire_version = "stu3"` selects it, and every operation and
+  the batch go through the generated STU3 operation contracts. The client
+  sends a code system version as STU3's `version` on `$validate-code`, reads
+  STU3's `code`-typed `$lookup` property values, and reads the same
+  `$translate` match parts and equivalence codes as R4. A request naming a
+  parameter STU3 does not declare (a concept map URL on `$translate`, a
+  value set version on `$validate-code`) is refused with
+  `Error::UnsupportedParameter` before anything is sent.
 - The FHIR facade authenticates its callers as a SMART App Launch 2.x
   resource server (#400). A new `[auth]` section, off by default, names the
   issuer and the audience; the issuer's metadata and key set are read at

@@ -21,9 +21,9 @@ include = ["src/**", "README.md", "LICENSE"]
 
 [dependencies]
 backon.workspace = true
-# The two wire versions the client speaks, with the terminology root set that
+# The three wire versions the client speaks, with the terminology root set that
 # carries Parameters, OperationOutcome, Bundle and the operation contracts.
-fhir-types = { workspace = true, features = ["r4", "r4b", "terminology"] }
+fhir-types = { workspace = true, features = ["stu3", "r4", "r4b", "terminology"] }
 http.workspace = true
 reqwest.workspace = true
 secrecy.workspace = true
