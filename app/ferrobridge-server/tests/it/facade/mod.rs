@@ -11,6 +11,7 @@
 mod capability;
 mod conditional;
 mod examples;
+mod person;
 mod read;
 mod reconcile;
 mod replay;
