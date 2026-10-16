@@ -288,6 +288,11 @@ crates on crates.io.
   `[etl] deletions = "report"` lists a confirmed deletion and keeps its rows;
   the default is `remove`. The run report counts the checks and lists the
   removed, kept and unknown compositions with the rows removed per table.
+- Updating or removing the composition that wrote a `PERSON` row keeps the
+  row while any row of the person remains, where the update or removal
+  deleted it and left clinical rows naming a missing person (#536). The
+  `PERSON` row goes only when no composition writes it and no row of the
+  person is left, and the newest version that writes it rewrites its columns.
 - `fhir-types` 0.1.110 writes a repeating primitive whose every position
   carries only an `id` or an `extension` as the `_name` array alone, in every
   version, where it wrote a value array of nulls beside it (`"event": [null]`);

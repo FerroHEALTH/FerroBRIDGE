@@ -20,6 +20,7 @@ use crate::writer::error::Step;
 use crate::writer::error::WriteError;
 use crate::writer::side_table::delete_earlier;
 use crate::writer::side_table::earlier_rows;
+use crate::writer::side_table::retire_persons;
 
 /// One composition a watermark names: the versioned composition, its EHR and
 /// the version last committed.
@@ -159,8 +160,13 @@ impl CdmWriter {
             return Ok(Removal::Superseded);
         }
         let earlier = earlier_rows(&transaction, bridge, versioned_object_uid).await?;
-        let rows =
+        let deleted =
             delete_earlier(&transaction, cdm, bridge, versioned_object_uid, &earlier).await?;
+        let mut rows = deleted.rows;
+        let persons = retire_persons(&transaction, cdm, bridge, &deleted.persons).await?;
+        if persons > 0 {
+            rows.insert("person", persons);
+        }
         transaction.commit().await.map_err(database(Step::Commit))?;
         Ok(Removal::Removed(rows))
     }

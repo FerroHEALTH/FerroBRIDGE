@@ -10,6 +10,8 @@
 //! `relationship_concept_id` 0. The container-backed tests run only when
 //! `FERROBRIDGE_E2E=1` admits the harness.
 
+mod person;
+
 use ferrobridge_testkit::containers::{self, Postgres};
 use omop_cdm::database::{self, CdmPool};
 use omop_cdm::ddl::SchemaName;

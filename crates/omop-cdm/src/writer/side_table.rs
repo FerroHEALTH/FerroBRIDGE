@@ -5,6 +5,7 @@
 //! the rows an earlier version wrote, and the links of a composition.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use tokio_postgres::Transaction;
@@ -13,6 +14,8 @@ use crate::ddl::SchemaName;
 use crate::graph;
 use crate::graph::RecordGraph;
 use crate::graph::key::RecordKey;
+use crate::meta::CdmSchema;
+use crate::meta::TableMeta;
 use crate::writer::database;
 use crate::writer::error::Step;
 use crate::writer::error::WriteError;
@@ -246,22 +249,53 @@ pub(super) async fn earlier_rows(
     Ok(Earlier { ids })
 }
 
+/// What [`delete_earlier`] deleted, and the persons it touched.
+pub(super) struct Deleted {
+    /// The rows deleted, by CDM table.
+    pub(super) rows: BTreeMap<&'static str, u64>,
+    /// The `person_id` of every deleted row, and of the `PERSON` row the
+    /// composition wrote, whose `PERSON` row [`retire_persons`] may remove.
+    pub(super) persons: BTreeSet<i32>,
+}
+
+/// The column every row of a person names its person by.
+const PERSON_ID: &str = "person_id";
+
+/// Returns whether `table` holds rows of a person that keep the person's
+/// `PERSON` row alive: a CDM table with a `person_id`, other than `PERSON`
+/// and the derived tables a run rebuilds whole.
+fn holds_rows_of_a_person(table: &TableMeta) -> bool {
+    table.cdm_schema == CdmSchema::Cdm
+        && table.name != "person"
+        && !graph::row::DERIVED_TABLES.contains(&table.name)
+        && table.column(PERSON_ID).is_some()
+}
+
 /// Deletes the CDM rows, the links and the side table rows an earlier
 /// version of the composition wrote, and returns the rows deleted by CDM
-/// table.
+/// table with the persons they belonged to.
+///
+/// The `PERSON` row is left in place: it belongs to the person, and
+/// [`retire_persons`] decides it once the composition's new rows, if any,
+/// are written.
 pub(super) async fn delete_earlier(
     transaction: &Transaction<'_>,
     cdm: &SchemaName,
     bridge: &SchemaName,
     versioned_object_uid: &str,
     earlier: &Earlier,
-) -> Result<BTreeMap<&'static str, u64>, WriteError> {
+) -> Result<Deleted, WriteError> {
     let mut deleted = BTreeMap::new();
+    let mut persons = BTreeSet::new();
     let mut by_table: BTreeMap<&'static str, Vec<i32>> = BTreeMap::new();
     for (key, id) in &earlier.ids {
         by_table.entry(key.table).or_default().push(*id);
     }
     for (table, ids) in &by_table {
+        if *table == "person" {
+            persons.extend(ids.iter().copied());
+            continue;
+        }
         let meta = graph::row::cdm_table(table)?;
         let Some(key) = graph::row::primary_key(meta) else {
             return Err(WriteError::SideTable {
@@ -269,18 +303,29 @@ pub(super) async fn delete_earlier(
                 value: (*table).to_owned(),
             });
         };
-        let rows = transaction
-            .execute(
-                &format!(
-                    "DELETE FROM {cdm}.{} WHERE {} = ANY($1)",
-                    quoted(table),
-                    quoted(key.name)
-                ),
-                &[ids],
+        let statement = if meta.column(PERSON_ID).is_some() {
+            format!(
+                "DELETE FROM {cdm}.{} WHERE {} = ANY($1) RETURNING {}",
+                quoted(table),
+                quoted(key.name),
+                quoted(PERSON_ID)
             )
+        } else {
+            format!(
+                "DELETE FROM {cdm}.{} WHERE {} = ANY($1) RETURNING NULL::integer",
+                quoted(table),
+                quoted(key.name)
+            )
+        };
+        let rows = transaction
+            .query(&statement, &[ids])
             .await
             .map_err(database(Step::Delete(table)))?;
-        deleted.insert(*table, rows);
+        for row in &rows {
+            let person: Option<i32> = row.try_get(0).map_err(database(Step::Delete(table)))?;
+            persons.extend(person);
+        }
+        deleted.insert(*table, u64::try_from(rows.len()).unwrap_or(u64::MAX));
     }
     let links = transaction
         .execute(
@@ -309,7 +354,80 @@ pub(super) async fn delete_earlier(
             .await
             .map_err(database(Step::Record))?;
     }
-    Ok(deleted)
+    Ok(Deleted {
+        rows: deleted,
+        persons,
+    })
+}
+
+/// Removes the `PERSON` row of each of `persons` that no composition writes
+/// and no row of the person names any more, and returns how many it removed.
+///
+/// OMOP CDM v5.4 makes `person_id` a foreign key to `PERSON` in every
+/// clinical table (<https://ohdsi.github.io/CommonDataModel/cdm54.html>), so
+/// a `PERSON` row stays while any row of the person remains. The person map
+/// keeps the EHR's `person_id` either way, so a later row of the EHR takes
+/// the same id.
+pub(super) async fn retire_persons(
+    transaction: &Transaction<'_>,
+    cdm: &SchemaName,
+    bridge: &SchemaName,
+    persons: &BTreeSet<i32>,
+) -> Result<u64, WriteError> {
+    if persons.is_empty() {
+        return Ok(0);
+    }
+    let ids: Vec<i32> = persons.iter().copied().collect();
+    // NOTE: no specification governs this: our own design; a person stays while a
+    // composition writes its PERSON row or any row of the person remains.
+    let mut kept = vec![format!(
+        "NOT EXISTS (SELECT 1 FROM {bridge}.record AS r
+            WHERE r.cdm_table = 'person' AND r.surrogate_id = p.person_id)"
+    )];
+    for table in &crate::generated::TABLES {
+        if holds_rows_of_a_person(table) {
+            kept.push(format!(
+                "NOT EXISTS (SELECT 1 FROM {cdm}.{} AS t WHERE t.{person} = p.person_id)",
+                quoted(table.name),
+                person = quoted(PERSON_ID)
+            ));
+        }
+    }
+    transaction
+        .execute(
+            &format!(
+                "DELETE FROM {cdm}.person AS p WHERE p.person_id = ANY($1) AND {}",
+                kept.join(" AND ")
+            ),
+            &[&ids],
+        )
+        .await
+        .map_err(database(Step::Delete("person")))
+}
+
+/// Deletes the `PERSON` rows `graph` writes before they are copied in again,
+/// so the newest writer's columns replace a `PERSON` row a person kept.
+pub(super) async fn replace_persons(
+    transaction: &Transaction<'_>,
+    cdm: &SchemaName,
+    ids: &Ids<'_>,
+) -> Result<(), WriteError> {
+    let persons: Vec<i32> = ids
+        .iter()
+        .filter(|((table, _), _)| *table == "person")
+        .map(|(_, id)| *id)
+        .collect();
+    if persons.is_empty() {
+        return Ok(());
+    }
+    transaction
+        .execute(
+            &format!("DELETE FROM {cdm}.person WHERE person_id = ANY($1)"),
+            &[&persons],
+        )
+        .await
+        .map_err(database(Step::Delete("person")))?;
+    Ok(())
 }
 
 /// Records the natural key and id of every row of `graph`.

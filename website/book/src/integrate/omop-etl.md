@@ -95,6 +95,16 @@ the ones it no longer has. One
 `ehr_id` is one `PERSON`; the bridge does not reconcile a person across EHRs.
 An exhausted sequence refuses the composition with a typed error.
 
+The `PERSON` row belongs to the person, not to the composition whose mapping
+wrote it. Every clinical table names its person through a `person_id` foreign
+key to `PERSON` (CDM v5.4), so when a later version of that composition no
+longer writes the person, or the composition is removed, the `PERSON` row
+stays while any row of the person remains. It goes only when no composition
+writes it and no row of the person is left; the person map keeps the EHR's
+`person_id`, so a later row of the EHR takes the same id. The newest version
+that writes the `PERSON` row rewrites its columns. This is FerroBRIDGE's own
+design.
+
 Each committed composition leaves a watermark naming the version written.
 `ferrobridge etl run --resume` skips every composition whose watermark names
 the version the query answers and runs the rest, so a run that stopped part
