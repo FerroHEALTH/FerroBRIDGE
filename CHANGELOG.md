@@ -399,6 +399,11 @@ crates on crates.io.
 
 ### Fixed
 
+- The facade `CapabilityStatement` declares `conditionalUpdate: false`
+  (#666). R4 `CapabilityStatement.rest.resource.conditionalUpdate` names the
+  `PUT [type]?[search parameters]` interaction (http.html#cond-update), which
+  the facade does not serve; `If-Match` on an update is the version-aware
+  update, which the facade still honours.
 - A facade update whose body names no `id`, or an `id` other than the one
   its URL names, answers `400` with an `invalid` `OperationOutcome` at
   `<type>.id` and commits nothing, as R4 http.html#update requires (#665).

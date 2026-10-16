@@ -51,8 +51,10 @@ page it did not ask for.
 
 The `CapabilityStatement` names exactly the resource types the loaded programs
 map, with `create`, `read`, `vread` and `update` per type, `transaction` and
-`batch` at system level, the `$validate` operation, `updateCreate: false`, `conditionalCreate`
-and `conditionalUpdate` true, and `fhirVersion: 4.0.1`. A type a search
+`batch` at system level, the `$validate` operation, `updateCreate: false`,
+`conditionalCreate` true, `conditionalUpdate` false (no `PUT [type]?[search]`
+is served; `If-Match` on an update is the version-aware update), and
+`fhirVersion: 4.0.1`. A type a search
 declaration answers also names `search-type` and, in `searchParam`, exactly
 `_id` and the parameters the declaration states; every other type names no
 search parameter.
