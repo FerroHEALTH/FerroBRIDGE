@@ -25,6 +25,7 @@ use super::super::VERSION_ONE;
 use super::super::VERSION_TWO;
 use super::super::call;
 use super::super::condition;
+use super::super::named;
 use super::super::raw;
 use super::super::stub::mount_read;
 use super::AQL;
@@ -133,7 +134,7 @@ fn put(
     if let Some(if_match) = if_match {
         request = request.header(header::IF_MATCH, if_match);
     }
-    Ok(request.body(Body::from(body.to_string()))?)
+    Ok(request.body(Body::from(named(body.clone(), id).to_string()))?)
 }
 
 /// Returns the diagnosis entries of `composition`, in `content` order.

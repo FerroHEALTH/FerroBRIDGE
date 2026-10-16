@@ -399,6 +399,11 @@ crates on crates.io.
 
 ### Fixed
 
+- A facade update whose body names no `id`, or an `id` other than the one
+  its URL names, answers `400` with an `invalid` `OperationOutcome` at
+  `<type>.id` and commits nothing, as R4 http.html#update requires (#665).
+  The facade used to accept it and record the body `id` as a consumed source
+  of the resource the URL named.
 - A CDR credential the token endpoint will not issue answers the FHIR caller
   `502` (#518). When the OAuth 2.0 client credentials fetch fails, because the
   token endpoint is unreachable or refuses the bridge's own credentials, the

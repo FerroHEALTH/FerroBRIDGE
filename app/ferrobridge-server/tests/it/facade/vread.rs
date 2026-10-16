@@ -22,6 +22,7 @@ use super::create_one;
 use super::first_issue;
 use super::get_tagged;
 use super::harness;
+use super::named;
 use super::post_located;
 use super::revised_condition;
 use super::stub::mount_create;
@@ -86,7 +87,7 @@ async fn after_an_update_each_version_reads_back_with_its_own_content()
         harness.app(),
         Request::put(format!("/fhir/Condition/{id}"))
             .header(header::CONTENT_TYPE, "application/fhir+json")
-            .body(Body::from(revised_condition().to_string()))?,
+            .body(Body::from(named(revised_condition(), &id).to_string()))?,
     )
     .await?;
     assert_eq!(StatusCode::OK, status, "{updated}");
