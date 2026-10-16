@@ -410,6 +410,12 @@ crates on crates.io.
   FHIR R4 ext-1 forbids (#629). The extension method of the same append had
   the same one-sided gate, so its url manual ran for every read; it now runs
   only when the composition holds a diagnostic certainty.
+- A `CodeableConcept` with codings and no `text` fills a `DV_TEXT` (#626).
+  The facade used to refuse such a resource with a `422`, because
+  `DV_TEXT.value` had no source. It now takes the first coding's `display`,
+  then its `code`, the fallback FHIRconnect writes for `DV_CODED_TEXT`, and
+  records the one-way row in the outcome. Reading the resource back adds
+  `code.text` holding that rubric and leaves the codings as they were.
 - A `recorder` that carries only a reference no longer leaves
   `COMPOSITION.composer` empty (#627). The FHIRconnect engine used to count
   the empty party as a written composer, so the default composer was
