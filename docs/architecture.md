@@ -830,7 +830,26 @@ expression is a load error: the reference CDR's connector let `where()` and
   stating exactly which search parameters each resource supports and refusing
   the rest with an `OperationOutcome`. `patient` and `_id` are distinct
   parameters and a subject is verified, never echoed. Labelled as
-  FerroBRIDGE's extension wherever it appears.
+  FerroBRIDGE's extension wherever it appears. As built (#98): the
+  declaration is a `<name>.search.yml` file in the mapping tree naming one
+  context, its subject parameters, its `token`, `string` and `date`
+  parameters, each with the node it is read under (an RM class and an
+  archetype id) and a path relative to it, and a configured total order; the
+  facade writes the `SELECT`, the `FROM EHR e CONTAINS VERSION
+  v[LATEST_VERSION] CONTAINS COMPOSITION c`, one `CONTAINS <CLASS>
+  n<i>[<archetype>]` per parameter occurrence read under a node, and the
+  template condition itself, so the paths of one occurrence read one node
+  (a token's code and system are one coded value's, #526) and a declaration
+  contributes paths only, every value bound as an AQL parameter. A path that
+  crosses a node the Web Template lets occur more than once below the bound
+  one is refused at load. A composition matching on several nodes is one
+  entry: rows are grouped by version uid and the count is
+  `COUNT(DISTINCT v/uid/value)`. One resource type answers one
+  parameter set, and two declarations of one type over one template are
+  refused at load. A parameter outside the set is refused unless the client
+  sends `Prefer: handling=lenient` (R4 search §3.1.1.3); an unsupported
+  modifier is always refused (§3.1.1.4.4); `_count=0` runs the count query
+  alone, as R4 treats it as `_summary=count` (§3.1.1.5.3).
 - **Status codes are mapped as types**, from the ITS-REST outcome to the FHIR
   outcome, in a table that is FerroBRIDGE's own design with both sides cited
   and every row pinned by a wire test: a CDR `422` (template validation) is a

@@ -16,6 +16,7 @@ mod person;
 mod read;
 mod reconcile;
 mod replay;
+mod search;
 pub(crate) mod stub;
 mod transaction;
 mod validate;
@@ -210,9 +211,26 @@ async fn harness_with(facade_settings: Settings) -> Harness {
     harness_over(FIXTURES, facade_settings).await
 }
 
+/// Returns a harness whose facade answers search as the declarations in
+/// [`FIXTURES`] state, with the page sizes of `limits`.
+async fn search_harness(limits: ferrobridge_server::facade::search::Limits) -> Harness {
+    harness_built(FIXTURES, settings(), Some(limits)).await
+}
+
 /// Returns a harness whose facade runs the mapping set under `fixtures` with
 /// `facade_settings`.
 async fn harness_over(fixtures: &str, facade_settings: Settings) -> Harness {
+    harness_built(fixtures, facade_settings, None).await
+}
+
+/// Returns a harness whose facade runs the mapping set under `fixtures` with
+/// `facade_settings`, answering search as the declarations under `fixtures`
+/// state when `search` carries its page sizes.
+async fn harness_built(
+    fixtures: &str,
+    facade_settings: Settings,
+    search: Option<ferrobridge_server::facade::search::Limits>,
+) -> Harness {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(
@@ -231,12 +249,16 @@ async fn harness_over(fixtures: &str, facade_settings: Settings) -> Harness {
         .expect("the template fetch answers");
     let compiled = programs::compile_set(&set, &templates).expect("the mapping set compiles");
     let store = Arc::new(MemoryStore::new());
-    let facade = Arc::new(Facade::new(
-        compiled,
-        handle(&store),
-        client(&cdr),
-        facade_settings,
-    ));
+    let mut built = Facade::new(compiled, handle(&store), client(&cdr), facade_settings);
+    if let Some(limits) = search {
+        let catalog = ferrobridge_server::facade::search::load(
+            std::path::Path::new(fixtures),
+            built.programs(),
+        )
+        .expect("the search declarations load");
+        built = built.with_search(catalog, limits);
+    }
+    let facade = Arc::new(built);
     Harness { cdr, store, facade }
 }
 

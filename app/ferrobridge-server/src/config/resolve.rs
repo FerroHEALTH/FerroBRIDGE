@@ -80,6 +80,32 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
             territory: facade.composition_territory.clone(),
         },
         identity_store: facade.identity_store.clone(),
+        search: search_limits(facade)?,
+    })
+}
+
+/// Returns the search page sizes `facade` configures.
+///
+/// A page holds at least one match, and the default page fits under the
+/// largest one.
+fn search_limits(facade: &Facade) -> Result<crate::facade::search::Limits, Error> {
+    if facade.search_count_max == 0 {
+        return Err(Error::SearchCount {
+            key: String::from("facade.search_count_max"),
+            value: 0,
+            reason: "a page holds at least one match",
+        });
+    }
+    if facade.search_count == 0 || facade.search_count > facade.search_count_max {
+        return Err(Error::SearchCount {
+            key: String::from("facade.search_count"),
+            value: facade.search_count,
+            reason: "the default page holds at least one match and no more than facade.search_count_max",
+        });
+    }
+    Ok(crate::facade::search::Limits {
+        default_count: facade.search_count,
+        max_count: facade.search_count_max,
     })
 }
 

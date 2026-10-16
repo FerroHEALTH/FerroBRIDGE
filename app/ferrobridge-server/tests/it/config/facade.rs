@@ -84,3 +84,45 @@ fn an_enabled_facade_without_a_composition_language_refuses_to_boot()
     }
     Ok(())
 }
+
+/// The smallest enabled facade section.
+const ENABLED: &str =
+    "[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n";
+
+#[test]
+fn the_search_page_sizes_default_and_resolve_as_configured() -> Result<(), Box<dyn StdError>> {
+    let settings = Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve()?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    assert_eq!(
+        ferrobridge_server::facade::search::Limits::default(),
+        facade.search
+    );
+    let text = format!("{ENABLED}search_count = 5\nsearch_count_max = 50\n");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    assert_eq!(5, facade.search.default_count);
+    assert_eq!(50, facade.search.max_count);
+    Ok(())
+}
+
+#[test]
+fn a_search_page_size_no_page_can_hold_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    for (keys, refused) in [
+        ("search_count_max = 0\n", "facade.search_count_max"),
+        ("search_count = 0\n", "facade.search_count"),
+        (
+            "search_count = 60\nsearch_count_max = 50\n",
+            "facade.search_count",
+        ),
+    ] {
+        let text = format!("{ENABLED}{keys}");
+        let error = Config::from_sources(Some(&text), &BTreeMap::new())?
+            .resolve()
+            .expect_err("the page size is refused");
+        match &error {
+            Error::SearchCount { key, .. } => assert_eq!(refused, key, "{keys}"),
+            other => return Err(format!("expected a search count error, got {other:?}").into()),
+        }
+    }
+    Ok(())
+}

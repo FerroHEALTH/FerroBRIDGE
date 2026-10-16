@@ -240,7 +240,7 @@ impl Ingest<'_> {
 
     /// Records the identity binding of one committed composition, and returns
     /// the resource id and the binding that stand.
-    fn bind(
+    pub(crate) fn bind(
         &self,
         program: &Loaded,
         resource_type: &str,
