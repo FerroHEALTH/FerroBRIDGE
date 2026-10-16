@@ -6,16 +6,21 @@
 //! Each release has its own generated model, so the same code is generated
 //! once per release by `per_release` and the functions below dispatch on
 //! [`WireVersion`]. The request and response contracts come from
-//! `fhir_types::r4::operations` and `fhir_types::r4b::operations`; this module
-//! writes no FHIR by hand.
+//! `fhir_types::stu3::operations`, `fhir_types::r4::operations` and
+//! `fhir_types::r4b::operations`; this module writes no FHIR by hand.
 //!
-//! NOTE: R4 and R4B declare identical `in` and `out` parameter sets for the
-//! three operations (the vendored `OperationDefinition-CodeSystem-lookup`,
+//! R4 and R4B declare identical `in` and `out` parameter sets for the three
+//! operations (the vendored `OperationDefinition-CodeSystem-lookup`,
 //! `-ConceptMap-translate` and `-ValueSet-validate-code` of both packages), so
-//! only the decoder differs.
+//! they share `r4_contracts`. STU3 differs in three places, which
+//! `stu3_contracts` carries (the same three definitions in
+//! `hl7.fhir.r3.core` 3.0.2): `$validate-code` names the code system version
+//! `version` and has no `valueSetVersion`, `$translate` has no `url`, and
+//! `$lookup` types `property.value` as `code`. A parameter the request
+//! carries and STU3 does not declare is refused before anything is sent.
 
 use crate::config::WireVersion;
-use crate::error::{BodyError, Outcome};
+use crate::error::{BodyError, Error, Outcome};
 use crate::outcome::{LookupOutcome, Request, TranslateOutcome, ValidateOutcome};
 use http::StatusCode;
 
@@ -39,12 +44,248 @@ pub(crate) struct BatchEntry {
     pub(crate) body: String,
 }
 
-/// Generates the reader and writer of one FHIR release.
+/// Why a request could not be written in the configured release.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum RequestError {
+    /// The `Parameters` or the `Bundle` could not be written as JSON.
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    /// The request carries a parameter the release's operation does not
+    /// declare and has no equivalent for.
+    #[error("the {operation} request carries `{parameter}`, which the release does not declare")]
+    Unsupported {
+        /// The operation, as `Resource/$code`.
+        operation: &'static str,
+        /// The parameter, as the R4 `OperationDefinition` names it.
+        parameter: &'static str,
+    },
+}
+
+impl RequestError {
+    /// Returns the client error for this failure of the `operation` request
+    /// in `version`.
+    pub(crate) fn into_error(self, operation: &'static str, version: WireVersion) -> Error {
+        match self {
+            Self::Json(source) => Error::RequestBody { operation, source },
+            Self::Unsupported {
+                operation,
+                parameter,
+            } => Error::UnsupportedParameter {
+                operation,
+                parameter,
+                wire_version: version,
+            },
+        }
+    }
+}
+
+/// The request writers of R4 and R4B, which declare the same parameters.
+macro_rules! r4_contracts {
+    () => {
+        /// Returns the parameter of `request` this release cannot carry.
+        ///
+        /// R4 and R4B declare every parameter a [`Request`] carries.
+        const fn unsupported(_request: &Request) -> Option<&'static str> {
+            None
+        }
+
+        /// Returns the `Parameters` that carries `request`.
+        fn parameters(request: &Request) -> Parameters {
+            match request {
+                Request::Lookup {
+                    system,
+                    code,
+                    version,
+                } => CodeSystemLookupRequest {
+                    system: Some(system.as_str().into()),
+                    code: Some(code.as_str().into()),
+                    version: version.as_deref().map(Into::into),
+                    ..Default::default()
+                }
+                .into_parameters(),
+                Request::Translate {
+                    system,
+                    code,
+                    target_system,
+                    concept_map_url,
+                } => ConceptMapTranslateRequest {
+                    url: concept_map_url.as_deref().map(Into::into),
+                    system: Some(system.as_str().into()),
+                    code: Some(code.as_str().into()),
+                    targetsystem: Some(target_system.as_str().into()),
+                    ..Default::default()
+                }
+                .into_parameters(),
+                Request::ValidateCode(validation) => validate_code_parameters(validation),
+            }
+        }
+
+        /// Returns the `Parameters` of one `ValueSet/$validate-code`.
+        fn validate_code_parameters(validation: &Validation) -> Parameters {
+            let mut request = ValueSetValidateCodeRequest {
+                url: Some(validation.value_set_url.as_str().into()),
+                value_set_version: validation.value_set_version.as_deref().map(Into::into),
+                ..Default::default()
+            };
+            match &validation.coded {
+                Coded::Code {
+                    system,
+                    code,
+                    version,
+                    display,
+                } => {
+                    request.system = Some(system.as_str().into());
+                    request.code = Some(code.as_str().into());
+                    request.system_version = version.as_deref().map(Into::into);
+                    request.display = display.as_deref().map(Into::into);
+                }
+                Coded::Coding(concept) => request.coding = Some(coding(concept)),
+                Coded::CodeableConcept {
+                    coding: codings,
+                    text,
+                } => {
+                    request.codeable_concept = Some(codeable_concept(codings, text.as_deref()));
+                }
+            }
+            request.into_parameters()
+        }
+
+        /// Returns one `property.value`, which these releases type as any
+        /// FHIR type (`OperationDefinition-CodeSystem-lookup`, R4).
+        fn lookup_property_value(
+            value: ParametersParameterValue,
+        ) -> Result<PropertyValue, BodyError> {
+            property_value(value)
+        }
+
+        /// Returns the `issues` outcome of a false `$validate-code` answer.
+        fn invalid_issues(
+            answer: &ValueSetValidateCodeResponse,
+        ) -> Result<Option<Outcome>, BodyError> {
+            answer
+                .issues
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()?
+                .map(|text| outcome(&text))
+                .transpose()
+        }
+    };
+}
+
+/// The request writers of STU3, after `OperationDefinition-CodeSystem-lookup`,
+/// `-ConceptMap-translate` and `-ValueSet-validate-code` of
+/// `hl7.fhir.r3.core` 3.0.2.
+macro_rules! stu3_contracts {
+    () => {
+        /// Returns the parameter of `request` STU3 declares no equivalent for.
+        ///
+        /// STU3 `$translate` has no `url` and names no concept map
+        /// (<https://hl7.org/fhir/STU3/conceptmap-operations.html#translate>),
+        /// and STU3 `$validate-code` has no `valueSetVersion`
+        /// (<https://hl7.org/fhir/STU3/valueset-operations.html#validate-code>):
+        /// its `version` is the code system's.
+        const fn unsupported(request: &Request) -> Option<&'static str> {
+            match request {
+                Request::Translate {
+                    concept_map_url: Some(_),
+                    ..
+                } => Some("url"),
+                Request::ValidateCode(Validation {
+                    value_set_version: Some(_),
+                    ..
+                }) => Some("valueSetVersion"),
+                _ => None,
+            }
+        }
+
+        /// Returns the `Parameters` that carries `request`, which
+        /// `unsupported` has passed.
+        fn parameters(request: &Request) -> Parameters {
+            match request {
+                Request::Lookup {
+                    system,
+                    code,
+                    version,
+                } => CodeSystemLookupRequest {
+                    system: Some(system.as_str().into()),
+                    code: Some(code.as_str().into()),
+                    version: version.as_deref().map(Into::into),
+                    ..Default::default()
+                }
+                .into_parameters(),
+                Request::Translate {
+                    system,
+                    code,
+                    target_system,
+                    concept_map_url: _,
+                } => ConceptMapTranslateRequest {
+                    system: Some(system.as_str().into()),
+                    code: Some(code.as_str().into()),
+                    targetsystem: Some(target_system.as_str().into()),
+                    ..Default::default()
+                }
+                .into_parameters(),
+                Request::ValidateCode(validation) => validate_code_parameters(validation),
+            }
+        }
+
+        /// Returns the `Parameters` of one STU3 `ValueSet/$validate-code`.
+        fn validate_code_parameters(validation: &Validation) -> Parameters {
+            let mut request = ValueSetValidateCodeRequest {
+                url: Some(validation.value_set_url.as_str().into()),
+                ..Default::default()
+            };
+            match &validation.coded {
+                Coded::Code {
+                    system,
+                    code,
+                    version,
+                    display,
+                } => {
+                    request.system = Some(system.as_str().into());
+                    request.code = Some(code.as_str().into());
+                    // NOTE: STU3 `version` is "the version of the system", R4's `systemVersion`
+                    // (`OperationDefinition-ValueSet-validate-code`, 3.0.2 and 4.0.1).
+                    request.version = version.as_deref().map(Into::into);
+                    request.display = display.as_deref().map(Into::into);
+                }
+                Coded::Coding(concept) => request.coding = Some(coding(concept)),
+                Coded::CodeableConcept {
+                    coding: codings,
+                    text,
+                } => {
+                    request.codeable_concept = Some(codeable_concept(codings, text.as_deref()));
+                }
+            }
+            request.into_parameters()
+        }
+
+        /// Returns one `property.value`, which STU3 types as `code`
+        /// (`OperationDefinition-CodeSystem-lookup`, 3.0.2).
+        fn lookup_property_value(
+            value: fhir_types::stu3::primitives::Code,
+        ) -> Result<PropertyValue, BodyError> {
+            property_value(ParametersParameterValue::Code(value))
+        }
+
+        /// Returns the `issues` outcome of a false `$validate-code` answer,
+        /// a parameter STU3 does not declare.
+        const fn invalid_issues(
+            _answer: &ValueSetValidateCodeResponse,
+        ) -> Result<Option<Outcome>, BodyError> {
+            Ok(None)
+        }
+    };
+}
+
+/// Generates the reader and writer of one FHIR release, with the request
+/// writers `$contracts` expands to.
 macro_rules! per_release {
-    ($module:ident, $release:ident) => {
+    ($module:ident, $release:ident, $contracts:ident) => {
         /// The bodies of one FHIR release, over its own generated model.
         pub(crate) mod $module {
-            use super::{BatchEntry, BATCH, BATCH_RESPONSE, POST};
+            use super::{BatchEntry, RequestError, BATCH, BATCH_RESPONSE, POST};
             use crate::concept::{
                 Concept, Designation, Equivalence, Match, Property, PropertyValue,
             };
@@ -68,66 +309,18 @@ macro_rules! per_release {
             use fhir_types::$release::resource::Resource;
             use fhir_types::codec::Json;
 
-            /// Returns the `Parameters` that carries `request`.
-            fn parameters(request: &Request) -> Parameters {
-                match request {
-                    Request::Lookup {
-                        system,
-                        code,
-                        version,
-                    } => CodeSystemLookupRequest {
-                        system: Some(system.as_str().into()),
-                        code: Some(code.as_str().into()),
-                        version: version.as_deref().map(Into::into),
-                        ..Default::default()
-                    }
-                    .into_parameters(),
-                    Request::Translate {
-                        system,
-                        code,
-                        target_system,
-                        concept_map_url,
-                    } => ConceptMapTranslateRequest {
-                        url: concept_map_url.as_deref().map(Into::into),
-                        system: Some(system.as_str().into()),
-                        code: Some(code.as_str().into()),
-                        targetsystem: Some(target_system.as_str().into()),
-                        ..Default::default()
-                    }
-                    .into_parameters(),
-                    Request::ValidateCode(validation) => validate_code_parameters(validation),
-                }
-            }
+            $contracts!();
 
-            /// Returns the `Parameters` of one `ValueSet/$validate-code`.
-            fn validate_code_parameters(validation: &Validation) -> Parameters {
-                let mut request = ValueSetValidateCodeRequest {
-                    url: Some(validation.value_set_url.as_str().into()),
-                    value_set_version: validation.value_set_version.as_deref().map(Into::into),
-                    ..Default::default()
-                };
-                match &validation.coded {
-                    Coded::Code {
-                        system,
-                        code,
-                        version,
-                        display,
-                    } => {
-                        request.system = Some(system.as_str().into());
-                        request.code = Some(code.as_str().into());
-                        request.system_version = version.as_deref().map(Into::into);
-                        request.display = display.as_deref().map(Into::into);
-                    }
-                    Coded::Coding(concept) => request.coding = Some(coding(concept)),
-                    Coded::CodeableConcept { coding: codings, text } => {
-                        request.codeable_concept = Some(CodeableConcept {
-                            coding: codings.iter().map(coding).collect(),
-                            text: text.as_deref().map(Into::into),
-                            ..Default::default()
-                        });
-                    }
+            /// Returns the `Parameters` that carries `request`, or the
+            /// parameter this release cannot carry.
+            fn encode(request: &Request) -> Result<Parameters, RequestError> {
+                match unsupported(request) {
+                    Some(parameter) => Err(RequestError::Unsupported {
+                        operation: request.operation(),
+                        parameter,
+                    }),
+                    None => Ok(parameters(request)),
                 }
-                request.into_parameters()
             }
 
             /// Returns `concept` as a `Coding` of this release.
@@ -141,30 +334,46 @@ macro_rules! per_release {
                 }
             }
 
+            /// Returns `codings` and `text` as a `CodeableConcept` of this
+            /// release.
+            fn codeable_concept(codings: &[Concept], text: Option<&str>) -> CodeableConcept {
+                CodeableConcept {
+                    coding: codings.iter().map(coding).collect(),
+                    text: text.map(Into::into),
+                    ..Default::default()
+                }
+            }
+
             /// Returns the FHIR JSON body that carries `request`.
-            pub(crate) fn request_body(request: &Request) -> Result<String, serde_json::Error> {
-                serde_json::to_string(&parameters(request))
+            pub(crate) fn request_body(request: &Request) -> Result<String, RequestError> {
+                Ok(serde_json::to_string(&encode(request)?)?)
             }
 
             /// Returns the FHIR JSON `batch` Bundle that carries `requests`.
-            pub(crate) fn batch_body(requests: &[Request]) -> Result<String, serde_json::Error> {
-                let bundle = Bundle {
-                    r#type: BATCH.into(),
-                    entry: requests
-                        .iter()
-                        .map(|request| BundleEntry {
+            ///
+            /// A request this release cannot carry refuses the whole batch,
+            /// so nothing is sent.
+            pub(crate) fn batch_body(requests: &[Request]) -> Result<String, RequestError> {
+                let entry = requests
+                    .iter()
+                    .map(|request| {
+                        Ok(BundleEntry {
                             request: Some(BundleEntryRequest {
                                 method: POST.into(),
                                 url: super::path_of(request).into(),
                                 ..Default::default()
                             }),
-                            resource: Some(Resource::Parameters(Box::new(parameters(request)))),
+                            resource: Some(Resource::Parameters(Box::new(encode(request)?))),
                             ..Default::default()
                         })
-                        .collect(),
+                    })
+                    .collect::<Result<Vec<_>, RequestError>>()?;
+                let bundle = Bundle {
+                    r#type: BATCH.into(),
+                    entry,
                     ..Default::default()
                 };
-                serde_json::to_string(&bundle)
+                Ok(serde_json::to_string(&bundle)?)
             }
 
             /// Returns the entries of the `batch-response` `body` carries.
@@ -266,7 +475,11 @@ macro_rules! per_release {
                                 property.code.value.clone(),
                                 "property.code",
                             )?,
-                            value: property.value.clone().map(property_value).transpose()?,
+                            value: property
+                                .value
+                                .clone()
+                                .map(lookup_property_value)
+                                .transpose()?,
                             description: property
                                 .description
                                 .as_ref()
@@ -318,16 +531,9 @@ macro_rules! per_release {
                         message,
                     });
                 }
-                let issues = answer
-                    .issues
-                    .as_ref()
-                    .map(serde_json::to_string)
-                    .transpose()?
-                    .map(|text| outcome(&text))
-                    .transpose()?;
                 Ok(ValidateOutcome::Invalid {
                     message,
-                    outcome: issues,
+                    outcome: invalid_issues(&answer)?,
                 })
             }
 
@@ -362,8 +568,9 @@ macro_rules! per_release {
     };
 }
 
-per_release!(r4, r4);
-per_release!(r4b, r4b);
+per_release!(stu3, stu3, stu3_contracts);
+per_release!(r4, r4, r4_contracts);
+per_release!(r4b, r4b, r4_contracts);
 
 /// Returns the relative URL of `request`, the form a batch entry carries
 /// (<https://hl7.org/fhir/R4/http.html#transaction>).
@@ -402,6 +609,7 @@ fn required_flag(value: Option<bool>, parameter: &'static str) -> Result<bool, B
 /// Returns the `OperationOutcome` that `body` carries, read in `version`.
 pub(crate) fn outcome(version: WireVersion, body: &str) -> Result<Outcome, BodyError> {
     match version {
+        WireVersion::Stu3 => stu3::outcome(body),
         WireVersion::R4 => r4::outcome(body),
         WireVersion::R4B => r4b::outcome(body),
     }
@@ -411,8 +619,9 @@ pub(crate) fn outcome(version: WireVersion, body: &str) -> Result<Outcome, BodyE
 pub(crate) fn request_body(
     version: WireVersion,
     request: &Request,
-) -> Result<String, serde_json::Error> {
+) -> Result<String, RequestError> {
     match version {
+        WireVersion::Stu3 => stu3::request_body(request),
         WireVersion::R4 => r4::request_body(request),
         WireVersion::R4B => r4b::request_body(request),
     }
@@ -422,8 +631,9 @@ pub(crate) fn request_body(
 pub(crate) fn batch_body(
     version: WireVersion,
     requests: &[Request],
-) -> Result<String, serde_json::Error> {
+) -> Result<String, RequestError> {
     match version {
+        WireVersion::Stu3 => stu3::batch_body(requests),
         WireVersion::R4 => r4::batch_body(requests),
         WireVersion::R4B => r4b::batch_body(requests),
     }
@@ -435,6 +645,7 @@ pub(crate) fn batch_entries(
     body: &str,
 ) -> Result<Vec<BatchEntry>, BodyError> {
     match version {
+        WireVersion::Stu3 => stu3::batch_entries(body),
         WireVersion::R4 => r4::batch_entries(body),
         WireVersion::R4B => r4b::batch_entries(body),
     }
@@ -443,6 +654,7 @@ pub(crate) fn batch_entries(
 /// Returns the `CodeSystem/$lookup` answer `body` carries.
 pub(crate) fn lookup_found(version: WireVersion, body: &str) -> Result<LookupOutcome, BodyError> {
     match version {
+        WireVersion::Stu3 => stu3::lookup_found(body),
         WireVersion::R4 => r4::lookup_found(body),
         WireVersion::R4B => r4b::lookup_found(body),
     }
@@ -451,6 +663,7 @@ pub(crate) fn lookup_found(version: WireVersion, body: &str) -> Result<LookupOut
 /// Returns the `ConceptMap/$translate` answer `body` carries.
 pub(crate) fn translate(version: WireVersion, body: &str) -> Result<TranslateOutcome, BodyError> {
     match version {
+        WireVersion::Stu3 => stu3::translate(body),
         WireVersion::R4 => r4::translate(body),
         WireVersion::R4B => r4b::translate(body),
     }
@@ -462,6 +675,7 @@ pub(crate) fn validate_code(
     body: &str,
 ) -> Result<ValidateOutcome, BodyError> {
     match version {
+        WireVersion::Stu3 => stu3::validate_code(body),
         WireVersion::R4 => r4::validate_code(body),
         WireVersion::R4B => r4b::validate_code(body),
     }
@@ -492,7 +706,7 @@ mod tests {
 
     #[test]
     #[expect(clippy::panic_in_result_fn, reason = "test assertions")]
-    fn both_releases_write_the_same_lookup_parameters() -> Result<(), serde_json::Error> {
+    fn both_releases_write_the_same_lookup_parameters() -> Result<(), super::RequestError> {
         let r4 = request_body(WireVersion::R4, &lookup())?;
         let r4b = request_body(WireVersion::R4B, &lookup())?;
         assert_eq!(r4, r4b);
@@ -504,7 +718,7 @@ mod tests {
 
     #[test]
     #[expect(clippy::panic_in_result_fn, reason = "test assertions")]
-    fn a_batch_bundle_carries_one_post_entry_per_request() -> Result<(), serde_json::Error> {
+    fn a_batch_bundle_carries_one_post_entry_per_request() -> Result<(), super::RequestError> {
         let body = batch_body(WireVersion::R4, &[lookup(), lookup()])?;
         assert!(body.contains(r#""type":"batch""#), "{body}");
         assert_eq!(2, body.matches(r#""method":"POST""#).count(), "{body}");

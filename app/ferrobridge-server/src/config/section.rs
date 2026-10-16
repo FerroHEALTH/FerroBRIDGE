@@ -437,7 +437,7 @@ impl Default for OAuthClient {
 pub struct Terminology {
     /// The FHIR service base URL.
     pub base_url: String,
-    /// The release the server answers in: `r4` or `r4b`.
+    /// The release the server answers in: `stu3`, `r4` or `r4b`.
     pub wire_version: String,
     /// How long one call may take, connection included.
     pub timeout_ms: u64,

@@ -20,7 +20,7 @@ Three operations on one configured server:
 
 `validate` takes the three input forms `$validate-code` declares: a code with
 its system, `systemVersion` and `display`, a `Coding`, or a `CodeableConcept`,
-with an optional `valueSetVersion`. `validate_all` answers several validations
+with an optional `valueSetVersion` (R4 and R4B). `validate_all` answers several validations
 by position, one call for one and one `batch` for several.
 
 `batch` sends several of them as one `batch` `Bundle` and answers them by
@@ -44,13 +44,30 @@ The request and response contracts come from the generated
 [`fhir-types`](https://docs.rs/fhir-types) operation modules; this crate models
 no FHIR of its own.
 
-## Two wire versions
+## Three wire versions
 
-`WireVersion` selects R4 or R4B. Both releases declare the same `in` and `out`
-parameters for the three operations, so the release decides which generated
-model reads the answer. A server that serves several releases side by side puts
-the release in its base path, so the base URL and the wire version are
-configured together.
+`WireVersion` selects STU3, R4 or R4B, and the release decides which generated
+model writes the request and reads the answer. R4 and R4B declare the same `in`
+and `out` parameters for the three operations. STU3 (3.0.2) differs:
+
+- `$validate-code` names the code system version `version` where R4 names it
+  `systemVersion`, and the client sends it under that name. STU3 has no
+  `valueSetVersion`.
+- `$translate` has no `url`, so STU3 cannot name the concept map to use.
+- `$lookup` types `property.value` as `code`, so every property value of an
+  STU3 answer is a `valueCode`.
+- `$translate` answers the same `match` parts (`equivalence`, `concept`,
+  `product`, `source`) with the same `ConceptMapEquivalence` codes, so
+  `accepted()` reads both releases the same way.
+
+A request that names a parameter STU3 has no equivalent for (a concept map URL
+on `translate`, a `value_set_version` on `validate`) is refused with
+`Error::UnsupportedParameter` before anything is sent. In a batch the whole
+batch is refused. The request is never sent with the parameter dropped,
+because that would ask the server a different question.
+
+A server that serves several releases side by side puts the release in its
+base path, so the base URL and the wire version are configured together.
 
 ## An absent server
 

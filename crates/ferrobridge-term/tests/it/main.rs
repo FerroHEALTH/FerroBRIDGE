@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! Integration tests: the three terminology operations against a stub server,
-//! the batch form, the transport rules, a run against the reference server in
-//! a container, and the crate's pinned specification version.
+//! the batch form, the STU3 wire version, the transport rules, a run against
+//! the reference server in a container, and the crate's pinned specification
+//! version.
 
 #![allow(
     clippy::panic_in_result_fn,
@@ -16,6 +17,7 @@ mod batch;
 mod end_to_end;
 mod lookup;
 mod pins;
+mod stu3;
 mod support;
 mod translate;
 mod transport;
