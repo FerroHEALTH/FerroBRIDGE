@@ -410,6 +410,14 @@ crates on crates.io.
   FHIR R4 ext-1 forbids (#629). The extension method of the same append had
   the same one-sided gate, so its url manual ran for every read; it now runs
   only when the composition holds a diagnostic certainty.
+- A facade search that matches a composition's second entry answers that
+  entry (#530). Each entry of the archetype a context maps is a resource with
+  an id of its own, derived from the composition and the entry's place among
+  the entries of its archetype; the first entry keeps the id it had alone. A
+  search reads which entry a row matched from the node it selects, so a
+  composition with two matching diagnoses answers two `Condition`s, each
+  carrying its own code, and `Bundle.total` and the paging count entries. A
+  read, a vread and an `_id` search of an entry's id answer that entry.
 - A `CodeableConcept` with codings and no `text` fills a `DV_TEXT` (#626).
   The facade used to refuse such a resource with a `422`, because
   `DV_TEXT.value` had no source. It now takes the first coding's `display`,

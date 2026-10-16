@@ -7,7 +7,8 @@
 //! uses to manage the state of the search as pages are retrieved. These
 //! parameters do not need to be understood or processed by the client"
 //! (<https://hl7.org/fhir/R4/search.html>, §3.1.1.5.3). The cursor names the
-//! declaration a page starts in, the row offset inside it, and a fingerprint
+//! declaration a page starts in, the row offset inside it, how many entries
+//! of the composition at that row an earlier page answered, and a fingerprint
 //! of the search it belongs to, so a cursor pasted onto another search is
 //! refused rather than read as a row number of the wrong query. No
 //! specification governs the shape: our own design.
@@ -25,6 +26,9 @@ pub struct Position {
     pub declaration: usize,
     /// The row offset inside that declaration's query.
     pub offset: i64,
+    /// How many entries of the composition at `offset` an earlier page
+    /// answered, in the order its rows first name them.
+    pub skip: usize,
 }
 
 impl Position {
@@ -32,6 +36,7 @@ impl Position {
     pub const START: Self = Self {
         declaration: 0,
         offset: 0,
+        skip: 0,
     };
 }
 
@@ -70,7 +75,10 @@ pub fn fingerprint(resource_type: &str, used: &[(String, String)]) -> String {
 /// Returns the cursor of `position` in the search `fingerprint` names.
 #[must_use]
 pub fn encode(position: Position, fingerprint: &str) -> String {
-    format!("{}.{}.{fingerprint}", position.declaration, position.offset)
+    format!(
+        "{}.{}.{}.{fingerprint}",
+        position.declaration, position.offset, position.skip
+    )
 }
 
 /// Reads a cursor of the search `fingerprint` names.
@@ -82,9 +90,13 @@ pub fn encode(position: Position, fingerprint: &str) -> String {
 pub fn decode(text: &str, fingerprint: &str) -> Result<Position, CursorError> {
     let malformed = || CursorError::Malformed(text.to_owned());
     let mut parts = text.split('.');
-    let (Some(declaration), Some(offset), Some(print), None) =
-        (parts.next(), parts.next(), parts.next(), parts.next())
-    else {
+    let (Some(declaration), Some(offset), Some(skip), Some(print), None) = (
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+    ) else {
         return Err(malformed());
     };
     let declaration = declaration.parse::<usize>().map_err(|_parse| malformed())?;
@@ -93,12 +105,14 @@ pub fn decode(text: &str, fingerprint: &str) -> Result<Position, CursorError> {
         .ok()
         .filter(|offset| *offset >= 0)
         .ok_or_else(malformed)?;
+    let skip = skip.parse::<usize>().map_err(|_parse| malformed())?;
     if print != fingerprint {
         return Err(CursorError::Foreign);
     }
     Ok(Position {
         declaration,
         offset,
+        skip,
     })
 }
 
@@ -116,6 +130,7 @@ mod tests {
         let position = Position {
             declaration: 1,
             offset: 40,
+            skip: 2,
         };
         assert_eq!(Ok(position), decode(&encode(position, &print), &print));
     }
@@ -132,7 +147,17 @@ mod tests {
     #[test]
     fn a_cursor_this_server_did_not_write_is_refused() {
         let print = fingerprint("Condition", &[]);
-        for text in ["", "1", "1.2", "a.2.x", "1.-2.x", "1.2.x.y"] {
+        for text in [
+            "",
+            "1",
+            "1.2",
+            "1.2.x",
+            "a.2.0.x",
+            "1.-2.0.x",
+            "1.2.-1.x",
+            "1.2.y.x",
+            "1.2.0.x.y",
+        ] {
             assert!(
                 matches!(decode(text, &print), Err(CursorError::Malformed(_))),
                 "{text}"

@@ -25,6 +25,7 @@ use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::cdr::ids::entity_tag;
 use crate::facade::Facade;
+use crate::facade::engine;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::Refusal;
 use crate::facade::handlers::render;
@@ -58,6 +59,7 @@ pub(crate) async fn read(
         .map_err(|error| stored_identifier(&error))?;
     let (version, composition) =
         fetch(facade, client, &ehr_id, &container, &binding.template_id).await?;
+    let composition = entry_view(program, &composition, &binding, &internal)?;
     let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
     let subject = render::subject_of(facade, &ehr_id)?;
     let rendered = render::render(
@@ -145,6 +147,7 @@ pub(crate) async fn vread(
         (wanted, body)
     };
     let composition = canonical(facade, &body, &binding.template_id)?;
+    let composition = entry_view(program, &composition, &binding, &internal)?;
     let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
     let subject = render::subject_of(facade, &ehr_id)?;
     let rendered = render::render(
@@ -396,6 +399,31 @@ pub(crate) async fn version_of_etag(
         )
         .with_entity_tag(current_tree.value()),
     ))
+}
+
+/// Returns the composition narrowed to the one entry `binding` names, so the
+/// resource answered is that entry's.
+///
+/// A version that no longer holds the entry holds no such resource, so it is
+/// `404` (no specification governs the entry identity: our own design).
+pub(crate) fn entry_view(
+    program: &Loaded,
+    composition: &CanonicalComposition,
+    binding: &CompositionBinding,
+    id: &FhirResourceId,
+) -> Result<CanonicalComposition, Refusal> {
+    let entry = engine::entry_named(program.program(), composition, &binding.entry_path)
+        .ok_or_else(|| {
+            reply::refusal(
+                StatusCode::NOT_FOUND,
+                Issue::error(IssueType::NotFound).diagnosing(format!(
+                    "{}/{} names an entry the composition version no longer holds",
+                    binding.resource_type,
+                    id.as_str()
+                )),
+            )
+        })?;
+    Ok(entry.isolate(composition))
 }
 
 /// Returns the `404` an id the map does not know answers.

@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! A token's code and system are read from one node, and a composition with
-//! several matching nodes is one entry (#526).
+//! A token's code and system are read from one node, and an entry with
+//! several matching nodes is one match (#526).
 //!
 //! R4 matches `[system]|[code]` against one `Coding`
 //! (<https://hl7.org/fhir/R4/search.html#token>). The stub CDR evaluates no
@@ -20,14 +20,15 @@ use super::super::VERSION_ONE;
 use super::AQL;
 use super::OTHER_CONTAINER;
 use super::bound;
+use super::diagnosis;
 use super::get;
 use super::link;
 use super::matches;
 use super::mount_count;
 use super::mount_rows;
+use super::node_row;
 use super::queries;
 use super::result_set;
-use super::row;
 use super::searching;
 
 #[tokio::test]
@@ -71,11 +72,12 @@ async fn code_and_system_are_compared_on_the_one_node_the_from_binds()
 async fn a_composition_whose_two_nodes_match_is_one_entry() -> Result<(), Box<dyn StdError>> {
     let harness = searching().await;
     let composition = harness.composition();
+    let node = diagnosis(&composition);
     mount_rows(
         &harness.cdr,
         &[
-            row(VERSION_ONE, &composition),
-            row(VERSION_ONE, &composition),
+            node_row(VERSION_ONE, &composition, &node),
+            node_row(VERSION_ONE, &composition, &node),
         ],
     )
     .await;
@@ -97,6 +99,7 @@ async fn paging_and_the_total_count_compositions_and_never_nodes() -> Result<(),
     // of one holds A, and the next page starts at B's row, offset 2.
     let harness = searching().await;
     let composition = harness.composition();
+    let node = diagnosis(&composition);
     let second = format!("{OTHER_CONTAINER}::ferrobridge.test::1");
     let answer =
         |rows: &[serde_json::Value]| ResponseTemplate::new(200).set_body_json(result_set(rows));
@@ -105,12 +108,21 @@ async fn paging_and_the_total_count_compositions_and_never_nodes() -> Result<(),
             0,
             2,
             vec![
-                row(VERSION_ONE, &composition),
-                row(VERSION_ONE, &composition),
+                node_row(VERSION_ONE, &composition, &node),
+                node_row(VERSION_ONE, &composition, &node),
             ],
         ),
-        (2, 1, vec![row(&second, &composition)]),
-        (2, 2, vec![row(&second, &composition)]),
+        (2, 1, vec![node_row(&second, &composition, &node)]),
+        (
+            0,
+            100,
+            vec![
+                node_row(VERSION_ONE, &composition, &node),
+                node_row(VERSION_ONE, &composition, &node),
+                node_row(&second, &composition, &node),
+            ],
+        ),
+        (2, 2, vec![node_row(&second, &composition, &node)]),
     ] {
         Mock::given(matchers::method("POST"))
             .and(matchers::path(AQL))
@@ -161,10 +173,8 @@ async fn paging_and_the_total_count_compositions_and_never_nodes() -> Result<(),
         .filter(|text| text.contains("COUNT("))
         .collect();
     assert!(
-        counts
-            .iter()
-            .all(|text| text.contains("COUNT(DISTINCT v/uid/value)")),
-        "a count over a bound node counts version uids: {counts:?}"
+        counts.is_empty(),
+        "a total over a bound node counts the entries its rows answer (#530), never a COUNT of version uids: {counts:?}"
     );
     Ok(())
 }

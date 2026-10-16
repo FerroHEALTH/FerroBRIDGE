@@ -1576,6 +1576,24 @@ draft upstream change.
   failure mode (a re-sent Bundle omitting one resource reads as a different
   mapping) is documented, not hidden.
 
+  Each `content` item of the archetype a context's start model mapping names
+  is a resource of its own (#530). Its entry path is
+  `/content[<archetype>, <n>]`, `n` its 1-based place among the items of that
+  archetype (openEHR BASE Release 1.2.0, Paths and Locators), and the first
+  item keys the identity map by the unindexed `/content[<archetype>]`, the
+  path it has when it is the only one, so a composition that gains a second
+  entry does not rename the resource of its first. The binding records that
+  path; a read, a vread or an `_id` search finds the entry by its place and
+  maps the composition with every other item of the archetype removed. A
+  search query selects each node its `FROM` binds, and the facade answers the
+  entries that hold every selected node; a row whose nodes lie in no entry,
+  and a search binding no node, answers the entries `_id` names or else the
+  composition's first entry. The
+  place is positional, so removing an earlier entry in a later version moves
+  the identity of the ones after it, the same property the released
+  recommendation's entry path has. No specification governs how a row names
+  its entry: our own design.
+
   ```mermaid
   flowchart TB
       E["Entry in a composition version"] --> M{"Identity map has<br/>this entry?"}
