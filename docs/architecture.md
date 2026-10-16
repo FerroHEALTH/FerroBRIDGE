@@ -1527,9 +1527,13 @@ draft upstream change.
   transaction all-or-nothing, batch per entry (section 4.6). OMOP: one
   composition's record graph all-or-nothing (section 5.1). Upstream: a refused
   call, a failed terminology lookup, a timeout, a `204` on a deleted
-  composition, an ambiguous concept match are each a typed error carrying the
+  composition for a read that expects its content (the facade's read answers
+  it as `410`), an ambiguous concept match are each a typed error carrying the
   upstream status and body, never a default, never an empty value (the
-  reference OMOP engine turns a CDR outage into "no visits").
+  reference OMOP engine turns a CDR outage into "no visits"). The ETL's
+  deletion check reads the same `204` as the deletion signal it asks for
+  (section 5.1), and a call there with no documented answer is the typed
+  error.
 - **Type coercion** is strict (section 4.4).
 - **PROGRAMMED mappings and `CustomMapping`** are named Rust functions
   registered at build time; there is no runtime plugin loading (sections 4.4,
