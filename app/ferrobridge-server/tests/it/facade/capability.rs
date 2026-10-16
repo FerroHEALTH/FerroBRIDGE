@@ -65,6 +65,17 @@ async fn the_capability_statement_names_exactly_the_loaded_programs()
     assert_eq!(Some(false), condition["updateCreate"].as_bool());
     assert_eq!(Some(true), condition["conditionalCreate"].as_bool());
     assert_eq!(
+        Some("versioned-update"),
+        condition["versioning"].as_str(),
+        "every answer carries an ETag and an update checks If-Match \
+         (R4 capabilitystatement-definitions.html#CapabilityStatement.rest.resource.versioning)"
+    );
+    assert_eq!(
+        Some(true),
+        condition["readHistory"].as_bool(),
+        "a vread answers past versions (R4 CapabilityStatement.rest.resource.readHistory)"
+    );
+    assert_eq!(
         Some(false),
         condition["conditionalUpdate"].as_bool(),
         "no PUT [type]?[search parameters] route is served (R4 http.html#cond-update)"
