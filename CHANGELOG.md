@@ -399,6 +399,13 @@ crates on crates.io.
 
 ### Fixed
 
+- `fhir-types` 0.1.116 holds an element id to the `string` form in R4B and
+  R5 (#378). The published definitions type `Element.id` as `string` in every
+  version, while the 4.3.0 and 5.0.0 core packages state `id` on the copies
+  `ElementDefinition.id`, `Extension.id` and the other datatypes inherit, so
+  an element id such as `Patient.extension:birthPlace` or one longer than 64
+  characters was refused. A resource id keeps the form its package states.
+  The R4B and R5 examples corpora pass 544 and 191 more instances.
 - A CDR credential the token endpoint will not issue answers the FHIR caller
   `502` (#518). When the OAuth 2.0 client credentials fetch fails, because the
   token endpoint is unreachable or refuses the bridge's own credentials, the

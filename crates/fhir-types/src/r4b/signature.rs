@@ -210,7 +210,7 @@ impl super::super::codec::Json for Signature {
             .map(|value| {
                 path.with("id", |path| {
                     let value = super::super::codec::expect_single(value, path)?;
-                    super::primitives::checked_id(
+                    super::primitives::checked_string(
                         super::super::codec::expect_string(value, path)?,
                         path,
                     )
