@@ -25,6 +25,23 @@ crates on crates.io.
 
 ### Added
 
+- The FHIR facade answers `batch` Bundles on `POST [base]` (#531). Each entry
+  runs as the read, vread, search, create or update its `request` names,
+  through the same handler as the single interaction, with `ifMatch` and
+  `ifNoneExist` as its conditional headers and the request's
+  `Prefer: return` applied to it, and the answer is a `batch-response`
+  Bundle with one entry per request entry in the same order, each carrying
+  its status, `location`, `etag` and resource, or its `OperationOutcome` in
+  `response.outcome` (R4 http.html §3.1.0.11). A CDR refusal of one entry is
+  that entry's status through the status table and the others still run.
+  Under `[auth]` each entry is authorised on its own, and an entry the token
+  does not cover, or one outside a `patient/` token's compartment, answers
+  `403` inside the response. An entry referencing another entry's `fullUrl`
+  answers `400`, as R4 calls it non-conformant, and a Bundle with an entry
+  that has no `request`, or a `POST` or `PUT` with no resource, is refused
+  whole with `400`. Each entry leaves its own audit line, with its position
+  as `entry`, beside the request's line, whose interaction reads `batch`. The
+  `CapabilityStatement` declares `batch` beside `transaction`.
 - The FHIR facade answers search (#98): `GET [base]/{type}?…` and
   `POST [base]/{type}/_search` over an AQL projection declared beside the
   context mapping, in a `<name>.search.yml` file that names the context, the

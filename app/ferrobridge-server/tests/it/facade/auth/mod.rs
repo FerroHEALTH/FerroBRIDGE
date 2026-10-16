@@ -8,6 +8,7 @@
 //! memory: no key, real or synthetic, is committed.
 
 mod audit;
+mod batch;
 mod compartment;
 mod discovery;
 mod routes;
