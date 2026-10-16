@@ -28,6 +28,7 @@ use super::first_issue;
 use super::get_tagged;
 use super::harness;
 use super::harness_with;
+use super::named;
 use super::post_condition;
 use super::raw;
 use super::revised_condition;
@@ -149,6 +150,57 @@ async fn an_update_of_an_id_the_map_does_not_know_is_four_hundred_and_four()
 }
 
 #[tokio::test]
+async fn an_update_whose_body_names_no_id_is_four_hundred_and_commits_nothing()
+-> Result<(), Box<dyn StdError>> {
+    // "If no id element is provided ... the server SHALL respond with an HTTP
+    // 400 error code" (<https://hl7.org/fhir/R4/http.html#update>).
+    let harness = harness().await;
+    let id = create_one(&harness).await?;
+    mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
+    mount_version_two(&harness).await;
+    let mut resource = revised_condition();
+    resource
+        .as_object_mut()
+        .ok_or("the fixture is an object")?
+        .remove("id");
+    let request = Request::put(format!("/fhir/Condition/{id}"))
+        .header(header::CONTENT_TYPE, "application/fhir+json")
+        .body(Body::from(resource.to_string()))?;
+    let (status, body) = call(harness.app(), request).await?;
+    assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");
+    assert_eq!(Some("invalid"), first_issue(&body)["code"].as_str());
+    assert_eq!(
+        Some("Condition.id"),
+        first_issue(&body)["location"][0].as_str(),
+        "{body}"
+    );
+    assert_eq!(0, writes(&harness).await.1, "no update reached the CDR");
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_update_whose_body_names_another_id_is_four_hundred_and_commits_nothing()
+-> Result<(), Box<dyn StdError>> {
+    // "If ... the id disagrees with the id in the URL, the server SHALL
+    // respond with an HTTP 400 error code"
+    // (<https://hl7.org/fhir/R4/http.html#update>).
+    let harness = harness().await;
+    let id = create_one(&harness).await?;
+    mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
+    mount_version_two(&harness).await;
+    let request = Request::put(format!("/fhir/Condition/{id}"))
+        .header(header::CONTENT_TYPE, "application/fhir+json")
+        .body(Body::from(
+            named(revised_condition(), "another-id").to_string(),
+        ))?;
+    let (status, body) = call(harness.app(), request).await?;
+    assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");
+    assert_eq!(Some("invalid"), first_issue(&body)["code"].as_str());
+    assert_eq!(0, writes(&harness).await.1, "no update reached the CDR");
+    Ok(())
+}
+
+#[tokio::test]
 async fn an_update_without_if_match_checks_the_current_etag() -> Result<(), Box<dyn StdError>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
@@ -163,7 +215,7 @@ async fn an_update_without_if_match_checks_the_current_etag() -> Result<(), Box<
     .await;
     let request = Request::put(format!("/fhir/Condition/{id}"))
         .header(header::CONTENT_TYPE, "application/fhir+json")
-        .body(Body::from(condition().to_string()))?;
+        .body(Body::from(named(condition(), &id).to_string()))?;
     let (status, body) = call(harness.app(), request).await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     assert!(
@@ -191,7 +243,7 @@ async fn a_cdr_precondition_failure_is_four_hundred_and_twelve_with_the_current_
     let request = Request::put(format!("/fhir/Condition/{id}"))
         .header(header::CONTENT_TYPE, "application/fhir+json")
         .header(header::IF_MATCH, format!("W/\"{VERSION_ONE}\""))
-        .body(Body::from(condition().to_string()))?;
+        .body(Body::from(named(condition(), &id).to_string()))?;
     let response = raw(harness.app(), request).await?;
     assert_eq!(StatusCode::PRECONDITION_FAILED, response.status());
     assert_eq!(
@@ -210,7 +262,7 @@ fn put_if_match(id: &str, if_match: &str) -> Result<Request<Body>, Box<dyn StdEr
     Ok(Request::put(format!("/fhir/Condition/{id}"))
         .header(header::CONTENT_TYPE, "application/fhir+json")
         .header(header::IF_MATCH, if_match)
-        .body(Body::from(revised_condition().to_string()))?)
+        .body(Body::from(named(revised_condition(), id).to_string()))?)
 }
 
 /// Returns one response header as text.

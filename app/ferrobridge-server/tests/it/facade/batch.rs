@@ -24,6 +24,7 @@ use super::call;
 use super::condition;
 use super::first_issue;
 use super::harness;
+use super::named;
 use super::post_condition;
 use super::post_transaction;
 use super::revised_condition;
@@ -153,7 +154,11 @@ async fn a_mixed_batch_answers_every_entry_in_request_order() -> Result<(), Box<
             entry("GET", &format!("Condition/{id}"), None),
             entry("POST", "Condition", Some(second)),
             entry("GET", "Condition?patient=p-1", None),
-            entry("PUT", &format!("Condition/{id}"), Some(revised_condition())),
+            entry(
+                "PUT",
+                &format!("Condition/{id}"),
+                Some(named(revised_condition(), &id)),
+            ),
         ]),
     )
     .await?;
@@ -378,7 +383,11 @@ async fn an_entry_if_match_reaches_its_update_as_the_header() -> Result<(), Box<
     let id = created(&harness).await?;
     mount_read(&harness.cdr, VERSION_TWO, &harness.composition()).await;
     mount_version_two(&harness).await;
-    let mut stale = entry("PUT", &format!("Condition/{id}"), Some(revised_condition()));
+    let mut stale = entry(
+        "PUT",
+        &format!("Condition/{id}"),
+        Some(named(revised_condition(), &id)),
+    );
     stale["request"]["ifMatch"] = serde_json::json!("W/\"1\"");
     let (status, body) = post_transaction(&harness, &batch_of(&[stale])).await?;
     assert_eq!(StatusCode::OK, status, "{body}");

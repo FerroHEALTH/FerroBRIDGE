@@ -15,7 +15,8 @@
 //! create claims its source before it reads the map and holds the claim until
 //! it answers, so a second create of the same `id` that arrives meanwhile is a
 //! `409` and commits nothing. Update needs the map to know the id, because
-//! this milestone declares `updateCreate: false`, and it checks the CDR's
+//! this milestone declares `updateCreate: false`. It refuses a body whose `id`
+//! is missing or differs from the URL id with a `400`, and checks the CDR's
 //! current `ETag` when the client sends no `If-Match`. An update of one
 //! entry's resource commits the composition version it follows with that
 //! entry replaced and every other entry as it stood
@@ -144,10 +145,39 @@ pub(crate) async fn update(
         )
     })?;
     let inbound = read::parse(body, resource_type)?;
+    same_id(&inbound, id)?;
     compartment::admit_inbound(facade, access, Permission::Update, &inbound)?;
     let program = select_program(facade, &inbound, headers)?;
     let ingest = facade.ingest(facade.client_for(headers));
     resend(facade, &ingest, program, &inbound, &binding, headers).await
+}
+
+/// Checks that the resource an update carries names the id its URL names.
+///
+/// R4 update: "If no id element is provided, or the id disagrees with the id
+/// in the URL, the server SHALL respond with an HTTP 400 error code"
+/// (<https://hl7.org/fhir/R4/http.html#update>).
+///
+/// # Errors
+///
+/// Returns a `400` [`Refusal`] with an `invalid` issue at `Resource.id` when
+/// the body carries no `id` or another one.
+fn same_id(inbound: &Inbound, id: &str) -> Result<(), Refusal> {
+    let location = format!("{}.id", inbound.resource_type());
+    let diagnostics = match inbound.id() {
+        Some(carried) if carried.as_str() == id => return Ok(()),
+        Some(carried) => format!(
+            "the resource names the id {}, and the URL names {id}",
+            carried.as_str()
+        ),
+        None => format!("the resource names no id, and the URL names {id}"),
+    };
+    Err(reply::refusal(
+        StatusCode::BAD_REQUEST,
+        Issue::error(IssueType::Invalid)
+            .diagnosing(diagnostics)
+            .at(location),
+    ))
 }
 
 /// Returns the binding of the resource a consumed source produced.

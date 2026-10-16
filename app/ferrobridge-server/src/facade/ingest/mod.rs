@@ -36,7 +36,6 @@ use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::cdr::CdrClient;
-use crate::cdr::Returned;
 use crate::cdr::ids::ContributionUid;
 use crate::cdr::ids::EhrId;
 use crate::facade::Settings;
@@ -56,7 +55,7 @@ use crate::facade::programs::Programs;
 use crate::facade::request::Inbound;
 use crate::facade::status;
 
-use binding::representation;
+use binding::canonical_of;
 
 /// What a Bundle entry no loaded program maps does to the Bundle.
 ///
@@ -474,15 +473,20 @@ impl Standing {
     /// committed nothing, with `built` as the mapping the answer renders
     /// through.
     fn written(self, built: &CanonicalComposition) -> Result<Written, Refused> {
-        let composition =
-            representation(Returned::Representation(Box::new(self.composition)), built)?;
-        Ok(Written {
+        let composition = canonical_of(&self.composition, built)?;
+        Ok(self.replayed(composition))
+    }
+
+    /// Returns the answer of a write that found this composition and
+    /// committed nothing, rendering `composition`.
+    fn replayed(self, composition: CanonicalComposition) -> Written {
+        Written {
             id: self.id,
             ehr_id: self.ehr_id,
             version: self.version,
             composition,
             delivery: Delivery::Replayed,
-        })
+        }
     }
 }
 

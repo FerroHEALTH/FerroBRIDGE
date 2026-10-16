@@ -13,9 +13,13 @@
 //! wire (`docs/architecture.md` §4.6).
 //!
 //! The statement declares `updateCreate: false`, because a `PUT` to an
-//! unknown id is a `404` rather than a create, and `conditionalCreate` and
-//! `conditionalUpdate` true, because `If-None-Exist` and `If-Match` are
-//! honoured as R4 defines them (<https://hl7.org/fhir/R4/http.html>).
+//! unknown id is a `404` rather than a create, `conditionalCreate` true,
+//! because `If-None-Exist` is honoured as R4 defines it
+//! (<https://hl7.org/fhir/R4/http.html#ccreate>), and `conditionalUpdate`
+//! false, because no `PUT [type]?[search parameters]` route is served
+//! (<https://hl7.org/fhir/R4/http.html#cond-update>). `If-Match` on an update
+//! is the version-aware update of R4, which `conditionalUpdate` does not name
+//! (<https://hl7.org/fhir/R4/http.html#concurrency>).
 
 use fhir_types::r4::capability_statement::CapabilityStatement;
 use fhir_types::r4::capability_statement::CapabilityStatementRest;
@@ -378,7 +382,7 @@ fn resource(name: &str, search: &Catalog) -> CapabilityStatementRestResource {
             .unwrap_or_default(),
         update_create: Some(false.into()),
         conditional_create: Some(true.into()),
-        conditional_update: Some(true.into()),
+        conditional_update: Some(false.into()),
         operation: vec![CapabilityStatementRestResourceOperation {
             name: "validate".into(),
             definition: VALIDATE_DEFINITION.into(),
