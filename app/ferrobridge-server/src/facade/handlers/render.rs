@@ -268,6 +268,7 @@ pub(crate) const fn loss_kind(loss: &Loss) -> &'static str {
             SkipReason::PreprocessorGate { .. } => "skipped-preprocessor-gate",
             SkipReason::UnresolvedReference { .. } => "skipped-unresolved-reference",
             SkipReason::EmptyReference => "skipped-empty-reference",
+            SkipReason::TermMappingMatch { .. } => "skipped-term-mapping-match",
         },
         Loss::Defaulted { .. } => "defaulted",
         Loss::LastOfMany { .. } => "last-of-many",

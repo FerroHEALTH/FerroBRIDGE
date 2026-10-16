@@ -306,6 +306,48 @@ fn every_loss_coming_out_to_fhir_names_both_places() -> Result<(), Box<dyn Error
     Ok(())
 }
 
+// A withheld TERM_MAPPING arises coming out to FHIR only: going in, a Coding is
+// written back as an `=` mapping, which FHIR carries.
+#[test]
+fn a_withheld_term_mapping_names_the_element_and_the_mappings() -> Result<(), Box<dyn Error>> {
+    let index = template()?;
+    let program = compiled("ferrobridge_diagnose_minimal")?;
+    let outbound = to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        &crate::term_mapping::annotated_composition(&index, '?')?,
+        &Seams::default(),
+        &CallContext::new(),
+    )?;
+    let mappings = format!("{}/mappings", crate::term_mapping::PROBLEM);
+    assert_eq!(
+        outbound.warnings(),
+        [located(
+            Loss::Skipped {
+                mapping: String::from("problemDiagnose"),
+                reason: SkipReason::TermMappingMatch {
+                    match_code: '?',
+                    terminology: String::from(crate::term_mapping::BROADER_SYSTEM),
+                    code: String::from(crate::term_mapping::BROADER_CODE),
+                },
+            },
+            Some("Condition.code"),
+            Some(&mappings),
+        )]
+    );
+    assert_rendered(outbound.warnings());
+    assert_no_value(
+        &serde_json::json!([
+            crate::term_mapping::BROADER_SYSTEM,
+            crate::term_mapping::BROADER_CODE,
+            "a synthetic problem name",
+        ]),
+        outbound.warnings(),
+    );
+    Ok(())
+}
+
 /// Renders each warning as its text and its two locations, for a snapshot.
 fn rows(warnings: &[Warning]) -> Vec<String> {
     warnings

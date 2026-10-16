@@ -9,6 +9,11 @@
 //! names. This module is that lookup, and nothing more: every conversion
 //! lives in [`crate::engine::lens`] and runs both ways there.
 
+use fhir_types::r4::codeable_concept::CodeableConcept;
+use fhir_types::r4::coding::Coding;
+use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
+use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
+
 use crate::engine::fhir::FhirKind;
 use crate::engine::fhir::FhirValue;
 use crate::engine::lens::Fallback;
@@ -24,6 +29,7 @@ use crate::engine::lens::interval::DateTimeIntervalLens;
 use crate::engine::lens::party::IdentifierLens;
 use crate::engine::lens::party::PartyLens;
 use crate::engine::lens::proportion::PercentLens;
+use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::lens::text::TextLens;
 use crate::engine::rm::RmValue;
 use crate::model::ast::keyword::Direction;
@@ -92,6 +98,28 @@ pub fn get(
             .get(proportion.as_ref())
             .map(|quantity| FhirValue::Quantity(Box::new(quantity))),
         (source, kind) => Err(no_cell(source, kind, Direction::OpenehrToFhir)),
+    }
+}
+
+/// Returns the term mappings [`get`] leaves out of the FHIR element `kind`
+/// names, in the order the value holds them.
+///
+/// Only the cells that carry `mappings` withhold any: `DV_TEXT` against
+/// `Coding` and `CodeableConcept`, and `DV_CODED_TEXT` against
+/// `CodeableConcept`.
+#[must_use]
+pub fn withheld(source: &RmValue, kind: FhirKind, binding: Option<&str>) -> Vec<Withheld> {
+    match (source, kind) {
+        (RmValue::Text(text), FhirKind::Coding) => {
+            Lens::<DvTextData, Coding>::withheld(&TextLens, text)
+        }
+        (RmValue::Text(text), FhirKind::CodeableConcept) => {
+            Lens::<DvTextData, CodeableConcept>::withheld(&TextLens, text)
+        }
+        (RmValue::CodedText(text), FhirKind::CodeableConcept) => {
+            Lens::<DvCodedText, CodeableConcept>::withheld(&coded_lens(binding), text.as_ref())
+        }
+        (_source, _kind) => Vec::new(),
     }
 }
 
@@ -216,9 +244,9 @@ fn no_cell(source: &RmValue, kind: FhirKind, direction: Direction) -> LensError 
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_types.html#_dv_coded_text_class>),
 /// so the `DV_TEXT` rows apply to it unchanged.
 fn plain(
-    coded: &openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText,
-) -> openehr_rm::v1_2::data_types::text::dv_text::DvTextData {
-    openehr_rm::v1_2::data_types::text::dv_text::DvTextData {
+    coded: &DvCodedText,
+) -> DvTextData {
+    DvTextData {
         value: coded.value.clone(),
         hyperlink: coded.hyperlink.clone(),
         formatting: coded.formatting.clone(),
@@ -231,7 +259,7 @@ fn plain(
 /// Returns the held `DV_TEXT`, when the target holds one.
 fn held_text(
     existing: Option<&RmValue>,
-) -> Option<&openehr_rm::v1_2::data_types::text::dv_text::DvTextData> {
+) -> Option<&DvTextData> {
     match existing {
         Some(RmValue::Text(text)) => Some(text),
         _other => None,
@@ -241,7 +269,7 @@ fn held_text(
 /// Returns the held `DV_CODED_TEXT`, when the target holds one.
 fn held_coded(
     existing: Option<&RmValue>,
-) -> Option<&openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText> {
+) -> Option<&DvCodedText> {
     match existing {
         Some(RmValue::CodedText(text)) => Some(text.as_ref()),
         _other => None,
