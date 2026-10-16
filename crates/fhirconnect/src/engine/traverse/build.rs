@@ -357,7 +357,7 @@ fn composer_keys(party: &PartyIdentifiedData) -> Vec<NodeValue> {
 /// `external_ref`.
 ///
 /// The openEHR RM `PARTY_IDENTIFIED` requires "at least one of name,
-/// identifier or external_ref", so such a party is no value.
+/// identifier or `external_ref`", so such a party is no value.
 fn void(party: &PartyIdentifiedData) -> bool {
     party.name.is_none() && party.identifiers.is_none() && party.external_ref.is_none()
 }
