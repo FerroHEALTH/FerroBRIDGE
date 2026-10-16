@@ -142,7 +142,9 @@ derived mirror `project-board.md` describes).
 
 ## Milestones = releases
 
-A milestone is a delivery promise (`vX.Y.Z`). A release is cut when its
+A milestone is a delivery promise (`vX.Y.Z`). It holds one theme of 5 to 25
+issues, so it is cut when that theme is done and never waits on an unrelated
+one; a theme that outgrows that size splits into two milestones. A release is cut when its
 milestone reaches zero open issues (or the owner calls the cut and moves the
 stragglers to the next milestone). Every en-route issue goes in the CURRENT
 milestone, never the next. A new `vX.Y.Z` milestone gets a due date (the
