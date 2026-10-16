@@ -36,6 +36,16 @@ const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
 /// characters and the last one carries four bits.
 pub const DIGEST_CHARACTERS: usize = 52;
 
+/// The identity derivation this build writes.
+///
+/// Derivation 2 keys an entry by an openEHR path the BASE Release 1.2.0 path
+/// grammar parses (Paths and Locators): `/content[<archetype>]` for the first
+/// item of the archetype and `/content[<n>]` for every further one. A binding
+/// that names no derivation was written by a build up to 0.0.6, whose entry
+/// paths may take the `/content[<archetype>, <n>]` form, and is read as it
+/// stands (no specification governs the derivation: our own design).
+pub const DERIVATION: u32 = 2;
+
 /// Which input produced a derived id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Derivation {

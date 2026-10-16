@@ -37,6 +37,43 @@ crates on crates.io.
   seconds, so a Kubernetes pod that starts before its CDR stays up instead of
   crash-looping. A documented refusal, such as a `404` for a template the CDR
   does not hold, still stops the start.
+- The facade keys a second or later entry of a composition by the openEHR
+  positional path `/content[<n>]`, `n` its 1-based place in `content`, and
+  the first by `/content[<archetype>]`, both built with the `openehr-rm` path
+  types (#242). Earlier builds wrote `/content[<archetype>, <n>]`, which the
+  openEHR BASE path grammar reads as a name predicate and refuses. Each new
+  binding records identity derivation 2. An id an earlier build recorded
+  under the old form keeps naming its entry: the facade looks the old key up
+  when the new one is unbound and still reads a stored binding of the old
+  form, so no resource a client holds is renamed. A resource first bound by
+  this build gets an id derived from the new path.
+- A binding a build up to 0.0.5 recorded for a composition holding several
+  entries of one archetype named its entry by its place in `content`, and
+  0.0.6 read the same `/content[<archetype>, <n>]` text as the `n`th entry
+  of the archetype, so such a resource could answer another entry (#659).
+  The facade now reads both meanings: the path resolves when one names an
+  entry or both name the same one, and when they name two entries, the read,
+  search or bind that meets it answers `500` with an `exception` issue naming
+  the path, and no id moves to another entry.
+- A transaction entry, and a retry that binds a contribution an earlier
+  delivery committed, now derive the entry's identity from the composition
+  the CDR stored at its version (#284). Before, they derived it from the
+  composition the current run built. Nothing the derivation reads differed
+  between the two, so no id changes. A CDR that stores an entry
+  `LOCATABLE.uid` the sender did not send now gives that entry the same id on
+  the transaction path as on the single create.
+- The `409` a create meets when an identity store written before 0.0.4 binds
+  its `id` to two compositions now names the repair (#298): its `conflict`
+  issue lists the resource id of each composition, and an update
+  (`PUT [base]/[type]/[id]`) of the one the sender means revises it.
+
+### Changed
+
+- The identity store records its schema (#298). This build writes schema 2
+  and reads schemas 1 and 2; a file with no schema row, which 0.0.6 or
+  earlier wrote, reads as schema 1 and is stamped on open. A file in another
+  schema stops the start with an error naming the file, the schema found and
+  the schemas this build reads, and the file is left unchanged.
 
 ## [0.0.6] - 2026-10-17
 

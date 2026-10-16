@@ -222,3 +222,45 @@ async fn a_create_of_an_id_the_map_binds_to_two_compositions_is_refused_and_comm
     assert_eq!((0, 0, 0), writes(&harness).await, "nothing is committed");
     Ok(())
 }
+
+#[tokio::test]
+async fn the_refusal_of_a_split_id_names_the_update_of_each_resource_it_binds()
+-> Result<(), Box<dyn StdError>> {
+    // A store an earlier build wrote bound each meta.versionId of one source
+    // to its own composition and resource; the refusal names the update that
+    // revises each (R4 http.html#update).
+    let harness = harness().await;
+    mount_ehr(&harness.cdr).await;
+    for (version, container, internal) in [
+        ("1", CONTAINER, "splitone"),
+        ("2", "5f0e2b1a-0000-4000-8000-00000000000d", "splittwo"),
+    ] {
+        harness.store.record_consumed(
+            &ferrobridge_server::facade::identity::record::SourceVersion::new(
+                "Condition",
+                ferrobridge_server::facade::identity::ExternalResourceId::new(
+                    "ferrobridge-synthetic-condition-1",
+                )?,
+                Some(String::from(version)),
+            ),
+            &ferrobridge_server::facade::identity::record::ConsumedSource {
+                ehr_id: String::from(EHR_ID),
+                versioned_object_uid: String::from(container),
+                internal_id: String::from(internal),
+                context: String::from("ferrobridge_facade.context"),
+            },
+        )?;
+    }
+    let (status, _, body) = post_located(&harness, &condition_at("3")).await?;
+    assert_eq!(StatusCode::CONFLICT, status, "{body}");
+    let diagnostics = first_issue(&body)["diagnostics"]
+        .as_str()
+        .unwrap_or_default();
+    assert!(diagnostics.contains("update (PUT)"), "{body}");
+    assert!(
+        diagnostics.contains("Condition/splitone, Condition/splittwo"),
+        "{body}"
+    );
+    assert_eq!((0, 0, 0), writes(&harness).await, "nothing is committed");
+    Ok(())
+}
