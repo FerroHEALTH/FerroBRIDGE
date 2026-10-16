@@ -524,3 +524,106 @@ async fn a_bridge_schema_of_an_earlier_release_takes_several_writers_after_init(
     );
     Ok(())
 }
+
+/// The third synthetic versioned composition, of the same EHR.
+const THIRD: &str = "6b2d9e4f-8a13-4c57-b0e2-9d4c1f3a7e52";
+
+/// Returns the `PERSON` row a graph of [`graph`] born in `year` writes, as
+/// [`person_rows`] reads it.
+fn written_by(year: i32) -> (i32, i32, i32, i32, Option<String>) {
+    (8532, year, 0, 0, None)
+}
+
+#[tokio::test]
+async fn removing_the_newest_writer_hands_the_person_row_to_the_newest_writer_that_remains()
+-> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
+    let run = RunId::new("run-1")?;
+    for (uid, year) in [(COMPOSITION, 1970), (OTHER, 1980), (THIRD, 1990)] {
+        database
+            .writer
+            .commit(&graph(uid, 1, Some(year))?, &run)
+            .await?;
+    }
+    let client = reader(&database.postgres).await?;
+    assert_eq!(vec![written_by(1990)], person_rows(&client).await?);
+
+    database
+        .writer
+        .remove(&committed_of(&database.writer, THIRD).await?)
+        .await?;
+    assert_eq!(
+        vec![written_by(1980)],
+        person_rows(&client).await?,
+        "the newest writer that remains gives the row its columns"
+    );
+    assert_eq!(0, orphans_in_every_table(&client).await?);
+
+    database
+        .writer
+        .remove(&committed_of(&database.writer, COMPOSITION).await?)
+        .await?;
+    assert_eq!(
+        vec![written_by(1980)],
+        person_rows(&client).await?,
+        "removing an older writer keeps the newest writer's columns"
+    );
+
+    let removal = database
+        .writer
+        .remove(&committed_of(&database.writer, OTHER).await?)
+        .await?;
+    let Removal::Removed(rows) = removal else {
+        return Err(format!("expected a removal, got {removal:?}").into());
+    };
+    assert_eq!(Some(&1), rows.get("person"), "no writer and no row remain");
+    assert!(person_rows(&client).await?.is_empty());
+    assert_eq!(0, person_writers(&client).await?);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_newest_writer_that_stops_writing_the_person_hands_the_row_to_the_writer_that_remains()
+-> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
+    let run = RunId::new("run-1")?;
+    database
+        .writer
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .await?;
+    database
+        .writer
+        .commit(&graph(OTHER, 1, Some(1980))?, &run)
+        .await?;
+    let client = reader(&database.postgres).await?;
+    assert_eq!(vec![written_by(1980)], person_rows(&client).await?);
+
+    database
+        .writer
+        .commit(&graph(OTHER, 2, None)?, &run)
+        .await?;
+    assert_eq!(
+        vec![written_by(1970)],
+        person_rows(&client).await?,
+        "the writer that remains gives the row its columns"
+    );
+    assert_eq!(1, person_writers(&client).await?);
+    assert_eq!(0, orphans_in_every_table(&client).await?);
+
+    database
+        .writer
+        .commit(&graph(OTHER, 3, Some(1985))?, &run)
+        .await?;
+    assert_eq!(
+        vec![written_by(1985)],
+        person_rows(&client).await?,
+        "a writer that writes the person again is the newest"
+    );
+    Ok(())
+}
