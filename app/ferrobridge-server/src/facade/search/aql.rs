@@ -8,15 +8,15 @@
 //! A parameter read under a repeated node binds that node in the `FROM`, one
 //! alias per parameter occurrence, so the conditions of one occurrence read
 //! one node, and two occurrences (an `AND`) may each match a node of their
-//! own. A row is then one composition with one node per bound alias, so one
-//! composition may answer several rows: the count query counts distinct
-//! version uids, and the facade reads one entry per composition. A
-//! declaration contributes paths only, each compared against a bound `$`
-//! parameter and never spliced in as a value (QUERY AQL §3.5). The paging is
-//! the `offset` and `fetch` of ITS-REST 1.1.0 (`query-codegen.openapi.yaml`,
-//! `components.parameters.offset`), which name row numbers, so every query
-//! carries the declaration's total order. No specification governs the shape:
-//! our own design.
+//! own. A row is then one composition with one node per bound alias, and it
+//! selects each bound node, so the facade answers the entry that holds the
+//! nodes that matched (no specification governs how a row names its entry:
+//! our own design). A declaration contributes paths only, each compared
+//! against a bound `$` parameter and never spliced in as a value (QUERY AQL
+//! §3.5). The paging is the `offset` and `fetch` of ITS-REST 1.1.0
+//! (`query-codegen.openapi.yaml`, `components.parameters.offset`), which name
+//! row numbers, so every query carries the declaration's total order. No
+//! specification governs the shape: our own design.
 
 use openehr_its::rest::generated::query::AdhocQueryExecute;
 use openehr_its::rest::generated::query::QueryParameters;
@@ -60,6 +60,9 @@ pub mod column {
     pub const VERSION_UID: usize = 1;
     /// The composition, canonical JSON.
     pub const COMPOSITION: usize = 2;
+    /// The first bound node, canonical JSON; node `n<i>` is column
+    /// `FIRST_NODE + i`.
+    pub const FIRST_NODE: usize = 3;
 }
 
 /// The order a declaration with no `order` key pages in.
@@ -127,6 +130,13 @@ impl Conditions {
         !self.nodes.is_empty()
     }
 
+    /// Returns the number of nodes the `FROM` binds, each one more column of
+    /// a row.
+    #[must_use]
+    pub fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+
     /// Adds `clause`, which every row must also satisfy.
     pub fn push(&mut self, clause: String) {
         self.clauses.push(clause);
@@ -185,8 +195,12 @@ pub fn rows_text(conditions: &Conditions, order: &[OrderKey]) -> String {
         })
         .collect::<Vec<String>>()
         .join(", ");
+    let nodes: String = (0..conditions.node_count())
+        .map(|index| format!(", n{index} AS n{index}"))
+        .collect::<Vec<String>>()
+        .concat();
     format!(
-        "SELECT {COLUMNS} FROM {} WHERE {} ORDER BY {keys}",
+        "SELECT {COLUMNS}{nodes} FROM {} WHERE {} ORDER BY {keys}",
         conditions.from(),
         conditions.text()
     )
@@ -366,6 +380,10 @@ mod tests {
             ),
             "{rows}"
         );
+        assert!(
+            rows.contains("c AS composition, n0 AS n0 FROM"),
+            "a row names the node that matched: {rows}"
+        );
         parses(&rows).expect("the row query parses");
         let count = count_text(&conditions);
         assert!(count.contains("COUNT(DISTINCT v/uid/value)"), "{count}");
@@ -381,6 +399,7 @@ mod tests {
             ),
             "{rows}"
         );
+        assert!(rows.contains("n0 AS n0, n1 AS n1 FROM"), "{rows}");
         parses(&rows).expect("two bound nodes parse");
         assert!(count_text(&Conditions::new("t")).contains("COUNT(*)"));
     }

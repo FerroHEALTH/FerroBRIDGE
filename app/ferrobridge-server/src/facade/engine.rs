@@ -123,13 +123,19 @@ pub fn outbound(
     )
 }
 
-/// Where in a composition the entry one program maps sits.
+/// Where in a composition one entry a program maps sits.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
     /// The archetype path of the entry, as an openEHR path writes it.
     path: String,
     /// The `LOCATABLE.uid` the entry carries, when it carries one.
     uid: Option<String>,
+    /// The archetype id the entry carries.
+    archetype: String,
+    /// The 1-based place of the entry among the items of its archetype.
+    ordinal: usize,
+    /// The index of the entry in the composition's `content`.
+    index: usize,
 }
 
 impl Entry {
@@ -144,9 +150,82 @@ impl Entry {
     pub fn uid(&self) -> Option<&str> {
         self.uid.as_deref()
     }
+
+    /// Returns the 1-based place of the entry among the items of its
+    /// archetype.
+    #[must_use]
+    pub const fn ordinal(&self) -> usize {
+        self.ordinal
+    }
+
+    /// Returns the path the identity map keys the entry by.
+    ///
+    /// The first entry of an archetype keeps the unindexed path it has when
+    /// it is the only one, so a composition that gains a second entry does
+    /// not rename the resource of its first; every further entry keeps its
+    /// positional path (no specification governs this: our own design).
+    #[must_use]
+    pub fn identity_path(&self) -> String {
+        if self.ordinal <= 1 {
+            format!("/content[{}]", self.archetype)
+        } else {
+            self.path.clone()
+        }
+    }
+
+    /// Returns `composition` with every other `content` item of this entry's
+    /// archetype removed, so the program maps this entry alone.
+    #[must_use]
+    pub fn isolate(&self, composition: &CanonicalComposition) -> CanonicalComposition {
+        let mut value = composition.value().clone();
+        if let Some(content) = value
+            .get_mut("content")
+            .and_then(serde_json::Value::as_array_mut)
+        {
+            let kept: Vec<serde_json::Value> = content
+                .iter()
+                .enumerate()
+                .filter(|(index, item)| {
+                    *index == self.index || archetype_node_id(item) != Some(self.archetype.as_str())
+                })
+                .map(|(_, item)| item.clone())
+                .collect();
+            *content = kept;
+        }
+        CanonicalComposition::new(value, composition.template_id(), composition.generation())
+    }
+
+    /// Whether the entry's item in `composition` is `node` or holds it.
+    #[must_use]
+    pub fn holds(&self, composition: &CanonicalComposition, node: &serde_json::Value) -> bool {
+        composition
+            .value()
+            .get("content")
+            .and_then(serde_json::Value::as_array)
+            .and_then(|content| content.get(self.index))
+            .is_some_and(|item| contains(item, node))
+    }
 }
 
-/// Returns the entry the start model mapping of `program` writes.
+/// Whether `value` is `node` or holds it at any depth.
+fn contains(value: &serde_json::Value, node: &serde_json::Value) -> bool {
+    if value == node {
+        return true;
+    }
+    match value {
+        serde_json::Value::Object(members) => members.values().any(|child| contains(child, node)),
+        serde_json::Value::Array(items) => items.iter().any(|child| contains(child, node)),
+        _ => false,
+    }
+}
+
+/// Returns the `archetype_node_id` of one `content` item.
+fn archetype_node_id(item: &serde_json::Value) -> Option<&str> {
+    item.get("archetype_node_id")
+        .and_then(serde_json::Value::as_str)
+}
+
+/// Returns the first entry the start model mapping of `program` writes.
 ///
 /// A context maps one profile onto one template through a start model mapping
 /// whose `metadata.archetype` names the entry
@@ -160,37 +239,90 @@ impl Entry {
 /// of its own archetype, which the caller reports rather than papering over.
 #[must_use]
 pub fn entry_of(program: &Program, composition: &CanonicalComposition) -> Option<Entry> {
-    entry_at(composition, &archetype_of(program)?)
+    entries_of(program, composition).into_iter().next()
 }
 
-/// Returns the `content` item of `composition` carrying `archetype`.
-fn entry_at(composition: &CanonicalComposition, archetype: &str) -> Option<Entry> {
-    let content = composition.value().get("content")?.as_array()?;
+/// Returns every entry of the archetype the start model mapping of `program`
+/// writes, in `content` order.
+#[must_use]
+pub fn entries_of(program: &Program, composition: &CanonicalComposition) -> Vec<Entry> {
+    archetype_of(program)
+        .map(|archetype| entries_at(composition, &archetype))
+        .unwrap_or_default()
+}
+
+/// Returns the entry `path` names in `composition`, as
+/// [`Entry::identity_path`] or [`Entry::path`] wrote it.
+///
+/// An entry is named by its place among the items of its archetype, and an
+/// unindexed path names the first (no specification governs the identity:
+/// our own design).
+#[must_use]
+pub fn entry_named(
+    program: &Program,
+    composition: &CanonicalComposition,
+    path: &str,
+) -> Option<Entry> {
+    let archetype = archetype_of(program)?;
+    let ordinal = ordinal_of(path, &archetype)?;
+    entries_at(composition, &archetype)
+        .into_iter()
+        .find(|entry| entry.ordinal == ordinal)
+}
+
+/// Returns the 1-based place `path` names among the items of `archetype`.
+fn ordinal_of(path: &str, archetype: &str) -> Option<usize> {
+    let inner = path.strip_prefix("/content[")?.strip_suffix(']')?;
+    if inner == archetype {
+        return Some(1);
+    }
+    let (named, place) = inner.split_once(',')?;
+    if named.trim() != archetype {
+        return None;
+    }
+    place
+        .trim()
+        .parse::<usize>()
+        .ok()
+        .filter(|place| *place >= 1)
+}
+
+/// Returns every `content` item of `composition` carrying `archetype`.
+fn entries_at(composition: &CanonicalComposition, archetype: &str) -> Vec<Entry> {
+    let Some(content) = composition
+        .value()
+        .get("content")
+        .and_then(serde_json::Value::as_array)
+    else {
+        return Vec::new();
+    };
     let matching: Vec<(usize, &serde_json::Value)> = content
         .iter()
         .enumerate()
-        .filter(|(_, item)| {
-            item.get("archetype_node_id")
-                .and_then(serde_json::Value::as_str)
-                == Some(archetype)
-        })
+        .filter(|(_, item)| archetype_node_id(item) == Some(archetype))
         .collect();
-    let (index, item) = matching.first().copied()?;
-    let path = if matching.len() > 1 {
-        // NOTE: openEHR BASE Release 1.2.0 §Paths and Locators writes the
-        // positional predicate 1-based, so the `content` index converts.
-        format!("/content[{archetype}, {}]", index.saturating_add(1))
-    } else {
-        format!("/content[{archetype}]")
-    };
-    Some(Entry {
-        path,
-        uid: item
-            .get("uid")
-            .and_then(|uid| uid.get("value"))
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned),
-    })
+    let several = matching.len() > 1;
+    matching
+        .into_iter()
+        .zip(1_usize..)
+        .map(|((index, item), ordinal)| Entry {
+            // NOTE: openEHR BASE Release 1.2.0 §Paths and Locators writes the
+            // positional predicate 1-based, here among the items of one archetype.
+            path: if several {
+                format!("/content[{archetype}, {ordinal}]")
+            } else {
+                format!("/content[{archetype}]")
+            },
+            uid: item
+                .get("uid")
+                .and_then(|uid| uid.get("value"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned),
+            archetype: archetype.to_owned(),
+            ordinal,
+            index,
+        })
+        .collect()
 }
 
 /// Returns the archetype the start model mapping of `program` declares.
@@ -205,7 +337,9 @@ fn archetype_of(program: &Program) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::entry_at;
+    use super::Entry;
+    use super::entries_at;
+    use super::ordinal_of;
     use openehr_mapping_core::composition::CanonicalComposition;
     use openehr_mapping_core::template::Generation;
 
@@ -219,6 +353,11 @@ mod tests {
             "ferrobridge.diagnose.v1",
             Generation::Adl14,
         )
+    }
+
+    /// Returns the first entry of `archetype` in `composition`.
+    fn entry_at(composition: &CanonicalComposition, archetype: &str) -> Option<Entry> {
+        entries_at(composition, archetype).into_iter().next()
     }
 
     #[test]
@@ -256,5 +395,73 @@ mod tests {
         ]));
         assert!(entry_at(&built, DIAGNOSIS).is_none());
         assert!(entry_at(&composition(&serde_json::json!([])), DIAGNOSIS).is_none());
+    }
+
+    #[test]
+    fn the_place_of_an_entry_counts_only_items_of_its_archetype() {
+        let built = composition(&serde_json::json!([
+            { "archetype_node_id": "openEHR-EHR-OBSERVATION.body_weight.v2" },
+            { "archetype_node_id": DIAGNOSIS, "name": "one" },
+            { "archetype_node_id": DIAGNOSIS, "name": "two" }
+        ]));
+        let entries = entries_at(&built, DIAGNOSIS);
+        let paths: Vec<&str> = entries.iter().map(Entry::path).collect();
+        assert_eq!(
+            vec![
+                format!("/content[{DIAGNOSIS}, 1]"),
+                format!("/content[{DIAGNOSIS}, 2]")
+            ],
+            paths
+        );
+        let identities: Vec<String> = entries.iter().map(Entry::identity_path).collect();
+        assert_eq!(
+            vec![
+                format!("/content[{DIAGNOSIS}]"),
+                format!("/content[{DIAGNOSIS}, 2]")
+            ],
+            identities,
+            "the first entry keeps the identity it had alone"
+        );
+    }
+
+    #[test]
+    fn an_isolated_entry_is_the_only_item_of_its_archetype_left() {
+        let built = composition(&serde_json::json!([
+            { "archetype_node_id": "openEHR-EHR-OBSERVATION.body_weight.v2" },
+            { "archetype_node_id": DIAGNOSIS, "name": "one" },
+            { "archetype_node_id": DIAGNOSIS, "name": "two" }
+        ]));
+        let second = entries_at(&built, DIAGNOSIS)
+            .into_iter()
+            .nth(1)
+            .expect("two entries");
+        let isolated = second.isolate(&built);
+        assert_eq!(
+            serde_json::json!([
+                { "archetype_node_id": "openEHR-EHR-OBSERVATION.body_weight.v2" },
+                { "archetype_node_id": DIAGNOSIS, "name": "two" }
+            ]),
+            isolated.value()["content"]
+        );
+        assert!(second.holds(&built, &serde_json::json!("two")));
+        assert!(!second.holds(&built, &serde_json::json!("one")));
+    }
+
+    #[test]
+    fn a_recorded_path_names_its_place_among_the_items() {
+        assert_eq!(
+            Some(1),
+            ordinal_of(&format!("/content[{DIAGNOSIS}]"), DIAGNOSIS)
+        );
+        assert_eq!(
+            Some(2),
+            ordinal_of(&format!("/content[{DIAGNOSIS}, 2]"), DIAGNOSIS)
+        );
+        assert_eq!(
+            None,
+            ordinal_of(&format!("/content[{DIAGNOSIS}, 0]"), DIAGNOSIS)
+        );
+        assert_eq!(None, ordinal_of("/content[other, 2]", DIAGNOSIS));
+        assert_eq!(None, ordinal_of("/context", DIAGNOSIS));
     }
 }

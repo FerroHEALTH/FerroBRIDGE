@@ -214,7 +214,7 @@ async fn a_cursor_of_another_search_is_refused() -> Result<(), Box<dyn StdError>
     let harness = searching().await;
     let (status, body) = get(
         &harness,
-        "Condition?patient=p-1&_cursor=0.1.0000000000000000",
+        "Condition?patient=p-1&_cursor=0.1.0.0000000000000000",
     )
     .await?;
     assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");

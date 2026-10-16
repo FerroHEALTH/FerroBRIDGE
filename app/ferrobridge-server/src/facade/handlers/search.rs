@@ -8,10 +8,11 @@
 //! parameters and `_id` resolve through the identity map, and each
 //! declaration runs one AQL query paged by the CDR's `offset` and `fetch`.
 //! A page reads one row more than it answers, so a `next` link is written
-//! only when a row is left. Every row is mapped back through the context's
-//! compiled program as a read maps it, and every CDR refusal reaches the wire
-//! through the status table: a search never answers an empty Bundle for a
-//! failed call (`docs/architecture.md` §9).
+//! only when a row is left. Every entry a row matched is mapped back through
+//! the context's compiled program as a read maps it, as a resource of its
+//! own, and every CDR refusal reaches the wire through the status table: a
+//! search never answers an empty Bundle for a failed call
+//! (`docs/architecture.md` §9).
 
 use std::collections::BTreeSet;
 
@@ -23,6 +24,7 @@ use http::header;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::query::ResultSetRow;
 use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
+use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::auth::Access;
@@ -30,7 +32,10 @@ use crate::auth::Compartment;
 use crate::auth::scope::Permission;
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
+use crate::cdr::ids::versioned_object_uid;
 use crate::facade::Facade;
+use crate::facade::engine;
+use crate::facade::engine::Entry;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::Refusal;
 use crate::facade::handlers::read;
@@ -38,8 +43,10 @@ use crate::facade::handlers::render;
 use crate::facade::handlers::write;
 use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::PersonId;
+use crate::facade::identity::record::CompositionBinding;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
+use crate::facade::programs::Loaded;
 use crate::facade::reply;
 use crate::facade::search::Declared;
 use crate::facade::search::aql;
@@ -163,8 +170,10 @@ async fn search(
             .map_err(|error| reply::refusal(StatusCode::BAD_REQUEST, error.issue()))?;
         plans.push(Plan {
             declared,
+            program: program_of(facade, declared)?,
             conditions,
             order: plan::order(declared, &criteria),
+            ids: ids_of(&resolved, declared),
         });
     }
     let limits = facade.search_limits();
@@ -176,10 +185,23 @@ async fn search(
     // NOTE: R4 search.html §3.1.1.5.3: "if _count has the value 0, this shall be
     // treated the same as _summary=count", a Bundle.total and no entries or links.
     let (matches, next, total) = if criteria.summary_count || page_size == 0 {
-        (Vec::new(), None, Some(count_all(&client, &plans).await?))
+        (
+            Vec::new(),
+            None,
+            Some(count_all(facade, &client, &plans).await?),
+        )
     } else {
         let (matches, next) = page(facade, &client, &plans, start, page_size).await?;
-        let total = total_of(&client, &plans, &criteria, start, next, matches.len()).await?;
+        let total = total_of(
+            facade,
+            &client,
+            &plans,
+            &criteria,
+            start,
+            next,
+            matches.len(),
+        )
+        .await?;
         (matches, next, total)
     };
     let self_cursor = criteria.cursor.as_deref();
@@ -221,6 +243,10 @@ async fn search(
 struct Plan<'a> {
     /// The declaration.
     declared: &'a Declared,
+    /// The program of the declaration's context.
+    program: &'a Loaded,
+    /// Each `_id` occurrence, the entries of this context its ids name.
+    ids: Vec<Vec<CompositionBinding>>,
     /// The conditions, or `None` when it can match nothing.
     conditions: Option<Conditions>,
     /// The `ORDER BY`.
@@ -322,15 +348,17 @@ fn resolve(facade: &Facade, resource_type: &str, criteria: &Criteria) -> Result<
     Ok(resolved)
 }
 
-/// Reads one page, starting at `start`, of at most `size` compositions.
+/// Reads one page, starting at `start`, of at most `size` matches.
 ///
-/// A query that binds a node answers a row per matching node, so the rows of
-/// one composition sit together under the composition-level order, and the
-/// page reads one entry per composition: a row of a composition the page
-/// already holds is passed over. Each query asks one row more than the page
-/// still has room for. The first row of a composition the page has no room
-/// for is where the next page starts, and a declaration that runs out hands
-/// over to the next one at its first row.
+/// Each entry of the program's archetype is a resource of its own, and a row
+/// answers the entries [`matched`] finds in it. A query that binds a node
+/// answers a row per matching node, so the rows of one composition sit
+/// together under the composition-level order, and an entry a row of the
+/// page already answered is passed over. Each query asks one row more than
+/// the page still has room for. A page with no room left ends at the first
+/// entry it cannot hold: the next page starts at the first row of that
+/// entry's composition and skips the entries of it this page answered, and a
+/// declaration that runs out hands over to the next one at its first row.
 async fn page(
     facade: &Facade,
     client: &CdrClient,
@@ -341,34 +369,52 @@ async fn page(
     let mut matches = Vec::new();
     let mut room = usize::try_from(size).unwrap_or(usize::MAX);
     let mut offset = start.offset;
+    let mut skip = start.skip;
     for (index, plan) in plans.iter().enumerate().skip(start.declaration) {
         let Some(conditions) = plan.conditions.as_ref() else {
             offset = 0;
+            skip = 0;
             continue;
         };
-        let mut held: BTreeSet<String> = BTreeSet::new();
+        let mut held: BTreeSet<(String, usize)> = BTreeSet::new();
+        let mut current = Reading::default();
         loop {
             let fetch = i64::try_from(room.saturating_add(1)).unwrap_or(i64::MAX);
             let request = aql::rows_request(conditions, &plan.order, offset, fetch);
             let rows = rows_of(client, &request).await?;
             for (position, row) in rows.iter().enumerate() {
-                let version = version_of(row, position)?;
-                if held.contains(version) {
-                    continue;
+                let at = offset.saturating_add(i64::try_from(position).unwrap_or(i64::MAX));
+                let read = read_row(facade, plan, row, position)?;
+                if current.version != read.version.value() {
+                    current = Reading {
+                        version: read.version.value().to_owned(),
+                        first_row: at,
+                        answered: 0,
+                    };
                 }
-                if room == 0 {
-                    let skipped = i64::try_from(position).unwrap_or(i64::MAX);
-                    return Ok((
-                        matches,
-                        Some(Position {
-                            declaration: index,
-                            offset: offset.saturating_add(skipped),
-                        }),
-                    ));
+                for entry in matched(plan, &read, row, position)? {
+                    if !held.insert((current.version.clone(), entry.ordinal())) {
+                        continue;
+                    }
+                    if skip > 0 {
+                        skip = skip.saturating_sub(1);
+                        current.answered = current.answered.saturating_add(1);
+                        continue;
+                    }
+                    if room == 0 {
+                        return Ok((
+                            matches,
+                            Some(Position {
+                                declaration: index,
+                                offset: current.first_row,
+                                skip: current.answered,
+                            }),
+                        ));
+                    }
+                    matches.push(render_entry(facade, client, plan, &read, &entry)?);
+                    current.answered = current.answered.saturating_add(1);
+                    room = room.saturating_sub(1);
                 }
-                held.insert(version.to_owned());
-                matches.push(render_row(facade, client, plan.declared, row, position)?);
-                room = room.saturating_sub(1);
             }
             let fetched = i64::try_from(rows.len()).unwrap_or(i64::MAX);
             if fetched < fetch {
@@ -377,18 +423,146 @@ async fn page(
             offset = offset.saturating_add(fetched);
         }
         offset = 0;
+        skip = 0;
     }
     Ok((matches, None))
 }
 
-/// Returns the version uid one row names, or the `502` a row without one
-/// answers.
-fn version_of(row: &ResultSetRow, position: usize) -> Result<&str, Refusal> {
-    row.get(aql::column::VERSION_UID)
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| malformed_row(position, "version_uid"))
+/// The composition a page is reading the rows of.
+#[derive(Debug, Default)]
+struct Reading {
+    /// Its version uid.
+    version: String,
+    /// The offset of its first row.
+    first_row: i64,
+    /// How many of its entries this page answered or skipped.
+    answered: usize,
 }
 
+/// One row, read.
+struct Row {
+    /// The EHR the composition lives in.
+    ehr_id: EhrId,
+    /// The composition version.
+    version: ObjectVersionId,
+    /// The composition, canonical.
+    composition: CanonicalComposition,
+}
+
+/// Reads one row, or answers the `502` of a row the bridge cannot read.
+fn read_row(
+    facade: &Facade,
+    plan: &Plan<'_>,
+    row: &ResultSetRow,
+    position: usize,
+) -> Result<Row, Refusal> {
+    let text = |column: usize| row.get(column).and_then(serde_json::Value::as_str);
+    let ehr_id = text(aql::column::EHR_ID)
+        .and_then(|value| EhrId::new(value).ok())
+        .ok_or_else(|| malformed_row(position, "ehr_id"))?;
+    let version = text(aql::column::VERSION_UID)
+        .and_then(|value| ObjectVersionId::new(value).ok())
+        .ok_or_else(|| malformed_row(position, "version_uid"))?;
+    let composition = row
+        .get(aql::column::COMPOSITION)
+        .and_then(|value| serde_json::to_string(value).ok())
+        .and_then(|value| openehr_its::json::from_canonical_json::<Composition>(&value).ok())
+        .ok_or_else(|| malformed_row(position, "composition"))?;
+    let canonical = read::canonical(facade, &composition, plan.declared.template_id())?;
+    Ok(Row {
+        ehr_id,
+        version,
+        composition: canonical,
+    })
+}
+
+/// Returns the entries of the program's archetype one row answers.
+///
+/// Each bound node the row selects names the entry that holds it, and the
+/// row answers the entries that hold every such node; a node outside every
+/// entry constrains none. A row that names no entry this way answers the
+/// entries the `_id` criteria name, or the first entry. No specification
+/// governs how a row names its entry: our own design.
+fn matched(
+    plan: &Plan<'_>,
+    read: &Row,
+    row: &ResultSetRow,
+    position: usize,
+) -> Result<Vec<Entry>, Refusal> {
+    let program = plan.program.program();
+    let every = engine::entries_of(program, &read.composition);
+    let nodes = plan.conditions.as_ref().map_or(0, Conditions::node_count);
+    let mut chosen: Option<Vec<Entry>> = None;
+    for node in 0..nodes {
+        let value = row
+            .get(aql::column::FIRST_NODE.saturating_add(node))
+            .ok_or_else(|| malformed_row(position, &format!("n{node}")))?;
+        let holding: Vec<Entry> = every
+            .iter()
+            .filter(|entry| entry.holds(&read.composition, value))
+            .cloned()
+            .collect();
+        if holding.is_empty() {
+            continue;
+        }
+        chosen = Some(match chosen {
+            None => holding,
+            Some(earlier) => earlier
+                .into_iter()
+                .filter(|entry| holding.contains(entry))
+                .collect(),
+        });
+    }
+    let mut entries = match chosen {
+        Some(entries) => entries,
+        None if plan.ids.is_empty() => every.into_iter().take(1).collect(),
+        None => every,
+    };
+    let container = versioned_object_uid(&read.version);
+    for bindings in &plan.ids {
+        entries.retain(|entry| {
+            bindings.iter().any(|binding| {
+                binding.versioned_object_uid == container.value()
+                    && engine::entry_named(program, &read.composition, &binding.entry_path)
+                        .is_some_and(|named| named.ordinal() == entry.ordinal())
+            })
+        });
+    }
+    Ok(entries)
+}
+
+/// Returns, for each `_id` occurrence, the entries of `declared`'s context
+/// its ids name.
+fn ids_of(resolved: &Resolved, declared: &Declared) -> Vec<Vec<CompositionBinding>> {
+    resolved
+        .ids
+        .iter()
+        .map(|bindings| {
+            bindings
+                .iter()
+                .filter(|binding| binding.context == declared.context())
+                .cloned()
+                .collect()
+        })
+        .collect()
+}
+
+/// Returns the program of the context `declared` names.
+fn program_of<'a>(facade: &'a Facade, declared: &Declared) -> Result<&'a Loaded, Refusal> {
+    facade
+        .programs()
+        .by_context(declared.context())
+        .ok_or_else(|| {
+            reply::refusal(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Issue::error(IssueType::Exception).diagnosing(format!(
+                    "the search declaration {} names the context {}, which this deployment did not load",
+                    declared.file().display(),
+                    declared.context()
+                )),
+            )
+        })
+}
 /// Returns the `Bundle.total` of one page, when it is known or asked for.
 ///
 /// A first page that leaves no next page holds every match, so its size is
@@ -396,6 +570,7 @@ fn version_of(row: &ResultSetRow, position: usize) -> Result<&str, Refusal> {
 /// client asked for a total (<https://hl7.org/fhir/R4/search.html>,
 /// §3.1.1.5.2), and `_total=none` never gets one.
 async fn total_of(
+    facade: &Facade,
     client: &CdrClient,
     plans: &[Plan<'_>],
     criteria: &Criteria,
@@ -408,18 +583,34 @@ async fn total_of(
         _ if start == Position::START && next.is_none() => {
             Ok(Some(u64::try_from(answered).unwrap_or(u64::MAX)))
         }
-        Some(Total::Accurate | Total::Estimate) => Ok(Some(count_all(client, plans).await?)),
+        Some(Total::Accurate | Total::Estimate) => {
+            Ok(Some(count_all(facade, client, plans).await?))
+        }
         None => Ok(None),
     }
 }
 
 /// Returns the number of matches across every declaration.
-async fn count_all(client: &CdrClient, plans: &[Plan<'_>]) -> Result<u64, Refusal> {
+///
+/// A declaration whose rows each answer the first entry of one composition
+/// is counted by the count query. One that binds a node or names `_id`s may
+/// answer several entries of one composition, which no AQL count expresses,
+/// so its rows are read and every entry [`matched`] answers is counted once.
+async fn count_all(
+    facade: &Facade,
+    client: &CdrClient,
+    plans: &[Plan<'_>],
+) -> Result<u64, Refusal> {
     let mut total: u64 = 0;
     for plan in plans {
         let Some(conditions) = plan.conditions.as_ref() else {
             continue;
         };
+        if conditions.binds_nodes() || !plan.ids.is_empty() {
+            let counted = count_entries(facade, client, plan, conditions).await?;
+            total = total.saturating_add(u64::try_from(counted).unwrap_or(u64::MAX));
+            continue;
+        }
         let rows = rows_of(client, &aql::count_request(conditions)).await?;
         let counted = rows
             .first()
@@ -431,6 +622,33 @@ async fn count_all(client: &CdrClient, plans: &[Plan<'_>]) -> Result<u64, Refusa
         total = total.saturating_add(counted);
     }
     Ok(total)
+}
+
+/// Returns the number of entries the rows of one declaration answer.
+async fn count_entries(
+    facade: &Facade,
+    client: &CdrClient,
+    plan: &Plan<'_>,
+    conditions: &Conditions,
+) -> Result<usize, Refusal> {
+    let fetch = i64::from(facade.search_limits().max_count.max(1));
+    let mut counted: BTreeSet<(String, usize)> = BTreeSet::new();
+    let mut offset: i64 = 0;
+    loop {
+        let request = aql::rows_request(conditions, &plan.order, offset, fetch);
+        let rows = rows_of(client, &request).await?;
+        for (position, row) in rows.iter().enumerate() {
+            let read = read_row(facade, plan, row, position)?;
+            for entry in matched(plan, &read, row, position)? {
+                counted.insert((read.version.value().to_owned(), entry.ordinal()));
+            }
+        }
+        let fetched = i64::try_from(rows.len()).unwrap_or(i64::MAX);
+        if fetched < fetch {
+            return Ok(counted.len());
+        }
+        offset = offset.saturating_add(fetched);
+    }
 }
 
 /// Runs one query and returns its rows, or the refusal the status table
@@ -452,56 +670,38 @@ async fn rows_of(
     }
 }
 
-/// Maps one row back to the resource it holds.
-fn render_row(
+/// Maps one entry of a row back to the resource it is, with the id the
+/// identity map holds for that entry.
+fn render_entry(
     facade: &Facade,
     client: &CdrClient,
-    declared: &Declared,
-    row: &ResultSetRow,
-    position: usize,
+    plan: &Plan<'_>,
+    read: &Row,
+    entry: &Entry,
 ) -> Result<Match, Refusal> {
-    let text = |column: usize| row.get(column).and_then(serde_json::Value::as_str);
-    let ehr_id = text(aql::column::EHR_ID)
-        .and_then(|value| EhrId::new(value).ok())
-        .ok_or_else(|| malformed_row(position, "ehr_id"))?;
-    let version = text(aql::column::VERSION_UID)
-        .and_then(|value| ObjectVersionId::new(value).ok())
-        .ok_or_else(|| malformed_row(position, "version_uid"))?;
-    let composition = row
-        .get(aql::column::COMPOSITION)
-        .and_then(|value| serde_json::to_string(value).ok())
-        .and_then(|value| openehr_its::json::from_canonical_json::<Composition>(&value).ok())
-        .ok_or_else(|| malformed_row(position, "composition"))?;
-    let canonical = read::canonical(facade, &composition, declared.template_id())?;
-    let program = facade
-        .programs()
-        .by_context(declared.context())
-        .ok_or_else(|| {
-            reply::refusal(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Issue::error(IssueType::Exception).diagnosing(format!(
-                    "the search declaration {} names the context {}, which this deployment did not load",
-                    declared.file().display(),
-                    declared.context()
-                )),
-            )
-        })?;
-    let (id, _binding) = facade.ingest(client.clone()).bind(
+    let Row {
+        ehr_id,
+        version,
+        composition,
+    } = read;
+    let program = plan.program;
+    let (id, _binding) = facade.ingest(client.clone()).bind_entry(
         program,
-        declared.resource_type(),
-        &ehr_id,
-        &version,
-        &canonical,
+        plan.declared.resource_type(),
+        ehr_id,
+        version,
+        composition,
+        entry,
     )?;
-    let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
-    let subject = render::subject_of(facade, &ehr_id)?;
+    let source = render::composition_url(client.base_url(), ehr_id, version)?;
+    let subject = render::subject_of(facade, ehr_id)?;
     let rendered = render::render(
         program.program(),
         program.index(),
-        &canonical,
+        &entry.isolate(composition),
         render::Origin {
             id: &id,
-            version: &version,
+            version,
             source: &source,
             subject: subject.as_ref(),
         },

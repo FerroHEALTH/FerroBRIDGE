@@ -128,7 +128,7 @@ async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
 -> Result<(), Box<dyn StdError>> {
     // #526 and R4 search.html#token: `[system]|[code]` matches one Coding, so a
     // composition holding diagnosis 1 (S1, X) and diagnosis 2 (S2, Y) answers
-    // `S2|X` with nothing, and a composition matching on both is one entry.
+    // `S2|X` with nothing, and each diagnosis that matches is one resource.
     if !containers::e2e_enabled() {
         return Ok(());
     }
@@ -197,6 +197,23 @@ async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
     let (status, own) = get(&facade, &search("SYNTHETIC-B", "SYN-B2")).await?;
     assert_eq!(StatusCode::OK, status, "{own}");
     assert_eq!(Some(1), own["total"].as_u64(), "{own}");
+    // #530 and R4 search.html §3.1.1: the match on the second diagnosis
+    // answers that diagnosis, with an id of its own.
+    let second = own["entry"][0]["resource"].clone();
+    assert_eq!(
+        Some("SYN-B2"),
+        second["code"]["coding"][0]["code"].as_str(),
+        "the match on the second diagnosis answered another: {own}"
+    );
+    let second_id = second["id"].as_str().ok_or("the match carries an id")?;
+    assert_ne!(id.as_str(), second_id, "two entries answered one id");
+    let (status, read) = get(&facade, &format!("Condition/{second_id}")).await?;
+    assert_eq!(StatusCode::OK, status, "{read}");
+    assert_eq!(
+        Some("SYN-B2"),
+        read["code"]["coding"][0]["code"].as_str(),
+        "{read}"
+    );
     let (status, both) = get(&facade, &search(&system_one, &code_one)).await?;
     assert_eq!(StatusCode::OK, status, "{both}");
     assert_eq!(Some(2), both["total"].as_u64(), "{both}");
@@ -206,11 +223,11 @@ async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
     let (status, either) = get(&facade, &format!("Condition?{either}")).await?;
     assert_eq!(StatusCode::OK, status, "{either}");
     assert_eq!(
-        Some(2),
+        Some(3),
         either["total"].as_u64(),
-        "a composition matching on two nodes is one entry: {either}"
+        "each matching diagnosis is one resource: {either}"
     );
-    assert_eq!(2, matched(&either).len(), "{either}");
+    assert_eq!(3, matched(&either).len(), "{either}");
     Ok(())
 }
 
