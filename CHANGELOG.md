@@ -78,6 +78,12 @@ crates on crates.io.
   its `id` to two compositions now names the repair (#298): its `conflict`
   issue lists the resource id of each composition, and an update
   (`PUT [base]/[type]/[id]`) of the one the sender means revises it.
+- A stored version container that the openEHR BASE `HIER_OBJECT_ID` grammar
+  refuses, or a stored `ehr_id` carrying a character that would change the
+  request path, now answers a `500` whose `exception` issue names the
+  resource the record belongs to, the field and the value (#280). Before, the issue named
+  neither the resource nor the field. The Operate page on failure and
+  identity states the rule.
 
 ### Changed
 
