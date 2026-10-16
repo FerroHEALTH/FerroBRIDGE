@@ -9,6 +9,7 @@
 //! sibling read at boot. A lane is off until its section is present. No
 //! specification governs the configuration: our own design.
 
+mod auth;
 mod credentials;
 mod overrides;
 mod resolve;
@@ -34,6 +35,7 @@ use resolve::resolve_facade;
 use resolve::resolve_hl7v2;
 use resolve::resolve_mappings;
 use resolve::resolve_terminology;
+use section::Auth;
 use section::Cdm;
 use section::Cdr;
 use section::Etl;
@@ -74,6 +76,8 @@ pub struct Config {
     pub mappings: Mappings,
     /// The FHIR facade, off until its section turns it on.
     pub facade: Facade,
+    /// Inbound authentication, off until its section turns it on.
+    pub auth: Auth,
     /// The FHIRconnect operations.
     pub operations: Operations,
     /// The HL7 v2 face, off until its section turns it on.
@@ -211,6 +215,24 @@ pub enum Error {
     Issuer {
         /// The key that holds it.
         key: String,
+    },
+    /// An algorithm is no asymmetric JWS algorithm (RFC 7518 §3.1).
+    #[error(
+        "{key} names `{value}`; the algorithms are RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384 and EdDSA"
+    )]
+    Algorithm {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: String,
+    },
+    /// The token profile names neither of the two values.
+    #[error("{key} is `{value}`; the profiles are rfc9068 and jwt")]
+    TokenProfile {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: String,
     },
     /// A resource indicator carries a fragment, which RFC 8707 §2 forbids.
     #[error("{key} carries a fragment, which a resource indicator may not (RFC 8707 §2)")]
@@ -497,6 +519,11 @@ impl Config {
             } else {
                 None
             },
+            auth: if self.auth.enabled {
+                Some(auth::resolve_auth(&self.auth)?)
+            } else {
+                None
+            },
             hl7v2: if self.hl7v2.enabled {
                 Some(resolve_hl7v2(&self.hl7v2, self.facade.enabled)?)
             } else {
@@ -578,6 +605,8 @@ pub struct Settings {
     pub mappings: Option<MappingSettings>,
     /// The facade lane, when it is on.
     pub facade: Option<FacadeSettings>,
+    /// The resource server, when inbound authentication is on.
+    pub auth: Option<crate::auth::AuthSettings>,
     /// The HL7 v2 face, when it is on.
     pub hl7v2: Option<Hl7v2Settings>,
     /// The FHIRconnect operations lane.

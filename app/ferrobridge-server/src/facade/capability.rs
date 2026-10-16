@@ -21,7 +21,12 @@ use fhir_types::r4::capability_statement::CapabilityStatementRestInteraction;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResource;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResourceInteraction;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResourceOperation;
+use fhir_types::r4::capability_statement::CapabilityStatementRestSecurity;
 use fhir_types::r4::capability_statement::CapabilityStatementSoftware;
+use fhir_types::r4::codeable_concept::CodeableConcept;
+use fhir_types::r4::coding::Coding;
+use fhir_types::r4::extension::Extension;
+use fhir_types::r4::extension::ExtensionValue;
 
 use crate::facade::programs::Programs;
 use crate::state;
@@ -88,6 +93,45 @@ pub enum Hl7v2 {
     Absent,
 }
 
+/// The authorization server that guards the facade, as `rest.security`
+/// states it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Security {
+    /// The authorization endpoint, when the server has one.
+    pub authorize: Option<String>,
+    /// The token endpoint.
+    pub token: String,
+    /// The dynamic registration endpoint, when the server has one.
+    pub register: Option<String>,
+    /// The token introspection endpoint, when the server has one.
+    pub introspect: Option<String>,
+    /// The token revocation endpoint, when the server has one.
+    pub revoke: Option<String>,
+}
+
+/// Everything beside the programs that shapes the statement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Shape {
+    /// Whether the FHIRconnect operations are served.
+    pub operations: Operations,
+    /// Whether the HL7 v2 face runs.
+    pub hl7v2: Hl7v2,
+    /// The authorization server, when inbound authentication is on.
+    pub security: Option<Security>,
+}
+
+/// The `oauth-uris` extension of SMART App Launch
+/// (<https://hl7.org/fhir/smart-app-launch/1.0.0/conformance/index.html>).
+pub const OAUTH_URIS: &str =
+    "http://fhir-registry.smarthealthit.org/StructureDefinition/oauth-uris";
+
+/// The R4 code system of `rest.security.service`.
+///
+/// R4 binds the element to `http://hl7.org/fhir/ValueSet/restful-security-service`,
+/// whose codes live in this system (<https://hl7.org/fhir/R4/codesystem-restful-security-service.html>).
+pub const SECURITY_SERVICE_SYSTEM: &str =
+    "http://terminology.hl7.org/CodeSystem/restful-security-service";
+
 /// The implementation description of a facade with no HL7 v2 face.
 const DESCRIPTION: &str = "The FerroBRIDGE FHIR facade over an openEHR CDR";
 
@@ -122,6 +166,27 @@ pub fn statement_with(
     operations: Operations,
     hl7v2: Hl7v2,
 ) -> CapabilityStatement {
+    statement_of(
+        programs,
+        base,
+        &Shape {
+            operations,
+            hl7v2,
+            security: None,
+        },
+    )
+}
+
+/// Returns the statement the loaded `programs` support under `shape`.
+///
+/// With a [`Shape::security`], `rest.security` names the SMART service and
+/// carries the `oauth-uris` extension with the authorization server's
+/// endpoints, the form SMART App Launch 1.0.0 defined and 2.x keeps for
+/// existing clients while it calls it deprecated
+/// (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
+#[must_use]
+pub fn statement_of(programs: &Programs, base: &str, shape: &Shape) -> CapabilityStatement {
+    let (operations, hl7v2) = (shape.operations, shape.hl7v2);
     let description = match hl7v2 {
         Hl7v2::Absent => String::from(DESCRIPTION),
         Hl7v2::Configured => format!("{DESCRIPTION}. {HL7V2_SENTENCE}"),
@@ -165,9 +230,55 @@ pub fn statement_with(
                 ..CapabilityStatementRestInteraction::default()
             }],
             operation: system_operations(operations),
+            security: shape.security.as_ref().map(security),
             ..CapabilityStatementRest::default()
         }],
         ..CapabilityStatement::default()
+    }
+}
+
+/// Returns the `rest.security` of a facade `security` guards.
+///
+/// The `authorize` and `token` members are the ones the extension requires
+/// (SMART App Launch 1.0.0, conformance); a server with no authorization
+/// endpoint serves backend services only, and the member is left out rather
+/// than invented.
+fn security(security: &Security) -> CapabilityStatementRestSecurity {
+    let members = [
+        ("authorize", security.authorize.as_deref()),
+        ("token", Some(security.token.as_str())),
+        ("register", security.register.as_deref()),
+        ("introspect", security.introspect.as_deref()),
+        ("revoke", security.revoke.as_deref()),
+    ];
+    CapabilityStatementRestSecurity {
+        extension: vec![Extension {
+            url: OAUTH_URIS.into(),
+            extension: members
+                .into_iter()
+                .filter_map(|(name, uri)| {
+                    uri.map(|uri| Extension {
+                        url: name.into(),
+                        value: Some(ExtensionValue::Uri(uri.into())),
+                        ..Extension::default()
+                    })
+                })
+                .collect(),
+            ..Extension::default()
+        }],
+        service: vec![CodeableConcept {
+            coding: vec![Coding {
+                system: Some(SECURITY_SERVICE_SYSTEM.into()),
+                code: Some("SMART-on-FHIR".into()),
+                ..Coding::default()
+            }],
+            ..CodeableConcept::default()
+        }],
+        description: Some(
+            "SMART App Launch 2.x: each request carries a bearer access token of the authorization server named here; discovery at [base]/.well-known/smart-configuration."
+                .into(),
+        ),
+        ..CapabilityStatementRestSecurity::default()
     }
 }
 

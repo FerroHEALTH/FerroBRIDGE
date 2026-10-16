@@ -25,6 +25,23 @@ crates on crates.io.
 
 ### Added
 
+- The FHIR facade authenticates its callers as a SMART App Launch 2.x
+  resource server (#400). A new `[auth]` section, off by default, names the
+  issuer and the audience; the issuer's metadata and key set are read at
+  boot, and every request under `/fhir` needs a bearer JWT access token
+  (RFC 9068 profile by default) except `GET /fhir/metadata` and the new
+  `/.well-known/smart-configuration` document. A missing or invalid token
+  answers `401` and a token whose SMART v2 scopes (`patient/`, `user/`,
+  `system/` with `cruds`, v1 `.read` and `.write` included) do not permit
+  the request answers `403`, neither naming a claim or a scope. A
+  `patient/` token reaches only its patient's compartment, a transaction is
+  authorised entry by entry and fails whole, a create that revises a
+  resource the facade holds needs `u` beside `c`, a scopeless token gets system
+  rights only for a listed subject, and every FHIR request leaves one audit
+  line on the `ferrobridge::audit` target without the token or the body.
+  The `CapabilityStatement` carries `rest.security` with the SMART service
+  and the `oauth-uris` extension. With `[auth]` off the facade stays open,
+  and the server warns at start-up.
 - `fhir-types` 0.1.111 names each type's base type in the element table
   (`TypeSchema::base`, from `StructureDefinition.baseDefinition`, and for a
   backbone element the `BackboneElement` or `Element` its element names), in

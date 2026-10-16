@@ -89,7 +89,11 @@ the testkit tool crate. Beside it:
   `[hl7v2]` and beside the facade: the MLLP listener under the same drain,
   each message mapped by `ferrobridge-hl7v2` and written through the facade's
   `ingest` service as one transaction, and the acknowledgment chosen from the
-  commit outcome (`hl7v2::answer`).
+  commit outcome (`hl7v2::answer`). `src/auth/` makes the facade a SMART App
+  Launch 2.x resource server behind `[auth]` (#400): the issuer's keys
+  discovered and cached, every access token checked, SMART v2 scopes per
+  interaction and the patient compartment, and one audit line per request;
+  every facade handler takes the caller's `Access`.
 
 - `crates/fhir-types`: the generated FHIR model, Apache-2.0, emitted whole by
   the generator below and never hand-edited: one module per version, STU3,

@@ -11,6 +11,7 @@
 //! stop. `main.rs` only hands in the arguments and returns the exit code.
 #![doc(test(attr(deny(warnings))))]
 
+pub mod auth;
 pub mod banner;
 pub mod build_info;
 pub mod cdr;
@@ -21,6 +22,7 @@ pub mod facade;
 pub mod health;
 pub mod hl7v2;
 pub mod indicators;
+mod jobs;
 pub mod mappings;
 pub mod operations;
 pub mod panic;
@@ -151,7 +153,7 @@ where
                 eprintln!("ferrobridge: cannot start: `cdm init` needs a [cdm] section");
                 return ExitCode::from(EXIT_CONFIG);
             };
-            match cdm_init_command(&cdm, with_constraints) {
+            match jobs::cdm_init_command(&cdm, with_constraints) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
                     tracing::error!(error = format!("{error:#}"), "cdm init failed");
@@ -164,7 +166,7 @@ where
                 eprintln!("ferrobridge: cannot start: `etl run` needs {missing}");
                 return ExitCode::from(EXIT_CONFIG);
             }
-            match etl_run_command(&settings, &options) {
+            match jobs::etl_run_command(&settings, &options) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
                     tracing::error!(error = format!("{error:#}"), "etl run failed");
@@ -188,115 +190,6 @@ enum Job {
     EtlRun(etl::RunOptions),
 }
 
-/// Applies the CDM DDL and the bridge schema to the configured database, and
-/// prints what it found and did.
-///
-/// The CDM schema is built in one transaction through `sqlx`, and the bridge
-/// schema through the writer's own `tokio-postgres` connection; the two
-/// clients never share a pool, and both connect over the TLS the `[cdm]`
-/// section settles. A schema that already holds every CDM table is reported
-/// and left as it is; one that holds some of them is refused. With
-/// `with_constraints`, OHDSI's foreign keys follow in a transaction of their
-/// own, so a refusal there leaves the tables in place and names the refused
-/// statement.
-#[expect(
-    clippy::print_stdout,
-    reason = "what the job found and did is its output, written to stdout for the operator"
-)]
-fn cdm_init_command(cdm: &config::CdmSettings, with_constraints: bool) -> anyhow::Result<()> {
-    use anyhow::Context;
-    use omop_cdm::database::{self, CONSTRAINTS_FILE, Init};
-
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    runtime.block_on(async {
-        tracing::info!(
-            schema = %cdm.schema,
-            ssl_mode = %cdm.connection.ssl_mode(),
-            ca = cdm.connection.has_ca(),
-            "connecting to the CDM database"
-        );
-        let pool = database::CdmPool::connect(
-            sqlx::postgres::PgPoolOptions::new().max_connections(1),
-            cdm.connection.pool_options(),
-            cdm.schema.clone(),
-        )
-        .await
-        .context("connecting to the CDM database")?;
-        let outcome = database::init(&pool)
-            .await
-            .with_context(|| format!("applying the CDM DDL to schema {}", cdm.schema))?;
-        match &outcome {
-            Init::Created => println!(
-                "CDM schema {}: created the CDM {} tables, primary keys and indices (OHDSI {})",
-                cdm.schema,
-                omop_cdm::CDM_VERSION,
-                omop_cdm::CDM_DEFINITIONS_TAG
-            ),
-            Init::AlreadyInitialised { cdm_versions } if cdm_versions.is_empty() => println!(
-                "CDM schema {}: already initialised, every CDM {} table is present and \
-                 CDM_SOURCE holds no row; nothing applied",
-                cdm.schema,
-                omop_cdm::CDM_VERSION
-            ),
-            Init::AlreadyInitialised { cdm_versions } => println!(
-                "CDM schema {}: already initialised, CDM_SOURCE records cdm_version {}; \
-                 nothing applied",
-                cdm.schema,
-                cdm_versions.join(", ")
-            ),
-        }
-        if with_constraints {
-            let applied = database::constrain(&pool)
-                .await
-                .with_context(|| format!("applying {CONSTRAINTS_FILE} to schema {}", cdm.schema))?;
-            println!(
-                "CDM schema {}: applied the {applied} foreign keys of {CONSTRAINTS_FILE}",
-                cdm.schema
-            );
-        }
-        pool.pool().close().await;
-        let mut writer = omop_cdm::writer::CdmWriter::connect_with(
-            &cdm.connection,
-            cdm.schema.clone(),
-            cdm.bridge_schema.clone(),
-            cdm.person_policy,
-        )
-        .await
-        .context("connecting the CDM writer")?;
-        writer
-            .init()
-            .await
-            .with_context(|| format!("creating the bridge schema {}", cdm.bridge_schema))?;
-        println!("bridge schema {}: in place", cdm.bridge_schema);
-        tracing::info!(
-            schema = %cdm.schema,
-            bridge_schema = %cdm.bridge_schema,
-            "the CDM schema and the bridge schema are in place"
-        );
-        Ok(())
-    })
-}
-
-/// Runs the OMOP ETL once and prints its report as text and as JSON.
-///
-/// The job itself is [`etl::job::run`], which a test drives with a
-/// configuration of its own.
-#[expect(
-    clippy::print_stdout,
-    reason = "the run report is the job's output, written to stdout for the operator"
-)]
-fn etl_run_command(settings: &Settings, options: &etl::RunOptions) -> anyhow::Result<()> {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    let report = runtime.block_on(etl::job::run(settings, options))?;
-    println!("{report}");
-    println!("{}", serde_json::to_string_pretty(&report)?);
-    Ok(())
-}
-
 /// Builds the runtime and serves until the process is asked to stop.
 fn serve_command(settings: Settings) -> anyhow::Result<()> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -309,6 +202,16 @@ fn serve_command(settings: Settings) -> anyhow::Result<()> {
         let mut state = AppState::build(&settings)
             .await
             .context("building the upstream clients")?;
+        if let Some(auth) = settings.auth.clone() {
+            let authority = auth::Authority::discover(auth)
+                .await
+                .context("reading the authorization server")?;
+            state = state.with_auth(Arc::new(authority));
+        } else {
+            tracing::warn!(
+                "[auth] is off: the FHIR facade authenticates no caller and serves every request"
+            );
+        }
         let mut lanes = startup::lanes(&settings);
         if let Some(lane) = settings.facade.as_ref() {
             let (mounted, counts) = build_facade(&settings, lane)
@@ -586,7 +489,10 @@ fn chain(error: &dyn std::error::Error) -> String {
 /// `GET /health/readiness` answers `200` when every registered indicator is up
 /// and `503` with each indicator's state otherwise, and `GET /health/info`
 /// answers the build facts and the pins as JSON. The two FHIRconnect
-/// operations and their direct forms are mounted under `/fhir`.
+/// operations and their direct forms are mounted under `/fhir`. Every route
+/// passes [`auth::guard::guard`], which checks the bearer token of a FHIR
+/// request when the state carries a resource server and leaves the facade
+/// open when it does not.
 pub fn router(state: Arc<AppState>, server: &ServerSettings) -> Router {
     let mut routes = Router::new()
         .route("/", get(root))
@@ -595,19 +501,36 @@ pub fn router(state: Arc<AppState>, server: &ServerSettings) -> Router {
         .route("/health/info", get(info))
         .with_state(Arc::clone(&state))
         .merge(operations::router(Arc::clone(&state)));
-    if let Some(mounted) = state.facade() {
-        let operations = if state.operations().is_some() {
-            facade::capability::Operations::Served
-        } else {
-            facade::capability::Operations::Absent
-        };
-        let hl7v2 = if state.hl7v2().is_some() {
-            facade::capability::Hl7v2::Configured
-        } else {
-            facade::capability::Hl7v2::Absent
-        };
-        routes = routes.merge(facade::routes(Arc::clone(mounted), operations, hl7v2));
+    if let Some(authority) = state.auth() {
+        routes = routes.merge(auth::smart::routes(authority));
     }
+    if let Some(mounted) = state.facade() {
+        let shape = facade::capability::Shape {
+            operations: if state.operations().is_some() {
+                facade::capability::Operations::Served
+            } else {
+                facade::capability::Operations::Absent
+            },
+            hl7v2: if state.hl7v2().is_some() {
+                facade::capability::Hl7v2::Configured
+            } else {
+                facade::capability::Hl7v2::Absent
+            },
+            security: state
+                .auth()
+                .map(|authority| auth::smart::security(authority)),
+        };
+        routes = routes.merge(facade::routes(Arc::clone(mounted), shape));
+    }
+    let gate = state
+        .auth()
+        .map_or_else(auth::guard::Gate::open, |authority| {
+            auth::guard::Gate::new(Arc::clone(authority))
+        });
+    let routes = routes.layer(axum::middleware::from_fn_with_state(
+        gate,
+        auth::guard::guard,
+    ));
     with_middleware(routes, state, server)
 }
 

@@ -8,6 +8,7 @@
 //! guard, the program selection, the engine, the identity map and the status
 //! table.
 
+mod auth;
 mod capability;
 mod conditional;
 mod examples;

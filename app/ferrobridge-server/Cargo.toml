@@ -39,6 +39,8 @@ http.workspace = true
 # The one clock: the instant every composition default of one ingest is taken
 # from.
 jiff.workspace = true
+# The facade checks each inbound bearer token against the issuer's key set.
+jsonwebtoken.workspace = true
 # The ADL 2 HRID parser an adl2 template ETag is read with.
 openehr-adl.workspace = true
 # The AOM2 operational template the adl2 route serves.
@@ -86,6 +88,8 @@ jiff.workspace = true
 toml.workspace = true
 
 [dev-dependencies]
+# The inbound token cases sign with key pairs generated at test time.
+aws-lc-rs.workspace = true
 ferrobridge-testkit.workspace = true
 # The OMOP round trip pins its rows as a reviewed snapshot.
 insta.workspace = true
