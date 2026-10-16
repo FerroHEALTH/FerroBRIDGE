@@ -173,6 +173,16 @@ pub enum CdrError {
         /// The answer the service sent, when the call reached it.
         upstream: Option<Box<Upstream>>,
     },
+    /// The CDR refused the token (`401`) and no new one could be obtained,
+    /// so the call ended without being asked again.
+    #[error("the CDR call ended without a usable credential")]
+    Renewal {
+        /// Why the new token could not be obtained.
+        #[source]
+        source: crate::cdr::oauth::RenewalError,
+        /// The `401` the service sent.
+        upstream: Option<Box<Upstream>>,
+    },
     /// The commit metadata cannot travel in a header.
     #[error("the commit metadata cannot travel in a header")]
     Commit(#[from] HeaderError),
@@ -257,6 +267,7 @@ impl CdrError {
             Self::Build { .. } => "client-build",
             Self::TokenClient { .. } => "token-client-build",
             Self::Client { source, .. } => client_kind(source),
+            Self::Renewal { .. } => "token-renewal",
             Self::Commit(HeaderError::Attribute { .. }) => "header-attribute",
             Self::Commit(_) | Self::HeaderValue { .. } => "header-value",
             Self::MissingHeader { .. } => "missing-header",

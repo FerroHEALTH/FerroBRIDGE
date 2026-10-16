@@ -23,6 +23,14 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Fixed
+
+- A CDR call whose token the CDR refused, and whose renewal the token
+  endpoint then refused, is no longer retried (#663). The client asked the
+  refusing token endpoint again on every retry of a `GET`; it now ends the
+  call after the one renewal, with the `401` standing and the token error as
+  its cause, and the facade still answers it with the credentials `502`.
+
 ## [0.0.6] - 2026-10-17
 
 ### Added
