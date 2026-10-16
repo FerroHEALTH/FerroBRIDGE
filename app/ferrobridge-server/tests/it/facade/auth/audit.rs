@@ -130,3 +130,44 @@ fn a_create_body_never_reaches_the_audit_line() {
     assert_eq!(Some("create"), lines[0]["interaction"].as_str());
     assert!(!text.contains("SYNTHETIC-NOTE-CONTENT"), "{text}");
 }
+#[test]
+fn a_batch_audits_each_entry_and_the_batch_without_any_content() {
+    let text = logged(async {
+        let harness = harness().await;
+        let mut resource = crate::facade::condition();
+        resource["note"] = serde_json::json!([{ "text": "SYNTHETIC-BATCH-NOTE" }]);
+        let bundle = crate::facade::batch::batch_of(&[
+            crate::facade::batch::entry("GET", "Condition/c-audit-4", None),
+            crate::facade::batch::entry("POST", "Condition", Some(resource)),
+        ]);
+        let request = http::Request::post("/fhir")
+            .header(http::header::CONTENT_TYPE, "application/fhir+json")
+            .body(axum::body::Body::from(bundle.to_string()))
+            .expect("a legal request");
+        let response = raw(harness.app(), request).await.expect("an answer");
+        assert_eq!(StatusCode::OK, response.status());
+    });
+    let lines = audit_lines(&text);
+    assert_eq!(
+        3,
+        lines.len(),
+        "one line per entry and one for the batch: {text}"
+    );
+    let read = lines
+        .iter()
+        .find(|line| line["entry"].as_u64() == Some(0))
+        .expect("the first entry's line");
+    assert_eq!(Some("read"), read["interaction"].as_str());
+    assert_eq!(Some("c-audit-4"), read["resource_id"].as_str());
+    assert_eq!(Some(404), read["status"].as_u64());
+    let create = lines
+        .iter()
+        .find(|line| line["entry"].as_u64() == Some(1))
+        .expect("the second entry's line");
+    assert_eq!(Some("create"), create["interaction"].as_str());
+    let whole = lines.last().expect("the batch line");
+    assert_eq!(Some("batch"), whole["interaction"].as_str(), "{text}");
+    assert_eq!(Some(200), whole["status"].as_u64());
+    assert!(whole["entry"].is_null(), "{text}");
+    assert!(!text.contains("SYNTHETIC-BATCH-NOTE"), "{text}");
+}

@@ -9,6 +9,7 @@
 //! table.
 
 mod auth;
+pub(crate) mod batch;
 mod capability;
 mod conditional;
 mod examples;
