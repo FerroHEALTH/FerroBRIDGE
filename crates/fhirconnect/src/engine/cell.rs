@@ -243,9 +243,7 @@ fn no_cell(source: &RmValue, kind: FhirKind, direction: Direction) -> LensError 
 /// `DV_CODED_TEXT` is a subtype of `DV_TEXT`
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_types.html#_dv_coded_text_class>),
 /// so the `DV_TEXT` rows apply to it unchanged.
-fn plain(
-    coded: &DvCodedText,
-) -> DvTextData {
+fn plain(coded: &DvCodedText) -> DvTextData {
     DvTextData {
         value: coded.value.clone(),
         hyperlink: coded.hyperlink.clone(),
@@ -257,9 +255,7 @@ fn plain(
 }
 
 /// Returns the held `DV_TEXT`, when the target holds one.
-fn held_text(
-    existing: Option<&RmValue>,
-) -> Option<&DvTextData> {
+fn held_text(existing: Option<&RmValue>) -> Option<&DvTextData> {
     match existing {
         Some(RmValue::Text(text)) => Some(text),
         _other => None,
@@ -267,9 +263,7 @@ fn held_text(
 }
 
 /// Returns the held `DV_CODED_TEXT`, when the target holds one.
-fn held_coded(
-    existing: Option<&RmValue>,
-) -> Option<&DvCodedText> {
+fn held_coded(existing: Option<&RmValue>) -> Option<&DvCodedText> {
     match existing {
         Some(RmValue::CodedText(text)) => Some(text.as_ref()),
         _other => None,
