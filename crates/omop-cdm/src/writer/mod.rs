@@ -17,7 +17,9 @@
 //! links and watermark in one transaction the same way ([`removal`]). The
 //! `PERSON` row belongs to the person: either kind of transaction keeps it
 //! while a composition writes it or any row of the person remains, and the
-//! newest version that writes it rewrites its columns.
+//! newest version that writes it rewrites its columns. A row whose person
+//! has no `PERSON` row gets the placeholder [`person`] writes, or is refused,
+//! under the writer's [`PersonPolicy`].
 //!
 //! The rows cross into PostgreSQL through binary `COPY` into a temporary
 //! staging table whose `integer` columns are binary and whose other columns
@@ -30,6 +32,7 @@
 
 pub mod error;
 pub mod input;
+pub mod person;
 pub mod removal;
 pub mod side_table;
 pub mod stage;
@@ -56,12 +59,13 @@ use crate::writer::error::WriteError;
 use crate::writer::input::PersonPolicy;
 use crate::writer::input::RunId;
 use crate::writer::input::VisitConcepts;
+use crate::writer::person::person_id;
+use crate::writer::side_table::Ids;
 use crate::writer::side_table::allocate;
 use crate::writer::side_table::assign_ids;
 use crate::writer::side_table::bridge_ddl;
 use crate::writer::side_table::delete_earlier;
 use crate::writer::side_table::earlier_rows;
-use crate::writer::side_table::person_id;
 use crate::writer::side_table::record_keys;
 use crate::writer::side_table::replace_persons;
 use crate::writer::side_table::retire_persons;
@@ -316,9 +320,10 @@ impl CdmWriter {
         let mut report = graph.report().clone();
         let mut resolver = Resolver {
             transaction: &transaction,
+            cdm,
             bridge,
-            create: *policy == PersonPolicy::CreateOnFirstSight,
-            persons: BTreeMap::new(),
+            policy: *policy,
+            persons: written_persons(&ids),
             ids: &ids,
         };
         let tables = stage_graph(&mut resolver, graph, &mut report).await?;
@@ -363,7 +368,7 @@ impl CdmWriter {
     /// # Errors
     ///
     /// Returns [`WriteError::UnknownPerson`] under
-    /// [`PersonPolicy::Existing`] for an EHR with no person,
+    /// [`PersonPolicy::Existing`] for an EHR with no `PERSON` row,
     /// [`WriteError::SequenceExhausted`] when the sequence has no id left,
     /// and [`WriteError::Database`] for a statement PostgreSQL refuses; the
     /// transaction is rolled back in every case.
@@ -381,7 +386,6 @@ impl CdmWriter {
         } = self;
         let table = graph::row::cdm_table("visit_occurrence")?;
         let transaction = client.transaction().await.map_err(database(Step::Begin))?;
-        let create = *policy == PersonPolicy::CreateOnFirstSight;
         let mut ids = Vec::with_capacity(visits.len());
         let mut rows = Vec::with_capacity(visits.len());
         for visit in visits {
@@ -412,7 +416,7 @@ impl CdmWriter {
                     .map_err(database(Step::Record))?;
                 id
             };
-            let person = person_id(&transaction, bridge, key.ehr_id(), create).await?;
+            let person = person_id(&transaction, cdm, bridge, key.ehr_id(), *policy).await?;
             ids.push(id);
             rows.push(stage_row(
                 table,
@@ -463,11 +467,21 @@ impl CdmWriter {
     }
 }
 
+/// Returns the `person_id` of every person whose `PERSON` row `ids` holds, by
+/// `ehr_id`: those rows are the graph's own, so no placeholder stands in.
+fn written_persons(ids: &Ids<'_>) -> BTreeMap<String, i32> {
+    ids.iter()
+        .filter(|((table, _), _)| *table == "person")
+        .map(|((_, key), id)| (key.ehr_id().value().to_owned(), *id))
+        .collect()
+}
+
 /// Resolves the references of one commit.
 struct Resolver<'a, 't> {
     transaction: &'a Transaction<'t>,
+    cdm: &'a SchemaName,
     bridge: &'a SchemaName,
-    create: bool,
+    policy: PersonPolicy,
     persons: BTreeMap<String, i32>,
     ids: &'a BTreeMap<(&'static str, &'a RecordKey), i32>,
 }
@@ -480,7 +494,8 @@ impl Resolver<'_, '_> {
                 if let Some(id) = self.persons.get(ehr_id.value()) {
                     return Ok(*id);
                 }
-                let id = person_id(self.transaction, self.bridge, ehr_id, self.create).await?;
+                let id =
+                    person_id(self.transaction, self.cdm, self.bridge, ehr_id, self.policy).await?;
                 self.persons.insert(ehr_id.value().to_owned(), id);
                 Ok(id)
             }

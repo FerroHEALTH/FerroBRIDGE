@@ -7,7 +7,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
-use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use tokio_postgres::Transaction;
 
 use crate::ddl::SchemaName;
@@ -19,6 +18,7 @@ use crate::meta::TableMeta;
 use crate::writer::database;
 use crate::writer::error::Step;
 use crate::writer::error::WriteError;
+use crate::writer::person::mapped;
 use crate::writer::quoted;
 use crate::writer::stage::Staged;
 use crate::writer::stage::copy_rows;
@@ -43,39 +43,6 @@ pub(super) async fn allocate(
         .await
         .map_err(database(Step::Allocate(table)))?;
     row.try_get(0).map_err(database(Step::Allocate(table)))
-}
-
-/// Resolves `ehr_id` to its `person_id`, assigning one when `create` allows.
-pub(super) async fn person_id(
-    transaction: &Transaction<'_>,
-    bridge: &SchemaName,
-    ehr_id: &HierObjectId,
-    create: bool,
-) -> Result<i32, WriteError> {
-    let found = transaction
-        .query_opt(
-            &format!("SELECT person_id FROM {bridge}.person_map WHERE ehr_id = $1"),
-            &[&ehr_id.value()],
-        )
-        .await
-        .map_err(database(Step::Read))?;
-    if let Some(row) = found {
-        return row.try_get(0).map_err(database(Step::Read));
-    }
-    if !create {
-        return Err(WriteError::UnknownPerson {
-            ehr_id: ehr_id.clone(),
-        });
-    }
-    let id = allocate(transaction, bridge, "person").await?;
-    transaction
-        .execute(
-            &format!("INSERT INTO {bridge}.person_map (ehr_id, person_id) VALUES ($1, $2)"),
-            &[&ehr_id.value(), &id],
-        )
-        .await
-        .map_err(database(Step::Record))?;
-    Ok(id)
 }
 
 /// The tables and sequences of the bridge schema.
@@ -158,7 +125,7 @@ pub(super) async fn assign_ids<'g>(
         let table = row.table().name;
         let key = row.key();
         let id = if table == "person" {
-            person_id(transaction, bridge, key.ehr_id(), true).await?
+            mapped(transaction, bridge, key.ehr_id(), true).await?
         } else if let Some(id) = earlier.ids.get(&EarlierKey::of(table, key)) {
             *id
         } else {
@@ -406,7 +373,8 @@ pub(super) async fn retire_persons(
 }
 
 /// Deletes the `PERSON` rows `graph` writes before they are copied in again,
-/// so the newest writer's columns replace a `PERSON` row a person kept.
+/// so the newest writer's columns replace a `PERSON` row a person kept, the
+/// placeholder or the row another composition of the person wrote.
 pub(super) async fn replace_persons(
     transaction: &Transaction<'_>,
     cdm: &SchemaName,

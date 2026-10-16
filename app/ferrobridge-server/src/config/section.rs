@@ -469,8 +469,8 @@ pub struct Cdm {
     pub schema: String,
     /// The schema the bridge keeps its natural-key side table in.
     pub bridge_schema: String,
-    /// What the writer does for an EHR with no `PERSON`:
-    /// `create_on_first_sight` or `existing`.
+    /// What the writer does for an EHR with no `PERSON` row:
+    /// `create_on_first_sight` (a placeholder row) or `existing` (a refusal).
     pub person_policy: String,
 }
 

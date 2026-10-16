@@ -15,6 +15,7 @@
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::cdr::ids::{EhrId, versioned_object_uid};
+use ferrobridge_server::etl::report::RunReport;
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::fixtures::LABORATORY_REPORT_OPT;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
@@ -119,6 +120,7 @@ async fn a_composition_deleted_in_the_cdr_loses_its_rows_on_the_next_run()
         cell(&postgres, &period_end).await?,
         "the observation period no longer reaches the deleted composition's day"
     );
+    assert_eq!(0, crate::etl::orphans(&postgres).await?, "{second}");
     let after_removal = crate::etl::dump(&postgres)?;
 
     let third = etl_run(&config).await?;
@@ -136,6 +138,16 @@ async fn a_composition_deleted_in_the_cdr_loses_its_rows_on_the_next_run()
         .ok_or("an EHR")?;
     delete(&client, last_ehr, last).await?;
     let fourth = etl_run(&config).await?;
+    assert_second_ehr_gone(&postgres, &fourth).await
+}
+
+/// Asserts what the run after the deletion of the second EHR's only
+/// composition left: its visit, its observation period and its placeholder
+/// `PERSON` row are gone.
+async fn assert_second_ehr_gone(
+    postgres: &containers::Postgres,
+    fourth: &RunReport,
+) -> Result<(), Box<dyn Error>> {
     assert_eq!(1, fourth.deletions.removed.len(), "{fourth}");
     assert_eq!(
         1, fourth.derived.visit_occurrence_removed,
@@ -143,12 +155,20 @@ async fn a_composition_deleted_in_the_cdr_loses_its_rows_on_the_next_run()
     );
     assert_eq!(
         "1",
-        cell(&postgres, "SELECT count(*) FROM cdm.visit_occurrence").await?
+        cell(postgres, "SELECT count(*) FROM cdm.visit_occurrence").await?,
+        "the first EHR keeps its visit"
     );
     assert_eq!(
         "1",
-        cell(&postgres, "SELECT count(*) FROM cdm.observation_period").await?,
+        cell(postgres, "SELECT count(*) FROM cdm.observation_period").await?,
         "the second EHR keeps no observation period"
     );
+    let persons = (fourth.persons.total, fourth.persons.placeholders);
+    assert_eq!(
+        (1, 1),
+        persons,
+        "the second EHR's placeholder goes: {fourth}"
+    );
+    assert_eq!(0, crate::etl::orphans(postgres).await?, "{fourth}");
     Ok(())
 }

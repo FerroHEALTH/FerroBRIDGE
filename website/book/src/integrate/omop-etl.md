@@ -32,7 +32,7 @@ MEASUREMENT, OBSERVATION, DEATH, SPECIMEN, FACT_RELATIONSHIP, NOTE, and
 NOTE_NLP, beside the vocabulary tables.
 
 Some of those come from mappings and some are derived. PERSON rows come per
-EHR. VISIT_OCCURRENCE comes from a configured AQL query, checked when the
+EHR ([The PERSON row](#the-person-row)). VISIT_OCCURRENCE comes from a configured AQL query, checked when the
 configuration loads, grouped by `ehr_id` and source. OBSERVATION_PERIOD is
 derived from the first and last clinical event per person, and the ERA tables
 run the SQL the CDM publishes. The CDM leaves each of these to the ETL's
@@ -104,6 +104,34 @@ writes it and no row of the person is left; the person map keeps the EHR's
 `person_id`, so a later row of the EHR takes the same id. The newest version
 that writes the `PERSON` row rewrites its columns. This is FerroBRIDGE's own
 design.
+
+## The PERSON row
+
+Every clinical table names its person through `person_id`, a required
+foreign key to `PERSON` (CDM v5.4), so every `person_id` a run writes names a
+`PERSON` row. Its columns come from the first of these that applies:
+
+1. A `PERSON` row an OMOCL mapping writes. The OMOCL corpus maps the
+   `openEHR-EHR-ADMIN_ENTRY.person_data.v0` archetype to `PERSON`
+   (`person_data/person_data_v0.yml`); when one of the person's compositions
+   carries it, its row replaces whatever row the person held, keeping the
+   `person_id`.
+2. Otherwise, `[cdm] person_policy`:
+   - `create_on_first_sight`, the default, writes a placeholder row the first
+     time a row or a visit names the EHR: `gender_concept_id`,
+     `race_concept_id` and `ethnicity_concept_id` 0 (the CDM's concept for
+     "no matching concept"), `year_of_birth` 0, and `person_source_value` the
+     `ehr_id` when it fits the column's 50 characters.
+   - `existing` refuses every row whose EHR has no `PERSON` row.
+
+The CDM requires `year_of_birth`, and its ETL convention drops every person
+with no year of birth. `existing` follows that convention. The placeholder's
+0 is a value no person was born in: a year taken from the person's first
+event would look real and corrupt every age computed from it, while 0 fails
+the Data Quality Dashboard's plausible-value check for `year_of_birth`, so
+every placeholder shows up there. The run report prints the `PERSON` rows
+and the placeholders among them (`persons` in the JSON). Both policies are
+FerroBRIDGE's own design.
 
 Each committed composition leaves a watermark naming the version written.
 `ferrobridge etl run --resume` skips every composition whose watermark names

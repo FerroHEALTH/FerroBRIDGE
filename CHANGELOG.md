@@ -307,6 +307,16 @@ crates on crates.io.
   one of two sibling clusters that share a node id (the `Straßenanschrift` and
   `Postfach` addresses of `KDS_Person`) names the node below that cluster
   alone (#468).
+- Every `person_id` an `etl run` writes names a `PERSON` row, where the
+  rows of a person no mapping wrote a `PERSON` row for named a `person_id`
+  that `PERSON` did not hold, against the CDM v5.4 foreign key (#541). A
+  `PERSON` row an OMOCL mapping writes is the person's source; otherwise
+  `[cdm] person_policy = "create_on_first_sight"` writes a placeholder row
+  (every concept 0, `year_of_birth` 0, the `ehr_id` as
+  `person_source_value`) that such a mapping later replaces, and `existing`
+  refuses the row, also when the person map knows the EHR but its `PERSON`
+  row is gone. The run report counts the `PERSON` rows and the placeholders
+  (`persons`).
 - The facade's loss log records each declared loss as a value-free kind
   (`skipped-unresolved-reference`, `deferred-reference`, `defaulted` and the
   rest) with its FHIRPath and its openEHR path, where it logged the loss's

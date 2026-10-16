@@ -5,14 +5,18 @@
 //! composition that wrote it keeps it while any row of the person remains,
 //! because OMOP CDM v5.4 makes `person_id` a foreign key to `PERSON` in every
 //! clinical table (<https://ohdsi.github.io/CommonDataModel/cdm54.html>).
-//! Which writer's columns win is FerroBRIDGE's own design.
+//! Which writer's columns win, and the placeholder row of a person with no
+//! `PERSON` source, are FerroBRIDGE's own design.
 
 use ferrobridge_testkit::containers;
 use omop_cdm::graph::{
     RecordGraph, key::ArchetypeRootPath, key::Discriminator, key::MappingName, key::OccurrencePath,
     key::RecordKey, key::Source, row::Row, row::Value,
 };
-use omop_cdm::writer::{input::PersonPolicy, input::RunId, removal::Removal};
+use omop_cdm::meta::CdmSchema;
+use omop_cdm::writer::{
+    error::WriteError, input::PersonPolicy, input::RunId, person::Persons, removal::Removal,
+};
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use std::error::Error;
@@ -181,5 +185,168 @@ async fn a_removal_keeps_the_person_while_another_composition_remains_and_then_r
         count(&client, "ferrobridge.person_map").await?,
         "the EHR keeps its person_id for a later row"
     );
+    Ok(())
+}
+
+/// Returns the rows of every CDM table that names a person whose `PERSON`
+/// row is missing, over every table with a `person_id`.
+async fn orphans_in_every_table(client: &tokio_postgres::Client) -> Result<i64, Box<dyn Error>> {
+    let mut total = 0;
+    for table in &omop_cdm::generated::TABLES {
+        if table.cdm_schema == CdmSchema::Cdm
+            && table.name != "person"
+            && table.column("person_id").is_some()
+        {
+            total += count(
+                client,
+                &format!(
+                    "cdm.{} t WHERE NOT EXISTS
+                        (SELECT 1 FROM cdm.person p WHERE p.person_id = t.person_id)",
+                    table.name
+                ),
+            )
+            .await?;
+        }
+    }
+    Ok(total)
+}
+
+/// Returns every `PERSON` row as its four required columns and its source
+/// value.
+async fn person_rows(
+    client: &tokio_postgres::Client,
+) -> Result<Vec<(i32, i32, i32, i32, Option<String>)>, Box<dyn Error>> {
+    Ok(client
+        .query(
+            "SELECT gender_concept_id, year_of_birth, race_concept_id, ethnicity_concept_id,
+                person_source_value
+             FROM cdm.person ORDER BY person_id",
+            &[],
+        )
+        .await?
+        .iter()
+        .map(|row| (row.get(0), row.get(1), row.get(2), row.get(3), row.get(4)))
+        .collect())
+}
+
+#[tokio::test]
+async fn a_person_with_no_person_source_gets_the_placeholder_row() -> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
+    database
+        .writer
+        .commit(&graph(OTHER, 1, None)?, &RunId::new("run-1")?)
+        .await?;
+    let client = reader(&database.postgres).await?;
+    assert_eq!(
+        vec![(0, 0, 0, 0, Some(EHR.to_owned()))],
+        person_rows(&client).await?,
+        "every concept 0, year_of_birth 0, and the EHR as the source value"
+    );
+    assert_eq!(0, orphans_in_every_table(&client).await?);
+    assert_eq!(
+        Persons {
+            total: 1,
+            placeholders: 1,
+        },
+        database.writer.persons().await?
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_composition_writing_the_person_replaces_the_placeholder() -> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
+    let run = RunId::new("run-1")?;
+    database
+        .writer
+        .commit(&graph(OTHER, 1, None)?, &run)
+        .await?;
+    let client = reader(&database.postgres).await?;
+    let placeholder: i32 = client
+        .query_one("SELECT person_id FROM cdm.person", &[])
+        .await?
+        .get(0);
+
+    database
+        .writer
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .await?;
+    assert_eq!(vec![1970], births(&client).await?);
+    let replaced: i32 = client
+        .query_one("SELECT person_id FROM cdm.person", &[])
+        .await?
+        .get(0);
+    assert_eq!(placeholder, replaced, "the person keeps its person_id");
+    assert_eq!(0, orphans_in_every_table(&client).await?);
+    assert_eq!(
+        Persons {
+            total: 1,
+            placeholders: 0,
+        },
+        database.writer.persons().await?
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_existing_policy_takes_a_person_its_composition_writes() -> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut database = database(PersonPolicy::Existing).await?;
+    let run = RunId::new("run-1")?;
+    database
+        .writer
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .await?;
+    database
+        .writer
+        .commit(&graph(OTHER, 1, None)?, &run)
+        .await?;
+    let client = reader(&database.postgres).await?;
+    assert_eq!(vec![1970], births(&client).await?);
+    assert_eq!(0, orphans_in_every_table(&client).await?);
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_existing_policy_refuses_a_person_whose_row_is_gone() -> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut database = database(PersonPolicy::Existing).await?;
+    let run = RunId::new("run-1")?;
+    database
+        .writer
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .await?;
+    let committed = database
+        .writer
+        .watermarks_after(None, 10)
+        .await?
+        .into_iter()
+        .next()
+        .ok_or("the composition that wrote the person")?;
+    database.writer.remove(&committed).await?;
+    let client = reader(&database.postgres).await?;
+    assert!(births(&client).await?.is_empty());
+    assert_eq!(1, count(&client, "ferrobridge.person_map").await?);
+
+    let error = database
+        .writer
+        .commit(&graph(OTHER, 1, None)?, &run)
+        .await
+        .expect_err("the person map names the EHR and no PERSON row does");
+    assert!(
+        matches!(error, WriteError::UnknownPerson { .. }),
+        "{error:?}"
+    );
+    assert_eq!(0, count(&client, "cdm.measurement").await?);
     Ok(())
 }

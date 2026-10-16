@@ -251,7 +251,7 @@ server says so once at start-up.
 | `tls_ca_file` | none | no | A file holding that CA, read at boot |
 | `schema` | `cdm` | no | The schema the CDM tables live in, an unquoted lower-case identifier |
 | `bridge_schema` | `ferrobridge` | no | The schema the bridge keeps its natural-key side table, id sequences and watermarks in |
-| `person_policy` | `create_on_first_sight` | no | `create_on_first_sight` gives an EHR a `person_id` the first time a row refers to it; `existing` refuses a row whose EHR has no `PERSON` row yet |
+| `person_policy` | `create_on_first_sight` | no | For a person no mapping writes a `PERSON` row for: `create_on_first_sight` gives the EHR a `person_id` and a placeholder `PERSON` row (concepts 0, `year_of_birth` 0) the first time a row refers to it; `existing` refuses a row whose EHR has no `PERSON` row ([The PERSON row](../integrate/omop-etl.md#the-person-row)) |
 
 Two clients open the database: the concept resolver's pool and the CDM
 writer's own connection. Both read the `sslmode` of `url` and the CA from

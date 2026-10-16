@@ -106,3 +106,35 @@ async fn an_unanswered_visit_no_row_names_is_removed_and_a_named_one_kept()
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn a_visit_gives_its_person_the_placeholder_row_and_takes_it_when_retired()
+-> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
+    database
+        .writer
+        .write_visits(&[visit("ward-a")?], CONCEPTS)
+        .await?;
+    let client = reader(&database.postgres).await?;
+    assert_eq!(
+        1,
+        count(
+            &client,
+            "cdm.person p JOIN cdm.visit_occurrence v ON v.person_id = p.person_id"
+        )
+        .await?,
+        "the visit names a PERSON row"
+    );
+
+    database.writer.retire_visits(&[]).await?;
+    assert_eq!(0, count(&client, "cdm.visit_occurrence").await?);
+    assert_eq!(
+        0,
+        count(&client, "cdm.person").await?,
+        "no row of the person remains"
+    );
+    Ok(())
+}

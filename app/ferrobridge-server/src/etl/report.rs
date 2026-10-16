@@ -99,6 +99,16 @@ pub struct Derived {
     pub drug_era: u64,
 }
 
+/// The `PERSON` rows after the run.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct Persons {
+    /// `PERSON` rows.
+    pub total: u64,
+    /// `PERSON` rows no mapping wrote, the placeholders of persons whose
+    /// compositions carry no `PERSON` source.
+    pub placeholders: u64,
+}
+
 /// The compositions an earlier run committed that this run's query did not
 /// answer, and what the CDR said of each.
 ///
@@ -142,6 +152,8 @@ pub struct RunReport {
     pub mappings: BTreeMap<String, MappingTotals>,
     /// The derived tables.
     pub derived: Derived,
+    /// The `PERSON` rows.
+    pub persons: Persons,
     /// The compositions checked for a deletion in the CDR.
     pub deletions: Deletions,
     /// Every refused record.
@@ -294,6 +306,11 @@ impl fmt::Display for RunReport {
             derived.observation_period,
             derived.condition_era,
             derived.drug_era
+        )?;
+        writeln!(
+            f,
+            "persons: {}, {} placeholders with no PERSON source",
+            self.persons.total, self.persons.placeholders
         )?;
         let deletions = &self.deletions;
         writeln!(
