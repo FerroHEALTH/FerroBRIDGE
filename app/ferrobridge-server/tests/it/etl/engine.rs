@@ -193,19 +193,19 @@ async fn the_omocl_engine_writes_the_laboratory_compositions_and_a_rerun_changes
         )
         .await?
     );
-    let before = dump(&harness.postgres)?;
+    let before = dump(&harness.postgres).await?;
 
     let second = engine_run(&mut harness, false, "run-2").await?;
     assert_eq!(2, second.compositions.committed);
     assert_eq!(
         before,
-        dump(&harness.postgres)?,
+        dump(&harness.postgres).await?,
         "a re-run through the engine leaves the data as it was"
     );
 
     let resumed = engine_run(&mut harness, true, "run-3").await?;
     assert_eq!(2, resumed.compositions.skipped);
-    assert_eq!(before, dump(&harness.postgres)?);
+    assert_eq!(before, dump(&harness.postgres).await?);
     Ok(())
 }
 

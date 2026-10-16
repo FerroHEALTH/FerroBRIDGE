@@ -223,12 +223,12 @@ async fn a_composition_the_cdr_reports_deleted_loses_its_rows_and_a_rerun_change
         )
         .await?
     );
-    let before = super::dump(&harness.postgres)?;
+    let before = super::dump(&harness.postgres).await?;
 
     let third = run_under(&mut harness, DeletionPolicy::Remove, "run-3").await??;
     assert_eq!(0, third.deletions.checked, "no watermark is left to check");
     assert!(third.deletions.removed.is_empty());
-    assert_eq!(before, super::dump(&harness.postgres)?);
+    assert_eq!(before, super::dump(&harness.postgres).await?);
     Ok(())
 }
 

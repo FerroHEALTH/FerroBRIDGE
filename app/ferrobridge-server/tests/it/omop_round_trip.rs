@@ -615,8 +615,8 @@ async fn projection(
 
 /// Returns the data of the CDM and bridge schemas as `pg_dump` writes it,
 /// each table's rows sorted and the watermark's run columns cut.
-fn dump(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
-    crate::etl::dump(postgres)
+async fn dump(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
+    crate::etl::dump(postgres).await
 }
 
 #[tokio::test]
@@ -684,13 +684,13 @@ async fn the_laboratory_round_trip_writes_the_reviewed_rows_and_a_rerun_changes_
         "laboratory_round_trip",
         projection(&postgres, &names).await?
     );
-    let before = dump(&postgres)?;
+    let before = dump(&postgres).await?;
 
     let second = etl_run(&config).await?;
     assert_eq!(3, second.compositions.committed, "{second}");
     assert_eq!(
         before,
-        dump(&postgres)?,
+        dump(&postgres).await?,
         "a second run leaves the data as it was"
     );
 
@@ -708,7 +708,7 @@ async fn the_laboratory_round_trip_writes_the_reviewed_rows_and_a_rerun_changes_
     assert_eq!(3, third.compositions.committed, "{third}");
     assert_ne!(
         before,
-        dump(&postgres)?,
+        dump(&postgres).await?,
         "the altered composition changes the data"
     );
     let rows_after = projection(&postgres, &names).await?;
