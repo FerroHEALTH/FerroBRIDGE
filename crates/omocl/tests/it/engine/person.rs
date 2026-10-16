@@ -19,6 +19,7 @@ use serde_json::Value;
 
 use crate::engine::int;
 use crate::engine::rows;
+use crate::engine::text;
 use crate::lab::StubSource;
 use crate::lab::compiled;
 use crate::lab::concept;
@@ -58,8 +59,17 @@ async fn person(
     corpus: &[&str],
     inline: &[(&str, &str)],
 ) -> Result<(RecordGraph, Vec<omocl::engine::RecordRefusal>), Box<dyn Error>> {
+    person_from(&flat()?, corpus, inline).await
+}
+
+/// Runs `corpus` and `inline` over the person `flat` describes.
+async fn person_from(
+    flat: &serde_json::Map<String, Value>,
+    corpus: &[&str],
+    inline: &[(&str, &str)],
+) -> Result<(RecordGraph, Vec<omocl::engine::RecordRefusal>), Box<dyn Error>> {
     let index = template()?;
-    let composition = index.build_from_flat(&flat()?, "2026-10-01T09:00:00Z")?;
+    let composition = index.build_from_flat(flat, "2026-10-01T09:00:00Z")?;
     let program = compiled(&set(corpus, inline)?, &index)?;
     let mut stub = StubSource::default();
     stub.code(
@@ -155,5 +165,77 @@ async fn a_person_mapping_that_omits_a_key_it_could_write_is_refused() -> Result
     };
     assert_eq!(refusal.kind, RefusalKind::RequiredColumn);
     assert_eq!(refusal.column, Some("ethnicity_concept_id"));
+    Ok(())
+}
+
+/// FerroBRIDGE's `Person` mapping for `KDS_Person`.
+const KDS_PERSON_DATA: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/projects/ferrobridge/kds_person/kds_person_data.yml"
+);
+
+/// Runs FerroBRIDGE's KDS `Person` mapping over the person `flat` describes.
+async fn kds_person(
+    flat: &serde_json::Map<String, Value>,
+) -> Result<(RecordGraph, Vec<omocl::engine::RecordRefusal>), Box<dyn Error>> {
+    let source = std::fs::read_to_string(KDS_PERSON_DATA)?;
+    person_from(flat, &[], &[("kds_person_data.yml", &source)]).await
+}
+
+#[tokio::test]
+async fn the_kds_person_mapping_writes_the_administrative_gender() -> Result<(), Box<dyn Error>> {
+    let (graph, refusals) = kds_person(&flat()?).await?;
+    assert!(refusals.is_empty(), "{refusals:?}");
+    let persons = rows(&graph, "person");
+    let [row] = persons.as_slice() else {
+        panic!("one PERSON row, got {}", persons.len());
+    };
+    // CDM v5.4 `person.gender_concept_id`: "Use the gender or sex value
+    // present in the data"; KDS_Person carries it at `items[at0022]`.
+    assert_eq!(int(row, "gender_concept_id"), Some(GENDER_CONCEPT));
+    assert_eq!(text(row, "gender_source_value"), Some(GENDER_CODE));
+    assert_eq!(int(row, "year_of_birth"), Some(1984));
+    assert_eq!(int(row, "ethnicity_concept_id"), Some(0));
+    assert_eq!(int(row, "race_concept_id"), Some(0));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_kds_gender_code_with_no_standard_concept_writes_concept_zero_and_its_source()
+-> Result<(), Box<dyn Error>> {
+    let mut flat = flat()?;
+    flat.insert(
+        "person/geschlecht/administratives_geschlecht|code".to_owned(),
+        Value::from("SYN-GENDER-UNMAPPED"),
+    );
+    let (graph, refusals) = kds_person(&flat).await?;
+    assert!(refusals.is_empty(), "{refusals:?}");
+    let persons = rows(&graph, "person");
+    let [row] = persons.as_slice() else {
+        panic!("one PERSON row, got {}", persons.len());
+    };
+    // CDM conventions: "If a Standard Concept does not exist or cannot be
+    // identified, the Concept with the CONCEPT_ID 0 is used".
+    assert_eq!(int(row, "gender_concept_id"), Some(0));
+    assert_eq!(
+        text(row, "gender_source_value"),
+        Some("SYN-GENDER-UNMAPPED")
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_kds_person_with_no_gender_takes_the_literal_concept_zero() -> Result<(), Box<dyn Error>>
+{
+    let mut flat = flat()?;
+    flat.retain(|key, _| !key.starts_with("person/geschlecht/administratives_geschlecht"));
+    let (graph, refusals) = kds_person(&flat).await?;
+    assert!(refusals.is_empty(), "{refusals:?}");
+    let persons = rows(&graph, "person");
+    let [row] = persons.as_slice() else {
+        panic!("one PERSON row, got {}", persons.len());
+    };
+    assert_eq!(int(row, "gender_concept_id"), Some(0));
+    assert_eq!(row.cell("gender_source_value"), None);
     Ok(())
 }

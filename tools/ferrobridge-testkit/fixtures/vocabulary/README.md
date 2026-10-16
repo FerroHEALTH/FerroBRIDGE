@@ -13,11 +13,11 @@ the vendored OHDSI DDL.
 Every row was written by hand for the tests on 2026-09-25. No concept code,
 concept name or vocabulary comes from an OHDSI vocabulary release or from any
 licensed terminology. The vocabularies are `FB-SOURCE`, `FB-STANDARD`,
-`FB-UNIT` and `FB-META`, plus the stand-ins `LOINC`, `UCUM` and `SNOMED`
-described below, each with the version `synthetic-1`. The domain
-identifiers are the CDM's own names (`Measurement`, `Condition`, `Unit`,
-`Drug`, `Specimen`, `Meas Value Operator`, `Visit`, `Type Concept`,
-`Metadata`) because the engine checks a resolved concept's domain
+`FB-UNIT`, `FB-GENDER` and `FB-META`, plus the stand-ins `LOINC`, `UCUM`
+and `SNOMED` described below, each with the version `synthetic-1`. The
+domain identifiers are the CDM's own names (`Measurement`, `Condition`,
+`Unit`, `Drug`, `Specimen`, `Meas Value Operator`, `Visit`, `Type Concept`,
+`Gender`, `Metadata`) because the engine checks a resolved concept's domain
 against the table a mapping writes, and the CDM field definitions name the
 domains that way. The relationship identifiers `Maps to` and `Mapped from`
 are the ones the CDM conventions name
@@ -61,6 +61,7 @@ default end date, for example).
 | `Meas Value Operator` `<`, `<=`, `=`, `>=`, `>` | the operator concepts the resolver finds by name |
 | `FB-STANDARD` `STD-VISIT` | the `visit_concept_id` the round trip configures |
 | `FB-STANDARD` `STD-TYPE-RECORD`, `STD-TYPE-PERIOD` | the record and observation period type concepts the round trip configures |
+| `FB-GENDER` `SYN-GENDER-F` | a standard `Gender` concept, the administrative gender of the synthetic KDS person, reached through a configured vocabulary alias |
 
 The laboratory rows sit under the vocabulary identifiers `LOINC`, `UCUM` and
 `SNOMED`, because the OMOCL engine looks a code up under the vocabulary its

@@ -25,6 +25,25 @@ crates on crates.io.
 
 ### Added
 
+- A FerroBRIDGE OMOCL `Person` mapping for the KDS person template (#568),
+  `crates/omocl/tests/fixtures/projects/ferrobridge/kds_person/kds_person_data.yml`.
+  The corpus file `person_data/person_data_v0.yml` reads gender at
+  `items[at0019]`, which `KDS_Person` does not carry, so every KDS person
+  took `gender_concept_id` 0. This file reads the administrative gender at
+  `items[at0022]`: its code resolves through the loaded OHDSI vocabulary
+  into `gender_concept_id` and is kept in `gender_source_value`, and a person
+  with no gender, or a code with no standard concept, takes concept 0. Point
+  `[mappings] omocl` at a directory holding it in place of the corpus file.
+- `[etl.vocabulary_aliases]` maps a terminology id, such as a URI or an OID,
+  to the OHDSI `vocabulary_id` the ETL looks a coded value up in (#625).
+  The table is added over the defaults (`LOINC` to `LOINC`, `SNOMED-CT` to
+  `SNOMED`) and checked at load: an empty id or vocabulary, or a vocabulary
+  longer than the 20 characters of OMOP CDM v5.4 `VOCABULARY.vocabulary_id`,
+  refuses the start. A KDS administrative gender coded under
+  `http://terminology.hl7.org/CodeSystem/v2-0001` now reaches
+  `person.gender_concept_id` once that id is aliased to the vocabulary that
+  holds its codes; before, any terminology id longer than 20 characters
+  resolved to concept 0.
 - The FHIR facade answers `batch` Bundles on `POST [base]` (#531). Each entry
   runs as the read, vread, search, create or update its `request` names,
   through the same handler as the single interaction, with `ifMatch` and

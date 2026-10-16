@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of person_data/person_data_v0.yml, a derivative of it under
+# its licence.
+# Source: SevKohler/OMOCL at commit c082db8e (vendored under docs/specs/omocl),
+# Apache License 2.0; the source file carries no copyright line to keep.
+# Changed: the metadata name is FerroBRIDGE's. gender_concept reads the
+# administrative gender, items[at0022], which the KDS_Person template
+# constrains, where the published file reads items[at0019], which it does not.
+# OMOP CDM v5.4 person.gender_concept_id: "Use the gender or sex value present
+# in the data under the assumption that it is the biological sex at birth".
+# The code resolves through the loaded vocabulary, and the CDM's concept 0 is
+# the last alternative. The alternatives over the age observation and the
+# ethnicity archetypes are left out, because KDS_Person carries none of them.
+grammar: OMOCL/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_kds_person_data.v0
+  version: 1.0.0
+spec: # OHDSI OMOP v5.4
+  system: OMOP
+  version: 5.4
+  openEhrConfig:
+    archetype: openEHR-EHR-ADMIN_ENTRY.person_data.v0
+
+mappings:
+  - type: "Person"
+    gender_concept:
+      alternatives:
+        - path: "../content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]"
+        - code: 0
+    year_of_birth:
+      alternatives:
+        - path: "/data[at0001]/items[openEHR-EHR-CLUSTER.person_birth_data_iso.v0]/items[at0001]"
+        - code: 0
+    ethnicity_concept_id:
+      alternatives:
+        - code: 0
+    birth_datetime:
+      optional: true
+      alternatives:
+        - path: "/data[at0001]/items[openEHR-EHR-CLUSTER.person_birth_data_iso.v0]/items[at0001]"

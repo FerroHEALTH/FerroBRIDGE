@@ -36,6 +36,7 @@ use crate::etl::deletions::{CheckError, DeletionPolicy, Sweep};
 use crate::etl::report::{Persons, RunReport};
 use crate::etl::tie::{Tie, Windows};
 use futures_util::StreamExt;
+use omocl::engine::concept::VocabularyAliases;
 use omop_cdm::derived;
 use omop_cdm::graph::{RecordGraph, key::Source, key::VisitKey, report::Refusal};
 use omop_cdm::writer::{CdmWriter, error::WriteError, input::RunId, input::VisitConcepts};
@@ -75,6 +76,8 @@ pub struct EtlSettings {
     pub visits: Option<VisitSettings>,
     /// What the run does with a composition the CDR reports deleted.
     pub deletions: DeletionPolicy,
+    /// The OHDSI `vocabulary_id` each terminology id is looked up under.
+    pub aliases: VocabularyAliases,
 }
 
 /// What a mapper is handed besides the composition.
