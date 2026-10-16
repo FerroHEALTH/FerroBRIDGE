@@ -8,7 +8,8 @@
 //! to parse, fails the static check against the input's resource type, or
 //! fails to evaluate. Any other case passes when the evaluation answers the
 //! expected outputs, in order unless the test says `ordered="false"`. A
-//! failing case records why. No case is special-cased by its name.
+//! failing case records why, and a case on an input FHIR refuses records the
+//! rule the input breaks. No case is special-cased by its name.
 
 use std::collections::BTreeMap;
 
@@ -45,6 +46,31 @@ impl Profiles for BaseDefinitions {
             .filter(|name| resource_type(&R4, name).is_some())
             .ok_or_else(|| SeamError::from(format!("no structure definition {structure}")))?;
         Ok(type_name == Some(name))
+    }
+}
+
+/// The suite inputs FHIR refuses, each with the refusal the reader reports
+/// and the rule it enforces; every case on such an input fails with that
+/// citation.
+///
+/// `parameters-example-types.xml` declares the XML Schema instance namespace
+/// and `xsi:schemaLocation` on its root, and exchanged content "SHALL NOT
+/// specify the schema or even contain the schema instance namespace in the
+/// resource itself" (<https://hl7.org/fhir/R4/xml.html> §2.6.1.1).
+const REFUSED_INPUTS: [(&str, &str, &str); 1] = [(
+    "parameters-example-types.xml",
+    "Resource.xmlns:xsi: unknown property",
+    "R4 xml.html §2.6.1.1 forbids the schema instance namespace in a resource",
+)];
+
+/// Why a case on `file` cannot run when the input does not load.
+fn refused_input(file: &str, error: &str) -> String {
+    match REFUSED_INPUTS
+        .iter()
+        .find(|(input, refusal, _)| *input == file && *refusal == error)
+    {
+        Some((_, _, rule)) => format!("the input is refused as FHIR requires ({rule}): {error}"),
+        None => format!("the input does not load: {error}"),
     }
 }
 
@@ -160,7 +186,7 @@ fn verdict(test: &Test, inputs: &BTreeMap<String, Result<Value, String>>) -> Res
                 .get(file)
                 .ok_or_else(|| format!("no input {file}"))?
                 .as_ref()
-                .map_err(|error| format!("the input does not load: {error}"))?,
+                .map_err(|error| refused_input(file, error))?,
         ),
         None => None,
     };
@@ -235,6 +261,16 @@ fn conformance_fhirpath_r4() {
                 .entry(String::from(file))
                 .or_insert_with(|| load(&directory.join(file)));
         }
+    }
+    for (file, refusal, _) in REFUSED_INPUTS {
+        let loaded = inputs
+            .get(file)
+            .unwrap_or_else(|| panic!("the suite reads the refused input {file}"));
+        assert_eq!(
+            loaded.as_ref().err().map(String::as_str),
+            Some(refusal),
+            "{file}: the listed refusal"
+        );
     }
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     let mut cases = Vec::with_capacity(tests.len());
