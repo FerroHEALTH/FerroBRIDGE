@@ -322,6 +322,12 @@ fn of_generated_error(error: &ClientError) -> Answer {
             UPSTREAM,
             String::from("the openEHR service could not be reached"),
         ),
+        ClientError::AnswerTooLarge { status, limit, .. } => Answer::new(
+            UPSTREAM,
+            format!(
+                "the openEHR service answered {status} with a body over the {limit}-byte limit"
+            ),
+        ),
         ClientError::UndocumentedStatus {
             status, ref body, ..
         } => Answer::new(UNDOCUMENTED, diagnostics(status, body)),
@@ -428,6 +434,29 @@ mod tests {
                 .and_then(|text| text.value)
                 .is_some_and(|text| text.contains("503")),
             "the 502 does not carry the upstream status"
+        );
+    }
+
+    #[test]
+    fn an_answer_over_the_body_limit_becomes_a_502_naming_status_and_limit() {
+        let error = CdrError::client(
+            ClientError::AnswerTooLarge {
+                method: Method::POST,
+                path: String::from("/query/aql"),
+                status: StatusCode::OK,
+                limit: 1024,
+            },
+            None,
+        );
+        let answer = of_client_error(&error);
+        assert_eq!(StatusCode::BAD_GATEWAY, answer.status());
+        let built = answer.issue().build();
+        assert!(
+            built
+                .diagnostics
+                .and_then(|text| text.value)
+                .is_some_and(|text| text.contains("200") && text.contains("1024")),
+            "the 502 does not name the upstream status and the limit"
         );
     }
 
