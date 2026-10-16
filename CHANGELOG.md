@@ -399,6 +399,13 @@ crates on crates.io.
 
 ### Fixed
 
+- A request under `/fhir` over the body ceiling or past the request timeout
+  answers an `OperationOutcome` (#548). The ceiling answers `413` with the
+  `too-long` issue and the timeout answers `504 Gateway Timeout` with the
+  `timeout` issue, both as `application/fhir+json` with the limit named in
+  the diagnostics. A timed-out FHIR request used to answer a plain `408`,
+  which tells a client it may resend a write the CDR may already hold. Every
+  other route keeps its plain `408` and `413`.
 - Removing a person's newest `PERSON` writer hands the row to the writer
   that remains (#561). When several compositions of one EHR write the
   person's `PERSON` row and the newest of them is deleted in the CDR, or a

@@ -388,6 +388,13 @@ both sides, and one wire test asserts each row.
 | `408` on a search query | `502` carrying the upstream status |
 | no answer: a connect failure or a timeout | `502` |
 
+Two answers come from the server itself, before or around the handler, and
+under `/fhir` both are an `OperationOutcome`: a body over
+`body_limit_bytes` answers `413` with the `too-long` issue, and a request that
+outlasts `request_timeout_ms` answers `504` with the `timeout` issue. The
+`504` replaces the plain `408` other routes answer, because a `408` tells a
+client it may resend a write the CDR may already have committed.
+
 ## Paths are written as well as read
 
 The engine is a bidirectional path model over FHIR JSON, because a mapping has
