@@ -434,6 +434,16 @@ crates on crates.io.
   (XML 1.0 §2.3 `AttValue`, §4.6), so `title='a "b"'` yields a well-formed
   `div` string that reads back equal. The reader wrapped the raw value in
   double quotes whatever quote the source used (#575).
+- `fhir-types` 0.1.114 reads a narrative `div` whose XHTML prefix is
+  declared on an ancestor (`xmlns:h` on the root, `<h:div>`) to a
+  self-contained string in the default-namespace form R4 json.html §2.6.2.4
+  shows, `<div xmlns="http://www.w3.org/1999/xhtml">`, with the prefix
+  removed from the `div` and every element inside it, so the string is the
+  `innerHTML` R4 narrative.html §2.4.0 describes. An element inside the
+  narrative outside the XHTML namespace is refused as `UnknownElement`, and a
+  prefixed attribute outside the `xml` namespace as `UnknownProperty` (R4
+  xml.html §2.6.1). The reader copied `<h:div>` verbatim, leaving a prefix
+  nothing in the string bound (#576).
 - `fhir_types::xml::from_xml` refuses a resource that declares the XML Schema
   instance namespace on any of its elements, naming the declaring attribute
   (`Resource.xmlns:xsi`), because exchanged content "SHALL NOT specify the

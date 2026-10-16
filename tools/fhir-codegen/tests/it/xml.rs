@@ -374,8 +374,8 @@ fn with_narrative(div: &str) -> String {
 
 /// The narrative is "a root `<div>` element in the xhtml namespace" (R5
 /// xml.html §2.1.6.3.3; R4 xml.html §2.6.1: "the only other namespace that
-/// occurs in FHIR resources is the XHTML namespace"), and its content is
-/// carried verbatim.
+/// occurs in FHIR resources is the XHTML namespace"), every element inside it
+/// included.
 #[test]
 fn the_narrative_div_is_held_to_the_xhtml_namespace() {
     for schemas in namespace_versions() {
@@ -384,20 +384,16 @@ fn the_narrative_div_is_held_to_the_xhtml_namespace() {
             r#"<div xmlns="http://example.org/other"><p>synthetic</p></div>"#,
             r#"<x:div xmlns:x="http://example.org/other"><p>synthetic</p></x:div>"#,
             r#"<h:div xmlns:h="http://hl7.org/fhir"><p>synthetic</p></h:div>"#,
+            r#"<h:div xmlns:h="http://www.w3.org/1999/xhtml"><p>synthetic</p></h:div>"#,
+            r#"<div xmlns="http://www.w3.org/1999/xhtml"><p xmlns="http://example.org/other">synthetic</p></div>"#,
         ] {
             let xml = with_narrative(div);
             let refused = from_xml(schemas, &xml).expect_err(div);
             assert_eq!(refused.kind, DecodeErrorKind::UnknownElement, "{div}");
             assert_eq!(refused.path, "Resource.text.div", "{div}");
         }
-        for div in [
-            r#"<div xmlns="http://www.w3.org/1999/xhtml"><p>synthetic <b>text</b></p></div>"#,
-            r#"<h:div xmlns:h="http://www.w3.org/1999/xhtml"><h:p>synthetic</h:p></h:div>"#,
-        ] {
-            let read = from_xml(schemas, &with_narrative(div)).expect(div);
-            let text = member(&Value::Object(read), "text").clone();
-            assert_eq!(member(&text, "div").as_str(), Some(div));
-        }
+        let div = r#"<div xmlns="http://www.w3.org/1999/xhtml"><p>synthetic <b>text</b></p></div>"#;
+        assert_eq!(narrative_of(schemas, &with_narrative(div)), div);
     }
 }
 
@@ -411,18 +407,77 @@ fn narrative_of(schemas: &Schemas, xml: &str) -> String {
         .to_owned()
 }
 
+/// The JSON `div` is "a single escaped string of XHTML" whose root "needs to
+/// be a `<div>` in the xhtml namespace" (R4 json.html §2.6.2.1 and §2.6.2.4,
+/// whose example uses the default `xmlns` form), and its content is what a
+/// browser takes as `innerHTML` (R4 narrative.html §2.4.0): a prefixed `div`
+/// reads to that form, its own declaration or an ancestor's alike.
+#[test]
+fn a_prefixed_narrative_reads_to_a_self_contained_div() {
+    let expected = r#"<div xmlns="http://www.w3.org/1999/xhtml"><p class="c">synthetic <b>text</b><br/></p></div>"#;
+    let prefixed = r#"<h:div><h:p class="c">synthetic <h:b>text</h:b><h:br/></h:p></h:div>"#;
+    let on_ancestor = format!(
+        r#"<Basic xmlns="http://hl7.org/fhir" xmlns:h="http://www.w3.org/1999/xhtml"><text><status value="generated"/>{prefixed}</text><code><text value="synthetic"/></code></Basic>"#
+    );
+    let on_div = with_narrative(
+        r#"<h:div xmlns:h="http://www.w3.org/1999/xhtml"><h:p class="c">synthetic <h:b>text</h:b><h:br/></h:p></h:div>"#,
+    );
+    for schemas in namespace_versions() {
+        for xml in [&on_ancestor, &on_div] {
+            let div = narrative_of(schemas, xml);
+            assert_eq!(div, expected, "{xml}");
+            // The string reads back alone, under a root that binds no prefix.
+            assert_eq!(narrative_of(schemas, &with_narrative(&div)), div);
+        }
+    }
+}
+
 /// An attribute value is written in double quotes, so a `"` it holds is
 /// escaped (XML 1.0 §2.3 `AttValue`, §4.6): a single-quoted value with a
 /// double quote reads to a well-formed string that reads back equal.
 #[test]
 fn a_single_quoted_narrative_attribute_is_escaped_for_double_quotes() {
-    let source =
-        r#"<div xmlns="http://www.w3.org/1999/xhtml" title='a "b" &amp; c'><p>synthetic</p></div>"#;
-    let expected = r#"<div xmlns="http://www.w3.org/1999/xhtml" title="a &quot;b&quot; &amp; c"><p>synthetic</p></div>"#;
+    let source = r#"<div xmlns="http://www.w3.org/1999/xhtml" title='a "b"'><p title='c "d" &amp; e'>synthetic</p></div>"#;
+    let expected = r#"<div xmlns="http://www.w3.org/1999/xhtml" title="a &quot;b&quot;"><p title="c &quot;d&quot; &amp; e">synthetic</p></div>"#;
     for schemas in namespace_versions() {
         let div = narrative_of(schemas, &with_narrative(source));
         assert_eq!(div, expected);
         assert_eq!(narrative_of(schemas, &with_narrative(&div)), div);
+    }
+}
+
+/// A prefixed attribute in the narrative has no namespace FHIR admits (R4
+/// xml.html §2.6.1); `xml:lang` is in the XML namespace and is kept.
+#[test]
+fn a_prefixed_narrative_attribute_outside_the_xml_namespace_is_refused() {
+    for schemas in namespace_versions() {
+        let refused = from_xml(
+            schemas,
+            &with_narrative(
+                r#"<div xmlns="http://www.w3.org/1999/xhtml"><p xmlns:x="http://example.org/other" x:a="1">synthetic</p></div>"#,
+            ),
+        )
+        .expect_err("refused");
+        assert_eq!(refused.kind, DecodeErrorKind::UnknownProperty);
+        assert_eq!(refused.path, "Resource.text.div.x:a");
+        let div =
+            r#"<div xmlns="http://www.w3.org/1999/xhtml" xml:lang="nl"><p>synthetic</p></div>"#;
+        assert_eq!(narrative_of(schemas, &with_narrative(div)), div);
+    }
+}
+
+/// The writer carries the self-contained `div` an ancestor-bound prefix read
+/// to, and that XML reads back to the same resource.
+#[test]
+fn the_writer_round_trips_a_narrative_bound_on_an_ancestor() {
+    let xml = r#"<Basic xmlns="http://hl7.org/fhir" xmlns:h="http://www.w3.org/1999/xhtml"><text><status value="generated"/><h:div title='a "b"'><h:p>synthetic</h:p></h:div></text><code><text value="synthetic"/></code></Basic>"#;
+    let div = r#"<div xmlns="http://www.w3.org/1999/xhtml" title="a &quot;b&quot;"><p>synthetic</p></div>"#;
+    for schemas in namespace_versions() {
+        let read = from_xml(schemas, xml).expect("reads");
+        let written = to_xml(schemas, &read).expect("writes");
+        assert!(written.contains(div), "{written}");
+        let again = from_xml(schemas, &written).expect("reads back");
+        assert_eq!(again, read);
     }
 }
 
