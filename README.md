@@ -102,6 +102,16 @@ The site is <https://ferrobridge.eu/>, and the book lives under
   and [checks and gates](https://ferrobridge.eu/docs/contribute/checks-and-gates.html),
   to contribute.
 
+FerroBRIDGE is one product of the FerroHEALTH family, made by Cadasto B.V.
+What holds for every product is written once, in the family book at
+<https://ferrohealth.eu/docs/>:
+[the manufacturer](https://ferrohealth.eu/docs/manufacturer.html),
+[the security policy](https://ferrohealth.eu/docs/security.html) and
+[post-market support](https://ferrohealth.eu/docs/post-market.html),
+[the Cyber Resilience Act](https://ferrohealth.eu/docs/cra.html),
+[how the products fit together](https://ferrohealth.eu/docs/architecture.html),
+and [licensing and trademarks](https://ferrohealth.eu/docs/licensing.html).
+
 ## What is decided
 
 - **A standalone server.** FerroBRIDGE is its own process and its own image. It

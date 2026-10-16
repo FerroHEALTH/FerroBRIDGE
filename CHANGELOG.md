@@ -23,6 +23,18 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Changed
+
+- `SECURITY.md` and `CONTRIBUTING.md` keep what is particular to FerroBRIDGE
+  and link the FerroHEALTH family book at <https://ferrohealth.eu/docs/> for
+  the rest (#402). `SECURITY.md` keeps the supported versions, the reporting
+  route, the response times, the scope and release verification, and links
+  the family policy for disclosure, advisories and the support period.
+  `CONTRIBUTING.md` describes the current build and test gate,
+  `scripts/checks/fast.sh`. The README and the book's introduction link the
+  family book for the manufacturer, the Cyber Resilience Act, how the
+  products fit together, and licensing and trademarks.
+
 ### Fixed
 
 - A CDR call whose token the CDR refused, and whose renewal the token

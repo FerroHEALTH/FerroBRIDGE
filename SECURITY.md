@@ -4,14 +4,21 @@
 # Security Policy
 
 FerroBRIDGE is a bridge between openEHR and two interoperability targets, HL7
-FHIR and the OMOP Common Data Model. This document says which versions receive
-security fixes and how to report a vulnerability privately.
+FHIR and the OMOP Common Data Model. This document carries what is particular
+to FerroBRIDGE: the versions that receive security fixes, where to report, the
+response times it commits to, its scope, and how to verify a release.
+
+The vulnerability-handling policy every FerroHEALTH product shares is on one
+page of the family book, written by the manufacturer, Cadasto B.V.:
+<https://ferrohealth.eu/docs/security.html>. It covers what happens after you
+report, coordinated disclosure and credit, how a fix and its advisory reach
+you, the support period, and what the manufacturer reports to
+the authorities under the Cyber Resilience Act.
 
 ## Supported versions
 
-FerroBRIDGE is in its design phase and has no release. Once releases begin,
-security fixes apply to the latest released version only; there is no back-port
-line.
+Security fixes apply to the latest released version only; there is no
+back-port line.
 
 | Version             | Supported          |
 | ------------------- | ------------------ |
@@ -35,35 +42,20 @@ privately through GitHub's private vulnerability reporting:
 
 This opens a private advisory visible only to you and the maintainer. If you
 cannot use GitHub's form, contact the maintainer through their GitHub profile
-and ask for a private channel before sending any details.
-
-Please include, where you can:
-
-- the affected version, tag, or commit;
-- a description of the impact (what an attacker can do);
-- steps to reproduce, a proof of concept, or a failing request;
-- any suggested remediation.
+and ask for a private channel before sending any details. The family policy
+lists what a report should carry.
 
 **Never include patient data in a report.** A bridge sits in the path of
 clinical data, so a reproduction is easy to build from real content by
 accident. Redact it, or synthesize an equivalent case.
 
-## What to expect
+## Response times
 
-This is a solo-maintained project, so timelines are best effort rather than a
-contractual service-level agreement:
-
-- **Acknowledgement** of your report within about 5 business days.
-- **An initial assessment** (is it valid, how severe) within about 10 business
-  days.
-- **A fix or a mitigation plan** for a confirmed vulnerability as a priority,
-  released as a new patch version. A published release is immutable and its
-  tag cannot be moved or deleted, so a fix ships forward as a new version
-  rather than by re-tagging.
-
-You will be kept informed through the private advisory and, with your consent,
-credited when the advisory is published. Please give a reasonable window to
-release a fix before any public disclosure (coordinated disclosure).
+FerroBRIDGE is solo-maintained, so these are best effort rather than a
+contractual service-level agreement: an acknowledgement within about 5
+business days, and an initial assessment (is it valid, how severe) within
+about 10. A confirmed vulnerability is fixed as a priority in a new patch
+version; the family policy says how that release and its advisory reach you.
 
 ## Scope
 
