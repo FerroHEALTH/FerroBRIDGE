@@ -219,7 +219,7 @@ fn render_type(
                     module_name(resource)
                 )?;
             }
-            out.push_str("    /// A resource of a type outside the root set.\n");
+            out.push_str("    /// A resource of any type carried as its JSON body: decoded for a type\n    /// outside the enabled root set, written as given for any type.\n");
             writeln!(out, "    Unknown({UNKNOWN_RESOURCE}),")?;
             out.push_str("}\n");
         }
@@ -228,7 +228,7 @@ fn render_type(
             writeln!(out, "pub struct {} {{", ty.name)?;
             out.push_str("    /// The `resourceType` of the carried resource.\n");
             out.push_str("    pub resource_type: std::string::String,\n");
-            out.push_str("    /// The complete JSON object, `resourceType` included.\n");
+            out.push_str("    /// The complete JSON object, `resourceType` included, written with its\n    /// values as given and its members in sorted key order.\n");
             out.push_str("    pub body: super::super::codec::Value,\n");
             out.push_str("}\n");
         }
