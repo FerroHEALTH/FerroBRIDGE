@@ -123,8 +123,18 @@ pub enum Reason {
     /// The profile declares a `@default` slice under rules other than
     /// `closed`, which R4 does not allow, so the default slice is not used.
     DefaultSliceNotClosed,
-    /// The validator does not evaluate invariants.
-    Invariants,
+    /// The constraint carries no FHIRPath expression to evaluate.
+    NoExpression,
+    /// The invariant's expression could not be used or did not evaluate.
+    InvariantRefused {
+        /// Where it stopped.
+        stage: InvariantStage,
+        /// The error, with its causes.
+        error: String,
+        /// The upstream report of a defect in the published expression,
+        /// when one is recorded.
+        upstream: Option<&'static str>,
+    },
     /// The value set, the one bound or one it imports, is not in the package
     /// set.
     ValueSetNotFound(String),
@@ -210,7 +220,18 @@ impl fmt::Display for Reason {
             Self::DefaultSliceNotClosed => f.write_str(
                 "the @default slice is not used, because the slicing rules are not closed",
             ),
-            Self::Invariants => f.write_str("invariants are not evaluated"),
+            Self::NoExpression => f.write_str("the constraint carries no FHIRPath expression"),
+            Self::InvariantRefused {
+                stage,
+                error,
+                upstream,
+            } => {
+                write!(f, "{stage}: {error}")?;
+                match upstream {
+                    Some(report) => write!(f, " (a defect of the published expression, {report})"),
+                    None => Ok(()),
+                }
+            }
             Self::ValueSetNotFound(url) => {
                 write!(f, "the value set {url} is not in the package set")
             }
@@ -266,6 +287,29 @@ impl fmt::Display for Reason {
             }
             Self::ExtensionContext => f.write_str("extension contexts are not checked"),
         }
+    }
+}
+
+/// Where the use of an invariant's FHIRPath expression stopped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum InvariantStage {
+    /// The expression is no FHIRPath expression (N1 Appendix A).
+    Parse,
+    /// The expression names a member or a type the element's type does not
+    /// define (N1 §3).
+    Check,
+    /// The evaluation signalled an error, or called a function whose answer
+    /// the validator cannot give.
+    Evaluate,
+}
+
+impl fmt::Display for InvariantStage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Parse => "the expression does not parse",
+            Self::Check => "the expression does not fit the element's type",
+            Self::Evaluate => "the expression did not evaluate",
+        })
     }
 }
 

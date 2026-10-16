@@ -14,14 +14,16 @@
 //! aggregation of a reference, and terminology bindings. A reference resolves
 //! to a contained resource or to an entry of the Bundle around it, every
 //! profile a resource claims is validated against, and a document Bundle is
-//! held to the content rules of documents.html §3.3.1. Invariants are listed
-//! in the report as unevaluated, and so is every binding the package set
-//! cannot decide, which [`crate::report::Report::resolve_bindings`] can send
-//! to a terminology server.
+//! held to the content rules of documents.html §3.3.1. Every invariant on
+//! every element is evaluated with `ferrobridge-fhirpath` on each occurrence
+//! of its element, or listed as unevaluated with the reason; so is every
+//! binding the package set cannot decide, which
+//! [`crate::report::Report::resolve_bindings`] can send to a terminology
+//! server.
 
 mod document;
 mod extension;
-mod listing;
+mod invariant;
 mod matching;
 mod primitive;
 mod profiles;
@@ -45,6 +47,7 @@ use crate::report::Report;
 use crate::set::PackageId;
 use crate::set::PackageSet;
 use crate::set::ResolveError;
+use invariant::Compiled;
 use primitive::PrimitiveRule;
 use resolver::Bundled;
 use resolver::Resolver;
@@ -65,6 +68,24 @@ pub struct Validator<'set> {
     primitives: Mutex<BTreeMap<String, Arc<PrimitiveRule>>>,
     code_systems: Mutex<BTreeMap<Scoped, Result<Arc<CodeIndex>, Reason>>>,
     resolver: Box<dyn Resolver>,
+    /// The invariant expressions, parsed once by their text.
+    expressions: Mutex<BTreeMap<String, Compiled>>,
+    /// The static check of an expression against a context type, by the
+    /// expression text and the type.
+    checked: Mutex<BTreeMap<(String, String), Result<(), String>>>,
+    best_practice: BestPractice,
+}
+
+/// How a best-practice invariant, one carrying the R4 extension
+/// `elementdefinition-bestpractice`, is reported when it fails
+/// (<https://hl7.org/fhir/R4/conformance-rules.html#constraints>, §2.1.0.6).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum BestPractice {
+    /// As a warning, whatever severity the constraint declares.
+    #[default]
+    Warning,
+    /// As an error: the implementation context enforces best practice.
+    Error,
 }
 
 /// Why a validation could not run to the end.
@@ -120,7 +141,18 @@ impl<'set> Validator<'set> {
             primitives: Mutex::new(BTreeMap::new()),
             code_systems: Mutex::new(BTreeMap::new()),
             resolver: Box::new(Bundled),
+            expressions: Mutex::new(BTreeMap::new()),
+            checked: Mutex::new(BTreeMap::new()),
+            best_practice: BestPractice::Warning,
         }
+    }
+
+    /// Sets how a failed best-practice invariant is reported; a warning by
+    /// default.
+    #[must_use]
+    pub const fn with_best_practice(mut self, best_practice: BestPractice) -> Self {
+        self.best_practice = best_practice;
+        self
     }
 
     /// Validates `resource` against the core definition of its type.

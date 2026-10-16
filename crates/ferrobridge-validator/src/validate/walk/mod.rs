@@ -29,6 +29,7 @@ use crate::report::Collector;
 use crate::report::Report;
 use crate::validate::ValidateError;
 use crate::validate::Validator;
+use crate::validate::invariant::Subject;
 use crate::validate::reference::Memo;
 use crate::validate::reference::address;
 use crate::validate::slicing::Item;
@@ -112,6 +113,10 @@ pub(crate) struct Walk<'v, 'set, 'i> {
     scope: Vec<&'i Value>,
     /// The locations whose coding display was already checked.
     displayed: BTreeSet<String>,
+    /// The invariants already evaluated, by location, key and source.
+    invariants: BTreeSet<(String, String, String)>,
+    /// How many `conformsTo()` validations this walk runs inside.
+    depth: u8,
     /// Whether a resource is validated against the profiles it claims.
     claims: bool,
     /// The state every walk of this validation shares.
@@ -121,11 +126,18 @@ pub(crate) struct Walk<'v, 'set, 'i> {
 impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
     /// Starts a validation.
     pub(crate) fn new(validator: &'v Validator<'set>) -> Self {
+        Self::nested(validator, 0)
+    }
+
+    /// Starts a validation `depth` `conformsTo()` calls deep.
+    pub(crate) fn nested(validator: &'v Validator<'set>, depth: u8) -> Self {
         Self {
             validator,
             out: Collector::default(),
             scope: Vec::new(),
             displayed: BTreeSet::new(),
+            invariants: BTreeSet::new(),
+            depth,
             claims: true,
             shared: Rc::default(),
         }
@@ -139,6 +151,8 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             out: Collector::default(),
             scope: self.scope.clone(),
             displayed: BTreeSet::new(),
+            invariants: BTreeSet::new(),
+            depth: self.depth,
             claims: self.claims,
             shared: Rc::clone(&self.shared),
         }
@@ -208,6 +222,18 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
     /// marks it checked.
     pub(crate) fn first_display(&mut self, location: &str) -> bool {
         self.displayed.insert(location.to_owned())
+    }
+
+    /// Answers whether the invariant `key` of `source` is not yet evaluated
+    /// at `location`, and marks it evaluated.
+    pub(crate) fn first_invariant(&mut self, location: &str, key: &str, source: &str) -> bool {
+        self.invariants
+            .insert((location.to_owned(), key.to_owned(), source.to_owned()))
+    }
+
+    /// Returns how many `conformsTo()` validations this walk runs inside.
+    pub(crate) const fn depth(&self) -> u8 {
+        self.depth
     }
 
     /// Returns the resources the walk is inside, the outermost first.
@@ -286,6 +312,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         }
         self.scope.push(value);
         let walked = self.object(
+            value,
             object,
             schema,
             &Cursor::new(Arc::clone(&structure), name),
@@ -300,9 +327,11 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         self.claims(value, &structure, name, &location)
     }
 
-    /// Walks one object of the type `schema` against `cursor`.
+    /// Walks one object of the type `schema` against `cursor`; `value` is
+    /// the object as a document value.
     fn object(
         &mut self,
+        value: &'i Value,
         object: &'i Object,
         schema: &'static TypeSchema,
         cursor: &Cursor,
@@ -320,7 +349,14 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             );
         }
         if let Some(element) = cursor.structure.element(&cursor.prefix) {
-            self.list(&cursor.structure, &cursor.prefix, element, location);
+            let subject = Subject {
+                value: Some(value),
+                element: None,
+                type_name: schema.path,
+                location,
+                resource,
+            };
+            self.invariants(&cursor.structure, element, &subject);
             if !cursor.prefix.contains('.') && schema.name == cursor.structure.type_name() {
                 let held = (cursor.prefix.as_str(), element);
                 let bound = Bound::Object(object);
@@ -486,7 +522,19 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         occurrence: &Occurrence<'i>,
         code: Option<&str>,
     ) -> Result<(), ValidateError> {
-        self.list(structure, id, element, &occurrence.location);
+        let type_name = occurrence_type(occurrence.value, code);
+        if let Some(type_name) = &type_name {
+            let subject = Subject {
+                value: occurrence.value,
+                element: occurrence.element,
+                type_name,
+                location: &occurrence.location,
+                resource: false,
+            };
+            self.invariants(structure, element, &subject);
+        } else {
+            self.untyped_invariants(structure, id, element, &occurrence.location);
+        }
         self.targets(structure, id, element, occurrence, code)?;
         if let (Some(code), Some(value)) = (code, occurrence.value.and_then(Bound::of)) {
             self.binding(structure, (id, element), code, value, &occurrence.location)?;
@@ -521,8 +569,27 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             );
             return Ok(());
         };
-        self.object(object, type_named(name)?, cursor, location, false)
+        self.object(value, object, type_named(name)?, cursor, location, false)
     }
+}
+
+/// The FHIR type an occurrence is evaluated as: the type a resource names
+/// for itself, the element path of a backbone element, or the type `code`.
+fn occurrence_type(value: Option<&Value>, code: Option<&str>) -> Option<String> {
+    let named = value
+        .and_then(|value| value.get("resourceType"))
+        .and_then(Value::as_str)
+        .filter(|name| SCHEMAS.is_resource(name));
+    if let Some(name) = named {
+        return Some(name.to_owned());
+    }
+    let code = code?;
+    Some(
+        SCHEMAS
+            .type_named(code)
+            .map_or(code, |schema| schema.path)
+            .to_owned(),
+    )
 }
 
 /// Returns the element-table entry of the type `name`.

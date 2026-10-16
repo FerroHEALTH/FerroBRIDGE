@@ -47,16 +47,16 @@ fn a_slice_without_a_value_at_its_discriminator_is_named_unevaluated() -> TestRe
 }
 
 #[test]
-fn the_core_invariants_of_a_datatype_reached_are_named_unevaluated() -> TestResult {
+fn the_core_invariants_of_a_datatype_reached_are_evaluated_and_not_listed() -> TestResult {
     let set = PackageSet::load([core()])?;
     let report = validate(&set, &patient(), None)?;
-    let invariant = report.unevaluated().iter().find(|entry| {
-        entry.structure == "http://hl7.org/fhir/StructureDefinition/HumanName"
-            && matches!(&entry.constraint, Constraint::Invariant { key, .. } if key == "ele-1")
-    });
-    let invariant = invariant.expect("ele-1 on HumanName is listed");
-    assert_eq!(invariant.reason, Reason::Invariants);
-    assert_eq!(invariant.location, "Patient.name[0]");
+    let listed: Vec<_> = report
+        .unevaluated()
+        .iter()
+        .filter(|entry| matches!(&entry.constraint, Constraint::Invariant { key, .. } if key == "ele-1"))
+        .collect();
+    assert!(listed.is_empty(), "{listed:#?}");
+    assert!(report.is_valid(), "{:#?}", report.issues());
     Ok(())
 }
 
@@ -107,6 +107,7 @@ fn a_claimed_profile_not_validated_against_is_named_unevaluated() -> TestResult 
 fn every_issue_and_unevaluated_constraint_converts_into_the_outcome() -> TestResult {
     let mut resource = patient();
     resource["gender"] = json!("male");
+    resource["identifier"] = json!([{"system": "urn:example:local", "value": "1"}]);
     let report = against_patient(&resource)?;
     let outcome = OperationOutcome::from(&report);
     assert_eq!(
@@ -150,7 +151,7 @@ fn every_issue_and_unevaluated_constraint_converts_into_the_outcome() -> TestRes
         .filter(|issue| issue.code.value.as_deref() == Some("not-supported"))
         .count();
     assert_eq!(unevaluated, report.unevaluated().len());
-    assert!(unevaluated > 0, "the core invariants are named");
+    assert!(unevaluated > 0, "the undecided discriminator is named");
     Ok(())
 }
 

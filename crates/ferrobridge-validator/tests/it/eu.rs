@@ -36,6 +36,13 @@ pub(crate) fn eu_set() -> TestResult<Option<PackageSet>> {
     Ok(Some(PackageSet::load(paths)?))
 }
 
+/// The emptyReason of a patient summary section with nothing to hold, which
+/// `ips-comp-1` of `composition-eu-eps` asks of a required section without
+/// entries.
+pub(crate) fn empty_reason() -> serde_json::Value {
+    json!({"coding": [{"system": "http://terminology.hl7.org/CodeSystem/list-empty-reason", "code": "unavailable"}]})
+}
+
 /// A synthetic Patient for `patient-eu-core`.
 fn patient() -> serde_json::Value {
     json!({
