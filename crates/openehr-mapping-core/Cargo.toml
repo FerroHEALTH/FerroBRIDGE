@@ -4,7 +4,7 @@
 name = "openehr-mapping-core"
 description = "The shared foundation of the FerroBRIDGE mapping languages: the common header model, the YAML loader, the mapping registry, the diagnostic model, and openEHR path resolution and execution over the Web Template"
 # On the crate line, the fhir-types line, since its first publish (docs/VERSIONS.md).
-version = "0.1.111"
+version = "0.1.112"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

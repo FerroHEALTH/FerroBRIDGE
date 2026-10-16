@@ -26,6 +26,6 @@ hand-spelled suffixes; a class or attribute fact comes from
 `openehr_rm::v1_2::paths`; FLAT keys are built from
 `openehr_sdt::flat::path::{Segment, Suffix, FlatKey}`; a version string comes
 from `openehr_rm::Generation`. When the crate lacks a public reader, keep the
-local code minimal under `// TODO(#241)` naming the sibling request, and never
+local code minimal under `// TODO(#618)` naming the sibling request, and never
 widen it. Before a new module touches openEHR data, grep the crate for the
 item first.

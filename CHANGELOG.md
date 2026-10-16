@@ -433,6 +433,15 @@ crates on crates.io.
   load check and the CDR refused it at run time for the unbound parameter;
   `etl.visits.aql` is now refused when the configuration loads, with the
   reason.
+- A `TERM_MAPPING` whose `match` is `>`, `<` or `?` no longer fails the
+  whole openEHR to FHIR run (#588). FHIRconnect calls the other operators
+  "not mappable to FHIR", so the mapping still writes no `Coding`, and the
+  run now declares it as a located `Loss::Skipped` whose new
+  `SkipReason::TermMappingMatch` carries the match code, the target
+  terminology and the code as fields; the value's text and every `=` mapping
+  convert. Going back into openEHR, such a mapping the target already holds
+  keeps its place. A consumer that matches `SkipReason` exhaustively needs an
+  arm for the new variant (`fhirconnect` 0.1.120).
 - The container harness starts the reference CDR with
   `FERROEHR__USAGE_REPORT__ENABLED=false` (#582). A container does not
   inherit the CI runner's environment, so FerroEHR's own CI detection never

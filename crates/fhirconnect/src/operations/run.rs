@@ -399,7 +399,7 @@ fn object_of(document: &Value) -> Result<Object, OperationError> {
 /// `OBJECT_VERSION_ID`, which is the one part stable across versions (openEHR
 /// RM Common §`OBJECT_VERSION_ID`) and which fits the FHIR id grammar
 /// `[A-Za-z0-9\-\.]{1,64}` (<https://hl7.org/fhir/R4/resource.html>).
-// TODO(#85): the identity map assigns the id and keeps it stable across runs.
+// TODO(#619): the identity map assigns the id and keeps it stable across runs.
 fn identity(
     object: &Object,
     composition: &CanonicalComposition,

@@ -27,8 +27,11 @@ use crate::engine::lens::Lens;
 use crate::engine::lens::LensError;
 use crate::engine::lens::code_phrase::CodePhraseLens;
 use crate::engine::lens::code_phrase::text_of;
+use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::lens::term_mapping::coding_of;
-use crate::engine::lens::term_mapping::mapping_of;
+use crate::engine::lens::term_mapping::equivalents;
+use crate::engine::lens::term_mapping::mappings_of;
+use crate::engine::lens::term_mapping::withheld;
 use crate::model::ast::keyword::Direction;
 
 /// The name the `CodeableConcept` cell carries in a diagnostic.
@@ -95,7 +98,7 @@ impl Lens<DvCodedText, CodeableConcept> for CodedTextLens {
             .clone()
             .map(FhirString::from);
         let mut codings = vec![defining];
-        for mapping in source.mappings.iter().flatten() {
+        for mapping in equivalents(source.mappings.iter().flatten()) {
             codings.push(coding_of(mapping, CODEABLE_CONCEPT_CELL)?);
         }
         Ok(CodeableConcept {
@@ -118,17 +121,14 @@ impl Lens<DvCodedText, CodeableConcept> for CodedTextLens {
         let position = self.defining(&view.coding).ok_or_else(absent)?;
         let defining = view.coding.get(position).ok_or_else(absent)?;
         let held = existing.and_then(|value| value.mappings.as_deref());
-        let mut mappings = Vec::new();
-        for (index, coding) in view
-            .coding
-            .iter()
-            .enumerate()
-            .filter(|&(index, _coding)| index != position)
-            .map(|(_index, coding)| coding)
-            .enumerate()
-        {
-            mappings.push(mapping_of(coding, held.and_then(|held| held.get(index)))?);
-        }
+        let mappings = mappings_of(
+            view.coding
+                .iter()
+                .enumerate()
+                .filter(|&(index, _coding)| index != position)
+                .map(|(_index, coding)| coding),
+            held,
+        )?;
         let value = value_of(
             text_of(view.text.as_ref().map(|text| &text.value)),
             defining,
@@ -150,6 +150,10 @@ impl Lens<DvCodedText, CodeableConcept> for CodedTextLens {
             return Vec::new();
         }
         vec![Fallback::new(CODEABLE_CONCEPT_CELL, "DV_TEXT.value")]
+    }
+
+    fn withheld(&self, source: &DvCodedText) -> Vec<Withheld> {
+        withheld(source.mappings.iter().flatten())
     }
 }
 
@@ -439,38 +443,89 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_narrower_term_mapping_refuses_the_element() {
-        let source = DvCodedText {
+    /// A `DV_CODED_TEXT` whose mappings are an `=` one and one with `relation`.
+    fn with_relation(relation: char) -> DvCodedText {
+        let target = |system: &str, code: &str| CodePhrase {
+            terminology_id: terminology_id(system, ""),
+            code_string: String::from(code),
+            preferred_term: None,
+        };
+        DvCodedText {
             value: String::from("Fever"),
             hyperlink: None,
             formatting: None,
-            mappings: NonEmptyVec::new(vec![TermMapping {
-                r#match: '<',
-                purpose: None,
-                target: CodePhrase {
-                    terminology_id: terminology_id("http://snomed.info/sct", ""),
-                    code_string: String::from("386661006"),
-                    preferred_term: None,
+            mappings: NonEmptyVec::new(vec![
+                TermMapping {
+                    r#match: relation,
+                    purpose: None,
+                    target: target("http://snomed.info/sct", "386661006"),
                 },
-            }])
+                TermMapping {
+                    r#match: '=',
+                    purpose: None,
+                    target: target("http://hl7.org/fhir/sid/icd-10", "R50.9"),
+                },
+            ])
             .ok(),
             language: None,
             encoding: None,
-            defining_code: CodePhrase {
-                terminology_id: terminology_id("http://loinc.org", ""),
-                code_string: String::from("LP74849-8"),
-                preferred_term: None,
-            },
-        };
-        let error = <CodedTextLens as Lens<DvCodedText, CodeableConcept>>::get(
-            &CodedTextLens::unbound(),
-            &source,
-        )
-        .expect_err("a narrower relation cannot travel");
+            defining_code: target("http://loinc.org", "LP74849-8"),
+        }
+    }
+
+    // TERM_MAPPING.adoc: `match` is "hard coded to `=`, other operators not mappable
+    // to FHIR", so the mapping writes no coding and the rest of the value converts.
+    #[test]
+    fn a_term_mapping_fhir_cannot_carry_is_withheld_and_the_rest_converts() {
+        let lens = CodedTextLens::unbound();
+        for relation in ['>', '<', '?'] {
+            let source = with_relation(relation);
+            let view: CodeableConcept = lens.get(&source).expect("the mapping is withheld");
+            let codes: Vec<Option<&str>> = view
+                .coding
+                .iter()
+                .map(|coding| coding.code.as_ref().and_then(|code| code.value.as_deref()))
+                .collect();
+            assert_eq!(
+                codes,
+                [Some("LP74849-8"), Some("R50.9")],
+                "the defining code and the `=` mapping travel past `{relation}`"
+            );
+            let taken = Lens::<DvCodedText, CodeableConcept>::withheld(&lens, &source);
+            let rows: Vec<(char, &str, &str)> = taken
+                .iter()
+                .map(|term| (term.match_code(), term.terminology(), term.code()))
+                .collect();
+            assert_eq!(
+                rows,
+                [(relation, "http://snomed.info/sct", "386661006")],
+                "the withheld term names its operator and target"
+            );
+        }
+    }
+
+    #[test]
+    fn a_withheld_term_mapping_returns_from_the_held_value() {
+        let lens = CodedTextLens::unbound();
+        for relation in ['>', '<', '?'] {
+            let source = with_relation(relation);
+            let view: CodeableConcept = lens.get(&source).expect("the mapping is withheld");
+            let back = lens
+                .put(&view, Some(&source))
+                .expect("the view is complete");
+            assert_eq!(back, source, "GetPut holds past `{relation}`");
+        }
+    }
+
+    #[test]
+    fn an_equivalent_term_mapping_is_withheld_from_nothing() {
+        let source = with_relation('=');
+        let lens = CodedTextLens::unbound();
+        let view: CodeableConcept = lens.get(&source).expect("both mappings travel");
+        assert_eq!(view.coding.len(), 3, "the defining code and both mappings");
         assert!(
-            error.to_string().contains("TERM_MAPPING.match"),
-            "the refusal names the operator: {error}"
+            Lens::<DvCodedText, CodeableConcept>::withheld(&lens, &source).is_empty(),
+            "`=` is carried"
         );
     }
 }
