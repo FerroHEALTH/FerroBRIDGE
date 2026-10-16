@@ -386,7 +386,7 @@ fn in_namespace(reader: &NsReader<&[u8]>, start: &BytesStart<'_>, namespace: &st
 ///
 /// A root or nested resource element outside the FHIR namespace is refused
 /// as [`DecodeErrorKind::WrongRoot`]: "FHIR elements are always in the
-/// namespace http://hl7.org/fhir" (R4 xml.html §2.6.1, the same rule in STU3
+/// namespace `http://hl7.org/fhir`" (R4 xml.html §2.6.1, the same rule in STU3
 /// §2.6.1 and R5 §2.1.6.3, <https://hl7.org/fhir/R4/xml.html>).
 fn read_resource(
     schemas: &Schemas,
