@@ -32,6 +32,7 @@ use crate::facade::handlers::render;
 use crate::facade::handlers::write;
 use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::record::CompositionBinding;
+use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
@@ -439,6 +440,7 @@ pub(crate) fn entry_view(
     id: &FhirResourceId,
 ) -> Result<CanonicalComposition, Refusal> {
     let entry = engine::entry_named(program.program(), composition, &binding.entry_path)
+        .map_err(|error| Refusal::from(Refused::from(error)))?
         .ok_or_else(|| {
             reply::refusal(
                 StatusCode::NOT_FOUND,

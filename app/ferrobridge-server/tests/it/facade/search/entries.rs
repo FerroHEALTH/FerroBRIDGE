@@ -380,8 +380,8 @@ async fn an_accurate_total_is_one_count_query_for_one_and_two_entry_compositions
     Ok(())
 }
 
-/// Records `id` for the second diagnosis of the composition under `path`,
-/// as a build that wrote no derivation did.
+/// Records `id` for the entry of the composition `path` names, as a build
+/// that wrote no derivation did.
 fn record_earlier(
     harness: &super::super::Harness,
     path: &str,
@@ -462,5 +462,94 @@ async fn a_later_entry_is_bound_by_the_positional_path_of_its_place_in_content()
         .ok_or("the entry is bound")?;
     assert_eq!("/content[2]", binding.entry_path);
     assert_eq!(Some(derive::DERIVATION), binding.derivation);
+    Ok(())
+}
+
+/// The archetype of the `content` items [`with_foreign`] puts before the
+/// diagnoses, which the fixture context does not map.
+const FOREIGN: &str = "openEHR-EHR-EVALUATION.adverse_reaction_risk.v1";
+
+/// Returns `composition` with `count` items of [`FOREIGN`] before its
+/// content, each a copy of its first diagnosis under that archetype.
+fn with_foreign(composition: &serde_json::Value, count: usize) -> serde_json::Value {
+    let mut foreign = diagnosis(composition);
+    foreign["archetype_node_id"] = serde_json::json!(FOREIGN);
+    let mut changed = composition.clone();
+    let content = changed["content"]
+        .as_array_mut()
+        .expect("the composition has content");
+    for _ in 0..count {
+        content.insert(0, foreign.clone());
+    }
+    changed
+}
+
+#[tokio::test]
+async fn a_comma_path_a_build_up_to_0_0_5_recorded_reads_as_the_first_entry_at_its_place()
+-> Result<(), Box<dyn StdError>> {
+    // Builds up to 0.0.5 bound the first diagnosis by its place in content:
+    // the third item here, and the composition holds no third diagnosis.
+    let harness = searching().await;
+    let (composition, _, _) = two_diagnoses(&harness);
+    let composition = with_foreign(&composition, 2);
+    let early = FhirResourceId::new("earlyfirst")?;
+    record_earlier(&harness, &format!("/content[{DIAGNOSIS}, 3]"), &early)?;
+    mount_read(&harness.cdr, VERSION_ONE, &composition).await;
+    let (status, read) = get(&harness, "Condition/earlyfirst").await?;
+    assert_eq!(StatusCode::OK, status, "{read}");
+    assert_eq!(
+        Some("SYN-001"),
+        read["code"]["coding"][0]["code"].as_str(),
+        "{read}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_comma_path_whose_two_readings_name_two_entries_is_reported()
+-> Result<(), Box<dyn StdError>> {
+    // `/content[<archetype>, 2]` is the first diagnosis as builds up to 0.0.5
+    // wrote it and the second as 0.0.6 wrote it; the read reports the binding.
+    let harness = searching().await;
+    let (composition, _, _) = two_diagnoses(&harness);
+    let composition = with_foreign(&composition, 1);
+    let path = format!("/content[{DIAGNOSIS}, 2]");
+    record_earlier(&harness, &path, &FhirResourceId::new("splitread")?)?;
+    mount_read(&harness.cdr, VERSION_ONE, &composition).await;
+    let (status, body) = get(&harness, "Condition/splitread").await?;
+    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
+    let issue = &body["issue"][0];
+    assert_eq!(Some("exception"), issue["code"].as_str(), "{body}");
+    let diagnostics = issue["diagnostics"].as_str().unwrap_or_default();
+    assert!(diagnostics.contains(&path), "{body}");
+    assert!(!body.to_string().contains("SYN-00"), "{body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_search_meeting_a_comma_key_with_two_readings_is_reported()
+-> Result<(), Box<dyn StdError>> {
+    // The second diagnosis's 0.0.6 key is the first diagnosis's key as builds
+    // up to 0.0.5 wrote it, so binding it would move an id between entries.
+    let harness = searching().await;
+    let (composition, _, second) = two_diagnoses(&harness);
+    let composition = with_foreign(&composition, 1);
+    record_earlier(
+        &harness,
+        &format!("/content[{DIAGNOSIS}, 2]"),
+        &FhirResourceId::new("splitsearch")?,
+    )?;
+    mount_rows(
+        &harness.cdr,
+        &[node_row(VERSION_ONE, &composition, &second)],
+    )
+    .await;
+    let (status, body) = get(&harness, "Condition?code=SYN-002").await?;
+    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
+    assert_eq!(
+        Some("exception"),
+        body["issue"][0]["code"].as_str(),
+        "{body}"
+    );
     Ok(())
 }

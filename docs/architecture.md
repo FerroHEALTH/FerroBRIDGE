@@ -1592,6 +1592,12 @@ draft upstream change.
   shortcut and refuses; a binding without a derivation may carry that form,
   the facade still reads it, and an entry whose new key the map does not
   hold is looked up under its old key first, so no recorded id moves. The
+  old form has two readings (#659): builds up to 0.0.5 bound only the first
+  item of the archetype, with `n` its place in `content`, and 0.0.6 bound
+  the `n`th item of the archetype. A stored path resolves when one reading
+  names an item or both name the same one; when they name two items the
+  binding cannot say which entry it meant, and a read, a search or a bind
+  that meets it answers `500` with an `exception` issue naming the path. The
   binding records the path; a read, a vread or an `_id` search finds the
   entry by its place and
   maps the composition with every other item of the archetype removed. A

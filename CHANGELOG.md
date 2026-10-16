@@ -47,6 +47,14 @@ crates on crates.io.
   when the new one is unbound and still reads a stored binding of the old
   form, so no resource a client holds is renamed. A resource first bound by
   this build gets an id derived from the new path.
+- A binding a build up to 0.0.5 recorded for a composition holding several
+  entries of one archetype named its entry by its place in `content`, and
+  0.0.6 read the same `/content[<archetype>, <n>]` text as the `n`th entry
+  of the archetype, so such a resource could answer another entry (#659).
+  The facade now reads both meanings: the path resolves when one names an
+  entry or both name the same one, and when they name two entries, the read,
+  search or bind that meets it answers `500` with an `exception` issue naming
+  the path, and no id moves to another entry.
 
 ## [0.0.6] - 2026-10-17
 

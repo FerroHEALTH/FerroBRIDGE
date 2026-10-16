@@ -231,7 +231,7 @@ impl Ingest<'_> {
         composition: &CanonicalComposition,
         path: &str,
     ) -> Result<Written, Refused> {
-        let entry = engine::entry_named(program.program(), composition, path).ok_or_else(|| {
+        let entry = engine::entry_named(program.program(), composition, path)?.ok_or_else(|| {
             Refused::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Issue::error(IssueType::Exception).diagnosing(
@@ -361,12 +361,19 @@ impl Ingest<'_> {
             && let Some(legacy) = entry.legacy_path()
         {
             // The map wins once written: an id an earlier build recorded under
-            // the legacy path of the entry still stands.
-            let earlier = EntryKey::new(versioned_object_uid(version), legacy, 0);
-            recorded = self
+            // the legacy path of the entry still stands, when that path names
+            // this entry and no other.
+            let earlier = EntryKey::new(versioned_object_uid(version), legacy.as_str(), 0);
+            let held = self
                 .store
                 .internal_of(resource_type, &derive::map_key(&earlier))
                 .map_err(|error| store_refusal(&error))?;
+            if held.is_some()
+                && engine::entry_named(program.program(), composition, &legacy)?
+                    .is_some_and(|named| named == *entry)
+            {
+                recorded = held;
+            }
         }
         let id = if let Some(known) = recorded {
             known
