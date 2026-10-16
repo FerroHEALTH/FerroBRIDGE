@@ -1223,6 +1223,19 @@ Every rule here fills a silence; OMOCL states none of them.
   (the reference engine hard-codes `32817`; the CDM says the type concept
   records the provenance of the record, which a deployment knows and an engine
   does not).
+- **A required standard concept column that no OMOCL key writes takes concept
+  `0`.** The CDM conventions write the "no information" concept `0` in a
+  required standard concept field "if there is no information available for
+  that field" (<https://ohdsi.github.io/CommonDataModel/dataModelConventions.html>),
+  and a mapping cannot carry information for a column its language has no key
+  for. Across the ten targets the one such column is `person.race_concept_id`,
+  whose definition adds "If a clear race or ethnic background cannot be
+  established, use Concept_Id 0"; OMOCL and the corpus's `person_data` file
+  name no race. The writer counts each one as a concept `0` assignment. A
+  column that has a key the mapping leaves out still refuses the record, since
+  the mapping author could have written `code: 0`. Refusing every `Person`
+  mapping at load as incomplete was rejected because no OMOCL mapping could
+  then write a person.
 
 ### 5.3 Concept resolution
 

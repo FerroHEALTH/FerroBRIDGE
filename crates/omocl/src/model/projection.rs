@@ -160,6 +160,37 @@ pub fn key_without_column(target: Target, key: &str) -> Option<&'static KeyWitho
         .find(|entry| entry.target == target && entry.key == key)
 }
 
+/// Returns the required standard concept columns of `target`'s table that no
+/// key of its projection writes, in CDM definition order.
+///
+/// A mapping has no way to carry information for such a column, and the CDM
+/// conventions write the "no information" concept `0` in a required standard
+/// concept field "if there is no information available for that field"
+/// (<https://ohdsi.github.io/CommonDataModel/dataModelConventions.html>,
+/// "Source Values, Source Concept Ids, and Standard Concept Ids"), so the
+/// engine writes `0` there. A `Type Concept` column is not among them: the
+/// engine fills it with the configured type concept. Which columns lack a
+/// key follows from the projection, whose six unattested targets are our own
+/// design; OMOCL names no key for any of them.
+pub fn concept_columns_without_key(target: Target) -> impl Iterator<Item = &'static str> {
+    let projection = projection(target);
+    omop_cdm::meta::table(target.table())
+        .map_or(&[][..], |table| table.columns)
+        .iter()
+        .filter(|column| {
+            column.required
+                && column.foreign_key == Some(("concept", "concept_id"))
+                && !column.fk_domain.contains(&"Type Concept")
+        })
+        .map(|column| column.name)
+        .filter(move |name| {
+            !projection
+                .keys
+                .iter()
+                .any(|key| key.columns.iter().any(|column| column.column == *name))
+        })
+}
+
 /// Builds one column of a projection.
 const fn col(column: &'static str, part: Part) -> ColumnProjection {
     ColumnProjection { column, part }

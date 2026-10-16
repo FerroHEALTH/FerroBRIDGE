@@ -12,6 +12,7 @@ use omocl::model::ast::Target;
 use omocl::model::projection::Fill;
 use omocl::model::projection::KEYS_WITHOUT_COLUMN;
 use omocl::model::projection::Part;
+use omocl::model::projection::concept_columns_without_key;
 use omocl::model::projection::projection;
 use omocl::model::schema::SCHEMA;
 
@@ -183,6 +184,41 @@ fn the_schema_admits_exactly_the_projected_keys_per_target() -> Result<(), Box<d
             .collect();
         let projected: BTreeSet<&str> = projection(*target).keys.iter().map(|k| k.key).collect();
         assert_eq!(admitted, projected, "`{target}`");
+    }
+    Ok(())
+}
+
+#[test]
+fn person_race_is_the_one_required_concept_column_no_key_writes() {
+    let without: Vec<(Target, &str)> = Target::ALL
+        .iter()
+        .flat_map(|target| {
+            concept_columns_without_key(*target).map(move |column| (*target, column))
+        })
+        .collect();
+    assert_eq!(without, [(Target::Person, "race_concept_id")]);
+}
+
+#[test]
+fn every_required_column_has_a_key_an_engine_fill_or_concept_zero() -> Result<(), Box<dyn Error>> {
+    for target in Target::ALL {
+        let table = omop_cdm::meta::table(target.table()).ok_or("a CDM table")?;
+        let without: Vec<&str> = concept_columns_without_key(*target).collect();
+        for column in table.columns.iter().filter(|column| column.required) {
+            let keyed = projection(*target)
+                .keys
+                .iter()
+                .any(|key| key.columns.iter().any(|c| c.column == column.name));
+            let filled = column.primary_key
+                || column.foreign_key == Some(("person", "person_id"))
+                || column.fk_domain.contains(&"Type Concept");
+            assert!(
+                keyed || filled || without.contains(&column.name),
+                "`{}.{}` is required and nothing writes it",
+                table.name,
+                column.name
+            );
+        }
     }
     Ok(())
 }

@@ -72,7 +72,9 @@ A record that cannot be written is a typed `RecordRefusal` in the outcome
 and a `Refusal` in the graph's report, and the rest runs. A failed vocabulary call, a program of another template or a
 missing domain concept is an `EngineError`: never turn one into concept `0`.
 Concept `0` is written only where the CDM field definitions say so (no
-standard concept, units given but unmapped); the writer counts them. Each
+standard concept, units given but unmapped, and a required standard concept
+column no key of the projection writes, today only `person.race_concept_id`,
+read from `projection::concept_columns_without_key`); the writer counts them. Each
 silence the engine fills carries a `// NOTE:` or a doc line naming it our own
 design; the graph seam is `omop_cdm::graph`, owned by `omop-cdm`.
 
