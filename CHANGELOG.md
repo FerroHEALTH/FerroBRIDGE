@@ -306,6 +306,11 @@ crates on crates.io.
 
 ### Fixed
 
+- The R4 profile validator reports an extension whose `url` the package set
+  cannot resolve to a definition (a `#` fragment, or two definitions under
+  one canonical) as an unknown extension at that extension, a warning or an
+  error under `modifierExtension`, and goes on, where it ended the whole
+  validation with a resolution error (#550).
 - The facade's loss log records each declared loss as a value-free kind
   (`skipped-unresolved-reference`, `deferred-reference`, `defaulted` and the
   rest) with its FHIRPath and its openEHR path, where it logged the loss's

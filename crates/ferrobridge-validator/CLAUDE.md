@@ -77,7 +77,9 @@ change.
 ## Settled decisions are `// NOTE:` comments at their site
 
 The lexical forms are the package's informative regexes, compiled anchored
-with Unicode mode off; an unknown non-modifier extension is a warning; a
+with Unicode mode off; an unknown non-modifier extension is a warning, and an
+extension url the set cannot resolve (absent, a `#` fragment, two
+definitions under one canonical) is unknown and never ends the run; a
 `fixed[x]` comparison ignores an instance `id`, `extension` or `_` sibling the
 fixed value lacks; an example binding is not listed; a bare canonical resolves
 to the latest version by Semantic Versioning precedence, within the
