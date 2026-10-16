@@ -54,6 +54,20 @@ pub enum StoreError {
         #[source]
         source: Box<redb::DatabaseError>,
     },
+    /// The store file carries a schema this build does not read.
+    #[error(
+        "the identity store at {path} carries schema {found}, and this build reads schemas {oldest} to {newest}"
+    )]
+    Schema {
+        /// The path that was opened.
+        path: String,
+        /// The schema the file records.
+        found: String,
+        /// The oldest schema this build reads.
+        oldest: u32,
+        /// The schema this build writes.
+        newest: u32,
+    },
     /// A transaction could not be started or committed.
     #[error("an identity store transaction did not complete")]
     Transaction {

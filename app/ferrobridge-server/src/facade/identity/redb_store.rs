@@ -65,6 +65,22 @@ const CONTRIBUTIONS: TableDefinition<'static, &str, &str> =
 const IDENTIFIERS: TableDefinition<'static, &str, &str> =
     TableDefinition::new("identifier_internal");
 
+/// The store's own facts, such as the schema it was written in.
+const META: TableDefinition<'static, &str, &str> = TableDefinition::new("store_meta");
+
+/// The key [`META`] holds the schema under.
+const SCHEMA_KEY: &str = "schema";
+
+/// The schema this build writes.
+///
+/// Schema 2 adds the identity derivation to each composition binding. A file
+/// with no schema row was written by a build up to 0.0.6 and reads as schema
+/// 1 (no specification governs the store: our own design).
+pub const SCHEMA: u32 = 2;
+
+/// The oldest schema this build reads.
+pub const OLDEST_SCHEMA: u32 = 1;
+
 /// The identity map of one configured CDR, on disk.
 ///
 /// One store per configured CDR: a multi-tenant deployment runs one bridge per
@@ -83,13 +99,15 @@ impl RedbStore {
     /// The seven tables are created in one transaction, so every later read
     /// finds a table rather than a missing one. A store an earlier version
     /// wrote has no reverse row for its EHRs, so the same transaction writes
-    /// one for every patient row that lacks it.
+    /// one for every patient row that lacks it. The same transaction checks
+    /// the schema the file was written in and stamps it with [`SCHEMA`].
     ///
     /// # Errors
     ///
-    /// Returns [`StoreError::Open`] when the path cannot be opened or created
-    /// and [`StoreError::Transaction`] when the table creation does not
-    /// commit.
+    /// Returns [`StoreError::Open`] when the path cannot be opened or created,
+    /// [`StoreError::Schema`] when the file carries a schema outside
+    /// [`OLDEST_SCHEMA`] to [`SCHEMA`], and [`StoreError::Transaction`] when
+    /// the table creation does not commit.
     pub fn open(path: &Path) -> Result<Self, StoreError> {
         let database = Database::create(path).map_err(|source| StoreError::Open {
             path: path.display().to_string(),
@@ -101,6 +119,8 @@ impl RedbStore {
         };
         let write = store.database.begin_write().map_err(transaction)?;
         {
+            let mut meta = write.open_table(META).map_err(transaction)?;
+            stamp(&mut meta, path)?;
             let patients = write.open_table(PATIENTS).map_err(transaction)?;
             let mut subjects = write.open_table(SUBJECTS).map_err(transaction)?;
             backfill(&patients, &mut subjects)?;
@@ -175,6 +195,34 @@ impl RedbStore {
         write.commit().map_err(transaction)?;
         Ok(stood)
     }
+}
+
+/// Checks the schema `meta` records and stamps it with [`SCHEMA`].
+///
+/// A file with no schema row reads as [`OLDEST_SCHEMA`]. A schema this build
+/// does not read is refused before anything else is written, so a later build
+/// can raise [`OLDEST_SCHEMA`] and refuse an older file by name.
+fn stamp(meta: &mut redb::Table<'_, &str, &str>, path: &Path) -> Result<(), StoreError> {
+    let held = meta
+        .get(SCHEMA_KEY)
+        .map_err(transaction)?
+        .map(|value| value.value().to_owned());
+    if let Some(text) = held {
+        let readable = text
+            .parse::<u32>()
+            .is_ok_and(|schema| (OLDEST_SCHEMA..=SCHEMA).contains(&schema));
+        if !readable {
+            return Err(StoreError::Schema {
+                path: path.display().to_string(),
+                found: text,
+                oldest: OLDEST_SCHEMA,
+                newest: SCHEMA,
+            });
+        }
+    }
+    meta.insert(SCHEMA_KEY, SCHEMA.to_string().as_str())
+        .map_err(transaction)?;
+    Ok(())
 }
 
 /// Writes the reverse row of every patient row that has none.
@@ -442,6 +490,7 @@ mod tests {
         CommittedSource, CompositionBinding, ConsumedSource, SourceVersion,
     };
     use crate::facade::identity::store::Store;
+    use crate::facade::identity::store::StoreError;
     use crate::facade::identity::{ExternalResourceId, FhirResourceId, PersonId};
 
     /// A synthetic clinical value, to prove it never reaches the file.
@@ -637,6 +686,77 @@ mod tests {
                 .identified("Condition", &IdentifierQuery::new(SystemMatch::Any, "v-10"))
                 .expect("the read")
         );
+    }
+
+    /// Returns the schema row of the store file at `path`.
+    fn schema_of(path: &std::path::Path) -> Option<String> {
+        use redb::ReadableDatabase;
+        let database = redb::Database::open(path).expect("the file");
+        let read = database.begin_read().expect("a read");
+        let meta = read.open_table(super::META).expect("the table");
+        meta.get(super::SCHEMA_KEY)
+            .expect("the row reads")
+            .map(|value| value.value().to_owned())
+    }
+
+    /// Writes a store file at `path` whose schema row holds `schema`, or
+    /// carries no schema row when `schema` is `None`.
+    fn file_with_schema(path: &std::path::Path, schema: Option<&str>) {
+        let database = redb::Database::create(path).expect("the file");
+        let write = database.begin_write().expect("a write");
+        {
+            let mut patients = write.open_table(super::PATIENTS).expect("the table");
+            patients
+                .insert(
+                    "http://example.org/ns|p-1",
+                    "bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11",
+                )
+                .expect("the row");
+            if let Some(schema) = schema {
+                let mut meta = write.open_table(super::META).expect("the table");
+                meta.insert(super::SCHEMA_KEY, schema).expect("the row");
+            }
+        }
+        write.commit().expect("the commit");
+    }
+
+    #[test]
+    fn a_new_store_is_stamped_with_the_schema_this_build_writes() {
+        let directory = tempfile::tempdir().expect("a temporary directory");
+        let path = directory.path().join("identity.redb");
+        drop(RedbStore::open(&path).expect("the open"));
+        assert_eq!(Some(super::SCHEMA.to_string()), schema_of(&path));
+    }
+
+    #[test]
+    fn a_store_an_earlier_build_wrote_without_a_schema_opens_and_is_stamped() {
+        let directory = tempfile::tempdir().expect("a temporary directory");
+        let path = directory.path().join("identity.redb");
+        file_with_schema(&path, None);
+        drop(RedbStore::open(&path).expect("the open"));
+        assert_eq!(Some(super::SCHEMA.to_string()), schema_of(&path));
+    }
+
+    #[test]
+    fn a_store_in_a_schema_this_build_does_not_read_is_refused_by_name() {
+        for found in ["0", "99", "two"] {
+            let directory = tempfile::tempdir().expect("a temporary directory");
+            let path = directory.path().join("identity.redb");
+            file_with_schema(&path, Some(found));
+            let refused = RedbStore::open(&path).expect_err("the schema is refused");
+            assert!(
+                matches!(
+                    refused,
+                    StoreError::Schema { found: ref held, oldest: 1, newest: 2, .. } if held == found
+                ),
+                "{refused}"
+            );
+            assert_eq!(
+                Some(String::from(found)),
+                schema_of(&path),
+                "a refused file is left as it was"
+            );
+        }
     }
 
     #[test]

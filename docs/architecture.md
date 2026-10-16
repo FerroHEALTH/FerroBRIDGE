@@ -1575,7 +1575,12 @@ draft upstream change.
   them, so a `PUT` resolves, a re-sent Bundle is recognised, and a re-sent
   resource updates rather than duplicates (section 4.6). The acknowledged
   failure mode (a re-sent Bundle omitting one resource reads as a different
-  mapping) is documented, not hidden.
+  mapping) is documented, not hidden. The store file records its schema
+  (#298): this build writes schema 2, reads 1 and 2 (a file without the row
+  is schema 1, written by 0.0.6 or earlier), and refuses any other by name,
+  so a later build that drops a schema refuses the older file. A source `id`
+  a store written before 0.0.4 bound to two compositions answers `409`, and
+  the refusal names each composition's resource id, whose update revises it.
 
   Each `content` item of the archetype a context's start model mapping names
   is a resource of its own (#530). The first item keys the identity map by

@@ -62,6 +62,18 @@ crates on crates.io.
   between the two, so no id changes. A CDR that stores an entry
   `LOCATABLE.uid` the sender did not send now gives that entry the same id on
   the transaction path as on the single create.
+- The `409` a create meets when an identity store written before 0.0.4 binds
+  its `id` to two compositions now names the repair (#298): its `conflict`
+  issue lists the resource id of each composition, and an update
+  (`PUT [base]/[type]/[id]`) of the one the sender means revises it.
+
+### Changed
+
+- The identity store records its schema (#298). This build writes schema 2
+  and reads schemas 1 and 2; a file with no schema row, which 0.0.6 or
+  earlier wrote, reads as schema 1 and is stamped on open. A file in another
+  schema stops the start with an error naming the file, the schema found and
+  the schemas this build reads, and the file is left unchanged.
 
 ## [0.0.6] - 2026-10-17
 

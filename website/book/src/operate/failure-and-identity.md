@@ -56,6 +56,14 @@ a re-sent Bundle is recognised. It also records each `Resource.identifier` a
 committed resource carries against its resource id, which is what a
 conditional create's `identifier` search reads.
 
+The id-map file records the schema it was written in. This build writes
+schema 2 and reads schemas 1 and 2; a file with no schema row was written by
+0.0.6 or earlier and reads as schema 1. Opening the store checks the schema
+and stamps the file with schema 2. A file in any other schema, for example
+one a later build wrote, stops the start with an error that names the file,
+the schema it found and the schemas this build reads, and the file is left
+unchanged.
+
 ## A re-sent transaction commits once
 
 Every entry the facade commits records the source it consumed. A resource is
@@ -133,7 +141,12 @@ own design.
   the later version.
 - **An `id` the map binds to more than one composition:** the facade cannot
   tell which one the create revises, so it answers `409 Conflict` with a
-  `conflict` issue and commits nothing.
+  `conflict` issue and commits nothing. Only a store written before 0.0.4
+  can hold such an `id`. Each of those compositions is a resource of its
+  own, and the issue names every resource id (`Condition/<id>`, one per
+  composition). Send the change as an update, `PUT [base]/Condition/<id>`
+  with that `id` in the body, to the resource it revises. The store keeps
+  the split, so every later change of that source goes the same way.
 
 A transaction entry follows the same lookup. An entry whose exact key the map
 consumed, or a transaction committed, is recognised as above. An entry whose

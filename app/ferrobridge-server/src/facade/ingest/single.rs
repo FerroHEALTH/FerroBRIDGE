@@ -122,7 +122,7 @@ impl Ingest<'_> {
                 .store
                 .consumed_versions(&source)
                 .map_err(|error| store_refusal(&error))?;
-            let Some(known) = one_composition(&source, versions)? else {
+            let Some(known) = one_composition(&source, &versions)? else {
                 return Ok(Recognised::Unknown);
             };
             if source.version_id().is_some() {
