@@ -31,6 +31,7 @@ use openehr_its::rest::client::ClientError;
 use openehr_its::rest::client::ErrorBody;
 
 use crate::cdr::error::CdrError;
+use crate::cdr::oauth::RenewalError;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 
@@ -154,14 +155,16 @@ pub const UPSTREAM: Row = Row {
 ///
 /// The token endpoint the bridge fetches its CDR credential from was
 /// unreachable, refused the bridge's own client credentials, or answered no
-/// usable token. That is a fault of a server upstream of the bridge, so the
-/// answer is a `502` (RFC 9110 §15.6.3) and never a `401` to a caller whose
-/// own credentials were fine. No CDR call was made, so no ITS-REST status
-/// applies: no specification governs this: our own design.
+/// usable token, either before the CDR call or when the CDR refused the token
+/// (`401`) and the bridge renewed it once. That is a fault of a server upstream
+/// of the bridge, so the answer is a `502` (RFC 9110 §15.6.3) and never a `401`
+/// to a caller whose own credentials were fine. No ITS-REST status governs a
+/// credential the bridge could not obtain: no specification governs this: our
+/// own design.
 pub const CREDENTIALS: Row = Row {
     status: StatusCode::BAD_GATEWAY,
     issue: IssueType::Exception,
-    openehr: "no CDR call was made: the credential for it could not be obtained",
+    openehr: "no usable CDR call: the credential for it could not be obtained or renewed",
     fhir: "hl7.org/fhir/R4/http.html, the server is a gateway to the CDR",
 };
 
@@ -344,10 +347,19 @@ fn of_generated_error(error: &ClientError) -> Answer {
                 crate::facade::outcome::chain(source)
             ),
         ),
-        ClientError::Transport { .. } => Answer::new(
-            UPSTREAM,
-            String::from("the openEHR service could not be reached"),
-        ),
+        ClientError::Transport { ref source, .. } => match renewal_of(source) {
+            Some(renewal) => Answer::new(
+                CREDENTIALS,
+                format!(
+                    "no credential for the openEHR service could be obtained: {}",
+                    crate::facade::outcome::chain(renewal)
+                ),
+            ),
+            None => Answer::new(
+                UPSTREAM,
+                String::from("the openEHR service could not be reached"),
+            ),
+        },
         ClientError::AnswerTooLarge { status, limit, .. } => Answer::new(
             UPSTREAM,
             format!(
@@ -371,6 +383,22 @@ fn of_generated_error(error: &ClientError) -> Answer {
             ),
         ),
     }
+}
+
+/// Returns the token renewal failure in the cause chain of `error`, when a
+/// refused CDR token could not be renewed.
+///
+/// The renewal runs inside the call's engine, so its failure reaches the
+/// generated client as the source of a transport error.
+fn renewal_of<'e>(error: &'e (dyn core::error::Error + 'static)) -> Option<&'e RenewalError> {
+    let mut cause = Some(error);
+    while let Some(current) = cause {
+        if let Some(renewal) = current.downcast_ref::<RenewalError>() {
+            return Some(renewal);
+        }
+        cause = current.source();
+    }
+    None
 }
 
 #[cfg(test)]
@@ -486,6 +514,53 @@ mod tests {
                 .is_some_and(|text| text.contains("invalid_client")),
             "the 502 does not carry the token endpoint's refusal"
         );
+    }
+
+    #[test]
+    fn a_failed_renewal_after_a_cdr_401_is_the_credentials_row() {
+        let refused = crate::cdr::oauth::TokenError::Refused {
+            status: StatusCode::BAD_REQUEST,
+            error: Some(crate::cdr::oauth::OAuthError {
+                error: String::from("invalid_grant"),
+                error_description: None,
+                error_uri: None,
+            }),
+            body: String::new(),
+        };
+        let error = CdrError::client(
+            ClientError::Transport {
+                method: Method::GET,
+                path: String::from("/ehr"),
+                source: openehr_its::rest::client::TransportError::Send {
+                    source: Box::new(crate::cdr::oauth::RenewalError::new(std::sync::Arc::new(
+                        refused,
+                    ))),
+                },
+            },
+            None,
+        );
+        let answer = of_client_error(&error);
+        assert_eq!(CREDENTIALS, answer.row());
+        let diagnostics = answer.issue().diagnostics().unwrap_or_default();
+        assert!(
+            diagnostics.contains("400") && diagnostics.contains("invalid_grant"),
+            "{diagnostics}"
+        );
+    }
+
+    #[test]
+    fn a_transport_failure_without_a_renewal_stays_the_upstream_row() {
+        let error = CdrError::client(
+            ClientError::Transport {
+                method: Method::GET,
+                path: String::from("/ehr"),
+                source: openehr_its::rest::client::TransportError::Send {
+                    source: Box::new(std::io::Error::other("connection refused")),
+                },
+            },
+            None,
+        );
+        assert_eq!(UPSTREAM, of_client_error(&error).row());
     }
 
     #[test]

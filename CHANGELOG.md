@@ -462,6 +462,12 @@ crates on crates.io.
   as `application/fhir+json` with the `exception` issue and the request id in
   the diagnostics, never the panic message. It used to answer the plain JSON
   body every other route keeps.
+- A CDR token refusal the bridge cannot renew answers the FHIR caller with the
+  token endpoint's refusal (#654). When the CDR answers `401` and the one
+  renewal of the OAuth token fails, the facade answers the credentials `502`
+  with the token endpoint's status and OAuth error (RFC 6749 §5.2) in the
+  diagnostics, never the client secret. It used to answer "the openEHR
+  service could not be reached".
 - Removing a person's newest `PERSON` writer hands the row to the writer
   that remains (#561). When several compositions of one EHR write the
   person's `PERSON` row and the newest of them is deleted in the CDR, or a
