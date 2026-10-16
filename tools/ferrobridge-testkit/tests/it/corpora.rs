@@ -31,6 +31,10 @@ const CORPORA: &[(&str, &str)] = &[
         "KDS Diagnose operational template (fixture)",
         "tools/ferrobridge-testkit/fixtures/opt/kds",
     ),
+    (
+        "KDS Person operational template (fixture)",
+        "tools/ferrobridge-testkit/fixtures/opt/kds-person",
+    ),
 ];
 
 /// The repository root, reached from this crate's manifest directory.
@@ -191,6 +195,26 @@ fn the_kds_template_hashes_to_the_pinned_sha256() -> Result<(), Box<dyn Error>> 
         sha256_of(&file)?,
         pinned,
         "the vendored KDS_Diagnose.opt no longer hashes to the value docs/VERSIONS.md pins"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_kds_person_template_hashes_to_the_pinned_sha256() -> Result<(), Box<dyn Error>> {
+    let cell = matrix_pin_cell("KDS Person operational template (fixture)")?;
+    let tokens: Vec<&str> = cell.split_whitespace().collect();
+    let pinned = tokens
+        .windows(2)
+        .find_map(|pair| match pair {
+            ["sha256", digest] => Some(*digest),
+            _ => None,
+        })
+        .ok_or("the KDS person template pin names no sha256")?;
+    let file = repo_root().join("tools/ferrobridge-testkit/fixtures/opt/kds-person/KDS_Person.opt");
+    assert_eq!(
+        sha256_of(&file)?,
+        pinned,
+        "the vendored KDS_Person.opt no longer hashes to the value docs/VERSIONS.md pins"
     );
     Ok(())
 }
