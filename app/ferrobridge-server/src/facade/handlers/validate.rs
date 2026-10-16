@@ -20,6 +20,8 @@
 //! that `build_composition` performs, and the strict RM read. The outcome says
 //! so in `issue.details`.
 
+use fhir_types::r4::operation_outcome::OperationOutcome;
+use fhirconnect::operations::issues::of_warning;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
@@ -103,7 +105,7 @@ pub(crate) fn validate(
     if let Err(error) = openehr_its::json::from_canonical_json::<Composition>(&text) {
         return Ok(invalid(&error.to_string()));
     }
-    let mut issues = vec![
+    let issues = [
         Issue::information(IssueType::Informational)
             .diagnosing(format!(
                 "the resource maps to a composition of {} that this server would commit",
@@ -114,10 +116,18 @@ pub(crate) fn validate(
             .diagnosing(disposition(facade, &person)?)
             .detailing(VALIDATOR),
     ];
-    for warning in built.warnings() {
-        issues.push(Issue::warning(IssueType::Informational).diagnosing(warning.to_string()));
-    }
-    Ok(reply::issues(StatusCode::OK, &issues, &[]))
+    // NOTE: `engine/rest-api.adoc` §Reporting partial results with `OperationOutcome`;
+    // each declared loss renders as the operations lane renders it, located by its
+    // FHIRPath in `expression` and its openEHR path in a `details.coding`.
+    let outcome = OperationOutcome {
+        issue: issues
+            .iter()
+            .map(Issue::build)
+            .chain(built.warnings().iter().map(of_warning))
+            .collect(),
+        ..OperationOutcome::default()
+    };
+    Ok(reply::built(StatusCode::OK, &outcome, &[]))
 }
 
 /// Returns where the composition would be written, as the create path would

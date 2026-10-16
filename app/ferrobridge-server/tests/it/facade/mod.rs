@@ -55,6 +55,10 @@ use stub::mount_ehr;
 /// The fixture directory this suite loads its mapping set from.
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures");
 
+/// The fixture directory whose model holds a mapping that runs out of openEHR
+/// only, so an inbound run declares a loss on a FHIR element.
+const ONE_WAY_FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/one_way");
+
 /// The profile the fixture context claims.
 const PROFILE: &str = "http://example.org/fhir/StructureDefinition/ferrobridge-facade-diagnosis";
 
@@ -202,6 +206,12 @@ async fn harness() -> Harness {
 
 /// Returns a harness whose facade runs with `facade_settings`.
 async fn harness_with(facade_settings: Settings) -> Harness {
+    harness_over(FIXTURES, facade_settings).await
+}
+
+/// Returns a harness whose facade runs the mapping set under `fixtures` with
+/// `facade_settings`.
+async fn harness_over(fixtures: &str, facade_settings: Settings) -> Harness {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(
@@ -214,7 +224,7 @@ async fn harness_with(facade_settings: Settings) -> Harness {
         )
         .mount(&cdr)
         .await;
-    let set = programs::read_set(std::path::Path::new(FIXTURES)).expect("the mapping set loads");
+    let set = programs::read_set(std::path::Path::new(fixtures)).expect("the mapping set loads");
     let templates = programs::fetch_templates(&set, &client(&cdr))
         .await
         .expect("the template fetch answers");
