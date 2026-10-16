@@ -388,13 +388,16 @@ both sides, and one wire test asserts each row.
 | `408` on a search query | `502` carrying the upstream status |
 | no answer: a connect failure or a timeout | `502` |
 | no call: the token endpoint for the CDR credential fails or refuses | `502` naming the token endpoint's refusal, never the secret |
+| `401`, and the token endpoint refuses the one renewal | `502` naming the token endpoint's refusal, never the secret |
 
 Two answers come from the server itself, before or around the handler, and
 under `/fhir` both are an `OperationOutcome`: a body over
 `body_limit_bytes` answers `413` with the `too-long` issue, and a request that
 outlasts `request_timeout_ms` answers `504` with the `timeout` issue. The
 `504` replaces the plain `408` other routes answer, because a `408` tells a
-client it may resend a write the CDR may already have committed.
+client it may resend a write the CDR may already have committed. A handler
+that fails unexpectedly answers `500` with the `exception` issue and the
+request id in `diagnostics`; the cause stays in the server log.
 
 ## Paths are written as well as read
 

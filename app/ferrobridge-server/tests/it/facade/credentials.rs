@@ -129,3 +129,68 @@ async fn an_unreachable_token_endpoint_answers_502() -> Result<(), Box<dyn StdEr
     assert!(diagnostics.contains(TOKEN_PATH), "{diagnostics}");
     Ok(())
 }
+
+#[tokio::test]
+async fn a_cdr_401_whose_token_renewal_is_refused_answers_502_naming_the_oauth_error()
+-> Result<(), Box<dyn StdError>> {
+    // NOTE: RFC 6749 §5.2, `invalid_grant` is the token endpoint's refusal of
+    // the grant, a fault upstream of the facade even after the CDR's `401`.
+    let cdr = MockServer::start().await;
+    let authorization = MockServer::start().await;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path(TOKEN_PATH))
+        .respond_with(IssueThenRefuse::default())
+        .mount(&authorization)
+        .await;
+    let app = app_over(&cdr, &authorization.uri()).await?;
+    Mock::given(matchers::any())
+        .respond_with(ResponseTemplate::new(401))
+        .with_priority(10)
+        .mount(&cdr)
+        .await;
+
+    let (status, body) = call(app, post_condition(&condition())).await?;
+    assert_eq!(StatusCode::BAD_GATEWAY, status);
+    let issue = first_issue(&body);
+    assert_eq!(Some("exception"), issue["code"].as_str());
+    let diagnostics = issue["diagnostics"].as_str().unwrap_or_default();
+    assert!(diagnostics.contains("400"), "{diagnostics}");
+    assert!(diagnostics.contains("invalid_grant"), "{diagnostics}");
+    assert!(
+        diagnostics.contains("refused the token (401)"),
+        "the answer names the failed renewal: {diagnostics}"
+    );
+    assert!(
+        !diagnostics.contains("could not be reached"),
+        "a refused renewal is no transport failure: {diagnostics}"
+    );
+    assert!(
+        !body.to_string().contains(SECRET),
+        "the client secret reached the wire"
+    );
+    Ok(())
+}
+
+/// A token endpoint that issues a token on every odd request and refuses the
+/// renewal on every even one, so each attempt the client makes, its retries
+/// included, ends in a refused renewal after the CDR's `401`.
+#[derive(Debug, Default)]
+struct IssueThenRefuse(std::sync::atomic::AtomicUsize);
+
+impl wiremock::Respond for IssueThenRefuse {
+    fn respond(&self, _: &wiremock::Request) -> ResponseTemplate {
+        let seen = self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if seen.is_multiple_of(2) {
+            ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "access_token": format!("synthetic-token-{seen}"),
+                "token_type": "Bearer",
+                "expires_in": 3600,
+            }))
+        } else {
+            ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "error": "invalid_grant",
+                "error_description": "the client grant is revoked",
+            }))
+        }
+    }
+}
