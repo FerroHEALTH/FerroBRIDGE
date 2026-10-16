@@ -10,6 +10,7 @@ use crate::engine::cell;
 use crate::engine::fhir::FhirKind;
 use crate::engine::fhir::FhirValue;
 use crate::engine::lens::LensError;
+use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::outcome::Warning;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::manual::Manual;
@@ -216,28 +217,32 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     },
                 };
                 self.put_fhir_at(mapping, target, binding, &view)?;
-                if !withheld.is_empty() {
-                    let location = self.locate(mapping, &binding.fhir);
-                    // NOTE: no specification governs this: our own design, the
-                    // loss concerns the value's `mappings` attribute, so the
-                    // openEHR side names it below the node's path.
-                    let location = match location.openehr() {
-                        Some(path) => {
-                            let below = format!("{path}/mappings");
-                            location.with_openehr(below)
-                        }
-                        None => location,
-                    };
-                    for taken in &withheld {
-                        self.warnings.push(Warning::withheld(
-                            mapping.name(),
-                            taken,
-                            location.clone(),
-                        ));
-                    }
-                }
+                self.record_withheld(mapping, binding, &withheld);
                 Ok(())
             }
+        }
+    }
+
+    /// Records each term mapping a cell of `mapping` left out of the FHIR
+    /// element it wrote under `binding`.
+    fn record_withheld(&mut self, mapping: &Mapping, binding: &Binding, withheld: &[Withheld]) {
+        if withheld.is_empty() {
+            return;
+        }
+        let location = self.locate(mapping, &binding.fhir);
+        // NOTE: no specification governs this: our own design, the loss
+        // concerns the value's `mappings` attribute, so the openEHR side
+        // names it below the node's path.
+        let location = match location.openehr() {
+            Some(path) => {
+                let below = format!("{path}/mappings");
+                location.with_openehr(below)
+            }
+            None => location,
+        };
+        for taken in withheld {
+            self.warnings
+                .push(Warning::withheld(mapping.name(), taken, location.clone()));
         }
     }
 
