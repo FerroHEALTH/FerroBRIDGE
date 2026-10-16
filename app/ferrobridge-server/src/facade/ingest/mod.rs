@@ -30,6 +30,7 @@ use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::traverse::error::EngineError;
 use fhirconnect::resolve::program::binding::TemplateId;
 use http::StatusCode;
+use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_rm::v1_2::composition::composition::Composition;
@@ -176,6 +177,23 @@ pub struct Written {
     pub composition: CanonicalComposition,
     /// Whether this write committed the composition or found it committed.
     pub delivery: Delivery,
+}
+
+/// The composition version one update follows, and the entry of it the
+/// update replaces.
+#[derive(Debug, Clone, Copy)]
+pub struct Revision<'a> {
+    /// The EHR the composition lives in.
+    pub ehr_id: &'a EhrId,
+    /// The version container of the composition.
+    pub container: &'a HierObjectId,
+    /// The version the write follows, so a concurrent writer meets the `412`
+    /// the CDR answers.
+    pub preceding: &'a ObjectVersionId,
+    /// The composition the CDR holds as `preceding`.
+    pub standing: &'a Composition,
+    /// The path the identity map binds the updated resource's entry by.
+    pub entry_path: &'a str,
 }
 
 /// How the composition one single write answers with reached the CDR.

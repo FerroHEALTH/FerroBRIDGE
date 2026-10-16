@@ -275,20 +275,9 @@ pub(crate) fn canonical(
     Ok(CanonicalComposition::new(value, template_id, generation))
 }
 
-/// Returns the latest version of one composition, for a precondition check.
-pub(crate) async fn latest_version(
-    client: &CdrClient,
-    ehr_id: &EhrId,
-    container: &HierObjectId,
-) -> Result<ObjectVersionId, Refusal> {
-    latest(client, ehr_id, container)
-        .await
-        .map(|(version, _composition)| version)
-}
-
 /// Reads the latest version of the composition `container` holds, with the
 /// version its `ETag` names.
-async fn latest(
+pub(crate) async fn latest(
     client: &CdrClient,
     ehr_id: &EhrId,
     container: &HierObjectId,
@@ -337,8 +326,45 @@ async fn answered_version(
     }
 }
 
+/// Reads the composition version an update follows, which the CDR must hold.
+///
+/// A version the CDR does not hold is no version the write can follow, so it
+/// is `412` as a stale `If-Match` is
+/// (<https://hl7.org/fhir/R4/http.html#concurrency>).
+///
+/// # Errors
+///
+/// A `412` for a version the CDR does not hold, a `410` for one it reports
+/// deleted, and every client failure through the status table.
+pub(crate) async fn followed_version(
+    client: &CdrClient,
+    ehr_id: &EhrId,
+    version: &ObjectVersionId,
+) -> Result<Composition, Refusal> {
+    let answered = client
+        .composition(ehr_id, &UidBasedId::ObjectVersionId(version.clone()), None)
+        .await
+        .map_err(|error| write::refuse(&status::of_client_error(&error)))?;
+    match answered.outcome {
+        CompositionGetOutcome::Ok { body, .. } => Ok(body),
+        CompositionGetOutcome::NoContent => Err(write::refuse(&status::Answer::new(
+            status::GONE,
+            String::from("the CDR reports this composition deleted"),
+        ))),
+        CompositionGetOutcome::NotFound { body } => Err(write::refuse(&status::Answer::new(
+            status::PRECONDITION_FAILED,
+            format!(
+                "If-Match names version {}, which the CDR does not hold: {}",
+                version.value(),
+                status::diagnostics(StatusCode::NOT_FOUND, &body)
+            ),
+        ))),
+    }
+}
+
 /// Returns the openEHR version an `If-Match` names, checked against the latest
-/// version `container` holds.
+/// version `container` holds, with that version's composition when the check
+/// read it.
 ///
 /// R4 sends the `versionId` as a weak entity tag ("`If-Match: W/"2"`",
 /// <https://hl7.org/fhir/R4/http.html#concurrency>), and ITS-REST takes the
@@ -357,7 +383,7 @@ pub(crate) async fn version_of_etag(
     ehr_id: &EhrId,
     container: &HierObjectId,
     value: &str,
-) -> Result<ObjectVersionId, Refusal> {
+) -> Result<(ObjectVersionId, Option<Composition>), Refusal> {
     let bare = entity_tag(value);
     if let Ok(full) = ObjectVersionId::new(bare) {
         if full.object_id().value() != container.value() {
@@ -369,7 +395,7 @@ pub(crate) async fn version_of_etag(
                 ),
             )));
         }
-        return Ok(full);
+        return Ok((full, None));
     }
     // NOTE: a parse failure IS the answer here: a value that is no
     // OBJECT_VERSION_ID is the R4 spelling, which names the version tree id
@@ -383,10 +409,10 @@ pub(crate) async fn version_of_etag(
             )),
         )
     })?;
-    let current = latest_version(client, ehr_id, container).await?;
+    let (current, composition) = latest(client, ehr_id, container).await?;
     let current_tree = current.version_tree_id();
     if current_tree.value() == tree.value() {
-        return Ok(current);
+        return Ok((current, Some(composition)));
     }
     Err(write::refuse(
         &status::Answer::new(
