@@ -19,7 +19,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 use rust_decimal::{Decimal, RoundingStrategy};
 
-use crate::ucum::Canonical;
+use crate::ucum::{Canonical, algebra};
 
 /// A calendar duration keyword (N1 §4.1.8).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -341,27 +341,35 @@ impl Quantity {
         Some(Self::new(value, unit))
     }
 
-    /// The product (N1 §6.6.1), its unit the UCUM product of the operands'.
+    /// The product (N1 §6.6.1), its unit the UCUM product of the operands'
+    /// with identical units merged ([`algebra::product`]), or the two
+    /// expressions joined by `.` where that has no written form.
     #[must_use]
     pub fn multiply(&self, other: &Self) -> Option<Self> {
         let value = self.value.checked_mul(other.value)?;
         let unit = match (&self.unit, &other.unit) {
             (Unit::Ucum(one), unit) | (unit, Unit::Ucum(one)) if one == "1" => unit.clone(),
-            (Unit::Ucum(a), Unit::Ucum(b)) => Unit::Ucum(format!("{}.{}", group(a), group(b))),
+            (Unit::Ucum(a), Unit::Ucum(b)) => Unit::Ucum(
+                algebra::product(a, b).unwrap_or_else(|| format!("{}.{}", group(a), group(b))),
+            ),
             _ => return None,
         };
         Some(Self::new(value, unit))
     }
 
-    /// The quotient (N1 §6.6.2), its unit the UCUM quotient of the operands';
-    /// `None` on a zero divisor.
+    /// The quotient (N1 §6.6.2), its unit the UCUM quotient of the operands'
+    /// with identical units merged ([`algebra::quotient`]), or the two
+    /// expressions joined by `/` where that has no written form; `None` on a
+    /// zero divisor.
     #[must_use]
     pub fn divide(&self, other: &Self) -> Option<Self> {
         let value = self.value.checked_div(other.value)?;
         let unit = match (&self.unit, &other.unit) {
             (a, b) if a == b => Unit::one(),
             (unit, Unit::Ucum(one)) if one == "1" => unit.clone(),
-            (Unit::Ucum(a), Unit::Ucum(b)) => Unit::Ucum(format!("{}/{}", group(a), group(b))),
+            (Unit::Ucum(a), Unit::Ucum(b)) => Unit::Ucum(
+                algebra::quotient(a, b).unwrap_or_else(|| format!("{}/{}", group(a), group(b))),
+            ),
             _ => return None,
         };
         Some(Self::new(value, unit))

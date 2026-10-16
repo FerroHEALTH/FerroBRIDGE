@@ -336,6 +336,12 @@ crates on crates.io.
   one of two sibling clusters that share a node id (the `Straßenanschrift` and
   `Postfach` addresses of `KDS_Person`) names the node below that cluster
   alone (#468).
+- FHIRPath quantity products and quotients carry the UCUM unit with
+  identical units merged, so `12 'cm' * 3 'cm'` answers `36 'cm2'` and
+  `12 'cm2' / 3 'cm'` answers `4 'cm'` as FHIRPath N1 §6.6.1 and §6.6.2
+  show, where the unit was the two expressions joined (`'cm.cm'`). Units
+  that cancel give `'1'`; a prefix stays part of its unit, and an annotated
+  unit is still joined whole (#499).
 - The facade's loss log records each declared loss as a value-free kind
   (`skipped-unresolved-reference`, `deferred-reference`, `defaulted` and the
   rest) with its FHIRPath and its openEHR path, where it logged the loss's

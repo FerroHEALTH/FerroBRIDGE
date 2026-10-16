@@ -17,8 +17,8 @@ use std::sync::LazyLock;
 
 use ferrobridge_fhirpath::eval::{Environment, Focus};
 use ferrobridge_fhirpath::expression::Expression;
-use ferrobridge_fhirpath::model::{named_type, path_type};
 use ferrobridge_fhirpath::model::r4::R4;
+use ferrobridge_fhirpath::model::{named_type, path_type};
 use ferrobridge_fhirpath::value::Collection;
 use fhir_types::codec::Value;
 use serde::Deserialize;
