@@ -216,6 +216,9 @@ the testkit tool crate. Beside it:
   FHIR examples packages per version, STU3 to R6, the R4 facade, and the HL7
   FHIRPath test suite for R4) (a regression fails, a new pass asks for the
   list, `--update` rewrites the lists and the shields.io badge JSON).
+  `affected.sh` computes the packages a change reaches, which decides the
+  CI lanes a pull request runs, and `fast.sh` is the default local gate over
+  the same set (`docs/ci-cd.md`).
 - `.github/`: issue and pull-request templates, CODEOWNERS, Dependabot, and
   ten workflows (CI, Docs, Scorecard, CodeQL, SonarQube Cloud, Release,
   Release build, Release image, Publish crates, Pin freshness). `ci.yml` runs

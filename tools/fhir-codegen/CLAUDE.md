@@ -86,7 +86,10 @@ Five integration tests emit a whole generated crate (`emit.rs` and `v2/emit.rs`:
 emitting twice is byte-identical, the check reports drift, the committed
 crate is in sync). A full emit takes minutes in a debug build and longer
 under coverage instrumentation, so they run only when
-`FERROBRIDGE_CODEGEN_EMIT` is exactly `1`, which the `codegen-drift` CI job
-sets over a release build; elsewhere they return early and pass. Run
-them locally with `FERROBRIDGE_CODEGEN_EMIT=1 cargo nextest run --release -p
-fhir-codegen`. The drift check itself (`emit --check`) stays the guard.
+`FERROBRIDGE_CODEGEN_EMIT` is exactly `1`, which the `codegen-emit-tests` CI
+job sets over the `emit` profile (the emitter optimised, the two generated
+crates the test binary links left at opt-level 0); elsewhere they return
+early and pass. `scripts/checks/fast.sh` runs them when your change reaches
+this crate; by hand it is `FERROBRIDGE_CODEGEN_EMIT=1 cargo nextest run
+--cargo-profile emit -p fhir-codegen`. The drift check itself
+(`emit --check`) stays the guard.

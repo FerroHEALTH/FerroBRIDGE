@@ -71,6 +71,16 @@ Non-negotiables (violations are rejected at review):
   green for every crate you touched, with `cargo fmt` clean, and every shell
   file you touched clean at `shellcheck --severity=style`. Report actual command
   results; never claim a green you did not see.
+- **The default local gate is `scripts/checks/fast.sh`** (run it in the
+  background). It runs rustfmt, clippy, nextest and the doctests on the
+  packages your diff reaches (the crates you touched, their dependants, and
+  the crates that read their files, the set the CI `detect` job computes),
+  plus the fhir-codegen full-emit tests only when the diff reaches
+  fhir-codegen (a change under `tools/fhir-codegen`, `crates/fhir-types`,
+  `crates/hl7v2-types` or a vendored input). `--dry-run` prints the plan,
+  `--no-emit` leaves out the ten-minute emit tests while you iterate. CI is
+  the full gate: do not rerun the whole workspace or the emit tests by hand
+  when `fast.sh` did not select them.
 - Deferred work is ALWAYS `// TODO(#NNNN): <what is missing>`, never a prose
   "later phase" note and never a phase or plan marker. `// NOTE:` is only for a
   settled decision, as a citation plus one sentence.

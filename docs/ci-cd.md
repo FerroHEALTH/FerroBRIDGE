@@ -62,15 +62,93 @@ clippy at `-D warnings`, nextest plus doctests, rustdoc at `-D warnings`,
 command in `.claude/rules/ci-cd.md` verbatim. The workspace pull request
 therefore changes nothing in CI; the lanes activate by themselves.
 
+## Lanes that run only when their inputs change
+
+A pull request runs a Rust lane only when the change reaches what that lane
+reads. The `detect` job computes the reach with
+`scripts/checks/affected.sh`, from GitHub's merge commit (`HEAD^1..HEAD`), and
+publishes it as job outputs. A push to `main`, a merge-group run and a
+dispatch pass `--all` and run every lane over every package, so `main` is
+always verified in full; to run everything on a pull request, dispatch the
+workflow on its branch.
+
+A changed path reaches packages in one of these ways:
+
+| Path | Reaches |
+|---|---|
+| a file under a member's directory (`crates/*`, `app/*`, `tools/*`) | that member, every member whose Rust source names that directory in a string literal (`"tools/fhir-codegen/vendor"`, `"../../crates/omop-cdm"`), then their normal and build dependants transitively, then the dev-dependants of all of those |
+| the root `Cargo.toml` | a line that is a member's own `[workspace.dependencies]` entry reaches that member; any other line (a third-party requirement, a profile, a lint) reaches everything |
+| `Cargo.lock` | a moved entry without a `source` (a member's version) reaches that member; a moved third-party entry reaches everything |
+| `conformance/**`, `scripts/checks/conformance.sh`, `README.md` | the packages `conformance.sh` runs (read from its own loop) |
+| `docs/VERSIONS.md` | `ferrobridge-testkit`, and through it every member testing with it (`matrix_pin`) |
+| `docs/architecture.md` | the testkit's own tests |
+| `scripts/checks/sqlx-offline.sh` | `omop-cdm` |
+| `.github/workflows/ci.yml`, `.github/actions/setup-rust/**`, `scripts/checks/affected.sh`, `scripts/checks/fast.sh` | everything |
+| the rest of `.github/`, `.claude/`, `website/`, `assets/`, `docker/`, `fuzz/`, `scripts/gh/`, `scripts/release/`, `docs/ci-cd.md`, `docs/release.md`, the root community files, and the guard scripts tier 1 runs | nothing |
+| anything else (`docs/specs/**`, `scripts/vendor/**`, `rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, `deny.toml`, a new root file) | everything |
+
+The last row is the default, so a new input runs every lane until someone
+maps it. Each lane then reads one output:
+
+| Lane | Runs when |
+|---|---|
+| `clippy`, `test`, `msrv` | any package is reached; each runs the reached packages only, in shards |
+| `rustdoc`, `publish-dry-run` | any package is reached |
+| `clippy-fhir-types`, `fhir-types-features` | `fhir-types` is reached |
+| `codegen-drift`, `codegen-emit-tests` | `fhir-codegen` is reached (its sources, its vendored packages, `fhir-types` or `hl7v2-types`) |
+| `omop-cdm-codegen-drift` | `omop-cdm-codegen` is reached (its sources or `omop-cdm`) |
+| `sqlx-offline` | `omop-cdm` is reached |
+| `conformance` | a package `conformance.sh` runs is reached |
+| `e2e (containers)` | one of `omop-cdm`, `ferrobridge-server`, `ferrobridge-term`, `ferrobridge-testkit` is reached; it runs those of them that are |
+| `rustfmt`, `cargo-deny`, `dependency-review` and every tier-1 job | always (`cargo-deny` because the advisory database moves without a change) |
+
+A skipped lane reports `skipped`, which `conclusion` counts as a pass, and a
+lane that runs and fails still fails `conclusion`. The `detect` job runs
+`affected.sh --self-test` first, which checks the classification against the
+real workspace graph, so a regression in the script fails the pipeline
+instead of skipping lanes.
+
+**Shards.** `test` runs in up to four shards and `clippy` and `msrv` in up to
+three. `affected.sh` packs every member into the shards once, greedily by its
+measured cost on the hosted runner, then keeps the reached members and drops
+an empty shard, so a member always lands in the same shard and that shard's
+build cache (`test-<n>`, `clippy-<n>`, `msrv-<n>`) fits it. Within a shard
+`cargo hack` still builds one package at a time, for the memory reason below.
+
+**Caches.** Every lane's build cache is saved from `main` only
+(`cache-save-if`), so pull requests restore `main`'s caches and never evict
+them; the repository's ten-gigabyte cache quota was full before this.
+`rustfmt` and `cargo-deny` compile nothing and keep no build cache.
+
+**The full-emit tests.** `codegen-emit-tests` builds under the `emit` profile
+of the root manifest: `fhir-codegen` optimised, and `fhir-types` and
+`hl7v2-types`, which its test binary links but no full-emit test runs, at
+opt-level 0. Building them optimised at `CARGO_BUILD_JOBS=1` took 35 of the
+lane's 47 minutes on 2026-10-16. The lane runs in three shards selected by
+nextest filtersets: the two longest tests (four and three full emits of
+`hl7v2-types`) each alone, and every other test in the third, whose filter
+is the complement of the first two, so a test runs in exactly one shard.
+
+**The local gate.** `scripts/checks/fast.sh` reads the same reach, measured
+from the merge base with `origin/main` to the working tree, and runs
+rustfmt, clippy, nextest and the doctests on the reached packages one at a
+time, the full-emit tests when `fhir-codegen` is reached, and the
+`omop-cdm-codegen` drift check when that is. It treats the CI configuration
+and its own pair as inert, since they change no cargo result. CI stays the
+full gate.
+
+No specification governs any of this: our own design.
+
 ## The end-to-end lane and its gate
 
 `e2e` is the one job that starts real servers. The container harness in
 `tools/ferrobridge-testkit` reads the environment variable `FERROBRIDGE_E2E`,
 and every container-backed test returns before it touches Docker unless that
 variable is exactly `1`. The ordinary `test` job therefore stays offline and
-fast, and `e2e` sets the variable and runs the four packages that own those
-tests: `cargo nextest run --locked -p omop-cdm -p ferrobridge-server -p
-ferrobridge-term -p ferrobridge-testkit --no-tests=pass`. The server's lanes
+fast, and `e2e` sets the variable and runs the packages that own those
+tests, `omop-cdm`, `ferrobridge-server`, `ferrobridge-term` and
+`ferrobridge-testkit`, in one `cargo nextest run --locked -p … --no-tests=pass`
+(on a pull request, those of them the change reaches). The server's lanes
 cover the CDR client, the facade and the ETL.
 
 Three properties of the job are deliberate. It names packages rather than

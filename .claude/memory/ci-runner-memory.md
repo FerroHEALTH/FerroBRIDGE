@@ -45,4 +45,12 @@ like the clippy and msrv lanes.
 the three v2 full-emit tests took 368 s to 819 s each under coverage and the
 SonarQube Cloud and `test` jobs hit their 45-minute timeouts, queueing
 eighteen runs. Any test that emits a whole generated crate goes behind
-`FERROBRIDGE_CODEGEN_EMIT=1` and runs only in `codegen-drift`, in release.
+`FERROBRIDGE_CODEGEN_EMIT=1` and runs only in `codegen-emit-tests`.
+
+**The `emit` profile (2026-10-16):** that lane spent 35 of its 47 minutes
+compiling `fhir-types` (28 min) and `hl7v2-types` (7 min) in release at
+`CARGO_BUILD_JOBS=1`, a cap that also starves rustc's codegen threads. No
+full-emit test runs their code, so the root `[profile.emit]` keeps the
+emitter optimised and builds the two generated crates at opt-level 0, which
+fits two at a time as the test lane already showed. A lane that builds a
+generated giant optimised should first ask whether anything runs that code.
