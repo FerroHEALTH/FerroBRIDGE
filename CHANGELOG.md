@@ -445,6 +445,23 @@ crates on crates.io.
   leaves the composer to its default, and a composer with an external
   reference travels as `ctx/composer_id`, `ctx/id_namespace` and
   `ctx/id_scheme` (Simplified Formats, §Composer).
+- A CDR credential the token endpoint will not issue answers the FHIR caller
+  `502` (#518). When the OAuth 2.0 client credentials fetch fails, because the
+  token endpoint is unreachable or refuses the bridge's own credentials, the
+  facade answers `502 Bad Gateway` with the token endpoint's status and OAuth
+  error in the `OperationOutcome` diagnostics, never the client secret. It
+  used to answer `500`.
+- A request under `/fhir` over the body ceiling or past the request timeout
+  answers an `OperationOutcome` (#548). The ceiling answers `413` with the
+  `too-long` issue and the timeout answers `504 Gateway Timeout` with the
+  `timeout` issue, both as `application/fhir+json` with the limit named in
+  the diagnostics. A timed-out FHIR request used to answer a plain `408`,
+  which tells a client it may resend a write the CDR may already hold. Every
+  other route keeps its plain `408` and `413`.
+- A handler panic under `/fhir` answers an `OperationOutcome` (#655): `500`
+  as `application/fhir+json` with the `exception` issue and the request id in
+  the diagnostics, never the panic message. It used to answer the plain JSON
+  body every other route keeps.
 - Removing a person's newest `PERSON` writer hands the row to the writer
   that remains (#561). When several compositions of one EHR write the
   person's `PERSON` row and the newest of them is deleted in the CDR, or a

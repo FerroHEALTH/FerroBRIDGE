@@ -212,12 +212,67 @@ async fn a_panicking_handler_yields_a_five_hundred_with_the_request_id_in_its_bo
             .get(request_id::HEADER)
             .and_then(|value| value.to_str().ok())
     );
+    let document_media = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
     let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
     let document: serde_json::Value = serde_json::from_slice(&bytes)?;
+    assert_eq!(
+        Some("application/json"),
+        document_media.as_deref(),
+        "a non-FHIR route keeps its plain answer"
+    );
     assert_eq!(Some("internal"), document["error"].as_str());
     assert_eq!(Some("corr-panic"), document["request_id"].as_str());
     assert!(
         !String::from_utf8_lossy(&bytes).contains("the handler gave up"),
+        "the panic message never reaches the client"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_panicking_fhir_handler_answers_a_500_operation_outcome_naming_the_request_id()
+-> Result<(), Box<dyn StdError>> {
+    // NOTE: R4 http.html §3.1.0.4 asks for an OperationOutcome on an error.
+    let router = with_middleware(
+        Router::new().route(
+            "/fhir/Condition",
+            get(|| async {
+                panic!("the handler gave up over synthetic-clinical-text");
+                #[expect(unreachable_code, reason = "the route panics by design")]
+                StatusCode::OK
+            }),
+        ),
+        support::state(),
+        &support::settings(),
+    );
+
+    let response = raw(
+        router,
+        Request::get("/fhir/Condition")
+            .header(request_id::HEADER, "corr-fhir-panic")
+            .body(Body::empty())?,
+    )
+    .await?;
+    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, response.status());
+    assert_eq!(
+        Some("corr-fhir-panic"),
+        response
+            .headers()
+            .get(request_id::HEADER)
+            .and_then(|value| value.to_str().ok())
+    );
+    let (media, issue) = edge_outcome(response).await?;
+    assert_eq!("application/fhir+json", media);
+    assert_eq!(Some("error"), issue["severity"].as_str());
+    assert_eq!(Some("exception"), issue["code"].as_str());
+    let diagnostics = issue["diagnostics"].as_str().unwrap_or_default();
+    assert!(diagnostics.contains("corr-fhir-panic"), "{issue}");
+    assert!(
+        !issue.to_string().contains("synthetic-clinical-text"),
         "the panic message never reaches the client"
     );
     Ok(())
