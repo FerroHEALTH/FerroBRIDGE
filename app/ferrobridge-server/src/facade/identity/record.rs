@@ -38,6 +38,10 @@ pub struct CompositionBinding {
     pub split: u32,
     /// The `metadata.name` of the context mapping that produced the resource.
     pub context: String,
+    /// The identity derivation that wrote [`entry_path`](Self::entry_path),
+    /// [`derive::DERIVATION`](crate::facade::identity::derive::DERIVATION) for
+    /// this build, and `None` for a binding a build up to 0.0.6 wrote.
+    pub derivation: Option<u32>,
 }
 
 /// The person one EHR was first recorded for: the reverse row of the patient
