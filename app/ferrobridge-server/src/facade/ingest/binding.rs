@@ -281,23 +281,30 @@ impl Ingest<'_> {
         })
     }
 
-    /// Binds and consumes each mapped entry at the version `versions` names
-    /// for it, in entry order.
+    /// Binds and consumes each mapped entry at the version `stored` pairs with
+    /// it, in entry order.
+    ///
+    /// The identity is read from the composition the CDR stored at that
+    /// version, so a retry that maps the resource again binds what the first
+    /// delivery committed, never a fresh build that differs from it in its
+    /// clock-filled times (no specification governs the identity: our own
+    /// design).
     pub(super) fn place(
         &self,
         mapped: &[Mapped<'_>],
         sources: &[Option<SourceVersion>],
         ehr_id: &EhrId,
-        versions: Vec<ObjectVersionId>,
+        stored: Vec<(ObjectVersionId, Composition)>,
     ) -> Result<Vec<Placed>, Refused> {
-        let mut placed = Vec::with_capacity(versions.len());
-        for ((entry, version), source) in mapped.iter().zip(versions).zip(sources) {
+        let mut placed = Vec::with_capacity(stored.len());
+        for ((entry, (version, held)), source) in mapped.iter().zip(stored).zip(sources) {
+            let composition = canonical_of(&held, &entry.built)?;
             let (id, stood) = self.bind(
                 entry.program,
                 entry.inbound.resource_type(),
                 ehr_id,
                 &version,
-                &entry.built,
+                &composition,
             )?;
             self.index(&entry.inbound, &id)?;
             if let Some(source) = source {

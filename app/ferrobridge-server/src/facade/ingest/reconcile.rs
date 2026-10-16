@@ -102,11 +102,6 @@ pub(super) fn one_contribution(committed: &[Option<CommittedSource>]) -> Option<
         .then_some(first)
 }
 
-/// Returns the versions of `paired`, in order.
-pub(super) fn versions_of(paired: Vec<(ObjectVersionId, Composition)>) -> Vec<ObjectVersionId> {
-    paired.into_iter().map(|(version, _)| version).collect()
-}
-
 /// Returns the versions a committed contribution names.
 ///
 /// The CONTRIBUTION's `versions` reference every version it committed
@@ -212,7 +207,12 @@ impl Ingest<'_> {
                 "its versions do not bind the resource once",
             ));
         };
-        let placed = self.place(&mapped, &[Some(source)], &ehr_id, vec![version.clone()])?;
+        let placed = self.place(
+            &mapped,
+            &[Some(source)],
+            &ehr_id,
+            vec![(version.clone(), stored.clone())],
+        )?;
         let [ref entry] = mapped;
         let Ok([place]) = <[Placed; 1]>::try_from(placed) else {
             return Err(unbound(
@@ -253,7 +253,7 @@ impl Ingest<'_> {
                 Scope::Whole,
             )
             .await?;
-        let placed = self.place(&partition.mapped, sources, &ehr_id, versions_of(versions))?;
+        let placed = self.place(&partition.mapped, sources, &ehr_id, versions)?;
         Ok(Ingested {
             ehr_id,
             commit: Commit::AlreadyConsumed,

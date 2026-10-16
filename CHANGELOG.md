@@ -55,6 +55,13 @@ crates on crates.io.
   entry or both name the same one, and when they name two entries, the read,
   search or bind that meets it answers `500` with an `exception` issue naming
   the path, and no id moves to another entry.
+- A transaction entry, and a retry that binds a contribution an earlier
+  delivery committed, now derive the entry's identity from the composition
+  the CDR stored at its version (#284). Before, they derived it from the
+  composition the current run built. Nothing the derivation reads differed
+  between the two, so no id changes. A CDR that stores an entry
+  `LOCATABLE.uid` the sender did not send now gives that entry the same id on
+  the transaction path as on the single create.
 
 ## [0.0.6] - 2026-10-17
 

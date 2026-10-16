@@ -110,7 +110,15 @@ pub(crate) enum Echo {
     Reversed,
     /// The versions in order, each read back naming an item no entry sent.
     Foreign,
+    /// The empty `201` of [`Echo::Minimal`], each stored composition giving
+    /// its `content` items a `LOCATABLE.uid` the sender did not send, so the
+    /// stored composition differs from the built one in an identity input.
+    MinimalAssigningUids,
 }
+
+/// The `LOCATABLE.uid` [`Echo::MinimalAssigningUids`] gives the first
+/// `content` item of every composition it stores.
+pub(super) const ASSIGNED_ENTRY_UID: &str = "6f1c0a52-0000-4000-8000-000000000001";
 
 /// The compositions a stub CDR committed, by version and by container.
 #[derive(Debug, Default)]
@@ -189,6 +197,12 @@ impl TakeContribution {
                 stored["feeder_audit"]["originating_system_item_ids"][0]["id"] =
                     serde_json::json!("an-item-no-entry-sent");
             }
+            if self.echo == Echo::MinimalAssigningUids
+                && let Some(first) = stored["content"].get_mut(0)
+            {
+                first["uid"] =
+                    serde_json::json!({ "_type": "HIER_OBJECT_ID", "value": ASSIGNED_ENTRY_UID });
+            }
             committed.versions.push((version.clone(), stored));
             named.push(version);
         }
@@ -196,7 +210,7 @@ impl TakeContribution {
         if self.echo == Echo::Reversed {
             named.reverse();
         }
-        if self.echo == Echo::Minimal {
+        if matches!(self.echo, Echo::Minimal | Echo::MinimalAssigningUids) {
             return ferrobridge_testkit::stubs::its_rest::contribution_created_minimal(
                 CONTRIBUTION,
             );

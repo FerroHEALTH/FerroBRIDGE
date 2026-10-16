@@ -96,7 +96,10 @@ versions, with the same `FEEDER_AUDIT` check. A contribution that cannot be
 read back or bound is a `500` naming the contribution, and the recorded uid
 stays. When you send the same Bundle again, the facade finds that uid,
 commits nothing, reads the contribution back and binds from it, and answers
-`200 OK` for each entry as for any re-sent Bundle.
+`200 OK` for each entry as for any re-sent Bundle. Each entry's identity is
+read from the composition the CDR stored at its version, on the first
+delivery and on a retry alike, so a retry binds the id the first delivery
+would have bound.
 
 A single create shares that rule. When you `POST` a resource whose `id` and
 `meta.versionId` a transaction committed and did not finish binding, the
