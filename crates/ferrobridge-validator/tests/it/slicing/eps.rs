@@ -11,6 +11,7 @@ use ferrobridge_validator::report::Constraint;
 use ferrobridge_validator::report::Reason;
 use serde_json::json;
 
+use crate::eu::empty_reason;
 use crate::eu::eu_set;
 use crate::support::TestResult;
 use crate::support::validate;
@@ -33,7 +34,10 @@ fn section(code: &str, entries: &[&str]) -> serde_json::Value {
         "code": {"coding": [{"system": "http://loinc.org", "code": code}]},
         "text": {"status": "generated", "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">x</div>"}
     });
-    if !entry.is_empty() {
+    // composition-eu-eps ips-comp-1: a required section carries entries or an emptyReason.
+    if entry.is_empty() {
+        section["emptyReason"] = empty_reason();
+    } else {
         section["entry"] = json!(entry);
     }
     section
