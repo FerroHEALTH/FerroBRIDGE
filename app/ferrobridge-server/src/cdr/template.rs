@@ -180,7 +180,7 @@ fn resolved_id(upstream: &Upstream, template: &OperationalTemplate) -> Archetype
         .unwrap_or_else(|| template.archetype_id.clone())
 }
 
-// TODO(#241): parse through `ArchetypeHrid` itself once openehr-am offers
+// TODO(#618): parse through `ArchetypeHrid` itself once openehr-am offers
 // `FromStr` for it (sibling request S2), and drop the openehr-adl dependency.
 /// Returns the archetype HRID an `ETag` value carries, when it carries one.
 fn hrid_from_etag(etag: &str) -> Option<ArchetypeHrid> {
