@@ -8,6 +8,7 @@
 //! wrong and the run carried on". Each variant of [`Loss`] is a loss the
 //! specification itself declares: a mapping the direction skips (a gate, a
 //! `unidirectional` marker, or a reference that resolves to nothing), a
+//! `TERM_MAPPING` whose `match` is not `=` and so has no FHIR form, a
 //! composition field the engine defaulted, the occurrences a `0..n` into a
 //! `0..1` dropped, a one-way row a data-type cell took, and a reference whose
 //! resolution belongs to the facade. Nothing else is a warning, and the
@@ -19,6 +20,7 @@ use core::fmt;
 use fhir_types::codec::Value;
 
 use crate::engine::lens::Fallback;
+use crate::engine::lens::term_mapping::Withheld;
 
 /// A produced document with the losses the run declared.
 ///
@@ -202,6 +204,23 @@ impl Warning {
         )
     }
 
+    /// Records the term mapping a data-type cell of `mapping` left out of the
+    /// FHIR element, at `location`.
+    #[must_use]
+    pub fn withheld(mapping: &str, taken: &Withheld, location: Location) -> Self {
+        Self::new(
+            Loss::Skipped {
+                mapping: String::from(mapping),
+                reason: SkipReason::TermMappingMatch {
+                    match_code: taken.match_code(),
+                    terminology: String::from(taken.terminology()),
+                    code: String::from(taken.code()),
+                },
+            },
+            location,
+        )
+    }
+
     /// Returns what was lost.
     #[must_use]
     pub const fn loss(&self) -> &Loss {
@@ -321,6 +340,19 @@ pub enum SkipReason {
     /// The `Reference` carries no literal reference and no display, so it
     /// names nothing to map.
     EmptyReference,
+    /// A `TERM_MAPPING` of the value has a `match` FHIR cannot carry.
+    ///
+    /// `match` is "hard coded to `=`, other operators not mappable to FHIR"
+    /// (`types-of-mappings/data-type/TERM_MAPPING.adoc`), so the mapping
+    /// wrote no `Coding` for this term; the rest of the value converted.
+    TermMappingMatch {
+        /// The `match` operator of the mapping: `>`, `<` or `?`.
+        match_code: char,
+        /// The `terminology_id` value of the mapping's target.
+        terminology: String,
+        /// The `code_string` of the mapping's target.
+        code: String,
+    },
 }
 
 impl fmt::Display for SkipReason {
@@ -339,6 +371,15 @@ impl fmt::Display for SkipReason {
                 write!(f, "the reference {reference} resolves to no resource")
             }
             Self::EmptyReference => f.write_str("the Reference names no resource"),
+            Self::TermMappingMatch {
+                match_code,
+                ref terminology,
+                ref code,
+            } => write!(
+                f,
+                "its TERM_MAPPING `{match_code}` to {code} of {terminology} is no equivalence, \
+                 and only `=` maps to a Coding"
+            ),
         }
     }
 }

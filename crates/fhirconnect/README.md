@@ -105,8 +105,10 @@ openEHR.
   the engine parses no timestamp and adds no offset.
 - **An attribute with no counterpart is carried, a falsified value refuses.**
   `put` restores the attributes the data-type table marks `-` from the openEHR
-  value the target holds; a `TERM_MAPPING` whose `match` is not `=` asserts an
-  equivalence the data denies and is refused instead.
+  value the target holds. A `TERM_MAPPING` whose `match` is not `=` would
+  assert an equivalence the data denies, so it writes no `Coding`: the run
+  declares it as a skipped loss naming the match code and the target term,
+  and the rest of the value converts.
 - **A `DV_PROPORTION` that is not a percentage refuses.** FHIR `Quantity`
   carries no denominator, and the engine writes no extension URL of its own for
   one.
