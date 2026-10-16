@@ -1,0 +1,24 @@
+---
+source: crates/fhirconnect/tests/it/person.rs
+expression: rows(&diagnostics)
+---
+[
+  "address.v1.yml:107 fc-unknown-fhir-element",
+  "address.v1.yml:107 fc-unknown-fhir-element",
+  "address.v1.yml:111 fc-unknown-fhir-element",
+  "address.v1.yml:111 fc-unknown-fhir-element",
+  "address.v1.yml:54 fc-uncarried-tail",
+  "address.v1.yml:54 fc-uncarried-tail",
+  "address.v1.yml:62 fc-unknown-fhir-element",
+  "address.v1.yml:62 fc-unknown-fhir-element",
+  "address.v1.yml:67 fc-unknown-fhir-element",
+  "address.v1.yml:67 fc-unknown-fhir-element",
+  "address.v1.yml:77 fc-uncarried-tail",
+  "address.v1.yml:77 fc-uncarried-tail",
+  "address.v1.yml:85 fc-unknown-fhir-element",
+  "address.v1.yml:85 fc-unknown-fhir-element",
+  "address.v1.yml:89 fc-unknown-fhir-element",
+  "address.v1.yml:89 fc-unknown-fhir-element",
+  "address.v1.yml:99 fc-uncarried-tail",
+  "address.v1.yml:99 fc-uncarried-tail"
+]

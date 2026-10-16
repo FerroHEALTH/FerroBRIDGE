@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The first FHIR round trip: the published KDS diagnosis chain of the
+//! The KDS diagnosis round trip: the published KDS diagnosis chain of the
 //! FHIRconnect mapping library under a FerroBRIDGE project context, compiled
 //! against the published `KDS_Diagnose` operational template.
 //!
@@ -461,10 +461,10 @@ fn getput_holds_on_the_kds_composition() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Returns the declared set a reviewed snapshot of this file pins.
+/// Returns the declared set a reviewed snapshot pins, named `<module>__<snapshot>`.
 fn reviewed(name: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     let text = std::fs::read_to_string(format!(
-        "{}/tests/it/snapshots/it__roundtrip__{name}.snap",
+        "{}/tests/it/snapshots/it__{name}.snap",
         env!("CARGO_MANIFEST_DIR")
     ))?;
     let body = text
@@ -518,8 +518,8 @@ fn conformance_the_round_trip_chains_hold_their_pass_list() -> Result<(), Box<dy
         );
         chain_case(
             "ferrobridge_diagnose_minimal",
-            holds("PutGet", "synthetic_putget", putget)?,
-            holds("GetPut", "synthetic_getput", getput)?,
+            holds("PutGet", "roundtrip__synthetic_putget", putget)?,
+            holds("GetPut", "roundtrip__synthetic_getput", getput)?,
         )
     };
     let kds = {
@@ -533,11 +533,31 @@ fn conformance_the_round_trip_chains_hold_their_pass_list() -> Result<(), Box<dy
         );
         chain_case(
             "kds_diagnose",
-            holds("PutGet", "kds_putget", putget)?,
-            holds("GetPut", "kds_getput", getput)?,
+            holds("PutGet", "roundtrip__kds_putget", putget)?,
+            holds("GetPut", "roundtrip__kds_getput", getput)?,
         )
     };
-    let outcome = record(Corpus::Roundtrip, &[synthetic, kds])?;
+    let kds_person = {
+        let (program, index) = crate::person::kds_person_program()?;
+        let putget = laws::putget(
+            &program,
+            &index,
+            &crate::person::kds_patient()?,
+            &laws::untouched,
+        );
+        let getput = laws::getput(
+            &program,
+            &index,
+            &crate::person::kds_person_composition(&index)?,
+            &laws::untouched,
+        );
+        chain_case(
+            "kds_person",
+            holds("PutGet", "person__kds_person_putget", putget)?,
+            holds("GetPut", "person__kds_person_getput", getput)?,
+        )
+    };
+    let outcome = record(Corpus::Roundtrip, &[synthetic, kds, kds_person])?;
     assert!(
         outcome.regressed.is_empty(),
         "cases the pass list records no longer pass: {:?}",

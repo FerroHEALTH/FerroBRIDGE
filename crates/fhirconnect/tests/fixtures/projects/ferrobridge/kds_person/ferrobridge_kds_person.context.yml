@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of projects/org.highmed/KDS/person/person.context.yaml, a
+# derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name and version are FerroBRIDGE's; the profile, the
+# template, the archetype list and the start are the published file's. The
+# published line 29 names KDS_person_data.v0, which no file of the library
+# carries, so it is not listed. The extension list names FerroBRIDGE's
+# stand-ins for KDS_admin_entry_person, KDS_cluster_person, KDS_address and
+# KDS_structured_name, which do not compile against KDS_Person, and the
+# published KDS_gender.v1 and KDS_composition_person.v0 verbatim. The
+# round-trip test records each published refusal by line.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_kds_person.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "https://www.medizininformatik-initiative.de/fhir/core/modul-person/StructureDefinition/Patient"
+    version: "2025.0.0"
+  template:
+    id: "KDS_Person"
+    sem_ver: "58.0.0"
+  archetypes:
+    - "EVALUATION.gender.v1"
+    - "ADMIN_ENTRY.person_data.v0"
+    - "CLUSTER.person.v1"
+    - "CLUSTER.structured_name.v1"
+    - "CLUSTER.address.v1"
+    - "CLUSTER.organisation.v1"
+    - "CLUSTER.person_birth_data_iso.v0"
+    - "CLUSTER.death_details.v1"
+    - "COMPOSITION.person.v0"
+    - "ADMIN_ENTRY.versicherungsinformationen.v0"
+  extensions:
+    - "KDS_gender.v1"
+    - "ferrobridge_kds_cluster_person"
+    - "ferrobridge_kds_address"
+    - "ferrobridge_kds_structured_name"
+    - "ferrobridge_kds_admin_entry_person"
+    - "KDS_composition_person.v0"
+  start: "ADMIN_ENTRY.person_data.v0"
