@@ -8,6 +8,7 @@ use axum::Router;
 use axum::body::Body;
 use ferrobridge_server::config::Config;
 use ferrobridge_server::state::AppState;
+use ferrobridge_testkit::net::closed_http_url;
 use http::{Request, StatusCode};
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
@@ -159,8 +160,8 @@ async fn a_cdr_token_that_cannot_be_obtained_makes_readiness_five_hundred_and_th
 #[tokio::test]
 async fn a_cdr_that_never_answers_makes_readiness_five_hundred_and_three()
 -> Result<(), Box<dyn StdError>> {
-    // Port 1 is reserved and unbindable, so the connection is refused at once.
-    let (status, document) = readiness(router("http://127.0.0.1:1").await?).await?;
+    let closed = closed_http_url()?;
+    let (status, document) = readiness(router(&closed).await?).await?;
     assert_eq!(StatusCode::SERVICE_UNAVAILABLE, status);
     assert_eq!(
         Some("down"),
@@ -175,7 +176,8 @@ async fn a_cdr_that_never_answers_makes_readiness_five_hundred_and_three()
 
 #[tokio::test]
 async fn liveness_stays_two_hundred_while_an_upstream_is_down() -> Result<(), Box<dyn StdError>> {
-    let app = router("http://127.0.0.1:1").await?;
+    let closed = closed_http_url()?;
+    let app = router(&closed).await?;
     let response = app
         .oneshot(Request::get("/health/liveness").body(Body::empty())?)
         .await?;

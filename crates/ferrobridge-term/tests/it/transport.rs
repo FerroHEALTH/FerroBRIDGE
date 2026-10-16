@@ -201,10 +201,11 @@ async fn the_bearer_token_travels_and_never_reaches_a_debug_rendering()
 
 #[tokio::test]
 async fn an_unreachable_server_is_a_transport_error() -> Result<(), Box<dyn StdError>> {
-    // Port 1 on the loopback interface refuses the connection at once, so the
-    // failure is the transport's rather than a slow address.
+    // A closed loopback port refuses the connection at once, so the failure is
+    // the transport's rather than a slow address.
+    let closed = ferrobridge_testkit::net::closed_http_url()?;
     let config =
-        Config::new("http://127.0.0.1:1/r4".parse()?, WireVersion::R4).with_retry(RetryPolicy {
+        Config::new(format!("{closed}/r4").parse()?, WireVersion::R4).with_retry(RetryPolicy {
             max_attempts: 1,
             initial_backoff: Duration::from_millis(1),
             max_backoff: Duration::from_millis(1),
@@ -243,7 +244,8 @@ async fn a_reachability_probe_reads_the_capability_statement_route() -> Result<(
 #[tokio::test]
 async fn a_reachability_probe_that_never_connects_is_a_transport_error()
 -> Result<(), Box<dyn StdError>> {
-    let config = Config::new("http://127.0.0.1:1/r4".parse()?, WireVersion::R4);
+    let closed = ferrobridge_testkit::net::closed_http_url()?;
+    let config = Config::new(format!("{closed}/r4").parse()?, WireVersion::R4);
 
     let outcome = Client::new(config)?.reachability().await;
     assert!(

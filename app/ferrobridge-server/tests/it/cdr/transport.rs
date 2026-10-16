@@ -11,6 +11,7 @@ use ferrobridge_server::cdr::Prefer;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::cdr::error::CdrError;
 use ferrobridge_server::cdr::ids::{EhrId, RequestId};
+use ferrobridge_testkit::net::closed_http_url;
 use openehr_its::rest::client::{ClientError, Credentials, RetryPolicy, TransportError};
 use openehr_its::rest::generated::ehr::client::EhrGetByIdOutcome;
 use secrecy::SecretString;
@@ -103,10 +104,9 @@ async fn a_post_is_not_retried_after_a_503() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn a_refused_connection_is_a_typed_transport_error() -> Result<(), Box<dyn Error>> {
-    // NOTE: no specification governs this: our own design. Port 1 is reserved
-    // and unbindable, so the connection is refused rather than answered.
+    let closed = closed_http_url()?;
     let client = CdrClient::new(
-        &CdrConfig::new("http://127.0.0.1:1/v1".parse()?)
+        &CdrConfig::new(format!("{closed}/v1").parse()?)
             .with_timeout(Duration::from_secs(2))
             .with_retry(RetryPolicy {
                 max_attempts: 2,
@@ -339,8 +339,9 @@ async fn a_reachability_probe_lists_templates_with_the_configured_credential()
 #[tokio::test]
 async fn a_reachability_probe_that_never_connects_is_a_transport_error()
 -> Result<(), Box<dyn Error>> {
+    let closed = closed_http_url()?;
     let config =
-        CdrConfig::new("http://127.0.0.1:1/v1".parse()?).with_timeout(Duration::from_secs(2));
+        CdrConfig::new(format!("{closed}/v1").parse()?).with_timeout(Duration::from_secs(2));
 
     let outcome = CdrClient::new(&config)?.reachability().await;
     assert!(
