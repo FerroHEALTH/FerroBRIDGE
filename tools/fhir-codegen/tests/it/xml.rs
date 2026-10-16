@@ -5,56 +5,27 @@
 //! refusals name their element, and a few examples are pinned as golden XML
 //! (<https://hl7.org/fhir/R4B/xml.html>).
 
-use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
-use fhir_codegen::package::without_byte_order_mark;
 use fhir_types::codec::Value;
-use fhir_types::codec::{DecodeErrorKind, Json, expect_object};
+use fhir_types::codec::{DecodeErrorKind, Json};
 use fhir_types::schema::Schemas;
 use fhir_types::xml::{from_xml, to_xml};
 use proptest::prelude::*;
 
+use crate::codec::{decode_file, root_set_files};
 use crate::vendor_dir;
 
-fn root_set_files(package: &str) -> Vec<PathBuf> {
-    let dir = vendor_dir().join(package).join("package");
-    let mut files: Vec<PathBuf> = fs::read_dir(&dir)
-        .expect("package dir")
-        .map(|entry| entry.expect("entry").path())
-        .filter(|path| {
-            let name = path
-                .file_name()
-                .and_then(std::ffi::OsStr::to_str)
-                .unwrap_or("");
-            path.extension()
-                .is_some_and(|e| e.eq_ignore_ascii_case("json"))
-                && [
-                    "ValueSet-",
-                    "CodeSystem-",
-                    "ConceptMap-",
-                    "CapabilityStatement-",
-                    "TerminologyCapabilities-",
-                    "OperationOutcome-",
-                    "Parameters-",
-                    "Bundle-",
-                ]
-                .iter()
-                .any(|prefix| name.starts_with(prefix))
-        })
-        .collect();
-    files.sort();
-    files
-}
-
-/// The canonical JSON of a file the JSON codec accepts, `None` when it refuses it.
-fn canonical<T: Json>(path: &std::path::Path) -> Option<Value> {
-    let text = fs::read_to_string(path).ok()?;
-    let original: Value = serde_json::from_str(without_byte_order_mark(&text)).ok()?;
-    let mut element_path = fhir_types::codec::Path::root("Resource");
-    let object = expect_object(&original, &element_path).ok()?;
-    let decoded = T::from_json(object, &mut element_path).ok()?;
-    Some(Value::Object(decoded.to_json().ok()?))
+/// The canonical JSON of one file of `package`, `None` only for a refusal
+/// `codec.rs` lists, and an error naming the path for any other failure.
+fn canonical<T: Json>(package: &str, path: &Path) -> Result<Option<Value>, String> {
+    let Some(decoded) = decode_file::<T>(package, path)? else {
+        return Ok(None);
+    };
+    let object = decoded
+        .to_json()
+        .map_err(|e| format!("{}: to JSON: {e}", path.display()))?;
+    Ok(Some(Value::Object(object)))
 }
 
 /// JSON to XML to JSON, equal to the canonical JSON.
@@ -82,8 +53,13 @@ fn round_trip_all<T: Json>(package: &str, schemas: &Schemas) {
             .file_name()
             .and_then(std::ffi::OsStr::to_str)
             .unwrap_or("");
-        let Some(canonical) = canonical::<T>(file) else {
-            continue;
+        let canonical = match canonical::<T>(package, file) {
+            Ok(Some(canonical)) => canonical,
+            Ok(None) => continue,
+            Err(e) => {
+                failures.push(e);
+                continue;
+            }
         };
         match round_trip(schemas, &canonical, name) {
             Ok(()) => passed += 1,
@@ -176,7 +152,9 @@ fn the_xml_of_examples_is_pinned() {
             .join("package")
             .join(file);
         let canonical =
-            canonical::<fhir_types::r4b::resource::Resource>(&path).expect("the codec accepts it");
+            canonical::<fhir_types::r4b::resource::Resource>("hl7.fhir.r4b.core", &path)
+                .expect("the file reads")
+                .expect("the codec accepts it");
         let xml = to_xml(schemas, canonical.as_object().expect("object")).expect("XML");
         insta::assert_snapshot!(file, xml);
     }

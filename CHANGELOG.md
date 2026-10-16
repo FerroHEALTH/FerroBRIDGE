@@ -286,6 +286,12 @@ crates on crates.io.
 
 ### Fixed
 
+- `fhir-codegen terminology` fails with the file's path when a package file
+  cannot be read or is not JSON, where it skipped the file and bundled
+  without it. The manifest and the index a package carries are told apart by
+  having no `resourceType`. The generator's corpus tests fail the same way on
+  a file that does not parse, and skip only a refusal they list with its
+  citation (#487).
 - The facade's loss log records each declared loss as a value-free kind
   (`skipped-unresolved-reference`, `deferred-reference`, `defaulted` and the
   rest) with its FHIRPath and its openEHR path, where it logged the loss's
