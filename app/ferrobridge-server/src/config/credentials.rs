@@ -108,9 +108,9 @@ pub(super) enum Scheme {
 }
 
 /// Returns the scheme `credentials` describes, or `None` when it names none.
-pub(super) fn resolve_credentials(
+pub(super) fn resolve_credentials<Grant>(
     section: &str,
-    credentials: &Credentials,
+    credentials: &Credentials<Grant>,
 ) -> Result<Option<Scheme>, Error> {
     let token = secret(
         &format!("{section}.bearer_token"),

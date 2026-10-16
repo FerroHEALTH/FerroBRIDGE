@@ -313,3 +313,17 @@ fn the_terminology_lane_takes_no_oauth_section() -> Result<(), Box<dyn StdError>
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
     Ok(())
 }
+
+#[test]
+fn the_terminology_oauth_refusal_names_the_table() -> Result<(), Box<dyn StdError>> {
+    let text = concat!(
+        "[terminology]\nbase_url = \"http://tx.invalid/r4\"\n\n",
+        "[terminology.credentials.oauth]\nclient_id = \"c\"\n",
+    );
+    let error = refusal(text)?;
+    let cause = StdError::source(&error)
+        .map(ToString::to_string)
+        .unwrap_or_default();
+    assert!(cause.contains("oauth"), "{cause}");
+    Ok(())
+}
