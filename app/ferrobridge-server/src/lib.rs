@@ -13,6 +13,7 @@
 
 pub mod auth;
 pub mod banner;
+pub mod boot;
 pub mod build_info;
 pub mod cdr;
 pub mod cli;
@@ -199,63 +200,84 @@ fn serve_command(settings: Settings) -> anyhow::Result<()> {
         use anyhow::Context;
 
         build_info::log();
-        let mut state = AppState::build(&settings)
-            .await
-            .context("building the upstream clients")?;
-        if let Some(auth) = settings.auth.clone() {
-            let authority = auth::Authority::discover(auth)
+        let listen = settings.server.listen;
+        let bind = move || async move {
+            TcpListener::bind(listen)
                 .await
-                .context("reading the authorization server")?;
-            state = state.with_auth(Arc::new(authority));
-        } else {
-            tracing::warn!(
-                "[auth] is off: the FHIR facade authenticates no caller and serves every request"
-            );
-        }
-        let mut lanes = startup::lanes(&settings);
-        if let Some(lane) = settings.facade.as_ref() {
-            let (mounted, counts) = build_facade(&settings, lane)
-                .await
-                .context("starting the FHIR facade")?;
-            state = state.with_facade(Arc::new(mounted));
-            set_counts(&mut lanes, "facade", counts);
-        }
-        if let Some(operations) = state.operations() {
-            set_counts(&mut lanes, "operations", operation_counts(operations));
-        }
-        let mut face = None;
-        if let Some(lane) = settings.hl7v2.as_ref() {
-            let (started, listening) = start_hl7v2(&settings, lane, &state)
-                .await
-                .context("starting the HL7 v2 face")?;
-            state = state.with_hl7v2(listening);
-            face = Some(started);
-        }
-        startup::log(&lanes);
-        let state = Arc::new(state.with_lanes(lanes));
-        tracing::info!(
-            version = state::VERSION,
-            indicators = state.health().names().join(","),
-            "ferrobridge starting"
-        );
-        let listener = TcpListener::bind(settings.server.listen)
-            .await
-            .with_context(|| format!("binding {}", settings.server.listen))?;
-        tracing::info!(listen = %settings.server.listen, "listening");
-        let app = router(Arc::clone(&state), &settings.server);
-        match face {
-            None => serve(listener, app, &settings.server)
-                .await
-                .context("serving HTTP")?,
-            Some(face) => serve_with_face(listener, app, &settings.server, face).await?,
-        }
+                .with_context(|| format!("binding {listen}"))
+        };
+        boot::serve_settings(&settings, bind, boot::Backoff::default(), shutdown_signal()).await?;
         tracing::info!("ferrobridge stopped");
         Ok(())
     })
 }
 
+/// Every lane of one start, built and ready to serve.
+pub(crate) struct Started {
+    /// The state the router is built over, with no lanes recorded yet.
+    pub(crate) state: AppState,
+    /// The lanes the boot summary reports.
+    pub(crate) lanes: Vec<startup::Lane>,
+    /// The HL7 v2 face, when it runs.
+    pub(crate) face: Option<StartedFace>,
+}
+
+impl Started {
+    /// Logs the boot summary and the indicators readiness runs.
+    pub(crate) fn announce(&self) {
+        startup::log(&self.lanes);
+        tracing::info!(
+            version = state::VERSION,
+            indicators = self.state.health().names().join(","),
+            "ferrobridge starting"
+        );
+    }
+}
+
+/// Builds the upstream clients and every lane `settings` configures.
+///
+/// The operations lane and the facade fetch the templates their mappings
+/// name from the CDR here, so this is the step [`boot::retry`] repeats.
+pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
+    use anyhow::Context;
+
+    let mut state = AppState::build(settings)
+        .await
+        .context("building the upstream clients")?;
+    if let Some(auth) = settings.auth.clone() {
+        let authority = auth::Authority::discover(auth)
+            .await
+            .context("reading the authorization server")?;
+        state = state.with_auth(Arc::new(authority));
+    } else {
+        tracing::warn!(
+            "[auth] is off: the FHIR facade authenticates no caller and serves every request"
+        );
+    }
+    let mut lanes = startup::lanes(settings);
+    if let Some(lane) = settings.facade.as_ref() {
+        let (mounted, counts) = build_facade(settings, lane)
+            .await
+            .context("starting the FHIR facade")?;
+        state = state.with_facade(Arc::new(mounted));
+        set_counts(&mut lanes, "facade", counts);
+    }
+    if let Some(operations) = state.operations() {
+        set_counts(&mut lanes, "operations", operation_counts(operations));
+    }
+    let mut face = None;
+    if let Some(lane) = settings.hl7v2.as_ref() {
+        let (started, listening) = start_hl7v2(settings, lane, &state)
+            .await
+            .context("starting the HL7 v2 face")?;
+        state = state.with_hl7v2(listening);
+        face = Some(started);
+    }
+    Ok(Started { state, lanes, face })
+}
+
 /// The HL7 v2 face, bound and ready to serve.
-struct StartedFace {
+pub(crate) struct StartedFace {
     /// The bound MLLP socket.
     socket: TcpListener,
     /// The face its frames are answered by.
@@ -314,30 +336,22 @@ async fn start_hl7v2(
     Ok((face, listening))
 }
 
-/// Serves HTTP and the HL7 v2 face until the process is asked to stop, each
-/// draining within the same bound.
+/// Serves HTTP and the HL7 v2 face until `stop` reads `true`, each draining
+/// within the same bound.
 ///
 /// The one signal stops both, and a listener that fails stops the other, so
 /// the process never keeps half its surface.
-async fn serve_with_face(
+pub(crate) async fn serve_with_face(
     listener: TcpListener,
     app: Router,
     server: &ServerSettings,
     face: StartedFace,
+    stop: &tokio::sync::watch::Sender<bool>,
 ) -> anyhow::Result<()> {
     use anyhow::Context;
 
-    let (stop, _) = tokio::sync::watch::channel(false);
-    let stop = Arc::new(stop);
-    let signal = {
-        let stop = Arc::clone(&stop);
-        tokio::spawn(async move {
-            shutdown_signal().await;
-            stop.send_replace(true);
-        })
-    };
     let http = async {
-        let ended = serve_until(listener, app, server.shutdown_timeout, stopped(&stop)).await;
+        let ended = serve_until(listener, app, server.shutdown_timeout, stopped(stop)).await;
         stop.send_replace(true);
         ended
     };
@@ -347,21 +361,22 @@ async fn serve_with_face(
             face.face,
             face.listener,
             face.listening,
-            stopped(&stop),
+            stopped(stop),
         )
         .await;
         stop.send_replace(true);
         ended
     };
     let (http, mllp) = tokio::join!(http, mllp);
-    signal.abort();
     http.context("serving HTTP")?;
     mllp.context("serving MLLP")?;
     Ok(())
 }
 
 /// Completes once `stop` reads `true`.
-fn stopped(stop: &tokio::sync::watch::Sender<bool>) -> impl Future<Output = ()> + Send + 'static {
+pub(crate) fn stopped(
+    stop: &tokio::sync::watch::Sender<bool>,
+) -> impl Future<Output = ()> + Send + 'static {
     let mut receiver = stop.subscribe();
     async move {
         let _settled = receiver.wait_for(|stopped| *stopped).await.is_ok();
@@ -569,7 +584,7 @@ pub fn with_middleware(router: Router, state: Arc<AppState>, server: &ServerSett
 }
 
 /// `GET /`: the product and the version, as JSON.
-async fn root() -> Response {
+pub(crate) async fn root() -> Response {
     axum::Json(serde_json::json!({
         "product": state::PRODUCT,
         "version": state::VERSION,
@@ -578,7 +593,7 @@ async fn root() -> Response {
 }
 
 /// `GET /health/liveness`: `200` while the process is up.
-async fn liveness() -> StatusCode {
+pub(crate) async fn liveness() -> StatusCode {
     StatusCode::OK
 }
 
@@ -588,7 +603,7 @@ async fn info(State(state): State<Arc<AppState>>) -> Response {
 }
 
 /// `GET /health/readiness`: the state of every registered indicator.
-async fn readiness(State(state): State<Arc<AppState>>) -> Response {
+pub(crate) async fn readiness(State(state): State<Arc<AppState>>) -> Response {
     let report = state.health().evaluate().await;
     (report.status(), axum::Json(report)).into_response()
 }
