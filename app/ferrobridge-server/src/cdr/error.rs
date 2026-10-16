@@ -278,6 +278,14 @@ impl CdrError {
             Self::Unrecorded => "unrecorded",
         }
     }
+
+    /// Returns whether asking again may succeed: the call reached no answer,
+    /// or the service answered a failure the generated client counts
+    /// retryable ([`ClientError::is_retryable`]).
+    #[must_use]
+    pub fn is_retryable(&self) -> bool {
+        matches!(self, Self::Client { source, .. } if source.is_retryable())
+    }
 }
 
 /// Returns the status clause of a refusal's display, when the call reached

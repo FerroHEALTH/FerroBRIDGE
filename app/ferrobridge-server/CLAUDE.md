@@ -37,9 +37,9 @@ the real run path; a binary-only crate cannot be imported from `tests/`
   wire test. A handler never picks a status of its own beside it.
 - **Tests are one binary**, `tests/it/main.rs` plus one module per topic, and
   they drive the public seams: `run`, `Config::from_sources`, `router`,
-  `with_middleware`, `serve_until`. A test that needs its own route builds one
-  and hands it to `with_middleware`, so the stack under test is the shipped
-  stack.
+  `with_middleware`, `serve_until`, `boot::serve_settings`. A test that needs
+  its own route builds one and hands it to `with_middleware`, so the stack
+  under test is the shipped stack.
 - The upstream stubs are `wiremock`; every fixture is synthetic.
 
 ## The CDR client (`src/cdr/`)
