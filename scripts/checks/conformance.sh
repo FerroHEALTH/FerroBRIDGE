@@ -44,7 +44,8 @@
 # usage error, a missing result or a failed fetch.
 set -euo pipefail
 
-# Each corpus, the package whose test measures it, and that test's name.
+# Each corpus, the package whose test measures it, and that test's name, one
+# quoted row per line; scripts/checks/affected.sh reads the rows in this shape.
 readonly CORPUS_TESTS=(
   'fhirconnect-mapping-lib fhirconnect conformance_the_fhirconnect_corpus_holds_its_pass_list'
   'omocl omocl conformance_the_omocl_corpus_holds_its_pass_list'
@@ -61,10 +62,16 @@ readonly CORPUS_TESTS=(
   'fhirpath-r4 ferrobridge-fhirpath conformance_fhirpath_r4'
 )
 corpora=()
+packages=()
 for row in "${CORPUS_TESTS[@]}"; do
   corpora+=("${row%% *}")
+  package="${row#* }"
+  package="${package%% *}"
+  [[ " ${packages[*]-} " = *" $package "* ]] || packages+=("$package")
 done
 readonly CORPORA=("${corpora[@]}")
+# The packages of the table, each once, in the order it first names them.
+readonly PACKAGES=("${packages[@]}")
 
 # The package and the test name of corpus $1, or status 1 for no such corpus.
 test_of() {
@@ -230,7 +237,7 @@ measure_corpus() {
 }
 
 # One package per invocation, as the CI test lane runs them.
-for package in fhirconnect omocl ferrobridge-hl7v2 ferrobridge-testkit ferrobridge-server ferrobridge-fhirpath; do
+for package in "${PACKAGES[@]}"; do
   [[ -z "$only" ]] || break
   measure "$package" 'test(/conformance_/)'
 done
