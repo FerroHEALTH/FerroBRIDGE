@@ -5,6 +5,7 @@
 //! and holding its defaults in its own `Default` impl.
 
 use serde::Deserialize;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::telemetry::{DEFAULT_FILTER, Format};
@@ -517,6 +518,9 @@ pub struct Etl {
     /// What a run does with a composition the CDR reports deleted: `remove`
     /// or `report`.
     pub deletions: String,
+    /// The OHDSI `vocabulary_id` each terminology id names, a URI or an OID
+    /// among them, added over the engine's defaults.
+    pub vocabulary_aliases: BTreeMap<String, String>,
 }
 
 impl Default for Etl {
@@ -530,6 +534,7 @@ impl Default for Etl {
             // NOTE: no specification governs this: our own design; keeping the rows of a
             // record the source deleted is the defect, so a confirmed deletion removes them.
             deletions: String::from("remove"),
+            vocabulary_aliases: BTreeMap::new(),
         }
     }
 }

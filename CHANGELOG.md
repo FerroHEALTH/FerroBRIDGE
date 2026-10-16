@@ -23,8 +23,29 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-10-17
+
 ### Added
 
+- A FerroBRIDGE OMOCL `Person` mapping for the KDS person template (#568),
+  `crates/omocl/tests/fixtures/projects/ferrobridge/kds_person/kds_person_data.yml`.
+  The corpus file `person_data/person_data_v0.yml` reads gender at
+  `items[at0019]`, which `KDS_Person` does not carry, so every KDS person
+  took `gender_concept_id` 0. This file reads the administrative gender at
+  `items[at0022]`: its code resolves through the loaded OHDSI vocabulary
+  into `gender_concept_id` and is kept in `gender_source_value`, and a person
+  with no gender, or a code with no standard concept, takes concept 0. Point
+  `[mappings] omocl` at a directory holding it in place of the corpus file.
+- `[etl.vocabulary_aliases]` maps a terminology id, such as a URI or an OID,
+  to the OHDSI `vocabulary_id` the ETL looks a coded value up in (#625).
+  The table is added over the defaults (`LOINC` to `LOINC`, `SNOMED-CT` to
+  `SNOMED`) and checked at load: an empty id or vocabulary, or a vocabulary
+  longer than the 20 characters of OMOP CDM v5.4 `VOCABULARY.vocabulary_id`,
+  refuses the start. A KDS administrative gender coded under
+  `http://terminology.hl7.org/CodeSystem/v2-0001` now reaches
+  `person.gender_concept_id` once that id is aliased to the vocabulary that
+  holds its codes; before, any terminology id longer than 20 characters
+  resolved to concept 0.
 - The FHIR facade answers `batch` Bundles on `POST [base]` (#531). Each entry
   runs as the read, vread, search, create or update its `request` names,
   through the same handler as the single interaction, with `ifMatch` and
@@ -317,6 +338,16 @@ crates on crates.io.
 
 ### Changed
 
+- A facade search total costs one AQL count query that reads no composition
+  (#661). A search that binds no node and no `_id`, over a template that
+  places the context's entry only among the composition's own `content`
+  items, counts the entries with
+  `SELECT COUNT(*) … CONTAINS COMPOSITION c CONTAINS <class> x[<archetype>]`,
+  which equals the entries the search answers. `_total=estimate` always
+  answers from that count, or from the row count of a search that binds a
+  node. `_total=accurate`, `_count=0` and `_summary=count` read the rows only
+  for a search that binds a node or an `_id`, or a template that nests the
+  entry in a `SECTION`, where AQL `CONTAINS` also finds nested entries.
 - `fhir-types` documents `UnknownResource`, in every FHIR version, as the
   carrier of any resource's JSON body, a root-set type such as
   `MedicationRequest` included, so a relay can write another server's resource
@@ -406,6 +437,22 @@ crates on crates.io.
   an element id such as `Patient.extension:birthPlace` or one longer than 64
   characters was refused. A resource id keeps the form its package states.
   The R4B and R5 examples corpora pass 544 and 191 more instances.
+- A create with no `meta.versionId` of a source the facade already holds as
+  one entry of a multi-entry composition is recognised as a replay when its
+  mapping is that entry as it stands, and commits nothing (#667). The replay
+  check compares what a revision would commit, that entry spliced into the
+  standing composition, with the composition the CDR holds, and the replay
+  answers that entry.
+- The facade `CapabilityStatement` declares `conditionalUpdate: false`
+  (#666). R4 `CapabilityStatement.rest.resource.conditionalUpdate` names the
+  `PUT [type]?[search parameters]` interaction (http.html#cond-update), which
+  the facade does not serve; `If-Match` on an update is the version-aware
+  update, which the facade still honours.
+- A facade update whose body names no `id`, or an `id` other than the one
+  its URL names, answers `400` with an `invalid` `OperationOutcome` at
+  `<type>.id` and commits nothing, as R4 http.html#update requires (#665).
+  The facade used to accept it and record the body `id` as a consumed source
+  of the resource the URL named.
 - A CDR credential the token endpoint will not issue answers the FHIR caller
   `502` (#518). When the OAuth 2.0 client credentials fetch fails, because the
   token endpoint is unreachable or refuses the bridge's own credentials, the
@@ -2562,7 +2609,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.6...HEAD
+[0.0.6]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.2...v0.0.3

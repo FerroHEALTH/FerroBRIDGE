@@ -218,11 +218,16 @@ async fn an_update_following_the_read_etag_commits_the_next_version_on_a_real_cd
 }
 
 /// Returns a `PUT [base]/Condition/{id}` of `resource` carrying `If-Match`.
+///
+/// The body names `id`, as an update must
+/// (<https://hl7.org/fhir/R4/http.html#update>).
 fn put_condition(
     id: &str,
     resource: &serde_json::Value,
     if_match: &str,
 ) -> Result<Request<Body>, Box<dyn StdError>> {
+    let mut resource = resource.clone();
+    resource["id"] = serde_json::json!(id);
     Ok(Request::put(format!("/fhir/Condition/{id}"))
         .header(header::CONTENT_TYPE, "application/fhir+json")
         .header(header::IF_MATCH, if_match)

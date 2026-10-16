@@ -8,6 +8,7 @@ use http::StatusCode;
 use openehr_its::rest::generated::ehr::client::CompositionCreateOutcome;
 use openehr_its::rest::generated::ehr::client::CompositionUpdateOutcome;
 use openehr_mapping_core::composition::CanonicalComposition;
+use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::cdr::Prefer;
 use crate::facade::commit;
@@ -26,6 +27,7 @@ use super::Provenance;
 use super::Recognised;
 use super::Refused;
 use super::Revision;
+use super::Standing;
 use super::Written;
 use super::binding::canonical_of;
 use super::binding::representation;
@@ -59,8 +61,10 @@ impl Ingest<'_> {
     /// - A source with no `meta.versionId` whose `id` the map consumed at any
     ///   version is compared with the composition as it stands, masking what
     ///   two mappings of one resource differ in (the `uid` the CDR assigns and
-    ///   every time the run filled from its clock, as `pair` masks them).
-    ///   The same content is [`Recognised::Replayed`], other content
+    ///   every time the run filled from its clock, as `pair` masks them). In
+    ///   a composition holding several entries of the archetype, the
+    ///   comparison is of the entry the `id` is bound to. The same content is
+    ///   [`Recognised::Replayed`], answering that entry, and other content
     ///   [`Recognised::Revised`].
     /// - A source whose key a transaction committed and left unbound, or whose
     ///   `id` the map never consumed, is [`Recognised::Unknown`].
@@ -98,7 +102,11 @@ impl Ingest<'_> {
             if source.version_id().is_some() {
                 let built = self.build(program, inbound, provenance)?;
                 let standing = self.standing(&known).await?;
-                return Ok(Recognised::Replayed(standing.written(&built)?));
+                let written = match self.standing_entry(program, inbound, &standing, &built)? {
+                    Some((whole, entry)) => standing.replayed(entry.isolate(&whole)),
+                    None => standing.written(&built)?,
+                };
+                return Ok(Recognised::Replayed(written));
             }
             known
         } else {
@@ -127,10 +135,49 @@ impl Ingest<'_> {
             .map_err(|error| engine_refusal(&error))?;
         let sent = strict_read(&built)?;
         let standing = self.standing(&known).await?;
-        if same_content(&sent, &instant, &standing.composition) {
-            return Ok(Recognised::Replayed(standing.written(&built)?));
+        let Some((whole, entry)) = self.standing_entry(program, inbound, &standing, &built)? else {
+            return Ok(Recognised::Revised(known));
+        };
+        let Some(committed) = would_commit(program, &whole, &entry, &built, sent)? else {
+            return Ok(Recognised::Revised(known));
+        };
+        if same_content(&committed, &instant, &standing.composition) {
+            return Ok(Recognised::Replayed(
+                standing.replayed(entry.isolate(&whole)),
+            ));
         }
         Ok(Recognised::Revised(known))
+    }
+
+    /// Returns the standing composition, canonical, with the entry the
+    /// consumed resource is bound to, or nothing when the composition no
+    /// longer holds that entry.
+    fn standing_entry(
+        &self,
+        program: &Loaded,
+        inbound: &Inbound,
+        standing: &Standing,
+        built: &CanonicalComposition,
+    ) -> Result<Option<(CanonicalComposition, engine::Entry)>, Refused> {
+        let binding = self
+            .store
+            .binding_of(inbound.resource_type(), &standing.id)
+            .map_err(|error| store_refusal(&error))?
+            .ok_or_else(|| {
+                Refused::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Issue::error(IssueType::Exception).diagnosing(format!(
+                        "the identity map consumed a source as {}/{} and binds that id to no entry",
+                        inbound.resource_type(),
+                        standing.id.as_str()
+                    )),
+                )
+            })?;
+        let whole = canonical_of(&standing.composition, built)?;
+        Ok(
+            engine::entry_named(program.program(), &whole, &binding.entry_path)
+                .map(|entry| (whole, entry)),
+        )
     }
 
     /// Commits the first version of a composition for `inbound`.
@@ -407,4 +454,36 @@ fn splice(
         spliced.template_id(),
         spliced.generation(),
     ))
+}
+
+/// Returns the composition a revision of `entry` by `built` would commit, or
+/// nothing when `built` maps no entry of the program's archetype.
+///
+/// A replay is a create that would change nothing, so it is judged against
+/// what [`Ingest::revise_resource`] commits: `sent`, the built composition,
+/// when `whole` holds one entry of the archetype, and otherwise `whole` with
+/// the entry's item replaced, so the entries beside it and the composition's
+/// own fields stand as they are (no specification governs this: our own
+/// design).
+///
+/// # Errors
+///
+/// Returns a `422` [`Refused`] when the spliced composition is no valid
+/// openEHR `COMPOSITION`.
+fn would_commit(
+    program: &Loaded,
+    whole: &CanonicalComposition,
+    entry: &engine::Entry,
+    built: &CanonicalComposition,
+    sent: Composition,
+) -> Result<Option<Composition>, Refused> {
+    if engine::entries_of(program.program(), whole).len() <= 1 {
+        return Ok(Some(sent));
+    }
+    let Some(item) =
+        engine::entry_of(program.program(), built).and_then(|mapped| mapped.item(built).cloned())
+    else {
+        return Ok(None);
+    };
+    strict_read(&entry.replaced(whole, item)).map(Some)
 }

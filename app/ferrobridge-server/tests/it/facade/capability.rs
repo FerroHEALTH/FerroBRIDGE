@@ -15,8 +15,10 @@ use std::sync::Arc;
 use wiremock::MockServer;
 
 use super::FIXTURES;
+use super::assert_nothing_written;
 use super::call;
 use super::client;
+use super::condition;
 use super::first_issue;
 use super::harness;
 use super::raw;
@@ -62,7 +64,11 @@ async fn the_capability_statement_names_exactly_the_loaded_programs()
     assert_eq!(Some("Condition"), condition["type"].as_str());
     assert_eq!(Some(false), condition["updateCreate"].as_bool());
     assert_eq!(Some(true), condition["conditionalCreate"].as_bool());
-    assert_eq!(Some(true), condition["conditionalUpdate"].as_bool());
+    assert_eq!(
+        Some(false),
+        condition["conditionalUpdate"].as_bool(),
+        "no PUT [type]?[search parameters] route is served (R4 http.html#cond-update)"
+    );
     let interactions: Vec<&str> = condition["interaction"]
         .as_array()
         .expect("the type names its interactions")
@@ -82,6 +88,26 @@ async fn the_capability_statement_names_exactly_the_loaded_programs()
         .filter_map(|entry| entry["code"].as_str())
         .collect();
     assert_eq!(vec!["transaction", "batch"], system);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_conditional_update_the_statement_does_not_declare_is_not_served()
+-> Result<(), Box<dyn StdError>> {
+    // The statement declares `conditionalUpdate: false`, so `PUT
+    // [type]?[search parameters]` (R4 http.html#cond-update) reaches no
+    // handler and writes nothing.
+    let harness = harness().await;
+    let request = Request::put("/fhir/Condition?identifier=a-sender-identifier")
+        .header(header::CONTENT_TYPE, "application/fhir+json")
+        .body(Body::from(condition().to_string()))?;
+    let response = raw(harness.app(), request).await?;
+    assert!(
+        response.status().is_client_error(),
+        "a conditional update answers {}",
+        response.status()
+    );
+    assert_nothing_written(&harness).await;
     Ok(())
 }
 

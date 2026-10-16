@@ -14,6 +14,8 @@
 //! search never answers an empty Bundle for a failed call
 //! (`docs/architecture.md` §9).
 
+mod total;
+
 use std::collections::BTreeSet;
 
 use axum::response::Response;
@@ -40,6 +42,9 @@ use crate::facade::handlers::Body;
 use crate::facade::handlers::Refusal;
 use crate::facade::handlers::read;
 use crate::facade::handlers::render;
+use crate::facade::handlers::search::total::Accuracy;
+use crate::facade::handlers::search::total::count_all;
+use crate::facade::handlers::search::total::total_of;
 use crate::facade::handlers::write;
 use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::PersonId;
@@ -58,7 +63,6 @@ use crate::facade::search::criteria;
 use crate::facade::search::criteria::Criteria;
 use crate::facade::search::criteria::Handling;
 use crate::facade::search::criteria::Subject;
-use crate::facade::search::criteria::Total;
 use crate::facade::search::cursor;
 use crate::facade::search::cursor::Position;
 use crate::facade::search::plan;
@@ -188,7 +192,7 @@ async fn search(
         (
             Vec::new(),
             None,
-            Some(count_all(facade, &client, &plans).await?),
+            Some(count_all(facade, &client, &plans, Accuracy::of(&criteria)).await?),
         )
     } else {
         let (matches, next) = page(facade, &client, &plans, start, page_size).await?;
@@ -560,80 +564,6 @@ fn program_of<'a>(facade: &'a Facade, declared: &Declared) -> Result<&'a Loaded,
                 )),
             )
         })
-}
-/// Returns the `Bundle.total` of one page, when it is known or asked for.
-///
-/// A first page that leaves no next page holds every match, so its size is
-/// the exact total at no cost. Otherwise the rows are counted only when the
-/// client asked for a total (<https://hl7.org/fhir/R4/search.html>,
-/// §3.1.1.5.2), and `_total=none` never gets one.
-async fn total_of(
-    facade: &Facade,
-    client: &CdrClient,
-    plans: &[Plan<'_>],
-    criteria: &Criteria,
-    start: Position,
-    next: Option<Position>,
-    answered: usize,
-) -> Result<Option<u64>, Refusal> {
-    match criteria.total {
-        Some(Total::None) => Ok(None),
-        _ if start == Position::START && next.is_none() => {
-            Ok(Some(u64::try_from(answered).unwrap_or(u64::MAX)))
-        }
-        Some(Total::Accurate | Total::Estimate) => {
-            Ok(Some(count_all(facade, client, plans).await?))
-        }
-        None => Ok(None),
-    }
-}
-
-/// Returns the number of matches across every declaration.
-///
-/// One composition may answer several entries, which no AQL count over the
-/// facade's `FROM` expresses, so the rows of every declaration are read and
-/// each entry [`matched`] answers is counted once.
-async fn count_all(
-    facade: &Facade,
-    client: &CdrClient,
-    plans: &[Plan<'_>],
-) -> Result<u64, Refusal> {
-    let mut total: u64 = 0;
-    for plan in plans {
-        let Some(conditions) = plan.conditions.as_ref() else {
-            continue;
-        };
-        let counted = count_entries(facade, client, plan, conditions).await?;
-        total = total.saturating_add(u64::try_from(counted).unwrap_or(u64::MAX));
-    }
-    Ok(total)
-}
-
-/// Returns the number of entries the rows of one declaration answer.
-async fn count_entries(
-    facade: &Facade,
-    client: &CdrClient,
-    plan: &Plan<'_>,
-    conditions: &Conditions,
-) -> Result<usize, Refusal> {
-    let fetch = i64::from(facade.search_limits().max_count.max(1));
-    let mut counted: BTreeSet<(String, usize)> = BTreeSet::new();
-    let mut offset: i64 = 0;
-    loop {
-        let request = aql::rows_request(conditions, &plan.order, offset, fetch);
-        let rows = rows_of(client, &request).await?;
-        for (position, row) in rows.iter().enumerate() {
-            let read = read_row(facade, plan, row, position)?;
-            for entry in matched(plan, &read, row, position)? {
-                counted.insert((read.version.value().to_owned(), entry.ordinal()));
-            }
-        }
-        let fetched = i64::try_from(rows.len()).unwrap_or(i64::MAX);
-        if fetched < fetch {
-            return Ok(counted.len());
-        }
-        offset = offset.saturating_add(fetched);
-    }
 }
 
 /// Runs one query and returns its rows, or the refusal the status table

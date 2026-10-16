@@ -51,8 +51,10 @@ page it did not ask for.
 
 The `CapabilityStatement` names exactly the resource types the loaded programs
 map, with `create`, `read`, `vread` and `update` per type, `transaction` and
-`batch` at system level, the `$validate` operation, `updateCreate: false`, `conditionalCreate`
-and `conditionalUpdate` true, and `fhirVersion: 4.0.1`. A type a search
+`batch` at system level, the `$validate` operation, `updateCreate: false`,
+`conditionalCreate` true, `conditionalUpdate` false (no `PUT [type]?[search]`
+is served; `If-Match` on an update is the version-aware update), and
+`fhirVersion: 4.0.1`. A type a search
 declaration answers also names `search-type` and, in `searchParam`, exactly
 `_id` and the parameters the declaration states; every other type names no
 search parameter.
@@ -284,7 +286,8 @@ reads the CDR's current `ETag` and answers `412` with it on a mismatch rather
 than overwriting a version the client never saw. Send back the `ETag` a read
 or write answered, `If-Match: W/"1"`: the facade completes that `versionId` to
 the current composition version and answers `412` with the current `ETag`
-when it is stale. A value that names no version is `400`. A `PUT` to an id the map does
+when it is stale. A value that names no version is `400`. The body must
+name the id the URL names: a body with no `id`, or another one, is `400`. A `PUT` to an id the map does
 not know is a `404`: this milestone does not upsert, and the
 `CapabilityStatement` says `updateCreate: false`.
 
@@ -546,9 +549,13 @@ its room through the CDR's `offset` and `fetch`, and a `next` link is written
 only when another entry is left, its cursor at the first row of that entry's
 composition with the number of its entries already answered. `Bundle.total`
 counts matching entries, never the page and never the nodes: a first page
-that holds every match carries it at no cost, `_total=accurate` or `estimate`
-reads the rows of a paged search and counts each entry once, and
-`_total=none` leaves it out. `_count=0` and `_summary=count` answer the total
+that holds every match carries it at no cost, and `_total=accurate` on a
+paged search costs one AQL count of the entries, which reads no composition.
+The count binds the entry as `CONTAINS <class> x[<archetype>]`, and AQL
+`CONTAINS` also finds an entry nested in a `SECTION`, so a search that binds
+a node or an `_id`, or a template that nests the entry, reads the rows and
+counts each entry once instead. `_total=estimate` always answers from one
+count query, and `_total=none` leaves the total out. `_count=0` and `_summary=count` answer the total
 alone, with no entries and no `next` link.
 
 A search never answers an empty Bundle for a failed call. A CDR refusal reaches

@@ -269,7 +269,9 @@ The library crates are published to crates.io on one crate version line,
 distinct from the product version (owner decision 2026-09-05). The line is
 `fhir-types`' own: the sibling published 0.1.97 on 2026-09-12, the first
 release from here was 0.1.98, and the line moves one patch with every change
-to the crate's packaged content (`.claude/rules/crates-publishing.md`).
+to the crate's packaged content (`.claude/rules/crates-publishing.md`). A
+change that breaks a public API is a patch too, so a consumer pins a crate of
+the line exactly (owner decision 2026-10-17, #510).
 `openehr-mapping-core` and `fhirconnect` joined the line at 0.1.108 with their
 first publish (#397). Every other library crate holds its name with a 0.0.0
 placeholder (#107), outside the line until its first publish, when it joins
@@ -299,11 +301,11 @@ toolchain.
 
 The product version is the workspace `version` in the root `Cargo.toml`, which
 every member inherits. The milestone line is 0.0.x, so the first product
-version is 0.0.5.
+version is 0.0.6.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| Product version | 0.0.5 | root `Cargo.toml` `[workspace.package]` `version` (#20), `CITATION.cff` `version` (#18), the `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml` (#22) |
+| Product version | 0.0.6 | root `Cargo.toml` `[workspace.package]` `version` (#20), `CITATION.cff` `version` (#18), the `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml` (#22) |
 
 `CITATION.cff` tracks this row exactly, and the guard compares the two whenever
 `CITATION.cff` exists. Once the root `Cargo.toml` lands, the guard also compares

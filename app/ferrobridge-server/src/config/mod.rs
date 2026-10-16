@@ -299,6 +299,24 @@ pub enum Error {
         /// The value it holds.
         value: String,
     },
+    /// A vocabulary alias names an empty terminology id.
+    #[error("{key} names an empty terminology id")]
+    AliasTerminology {
+        /// The table that holds it.
+        key: String,
+    },
+    /// A vocabulary alias names a vocabulary OMOP CDM v5.4
+    /// `VOCABULARY.vocabulary_id` cannot hold.
+    #[error("{key} is `{value}`, which is no OMOP CDM v5.4 vocabulary_id")]
+    AliasVocabulary {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: String,
+        /// Why the column refuses it.
+        #[source]
+        source: omop_cdm::value::ValueError,
+    },
     /// A page size that would never advance.
     #[error("{key} is 0; a page holds at least one row")]
     PageSize {

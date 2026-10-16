@@ -376,6 +376,13 @@ fn revised_condition() -> serde_json::Value {
     resource
 }
 
+/// Returns `resource` naming the logical id `id`, as the body of an update of
+/// `id` must (<https://hl7.org/fhir/R4/http.html#update>).
+fn named(mut resource: serde_json::Value, id: &str) -> serde_json::Value {
+    resource["id"] = serde_json::json!(id);
+    resource
+}
+
 /// Returns the synthetic Condition at the sender's `meta.versionId`
 /// `version`.
 fn condition_at(version: &str) -> serde_json::Value {

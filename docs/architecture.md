@@ -843,8 +843,9 @@ expression is a load error: the reference CDR's connector let `where()` and
   contributes paths only, every value bound as an AQL parameter. A path that
   crosses a node the Web Template lets occur more than once below the bound
   one is refused at load. Rows are grouped by version uid, each entry of
-  the context's archetype is answered once, and the total reads the rows
-  and counts entries (#530, #658). One resource type answers one
+  the context's archetype is answered once, and the total counts entries
+  (#530, #658) with one AQL count where that count agrees with the answer
+  (#661). One resource type answers one
   parameter set, and two declarations of one type over one template are
   refused at load. A parameter outside the set is refused unless the client
   sends `Prefer: handling=lenient` (R4 search §3.1.1.3); an unsupported
@@ -1589,8 +1590,13 @@ draft upstream change.
   entries that hold every selected node; a row whose nodes lie in no entry,
   and every row of a search binding no node, answers every entry of the
   archetype, of which `_id` keeps the ones it names (#658). `Bundle.total`
-  reads the rows and counts each entry once, because no AQL count over the
-  facade's `FROM` counts entries. The
+  is one `COUNT(*)` with the entry bound as `CONTAINS <class> x[<archetype>]`
+  when the search binds no node and no `_id` and the template places the
+  entry only among the composition's own `content` items (#661). AQL 1.1.0
+  §3.13.2.2 defines no direct-child containment, so `CONTAINS` also finds an
+  entry nested in a `SECTION`; such a template, a bound node or an `_id`
+  reads the rows and counts each entry once, and `_total=estimate` always
+  answers from a count query. The
   place is positional, so removing an earlier entry in a later version moves
   the identity of the ones after it, the same property the released
   recommendation's entry path has. No specification governs how a row names

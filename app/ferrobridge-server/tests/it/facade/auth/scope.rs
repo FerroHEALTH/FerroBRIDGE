@@ -36,6 +36,7 @@ use crate::facade::VERSION_ONE;
 use crate::facade::condition;
 use crate::facade::condition_at;
 use crate::facade::harness;
+use crate::facade::named;
 use crate::facade::post_condition;
 use crate::facade::raw;
 use crate::facade::stub::mount_create;
@@ -126,7 +127,7 @@ fn assert_forbidden((status, challenge, body): &(StatusCode, Option<String>, Str
 fn put_condition(id: &str) -> Request<Body> {
     Request::put(format!("/fhir/Condition/{id}"))
         .header(header::CONTENT_TYPE, "application/fhir+json")
-        .body(Body::from(condition().to_string()))
+        .body(Body::from(named(condition(), id).to_string()))
         .expect("a legal request")
 }
 

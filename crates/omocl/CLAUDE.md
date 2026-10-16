@@ -90,3 +90,9 @@ and its FLAT composition (`LABORATORY_REPORT_FLAT`), with a map-backed
 `ConceptSource` in `tests/it/lab.rs`; each engine rule has its own case and
 the laboratory files end to end are two committed snapshots. Fixtures are
 synthetic content invented for the test.
+
+`tests/fixtures/projects/ferrobridge/` holds FerroBRIDGE's own OMOCL files,
+each a modified copy of a corpus file with its change recorded in its header
+(`kds_person/kds_person_data.yml`: the `Person` mapping over `KDS_Person`,
+reading the administrative gender the corpus file misses). The corpus under
+`docs/specs/omocl/` is never edited.
