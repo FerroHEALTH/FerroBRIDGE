@@ -247,7 +247,8 @@ impl CdrClient {
     /// # Errors
     /// Returns [`CdrError::Client`] when the request never reached the
     /// service, the configured timeout included, or the answer was not the
-    /// documented template list.
+    /// documented template list, and [`CdrError::Renewal`] when the service
+    /// refused the token and no new one could be obtained.
     pub async fn reachability(&self) -> Result<StatusCode, CdrError> {
         let once = RetryPolicy {
             max_attempts: 1,
@@ -266,6 +267,11 @@ impl CdrClient {
             .definition_template_adl1_4_list(&params)
             .await;
         let status = match answered {
+            Err(source @ ClientError::Unauthorized { .. })
+                if client.transport().renewal_refused().is_some() =>
+            {
+                return Err(refusal(&client, source, client.transport().answered()));
+            }
             Ok(DefinitionTemplateAdl14ListOutcome::Ok { .. }) => StatusCode::OK,
             Err(ClientError::Unauthorized { .. }) => StatusCode::UNAUTHORIZED,
             Err(ClientError::Forbidden { .. }) => StatusCode::FORBIDDEN,
@@ -359,7 +365,24 @@ fn answered_by<O>(
         Ok(outcome) => upstream
             .map(|upstream| Answered { outcome, upstream })
             .ok_or(CdrError::Unrecorded),
-        Err(source) => Err(CdrError::client(source, upstream)),
+        Err(source) => Err(refusal(client, source, upstream)),
+    }
+}
+
+/// Returns the error a refusal of the generated client becomes: the renewal
+/// failure when the `401` stood because no new token could be obtained, the
+/// refusal itself otherwise.
+fn refusal(
+    client: &Client<Scoped<'_>>,
+    source: ClientError,
+    upstream: Option<Upstream>,
+) -> CdrError {
+    match (&source, client.transport().renewal_refused()) {
+        (ClientError::Unauthorized { .. }, Some(renewal)) => CdrError::Renewal {
+            source: renewal,
+            upstream: upstream.map(Box::new),
+        },
+        _ => CdrError::client(source, upstream),
     }
 }
 

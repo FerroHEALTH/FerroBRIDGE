@@ -12,8 +12,10 @@
 //! ones they leave out (the `ETag` of an `adl2` template, the `ETag` of a
 //! committed contribution whose body does not decode). The generated client
 //! retries no `401`, so a refused token is renewed and the request re-sent
-//! here, once.
+//! here, once; a renewal that fails leaves the `401` standing and is recorded
+//! for the caller, so the call is not retried.
 
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::PoisonError;
 
@@ -26,6 +28,7 @@ use openehr_its::rest::client::TransportError;
 
 use crate::cdr::error::Upstream;
 use crate::cdr::oauth::RenewalError;
+use crate::cdr::oauth::TokenError;
 use crate::cdr::oauth::cache::TokenSource;
 
 /// The engine of one call.
@@ -39,6 +42,8 @@ pub(crate) struct Scoped<'t> {
     renewal: Option<TokenSource>,
     /// The last answer an attempt read.
     answered: Mutex<Option<Upstream>>,
+    /// Why the renewal of a refused token failed, when it did.
+    refused: Mutex<Option<Arc<TokenError>>>,
 }
 
 impl<'t> Scoped<'t> {
@@ -54,6 +59,7 @@ impl<'t> Scoped<'t> {
             headers,
             renewal,
             answered: Mutex::new(None),
+            refused: Mutex::new(None),
         }
     }
 
@@ -67,27 +73,46 @@ impl<'t> Scoped<'t> {
             .clone()
     }
 
+    /// Returns the renewal failure an attempt of this call met, when one did.
+    ///
+    /// The refused attempt's `401` reached the generated client as its
+    /// answer, so the call ended as a refusal that is not retried.
+    pub(crate) fn renewal_refused(&self) -> Option<RenewalError> {
+        // NOTE: no specification governs this: our own design; a poisoned slot
+        // still holds the last renewal failure recorded, so it is taken as it stands.
+        self.refused
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+            .map(RenewalError::new)
+    }
+
     /// Returns the answer to `again` under a renewed token, the token the
-    /// refused attempt carried dropped first.
+    /// refused attempt carried dropped first, or `None` when no new token
+    /// could be obtained.
     async fn renewed(
         &self,
         source: &TokenSource,
         mut again: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, TransportError> {
+    ) -> Result<Option<http::Response<Vec<u8>>>, TransportError> {
         if let Some(stale) = again.headers().get(AUTHORIZATION) {
             source.invalidate(stale);
         }
-        let token = source
-            .token()
-            .await
-            .map_err(|source| TransportError::Send {
-                source: Box::new(RenewalError::new(source)),
-            })?;
+        let token = match source.token().await {
+            Ok(token) => token,
+            Err(refused) => {
+                tracing::debug!(
+                    "the CDR refused the token and no new one could be obtained; the call ends"
+                );
+                *self.refused.lock().unwrap_or_else(PoisonError::into_inner) = Some(refused);
+                return Ok(None);
+            }
+        };
         tracing::debug!("the CDR refused the token; re-sending once under a renewed one");
         again
             .headers_mut()
             .insert(AUTHORIZATION, token.header().clone());
-        self.inner.send(again).await
+        self.inner.send(again).await.map(Some)
     }
 }
 
@@ -104,10 +129,13 @@ impl Transport for Scoped<'_> {
         let mut response = self.inner.send(request).await?;
         // NOTE: RFC 9110 §15.5.2, a `401` means the request was not applied,
         // so re-sending it once, a `POST` included, cannot apply it twice.
+        // NOTE: RFC 6749 §5.2, a token endpoint's refusal is final for that
+        // grant, so a failed renewal keeps the `401`, which the client never retries.
         if response.status() == StatusCode::UNAUTHORIZED
             && let (Some(source), Some(again)) = (self.renewal.as_ref(), again)
+            && let Some(renewed) = self.renewed(source, again).await?
         {
-            response = self.renewed(source, again).await?;
+            response = renewed;
         }
         let upstream = Upstream::new(
             response.status(),
