@@ -93,12 +93,11 @@ impl Lens<DvTextData, CodeableConcept> for TextLens {
         view: &CodeableConcept,
         existing: Option<&DvTextData>,
     ) -> Result<DvTextData, LensError> {
-        let value =
-            text_of(view.text.as_ref().map(|text| &text.value)).ok_or(LensError::Missing {
-                cell: CODEABLE_CONCEPT_CELL,
-                attribute: "DV_TEXT.value",
-                direction: Direction::FhirToOpenehr,
-            })?;
+        let value = rubric_of(view).ok_or(LensError::Missing {
+            cell: CODEABLE_CONCEPT_CELL,
+            attribute: "DV_TEXT.value",
+            direction: Direction::FhirToOpenehr,
+        })?;
         let held = existing.and_then(|text| text.mappings.as_deref());
         let mappings = mappings_of(&view.coding, held)?;
         Ok(DvTextData {
@@ -108,13 +107,43 @@ impl Lens<DvTextData, CodeableConcept> for TextLens {
         })
     }
 
-    fn fallbacks(&self, _view: &CodeableConcept) -> Vec<Fallback> {
-        Vec::new()
+    fn fallbacks(&self, view: &CodeableConcept) -> Vec<Fallback> {
+        if text_of(view.text.as_ref().map(|text| &text.value)).is_some() {
+            return Vec::new();
+        }
+        vec![Fallback::new(CODEABLE_CONCEPT_CELL, "DV_TEXT.value")]
     }
 
     fn withheld(&self, source: &DvTextData) -> Vec<Withheld> {
         withheld(source.mappings.iter().flatten())
     }
+}
+
+/// Returns the rubric a `CodeableConcept` gives `DV_TEXT.value`.
+///
+/// `text` when the concept carries one, else the first coding's `display`,
+/// else its `code`. The last two are one-way rows, recorded by
+/// [`Lens::fallbacks`].
+fn rubric_of(view: &CodeableConcept) -> Option<&str> {
+    // NOTE: DV_TEXT.adoc §CodeableConcept gives `value` (1..1) no fallback;
+    // FerroBRIDGE reads that silence by DV_CODED_TEXT.adoc §CodeableConcept,
+    // which inherits from DV_TEXT and falls back to `coding.display`, `coding.code`.
+    let first = view.coding.first();
+    text_of(view.text.as_ref().map(|text| &text.value))
+        .or_else(|| {
+            text_of(
+                first
+                    .and_then(|coding| coding.display.as_ref())
+                    .map(|display| &display.value),
+            )
+        })
+        .or_else(|| {
+            text_of(
+                first
+                    .and_then(|coding| coding.code.as_ref())
+                    .map(|code| &code.value),
+            )
+        })
 }
 
 impl Lens<DvTextData, Coding> for TextLens {
@@ -199,15 +228,20 @@ fn carried(existing: Option<&DvTextData>) -> DvTextData {
 
 #[cfg(test)]
 mod tests {
+    use super::CODEABLE_CONCEPT_CELL;
     use super::CODING_CELL;
     use super::TextLens;
+    use crate::engine::lens::Fallback;
     use crate::engine::lens::Lens;
+    use crate::engine::lens::LensError;
     use crate::engine::lens::code_phrase::terminology_id;
     use crate::engine::lens::code_phrase::tests::code_phrase;
     use crate::engine::lens::code_phrase::tests::coding;
     use fhir_types::r4::codeable_concept::CodeableConcept;
     use fhir_types::r4::coding::Coding;
+    use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives::String as FhirString;
+    use fhir_types::r4::primitives::Uri;
     use openehr_base::containers::NonEmptyVec;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
     use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
@@ -281,6 +315,26 @@ mod tests {
             let source: DvTextData = TextLens.put(&view, None).expect("the generated subset is carried");
             let back: CodeableConcept = TextLens.get(&source).expect("the value is complete");
             assert_eq!(back, view, "PutGet failed for {view:?}");
+        }
+
+        #[test]
+        fn a_concept_without_text_comes_back_with_text_added(
+            codings in vec(coding(), 1..3),
+        ) {
+            let view = CodeableConcept { coding: codings, ..CodeableConcept::default() };
+            let source: DvTextData = TextLens.put(&view, None).expect("the first coding names the value");
+            let back: CodeableConcept = TextLens.get(&source).expect("the value is complete");
+            assert_eq!(back.coding, view.coding, "the codings come back unchanged");
+            assert_eq!(
+                back.text.map(|text| text.value),
+                Some(Some(source.value.clone())),
+                "the rubric comes back as an added text"
+            );
+            assert_eq!(
+                TextLens.fallbacks(&view),
+                vec![Fallback::new(CODEABLE_CONCEPT_CELL, "DV_TEXT.value")],
+                "the one-way row is recorded"
+            );
         }
 
         #[test]
@@ -468,5 +522,79 @@ mod tests {
         let view: CodeableConcept = TextLens.get(&source).expect("both mappings travel");
         assert_eq!(codes(&view.coding), [Some("386661006"), Some("LP74849-8")]);
         assert!(Lens::<DvTextData, CodeableConcept>::withheld(&TextLens, &source).is_empty());
+    }
+    /// A `CodeableConcept` with no `text` whose first coding carries `display`
+    /// and `code` as given, followed by a second, fully described coding.
+    fn untexted(display: Option<&str>, code: Option<&str>) -> CodeableConcept {
+        CodeableConcept {
+            coding: vec![
+                Coding {
+                    system: Some(Uri::from("http://snomed.info/sct")),
+                    code: code.map(Code::from),
+                    display: display.map(FhirString::from),
+                    ..Coding::default()
+                },
+                Coding {
+                    system: Some(Uri::from("http://snomed.info/sct")),
+                    code: Some(Code::from("386661006")),
+                    display: Some(FhirString::from("Second")),
+                    ..Coding::default()
+                },
+            ],
+            ..CodeableConcept::default()
+        }
+    }
+
+    #[test]
+    fn the_text_wins_over_the_first_display() {
+        let view = CodeableConcept {
+            text: Some(FhirString::from("Fever")),
+            ..untexted(Some("Pyrexia"), Some("386661006"))
+        };
+        let source: DvTextData = TextLens.put(&view, None).expect("the text names the value");
+        assert_eq!(source.value, "Fever", "the text fills the value");
+        assert!(
+            <TextLens as Lens<DvTextData, CodeableConcept>>::fallbacks(&TextLens, &view).is_empty(),
+            "a text takes no fallback"
+        );
+    }
+
+    #[test]
+    fn a_missing_text_falls_back_to_the_first_display() {
+        let view = untexted(Some("Pyrexia"), Some("386661006"));
+        let source: DvTextData = TextLens
+            .put(&view, None)
+            .expect("the display names the value");
+        assert_eq!(source.value, "Pyrexia", "the first display fills the value");
+    }
+
+    #[test]
+    fn a_missing_display_falls_back_to_the_first_code() {
+        let view = untexted(None, Some("39065001"));
+        let source: DvTextData = TextLens.put(&view, None).expect("the code names the value");
+        assert_eq!(source.value, "39065001", "the first code fills the value");
+        assert_eq!(
+            TextLens.fallbacks(&view),
+            vec![Fallback::new(CODEABLE_CONCEPT_CELL, "DV_TEXT.value")],
+            "the one-way row is recorded"
+        );
+    }
+
+    #[test]
+    fn a_concept_with_nothing_to_name_the_value_is_refused() {
+        let view = untexted(None, None);
+        let error = <TextLens as Lens<DvTextData, CodeableConcept>>::put(&TextLens, &view, None)
+            .expect_err("no text, display or code on the first coding");
+        assert!(
+            matches!(
+                error,
+                LensError::Missing {
+                    cell: CODEABLE_CONCEPT_CELL,
+                    attribute: "DV_TEXT.value",
+                    ..
+                }
+            ),
+            "the refusal names the cell and the attribute: {error}"
+        );
     }
 }
