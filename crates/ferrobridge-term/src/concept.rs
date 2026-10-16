@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The values the three operations answer with, in one shape for both wire
-//! versions.
+//! The values the three operations answer with, in one shape for every wire
+//! version.
 //!
 //! R4 and R4B declare the same `out` parameters for `CodeSystem/$lookup`,
-//! `ConceptMap/$translate` and `ValueSet/$validate-code`, so one set of types
-//! carries both and the release decides only which generated module reads the
-//! `Parameters`.
+//! `ConceptMap/$translate` and `ValueSet/$validate-code`. STU3 declares a
+//! subset of them: its `property.value` is a `code`, and its
+//! `$validate-code` has no `issues`. One set of types carries all three, and
+//! the release decides which generated module reads the `Parameters`.
 
 /// A code in a code system, the neutral form of a FHIR `Coding`
 /// (<https://hl7.org/fhir/R4/datatypes.html#Coding>).
@@ -81,7 +82,10 @@ pub struct Property {
 ///
 /// The codes are the `ConceptMapEquivalence` value set
 /// (<https://hl7.org/fhir/R4/valueset-concept-map-equivalence.html>), which
-/// the `match.equivalence` documentation names. The parameter declares no
+/// the `match.equivalence` documentation names; STU3 defines the same ten
+/// codes in the same hierarchy
+/// (<https://hl7.org/fhir/STU3/valueset-concept-map-equivalence.html>). The
+/// parameter declares no
 /// binding, so a code outside the set is kept as [`Equivalence::Other`] rather
 /// than refused; it can never be accepted, because [`Equivalence::accepted`]
 /// answers `true` for `equivalent` and `equal` alone.

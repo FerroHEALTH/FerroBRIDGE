@@ -207,6 +207,27 @@ pub enum Error {
         #[source]
         source: serde_json::Error,
     },
+    /// The request carries a parameter the configured release's
+    /// `OperationDefinition` does not declare and has no equivalent for, so
+    /// nothing was sent.
+    ///
+    /// STU3 `ConceptMap/$translate` has no `url`, and STU3
+    /// `ValueSet/$validate-code` has no `valueSetVersion`
+    /// (<https://hl7.org/fhir/STU3/terminology-service.html>). Sending the
+    /// request without the parameter would ask the server a different
+    /// question than the caller asked.
+    #[error(
+        "the {operation} request carries `{parameter}`, which FHIR {} declares no parameter for; nothing was sent",
+        .wire_version.as_str()
+    )]
+    UnsupportedParameter {
+        /// The operation, as `Resource/$code`.
+        operation: &'static str,
+        /// The parameter, as the R4 `OperationDefinition` names it.
+        parameter: &'static str,
+        /// The release the client is configured for.
+        wire_version: WireVersion,
+    },
     /// The request never reached the server.
     #[error("the request to {url} could not be sent")]
     Transport {
@@ -283,6 +304,7 @@ impl Error {
             Self::BaseUrl { .. } => "base-url",
             Self::ClientBuild { .. } => "client-build",
             Self::RequestBody { .. } => "request-body",
+            Self::UnsupportedParameter { .. } => "unsupported-parameter",
             Self::Transport { .. } => "transport",
             Self::Timeout { .. } => "timeout",
             Self::ServerFailure { .. } => "server-failure",
@@ -315,7 +337,9 @@ impl Error {
     /// `OperationDefinition-ConceptMap-translate` and
     /// `OperationDefinition-ValueSet-validate-code`, R4B), so a repeat is the
     /// same read and the `POST` form is retried like the `GET` form
-    /// (<https://hl7.org/fhir/R4/operations.html>).
+    /// (<https://hl7.org/fhir/R4/operations.html>). The STU3 definitions of
+    /// the same operations declare no such flag; retrying them on the same
+    /// ground is our own design.
     #[must_use]
     pub fn is_retryable(&self) -> bool {
         matches!(

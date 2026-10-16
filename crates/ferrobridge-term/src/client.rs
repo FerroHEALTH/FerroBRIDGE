@@ -195,7 +195,9 @@ impl Client {
     /// Returns [`Error::Refused`] when the server refused the operation, for
     /// example because it serves no such concept map, and [`Error`] otherwise
     /// when the call did not reach an answer or the answer could not be
-    /// decoded. A refusal is never a missing translation.
+    /// decoded. A refusal is never a missing translation. Returns
+    /// [`Error::UnsupportedParameter`] when `concept_map_url` is set on an
+    /// STU3 client, whose `$translate` has no `url`; nothing is sent.
     pub async fn translate(
         &self,
         system: &str,
@@ -248,7 +250,10 @@ impl Client {
     /// # Errors
     /// Returns [`Error::Refused`] when the server refused the operation, and
     /// [`Error`] otherwise when the call did not reach an answer or the answer
-    /// could not be decoded. A refusal is never an invalid code.
+    /// could not be decoded. A refusal is never an invalid code. Returns
+    /// [`Error::UnsupportedParameter`] when the validation names a value set
+    /// version on an STU3 client, whose `$validate-code` has no
+    /// `valueSetVersion`; nothing is sent.
     pub async fn validate(&self, validation: &Validation) -> Result<ValidateOutcome, Error> {
         let request = Request::ValidateCode(validation.clone());
         let answer = self.operation(&request).await?;
@@ -265,7 +270,9 @@ impl Client {
     /// Returns [`Error::BatchArity`] when a batch answer holds a different
     /// number of entries than were sent, and [`Error`] otherwise when the
     /// batch itself did not reach an answer or its `Bundle` could not be
-    /// decoded.
+    /// decoded. Returns [`Error::UnsupportedParameter`] when one of several
+    /// validations names a parameter the configured release does not
+    /// declare, and then no entry is sent.
     pub async fn validate_all(
         &self,
         validations: &[Validation],
@@ -299,6 +306,9 @@ impl Client {
     /// Returns [`Error::BatchArity`] when the answer holds a different number
     /// of entries than were sent, and [`Error`] otherwise when the batch
     /// itself did not reach an answer or its `Bundle` could not be decoded.
+    /// Returns [`Error::UnsupportedParameter`] when a request names a
+    /// parameter the configured release does not declare, and then no entry
+    /// is sent.
     pub async fn batch(
         &self,
         requests: &[Request],
@@ -315,11 +325,8 @@ impl Client {
     /// answer, in request order.
     async fn batch_answers(&self, requests: &[Request]) -> Result<Vec<Answer>, Error> {
         let version = self.config.wire_version;
-        let body =
-            crate::wire::batch_body(version, requests).map_err(|source| Error::RequestBody {
-                operation: crate::BATCH,
-                source,
-            })?;
+        let body = crate::wire::batch_body(version, requests)
+            .map_err(|source| source.into_error(crate::BATCH, version))?;
         let answer = self
             .execute(Call {
                 operation: crate::BATCH,
@@ -359,8 +366,9 @@ impl Client {
     /// (<https://hl7.org/fhir/R4/operations.html>).
     async fn operation(&self, request: &Request) -> Result<Answer, Error> {
         let operation = request.operation();
-        let body = crate::wire::request_body(self.config.wire_version, request)
-            .map_err(|source| Error::RequestBody { operation, source })?;
+        let version = self.config.wire_version;
+        let body = crate::wire::request_body(version, request)
+            .map_err(|source| source.into_error(operation, version))?;
         let url = self.url(operation)?;
         self.execute(Call {
             operation,
