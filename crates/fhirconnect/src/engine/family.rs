@@ -16,7 +16,7 @@
 //! reads the same attributes back out of the canonical JSON of the node as
 //! typed `openehr-rm` values.
 
-// TODO(#241): the write side spells the `_feeder_audit`, `_link:i`,
+// TODO(#618): the write side spells the `_feeder_audit`, `_link:i`,
 // `_participation:i`, `_other_participation:i` and `_provider` families key by
 // key until openehr-sdt honours `|raw` on `_`-prefixed attribute families or
 // makes `emit_rm_attrs` public (sibling request S1).

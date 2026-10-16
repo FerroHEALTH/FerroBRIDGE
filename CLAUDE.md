@@ -209,6 +209,8 @@ the testkit tool crate. Beside it:
   which fails when a file disagrees with the `docs/VERSIONS.md` pin matrix or
   claims a licence other than `BUSL-1.1`; `crate-version-guard.sh`, the crate
   bump rule; `favicon-sync.sh`, the book theme favicon against the brand mark;
+  `todo-issues.sh`, which fails a `TODO(#N)` or a pending subcommand's issue
+  that the tracker reports closed;
   `pin-freshness.sh`, every pin no ecosystem watches against its newest
   upstream release; and `conformance.sh`, the pass-list gate over the six
   corpora under `conformance/` (thirteen: the two mapping libraries, the

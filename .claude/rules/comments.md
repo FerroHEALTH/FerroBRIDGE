@@ -92,6 +92,9 @@ A comment describes the code as it IS.
   `# Errors`/`# Panics` doc sections. Runs per-edit (the `rust_fmt_clippy.sh`
   PostToolUse hook); a CI job running `--all` over the whole tree is added when
   the Rust CI lanes are stood up.
+- `scripts/checks/todo-issues.sh` (CI `todo-issues` job): every
+  `TODO(#N)` names an issue the tracker reports open; a closed one is
+  re-pointed at the open issue that carries the work, or removed.
 - `clippy::too_long_first_doc_paragraph` (CI `-D warnings`): the RFC 1574
   summary line. Configured in `[workspace.lints]` when the workspace exists.
 - Companion doc lints (`doc_markdown`, `missing_errors_doc`,
