@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of projects/org.highmed/KDS/person/KDS_cluster_person.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name and version are FerroBRIDGE's. The published
+# line 51 binds the post box address to `$resource`, the Patient, so the
+# address model below it reads `Patient.city` and the other Address elements,
+# which R4 Patient does not define; the method binds `$resource.address`, as
+# the street address method at its line 39 does. The other methods follow
+# unchanged.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_kds_cluster_person
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: CLUSTER.person.v1
+
+mappings:
+  - name: "name"
+    extension: "overwrite"
+    with:
+      fhir: "$resource.name"
+      openehr: "$archetype/items[openEHR-EHR-CLUSTER.structured_name.v1 and name/value='Name']"
+    slotArchetype: "CLUSTER.structured_name.v1"
+    fhirCondition:
+      targetRoot: "$resource.name"
+      targetAttribute: "use"
+      operator: "one of"
+      criteria: "official"
+
+  - name: "geburtsname"
+    extension: "add"
+    with:
+      fhir: "$resource.name"
+      openehr: "$archetype/items[openEHR-EHR-CLUSTER.structured_name.v1 and name/value='Geburtsname']"
+    slotArchetype: "CLUSTER.structured_name.v1"
+    fhirCondition:
+      targetRoot: "$resource.name"
+      targetAttribute: "use"
+      operator: "one of"
+      criteria: "maiden"
+
+  - name: "address"
+    extension: "overwrite"
+    with:
+      fhir: "$resource.address"
+      openehr: "$archetype/items[openEHR-EHR-CLUSTER.address.v1 and name/value='Straßenanschrift']"
+    slotArchetype: "CLUSTER.address.v1"
+    fhirCondition:
+      targetRoot: "address"
+      targetAttribute: "type"
+      operator: "one of"
+      criteria: "both"
+
+  - name: "addressPostfach"
+    extension: "add"
+    with:
+      fhir: "$resource.address"
+      openehr: "$archetype/items[openEHR-EHR-CLUSTER.address.v1 and name/value='Postfach']"
+    slotArchetype: "CLUSTER.address.v1"
+    fhirCondition:
+      targetRoot: "address"
+      targetAttribute: "type"
+      operator: "one of"
+      criteria: "postal"

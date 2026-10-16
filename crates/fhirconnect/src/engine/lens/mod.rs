@@ -35,8 +35,10 @@
 //! §4.4, and the line between the two cases is FerroBRIDGE's own: no
 //! specification governs it.
 
+pub mod boolean;
 pub mod code_phrase;
 pub mod coded_text;
+pub mod date;
 pub mod date_time;
 pub mod interval;
 pub mod party;

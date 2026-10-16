@@ -12,7 +12,36 @@
 use fhir_types::codec::Value;
 
 use crate::facade::identity::ExternalResourceId;
+use crate::facade::identity::IdError;
 use crate::facade::identity::PersonId;
+
+/// The resource type that is the subject of its own EHR.
+const PATIENT: &str = "Patient";
+
+/// Returns the person a Patient document names itself by: the first
+/// `identifier` with a `value`, in the namespace of its `system` or, when it
+/// carries none, `namespace`.
+///
+/// `None` when the document carries no identifier with a value.
+// NOTE: no specification governs this: our own design; the first identifier
+// in document order keys the person, as PID-3's first repetition does.
+pub(crate) fn person_by_identifier(
+    document: &Value,
+    namespace: &str,
+) -> Option<Result<PersonId, IdError>> {
+    let identifier = document
+        .get("identifier")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .find(|identifier| identifier.get("value").and_then(Value::as_str).is_some())?;
+    let value = identifier.get("value").and_then(Value::as_str)?;
+    let system = identifier
+        .get("system")
+        .and_then(Value::as_str)
+        .unwrap_or(namespace);
+    Some(PersonId::new(system, value))
+}
 
 /// Why one inbound document is not a resource this facade can take.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -57,7 +86,7 @@ pub enum RequestError {
     Id {
         /// What the identifier's constructor reported.
         #[source]
-        source: crate::facade::identity::IdError,
+        source: IdError,
     },
     /// The resource names no subject, so no EHR can hold it.
     #[error(
@@ -69,7 +98,7 @@ pub enum RequestError {
     Subject {
         /// What the identifier's constructor reported.
         #[source]
-        source: crate::facade::identity::IdError,
+        source: IdError,
     },
 }
 
@@ -208,19 +237,28 @@ impl Inbound {
     /// namespace" (`docs/architecture.md` §12), which is the pair the ITS-REST
     /// EHR lookup takes. A `subject.identifier` carries both halves; a literal
     /// `subject.reference` carries one, so `fallback` is the namespace a
-    /// deployment gives its own references. No specification fixes the
-    /// mapping from a FHIR subject to an openEHR subject: our own design.
+    /// deployment gives its own references. A `Patient` is the subject itself
+    /// and is keyed as `person_by_identifier` keys it. No specification
+    /// fixes the mapping from a FHIR subject to an openEHR subject: our own
+    /// design.
     ///
     /// # Errors
     ///
     /// Returns [`RequestError::NoSubject`] when the resource names none and
     /// [`RequestError::Subject`] when the value cannot be a person key.
     pub fn subject(&self, fallback: &str) -> Result<PersonId, RequestError> {
-        let reference = self
+        let named = self
             .document
             .get("subject")
-            .or_else(|| self.document.get("patient"))
-            .ok_or(RequestError::NoSubject)?;
+            .or_else(|| self.document.get("patient"));
+        let Some(reference) = named else {
+            if self.resource_type == PATIENT {
+                return person_by_identifier(&self.document, fallback)
+                    .ok_or(RequestError::NoSubject)?
+                    .map_err(|source| RequestError::Subject { source });
+            }
+            return Err(RequestError::NoSubject);
+        };
         if let Some(identifier) = reference.get("identifier") {
             let system = identifier
                 .get("system")
@@ -333,6 +371,52 @@ mod tests {
         let subject = referenced.subject(FALLBACK).expect("a subject is named");
         assert_eq!(FALLBACK, subject.namespace());
         assert_eq!("Patient/p-2", subject.id());
+    }
+
+    #[test]
+    fn a_patient_is_its_own_subject_by_its_first_identifier_with_a_value() {
+        let patient = Inbound::read(
+            &body(&serde_json::json!({
+                "resourceType": "Patient",
+                "identifier": [
+                    { "system": "http://example.org/no-value" },
+                    { "system": "http://example.org/mrn", "value": "p-3" },
+                    { "value": "p-4" }
+                ]
+            })),
+            "Patient",
+        )
+        .expect("the resource reads");
+        let subject = patient.subject(FALLBACK).expect("the Patient names itself");
+        assert_eq!("http://example.org/mrn", subject.namespace());
+        assert_eq!("p-3", subject.id());
+
+        let unsystemed = Inbound::read(
+            &body(&serde_json::json!({
+                "resourceType": "Patient",
+                "identifier": [{ "value": "p-5" }]
+            })),
+            "Patient",
+        )
+        .expect("the resource reads");
+        let subject = unsystemed
+            .subject(FALLBACK)
+            .expect("the Patient names itself");
+        assert_eq!(FALLBACK, subject.namespace());
+        assert_eq!("p-5", subject.id());
+    }
+
+    #[test]
+    fn a_patient_with_no_identifier_names_no_subject() {
+        let patient = Inbound::read(
+            &body(&serde_json::json!({ "resourceType": "Patient", "gender": "female" })),
+            "Patient",
+        )
+        .expect("the resource reads");
+        assert!(matches!(
+            patient.subject(FALLBACK),
+            Err(RequestError::NoSubject)
+        ));
     }
 
     #[test]

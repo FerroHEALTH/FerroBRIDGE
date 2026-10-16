@@ -1,0 +1,132 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of
+# projects/org.highmed/KDS/person/KDS_structured_name.v1.person_name-structured_name.yml,
+# a derivative of it under its licence, with an overwrite of a method of
+# model/cluster/org.openehr/structured_name.v1.yml.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# files carry no copyright line to keep.
+# Changed: the metadata name and version are FerroBRIDGE's. The published
+# prefix method (lines 13 to 32) writes `items[at0006]`, which KDS_Person
+# does not carry, and writes `url` below `Extension.value[x]`; KDS_Person
+# carries the prefix as `items[at0001]` named 'Prefix', which the method maps.
+# The published line 37 reads `$resource.family`, which R4 Patient does not
+# define; the method reads `$fhirRoot.family`, the HumanName element. The
+# model's typeOfName (line 20) names `items[at0001]`, which is two nodes of
+# KDS_Person, so it is overwritten with a method that maps nothing.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_kds_structured_name
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: CLUSTER.structured_name.v1
+
+mappings:
+  - name: "typeOfName"
+    extension: "overwrite"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$fhirRoot"
+      openehr: "$archetype"
+    manual:
+      - name: "official"
+        fhir:
+          - path: "use"
+            value: "official"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "name/value"
+          operator: "one of"
+          criteria: "Name"
+
+      - name: "maiden"
+        fhir:
+          - path: "use"
+            value: "maiden"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "name/value"
+          operator: "one of"
+          criteria: "Geburtsname"
+
+  - name: "prefix"
+    extension: "overwrite"
+    with:
+      fhir: "$fhirRoot.prefix"
+      openehr: "$archetype/items[at0001 and name/value='Prefix']"
+
+  - name: "familyName"
+    extension: "overwrite"
+    with:
+      fhir: "$fhirRoot.family"
+      openehr: "$archetype"
+    followedBy:
+      mappings:
+        - name: "family"
+          with:
+            fhir: "$fhirRoot"
+            openehr: "items[at0005 and name/value='Familienname']"
+
+        - name: "familiennameZusatz"
+          with:
+            fhir: "extension"
+            openehr: "items[at0005 and name/value='Familienname-Namenszusatz']"
+          fhirCondition:
+            targetRoot: "extension"
+            targetAttribute: "url"
+            operator: "one of"
+            criteria: "http://fhir.de/StructureDefinition/humanname-namenszusatz"
+          followedBy:
+            mappings:
+              - name: "staticExtensionUrl"
+                with:
+                  fhir: "$fhirRoot"
+                manual:
+                  - name: "staticUrl"
+                    fhir:
+                      - path: "url"
+                        value: "http://fhir.de/StructureDefinition/humanname-namenszusatz"
+
+        - name: "nachnameOhneZusätze"
+          with:
+            fhir: "extension"
+            openehr: "items[at0005 and name/value='Familienname-Nachname']"
+          fhirCondition:
+            targetRoot: "extension"
+            targetAttribute: "url"
+            operator: "one of"
+            criteria: "http://hl7.org/fhir/StructureDefinition/humanname-own-name"
+          followedBy:
+            mappings:
+              - name: "staticExtensionUrl"
+                with:
+                  fhir: "$fhirRoot"
+                manual:
+                  - name: "staticUrl"
+                    fhir:
+                      - path: "url"
+                        value: "http://hl7.org/fhir/StructureDefinition/humanname-own-name"
+
+        - name: "vorsatzwort"
+          with:
+            fhir: "extension"
+            openehr: "items[at0005 and name/value='Familienname-Vorsatzwort']"
+          fhirCondition:
+            targetRoot: "extension"
+            targetAttribute: "url"
+            operator: "one of"
+            criteria: "http://hl7.org/fhir/StructureDefinition/humanname-own-prefix"
+          followedBy:
+            mappings:
+              - name: "staticExtensionUrl"
+                with:
+                  fhir: "$fhirRoot"
+                manual:
+                  - name: "staticUrl"
+                    fhir:
+                      - path: "url"
+                        value: "http://hl7.org/fhir/StructureDefinition/humanname-own-prefix"

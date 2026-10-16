@@ -14,8 +14,10 @@ use crate::engine::fhir::FhirValue;
 use crate::engine::lens::Fallback;
 use crate::engine::lens::Lens;
 use crate::engine::lens::LensError;
+use crate::engine::lens::boolean::BooleanLens;
 use crate::engine::lens::code_phrase::CodePhraseLens;
 use crate::engine::lens::coded_text::CodedTextLens;
+use crate::engine::lens::date::DateLens;
 use crate::engine::lens::date_time::DateTimeLens;
 use crate::engine::lens::date_time::PeriodStartLens;
 use crate::engine::lens::interval::DateTimeIntervalLens;
@@ -67,6 +69,10 @@ pub fn get(
         (RmValue::CodePhrase(code), FhirKind::Coding) => CodePhraseLens
             .get(code)
             .map(|coding| FhirValue::Coding(Box::new(coding))),
+        (RmValue::Date(date), FhirKind::Date) => DateLens.get(date.as_ref()).map(FhirValue::Date),
+        (RmValue::Boolean(boolean), FhirKind::Boolean) => {
+            BooleanLens.get(boolean).map(FhirValue::Boolean)
+        }
         (RmValue::DateTime(date), FhirKind::DateTime) => {
             DateTimeLens.get(date.as_ref()).map(FhirValue::DateTime)
         }
@@ -124,6 +130,12 @@ pub fn put(
         ("CODE_PHRASE", FhirValue::Coding(coding)) => CodePhraseLens
             .put(coding.as_ref(), held_code_phrase(existing))
             .map(RmValue::CodePhrase),
+        ("DV_DATE", FhirValue::Date(date)) => DateLens
+            .put(date, held_date(existing))
+            .map(|date| RmValue::Date(Box::new(date))),
+        ("DV_BOOLEAN", FhirValue::Boolean(boolean)) => BooleanLens
+            .put(boolean, held_boolean(existing))
+            .map(RmValue::Boolean),
         ("DV_DATE_TIME", FhirValue::DateTime(date)) => DateTimeLens
             .put(date, held_date_time(existing))
             .map(|date| RmValue::DateTime(Box::new(date))),
@@ -164,6 +176,8 @@ fn fallbacks(view: &FhirValue, rm_type: &str, binding: Option<&str>) -> Vec<Fall
         ("DV_CODED_TEXT", FhirValue::Coding(coding)) => coded.fallbacks(coding.as_ref()),
         ("DV_CODED_TEXT", FhirValue::CodeableConcept(concept)) => coded.fallbacks(concept.as_ref()),
         ("CODE_PHRASE", FhirValue::Coding(coding)) => CodePhraseLens.fallbacks(coding.as_ref()),
+        ("DV_DATE", FhirValue::Date(date)) => DateLens.fallbacks(date),
+        ("DV_BOOLEAN", FhirValue::Boolean(boolean)) => BooleanLens.fallbacks(boolean),
         ("DV_DATE_TIME", FhirValue::DateTime(date)) => DateTimeLens.fallbacks(date),
         ("DV_DATE_TIME", FhirValue::Period(period)) => PeriodStartLens.fallbacks(period.as_ref()),
         ("DV_INTERVAL", FhirValue::Period(period)) => {
@@ -240,6 +254,26 @@ fn held_code_phrase(
 ) -> Option<&openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase> {
     match existing {
         Some(RmValue::CodePhrase(code)) => Some(code),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_DATE`, when the target holds one.
+fn held_date(
+    existing: Option<&RmValue>,
+) -> Option<&openehr_rm::v1_2::data_types::quantity::date_time::dv_date::DvDate> {
+    match existing {
+        Some(RmValue::Date(date)) => Some(date.as_ref()),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_BOOLEAN`, when the target holds one.
+fn held_boolean(
+    existing: Option<&RmValue>,
+) -> Option<&openehr_rm::v1_2::data_types::basic::dv_boolean::DvBoolean> {
+    match existing {
+        Some(RmValue::Boolean(boolean)) => Some(boolean),
         _other => None,
     }
 }

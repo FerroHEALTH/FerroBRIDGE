@@ -1,0 +1,121 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/evaluation/org.openehr/gender.v1.yml, a derivative
+# of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the published lines 17 to 20 map `Patient.gender`, a `code`, onto
+# the DV_CODED_TEXT `items[at0022]`, a conversion DV_CODED_TEXT.adoc §STRING
+# calls not possible, so a run refuses it. The method keeps its two paths and
+# maps the four codes of the R4 required binding (CodeSystem
+# administrative-gender) through a `manual` table, the form manual.adoc gives
+# for a path set to a static value. It is the one method of the published
+# file, so the published file is not loaded.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: EVALUATION.gender.v1
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.gender.v1
+    revision: 1.1.1
+  fhirConfig:
+    structureDefinition: "http://hl7.org/fhir/StructureDefinition/Patient"
+
+mappings:
+  - name: "gender"
+    with:
+      fhir: "$resource.gender"
+      openehr: "$archetype/data[at0002]/items[at0022]"
+    manual:
+      - name: "male"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/administrative-gender"
+          - path: "defining_code/code_string"
+            value: "male"
+          - path: "value"
+            value: "Male"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "value"
+          operator: "one of"
+          criteria: "male"
+        fhir:
+          - path: "value"
+            value: "male"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "male"
+
+      - name: "female"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/administrative-gender"
+          - path: "defining_code/code_string"
+            value: "female"
+          - path: "value"
+            value: "Female"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "value"
+          operator: "one of"
+          criteria: "female"
+        fhir:
+          - path: "value"
+            value: "female"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "female"
+
+      - name: "other"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/administrative-gender"
+          - path: "defining_code/code_string"
+            value: "other"
+          - path: "value"
+            value: "Other"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "value"
+          operator: "one of"
+          criteria: "other"
+        fhir:
+          - path: "value"
+            value: "other"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "other"
+
+      - name: "unknown"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/administrative-gender"
+          - path: "defining_code/code_string"
+            value: "unknown"
+          - path: "value"
+            value: "Unknown"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "value"
+          operator: "one of"
+          criteria: "unknown"
+        fhir:
+          - path: "value"
+            value: "unknown"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "unknown"
