@@ -86,6 +86,19 @@ pub(super) fn bridge_ddl(bridge: &SchemaName) -> String {
             "CREATE INDEX IF NOT EXISTS record_person_writer
                 ON {bridge}.record (surrogate_id) WHERE cdm_table = 'person'"
         ),
+        format!("CREATE SEQUENCE IF NOT EXISTS {bridge}.person_row_written_seq AS bigint"),
+        format!(
+            "CREATE TABLE IF NOT EXISTS {bridge}.person_row (
+                versioned_object_uid text NOT NULL,
+                person_id integer NOT NULL,
+                written bigint NOT NULL,
+                columns jsonb NOT NULL,
+                PRIMARY KEY (versioned_object_uid, person_id))"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS person_row_newest
+                ON {bridge}.person_row (person_id, written DESC)"
+        ),
         format!(
             "CREATE TABLE IF NOT EXISTS {bridge}.link (
                 versioned_object_uid text NOT NULL,
@@ -240,6 +253,10 @@ pub(super) struct Deleted {
     /// The `person_id` of every deleted row, and of the `PERSON` row the
     /// composition wrote, whose `PERSON` row [`retire_persons`] may remove.
     pub(super) persons: BTreeSet<i32>,
+    /// The `person_id` of every `PERSON` row the composition wrote, whose
+    /// columns [`restore_persons`](crate::writer::person::restore_persons)
+    /// takes from the newest writer that remains.
+    pub(super) written: BTreeSet<i32>,
 }
 
 /// The column every row of a person names its person by.
@@ -271,6 +288,7 @@ pub(super) async fn delete_earlier(
 ) -> Result<Deleted, WriteError> {
     let mut deleted = BTreeMap::new();
     let mut persons = BTreeSet::new();
+    let mut written = BTreeSet::new();
     let mut by_table: BTreeMap<&'static str, Vec<i32>> = BTreeMap::new();
     for (key, id) in &earlier.ids {
         by_table.entry(key.table).or_default().push(*id);
@@ -278,6 +296,7 @@ pub(super) async fn delete_earlier(
     for (table, ids) in &by_table {
         if *table == "person" {
             persons.extend(ids.iter().copied());
+            written.extend(ids.iter().copied());
             continue;
         }
         let meta = graph::row::cdm_table(table)?;
@@ -329,7 +348,7 @@ pub(super) async fn delete_earlier(
     if links > 0 {
         deleted.insert("fact_relationship", links);
     }
-    for table in ["link", "record"] {
+    for table in ["link", "record", "person_row"] {
         transaction
             .execute(
                 &format!("DELETE FROM {bridge}.{table} WHERE versioned_object_uid = $1"),
@@ -341,6 +360,7 @@ pub(super) async fn delete_earlier(
     Ok(Deleted {
         rows: deleted,
         persons,
+        written,
     })
 }
 

@@ -21,6 +21,7 @@ use crate::writer::CdmWriter;
 use crate::writer::database;
 use crate::writer::error::Step;
 use crate::writer::error::WriteError;
+use crate::writer::person::restore_persons;
 use crate::writer::quoted;
 use crate::writer::side_table::delete_earlier;
 use crate::writer::side_table::earlier_rows;
@@ -119,7 +120,9 @@ impl CdmWriter {
     /// In one transaction, under the same per-composition lock a commit
     /// takes: the watermark is deleted when it names `committed`'s version,
     /// then every row and link the side table attributes to the composition.
-    /// A second removal of the same composition finds no watermark and
+    /// A `PERSON` row the composition wrote takes the columns of the newest
+    /// writer that remains, and goes once no writer and no row of the person
+    /// remain. A second removal of the same composition finds no watermark and
     /// answers [`Removal::Superseded`]; the person map is kept, so the EHR
     /// keeps its `person_id`.
     ///
@@ -166,6 +169,8 @@ impl CdmWriter {
         let earlier = earlier_rows(&transaction, bridge, versioned_object_uid).await?;
         let deleted =
             delete_earlier(&transaction, cdm, bridge, versioned_object_uid, &earlier).await?;
+        let written: Vec<i32> = deleted.written.iter().copied().collect();
+        restore_persons(&transaction, cdm, bridge, &written).await?;
         let mut rows = deleted.rows;
         let persons = retire_persons(&transaction, cdm, bridge, &deleted.persons).await?;
         if persons > 0 {
