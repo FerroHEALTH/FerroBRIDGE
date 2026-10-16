@@ -99,6 +99,8 @@ pub fn fhir_quantity(model: &dyn Model, node: &Node<'_>) -> Result<Option<Quanti
         element: String::from("Quantity.value"),
         reason: String::from("the value is not a decimal"),
     })?;
+    // NOTE: FHIR R4 fhirpath.html §2.9.1.3 maps only a, mo, d, h, min and s to calendar
+    // keywords, so `wk` stays the definite UCUM week, equivalent to `1 week` (N1 §4.1.8).
     let unit = match code {
         "a" => Unit::Calendar(Calendar::Year),
         "mo" => Unit::Calendar(Calendar::Month),

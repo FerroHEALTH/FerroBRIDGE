@@ -219,6 +219,28 @@ fn a_coding_is_equivalent_by_system_and_code() {
 }
 
 #[test]
+fn a_fhir_quantity_in_wk_stays_a_definite_week() {
+    // FHIR R4 fhirpath.html §2.9.1.3 maps a, mo, d, h, min and s to calendar
+    // keywords and not wk; N1 §4.1.8: 1 week ~ 1 'wk', and N1 §6.1.1 makes
+    // a calendar duration above the second unequal to a definite one.
+    let observation = |code: &str| {
+        json(&format!(
+            r#"{{"resourceType": "Observation", "status": "final", "code": {{"text": "t"}},
+                "valueQuantity": {{"value": 1, "system": "http://unitsofmeasure.org", "code": "{code}"}}}}"#
+        ))
+    };
+    let weeks = observation("wk");
+    let holds = |expression: &str, resource| truth(&eval(expression, resource).expect("evaluates"));
+    assert_eq!(holds("value = 1 'wk'", &weeks), Some(true));
+    assert_eq!(holds("value = 7 'd'", &weeks), Some(true));
+    assert_eq!(holds("value = 1 week", &weeks), Some(false));
+    assert_eq!(holds("value ~ 1 week", &weeks), Some(true));
+    let days = observation("d");
+    assert_eq!(holds("value = 1 day", &days), Some(true));
+    assert_eq!(holds("value = 1 'd'", &days), Some(false));
+}
+
+#[test]
 fn a_ucum_quantity_converts_and_a_calendar_year_stays_unequal_to_an_annum() {
     // FHIR R4 §2.9.1.3 and N1 §6.1.1.
     let observation = json(
