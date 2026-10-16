@@ -399,6 +399,19 @@ crates on crates.io.
 
 ### Fixed
 
+- A CDR credential the token endpoint will not issue answers the FHIR caller
+  `502` (#518). When the OAuth 2.0 client credentials fetch fails, because the
+  token endpoint is unreachable or refuses the bridge's own credentials, the
+  facade answers `502 Bad Gateway` with the token endpoint's status and OAuth
+  error in the `OperationOutcome` diagnostics, never the client secret. It
+  used to answer `500`.
+- A request under `/fhir` over the body ceiling or past the request timeout
+  answers an `OperationOutcome` (#548). The ceiling answers `413` with the
+  `too-long` issue and the timeout answers `504 Gateway Timeout` with the
+  `timeout` issue, both as `application/fhir+json` with the limit named in
+  the diagnostics. A timed-out FHIR request used to answer a plain `408`,
+  which tells a client it may resend a write the CDR may already hold. Every
+  other route keeps its plain `408` and `413`.
 - The KDS diagnosis project context keeps a diagnosis code system outside
   ICD-10-GM when it reads a Condition back (#379). The `coding` method of the
   `icd10ProblemDiagnose` append was gated by a `fhirCondition` only, which
