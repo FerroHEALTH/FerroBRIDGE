@@ -195,7 +195,8 @@ rest under `--check`: a passing case the list does not record, a corpus whose
 size moved from the list's `total` line, a badge under `conformance/badges/`
 that disagrees with its list, and a README conformance badge that names no
 committed badge file. `scripts/checks/conformance.sh --update` rewrites the
-lists and the badges from one run. The script runs one package per `cargo
+lists and the badges from one run, and `--update <corpus>` or `--check
+<corpus>` runs and rewrites or checks one corpus alone. The script runs one package per `cargo
 nextest` invocation, for the same memory reason the `test` job uses
 `cargo hack`, and it needs `jq`, which the hosted runner carries.
 
