@@ -383,3 +383,27 @@ async fn count(postgres: &Postgres, query: &str) -> Result<i64, Box<dyn Error>> 
     tokio::spawn(connection);
     Ok(client.query_one(query, &[]).await?.get(0))
 }
+
+/// Returns the rows of every CDM table with a `person_id` whose person has
+/// no `PERSON` row: OMOP CDM v5.4 makes `person_id` a required foreign key
+/// to `PERSON` (<https://ohdsi.github.io/CommonDataModel/cdm54.html#person>).
+pub(crate) async fn orphans(postgres: &Postgres) -> Result<i64, Box<dyn Error>> {
+    let mut total = 0;
+    for table in &omop_cdm::generated::TABLES {
+        if table.cdm_schema == omop_cdm::meta::CdmSchema::Cdm
+            && table.name != "person"
+            && table.column("person_id").is_some()
+        {
+            total += count(
+                postgres,
+                &format!(
+                    "SELECT count(*) FROM cdm.{} t WHERE NOT EXISTS \
+                     (SELECT 1 FROM cdm.person p WHERE p.person_id = t.person_id)",
+                    table.name
+                ),
+            )
+            .await?;
+        }
+    }
+    Ok(total)
+}

@@ -1274,6 +1274,54 @@ load with `openehr-query`. The visit type concept is configuration, never the
 reference engine's hard-coded "inpatient". Each derivation is labelled as
 FerroBRIDGE's own where the CDM gives discretion.
 
+### 5.5 The PERSON row
+
+OMOP CDM v5.4 makes `person_id` a required foreign key to `PERSON` in every
+clinical table, and says "All Persons in a database needs one record in this
+table, unless they fail data quality requirements specified in the ETL"
+(`PERSON`, <https://ohdsi.github.io/CommonDataModel/cdm54.html#person>). Every
+`person_id` a run writes therefore names a `PERSON` row, and its columns come
+from one of two sources, in this order:
+
+- **A `PERSON` row a loaded OMOCL mapping writes.** It wins whenever a
+  composition of the person carries one. The OMOCL corpus has one such file,
+  `person_data/person_data_v0.yml` over `openEHR-EHR-ADMIN_ENTRY.person_data.v0`,
+  and a composition that commits a `PERSON` row replaces whatever row the
+  person held. Several compositions of one EHR may write it: the side table
+  records each writer, the `(cdm_table, surrogate_id)` uniqueness holds for
+  every other table, and the composition committed last rewrites the
+  columns (our own design; the CDM defines one row per person and no merge
+  rule). `cdm init` brings a bridge schema an earlier release created to
+  this shape.
+- **Otherwise, the policy `[cdm] person_policy` decides.** No specification
+  governs a person with no demographic source, so both values are our own
+  design:
+  - `create_on_first_sight` (the default) writes a placeholder row the first
+    time a row or a visit names the EHR: `gender_concept_id`,
+    `race_concept_id` and `ethnicity_concept_id` 0, the concept the CDM uses
+    for "a non-existing or un-mappable concept"
+    (<https://ohdsi.github.io/CommonDataModel/dataModelConventions.html>);
+    `year_of_birth` 0; and `person_source_value` the `ehr_id`, the bridge's
+    person key, when it fits the column's 50 characters. The CDM requires
+    `year_of_birth` and its ETL convention is that "If no year of birth is
+    available all the person's data should be dropped from the CDM
+    instance" (`OMOP_CDMv5.4_Field_Level.csv`, `person.year_of_birth`). A
+    year taken from the person's first event would read as a real birth year
+    and corrupt every age computed from it, so the placeholder writes 0, the
+    value the OMOCL corpus itself falls back to (`code: 0` as the last
+    `year_of_birth` alternative of `person_data_v0.yml`), and the Data
+    Quality Dashboard's `plausibleValueLow` check (1850) flags every such
+    row. The run report counts the `PERSON` rows and the placeholders among
+    them.
+  - `existing` refuses every row whose EHR has no `PERSON` row, which is the
+    CDM's convention applied: a person whose compositions carry no `PERSON`
+    source contributes no data.
+
+The `PERSON` row belongs to the person. It stays while any composition writes
+it or any row of the person remains, keeping the columns its last writer
+gave it, and goes when neither holds; the person map keeps the `ehr_id`'s
+`person_id` either way.
+
 ## 6. Terminology
 
 The FHIR side needs three operations on a FHIR terminology server: `$lookup`
@@ -2009,6 +2057,7 @@ extension.
 | Create semantics | conditional and idempotent by source `id` and `meta.versionId` through the identity map | R4 conditional create; the retired connector duplicated on every `POST` | a new composition per `POST` |
 | OMOP identity | sequences plus a bridge-owned natural-key side table | every CDM 5.4 key is a 32-bit integer | content-hash surrogate keys (collide near 65k rows) |
 | OMOP commit unit | one composition's record graph, all-or-nothing, with a watermark | more than twenty linked records per diagnosis (arXiv:2607.27208) | row batches |
+| OMOP `PERSON` source | a `PERSON` row a loaded OMOCL mapping writes; otherwise a placeholder row (concepts 0, `year_of_birth` 0) under `create_on_first_sight`, or a refusal under `existing` (section 5.5) | `person_id` is a required foreign key to `PERSON`; the CDM drops a person with no year of birth, and a placeholder 0 is flagged by the Data Quality Dashboard where an invented year would not be | clinical rows naming no `PERSON` row; a birth year taken from the first event |
 | OMOP table routing | `type` is the declaration, the concept's domain is validated against it | the CDM's domain rule; the reference engine ignores it | route by domain; trust `type` blind |
 | `alternatives` | ordered first-match | the only reading the library is consistent with | all-match; merge |
 | Incremental mode | a change-feed adapter over a configured stream, after the batch round trip, running the same per-composition commit | ITS-REST defines no feed; the reference CDR's outbox is the reference source | polling AQL by time; a bespoke feed |

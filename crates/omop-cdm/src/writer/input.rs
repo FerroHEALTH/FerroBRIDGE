@@ -38,15 +38,20 @@ impl fmt::Display for RunId {
     }
 }
 
-/// What the writer does for an EHR it has no `PERSON` for.
+/// What the writer does for a row whose EHR has no `PERSON` row.
 ///
 /// One `ehr_id` is one person; reconciling a person across EHRs is the
-/// deployment's decision and never the writer's.
+/// deployment's decision and never the writer's. A `PERSON` row a mapping
+/// writes is the person's source under either policy, and replaces a
+/// placeholder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PersonPolicy {
-    /// Assigns the EHR a `person_id` the first time a row refers to it.
+    /// Assigns the EHR a `person_id` the first time a row refers to it and
+    /// writes a placeholder `PERSON` row: every concept 0, `year_of_birth`
+    /// 0, and the `ehr_id` as `person_source_value` when it fits the column.
     CreateOnFirstSight,
-    /// Refuses a row that refers to an EHR no earlier `PERSON` row named.
+    /// Refuses a row whose EHR has no `PERSON` row, as the CDM's convention
+    /// for a person with no year of birth drops the person's data.
     Existing,
 }
 

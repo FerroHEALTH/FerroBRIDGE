@@ -7,7 +7,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
-use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use tokio_postgres::Transaction;
 
 use crate::ddl::SchemaName;
@@ -19,6 +18,7 @@ use crate::meta::TableMeta;
 use crate::writer::database;
 use crate::writer::error::Step;
 use crate::writer::error::WriteError;
+use crate::writer::person::mapped;
 use crate::writer::quoted;
 use crate::writer::stage::Staged;
 use crate::writer::stage::copy_rows;
@@ -45,40 +45,12 @@ pub(super) async fn allocate(
     row.try_get(0).map_err(database(Step::Allocate(table)))
 }
 
-/// Resolves `ehr_id` to its `person_id`, assigning one when `create` allows.
-pub(super) async fn person_id(
-    transaction: &Transaction<'_>,
-    bridge: &SchemaName,
-    ehr_id: &HierObjectId,
-    create: bool,
-) -> Result<i32, WriteError> {
-    let found = transaction
-        .query_opt(
-            &format!("SELECT person_id FROM {bridge}.person_map WHERE ehr_id = $1"),
-            &[&ehr_id.value()],
-        )
-        .await
-        .map_err(database(Step::Read))?;
-    if let Some(row) = found {
-        return row.try_get(0).map_err(database(Step::Read));
-    }
-    if !create {
-        return Err(WriteError::UnknownPerson {
-            ehr_id: ehr_id.clone(),
-        });
-    }
-    let id = allocate(transaction, bridge, "person").await?;
-    transaction
-        .execute(
-            &format!("INSERT INTO {bridge}.person_map (ehr_id, person_id) VALUES ($1, $2)"),
-            &[&ehr_id.value(), &id],
-        )
-        .await
-        .map_err(database(Step::Record))?;
-    Ok(id)
-}
-
 /// The tables and sequences of the bridge schema.
+///
+/// Every statement leaves what already exists, and a schema an earlier
+/// release created is brought to this shape: `record` loses the uniqueness of
+/// `(cdm_table, surrogate_id)` for `person`, the one table several
+/// compositions write the same row of.
 pub(super) fn bridge_ddl(bridge: &SchemaName) -> String {
     let mut statements = vec![
         format!("CREATE SCHEMA IF NOT EXISTS {bridge}"),
@@ -99,8 +71,20 @@ pub(super) fn bridge_ddl(bridge: &SchemaName) -> String {
                 branch integer NOT NULL,
                 surrogate_id integer NOT NULL,
                 PRIMARY KEY (versioned_object_uid, archetype_root_path, occurrence_path,
-                    mapping, entry, branch, cdm_table),
-                UNIQUE (cdm_table, surrogate_id))"
+                    mapping, entry, branch, cdm_table))"
+        ),
+        // NOTE: no specification governs this: our own design; every composition of a
+        // person may write its PERSON row, so an id is unique in every other table only.
+        format!(
+            "ALTER TABLE {bridge}.record DROP CONSTRAINT IF EXISTS record_cdm_table_surrogate_id_key"
+        ),
+        format!(
+            "CREATE UNIQUE INDEX IF NOT EXISTS record_surrogate_id
+                ON {bridge}.record (cdm_table, surrogate_id) WHERE cdm_table <> 'person'"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS record_person_writer
+                ON {bridge}.record (surrogate_id) WHERE cdm_table = 'person'"
         ),
         format!(
             "CREATE TABLE IF NOT EXISTS {bridge}.link (
@@ -158,7 +142,7 @@ pub(super) async fn assign_ids<'g>(
         let table = row.table().name;
         let key = row.key();
         let id = if table == "person" {
-            person_id(transaction, bridge, key.ehr_id(), true).await?
+            mapped(transaction, bridge, key.ehr_id(), true).await?
         } else if let Some(id) = earlier.ids.get(&EarlierKey::of(table, key)) {
             *id
         } else {
@@ -406,7 +390,8 @@ pub(super) async fn retire_persons(
 }
 
 /// Deletes the `PERSON` rows `graph` writes before they are copied in again,
-/// so the newest writer's columns replace a `PERSON` row a person kept.
+/// so the newest writer's columns replace a `PERSON` row a person kept, the
+/// placeholder or the row another composition of the person wrote.
 pub(super) async fn replace_persons(
     transaction: &Transaction<'_>,
     cdm: &SchemaName,
