@@ -25,6 +25,22 @@ crates on crates.io.
 
 ### Added
 
+- FHIR `Patient` from the KDS person template through FHIRconnect (#468).
+  The published KDS person chain of the FHIRconnect mapping library compiles
+  against the published `KDS_Person` operational template, which
+  `scripts/vendor/kds-person-opt.sh` vendors from the openFHIR test resources,
+  under a FerroBRIDGE project context, and a synthetic MII Person `Patient`
+  holds both lens laws through it. The published files that do not load,
+  compile or convert are replaced by stand-ins, each refusal pinned by file
+  and line; the defects are recorded on #475 and #468. Seven library files
+  join the mapping-library pass list and the chain joins the round-trip one.
+  `fhirconnect` 0.1.114 adds the `DV_DATE` against `date` and `DV_BOOLEAN`
+  against `boolean` cells, reads `value` on a primitive as the primitive
+  itself, the form FHIRconnect writes in a condition, and writes the
+  context's `health_care_facility` as the `_health_care_facility` family. The
+  facade keys a `Patient` by its first identifier with a value, so a
+  `Patient` written through it is stored as the `KDS_Person` composition of
+  its own EHR and reads back.
 - The FHIR facade authenticates its callers as a SMART App Launch 2.x
   resource server (#400). A new `[auth]` section, off by default, names the
   issuer and the audience; the issuer's metadata and key set are read at
@@ -311,6 +327,11 @@ crates on crates.io.
   one canonical) as an unknown extension at that extension, a warning or an
   error under `modifierExtension`, and goes on, where it ended the whole
   validation with a resolution error (#550).
+- `openehr-mapping-core` 0.1.110 compares a name predicate the `aqlPath` of a
+  Web Template node carries on an ancestor segment, so a mapping path below
+  one of two sibling clusters that share a node id (the `Straßenanschrift` and
+  `Postfach` addresses of `KDS_Person`) names the node below that cluster
+  alone (#468).
 - The facade's loss log records each declared loss as a value-free kind
   (`skipped-unresolved-reference`, `deferred-reference`, `defaulted` and the
   rest) with its FHIRPath and its openEHR path, where it logged the loss's

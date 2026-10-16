@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/composition/org.highmed/person.v1.Patient.yml, a
+# derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: no method of the published file compiles against R4 Patient, so
+# the published file is not loaded. Its lines 16 to 19, 62 to 65 and 67 to 83
+# read `Patient.serviceProvider` and its lines 21 to 46 `Patient.period`, and
+# R4 Patient defines neither (#475); its lines 52 to 60 and 75 to 83 write
+# `null_flavour` below a DV_DATE_TIME and a PARTY_PROXY, which carry none. The
+# one method kept maps the health care facility from the R4 element
+# `Patient.managingOrganization`, the element #475 names for it.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.person.v0
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.person.v0
+    revision: 1.0.1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Patient
+
+mappings:
+  - name: "healthcareFacility"
+    with:
+      fhir: "$resource.managingOrganization"
+      openehr: "$composition/context/health_care_facility"

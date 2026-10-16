@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of projects/org.highmed/KDS/person/KDS_admin_entry_person.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name and version are FerroBRIDGE's. The published
+# lines 19 to 23 carry no `extension` key, which every method of an extension
+# starts with (extension-methods.adoc), and name a PROGRAMMED function the
+# engine does not provide, so the method is left out. The model's `link`
+# method (person_data.v0.yml lines 58 to 76) reads `link` below a `Reference`
+# at its line 75, which R4 does not define, so it is overwritten with a
+# method that maps nothing.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_kds_admin_entry_person
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: ADMIN_ENTRY.person_data.v0
+
+mappings:
+  - name: "compositionMapping"
+    extension: "add"
+    with:
+      fhir: "$resource"
+      openehr: "$composition"
+    slotArchetype: "COMPOSITION.person.v0"
+
+  - name: "link"
+    extension: "overwrite"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype"
+      type: "NONE"

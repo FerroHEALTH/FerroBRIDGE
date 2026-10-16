@@ -135,11 +135,30 @@ fn the_underscore_sibling_reads_its_members_from_the_element_table()
 
 #[test]
 fn a_member_the_element_table_does_not_state_is_refused() -> Result<(), ParseError> {
-    let path = "$resource.recordedDate.value".parse()?;
+    let path = "$resource.recordedDate.unstated".parse()?;
     assert!(matches!(
         resolve(&SCHEMAS, "Condition", &path),
         Err(ResolveError::NoChildren { ref element, ref name })
-            if element == "Condition.recordedDate" && name == "value"
+            if element == "Condition.recordedDate" && name == "unstated"
+    ));
+    Ok(())
+}
+
+/// Every R4 primitive defines its own `value` beside `id` and `extension`
+/// (`StructureDefinition-dateTime`, `dateTime.value`), and FHIRconnect reads a
+/// primitive that way in a condition (`basics/Conditions.adoc` §not of), so
+/// `value` names the primitive itself and nothing lies below it.
+#[test]
+fn a_primitive_value_names_the_primitive_and_holds_nothing()
+-> Result<(), Box<dyn core::error::Error>> {
+    let value = resolved("Condition", "$resource.recordedDate.value")?;
+    let plain = resolved("Condition", "$resource.recordedDate")?;
+    assert_eq!(value, plain);
+    let path = "$resource.recordedDate.value.id".parse()?;
+    assert!(matches!(
+        resolve(&SCHEMAS, "Condition", &path),
+        Err(ResolveError::NoChildren { ref element, ref name })
+            if element == "Condition.recordedDate.value" && name == "id"
     ));
     Ok(())
 }

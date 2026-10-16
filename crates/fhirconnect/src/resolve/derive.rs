@@ -28,16 +28,20 @@ use crate::model::ast::keyword::DataType;
 /// A row holds only the pairs a data-type cell of the engine carries both
 /// ways, so a derived pair is always one the engine runs. `DV_INTERVAL`
 /// against `Period` is the engine's `DV_INTERVAL<DV_DATE_TIME>` cell.
+/// `DV_BOOLEAN` against `boolean` is a primitive pair the chapter leaves out
+/// as "straight forward" (`data-mappings.adoc`).
 pub const PAIRS: &[(&str, &[&str])] = &[
     ("DV_TEXT", &["string", "Coding", "CodeableConcept"]),
     ("DV_CODED_TEXT", &["CodeableConcept", "Coding"]),
     ("CODE_PHRASE", &["Coding"]),
+    ("DV_DATE", &["date"]),
     ("DV_DATE_TIME", &["dateTime", "Period"]),
     ("DV_INTERVAL", &["Period"]),
     ("PARTY_IDENTIFIED", &["Reference"]),
     ("PARTY_PROXY", &["Reference"]),
     ("DV_IDENTIFIER", &["Identifier"]),
     ("DV_PROPORTION", &["Quantity"]),
+    ("DV_BOOLEAN", &["boolean"]),
 ];
 
 /// The FHIR type code every primitive that travels as a JSON string falls
@@ -91,8 +95,9 @@ pub fn element(class: &str, code: &'static str, text: bool) -> &'static str {
 /// code with the first letter raised (<https://hl7.org/fhir/R4/formats.html#choice>),
 /// so it is matched against the class's pairs without regard to case, and an
 /// alternative that travels as text and is no pair converts as a `string`.
-/// `None` for a primitive that travels as a JSON boolean or number, which no
-/// cell carries.
+/// A primitive that travels as a JSON boolean converts only through a pair of
+/// the class, and one that travels as a JSON number through none, so either
+/// is `None` when no cell carries it.
 #[must_use]
 pub fn carried(class: &str, suffix: &str, kind: Kind) -> Option<&'static str> {
     match kind {
@@ -104,7 +109,11 @@ pub fn carried(class: &str, suffix: &str, kind: Kind) -> Option<&'static str> {
                 .copied()
                 .unwrap_or(TEXT),
         ),
-        Kind::Primitive(ValueKind::Boolean | ValueKind::Integer | ValueKind::Decimal)
+        Kind::Primitive(ValueKind::Boolean) => pairs(class)
+            .iter()
+            .find(|code| code.eq_ignore_ascii_case(suffix))
+            .copied(),
+        Kind::Primitive(ValueKind::Integer | ValueKind::Decimal)
         | Kind::Resource
         | Kind::Choice(_) => None,
     }

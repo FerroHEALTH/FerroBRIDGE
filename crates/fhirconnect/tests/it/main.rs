@@ -14,6 +14,7 @@ mod laws;
 mod locations;
 mod model;
 mod operations;
+mod person;
 mod pins;
 mod resolve;
 mod roundtrip;

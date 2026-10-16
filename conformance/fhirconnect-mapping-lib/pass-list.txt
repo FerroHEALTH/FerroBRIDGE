@@ -1,3 +1,10 @@
+model/admin_entry/org.highmed/person_data.v0.yml
+model/admin_entry/org.highmed/versicherungsinformationen.v0.yml
+model/cluster/org.openehr/death_details.v1.yml
+model/cluster/org.openehr/person_birth_data_iso.v0.yml
 model/cluster/org.openehr/problem_qualifier.v2.yml
+model/cluster/org.openehr/structured_name.v1.yml
 model/evaluation/org.openehr/problem_diagnosis.v1.yml
+projects/org.highmed/KDS/person/KDS_Composition.yml
+projects/org.highmed/KDS/person/KDS_gender.yml
 total 107
