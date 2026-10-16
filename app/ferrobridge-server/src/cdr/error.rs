@@ -294,6 +294,7 @@ pub(crate) fn client_kind(error: &ClientError) -> &'static str {
         ClientError::Forbidden { .. } => "forbidden",
         ClientError::ServiceFailure { .. } => "service-failure",
         ClientError::UndocumentedStatus { .. } => "undocumented-status",
+        ClientError::AnswerTooLarge { .. } => "answer-too-large",
     }
 }
 
