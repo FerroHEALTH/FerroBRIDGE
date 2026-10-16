@@ -20,7 +20,6 @@ mod cdr;
 mod config;
 mod console;
 mod etl;
-mod etl_config;
 mod facade;
 mod facade_e2e;
 mod facade_person_e2e;
