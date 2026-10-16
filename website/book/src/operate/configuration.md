@@ -376,7 +376,9 @@ alone. The two FHIRconnect operations take theirs from one of two sources:
   (`GET /definition/template/adl1.4/{template_id}`, openEHR ITS-REST 1.1.0
   §Definition). A template the CDR does not hold, or any other refused fetch,
   stops the start with an error naming the template and the status the CDR
-  answered, so the lane never comes up with part of its mappings.
+  answered, so the lane never comes up with part of its mappings. A CDR that
+  does not answer yet is waited for, with readiness at `503` meanwhile
+  ([the health probe](container.md#the-health-probe)).
 
 A `directory` with neither `templates` nor `[cdr]` is refused while the
 operations are enabled. The server checks this when it reads the
