@@ -366,7 +366,7 @@ macros read.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `zizmor` | 1.30.1 | `.github/workflows/ci.yml` |
+| `zizmor` | 1.31.1 | `.github/workflows/ci.yml` |
 | `actionlint` | 1.7.12 | `.github/workflows/ci.yml` |
 | `shellcheck` | 0.11.0 | `.github/workflows/ci.yml` |
 | `hadolint` | 2.15.1 | `.github/workflows/ci.yml` |
