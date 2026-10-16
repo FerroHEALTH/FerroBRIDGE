@@ -72,8 +72,8 @@ Non-negotiables (violations are rejected at review):
   file you touched clean at `shellcheck --severity=style`. Report actual command
   results; never claim a green you did not see.
 - **The default local gate is `scripts/checks/fast.sh`** (run it in the
-  background). It runs rustfmt, clippy, nextest and the doctests on the
-  packages your diff reaches (the crates you touched, their dependants, and
+  background). It runs rustfmt, clippy, nextest and the doctests, one cargo
+  invocation each, on the packages your diff reaches (the crates you touched, their dependants, and
   the crates that read their files, the set the CI `detect` job computes),
   plus the fhir-codegen full-emit tests only when the diff reaches
   fhir-codegen (a change under `tools/fhir-codegen`, `crates/fhir-types`,
