@@ -407,6 +407,17 @@ crates on crates.io.
   having no `resourceType`. The generator's corpus tests fail the same way on
   a file that does not parse, and skip only a refusal they list with its
   citation (#487).
+- The OMOCL engine writes a `PERSON` row from the corpus's `person_data`
+  mapping (#560). CDM v5.4 requires `person.race_concept_id`, and OMOCL has
+  no key that writes it, so every `Person` record was refused and no person
+  got a row. The engine now writes concept `0` in a required standard concept
+  column that no OMOCL key writes. The CDM conventions use `0` "if there is
+  no information available for that field", and the column's own definition
+  says "If a clear race or ethnic background cannot be established, use
+  Concept_Id 0". `person.race_concept_id` is the only such column across the
+  ten tables OMOCL writes. The run report counts each one as a concept `0`
+  assignment. A mapping that leaves out a key it could have written, such as
+  `ethnicity_concept_id`, is still refused.
 - `openehr-mapping-core` 0.1.110 compares a name predicate the `aqlPath` of a
   Web Template node carries on an ancestor segment, so a mapping path below
   one of two sibling clusters that share a node id (the `Straßenanschrift` and
