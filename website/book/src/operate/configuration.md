@@ -327,6 +327,7 @@ refuses every job.
 | `deletions` | `remove` | no | What a run does with a composition the CDR reports deleted: `remove` deletes its rows, links and watermark, `report` lists it in the run report and keeps them. Any other value refuses the start ([Deleted compositions](../integrate/omop-etl.md#deleted-compositions)) |
 | `type_concept_id` | none, required | no | The `*_type_concept_id` the mappings write, the provenance of the records |
 | `observation_period_type_concept_id` | none, required | no | The `period_type_concept_id` of every observation period |
+| `vocabulary_aliases` | `LOINC` to `LOINC`, `SNOMED-CT` to `SNOMED` | no | A table from a terminology id, such as a URI or an OID, to the OHDSI `vocabulary_id` a coded value under it is looked up in, added over the defaults. A terminology id it does not list is looked up as its own `vocabulary_id`, and one longer than the 20 characters of `VOCABULARY.vocabulary_id` resolves to concept 0. The concept is still found in the loaded vocabulary. An empty id or vocabulary, a vocabulary longer than 20 characters, or a value that is not a string refuses the start. Written as `[etl.vocabulary_aliases]` with quoted keys, `"http://terminology.hl7.org/CodeSystem/v2-0001" = "Gender"` |
 
 ### `[etl.visits]`
 

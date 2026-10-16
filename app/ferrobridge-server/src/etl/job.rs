@@ -13,7 +13,6 @@ use crate::config::Settings;
 use crate::etl::mapper::{CdmVocabulary, MapperError, OmoclMapper, read_set};
 use crate::etl::report::RunReport;
 use crate::etl::{RunError, RunOptions};
-use omocl::engine::concept::VocabularyAliases;
 use omop_cdm::database::{CdmPool, ConnectError};
 use omop_cdm::graph::key::EmptyIdentifier;
 use omop_cdm::vocabulary::ConceptResolver;
@@ -98,7 +97,7 @@ pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport,
     let mapper = OmoclMapper::new(
         set,
         CdmVocabulary::new(ConceptResolver::new(pool)),
-        VocabularyAliases::default(),
+        etl.aliases.clone(),
     );
     let mut writer = CdmWriter::connect_with(
         &cdm.connection,
