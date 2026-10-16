@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The interactions: metadata, create, search, read, vread, update,
-//! transaction, `$validate`.
+//! transaction, batch, `$validate`.
 //!
 //! Each handler is the same shape. It checks the media types and the query
 //! parameters, resolves the program the request runs, calls the engine and the
@@ -18,6 +18,7 @@
 //! reaches a handler without one never passed the guard, and axum refuses it
 //! with `500`.
 
+mod batch;
 mod complete;
 mod conditional;
 mod read;
@@ -118,19 +119,9 @@ pub async fn read_route(
     headers: HeaderMap,
     uri: Uri,
 ) -> Response {
-    if let Err(refusal) = admit_existing(&facade, &access, Permission::Read, &resource_type, &id) {
-        return refusal.into_response();
-    }
-    read::read(
-        &facade,
-        &facade.client_for(&headers),
-        &resource_type,
-        &id,
-        &headers,
-        &uri,
-    )
-    .await
-    .unwrap_or_else(Refusal::into_response)
+    read(&facade, &access, (&resource_type, &id), &headers, &uri)
+        .await
+        .unwrap_or_else(Refusal::into_response)
 }
 
 /// `GET [base]/{type}/{id}/_history/{vid}`: read one version of a mapped
@@ -142,12 +133,9 @@ pub async fn vread_route(
     headers: HeaderMap,
     uri: Uri,
 ) -> Response {
-    if let Err(refusal) = admit_existing(&facade, &access, Permission::Read, &resource_type, &id) {
-        return refusal.into_response();
-    }
-    read::vread(
+    vread(
         &facade,
-        &facade.client_for(&headers),
+        &access,
         (&resource_type, &id, &vid),
         &headers,
         &uri,
@@ -165,11 +153,7 @@ pub async fn update_route(
     uri: Uri,
     body: Bytes,
 ) -> Response {
-    if let Err(refusal) = admit_existing(&facade, &access, Permission::Update, &resource_type, &id)
-    {
-        return refusal.into_response();
-    }
-    write::update(
+    update(
         &facade,
         &access,
         (&resource_type, &id),
@@ -194,7 +178,8 @@ pub async fn validate_route(
         .unwrap_or_else(Refusal::into_response)
 }
 
-/// `POST [base]`: a `transaction` Bundle, all or nothing.
+/// `POST [base]`: a `transaction` Bundle, all or nothing, or a `batch`
+/// Bundle, each entry on its own.
 pub async fn transaction_route(
     State(facade): State<Arc<Facade>>,
     Extension(access): Extension<Access>,
@@ -205,6 +190,59 @@ pub async fn transaction_route(
     transaction::transaction(&facade, &access, &headers, &uri, &body)
         .await
         .unwrap_or_else(Refusal::into_response)
+}
+
+/// The read interaction behind its route and a batch entry: the compartment
+/// check, then the read.
+pub(crate) async fn read(
+    facade: &Facade,
+    access: &Access,
+    (resource_type, id): (&str, &str),
+    headers: &HeaderMap,
+    uri: &Uri,
+) -> Result<Response, Refusal> {
+    admit_existing(facade, access, Permission::Read, resource_type, id)?;
+    read::read(
+        facade,
+        &facade.client_for(headers),
+        resource_type,
+        id,
+        headers,
+        uri,
+    )
+    .await
+}
+
+/// The vread interaction behind its route and a batch entry.
+pub(crate) async fn vread(
+    facade: &Facade,
+    access: &Access,
+    (resource_type, id, vid): (&str, &str, &str),
+    headers: &HeaderMap,
+    uri: &Uri,
+) -> Result<Response, Refusal> {
+    admit_existing(facade, access, Permission::Read, resource_type, id)?;
+    read::vread(
+        facade,
+        &facade.client_for(headers),
+        (resource_type, id, vid),
+        headers,
+        uri,
+    )
+    .await
+}
+
+/// The update interaction behind its route and a batch entry.
+pub(crate) async fn update(
+    facade: &Facade,
+    access: &Access,
+    (resource_type, id): (&str, &str),
+    headers: &HeaderMap,
+    uri: &Uri,
+    body: &[u8],
+) -> Result<Response, Refusal> {
+    admit_existing(facade, access, Permission::Update, resource_type, id)?;
+    write::update(facade, access, (resource_type, id), headers, uri, body).await
 }
 
 /// Checks that `access` reaches the composition the identity map binds to

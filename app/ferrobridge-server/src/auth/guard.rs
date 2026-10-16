@@ -8,8 +8,9 @@
 //! it knows the resource type and the id before a handler runs. A request
 //! without a valid token answers `401`, one whose token grants no scope for
 //! the interaction `403` (RFC 6750 §3.1). What a scope reaches inside a type
-//! (the patient compartment) and the entries of a transaction are checked by
-//! the handler, which reads the [`Access`] the guard leaves on the request.
+//! (the patient compartment) and the entries of a transaction or a batch are
+//! checked by the handler, which reads the [`Access`] the guard leaves on the
+//! request.
 //! `GET [base]/metadata` and the SMART discovery document stay open: a client
 //! reads both before it holds a token.
 
@@ -90,8 +91,14 @@ pub enum Interaction {
     Validate,
     /// `GET [base]/{type}` and `POST [base]/{type}/_search`.
     Search,
-    /// `POST [base]`.
+    /// `POST [base]` carrying a `transaction` Bundle, and the route itself.
     Transaction,
+    /// `POST [base]` carrying a `batch` Bundle.
+    ///
+    /// The route is the transaction's, so the route table never names it; the
+    /// batch handler names it on its response, and the audit line reads it
+    /// from there.
+    Batch,
     /// A FHIRconnect operation, `$tofhir` or `$toopenehr`, or its direct form.
     Operation,
     /// The SMART discovery document.
@@ -117,6 +124,7 @@ impl Interaction {
             Self::Validate => "validate",
             Self::Search => "search-type",
             Self::Transaction => "transaction",
+            Self::Batch => "batch",
             Self::Operation => "operation",
             Self::Discovery => "smart-configuration",
             Self::Unclassified => "unclassified",
@@ -137,6 +145,7 @@ impl Interaction {
             Self::Search => &[Permission::Search],
             Self::Capabilities
             | Self::Transaction
+            | Self::Batch
             | Self::Operation
             | Self::Discovery
             | Self::Unclassified => &[],
@@ -199,16 +208,91 @@ pub async fn guard(State(gate): State<Gate>, mut request: Request, next: Next) -
             }
         }
     };
+    // NOTE: no specification governs this: our own design, `POST [base]` is
+    // one route for two Bundle types, so the handler names the one it served.
+    let answered = Target {
+        interaction: response
+            .extensions()
+            .get::<Interaction>()
+            .copied()
+            .unwrap_or(target.interaction),
+        ..target
+    };
     audit(&Audited {
         at,
         started,
         access: access.as_ref(),
         method: &method,
-        target: &target,
+        target: &answered,
         status: response.status(),
         request_id: &request_id,
+        entry: None,
     });
     response
+}
+
+/// Checks that `access` grants a permission `interaction` needs on
+/// `resource_type`, the type-level check the guard runs on a route, for one
+/// entry of a batch.
+///
+/// # Errors
+///
+/// Returns the guard's `403` when no permission is granted.
+pub(crate) fn admit(
+    access: &Access,
+    interaction: Interaction,
+    resource_type: &str,
+) -> Result<(), Refusal> {
+    authorize(
+        access,
+        &Target {
+            interaction,
+            resource_type: Some(resource_type.to_owned()),
+            id: None,
+        },
+    )
+}
+
+/// One entry of a batch, as its audit line records it.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AuditedEntry<'a> {
+    /// The entry's position in the Bundle, from zero.
+    pub(crate) position: usize,
+    /// The method its `request` names.
+    pub(crate) method: &'a Method,
+    /// The interaction it was answered as.
+    pub(crate) interaction: Interaction,
+    /// The resource type its `request.url` names.
+    pub(crate) resource_type: Option<&'a str>,
+    /// The logical id its `request.url` names.
+    pub(crate) id: Option<&'a str>,
+    /// The status it answered.
+    pub(crate) status: StatusCode,
+}
+
+/// Writes the audit line of one batch entry, under the batch's request id.
+///
+/// The line carries the request line's fields and the entry's position.
+pub(crate) fn audit_entry(
+    access: &Access,
+    entry: &AuditedEntry<'_>,
+    started: Instant,
+    request_id: &str,
+) {
+    audit(&Audited {
+        at: jiff::Timestamp::now(),
+        started,
+        access: Some(access),
+        method: entry.method,
+        target: &Target {
+            interaction: entry.interaction,
+            resource_type: entry.resource_type.map(str::to_owned),
+            id: entry.id.map(str::to_owned),
+        },
+        status: entry.status,
+        request_id,
+        entry: Some(entry.position),
+    });
 }
 
 /// Returns who calls, or the refusal a missing or invalid token answers.
@@ -376,6 +460,7 @@ fn classify(method: &Method, template: &str, path: &str) -> Option<Target> {
         Interaction::Read | Interaction::Update | Interaction::Vread => (first, second),
         Interaction::Capabilities
         | Interaction::Transaction
+        | Interaction::Batch
         | Interaction::Operation
         | Interaction::Discovery
         | Interaction::Unclassified => (None, None),
@@ -403,6 +488,9 @@ struct Audited<'a> {
     status: StatusCode,
     /// The request id.
     request_id: &'a str,
+    /// The position of the batch entry the line records, `None` for a
+    /// request.
+    entry: Option<usize>,
 }
 
 /// Writes the one audit line of a request.
@@ -437,6 +525,24 @@ fn audit(audited: &Audited<'_>) {
         .chars()
         .take(MAX_ID_LENGTH)
         .collect();
+    if let Some(position) = audited.entry {
+        tracing::info!(
+            target: AUDIT_TARGET,
+            at = %audited.at,
+            subject,
+            client,
+            method = audited.method.as_str(),
+            interaction = audited.target.interaction.code(),
+            resource_type,
+            resource_id = id,
+            status = audited.status.as_u16(),
+            duration_ms = audited.started.elapsed().as_secs_f64() * 1000.0,
+            request_id = audited.request_id,
+            entry = position,
+            "audit"
+        );
+        return;
+    }
     tracing::info!(
         target: AUDIT_TARGET,
         at = %audited.at,
