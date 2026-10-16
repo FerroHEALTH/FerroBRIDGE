@@ -20,6 +20,8 @@
 //! - a CDR `405` or `415` is a `500`, because the bridge chose a call the CDR
 //!   does not offer;
 //! - any CDR `5xx` is a `502` carrying the upstream status;
+//! - a CDR `400` on a search query is a `500`, because the bridge wrote the
+//!   AQL, and a CDR `408` on one is a `502`;
 //! - a connect failure or a timeout is a `502`.
 
 use http::StatusCode;
@@ -146,6 +148,25 @@ pub const UPSTREAM: Row = Row {
     fhir: "hl7.org/fhir/R4/http.html, the server is a gateway to the CDR",
 };
 
+/// A CDR `400` on a search query: the CDR refused the AQL the bridge built.
+///
+/// The facade writes every query a search runs, so a query the CDR cannot
+/// accept is the bridge's fault and a `500`, never an empty searchset.
+pub const QUERY_REFUSED: Row = Row {
+    status: StatusCode::INTERNAL_SERVER_ERROR,
+    issue: IssueType::Exception,
+    openehr: "query-codegen.openapi.yaml, query_execute_adhoc_query_body 400",
+    fhir: "hl7.org/fhir/R4/http.html, 500 Internal Server Error",
+};
+
+/// A CDR `408` on a search query: the query did not finish in the CDR's time.
+pub const QUERY_TIMEOUT: Row = Row {
+    status: StatusCode::BAD_GATEWAY,
+    issue: IssueType::Transient,
+    openehr: "query-codegen.openapi.yaml, query_execute_adhoc_query_body 408",
+    fhir: "hl7.org/fhir/R4/http.html, the server is a gateway to the CDR",
+};
+
 /// The identity store or another part of the bridge refused.
 pub const INTERNAL: Row = Row {
     status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -262,6 +283,23 @@ pub fn of_client_error(error: &CdrError) -> Answer {
     }
 }
 
+/// Returns the answer a documented refusal of the AQL query maps to.
+///
+/// The query operation documents `400` and `408`
+/// (`query-codegen.openapi.yaml`, `query_execute_adhoc_query_body`); either
+/// one reaches the wire as its row with the CDR's own words, never as an
+/// empty result.
+#[must_use]
+pub fn of_query_refusal(upstream: &crate::cdr::error::Upstream) -> Answer {
+    let row = if upstream.status() == StatusCode::REQUEST_TIMEOUT {
+        QUERY_TIMEOUT
+    } else {
+        QUERY_REFUSED
+    };
+    let body = ErrorBody::from_bytes(upstream.body().as_bytes().to_vec());
+    Answer::new(row, diagnostics(upstream.status(), &body))
+}
+
 /// Returns the answer one refusal of the generated client maps to, with the
 /// body the CDR sent when the call reached it.
 fn of_generated_error(error: &ClientError) -> Answer {
@@ -306,8 +344,9 @@ fn of_generated_error(error: &ClientError) -> Answer {
 #[cfg(test)]
 mod tests {
     use super::{
-        BAD_REQUEST, GONE, NOT_FOUND, PRECONDITION_FAILED, UNAUTHORIZED, UNDOCUMENTED,
-        UNPROCESSABLE, UPSTREAM, diagnostics, of_client_error,
+        BAD_REQUEST, GONE, NOT_FOUND, PRECONDITION_FAILED, QUERY_REFUSED, QUERY_TIMEOUT,
+        UNAUTHORIZED, UNDOCUMENTED, UNPROCESSABLE, UPSTREAM, diagnostics, of_client_error,
+        of_query_refusal,
     };
     use crate::cdr::error::CdrError;
     use http::{Method, StatusCode};
@@ -328,6 +367,8 @@ mod tests {
             UNAUTHORIZED,
             UNDOCUMENTED,
             UPSTREAM,
+            QUERY_REFUSED,
+            QUERY_TIMEOUT,
         ] {
             assert!(
                 !row.openehr_citation().is_empty() && !row.fhir_citation().is_empty(),
@@ -422,6 +463,33 @@ mod tests {
         );
         assert!(text.contains("the composition is invalid"), "{text}");
         assert!(text.contains("/content[0] is required"), "{text}");
+    }
+
+    #[test]
+    fn a_refused_query_is_a_500_and_a_timed_out_one_a_502_with_the_cdr_words() {
+        let refused = crate::cdr::error::Upstream::new(
+            StatusCode::BAD_REQUEST,
+            http::HeaderMap::new(),
+            String::from(r#"{"message":"unknown path c/x","validationErrors":[]}"#),
+        );
+        let answer = of_query_refusal(&refused);
+        assert_eq!(QUERY_REFUSED, answer.row());
+        assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, answer.status());
+        assert!(
+            answer
+                .issue()
+                .diagnostics()
+                .is_some_and(|text| text.contains("400") && text.contains("unknown path c/x")),
+            "the 500 does not carry the CDR's refusal"
+        );
+        let timed_out = crate::cdr::error::Upstream::new(
+            StatusCode::REQUEST_TIMEOUT,
+            http::HeaderMap::new(),
+            String::new(),
+        );
+        let answer = of_query_refusal(&timed_out);
+        assert_eq!(QUERY_TIMEOUT, answer.row());
+        assert_eq!(StatusCode::BAD_GATEWAY, answer.status());
     }
 
     #[test]

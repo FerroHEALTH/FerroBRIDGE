@@ -25,6 +25,32 @@ crates on crates.io.
 
 ### Added
 
+- The FHIR facade answers search (#98): `GET [base]/{type}?…` and
+  `POST [base]/{type}/_search` over an AQL projection declared beside the
+  context mapping, in a `<name>.search.yml` file that names the context, the
+  subject parameters, the `token`, `string` and `date` parameters with the
+  repeated node each is read under and its path relative to that node, and
+  the total order pages are read in. The query binds that node in its `FROM`
+  once per parameter occurrence, so a token's code and system always come
+  from one coded value (#526), a path crossing a node the template lets repeat
+  below the bound one is refused at load, and a composition matching on
+  several nodes is one entry, counted once. FHIRconnect leaves
+  search out, so the format is FerroBRIDGE's own. Every declaration is checked
+  and every query it can build is parsed at boot, and a declaration that does
+  not parse refuses the start. A search answers a `searchset` Bundle with an
+  `id`, `meta.lastUpdated`, one entry per composition with a unique `fullUrl`
+  and `search.mode = match`, `total` counting matches, and `self` and `next`
+  links over the CDR's `offset` and `fetch` paging. `_id`, `_count` (capped by
+  the new `[facade] search_count_max`, default page `search_count`), `_count=0`
+  and `_summary=count`, `_sort` and `_total` are supported. A parameter the
+  type does not declare is a `400` naming it unless the client sends
+  `Prefer: handling=lenient`; an unsupported modifier is always a `400`. An
+  unknown subject or id is an empty searchset with no CDR call, and a CDR
+  refusal maps through the facade's status table, a query `400` to a `500` and
+  a query `408` to a `502`. The `CapabilityStatement` names `search-type` and
+  exactly the declared parameters with `_id`. Under `[auth]`, a search needs
+  the `s` permission of its type, and a `patient/` token's search is held to
+  its patient's EHR.
 - FHIR `Patient` from the KDS person template through FHIRconnect (#468).
   The published KDS person chain of the FHIRconnect mapping library compiles
   against the published `KDS_Person` operational template, which
@@ -57,7 +83,10 @@ crates on crates.io.
   line on the `ferrobridge::audit` target without the token or the body.
   The `CapabilityStatement` carries `rest.security` with the SMART service
   and the `oauth-uris` extension. With `[auth]` off the facade stays open,
-  and the server warns at start-up.
+  and the server warns at start-up. The guard classifies every route under
+  `/fhir` by name, and a route it does not classify answers `403` without
+  reaching a handler, so a route added without a classification fails closed
+  (#547).
 - `fhir-types` 0.1.111 names each type's base type in the element table
   (`TypeSchema::base`, from `StructureDefinition.baseDefinition`, and for a
   backbone element the `BackboneElement` or `Element` its element names), in
