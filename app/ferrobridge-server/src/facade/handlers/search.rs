@@ -480,9 +480,11 @@ fn read_row(
 ///
 /// Each bound node the row selects names the entry that holds it, and the
 /// row answers the entries that hold every such node; a node outside every
-/// entry constrains none. A row that names no entry this way answers the
-/// entries the `_id` criteria name, or the first entry. No specification
-/// governs how a row names its entry: our own design.
+/// entry constrains none. A row that names no entry this way, which is every
+/// row of a search that binds no node, answers every entry of the archetype
+/// (R4 search.html §3.1.1: each matching resource is in the searchset). The
+/// `_id` criteria then keep the entries they name. No specification governs
+/// how a row names its entry: our own design.
 fn matched(
     plan: &Plan<'_>,
     read: &Row,
@@ -513,11 +515,7 @@ fn matched(
                 .collect(),
         });
     }
-    let mut entries = match chosen {
-        Some(entries) => entries,
-        None if plan.ids.is_empty() => every.into_iter().take(1).collect(),
-        None => every,
-    };
+    let mut entries = chosen.unwrap_or(every);
     let container = versioned_object_uid(&read.version);
     for bindings in &plan.ids {
         entries.retain(|entry| {
@@ -566,7 +564,7 @@ fn program_of<'a>(facade: &'a Facade, declared: &Declared) -> Result<&'a Loaded,
 /// Returns the `Bundle.total` of one page, when it is known or asked for.
 ///
 /// A first page that leaves no next page holds every match, so its size is
-/// the exact total at no cost. Otherwise the count queries run only when the
+/// the exact total at no cost. Otherwise the rows are counted only when the
 /// client asked for a total (<https://hl7.org/fhir/R4/search.html>,
 /// §3.1.1.5.2), and `_total=none` never gets one.
 async fn total_of(
@@ -592,10 +590,9 @@ async fn total_of(
 
 /// Returns the number of matches across every declaration.
 ///
-/// A declaration whose rows each answer the first entry of one composition
-/// is counted by the count query. One that binds a node or names `_id`s may
-/// answer several entries of one composition, which no AQL count expresses,
-/// so its rows are read and every entry [`matched`] answers is counted once.
+/// One composition may answer several entries, which no AQL count over the
+/// facade's `FROM` expresses, so the rows of every declaration are read and
+/// each entry [`matched`] answers is counted once.
 async fn count_all(
     facade: &Facade,
     client: &CdrClient,
@@ -606,20 +603,8 @@ async fn count_all(
         let Some(conditions) = plan.conditions.as_ref() else {
             continue;
         };
-        if conditions.binds_nodes() || !plan.ids.is_empty() {
-            let counted = count_entries(facade, client, plan, conditions).await?;
-            total = total.saturating_add(u64::try_from(counted).unwrap_or(u64::MAX));
-            continue;
-        }
-        let rows = rows_of(client, &aql::count_request(conditions)).await?;
-        let counted = rows
-            .first()
-            .and_then(|row| row.first())
-            .and_then(serde_json::Value::as_u64)
-            .ok_or_else(|| {
-                malformed_answer("the CDR answered the count query without a whole number")
-            })?;
-        total = total.saturating_add(counted);
+        let counted = count_entries(facade, client, plan, conditions).await?;
+        total = total.saturating_add(u64::try_from(counted).unwrap_or(u64::MAX));
     }
     Ok(total)
 }

@@ -10,6 +10,7 @@
 //! names the node that matched as the real CDR would.
 
 use http::StatusCode;
+use std::collections::BTreeSet;
 use std::error::Error as StdError;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
@@ -19,6 +20,7 @@ use super::super::VERSION_ONE;
 use super::super::condition;
 use super::super::stub::mount_read;
 use super::AQL;
+use super::OTHER_CONTAINER;
 use super::diagnosis;
 use super::get;
 use super::link;
@@ -26,6 +28,7 @@ use super::matches;
 use super::mount_rows;
 use super::node_row;
 use super::result_set;
+use super::row;
 use super::searching;
 
 /// Returns the composition one synthetic `Condition` coded `code` maps to.
@@ -199,5 +202,114 @@ async fn a_page_boundary_inside_a_composition_answers_each_entry_once()
         found.first().and_then(|entry| code_of(entry))
     );
     assert_eq!(None, link(&page_two, "next"));
+    Ok(())
+}
+
+/// Returns the version uid of a second composition.
+fn second_version() -> String {
+    format!("{OTHER_CONTAINER}::ferrobridge.test::1")
+}
+
+#[tokio::test]
+async fn a_search_binding_no_node_answers_every_entry_of_each_composition()
+-> Result<(), Box<dyn StdError>> {
+    // #658, R4 search.html §3.1.1: every resource that meets the criteria is
+    // in the searchset, so a subject search answers both diagnoses of each
+    // composition, each with its own id.
+    for query in [
+        "Condition?patient=p-1",
+        "Condition?context-start=ge2000-01-01",
+    ] {
+        let harness = searching().await;
+        let (composition, _, _) = two_diagnoses(&harness);
+        let second = second_version();
+        mount_rows(
+            &harness.cdr,
+            &[row(VERSION_ONE, &composition), row(&second, &composition)],
+        )
+        .await;
+        let (status, body) = get(&harness, query).await?;
+        assert_eq!(StatusCode::OK, status, "{query}: {body}");
+        let found = matches(&body);
+        let codes: Vec<Option<&str>> = found.iter().map(|entry| code_of(entry)).collect();
+        assert_eq!(
+            vec![
+                Some("SYN-001"),
+                Some("SYN-002"),
+                Some("SYN-001"),
+                Some("SYN-002")
+            ],
+            codes,
+            "{query}: {body}"
+        );
+        let ids: BTreeSet<&str> = found.iter().filter_map(|entry| id_of(entry)).collect();
+        assert_eq!(4, ids.len(), "{query}: each entry has its own id: {body}");
+        assert_eq!(Some(4), body["total"].as_u64(), "{query}: {body}");
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn paging_a_search_binding_no_node_answers_each_entry_once() -> Result<(), Box<dyn StdError>>
+{
+    // One composition, two entries, pages of one: page two starts at the
+    // composition's row and skips the entry page one answered.
+    let harness = searching().await;
+    let (composition, _, _) = two_diagnoses(&harness);
+    mount_rows(&harness.cdr, &[row(VERSION_ONE, &composition)]).await;
+    let (status, page_one) =
+        get(&harness, "Condition?patient=p-1&_count=1&_total=accurate").await?;
+    assert_eq!(StatusCode::OK, status, "{page_one}");
+    assert_eq!(
+        Some(2),
+        page_one["total"].as_u64(),
+        "the total counts entries, never compositions: {page_one}"
+    );
+    let first = matches(&page_one);
+    assert_eq!(1, first.len(), "{page_one}");
+    assert_eq!(
+        Some("SYN-001"),
+        first.first().and_then(|entry| code_of(entry))
+    );
+    let next = link(&page_one, "next").ok_or("a second entry is left")?;
+    assert!(
+        next.contains("_cursor=0.0.1."),
+        "the next page starts at the composition and skips one entry: {next}"
+    );
+    let (status, page_two) = get(
+        &harness,
+        next.strip_prefix("http://ferrobridge.invalid/fhir/")
+            .unwrap_or(next),
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{page_two}");
+    let second = matches(&page_two);
+    assert_eq!(1, second.len(), "{page_two}");
+    assert_eq!(
+        Some("SYN-002"),
+        second.first().and_then(|entry| code_of(entry))
+    );
+    assert_ne!(
+        first.first().and_then(|entry| id_of(entry)),
+        second.first().and_then(|entry| id_of(entry)),
+        "one entry answered on two pages"
+    );
+    assert_eq!(None, link(&page_two, "next"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_count_of_a_search_binding_no_node_counts_entries() -> Result<(), Box<dyn StdError>> {
+    // R4 search.html §3.1.1.5.3: _count=0 reports in Bundle.total the number
+    // of resources that match, here three entries in two compositions.
+    let harness = searching().await;
+    let (two, _, _) = two_diagnoses(&harness);
+    let one = harness.composition();
+    let second = second_version();
+    mount_rows(&harness.cdr, &[row(VERSION_ONE, &two), row(&second, &one)]).await;
+    let (status, body) = get(&harness, "Condition?patient=p-1&_count=0").await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(Some(3), body["total"].as_u64(), "{body}");
+    assert!(matches(&body).is_empty(), "{body}");
     Ok(())
 }

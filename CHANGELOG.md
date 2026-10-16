@@ -468,6 +468,11 @@ crates on crates.io.
   with the token endpoint's status and OAuth error (RFC 6749 §5.2) in the
   diagnostics, never the client secret. It used to answer "the openEHR
   service could not be reached".
+- A facade search that binds no node, such as `Condition?patient=…`, answers
+  every entry of the context's archetype in each matching composition, each
+  with its own id, where it answered only the first (#658). `Bundle.total`
+  counts those entries for every search, so `_count=0`, `_summary=count` and
+  `_total=accurate` read the rows instead of running an AQL `COUNT`.
 - Removing a person's newest `PERSON` writer hands the row to the writer
   that remains (#561). When several compositions of one EHR write the
   person's `PERSON` row and the newest of them is deleted in the CDR, or a

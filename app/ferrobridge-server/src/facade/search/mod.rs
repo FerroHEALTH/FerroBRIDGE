@@ -15,8 +15,8 @@
 //! One resource type answers one parameter set: every declaration of a type
 //! states the same parameters, and the `CapabilityStatement` names exactly
 //! those. Two declarations of one type over one template are refused, so a
-//! composition is never found twice and a searchset carries one entry per
-//! composition.
+//! composition is never found twice and a searchset carries each entry of
+//! the context's archetype in a matching composition once.
 
 pub mod aql;
 pub mod bundle;
@@ -346,16 +346,10 @@ fn check_paths(declared: &Declared) -> Result<(), DeclarationError> {
         path: path.clone(),
         descending: false,
     }));
-    for text in [
-        aql::rows_text(&conditions, &order),
-        aql::count_text(&conditions),
-    ] {
-        aql::parses(&text).map_err(|source| DeclarationError::Query {
-            file: declared.file.clone(),
-            source,
-        })?;
-    }
-    Ok(())
+    aql::parses(&aql::rows_text(&conditions, &order)).map_err(|source| DeclarationError::Query {
+        file: declared.file.clone(),
+        source,
+    })
 }
 
 /// Files `declared` under its type, refusing a second declaration over one
