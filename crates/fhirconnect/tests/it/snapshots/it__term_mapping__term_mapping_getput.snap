@@ -1,0 +1,32 @@
+---
+source: crates/fhirconnect/tests/it/term_mapping.rs
+expression: declared
+---
+{
+  "first_leg": [
+    "the mapping problemDiagnose did not run: its TERM_MAPPING `<` to SYN-BROAD-7 of http://example.org/fhir/CodeSystem/synthetic-broader is no equivalence, and only `=` maps to a Coding"
+  ],
+  "second_leg": [
+    "the mapping recordedDateOutboundOnly did not run: its unidirectional marker names the other direction",
+    "the engine filled /composer",
+    "the engine filled /context/start_time",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "lost": [
+    "diagnosis/problem_diagnosis/problem_name/_mapping:1/target|code = \"SYN-001\"",
+    "diagnosis/problem_diagnosis/problem_name/_mapping:1/target|terminology = \"http://example.org/fhir/CodeSystem/synthetic\"",
+    "diagnosis/problem_diagnosis/problem_name/_mapping:1|match = \"=\""
+  ],
+  "added": [
+    "ctx/setting = \"238\"",
+    "ctx/time = \"2026-09-13T08:00:00Z\""
+  ],
+  "changed": [
+    "ctx/composer_name: \"FerroBRIDGE\" became \"FHIRconnect\"",
+    "diagnosis/problem_diagnosis/problem_name/_mapping:0/target|code: \"SYN-BROAD-7\" became \"SYN-001\"",
+    "diagnosis/problem_diagnosis/problem_name/_mapping:0/target|terminology: \"http://example.org/fhir/CodeSystem/synthetic-broader\" became \"http://example.org/fhir/CodeSystem/synthetic\"",
+    "diagnosis/problem_diagnosis/problem_name/_mapping:0|match: \"<\" became \"=\""
+  ]
+}
