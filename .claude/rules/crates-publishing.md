@@ -48,6 +48,13 @@ rule, machine-enforced by the `crate-version-guard` CI job.
 - Not every bumped version is published; gaps in the published sequence are
   normal. Publishing different content under an existing version is what is
   forbidden, and crates.io refuses it.
+- **A breaking change is a patch too** (owner decision 2026-10-17, #510): the
+  line moves one patch per change whether or not the change breaks a crate's
+  public API. Cargo reads a `0.x` caret requirement as compatible across
+  patches (<https://doc.rust-lang.org/cargo/reference/semver.html>), so a
+  consumer pins a crate of the line exactly (`fhirconnect = "=0.1.120"`), as
+  FerroFED does, and moves the pin deliberately. A PR that breaks a public API
+  says so in its body and its CHANGELOG entry, naming what a consumer changes.
 - `crates/fhir-types/src/**` and `crates/hl7v2-types/src/**` are generated, so a bump there follows a generator
   change and a regeneration, never a hand-edit (`codegen.md`).
 
