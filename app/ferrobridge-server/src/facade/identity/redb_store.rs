@@ -454,9 +454,10 @@ mod tests {
             versioned_object_uid: String::from(uid),
             template_id: String::from("ferrobridge.diagnose.v1"),
             resource_type: String::from("Condition"),
-            entry_path: String::from("/content[0]"),
+            entry_path: String::from("/content[1]"),
             split: 0,
             context: String::from("ferrobridge_diagnosis.context"),
+            derivation: Some(crate::facade::identity::derive::DERIVATION),
         }
     }
 
@@ -635,6 +636,38 @@ mod tests {
             reopened
                 .identified("Condition", &IdentifierQuery::new(SystemMatch::Any, "v-10"))
                 .expect("the read")
+        );
+    }
+
+    #[test]
+    fn a_binding_an_earlier_build_wrote_reads_back_with_no_derivation() {
+        let directory = tempfile::tempdir().expect("a temporary directory");
+        let path = directory.path().join("identity.redb");
+        let internal = FhirResourceId::new("abc").expect("a legal FHIR id");
+        let key = crate::facade::identity::record::internal_key("Condition", &internal);
+        {
+            let database = redb::Database::create(&path).expect("the file");
+            let write = database.begin_write().expect("a write");
+            {
+                let mut bindings = write.open_table(super::BINDINGS).expect("the table");
+                bindings
+                    .insert(
+                        key.as_str(),
+                        r#"{"ehr_id":"bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11","versioned_object_uid":"uid-1","template_id":"ferrobridge.diagnose.v1","resource_type":"Condition","entry_path":"/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1, 2]","split":0,"context":"ferrobridge_diagnosis.context"}"#,
+                    )
+                    .expect("the row");
+            }
+            write.commit().expect("the commit");
+        }
+        let store = RedbStore::open(&path).expect("the open");
+        let held = store
+            .binding_of("Condition", &internal)
+            .expect("the read")
+            .expect("the binding");
+        assert_eq!(None, held.derivation);
+        assert_eq!(
+            "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1, 2]",
+            held.entry_path
         );
     }
 

@@ -491,9 +491,10 @@ mod tests {
             versioned_object_uid: String::from(uid),
             template_id: String::from("ferrobridge.diagnose.v1"),
             resource_type: String::from("Condition"),
-            entry_path: String::from("/content[0]"),
+            entry_path: String::from("/content[1]"),
             split: 0,
             context: String::from("ferrobridge_diagnosis.context"),
+            derivation: Some(crate::facade::identity::derive::DERIVATION),
         }
     }
 

@@ -97,6 +97,7 @@ async fn a_read_whose_ehr_has_no_recorded_person_is_refused_naming_the_element()
             entry_path: String::from("/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"),
             split: 0,
             context: String::from("ferrobridge_facade.context"),
+            derivation: Some(ferrobridge_server::facade::identity::derive::DERIVATION),
         },
     )?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;

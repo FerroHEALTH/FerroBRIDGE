@@ -37,6 +37,16 @@ crates on crates.io.
   seconds, so a Kubernetes pod that starts before its CDR stays up instead of
   crash-looping. A documented refusal, such as a `404` for a template the CDR
   does not hold, still stops the start.
+- The facade keys a second or later entry of a composition by the openEHR
+  positional path `/content[<n>]`, `n` its 1-based place in `content`, and
+  the first by `/content[<archetype>]`, both built with the `openehr-rm` path
+  types (#242). Earlier builds wrote `/content[<archetype>, <n>]`, which the
+  openEHR BASE path grammar reads as a name predicate and refuses. Each new
+  binding records identity derivation 2. An id an earlier build recorded
+  under the old form keeps naming its entry: the facade looks the old key up
+  when the new one is unbound and still reads a stored binding of the old
+  form, so no resource a client holds is renamed. A resource first bound by
+  this build gets an id derived from the new path.
 
 ## [0.0.6] - 2026-10-17
 

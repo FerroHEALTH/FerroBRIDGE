@@ -1578,13 +1578,22 @@ draft upstream change.
   mapping) is documented, not hidden.
 
   Each `content` item of the archetype a context's start model mapping names
-  is a resource of its own (#530). Its entry path is
-  `/content[<archetype>, <n>]`, `n` its 1-based place among the items of that
-  archetype (openEHR BASE Release 1.2.0, Paths and Locators), and the first
-  item keys the identity map by the unindexed `/content[<archetype>]`, the
-  path it has when it is the only one, so a composition that gains a second
-  entry does not rename the resource of its first. The binding records that
-  path; a read, a vread or an `_id` search finds the entry by its place and
+  is a resource of its own (#530). The first item keys the identity map by
+  the archetype predicate `/content[<archetype>]`, the path it has when it is
+  the only one, so a composition that gains a second entry does not rename
+  the resource of its first. Every further item keys it by the positional
+  predicate `/content[<n>]`, `n` its 1-based place in `content`, which openEHR
+  BASE Release 1.2.0, Paths and Locators, §Using Positional Parameters, writes
+  the same in openEHR and XPath (#242). Both are built with the `openehr-rm`
+  path types and parse back. This is identity derivation 2, and each binding
+  records the derivation that wrote its path. Builds up to 0.0.6 wrote
+  `/content[<archetype>, <n>]`, `n` the place among the items of the
+  archetype, which the BASE grammar reads as the name-based predicate
+  shortcut and refuses; a binding without a derivation may carry that form,
+  the facade still reads it, and an entry whose new key the map does not
+  hold is looked up under its old key first, so no recorded id moves. The
+  binding records the path; a read, a vread or an `_id` search finds the
+  entry by its place and
   maps the composition with every other item of the archetype removed. A
   search query selects each node its `FROM` binds, and the facade answers the
   entries that hold every selected node; a row whose nodes lie in no entry,
@@ -1597,8 +1606,9 @@ draft upstream change.
   entry nested in a `SECTION`; such a template, a bound node or an `_id`
   reads the rows and counts each entry once, and `_total=estimate` always
   answers from a count query. The
-  place is positional, so removing an earlier entry in a later version moves
-  the identity of the ones after it, the same property the released
+  place is positional, so removing or inserting an earlier `content` item in a
+  later version moves the identity of the entries after it, the same property
+  the released
   recommendation's entry path has. No specification governs how a row names
   its entry: our own design.
 

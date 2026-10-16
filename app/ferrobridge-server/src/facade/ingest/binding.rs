@@ -357,13 +357,15 @@ impl Ingest<'_> {
             .store
             .internal_of(resource_type, &map_key)
             .map_err(|error| store_refusal(&error))?;
-        if recorded.is_none() && entry.path() != path {
-            // The map wins once written: an id recorded under the positional
-            // path of the entry still stands.
-            let positional = EntryKey::new(versioned_object_uid(version), entry.path(), 0);
+        if recorded.is_none()
+            && let Some(legacy) = entry.legacy_path()
+        {
+            // The map wins once written: an id an earlier build recorded under
+            // the legacy path of the entry still stands.
+            let earlier = EntryKey::new(versioned_object_uid(version), legacy, 0);
             recorded = self
                 .store
-                .internal_of(resource_type, &derive::map_key(&positional))
+                .internal_of(resource_type, &derive::map_key(&earlier))
                 .map_err(|error| store_refusal(&error))?;
         }
         let id = if let Some(known) = recorded {
@@ -382,6 +384,7 @@ impl Ingest<'_> {
             entry_path: path,
             split: key.split(),
             context: program.program().context().to_string(),
+            derivation: Some(derive::DERIVATION),
         };
         let stood = self
             .store
