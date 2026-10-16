@@ -11,6 +11,7 @@
 //! `FERROBRIDGE_E2E=1` admits the harness.
 
 mod person;
+mod visits;
 
 use ferrobridge_testkit::containers::{self, Postgres};
 use omop_cdm::database::{self, CdmPool};

@@ -144,8 +144,9 @@ a removal takes the same per-composition lock a commit takes. The derived
 tables are rebuilt after the removals, so the observation period and the eras
 of the person no longer count the deleted rows, and the visits come from the
 visit query, which no longer reads the deleted composition's context. A
-visit the visit query no longer answers at all keeps the row an earlier run
-wrote, and the observation period still spans it. A second run finds no watermark left for the composition and changes nothing.
+visit the visit query no longer answers at all is removed after the
+removals, so the observation period shrinks with it ([The visits the query
+no longer answers](#the-visits-the-query-no-longer-answers)). A second run finds no watermark left for the composition and changes nothing.
 
 The CDM defines no deletion, so the removal is FerroBRIDGE's own design.
 With `--since`, the query answers only the changed compositions, so every
@@ -170,6 +171,22 @@ its wall-clock time, because the CDM `datetime` has no zone. The same holds for
 every date and time a mapping reads from a composition: the offset is not
 normalised, and the row keeps the wall-clock time the source wrote. The visit concept
 and the visit type concept are configuration with no default.
+
+## The visits the query no longer answers
+
+Each run writes the visits the `[etl.visits]` query answers before the
+compositions. After the compositions and the deletion check, and before the
+derived tables, it removes every visit an earlier run wrote that the query no
+longer answers, with the bridge's record of its key, unless a CDM row still
+names it through `visit_occurrence_id`. Such a visit stays, counted in the
+run report as unanswered and kept, so no row names a missing visit; once the
+rows that name it are written again without it, a later run removes it.
+
+The visit query is never bound to `--since`, so its answer holds every visit
+the deployment derives, and only a visit the whole query no longer answers is
+a candidate. A run whose visit query refused a row removes no visit, because
+the refused row may belong to a visit the query did answer. This is
+FerroBRIDGE's own design.
 
 ## Tying a composition to its visit
 

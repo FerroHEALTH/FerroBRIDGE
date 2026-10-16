@@ -293,6 +293,11 @@ crates on crates.io.
   deleted it and left clinical rows naming a missing person (#536). The
   `PERSON` row goes only when no composition writes it and no row of the
   person is left, and the newest version that writes it rewrites its columns.
+- `etl run` removes a visit the visit query no longer answers, such as one
+  whose every composition was deleted, where its `VISIT_OCCURRENCE` row stayed
+  and the observation period kept spanning it (#537). A visit some CDM row
+  still names is kept and counted, and a run whose visit query refused a row
+  removes none.
 - `fhir-types` 0.1.110 writes a repeating primitive whose every position
   carries only an `id` or an `extension` as the `_name` array alone, in every
   version, where it wrote a value array of nulls beside it (`"event": [null]`);

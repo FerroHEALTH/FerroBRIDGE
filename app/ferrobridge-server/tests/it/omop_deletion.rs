@@ -129,5 +129,26 @@ async fn a_composition_deleted_in_the_cdr_loses_its_rows_on_the_next_run()
         crate::etl::dump(&postgres)?,
         "a run after the removal changes nothing"
     );
+
+    let last = versions.get(2).ok_or("the third version")?;
+    let last_ehr = ehrs
+        .get(LABORATORIES.get(2).ok_or("lab-3")?.ehr)
+        .ok_or("an EHR")?;
+    delete(&client, last_ehr, last).await?;
+    let fourth = etl_run(&config).await?;
+    assert_eq!(1, fourth.deletions.removed.len(), "{fourth}");
+    assert_eq!(
+        1, fourth.derived.visit_occurrence_removed,
+        "the only composition of the second EHR's visit is gone: {fourth}"
+    );
+    assert_eq!(
+        "1",
+        cell(&postgres, "SELECT count(*) FROM cdm.visit_occurrence").await?
+    );
+    assert_eq!(
+        "1",
+        cell(&postgres, "SELECT count(*) FROM cdm.observation_period").await?,
+        "the second EHR keeps no observation period"
+    );
     Ok(())
 }

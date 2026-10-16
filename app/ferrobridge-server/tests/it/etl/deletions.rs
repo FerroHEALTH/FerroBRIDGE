@@ -297,3 +297,63 @@ async fn a_cdr_that_fails_the_check_ends_the_run_and_removes_nothing() -> Result
     assert_eq!(3, third_rows(&harness).await?);
     Ok(())
 }
+
+#[tokio::test]
+async fn deleting_every_composition_of_a_visit_removes_the_visit_and_its_observation_period()
+-> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut harness = harness().await?;
+    let visiting = Laboratory {
+        behaviours: [Behaviour::Map; 3],
+        visit: true,
+    };
+    let first = run(
+        &settings(true)?,
+        &RunOptions::default(),
+        &quick_client(&harness.cdr)?,
+        &mut harness.writer,
+        &visiting,
+        &RunId::new("run-1")?,
+    )
+    .await?;
+    assert_eq!(1, first.derived.visit_occurrence, "{first}");
+    assert_eq!(1, first.derived.observation_period, "{first}");
+
+    query_answers(&harness.cdr, Vec::new()).await;
+    Mock::given(method("POST"))
+        .and(path("/query/aql"))
+        .and(body_string_contains("AS visit_source"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "rows": [] })))
+        .mount(&harness.cdr)
+        .await;
+    for uid in COMPOSITIONS_UIDS {
+        answer(&harness.cdr, uid, 204).await;
+    }
+    let second = run(
+        &settings(true)?,
+        &RunOptions::default(),
+        &quick_client(&harness.cdr)?,
+        &mut harness.writer,
+        &visiting,
+        &RunId::new("run-2")?,
+    )
+    .await?;
+    assert_eq!(3, second.deletions.removed.len(), "{second}");
+    assert_eq!(1, second.derived.visit_occurrence_removed, "{second}");
+    assert_eq!(0, second.derived.observation_period, "{second}");
+    for table in [
+        "cdm.visit_occurrence",
+        "ferrobridge.visit",
+        "cdm.observation_period",
+        "cdm.measurement",
+    ] {
+        assert_eq!(
+            0,
+            count(&harness.postgres, &format!("SELECT count(*) FROM {table}")).await?,
+            "{table} is empty"
+        );
+    }
+    Ok(())
+}

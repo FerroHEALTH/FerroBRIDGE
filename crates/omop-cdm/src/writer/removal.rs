@@ -10,14 +10,18 @@
 //! transaction, the same unit as [`CdmWriter::commit`].
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 
+use crate::graph::key::VisitKey;
+use crate::meta::CdmSchema;
 use crate::writer::CdmWriter;
 use crate::writer::database;
 use crate::writer::error::Step;
 use crate::writer::error::WriteError;
+use crate::writer::quoted;
 use crate::writer::side_table::delete_earlier;
 use crate::writer::side_table::earlier_rows;
 use crate::writer::side_table::retire_persons;
@@ -169,6 +173,115 @@ impl CdmWriter {
         }
         transaction.commit().await.map_err(database(Step::Commit))?;
         Ok(Removal::Removed(rows))
+    }
+}
+
+/// What a visit retirement did.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct VisitRetirement {
+    /// Visits the visit query no longer answers, removed with their side
+    /// table row.
+    pub removed: u64,
+    /// Visits the visit query no longer answers that a row still names,
+    /// kept so no row names a missing visit.
+    pub referenced: u64,
+}
+
+/// The column every row names its visit by.
+const VISIT_OCCURRENCE_ID: &str = "visit_occurrence_id";
+
+impl CdmWriter {
+    /// Removes every visit the side table holds that `answered` does not
+    /// name and no CDM row names any more, and returns what it did.
+    ///
+    /// `answered` is the whole answer of the visit query, so a visit missing
+    /// from it is one the query no longer derives. A visit some row still
+    /// names through `visit_occurrence_id` stays, counted as referenced. The
+    /// person of a removed visit loses its `PERSON` row when no other row of
+    /// the person remains. One transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError::Database`] for any statement PostgreSQL refuses;
+    /// the transaction is rolled back and nothing is removed.
+    pub async fn retire_visits(
+        &mut self,
+        answered: &[VisitKey],
+    ) -> Result<VisitRetirement, WriteError> {
+        let Self {
+            client,
+            cdm,
+            bridge,
+            ..
+        } = self;
+        let ehrs: Vec<&str> = answered.iter().map(|key| key.ehr_id().value()).collect();
+        let sources: Vec<&str> = answered.iter().map(|key| key.source().as_str()).collect();
+        let transaction = client.transaction().await.map_err(database(Step::Begin))?;
+        let unanswered =
+            "NOT EXISTS (SELECT 1 FROM UNNEST($1::text[], $2::text[]) AS a (ehr_id, visit_source)
+                WHERE a.ehr_id = v.ehr_id AND a.visit_source = v.visit_source)";
+        let mut referenced = Vec::new();
+        for table in &crate::generated::TABLES {
+            if table.cdm_schema == CdmSchema::Cdm
+                && table.name != "visit_occurrence"
+                && table.column(VISIT_OCCURRENCE_ID).is_some()
+            {
+                referenced.push(format!(
+                    "EXISTS (SELECT 1 FROM {cdm}.{} AS t WHERE t.{} = v.visit_occurrence_id)",
+                    quoted(table.name),
+                    quoted(VISIT_OCCURRENCE_ID)
+                ));
+            }
+        }
+        let referenced = referenced.join(" OR ");
+        let kept = transaction
+            .query_one(
+                &format!(
+                    "SELECT count(*) FROM {bridge}.visit AS v WHERE {unanswered} AND ({referenced})"
+                ),
+                &[&ehrs, &sources],
+            )
+            .await
+            .map_err(database(Step::Read))?;
+        let kept: i64 = kept.try_get(0).map_err(database(Step::Read))?;
+        let retired = transaction
+            .query(
+                &format!(
+                    "DELETE FROM {bridge}.visit AS v WHERE {unanswered} AND NOT ({referenced})
+                     RETURNING v.visit_occurrence_id"
+                ),
+                &[&ehrs, &sources],
+            )
+            .await
+            .map_err(database(Step::Record))?;
+        let mut ids = Vec::with_capacity(retired.len());
+        for row in &retired {
+            let id: i32 = row.try_get(0).map_err(database(Step::Record))?;
+            ids.push(id);
+        }
+        let persons = transaction
+            .query(
+                &format!(
+                    "DELETE FROM {cdm}.visit_occurrence WHERE visit_occurrence_id = ANY($1)
+                     RETURNING person_id"
+                ),
+                &[&ids],
+            )
+            .await
+            .map_err(database(Step::Delete("visit_occurrence")))?;
+        let mut touched = BTreeSet::new();
+        for row in &persons {
+            let person: i32 = row
+                .try_get(0)
+                .map_err(database(Step::Delete("visit_occurrence")))?;
+            touched.insert(person);
+        }
+        retire_persons(&transaction, cdm, bridge, &touched).await?;
+        transaction.commit().await.map_err(database(Step::Commit))?;
+        Ok(VisitRetirement {
+            removed: u64::try_from(ids.len()).unwrap_or(u64::MAX),
+            referenced: kept.unsigned_abs(),
+        })
     }
 }
 

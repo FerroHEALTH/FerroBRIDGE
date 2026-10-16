@@ -85,6 +85,12 @@ pub struct Compositions {
 pub struct Derived {
     /// `VISIT_OCCURRENCE` rows the visit query wrote.
     pub visit_occurrence: u64,
+    /// `VISIT_OCCURRENCE` rows removed because the visit query no longer
+    /// answers their visit and no row names them.
+    pub visit_occurrence_removed: u64,
+    /// Visits the visit query no longer answers that a row still names, so
+    /// they were kept.
+    pub visit_occurrence_referenced: u64,
     /// `OBSERVATION_PERIOD` rows.
     pub observation_period: u64,
     /// `CONDITION_ERA` rows.
@@ -281,8 +287,10 @@ impl fmt::Display for RunReport {
         let derived = &self.derived;
         writeln!(
             f,
-            "derived: visit_occurrence {}, observation_period {}, condition_era {}, drug_era {}",
+            "derived: visit_occurrence {} ({} removed, {} unanswered and kept), observation_period {}, condition_era {}, drug_era {}",
             derived.visit_occurrence,
+            derived.visit_occurrence_removed,
+            derived.visit_occurrence_referenced,
             derived.observation_period,
             derived.condition_era,
             derived.drug_era

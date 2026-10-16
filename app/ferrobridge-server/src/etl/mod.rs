@@ -317,21 +317,8 @@ pub async fn run<M: Mapper>(
         _ => {}
     }
     let mut report = RunReport::new(run_id.as_str());
-    let mut windows = None;
-    if let Some(visits) = settings.visits.as_ref() {
-        let rows = rows(cdr, &visits.query, settings.page_size)
-            .await
-            .map_err(RunError::Visits)?;
-        let grouped = visits::group(&visits.query, &rows);
-        for refusal in &grouped.refusals {
-            report.refusal(None, refusal);
-        }
-        report.derived.visit_occurrence = writer
-            .write_visits(&grouped.visits, visits.concepts)
-            .await
-            .map_err(RunError::Database)?;
-        windows = Some(Windows::new(&grouped.visits));
-    }
+    let visited = read_visits(settings, cdr, writer, &mut report).await?;
+    let windows = visited.as_ref().map(|visited| &visited.windows);
 
     let context = MappingContext {
         type_concept_id: settings.type_concept_id,
@@ -366,7 +353,7 @@ pub async fn run<M: Mapper>(
             row: &row,
             source: &source,
             context,
-            windows: windows.as_ref(),
+            windows,
         };
         let (graph, tie) = match composition(cdr, &mut templates, &read, mapper).await? {
             Ok(outcome) => outcome,
@@ -394,17 +381,74 @@ pub async fn run<M: Mapper>(
         seen: &seen,
     };
     deletions::sweep(&sweep, cdr, writer, &mut report).await?;
-    derive(settings, writer, &mut report).await?;
+    let answered = visited
+        .as_ref()
+        .and_then(|visited| visited.answered.as_deref());
+    derive(settings, writer, &mut report, answered).await?;
     Ok(report)
 }
 
-/// Rebuilds the derived tables whole, after every commit and removal of the
-/// run.
+/// The visits a run derived.
+struct Visited {
+    /// Their windows, for tying compositions.
+    windows: Windows,
+    /// The key of every visit the visit query answered, or nothing when it
+    /// refused a row, since a refused row may belong to a visit it answered.
+    answered: Option<Vec<VisitKey>>,
+}
+
+/// Reads the visit query, when configured, and writes the visits it derives.
+async fn read_visits(
+    settings: &EtlSettings,
+    cdr: &CdrClient,
+    writer: &mut CdmWriter,
+    report: &mut RunReport,
+) -> Result<Option<Visited>, RunError> {
+    let Some(visits) = settings.visits.as_ref() else {
+        return Ok(None);
+    };
+    // NOTE: no specification governs this: our own design; the visit query is never
+    // bound to `--since`, so its answer holds every visit the deployment derives.
+    let rows = rows(cdr, &visits.query, settings.page_size)
+        .await
+        .map_err(RunError::Visits)?;
+    let grouped = visits::group(&visits.query, &rows);
+    for refusal in &grouped.refusals {
+        report.refusal(None, refusal);
+    }
+    report.derived.visit_occurrence = writer
+        .write_visits(&grouped.visits, visits.concepts)
+        .await
+        .map_err(RunError::Database)?;
+    let answered = grouped.refusals.is_empty().then(|| {
+        grouped
+            .visits
+            .iter()
+            .map(|visit| visit.key().clone())
+            .collect()
+    });
+    Ok(Some(Visited {
+        windows: Windows::new(&grouped.visits),
+        answered,
+    }))
+}
+
+/// Retires the visits the visit query no longer answers, then rebuilds the
+/// derived tables whole, after every commit and removal of the run.
 async fn derive(
     settings: &EtlSettings,
     writer: &mut CdmWriter,
     report: &mut RunReport,
+    answered: Option<&[VisitKey]>,
 ) -> Result<(), RunError> {
+    if let Some(answered) = answered {
+        let retired = writer
+            .retire_visits(answered)
+            .await
+            .map_err(RunError::Database)?;
+        report.derived.visit_occurrence_removed = retired.removed;
+        report.derived.visit_occurrence_referenced = retired.referenced;
+    }
     report.derived.observation_period =
         derived::observation_period(writer, settings.observation_period_type_concept_id)
             .await
