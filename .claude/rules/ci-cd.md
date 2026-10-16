@@ -22,7 +22,7 @@ Ten workflows:
 
 - `.github/workflows/ci.yml`: the two-tier gate. Tier 1 runs now (zizmor,
   actionlint, shellcheck, hadolint, the comment-style guard, the versions
-  guard, the favicon guard, the build-time profile package fetch and check, the tracker-helper
+  guard, the favicon guard, the open-issue guard over every `TODO(#N)`, the build-time profile package fetch and check, the tracker-helper
   self-tests); tier 2 is the
   Rust set, gated behind a `detect`
   job that looks for a
