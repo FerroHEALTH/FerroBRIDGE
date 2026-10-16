@@ -842,13 +842,13 @@ expression is a load error: the reference CDR's connector let `where()` and
   (a token's code and system are one coded value's, #526) and a declaration
   contributes paths only, every value bound as an AQL parameter. A path that
   crosses a node the Web Template lets occur more than once below the bound
-  one is refused at load. A composition matching on several nodes is one
-  entry: rows are grouped by version uid and the count is
-  `COUNT(DISTINCT v/uid/value)`. One resource type answers one
+  one is refused at load. Rows are grouped by version uid, each entry of
+  the context's archetype is answered once, and the total reads the rows
+  and counts entries (#530, #658). One resource type answers one
   parameter set, and two declarations of one type over one template are
   refused at load. A parameter outside the set is refused unless the client
   sends `Prefer: handling=lenient` (R4 search §3.1.1.3); an unsupported
-  modifier is always refused (§3.1.1.4.4); `_count=0` runs the count query
+  modifier is always refused (§3.1.1.4.4); `_count=0` answers the total
   alone, as R4 treats it as `_summary=count` (§3.1.1.5.3).
 - **Status codes are mapped as types**, from the ITS-REST outcome to the FHIR
   outcome, in a table that is FerroBRIDGE's own design with both sides cited
@@ -1587,8 +1587,10 @@ draft upstream change.
   maps the composition with every other item of the archetype removed. A
   search query selects each node its `FROM` binds, and the facade answers the
   entries that hold every selected node; a row whose nodes lie in no entry,
-  and a search binding no node, answers the entries `_id` names or else the
-  composition's first entry. The
+  and every row of a search binding no node, answers every entry of the
+  archetype, of which `_id` keeps the ones it names (#658). `Bundle.total`
+  reads the rows and counts each entry once, because no AQL count over the
+  facade's `FROM` counts entries. The
   place is positional, so removing an earlier entry in a later version moves
   the identity of the ones after it, the same property the released
   recommendation's entry path has. No specification governs how a row names

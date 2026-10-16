@@ -464,6 +464,11 @@ crates on crates.io.
   leaves the composer to its default, and a composer with an external
   reference travels as `ctx/composer_id`, `ctx/id_namespace` and
   `ctx/id_scheme` (Simplified Formats, §Composer).
+- A facade search that binds no node, such as `Condition?patient=…`, answers
+  every entry of the context's archetype in each matching composition, each
+  with its own id, where it answered only the first (#658). `Bundle.total`
+  counts those entries for every search, so `_count=0`, `_summary=count` and
+  `_total=accurate` read the rows instead of running an AQL `COUNT`.
 - Removing a person's newest `PERSON` writer hands the row to the writer
   that remains (#561). When several compositions of one EHR write the
   person's `PERSON` row and the newest of them is deleted in the CDR, or a

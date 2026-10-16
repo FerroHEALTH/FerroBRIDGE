@@ -533,17 +533,20 @@ and `link[next]` appears when another page follows. Its `_cursor` is opaque:
 follow the link as answered, because a cursor pasted onto another search is a
 `400`.
 
-A query that binds a node answers a row per matching node, so the facade
-reads one entry per composition: the rows of one composition sit together
-under the order, and a further row of a composition the page holds is passed
-over. Each page reads one row past its room through the CDR's `offset` and
-`fetch`, and a `next` link is written only when another composition is left,
-its cursor at that composition's first row. `Bundle.total` counts matching
-compositions, never the page and never the nodes: a first page that holds every
-match carries it at no cost, `_total=accurate` or `estimate` runs a count
-query for a paged search (`COUNT(DISTINCT v/uid/value)` when a node is bound,
-`COUNT(*)` otherwise), and `_total=none` leaves it out. `_count=0` and `_summary=count` run
-the count query alone and answer no entries and no `next` link.
+Each entry of the context's archetype in a composition is a resource of its
+own. A query that binds a node answers a row per matching node, and the
+search answers the entries that hold the matched nodes; a search that binds
+no node, such as `patient` alone, answers every entry of each matching
+composition. The rows of one composition sit together under the order, and
+an entry the page already holds is passed over. Each page reads one row past
+its room through the CDR's `offset` and `fetch`, and a `next` link is written
+only when another entry is left, its cursor at the first row of that entry's
+composition with the number of its entries already answered. `Bundle.total`
+counts matching entries, never the page and never the nodes: a first page
+that holds every match carries it at no cost, `_total=accurate` or `estimate`
+reads the rows of a paged search and counts each entry once, and
+`_total=none` leaves it out. `_count=0` and `_summary=count` answer the total
+alone, with no entries and no `next` link.
 
 A search never answers an empty Bundle for a failed call. A CDR refusal reaches
 the wire through the status table above: a `5xx` or a `408` on the query is a
