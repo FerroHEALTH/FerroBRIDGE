@@ -1,5 +1,5 @@
 ---
-source: app/ferrobridge-server/tests/it/omop_round_trip.rs
+source: app/ferrobridge-server/tests/it/omop/round_trip.rs
 expression: "projection(&postgres, &names).await?"
 ---
 PERSON

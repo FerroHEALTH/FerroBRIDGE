@@ -24,7 +24,7 @@ use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::template::TemplateSource;
 use std::error::Error;
 
-use crate::omop_round_trip::{
+use super::support::{
     LABORATORIES, build_cdm, canonical, configuration, copy_mappings, create, create_ehr, etl_run,
     rows, upload_template,
 };
