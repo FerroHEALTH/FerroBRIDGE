@@ -214,7 +214,8 @@ rows that name it are written again without it, a later run removes it.
 
 The visit query is never bound to `--since`, so its answer holds every visit
 the deployment derives, and only a visit the whole query no longer answers is
-a candidate. A run whose visit query refused a row removes no visit, because
+a candidate. A visit query that names `$since` refuses the start, since the
+parameter would reach the CDR unbound. A run whose visit query refused a row removes no visit, because
 the refused row may belong to a visit the query did answer. This is
 FerroBRIDGE's own design.
 
