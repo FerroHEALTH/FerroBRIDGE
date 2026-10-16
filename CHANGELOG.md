@@ -23,6 +23,13 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Added
+
+- The operate book says where the FHIR facade's identity store lives, which
+  volume it needs on a read-only root filesystem, and what happens across
+  replicas and restarts, with a Kubernetes pod spec (#419). The container
+  page no longer says the server writes nothing.
+
 ### Fixed
 
 - A CDR that does not answer the boot template fetch yet no longer fails the
