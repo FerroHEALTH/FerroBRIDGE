@@ -142,6 +142,15 @@ pub enum BundleError {
         #[source]
         source: io::Error,
     },
+    /// A package file is not JSON.
+    #[error("{path} is not JSON")]
+    Json {
+        /// The file.
+        path: PathBuf,
+        /// The cause.
+        #[source]
+        source: serde_json::Error,
+    },
     /// Two resources of one type share a canonical, so the bundle cannot
     /// hold both.
     #[error("{url} is defined twice in {package}")]
@@ -203,7 +212,12 @@ pub fn bundle(options: &BundleOptions) -> Result<BundleReport, BundleError> {
             let text = render(resources, elements);
             let path = dir.join(name);
             if options.check {
-                if fs::read_to_string(&path).ok() != Some(text) {
+                let on_disk = match fs::read_to_string(&path) {
+                    Ok(on_disk) => Some(on_disk),
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+                    Err(source) => return Err(BundleError::Io { path, source }),
+                };
+                if on_disk != Some(text) {
                     drift.push(path.display().to_string());
                 }
             } else {
@@ -379,19 +393,32 @@ fn self_contained(
 }
 
 /// Every JSON resource under `package`, in file-name order.
+///
+/// A package directory also holds JSON that is not a resource, the
+/// `package.json` manifest and the `.index.json` index
+/// (<https://hl7.org/fhir/R5/packages.html>). Such a file is told apart by its
+/// shape, a JSON object with no `resourceType`, never by failing to parse: a
+/// file that cannot be read or parsed fails the run with its path.
 fn read_resources(package: &Path) -> Result<Vec<serde_json::Value>, BundleError> {
-    let mut paths: Vec<PathBuf> = fs::read_dir(package)
-        .map_err(|source| BundleError::Io {
-            path: package.to_path_buf(),
-            source,
-        })?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.extension()
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
-        })
-        .collect();
+    let entries = fs::read_dir(package).map_err(|source| BundleError::Io {
+        path: package.to_path_buf(),
+        source,
+    })?;
+    let mut paths = Vec::new();
+    for entry in entries {
+        let path = entry
+            .map_err(|source| BundleError::Io {
+                path: package.to_path_buf(),
+                source,
+            })?
+            .path();
+        if path
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+        {
+            paths.push(path);
+        }
+    }
     paths.sort();
     let mut resources = Vec::new();
     for path in paths {
@@ -399,13 +426,13 @@ fn read_resources(package: &Path) -> Result<Vec<serde_json::Value>, BundleError>
             path: path.clone(),
             source,
         })?;
-        // NOTE: a package directory holds non-resource JSON (package.json,
-        // .index.json), which is not a parse failure of a resource.
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(
+        let value = serde_json::from_str::<serde_json::Value>(
             crate::package::without_byte_order_mark(&text),
-        ) else {
-            continue;
-        };
+        )
+        .map_err(|source| BundleError::Json {
+            path: path.clone(),
+            source,
+        })?;
         if value.get("resourceType").is_some() {
             resources.push(value);
         }

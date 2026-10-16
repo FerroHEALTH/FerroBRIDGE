@@ -30,6 +30,7 @@ mod roots;
 mod serialize;
 mod snapshot;
 mod stu3;
+mod terminology;
 mod v2;
 mod v2_legacy;
 mod value_conversion;
