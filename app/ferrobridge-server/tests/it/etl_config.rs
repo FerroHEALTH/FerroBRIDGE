@@ -153,6 +153,38 @@ fn a_visit_query_over_every_version_refuses_to_boot() -> Result<(), Box<dyn StdE
 }
 
 #[test]
+fn a_visit_query_naming_since_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    let query = VISITS.replace(
+        " ORDER BY",
+        " WHERE v/commit_audit/time_committed/value > $since ORDER BY",
+    );
+    let error = refusal(&format!(
+        "{ETL}\n[etl.visits]\naql = \"{query}\"\nvisit_concept_id = 9201\nvisit_type_concept_id = 32817\n"
+    ))?;
+    match &error {
+        Error::Aql { key, source } => {
+            assert_eq!("etl.visits.aql", key);
+            assert!(matches!(**source, AqlError::Windowed { .. }), "{source:?}");
+            assert!(source.to_string().contains("$since"), "{source}");
+        }
+        other => return Err(format!("expected an AQL refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_visit_query_naming_no_since_boots() -> Result<(), Box<dyn StdError>> {
+    let text = format!(
+        "{ETL}\n[etl.visits]\naql = \"{VISITS}\"\nvisit_concept_id = 9201\nvisit_type_concept_id = 32817\n"
+    );
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
+    let visits = etl.visits.as_ref().ok_or("the visits are configured")?;
+    assert_eq!(Some(0), visits.query.column("ehr_id"));
+    Ok(())
+}
+
+#[test]
 fn a_visit_query_that_does_not_parse_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
     let error = refusal(&format!(
         "{ETL}\n[etl.visits]\naql = \"SELECT FROM\"\nvisit_concept_id = 9201\nvisit_type_concept_id = 32817\n"

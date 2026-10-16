@@ -92,6 +92,14 @@ pub enum AqlError {
         /// Which query.
         query: &'static str,
     },
+    /// The visit query names `$since`, which the runner never binds for it.
+    #[error(
+        "the {query} names $since; the runner binds --since in the composition query only and reads every visit, so the parameter would be sent unbound"
+    )]
+    Windowed {
+        /// Which query.
+        query: &'static str,
+    },
 }
 
 /// A query that parsed and carries every projection its reader needs.
@@ -120,13 +128,23 @@ impl CheckedQuery {
     }
 
     /// Checks `text` as the visit query: `ehr_id`, `visit_source`,
-    /// `visit_start` and `visit_end`.
+    /// `visit_start` and `visit_end`, naming no `$since`.
+    ///
+    /// The runner reads every visit the deployment derives and never binds
+    /// `--since` to this query, so a `$since` in it would reach the CDR
+    /// unbound. No specification governs this: our own design.
     ///
     /// # Errors
     ///
-    /// Returns [`AqlError`] naming the first fault.
+    /// Returns [`AqlError`] naming the first fault, [`AqlError::Windowed`]
+    /// when the query names `$since`.
     pub fn visits(text: &str) -> Result<Self, AqlError> {
-        Self::check("visit query", text, &VISIT_PROJECTIONS, &[])
+        const QUERY: &str = "visit query";
+        let checked = Self::check(QUERY, text, &VISIT_PROJECTIONS, &[])?;
+        if checked.names_parameter(SINCE_PARAMETER) {
+            return Err(AqlError::Windowed { query: QUERY });
+        }
+        Ok(checked)
     }
 
     /// Parses `text` and finds each of `projections`, and each of `optional`
@@ -341,6 +359,55 @@ mod tests {
         )
         .expect_err("the visit query is unscoped");
         assert!(matches!(error, AqlError::Unscoped { .. }), "{error:?}");
+    }
+
+    /// A visit query with the four projections below a `LATEST_VERSION`
+    /// scope, with `filter` as its `WHERE` clause.
+    fn visits_where(filter: &str) -> String {
+        format!(
+            "SELECT e/ehr_id/value AS ehr_id, c/name/value AS visit_source, \
+             c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end \
+             FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
+             {filter} ORDER BY c/context/start_time/value"
+        )
+    }
+
+    #[test]
+    fn a_visit_query_naming_no_since_checks() {
+        let query = CheckedQuery::visits(&visits_where(
+            "WHERE c/context/start_time/value >= '2026-01-01T00:00:00Z'",
+        ))
+        .expect("the visit query checks");
+        assert_eq!(Some(2), query.column("visit_start"));
+        assert!(!query.names_parameter(SINCE_PARAMETER));
+    }
+
+    #[test]
+    fn a_visit_query_naming_since_is_refused() {
+        let error = CheckedQuery::visits(&visits_where(
+            "WHERE v/commit_audit/time_committed/value > $since",
+        ))
+        .expect_err("the visit query names $since");
+        assert!(
+            matches!(
+                error,
+                AqlError::Windowed {
+                    query: "visit query"
+                }
+            ),
+            "{error:?}"
+        );
+        assert!(error.to_string().contains("$since"), "{error}");
+    }
+
+    #[test]
+    fn a_composition_query_naming_since_checks() {
+        let query = CheckedQuery::compositions(&over(
+            "EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
+             WHERE v/commit_audit/time_committed/value > $since",
+        ))
+        .expect("the composition query binds $since");
+        assert!(query.names_parameter(SINCE_PARAMETER));
     }
 
     #[test]

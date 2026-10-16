@@ -335,7 +335,7 @@ by EHR and source, each visit spanning the earliest start to the latest end.
 
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
-| `aql` | none, required | no | The visit query, aliasing `ehr_id`, `visit_source`, `visit_start` and `visit_end`, with an `ORDER BY`, every `COMPOSITION` it reads below `VERSION v[LATEST_VERSION]` ([The composition query](../integrate/omop-etl.md#the-composition-query)) |
+| `aql` | none, required | no | The visit query, aliasing `ehr_id`, `visit_source`, `visit_start` and `visit_end`, with an `ORDER BY`, every `COMPOSITION` it reads below `VERSION v[LATEST_VERSION]` ([The composition query](../integrate/omop-etl.md#the-composition-query)), and no `$since` ([The visits the query no longer answers](../integrate/omop-etl.md#the-visits-the-query-no-longer-answers)) |
 | `visit_concept_id` | none, required | no | The `visit_concept_id` of every visit |
 | `visit_type_concept_id` | none, required | no | The `visit_type_concept_id` of every visit |
 

@@ -401,6 +401,11 @@ crates on crates.io.
   create it. A writer committed before the upgrade has no columns recorded,
   so a person left with only such writers keeps the row it has until one of
   them commits again.
+- A visit query that names `$since` refuses the start (#542). The ETL never
+  binds `--since` to the `[etl.visits]` query, so such a query passed the
+  load check and the CDR refused it at run time for the unbound parameter;
+  `etl.visits.aql` is now refused when the configuration loads, with the
+  reason.
 - The container harness starts the reference CDR with
   `FERROEHR__USAGE_REPORT__ENABLED=false` (#582). A container does not
   inherit the CI runner's environment, so FerroEHR's own CI detection never
