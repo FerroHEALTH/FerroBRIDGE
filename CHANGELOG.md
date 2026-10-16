@@ -412,6 +412,14 @@ crates on crates.io.
   the diagnostics. A timed-out FHIR request used to answer a plain `408`,
   which tells a client it may resend a write the CDR may already hold. Every
   other route keeps its plain `408` and `413`.
+- A `recorder` that carries only a reference no longer leaves
+  `COMPOSITION.composer` empty (#627). The FHIRconnect engine used to count
+  the empty party as a written composer, so the default composer was
+  skipped and the CDR refused the composition with "missing field
+  `composer`". A party holding no name, identifier or external reference now
+  leaves the composer to its default, and a composer with an external
+  reference travels as `ctx/composer_id`, `ctx/id_namespace` and
+  `ctx/id_scheme` (Simplified Formats, §Composer).
 - Removing a person's newest `PERSON` writer hands the row to the writer
   that remains (#561). When several compositions of one EHR write the
   person's `PERSON` row and the newest of them is deleted in the CDR, or a
