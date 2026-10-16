@@ -31,12 +31,14 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 
+use crate::facade::engine;
 use crate::facade::programs::Programs;
 use crate::facade::search::aql::Conditions;
 use crate::facade::search::aql::OrderKey;
 use crate::facade::search::declaration::DeclarationError;
 use crate::facade::search::declaration::Parameter;
 use crate::facade::search::declaration::ParameterType;
+use crate::facade::search::template::Placement;
 
 /// The page sizes a deployment configured.
 ///
@@ -101,6 +103,9 @@ pub struct Declared {
     order: Vec<String>,
     /// The declared parameters, by name.
     parameters: BTreeMap<String, Parameter>,
+    /// Where the template places the context's entry, which an entry count
+    /// reads.
+    placement: Option<Placement>,
 }
 
 impl Declared {
@@ -144,6 +149,13 @@ impl Declared {
     #[must_use]
     pub const fn parameters(&self) -> &BTreeMap<String, Parameter> {
         &self.parameters
+    }
+
+    /// Returns where the template places the context's entry, when it places
+    /// it with one RM class.
+    #[must_use]
+    pub const fn placement(&self) -> Option<&Placement> {
+        self.placement.as_ref()
     }
 
     /// Returns the parameter names with their types, the patient section
@@ -271,6 +283,8 @@ pub fn bind(
         patient,
         order,
         parameters,
+        placement: engine::archetype_of(loaded.program())
+            .and_then(|archetype| template::placement(loaded.index(), &archetype)),
     };
     check_paths(&declared)?;
     Ok(declared)
@@ -346,10 +360,21 @@ fn check_paths(declared: &Declared) -> Result<(), DeclarationError> {
         path: path.clone(),
         descending: false,
     }));
-    aql::parses(&aql::rows_text(&conditions, &order)).map_err(|source| DeclarationError::Query {
+    let refuse_query = |source| DeclarationError::Query {
         file: declared.file.clone(),
         source,
-    })
+    };
+    aql::parses(&aql::rows_text(&conditions, &order)).map_err(refuse_query)?;
+    let entry = declared
+        .placement
+        .as_ref()
+        .map(|placement| &placement.entry);
+    aql::parses(&aql::count_text(&conditions, entry)).map_err(refuse_query)?;
+    aql::parses(&aql::count_text(
+        &Conditions::new(&declared.template_id),
+        entry,
+    ))
+    .map_err(refuse_query)
 }
 
 /// Files `declared` under its type, refusing a second declaration over one

@@ -199,6 +199,44 @@ pub fn rows_text(conditions: &Conditions, order: &[OrderKey]) -> String {
     )
 }
 
+/// The alias a count binds the context's entry to.
+const ENTRY_ALIAS: &str = "x";
+
+/// Returns the count query `conditions` describe, `entry` the context's
+/// entry.
+///
+/// A query that binds no node counts the entries of `entry` the matching
+/// compositions contain, one row per entry under `CONTAINS` (QUERY AQL
+/// §3.13.2.2), with `COUNT(*)` (§3.9.1.1). A query that binds a node, or that
+/// has no `entry`, counts the rows the row query reads. Either count reads
+/// no composition.
+#[must_use]
+pub fn count_text(conditions: &Conditions, entry: Option<&Node>) -> String {
+    let from = match entry {
+        Some(entry) if conditions.nodes.is_empty() => format!(
+            "{FROM} CONTAINS {} {ENTRY_ALIAS}[{}]",
+            entry.class, entry.archetype
+        ),
+        _ => conditions.from(),
+    };
+    format!(
+        "SELECT COUNT(*) AS total FROM {from} WHERE {}",
+        conditions.text()
+    )
+}
+
+/// Returns the request body of the count query.
+#[must_use]
+pub fn count_request(conditions: &Conditions, entry: Option<&Node>) -> AdhocQueryExecute {
+    AdhocQueryExecute {
+        q: count_text(conditions, entry),
+        offset: None,
+        fetch: None,
+        query_parameters: Some(conditions.parameters.clone()),
+        additional_properties: std::collections::BTreeMap::new(),
+    }
+}
+
 /// Returns the request body of the row query, one page of it.
 #[must_use]
 pub fn rows_request(
@@ -262,7 +300,7 @@ pub fn check_path(path: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Conditions, DEFAULT_ORDER, OrderKey, check_path, parses, rows_text};
+    use super::{Conditions, DEFAULT_ORDER, OrderKey, check_path, count_text, parses, rows_text};
 
     fn default_order() -> Vec<OrderKey> {
         DEFAULT_ORDER
@@ -358,6 +396,38 @@ mod tests {
         );
         assert!(rows.contains("n0 AS n0, n1 AS n1 FROM"), "{rows}");
         parses(&rows).expect("two bound nodes parse");
+    }
+
+    #[test]
+    fn an_entry_count_contains_the_entry_and_reads_no_composition() {
+        let entry = crate::facade::search::declaration::Node {
+            class: String::from("EVALUATION"),
+            archetype: String::from("openEHR-EHR-EVALUATION.problem_diagnosis.v1"),
+        };
+        let mut conditions = Conditions::new("t");
+        let ehr = conditions.bind("bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11");
+        conditions.push(format!("e/ehr_id/value = {ehr}"));
+        let text = count_text(&conditions, Some(&entry));
+        assert!(
+            text.starts_with(
+                "SELECT COUNT(*) AS total FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c CONTAINS EVALUATION x[openEHR-EHR-EVALUATION.problem_diagnosis.v1] WHERE"
+            ),
+            "{text}"
+        );
+        parses(&text).expect("the entry count parses");
+        let bare = count_text(&conditions, None);
+        assert!(bare.contains("CONTAINS COMPOSITION c WHERE"), "{bare}");
+        parses(&bare).expect("the row count parses");
+
+        let node = conditions.alias(Some(&entry));
+        conditions.push(format!("EXISTS {node}/data"));
+        let bound = count_text(&conditions, Some(&entry));
+        assert!(
+            bound.contains("CONTAINS COMPOSITION c CONTAINS EVALUATION n0["),
+            "a query binding a node counts its rows: {bound}"
+        );
+        assert!(!bound.contains(" x["), "{bound}");
+        parses(&bound).expect("the bound count parses");
     }
 
     #[test]
