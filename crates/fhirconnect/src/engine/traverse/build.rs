@@ -3,12 +3,14 @@
 
 //! The composition defaults and the build of the values a run produced.
 
+use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
 use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::composition::NodeValue;
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::index::paths::AqlPath;
 use openehr_mapping_core::template::PathError;
+use openehr_rm::v1_2::common::generic::party_identified::PartyIdentifiedData;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::support::terminology::openehr_terminology_group_identifiers::OpenehrTerminologyGroupIdentifiersData;
@@ -27,6 +29,9 @@ use crate::engine::traverse::Held;
 use crate::engine::traverse::Routed;
 use crate::engine::traverse::Run;
 use crate::engine::traverse::error::EngineError;
+
+/// The archetype path of `COMPOSITION.composer`.
+const COMPOSER: &str = "/composer";
 
 impl<'a, T: Table + ?Sized> Run<'a, T> {
     /// Fills the composition fields no mapping wrote.
@@ -51,12 +56,8 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
         defaults: &Defaults,
     ) -> Result<Vec<String>, EngineError> {
         let mut filled = Vec::new();
-        self.default_context(
-            &mut filled,
-            "/composer",
-            "composer_name",
-            &defaults.composer,
-        )?;
+        self.release_void_composer()?;
+        self.default_context(&mut filled, COMPOSER, "composer_name", &defaults.composer)?;
         self.default_context(
             &mut filled,
             "/context/start_time",
@@ -143,24 +144,57 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
     /// Returns [`EngineError::Template`] when the template cannot answer for
     /// the path for any reason other than holding no node at it.
     fn unwritten(&self, path: &str) -> Result<Option<&'a ResolvedNode>, EngineError> {
-        let node = match self.index.node(&AqlPath::new(path)) {
-            Ok(node) => node,
-            // NOTE: engine/defaults-for-fields.adoc, the context "is usually
-            // populated", so a template with no node at the path takes no default.
-            Err(PathError::UnknownPath { .. }) => return Ok(None),
-            Err(source) => {
-                return Err(EngineError::Template {
-                    mapping: String::from(self.program.context().as_str()),
-                    node: String::from(path),
-                    source: Box::new(source),
-                });
-            }
+        let Some(node) = self.node_at(path)? else {
+            return Ok(None);
         };
         let written = self
             .written
             .iter()
             .any(|written| written.flat_id == *node.flat_id());
         Ok((!written).then_some(node))
+    }
+
+    /// Forgets a composer the run wrote as a `PARTY_IDENTIFIED` holding no
+    /// name, identifier or external reference, so the default composer
+    /// applies.
+    ///
+    /// A FHIR `Reference` carrying only `reference` puts nothing in the
+    /// party, since the demographics lookup the `PARTY_IDENTIFIED` cell of
+    /// FHIRconnect names is the caller's, and the RM refuses such a party.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Template`] when the template cannot answer for
+    /// the composer for any reason other than holding no node at it.
+    fn release_void_composer(&mut self) -> Result<(), EngineError> {
+        let Some(node) = self.node_at(COMPOSER)? else {
+            return Ok(());
+        };
+        self.written.retain(|written| {
+            written.flat_id != *node.flat_id()
+                || !matches!(written.value, Held::Value(RmValue::Party(ref party)) if void(party))
+        });
+        Ok(())
+    }
+
+    /// Returns the node at `path`, `None` when the template holds none.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Template`] when the template cannot answer for
+    /// the path for any reason other than holding no node at it.
+    fn node_at(&self, path: &str) -> Result<Option<&'a ResolvedNode>, EngineError> {
+        match self.index.node(&AqlPath::new(path)) {
+            Ok(node) => Ok(Some(node)),
+            // NOTE: engine/defaults-for-fields.adoc, the context "is usually
+            // populated", so a template with no node at the path takes no default.
+            Err(PathError::UnknownPath { .. }) => Ok(None),
+            Err(source) => Err(EngineError::Template {
+                mapping: String::from(self.program.context().as_str()),
+                node: String::from(path),
+                source: Box::new(source),
+            }),
+        }
     }
 
     /// Returns the values the run produced, as the composition builder wants
@@ -266,26 +300,131 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
 /// node.
 ///
 /// Simplified Formats, master06 §Composer and §Language and Territory:
-/// `ctx/composer_name` sets the composer's name and `ctx/language` and
-/// `ctx/territory` the two codes. A part the keys do not hold is left out
+/// `ctx/language` and `ctx/territory` set the two codes, and the composer
+/// travels as [`composer_keys`]. A part the keys do not hold is left out
 /// here and refused by [`Run::carried_whole`] once the composition is built.
 pub(super) fn context_keys(node: &ResolvedNode, value: &RmValue) -> Option<Vec<NodeValue>> {
-    let key = |field: &str, text: &str| {
-        NodeValue::context(field, serde_json::Value::String(String::from(text)))
-    };
     let field = match node.aql_path().as_str() {
         "/language" => "language",
         "/territory" => "territory",
-        "/composer" => "composer_name",
+        COMPOSER => {
+            return Some(match *value {
+                RmValue::Party(ref party) => composer_keys(party),
+                _ => Vec::new(),
+            });
+        }
         _ => return None,
     };
     Some(match *value {
-        RmValue::CodePhrase(ref code) if field != "composer_name" => {
-            vec![key(field, &code.code_string)]
-        }
-        RmValue::Party(ref party) if field == "composer_name" => {
-            party.name.iter().map(|name| key(field, name)).collect()
-        }
+        RmValue::CodePhrase(ref code) => vec![context_key(field, &code.code_string)],
         _ => Vec::new(),
     })
+}
+
+/// Returns the `ctx/` keys a composer `PARTY_IDENTIFIED` travels as.
+///
+/// Simplified Formats, master06 §Composer and §ID Namespace and Scheme:
+/// `ctx/composer_name` sets the name, `ctx/composer_id` the
+/// `external_ref.id.value`, `ctx/id_namespace` its `namespace` and
+/// `ctx/id_scheme` the `id.scheme` of a `GENERIC_ID`. The vocabulary has no
+/// key for `identifiers`, so a party carrying them is refused by
+/// [`Run::carried_whole`].
+fn composer_keys(party: &PartyIdentifiedData) -> Vec<NodeValue> {
+    let mut keys: Vec<NodeValue> = party
+        .name
+        .iter()
+        .map(|name| context_key("composer_name", name))
+        .collect();
+    if let Some(ref reference) = party.external_ref {
+        let (id, scheme) = match reference.id {
+            ObjectId::GenericId(ref id) => (id.value.as_str(), Some(id.scheme.as_str())),
+            ObjectId::HierObjectId(ref id) => (id.value(), None),
+            ObjectId::ObjectVersionId(ref id) => (id.value(), None),
+            ObjectId::ArchetypeId(ref id) => (id.value.as_str(), None),
+            ObjectId::TemplateId(ref id) => (id.value.as_str(), None),
+            ObjectId::TerminologyId(ref id) => (id.value.as_str(), None),
+        };
+        keys.push(context_key("composer_id", id));
+        keys.push(context_key("id_namespace", &reference.namespace));
+        if let Some(scheme) = scheme {
+            keys.push(context_key("id_scheme", scheme));
+        }
+    }
+    keys
+}
+
+/// Returns whether `party` holds none of `name`, `identifiers` and
+/// `external_ref`.
+///
+/// The openEHR RM `PARTY_IDENTIFIED` requires "at least one of name,
+/// identifier or external_ref", so such a party is no value.
+fn void(party: &PartyIdentifiedData) -> bool {
+    party.name.is_none() && party.identifiers.is_none() && party.external_ref.is_none()
+}
+
+/// Returns the `ctx/` key `field` carrying `text`.
+fn context_key(field: &str, text: &str) -> NodeValue {
+    NodeValue::context(field, serde_json::Value::String(String::from(text)))
+}
+
+#[cfg(test)]
+mod tests {
+    use openehr_base::v1_3::base_types::identification::generic_id::GenericId;
+    use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
+    use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
+    use openehr_rm::v1_2::common::generic::party_identified::PartyIdentifiedData;
+
+    use super::composer_keys;
+    use super::context_key;
+    use super::void;
+
+    fn party(name: Option<&str>, external_ref: Option<PartyRef>) -> PartyIdentifiedData {
+        PartyIdentifiedData {
+            external_ref,
+            name: name.map(String::from),
+            identifiers: None,
+        }
+    }
+
+    fn external_ref() -> PartyRef {
+        PartyRef {
+            namespace: String::from("demographics"),
+            r#type: String::from("PERSON"),
+            id: ObjectId::GenericId(GenericId {
+                value: String::from("synthetic-practitioner-0001"),
+                scheme: String::from("local"),
+            }),
+        }
+    }
+
+    #[test]
+    fn a_named_composer_travels_as_its_name() {
+        let named = party(Some("Synthetic Recorder"), None);
+        assert_eq!(
+            composer_keys(&named),
+            [context_key("composer_name", "Synthetic Recorder")]
+        );
+        assert!(!void(&named));
+    }
+
+    #[test]
+    fn a_nameless_composer_travels_as_its_external_ref() {
+        let referenced = party(None, Some(external_ref()));
+        assert_eq!(
+            composer_keys(&referenced),
+            [
+                context_key("composer_id", "synthetic-practitioner-0001"),
+                context_key("id_namespace", "demographics"),
+                context_key("id_scheme", "local"),
+            ]
+        );
+        assert!(!void(&referenced));
+    }
+
+    #[test]
+    fn an_empty_composer_is_void_and_carries_no_key() {
+        let empty = party(None, None);
+        assert_eq!(composer_keys(&empty), []);
+        assert!(void(&empty));
+    }
 }
