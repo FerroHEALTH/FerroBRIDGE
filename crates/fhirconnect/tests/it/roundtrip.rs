@@ -425,11 +425,15 @@ pub(crate) fn kds_condition() -> Result<serde_json::Value, Box<dyn Error>> {
     )?)
 }
 
+/// Returns the FLAT fixture of the synthetic `KDS_Diagnose` composition.
+pub(crate) fn kds_flat() -> Result<serde_json::Map<String, serde_json::Value>, Box<dyn Error>> {
+    let text = std::fs::read_to_string(Path::new(&project("kds_diagnose.flat.json")))?;
+    Ok(serde_json::from_str(&text)?)
+}
+
 /// Builds the synthetic `KDS_Diagnose` composition from its FLAT fixture.
 fn kds_composition(index: &WebTemplateIndex) -> Result<CanonicalComposition, Box<dyn Error>> {
-    let text = std::fs::read_to_string(Path::new(&project("kds_diagnose.flat.json")))?;
-    let flat: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&text)?;
-    Ok(index.build_from_flat(&flat, laws::NOW)?)
+    Ok(index.build_from_flat(&kds_flat()?, laws::NOW)?)
 }
 
 #[test]
