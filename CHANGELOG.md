@@ -25,6 +25,10 @@ crates on crates.io.
 
 ### Fixed
 
+- A percent-encoded `_count`, such as `_count=%32%30`, reads as its decoded
+  value on every facade route (#523). The request guard read `_count` from
+  the raw query and refused it with a `400`, while the search read the
+  decoded value; both now read the one decoded value.
 - A CDR call whose token the CDR refused, and whose renewal the token
   endpoint then refused, is no longer retried (#663). The client asked the
   refusing token endpoint again on every retry of a `GET`; it now ends the
