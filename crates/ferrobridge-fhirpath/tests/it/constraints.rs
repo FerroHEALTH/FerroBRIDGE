@@ -17,7 +17,7 @@ use std::sync::LazyLock;
 
 use ferrobridge_fhirpath::eval::{Environment, Focus};
 use ferrobridge_fhirpath::expression::Expression;
-use ferrobridge_fhirpath::model::path_type;
+use ferrobridge_fhirpath::model::{named_type, path_type};
 use ferrobridge_fhirpath::model::r4::R4;
 use ferrobridge_fhirpath::value::Collection;
 use fhir_types::codec::Value;
@@ -391,6 +391,35 @@ fn rng_2_compares_low_and_high_across_ucum_units() {
     assert_eq!(truth(&evaluate(&ordered)), Some(true));
     assert_eq!(truth(&evaluate(&reversed)), Some(false));
     assert_eq!(truth(&evaluate(&incommensurable)), None);
+}
+
+#[test]
+fn ras_1_checks_against_a_range_and_reads_percentages() {
+    // R4 RiskAssessment ras-1 constrains probability[x] when it is a Range;
+    // FHIR R4 §2.9.1.3: only a UCUM code makes a System.Quantity.
+    let (_, _, expression) = R4_CORE
+        .iter()
+        .find(|(key, ..)| key == "ras-1")
+        .expect("ras-1 should exist");
+    let range = named_type(&R4, "Range").expect("Range is an R4 type");
+    assert_eq!(
+        Expression::parse(expression)
+            .expect("ras-1 should parse")
+            .check(&R4, range),
+        Ok(())
+    );
+    let assessment = json(r#"{"resourceType": "RiskAssessment", "status": "final"}"#);
+    let percent = json(
+        r#"{"low": {"value": 10, "system": "http://unitsofmeasure.org", "code": "%"},
+            "high": {"value": 20, "system": "http://unitsofmeasure.org", "code": "%"}}"#,
+    );
+    let milligrams =
+        json(r#"{"low": {"value": 10, "system": "http://unitsofmeasure.org", "code": "mg"}}"#);
+    let open = json("{}");
+    let evaluate = |value| invariant("ras-1", Focus::element(value, "Range", &assessment));
+    assert_eq!(truth(&evaluate(&percent)), Some(true));
+    assert_eq!(truth(&evaluate(&milligrams)), Some(false));
+    assert_eq!(truth(&evaluate(&open)), Some(true));
 }
 
 #[test]
