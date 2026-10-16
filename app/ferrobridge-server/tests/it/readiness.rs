@@ -186,3 +186,60 @@ async fn liveness_stays_two_hundred_while_an_upstream_is_down() -> Result<(), Bo
     );
     Ok(())
 }
+
+/// Returns the router of a deployment whose only upstream is the CDM
+/// database `url`.
+async fn cdm_router(url: &str) -> Result<Router, Box<dyn StdError>> {
+    let text = format!("[cdm]\nurl = {url:?}\n");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let state = Arc::new(AppState::build(&settings).await?);
+    Ok(ferrobridge_server::router(state, &support::settings()))
+}
+
+#[tokio::test]
+async fn an_unreachable_cdm_database_makes_readiness_five_hundred_and_three()
+-> Result<(), Box<dyn StdError>> {
+    // A port taken and released at once has no listener behind it.
+    let port = std::net::TcpListener::bind("127.0.0.1:0")?
+        .local_addr()?
+        .port();
+    let url = format!("postgres://bridge@127.0.0.1:{port}/cdm?sslmode=disable");
+
+    let (status, document) = readiness(cdm_router(&url).await?).await?;
+    assert_eq!(StatusCode::SERVICE_UNAVAILABLE, status);
+    assert_eq!(
+        Some("down"),
+        document["indicators"]["cdm"]["state"].as_str()
+    );
+    assert!(
+        document["indicators"]["cdm"]["detail"].as_str().is_some(),
+        "the indicator says why: {document}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_reachable_cdm_database_makes_readiness_two_hundred() -> Result<(), Box<dyn StdError>> {
+    if !ferrobridge_testkit::containers::e2e_enabled() {
+        return Ok(());
+    }
+    let postgres = ferrobridge_testkit::containers::postgres().await?;
+
+    let (status, document) = readiness(cdm_router(postgres.url()).await?).await?;
+    assert_eq!(StatusCode::OK, status, "{document}");
+    assert_eq!(Some("up"), document["indicators"]["cdm"]["state"].as_str());
+    Ok(())
+}
+
+#[tokio::test]
+async fn without_a_cdm_section_readiness_carries_no_cdm_indicator() -> Result<(), Box<dyn StdError>>
+{
+    let settings = Config::from_sources(None, &BTreeMap::new())?.resolve()?;
+    let state = AppState::build(&settings).await?;
+    assert!(
+        !state.health().names().contains(&"cdm"),
+        "{:?}",
+        state.health().names()
+    );
+    Ok(())
+}

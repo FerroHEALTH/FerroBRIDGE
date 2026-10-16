@@ -23,6 +23,14 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Added
+
+- `/health/readiness` carries a `cdm` indicator when a `[cdm]` section is
+  configured (#615). It opens one connection to the CDM database over the
+  configured TLS and asks `SELECT 1`, and reports down with the reason on a
+  refused connection or a failed query, so an unreachable CDM shows before the
+  next `etl run` fails. Without `[cdm]`, readiness is unchanged.
+
 ## [0.0.6] - 2026-10-17
 
 ### Added

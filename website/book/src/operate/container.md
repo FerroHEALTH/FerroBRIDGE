@@ -135,8 +135,10 @@ external. Two endpoints answer it:
   configured credentials: the CDR check lists the ADL 1.4 templates
   (`GET /definition/template/adl1.4`, filtered so the answer is empty), and a
   `401` or `403` from either upstream counts as down, because every real call
-  would be refused the same way. Take the instance out of the load balancer
-  when it does not answer `200`.
+  would be refused the same way. With a `[cdm]` section, a `cdm` check opens
+  one connection to the CDM database over the configured TLS and asks
+  `SELECT 1`; a refused connection or a failed query counts as down. Take the
+  instance out of the load balancer when it does not answer `200`.
 
 Readiness answers `503` when any indicator is down, with a JSON body naming the
 aggregate and every indicator by name:

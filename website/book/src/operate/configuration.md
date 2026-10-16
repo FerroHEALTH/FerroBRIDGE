@@ -242,7 +242,8 @@ the engines fail closed on anything that would need one.
 ### `[cdm]`
 
 The OMOP CDM database lane. This section reaches identifiable data, and the
-server says so once at start-up.
+server says so once at start-up. Under `serve`, readiness carries a `cdm`
+indicator that reports whether the database answers.
 
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
