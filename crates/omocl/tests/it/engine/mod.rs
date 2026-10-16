@@ -8,6 +8,7 @@
 mod columns;
 mod forms;
 mod laboratory;
+mod person;
 mod quantity;
 mod run_outcome;
 mod vocabulary;

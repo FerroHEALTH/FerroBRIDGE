@@ -11,6 +11,7 @@
 mod cdr_aql;
 mod deletions;
 mod engine;
+mod person;
 mod run;
 mod visit;
 

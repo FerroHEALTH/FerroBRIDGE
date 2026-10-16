@@ -8,7 +8,10 @@
 //! part takes from a value follows the CDM v5.4 field definitions
 //! (`OMOP_CDMv5.4_Field_Level.csv`): a source code with no standard concept
 //! writes concept `0` and keeps its source value, units given but not mapped
-//! write `unit_concept_id = 0` and absent units leave it NULL, an exact value
+//! write `unit_concept_id = 0` and absent units leave it NULL, a required
+//! standard concept column no key of the projection writes takes `0`
+//! (`person.race_concept_id`, whose definition says "If a clear race or
+//! ethnic background cannot be established, use `Concept_Id` 0"), an exact value
 //! leaves `operator_concept_id` NULL, and a `*_source_concept_id` carries the
 //! concept the source code names when the vocabulary holds one. A resolved
 //! concept whose domain is not the one its column takes refuses the record:
@@ -271,6 +274,11 @@ impl Finisher<'_> {
                 };
                 self.column(&mut projection)?;
                 cells = projection.cells;
+            }
+            // NOTE: CDM conventions, "Source Values, Source Concept Ids, and Standard
+            // Concept Ids": a required standard concept field with no information is 0.
+            for column in crate::model::projection::concept_columns_without_key(target) {
+                cells.set(column, Cell::Int(ConceptId::NO_MATCHING_CONCEPT.get()));
             }
             let key = key_of_draft(draft, self.source, branch)?;
             let filled = Filled {

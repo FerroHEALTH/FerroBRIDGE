@@ -79,6 +79,11 @@ pub const KDS_PERSON_OPT: &str = include_str!("../fixtures/opt/kds-person/KDS_Pe
 /// The template identifier [`KDS_PERSON_OPT`] declares.
 pub const KDS_PERSON_TEMPLATE_ID: &str = "KDS_Person";
 
+/// A synthetic FLAT composition of [`KDS_PERSON_OPT`]: one person with a
+/// name, the birth date `1984-03-17` and the administrative gender
+/// `SYN-GENDER-F` of the synthetic `FB-GENDER` code system.
+pub const KDS_PERSON_FLAT: &str = include_str!("../fixtures/composition/kds_person.flat.json");
+
 /// A synthetic canonical COMPOSITION built against
 /// [`MINIMAL_EVALUATION_OPT`].
 pub const MINIMAL_EVALUATION_COMPOSITION: &str =
