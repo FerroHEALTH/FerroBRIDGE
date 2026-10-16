@@ -14,13 +14,18 @@ use url::Url;
 
 /// The FHIR release a server answers in.
 ///
-/// The release decides which generated module reads the `Parameters` and the
-/// `OperationOutcome` of a call. The two releases declare the same `in` and
-/// `out` parameters for the three operations this client sends, so the choice
-/// changes the decoder rather than the request.
+/// The release decides which generated module writes the request and reads
+/// the `Parameters` and the `OperationOutcome` of a call. R4 and R4B declare
+/// the same `in` and `out` parameters for the three operations this client
+/// sends. STU3 declares fewer, so a request naming a parameter STU3 has no
+/// equivalent for is refused with
+/// [`Error::UnsupportedParameter`](crate::error::Error::UnsupportedParameter)
+/// before anything is sent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum WireVersion {
+    /// FHIR STU3, release 3.0.2 (<https://hl7.org/fhir/STU3/>).
+    Stu3,
     /// FHIR R4 (<https://hl7.org/fhir/R4/>).
     R4,
     /// FHIR R4B (<https://hl7.org/fhir/R4B/>).
@@ -32,6 +37,7 @@ impl WireVersion {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::Stu3 => "STU3",
             Self::R4 => "R4",
             Self::R4B => "R4B",
         }
@@ -181,6 +187,7 @@ mod tests {
 
     #[test]
     fn a_wire_version_names_its_release() {
+        assert_eq!("STU3", WireVersion::Stu3.as_str());
         assert_eq!("R4", WireVersion::R4.as_str());
         assert_eq!("R4B", WireVersion::R4B.as_str());
     }

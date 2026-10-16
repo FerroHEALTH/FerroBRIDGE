@@ -126,6 +126,9 @@ pub enum Request {
         /// The code system to translate into.
         target_system: String,
         /// The canonical URL of the concept map to use, when one is named.
+        ///
+        /// STU3 `$translate` has no `url` parameter, so an STU3 client
+        /// refuses a request that names one.
         concept_map_url: Option<String>,
     },
     /// `ValueSet/$validate-code`.
@@ -152,6 +155,9 @@ pub struct Validation {
     pub value_set_url: String,
     /// `valueSetVersion`, the version of the value set, when the binding
     /// names one.
+    ///
+    /// STU3 `$validate-code` has no such parameter, so an STU3 client
+    /// refuses a validation that names one.
     pub value_set_version: Option<String>,
     /// The coded value, in one of the three forms the operation accepts.
     pub coded: Coded,
@@ -172,7 +178,7 @@ pub enum Coded {
         /// `code`.
         code: String,
         /// `systemVersion`, the version of the system, if one was provided in
-        /// the source data.
+        /// the source data. STU3 names this parameter `version`.
         version: Option<String>,
         /// `display`, the display associated with the code, if provided.
         display: Option<String>,
