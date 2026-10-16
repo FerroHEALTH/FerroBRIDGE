@@ -61,7 +61,7 @@ fn round_trip<T: Json>(path: &Path, root: &str) -> Result<(), String> {
 /// error the strict codec must report. CodeSystem.status and ValueSet.status are
 /// 1..1 (<https://hl7.org/fhir/R4B/codesystem.html>, <https://hl7.org/fhir/R4B/valueset.html>),
 /// and the 4.3.0 package omits both on catalogType.
-fn expected_rejections(package: &str) -> Vec<(&'static str, &'static str)> {
+pub(crate) fn expected_rejections(package: &str) -> Vec<(&'static str, &'static str)> {
     match package {
         "hl7.fhir.r4b.core" => vec![
             (
@@ -83,6 +83,72 @@ fn expected_rejections(package: &str) -> Vec<(&'static str, &'static str)> {
         )],
         _ => Vec::new(),
     }
+}
+
+/// One file of `package` decoded as `T`, for the readers that compare what
+/// the codec makes of the package.
+///
+/// A file listed in [`expected_rejections`] that the codec refuses with the
+/// listed error is `Ok(None)`, the one sanctioned skip. Any other failure, a
+/// file that cannot be read, is not JSON, or is refused without a listing, is
+/// an error naming the path.
+pub(crate) fn decode_file<T: Json>(package: &str, file: &Path) -> Result<Option<T>, String> {
+    let text = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
+    let value: Value = serde_json::from_str(without_byte_order_mark(&text))
+        .map_err(|e| format!("{}: not JSON: {e}", file.display()))?;
+    let mut path = ElementPath::root("Resource");
+    let object = expect_object(&value, &path).map_err(|e| format!("{}: {e}", file.display()))?;
+    match T::from_json(object, &mut path) {
+        Ok(decoded) => Ok(Some(decoded)),
+        Err(e) => {
+            let name = file
+                .file_name()
+                .and_then(std::ffi::OsStr::to_str)
+                .unwrap_or("");
+            let refusal = e.to_string();
+            let listed = expected_rejections(package)
+                .iter()
+                .any(|(f, expected)| *f == name && refusal.ends_with(expected));
+            if listed {
+                Ok(None)
+            } else {
+                Err(format!("{}: {refusal}", file.display()))
+            }
+        }
+    }
+}
+
+#[test]
+fn the_file_reader_names_an_unparsable_file() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let file = dir.path().join("CodeSystem-broken.json");
+    fs::write(&file, r#"{"resourceType":"CodeSystem","#).expect("the file is written");
+    let error = decode_file::<fhir_types::r4::resource::Resource>("hl7.fhir.r4.core", &file)
+        .expect_err("an unparsable file fails the reader");
+    assert!(error.contains("CodeSystem-broken.json"), "{error}");
+    assert!(error.contains("not JSON"), "{error}");
+}
+
+#[test]
+fn the_file_reader_names_an_unlisted_refusal() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    // The name of an expected rejection in another package is not a listing.
+    let file = dir.path().join("CodeSystem-catalogType.json");
+    fs::write(
+        &file,
+        r#"{"resourceType":"CodeSystem","content":"complete"}"#,
+    )
+    .expect("the file is written");
+    let error = decode_file::<fhir_types::r4::resource::Resource>("hl7.fhir.r4.core", &file)
+        .expect_err("an unlisted refusal fails the reader");
+    assert!(error.contains("CodeSystem-catalogType.json"), "{error}");
+    assert!(
+        error.ends_with("Resource.status: required property is missing"),
+        "{error}"
+    );
+    let listed = decode_file::<fhir_types::r4b::resource::Resource>("hl7.fhir.r4b.core", &file)
+        .expect("a listed refusal is the sanctioned skip");
+    assert!(listed.is_none());
 }
 
 fn round_trip_all<T: Json>(package: &str) {
