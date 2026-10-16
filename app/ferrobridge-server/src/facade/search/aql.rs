@@ -123,13 +123,6 @@ impl Conditions {
         alias
     }
 
-    /// Whether the `FROM` binds a node, so one composition may answer more
-    /// than one row.
-    #[must_use]
-    pub fn binds_nodes(&self) -> bool {
-        !self.nodes.is_empty()
-    }
-
     /// Returns the number of nodes the `FROM` binds, each one more column of
     /// a row.
     #[must_use]
@@ -206,26 +199,6 @@ pub fn rows_text(conditions: &Conditions, order: &[OrderKey]) -> String {
     )
 }
 
-/// Returns the count query `conditions` describe.
-///
-/// `COUNT(*)` counts every row and `COUNT(DISTINCT expression)` every
-/// distinct value (QUERY AQL §3.9.1.1). With no bound node a row is one
-/// composition; with one, the count is of distinct version uids, so either
-/// way it is the number of matching compositions.
-#[must_use]
-pub fn count_text(conditions: &Conditions) -> String {
-    let counted = if conditions.binds_nodes() {
-        "COUNT(DISTINCT v/uid/value)"
-    } else {
-        "COUNT(*)"
-    };
-    format!(
-        "SELECT {counted} AS total FROM {} WHERE {}",
-        conditions.from(),
-        conditions.text()
-    )
-}
-
 /// Returns the request body of the row query, one page of it.
 #[must_use]
 pub fn rows_request(
@@ -238,18 +211,6 @@ pub fn rows_request(
         q: rows_text(conditions, order),
         offset: Some(offset),
         fetch: Some(fetch),
-        query_parameters: Some(conditions.parameters.clone()),
-        additional_properties: std::collections::BTreeMap::new(),
-    }
-}
-
-/// Returns the request body of the count query.
-#[must_use]
-pub fn count_request(conditions: &Conditions) -> AdhocQueryExecute {
-    AdhocQueryExecute {
-        q: count_text(conditions),
-        offset: None,
-        fetch: None,
         query_parameters: Some(conditions.parameters.clone()),
         additional_properties: std::collections::BTreeMap::new(),
     }
@@ -301,7 +262,7 @@ pub fn check_path(path: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Conditions, DEFAULT_ORDER, OrderKey, check_path, count_text, parses, rows_text};
+    use super::{Conditions, DEFAULT_ORDER, OrderKey, check_path, parses, rows_text};
 
     fn default_order() -> Vec<OrderKey> {
         DEFAULT_ORDER
@@ -355,11 +316,10 @@ mod tests {
         }];
         order.extend(default_order());
         parses(&rows_text(&conditions, &order)).expect("the row query parses");
-        parses(&count_text(&conditions)).expect("the count query parses");
     }
 
     #[test]
-    fn a_bound_node_reads_code_and_system_from_one_node_and_counts_compositions() {
+    fn a_bound_node_reads_code_and_system_from_one_node() {
         // #526: the code and the system of one token value are read under one
         // alias the FROM binds, never as two leaves through the repeated node.
         let node = crate::facade::search::declaration::Node {
@@ -385,9 +345,6 @@ mod tests {
             "a row names the node that matched: {rows}"
         );
         parses(&rows).expect("the row query parses");
-        let count = count_text(&conditions);
-        assert!(count.contains("COUNT(DISTINCT v/uid/value)"), "{count}");
-        parses(&count).expect("the count query parses");
 
         let second = conditions.alias(Some(&node));
         assert_eq!("n1", second);
@@ -401,7 +358,6 @@ mod tests {
         );
         assert!(rows.contains("n0 AS n0, n1 AS n1 FROM"), "{rows}");
         parses(&rows).expect("two bound nodes parse");
-        assert!(count_text(&Conditions::new("t")).contains("COUNT(*)"));
     }
 
     #[test]
