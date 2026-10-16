@@ -5,8 +5,9 @@
 //! `fhirpath-r4` conformance corpus, one case per `test` element.
 //!
 //! A case expecting the expression refused (`invalid`) passes when it fails
-//! to parse, fails the static check against the input's resource type, or
-//! fails to evaluate. Any other case passes when the evaluation answers the
+//! to parse, fails the static check against the input's resource type or
+//! the types its `contextType` names, or fails to evaluate; any other case
+//! with a `contextType` must pass that check. Any other case passes when the evaluation answers the
 //! expected outputs, in order unless the test says `ordered="false"`. A
 //! failing case records why, and a case on an input FHIR refuses records the
 //! rule the input breaks. No case is special-cased by its name.
@@ -17,7 +18,7 @@ use ferrobridge_fhirpath::eval::convert::primitive_value;
 use ferrobridge_fhirpath::eval::{Environment, Focus};
 use ferrobridge_fhirpath::expression::Expression;
 use ferrobridge_fhirpath::model::r4::R4;
-use ferrobridge_fhirpath::model::{Model, resource_type};
+use ferrobridge_fhirpath::model::{FhirType, Model, named_type, resource_type};
 use ferrobridge_fhirpath::seam::{Profiles, SeamError};
 use ferrobridge_fhirpath::value::{Collection, Item};
 use ferrobridge_testkit::conformance::{Case, Corpus, record};
@@ -171,6 +172,19 @@ fn render(result: &Collection<'_>) -> String {
     format!("[{}]", items.join(", "))
 }
 
+/// The types a case's `contextType` names (`Period|Timing`), the types the
+/// context may hold when the expression is checked.
+fn context_types(model: &dyn Model, test: &Test) -> Result<Option<Vec<FhirType>>, String> {
+    let Some(names) = test.attribute("contextType") else {
+        return Ok(None);
+    };
+    names
+        .split('|')
+        .map(|name| named_type(model, name).ok_or_else(|| format!("no context type {name}")))
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
+}
+
 /// The verdict on one test.
 fn verdict(test: &Test, inputs: &BTreeMap<String, Result<Value, String>>) -> Result<(), String> {
     let model: &dyn Model = &R4;
@@ -200,6 +214,13 @@ fn verdict(test: &Test, inputs: &BTreeMap<String, Result<Value, String>>) -> Res
         && expression.check(model, root_type).is_err()
     {
         return Ok(());
+    }
+    if let Some(contexts) = context_types(model, test)? {
+        match expression.check_any(model, &contexts) {
+            Err(_) if invalid => return Ok(()),
+            Err(error) => return Err(format!("refused by the static check: {error}")),
+            Ok(()) => {}
+        }
     }
     let profiles = BaseDefinitions;
     let environment = Environment::new(model).with_profiles(&profiles);

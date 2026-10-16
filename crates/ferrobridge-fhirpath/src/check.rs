@@ -11,6 +11,13 @@
 //! leading type name that is not the context's, are refused before any
 //! document is read. Anything the check cannot type passes, and the
 //! evaluation's own checks apply.
+//!
+//! A type test of the focus narrows what the focus reaches where the test's
+//! outcome is known: the right operand of `and` and `implies` sees the test
+//! true, the right operand of `or` sees it false, the second argument of
+//! `iif()` true and the third false, and `where()` answers the items its
+//! criterion keeps. Where no type is left the operand cannot be reached and
+//! nothing in it is refused.
 
 use crate::ast::{BinaryOp, Expr, Literal, TypeSpecifier};
 use crate::model::{FhirType, Model, field_type, is_a, named_type, variant_type};
@@ -50,9 +57,19 @@ pub enum SemanticError {
         /// The literal's type.
         found: &'static str,
     },
+    /// A function given an input none of whose reachable types it takes
+    /// (N1 §11 "an input value ... not of the expected type").
+    #[error("{function}() takes no {type_name}")]
+    Input {
+        /// The function.
+        function: &'static str,
+        /// The reachable types.
+        type_name: String,
+    },
 }
 
-/// The FHIR types an expression can reach; `None` when unknown.
+/// The FHIR types an expression can reach; `None` when unknown, and none
+/// at all where a type guard leaves the expression unreachable.
 type Reach = Option<Vec<FhirType>>;
 
 /// Checks `expr` with a context of type `context`.
@@ -133,10 +150,20 @@ impl Checker<'_> {
                 Ok(None)
             }
             Expr::Binary { op, left, right } => {
-                let (a, b) = (
-                    self.infer(left, focus, this)?,
-                    self.infer(right, focus, this)?,
-                );
+                let a = self.infer(left, focus, this)?;
+                let b = match op {
+                    BinaryOp::And | BinaryOp::Implies => self.infer(
+                        right,
+                        &self.narrow(left, true, focus),
+                        &self.narrow(left, true, this),
+                    )?,
+                    BinaryOp::Or => self.infer(
+                        right,
+                        &self.narrow(left, false, focus),
+                        &self.narrow(left, false, this),
+                    )?,
+                    _ => self.infer(right, focus, this)?,
+                };
                 Ok(if *op == BinaryOp::Union {
                     union(a, b)
                 } else {
@@ -174,11 +201,105 @@ impl Checker<'_> {
         }
     }
 
+    /// The types `reach` keeps when the Boolean `guard` is `assume`.
+    ///
+    /// A guard is a type test of the focus (`$this is T`, `$this.is(T)`,
+    /// `is(T)`), its `not()`, or an `and` or `or` of guards; a test of any
+    /// other expression, or of a system type, tells nothing.
+    fn narrow(&self, guard: &Expr, assume: bool, reach: &Reach) -> Reach {
+        match guard {
+            Expr::Is {
+                operand,
+                type_specifier,
+            } if matches!(operand.as_ref(), Expr::This) => {
+                self.narrow_to(type_specifier, assume, reach)
+            }
+            Expr::Call { input, name, args }
+                if name == "is" && input.as_deref().is_none_or(|i| matches!(i, Expr::This)) =>
+            {
+                match args.as_slice() {
+                    [arg] => match arg.as_type_specifier() {
+                        Some(specifier) => self.narrow_to(&specifier, assume, reach),
+                        None => reach.clone(),
+                    },
+                    _ => reach.clone(),
+                }
+            }
+            Expr::Call {
+                input: Some(inner),
+                name,
+                args,
+            } if name == "not" && args.is_empty() => self.narrow(inner, !assume, reach),
+            Expr::Binary {
+                op: BinaryOp::And,
+                left,
+                right,
+            } => {
+                if assume {
+                    self.narrow(right, true, &self.narrow(left, true, reach))
+                } else {
+                    union(
+                        self.narrow(left, false, reach),
+                        self.narrow(right, false, reach),
+                    )
+                }
+            }
+            Expr::Binary {
+                op: BinaryOp::Or,
+                left,
+                right,
+            } => {
+                if assume {
+                    union(
+                        self.narrow(left, true, reach),
+                        self.narrow(right, true, reach),
+                    )
+                } else {
+                    self.narrow(right, false, &self.narrow(left, false, reach))
+                }
+            }
+            _ => reach.clone(),
+        }
+    }
+
+    /// The types `reach` keeps when the focus `is` the type `specifier`
+    /// names (`assume`), or is not (N1 §6.3.1: the type or a subclass).
+    fn narrow_to(&self, specifier: &TypeSpecifier, assume: bool, reach: &Reach) -> Reach {
+        let types = reach.as_ref()?;
+        let Ok(Some(named)) = self.resolve(specifier) else {
+            return reach.clone();
+        };
+        let Some(target) = named.first() else {
+            return reach.clone();
+        };
+        let mut kept: Vec<FhirType> = Vec::new();
+        for ty in types {
+            let found = if is_a(self.model, ty, target.name) {
+                assume.then_some(*ty)
+            } else if assume && is_a(self.model, target, ty.name) {
+                Some(*target)
+            } else if assume {
+                None
+            } else {
+                Some(*ty)
+            };
+            if let Some(found) = found
+                && !kept.contains(&found)
+            {
+                kept.push(found);
+            }
+        }
+        Some(kept)
+    }
+
     /// What the member `name` reaches from `from`.
     fn member(&self, from: &Reach, name: &str, at_root: bool) -> Result<Reach, SemanticError> {
         let Some(types) = from else {
             return Ok(None);
         };
+        if types.is_empty() {
+            return Ok(Some(Vec::new()));
+        }
         let mut reached: Vec<FhirType> = Vec::new();
         let mut known = true;
         let mut defined = false;
@@ -270,6 +391,24 @@ impl Checker<'_> {
                 });
             }
         }
+        if name == "toString"
+            && let Some(types) = from
+            && !types.is_empty()
+            && types
+                .iter()
+                .all(|ty| !ty.is_primitive() && !is_a(self.model, ty, "Quantity"))
+        {
+            // NOTE: N1 §5.5.8 toString() takes a primitive or a Quantity (R4 §2.9.1.3); N1 §11
+            // lets a compiler refuse an input no reachable type of which it takes.
+            return Err(SemanticError::Input {
+                function: "toString",
+                type_name: types
+                    .iter()
+                    .map(|ty| ty.name)
+                    .collect::<Vec<_>>()
+                    .join(" | "),
+            });
+        }
         let mut outputs = Vec::new();
         for (index, arg) in args.iter().enumerate() {
             let typed_argument = matches!(name, "ofType" | "as" | "is") && index == 0;
@@ -279,7 +418,13 @@ impl Checker<'_> {
                 }
                 continue;
             }
-            let reach = if lambdas.contains(&index) {
+            let reach = if name == "iif" && index > 0 {
+                let guarded = match args.first() {
+                    Some(criterion) => self.narrow(criterion, index == 1, from),
+                    None => from.clone(),
+                };
+                self.infer(arg, &guarded, &guarded)?
+            } else if lambdas.contains(&index) {
                 self.infer(arg, from, from)?
             } else {
                 self.infer(arg, focus, this)?
@@ -288,8 +433,12 @@ impl Checker<'_> {
         }
         let first = outputs.first().cloned().flatten();
         Ok(match name {
-            "where" | "first" | "last" | "tail" | "skip" | "take" | "single" | "distinct"
-            | "intersect" | "exclude" | "trace" | "checkModifiers" | "slice" => from.clone(),
+            "where" => match args.first() {
+                Some(criterion) => self.narrow(criterion, true, from),
+                None => from.clone(),
+            },
+            "first" | "last" | "tail" | "skip" | "take" | "single" | "distinct" | "intersect"
+            | "exclude" | "trace" | "checkModifiers" | "slice" => from.clone(),
             "select" => first,
             "union" | "combine" => union(from.clone(), first),
             "extension" => named_type(self.model, "Extension").map(|ty| vec![ty]),
