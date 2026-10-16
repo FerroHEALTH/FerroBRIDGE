@@ -109,6 +109,14 @@ openehr-adl = "0.0.86"
 # "rustls"; it carries its own platform verifier and aws-lc-rs provider.
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "http2"] }
 backon = "1.6.0"
+# The facade's inbound bearer-token check (RFC 7515, RFC 7517, RFC 7519) over
+# the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
+# backend and the PEM reader stay off. Verified against crates.io on
+# 2026-10-16 (11.1.0, published 2026-09-16).
+jsonwebtoken = { version = "11.1.0", default-features = false, features = ["aws_lc_rs"] }
+# The test-time key pairs the inbound token tests sign with, in the lock
+# already through rustls; 1.18.1 is the version the lock carries.
+aws-lc-rs = { version = "1.18.1", default-features = false, features = ["aws-lc-sys"] }
 # The openehr-its client runtime's Transport is an async-trait trait, so the
 # server's per-call engine implements it through the same macro. Verified
 # against crates.io on 2026-09-25.

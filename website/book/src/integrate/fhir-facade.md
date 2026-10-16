@@ -40,6 +40,7 @@ for `spec.version`. The service base is `/fhir`.
 | `GET /fhir/{type}/{id}/_history/{vid}` | Vread: read the version a write's `Location` named |
 | `PUT /fhir/{type}/{id}` | Update, with `If-Match` |
 | `POST /fhir` | A `transaction` Bundle, all or nothing |
+| `GET /fhir/.well-known/smart-configuration` | The SMART discovery document, with `[auth]` on |
 
 A type no loaded program maps is absent from the `CapabilityStatement` and
 answers `404` with a `not-supported` `OperationOutcome` on the wire. A batch
@@ -55,6 +56,88 @@ and `conditionalUpdate` true, `fhirVersion: 4.0.1`, and no search parameter.
 When the FHIRconnect operations lane is served under the same base,
 `rest.operation` also names `$tofhir` and `$toopenehr`; their direct forms are
 never declared ([The FHIRconnect operations](operations.md) says why).
+With `[auth]` on, `rest.security` names the `SMART-on-FHIR` service and
+carries the `oauth-uris` extension with the authorization server's
+endpoints, for clients that discover SMART through the statement (see
+[Security](#security)).
+
+## Security
+
+With [`[auth]`](../operate/configuration.md#auth) on, the facade is a SMART
+App Launch 2.x resource server for one authorization server, fixed by its
+issuer and the audience the deployment configures. **With `[auth]` off, the
+facade authenticates nobody and serves every request it receives.**
+
+Every request under `/fhir` carries `Authorization: Bearer <access token>`,
+except `GET /fhir/metadata` and the SMART discovery document at
+`GET /fhir/.well-known/smart-configuration` (also served at
+`/.well-known/smart-configuration`), which a client reads before it holds a
+token. The health routes stay open too. The token is a JWT signed by a key
+in the issuer's key set, with an `iss` equal to the issuer, an `aud` naming
+the audience, and an `exp`, `nbf` and `iat` that hold within the configured
+clock skew. Under the default `rfc9068` profile it also carries `typ: at+jwt`,
+`sub`, `client_id`, `iat` and `jti` (RFC 9068).
+
+| Answer | When | `WWW-Authenticate` |
+|---|---|---|
+| `401` | No bearer token, or a token in another scheme | `Bearer` |
+| `401` | A token that does not hold, whatever the reason, including a token of another issuer or for another audience | `Bearer error="invalid_token"` |
+| `403` | A valid token whose scopes do not permit the request | `Bearer error="insufficient_scope"` |
+| `503` | A token naming a key the server cannot fetch because the key set does not answer | none |
+
+Each refusal carries an `OperationOutcome`, `login` for a `401` and
+`forbidden` for a `403`. Neither names the claim that failed or the scope
+that was missing.
+
+The permission each interaction needs follows the SMART v2 `cruds` letters,
+on the resource type in the path or in the entry:
+
+| Interaction | Needs |
+|---|---|
+| create | `c`, and `u` too when the create revises a resource the facade already holds (a new `meta.versionId` of a known `id`); a replay that changes nothing needs `c` only |
+| read, vread | `r` |
+| update | `u` |
+| `$validate` | `c` or `u` |
+| transaction | the permission of each entry's `request.method`: `c` for `POST`, `u` for `PUT`, `r` for `GET`, `d` for `DELETE` |
+| `$tofhir`, `$toopenehr` | a valid token, no clinical scope: they transform the request body and reach no CDR |
+
+A scope reads `patient/`, `user/` or `system/`, then a resource type or `*`,
+then the letters in the order `cruds`, such as `system/*.crs` or
+`patient/Condition.rs`. The SMART v1 suffixes are read as the spec maps them:
+`.read` as `rs`, `.write` as `cud` and `.*` as `cruds`. A scope with letters
+out of order, an unknown resource type, or a `?` search constraint grants
+nothing; the facade does not evaluate the constraint, so it does not grant
+more than the scope says. A `user/` scope reaches every resource of its type,
+because the facade has no per-user access model of its own, and so does a
+`system/` scope. A token with no clinical scope at all gets system-wide
+access only when its `sub` is in `scopeless_subjects`.
+
+A `patient/` scope reaches only the patient in the token's `patient` claim.
+The facade reads a patient's data as the EHR it resolves for the subject
+`Patient/<id>`: a create or update must name `subject` (or `patient`) as
+the literal reference `Patient/<id>`, and a read reaches a resource only
+when the EHR holding its composition belongs to that subject. A resource
+whose subject is named by identifier cannot be shown to be the patient's, so
+a patient-scoped token is refused for it. A `patient/` scope without a
+`patient` claim grants nothing.
+
+A transaction is authorised entry by entry before anything is mapped, and one
+entry the token does not cover refuses the whole Bundle with `403`, because a
+transaction succeeds or fails as one unit. Batch has no route yet, so there
+is no per-entry answer inside a batch response.
+
+Every request under `/fhir` leaves one audit line on the `ferrobridge::audit`
+log target: the time, the token's `sub` and `client_id`, the method, the
+interaction, the resource type and id, the status and the duration. A
+refused token is recorded as `unauthenticated`, and with `[auth]` off the
+subject reads `-`. The line never carries the token, another claim, a query
+value or a body.
+
+The bridge reaches the CDR with its own credential
+([`[cdr.credentials.oauth]`](../operate/configuration.md#cdrcredentialsoauth)),
+never with the caller's token, because an access token is bound to the
+audience it was issued for. The CDR therefore records the bridge as the actor,
+and the caller's identity lives in the bridge's audit line.
 
 ## Media types and bodies
 
