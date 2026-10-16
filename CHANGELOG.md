@@ -399,6 +399,12 @@ crates on crates.io.
 
 ### Fixed
 
+- A `CodeableConcept` with codings and no `text` fills a `DV_TEXT` (#626).
+  The facade used to refuse such a resource with a `422`, because
+  `DV_TEXT.value` had no source. It now takes the first coding's `display`,
+  then its `code`, the fallback FHIRconnect writes for `DV_CODED_TEXT`, and
+  records the one-way row in the outcome. Reading the resource back adds
+  `code.text` holding that rubric and leaves the codings as they were.
 - Removing a person's newest `PERSON` writer hands the row to the writer
   that remains (#561). When several compositions of one EHR write the
   person's `PERSON` row and the newest of them is deleted in the CDR, or a
