@@ -46,7 +46,7 @@ server reads once at boot, with surrounding whitespace trimmed.
 | Key | Default | Meaning |
 |---|---|---|
 | `listen` | `127.0.0.1:8080` | The socket address to bind |
-| `request_timeout_ms` | `30000` | How long one request may take before the server answers `408` |
+| `request_timeout_ms` | `30000` | How long one request may take before the server answers `408` (`504` under `/fhir`) |
 | `shutdown_timeout_ms` | `10000` | How long the drain may take after `SIGTERM` or `SIGINT` |
 | `body_limit_bytes` | `1048576` | The largest request body read before the server answers `413` |
 
