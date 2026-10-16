@@ -81,7 +81,7 @@ async fn the_capability_statement_names_exactly_the_loaded_programs()
         .iter()
         .filter_map(|entry| entry["code"].as_str())
         .collect();
-    assert_eq!(vec!["transaction"], system);
+    assert_eq!(vec!["transaction", "batch"], system);
     Ok(())
 }
 
