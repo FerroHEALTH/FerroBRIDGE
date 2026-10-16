@@ -53,6 +53,12 @@ impl PageSize {
         Ok(Self(rows))
     }
 
+    /// Returns the page size as a count of rows.
+    #[must_use]
+    pub const fn get(self) -> u32 {
+        self.0
+    }
+
     /// Returns the page size as the `fetch` member of the request body.
     #[must_use]
     pub fn rows(self) -> i64 {

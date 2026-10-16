@@ -142,6 +142,15 @@ pub enum WriteError {
         #[source]
         source: IdError,
     },
+    /// The side table holds an object identifier BASE 1.3 refuses.
+    #[error("the side table holds `{value}` as an object id, which is no HIER_OBJECT_ID")]
+    ObjectId {
+        /// The value found.
+        value: String,
+        /// What the BASE 1.3 identifier grammar refused.
+        #[source]
+        source: IdError,
+    },
     /// The side table names something this writer never writes.
     #[error("the side table holds `{value}` for {what}, which this writer never writes")]
     SideTable {

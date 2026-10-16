@@ -281,6 +281,14 @@ pub enum Error {
         /// The value it holds.
         value: String,
     },
+    /// The deletion policy names neither of the two values.
+    #[error("{key} is `{value}`; the policies are remove and report")]
+    Deletions {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: String,
+    },
     /// A page size that would never advance.
     #[error("{key} is 0; a page holds at least one row")]
     PageSize {

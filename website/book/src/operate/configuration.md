@@ -321,7 +321,8 @@ refuses every job.
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
 | `aql` | none, required | no | The composition query. It aliases `ehr_id`, `version_uid` and the whole `composition`, carries an `ORDER BY` and no `LIMIT`. Every `COMPOSITION` it reads sits below `VERSION v[LATEST_VERSION]` ([The composition query](../integrate/omop-etl.md#the-composition-query)). It may name `$since`, which `--since` binds. It may also alias `versioned_object_uid`, which the runner then checks against the version; when it does not, the runner reads it from the `version_uid`, whose `object_id` part names the versioned object (openEHR RM Common 1.1.0, `OBJECT_VERSION_ID`) |
-| `page_size` | `100` | no | The `fetch` of each page of either query |
+| `page_size` | `100` | no | The `fetch` of each page of either query, and the number of watermarks each batch of the deletion check reads |
+| `deletions` | `remove` | no | What a run does with a composition the CDR reports deleted: `remove` deletes its rows, links and watermark, `report` lists it in the run report and keeps them. Any other value refuses the start ([Deleted compositions](../integrate/omop-etl.md#deleted-compositions)) |
 | `type_concept_id` | none, required | no | The `*_type_concept_id` the mappings write, the provenance of the records |
 | `observation_period_type_concept_id` | none, required | no | The `period_type_concept_id` of every observation period |
 

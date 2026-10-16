@@ -6,6 +6,7 @@
 
 use ferrobridge_server::config::{Config, Error};
 use ferrobridge_server::etl::aql::AqlError;
+use ferrobridge_server::etl::deletions::DeletionPolicy;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 
@@ -213,5 +214,35 @@ fn an_etl_section_without_a_type_concept_refuses_to_boot() -> Result<(), Box<dyn
 fn a_page_size_of_zero_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
     let error = refusal(&format!("{ETL}page_size = 0\n"))?;
     assert!(matches!(error, Error::PageSize { .. }), "{error:?}");
+    Ok(())
+}
+
+#[test]
+fn the_deletion_policy_defaults_to_remove() -> Result<(), Box<dyn StdError>> {
+    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
+    let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
+    assert_eq!(DeletionPolicy::Remove, etl.deletions);
+    Ok(())
+}
+
+#[test]
+fn the_report_deletion_policy_resolves() -> Result<(), Box<dyn StdError>> {
+    let text = format!("{ETL}deletions = \"report\"\n");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
+    assert_eq!(DeletionPolicy::Report, etl.deletions);
+    Ok(())
+}
+
+#[test]
+fn an_unknown_deletion_policy_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    let error = refusal(&format!("{ETL}deletions = \"ignore\"\n"))?;
+    match &error {
+        Error::Deletions { key, value } => {
+            assert_eq!("etl.deletions", key);
+            assert_eq!("ignore", value);
+        }
+        other => return Err(format!("expected a deletion policy refusal, got {other:?}").into()),
+    }
     Ok(())
 }

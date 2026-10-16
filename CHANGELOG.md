@@ -294,6 +294,27 @@ crates on crates.io.
   its FHIRPath in `issue.expression` and its openEHR path as a
   `details.coding`, severity `warning` and code `incomplete`, or
   `information` and `informational` for a defaulted composition field (#509).
+- `etl run` removes the CDM rows of a composition deleted in the CDR after an
+  earlier run loaded it, where they stayed in the CDM (#527). After the
+  compositions, each composition an earlier run committed and this run's
+  `LATEST_VERSION` query did not answer is read from the CDR over ITS-REST
+  1.1.0 `composition_get`; a `204`, the answer for a deleted composition,
+  removes its rows, links and watermark in one transaction, and the derived
+  tables are rebuilt after it. A `200` or a `404` keeps the rows, and a call
+  that reaches no documented answer ends the run with a typed error.
+  `[etl] deletions = "report"` lists a confirmed deletion and keeps its rows;
+  the default is `remove`. The run report counts the checks and lists the
+  removed, kept and unknown compositions with the rows removed per table.
+- Updating or removing the composition that wrote a `PERSON` row keeps the
+  row while any row of the person remains, where the update or removal
+  deleted it and left clinical rows naming a missing person (#536). The
+  `PERSON` row goes only when no composition writes it and no row of the
+  person is left, and the newest version that writes it rewrites its columns.
+- `etl run` removes a visit the visit query no longer answers, such as one
+  whose every composition was deleted, where its `VISIT_OCCURRENCE` row stayed
+  and the observation period kept spanning it (#537). A visit some CDM row
+  still names is kept and counted, and a run whose visit query refused a row
+  removes none.
 - `fhir-types` 0.1.110 writes a repeating primitive whose every position
   carries only an `id` or an `extension` as the `_name` array alone, in every
   version, where it wrote a value array of nulls beside it (`"event": [null]`);
