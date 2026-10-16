@@ -6,7 +6,7 @@
 //! Every response carries `Content-Type: application/fhir+json`
 //! (<https://hl7.org/fhir/R4/http.html#mime-type>), and every body is either a
 //! FHIR resource or an `OperationOutcome` the facade authored
-//! (`docs/architecture.md` §4.6). A refusal that cannot be encoded is still a
+//! (no specification governs this: our own design). A refusal that cannot be encoded is still a
 //! refusal: it answers `500` with a plain outcome rather than a truncated
 //! document.
 

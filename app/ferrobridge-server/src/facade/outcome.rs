@@ -7,7 +7,7 @@
 //! `OperationOutcome` (<https://hl7.org/fhir/R4/operationoutcome.html>), built
 //! from the generated R4 type. An upstream openEHR error body travels inside
 //! `issue.diagnostics`, so the two error vocabularies never mix on one wire
-//! (`docs/architecture.md` §4.6).
+//! (no specification governs this: our own design).
 //!
 //! [`IssueType`] is the subset of the R4 `issue-type` value set this facade
 //! uses, and [`Severity`] the `issue-severity` codes. Both are closed enums,

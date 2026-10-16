@@ -5,7 +5,7 @@
 //!
 //! Every body is read through the `fhir-types` strict codec, so an unknown
 //! property is a refusal rather than a silently dropped element
-//! (`docs/architecture.md` §4.1). What the facade then needs off the document
+//! (no specification governs this: our own design). What the facade then needs off the document
 //! is its `resourceType`, its `id` and `meta.versionId`, the set of
 //! `meta.profile`, and the subject the composition is written into.
 
@@ -62,7 +62,7 @@ pub enum RequestError {
     /// The body is not the resource its `resourceType` declares.
     ///
     /// The strict codec refuses an unknown property rather than dropping it
-    /// (`docs/architecture.md` §4.1).
+    /// (no specification governs this: our own design).
     #[error("{location}: {reason}")]
     Structure {
         /// The element path the codec refused at.
@@ -233,9 +233,10 @@ impl Inbound {
 
     /// Returns the subject the resource names.
     ///
-    /// The EHR one composition is written into is resolved "by subject id and
-    /// namespace" (`docs/architecture.md` §12), which is the pair the ITS-REST
-    /// EHR lookup takes. A `subject.identifier` carries both halves; a literal
+    /// The EHR one composition is written into is resolved by subject id and
+    /// namespace, the pair the ITS-REST EHR lookup takes
+    /// (`ehr-codegen.openapi.yaml`, `ehr_get_by_subject`). A
+    /// `subject.identifier` carries both halves; a literal
     /// `subject.reference` carries one, so `fallback` is the namespace a
     /// deployment gives its own references. A `Patient` is the subject itself
     /// and is keyed as `person_by_identifier` keys it. No specification

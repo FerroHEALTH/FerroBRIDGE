@@ -10,7 +10,7 @@
 //! answers also names `search-type` and exactly its declared parameters with
 //! `_id`; every other type names no search parameter. A type with no program
 //! is absent here and answers `404` with `not-supported` on the
-//! wire (`docs/architecture.md` §4.6).
+//! wire (no specification governs this: our own design).
 //!
 //! The statement declares `updateCreate: false`, because a `PUT` to an
 //! unknown id is a `404` rather than a create, `conditionalCreate` true,

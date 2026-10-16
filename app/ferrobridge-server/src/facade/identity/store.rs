@@ -3,8 +3,9 @@
 
 //! The identity map: the seam, and the in-memory implementation tests use.
 //!
-//! Four tables, as `docs/architecture.md` §9 names them: a patient identifier
-//! to an `ehr_id`, an external resource id to the internal one, an internal
+//! No specification governs the identity map: our own design. Four tables
+//! relate a patient identifier to an `ehr_id`, an external resource id to the
+//! internal one, an internal
 //! resource id to the composition it lives in, and a source resource `id` with
 //! its `meta.versionId` to the mapping that consumed them. A fifth table keys
 //! the same source to the CONTRIBUTION that committed it, written before the
