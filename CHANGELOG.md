@@ -410,6 +410,14 @@ crates on crates.io.
   FHIR R4 ext-1 forbids (#629). The extension method of the same append had
   the same one-sided gate, so its url manual ran for every read; it now runs
   only when the composition holds a diagnostic certainty.
+- A `recorder` that carries only a reference no longer leaves
+  `COMPOSITION.composer` empty (#627). The FHIRconnect engine used to count
+  the empty party as a written composer, so the default composer was
+  skipped and the CDR refused the composition with "missing field
+  `composer`". A party holding no name, identifier or external reference now
+  leaves the composer to its default, and a composer with an external
+  reference travels as `ctx/composer_id`, `ctx/id_namespace` and
+  `ctx/id_scheme` (Simplified Formats, §Composer).
 - Removing a person's newest `PERSON` writer hands the row to the writer
   that remains (#561). When several compositions of one EHR write the
   person's `PERSON` row and the newest of them is deleted in the CDR, or a
