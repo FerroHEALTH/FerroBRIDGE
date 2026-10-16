@@ -158,6 +158,16 @@ connect count it down. Each check is bounded, so a wedged upstream cannot hang
 the probe. In Kubernetes, point `livenessProbe` at `/health/liveness` and
 `readinessProbe` at `/health/readiness`.
 
+The server fetches the templates its mappings name from the CDR before it
+serves. When the CDR does not answer that fetch yet (a refused connection, a
+timeout, or a `5xx` other than `501`), the process stays up: it binds the
+listen address at once, answers liveness with `200` and readiness with `503`,
+and tries the start again after 1 second, doubling the wait up to 30 seconds.
+Readiness then carries a `startup` indicator whose `detail` names the attempt
+and why it failed, beside the `cdr` indicator. A documented answer such as a
+`404` for a template the CDR does not hold still stops the start. On
+Kubernetes this keeps a pod that starts before its CDR out of a crash loop.
+
 ## The OMOP CDM profiles
 
 Two compose profiles cover the OMOP target, and neither runs on a plain

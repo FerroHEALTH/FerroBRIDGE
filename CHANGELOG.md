@@ -23,6 +23,16 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Fixed
+
+- A CDR that does not answer the boot template fetch yet no longer fails the
+  start (#422). `serve` binds its listen address, answers liveness `200` and
+  readiness `503` with a `startup` indicator naming the attempt and its
+  reason, and tries the start again after a wait that doubles from 1 to 30
+  seconds, so a Kubernetes pod that starts before its CDR stays up instead of
+  crash-looping. A documented refusal, such as a `404` for a template the CDR
+  does not hold, still stops the start.
+
 ## [0.0.6] - 2026-10-17
 
 ### Added
