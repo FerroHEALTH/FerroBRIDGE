@@ -77,7 +77,7 @@ const EVENT: &str = "synthetic_laboratory_report/synthetic_laboratory_result:0/a
 
 /// One synthetic analyte.
 #[derive(Debug, Clone, Copy)]
-struct Analyte {
+pub(crate) struct Analyte {
     /// The analyte code, under the `LOINC` terminology.
     code: &'static str,
     /// The measured magnitude.
@@ -94,11 +94,11 @@ struct Analyte {
 
 /// One synthetic laboratory composition.
 #[derive(Debug, Clone, Copy)]
-struct Laboratory {
+pub(crate) struct Laboratory {
     /// The name the snapshot shows for it.
-    label: &'static str,
+    pub(crate) label: &'static str,
     /// Which of the two EHRs holds it.
-    ehr: usize,
+    pub(crate) ehr: usize,
     /// The health care facility of its context, the visit it belongs to.
     facility: &'static str,
     /// The context start and end times.
@@ -112,7 +112,7 @@ struct Laboratory {
 }
 
 /// The three compositions the round trip commits.
-const LABORATORIES: [Laboratory; 3] = [
+pub(crate) const LABORATORIES: [Laboratory; 3] = [
     Laboratory {
         label: "lab-1",
         ehr: 0,
@@ -247,7 +247,10 @@ fn each_quantity(value: &mut Value, edit: &mut dyn FnMut(&mut Map<String, Value>
 
 /// Returns the canonical JSON of `laboratory`: the FLAT build, with the
 /// context's end time and facility, and each analyte's range and status.
-fn canonical(index: &WebTemplateIndex, laboratory: &Laboratory) -> Result<Value, Box<dyn Error>> {
+pub(crate) fn canonical(
+    index: &WebTemplateIndex,
+    laboratory: &Laboratory,
+) -> Result<Value, Box<dyn Error>> {
     let mut value = index
         .build_from_flat(&flat(laboratory)?, "2026-09-25T00:00:00Z")?
         .into_value();
@@ -305,7 +308,7 @@ fn commit() -> Result<CommitContext, Box<dyn Error>> {
 }
 
 /// Uploads the laboratory template through the CDR's own route.
-async fn upload_template(cdr: &Cdr) -> Result<(), Box<dyn Error>> {
+pub(crate) async fn upload_template(cdr: &Cdr) -> Result<(), Box<dyn Error>> {
     let response = reqwest::Client::new()
         .post(format!("{}/definition/template/adl1.4", cdr.base_url()))
         .header("Content-Type", "application/xml")
@@ -324,7 +327,7 @@ async fn upload_template(cdr: &Cdr) -> Result<(), Box<dyn Error>> {
 }
 
 /// Creates an EHR and returns its identifier.
-async fn create_ehr(client: &CdrClient) -> Result<EhrId, Box<dyn Error>> {
+pub(crate) async fn create_ehr(client: &CdrClient) -> Result<EhrId, Box<dyn Error>> {
     match client.create_ehr(None, Prefer::Minimal).await?.outcome {
         EhrCreateOutcome::Created { headers, .. } => Ok(ferrobridge_server::cdr::ehr_id_from_etag(
             http::StatusCode::CREATED,
@@ -339,7 +342,7 @@ async fn create_ehr(client: &CdrClient) -> Result<EhrId, Box<dyn Error>> {
 }
 
 /// Commits the first version of `value` into `ehr`.
-async fn create(
+pub(crate) async fn create(
     client: &CdrClient,
     ehr: &EhrId,
     value: &Value,
@@ -406,7 +409,7 @@ async fn update(
 
 /// Copies the laboratory files from the vendored corpus into `directory`,
 /// checking that every copied byte equals the vendored one.
-fn copy_mappings(directory: &Path) -> Result<(), Box<dyn Error>> {
+pub(crate) fn copy_mappings(directory: &Path) -> Result<(), Box<dyn Error>> {
     let corpus = Path::new(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../docs/specs/omocl"
@@ -426,7 +429,7 @@ fn copy_mappings(directory: &Path) -> Result<(), Box<dyn Error>> {
 
 /// Writes the configuration `etl run` reads: both containers, the two
 /// queries, the configured concepts, and the OMOCL directory.
-fn configuration(
+pub(crate) fn configuration(
     directory: &Path,
     cdr: &Cdr,
     postgres: &Postgres,
@@ -451,7 +454,7 @@ fn configuration(
 
 /// Builds the CDM schema and the bridge schema, and loads the synthetic
 /// vocabulary.
-async fn build_cdm(postgres: &Postgres) -> Result<(), Box<dyn Error>> {
+pub(crate) async fn build_cdm(postgres: &Postgres) -> Result<(), Box<dyn Error>> {
     let pool = CdmPool::connect(
         sqlx::postgres::PgPoolOptions::new().max_connections(1),
         postgres.url().parse()?,
@@ -475,13 +478,16 @@ async fn build_cdm(postgres: &Postgres) -> Result<(), Box<dyn Error>> {
 }
 
 /// Runs `etl run` once through the job the binary calls.
-async fn etl_run(config: &Path) -> Result<RunReport, Box<dyn Error>> {
+pub(crate) async fn etl_run(config: &Path) -> Result<RunReport, Box<dyn Error>> {
     let settings = ferrobridge_server::config::Config::load(Some(config))?.resolve()?;
     Ok(ferrobridge_server::etl::job::run(&settings, &RunOptions::default()).await?)
 }
 
 /// Returns every row `query` answers, each cell rendered as text or `NULL`.
-async fn rows(postgres: &Postgres, query: &str) -> Result<Vec<Vec<String>>, Box<dyn Error>> {
+pub(crate) async fn rows(
+    postgres: &Postgres,
+    query: &str,
+) -> Result<Vec<Vec<String>>, Box<dyn Error>> {
     let (client, connection) =
         tokio_postgres::connect(postgres.url(), tokio_postgres::NoTls).await?;
     tokio::spawn(connection);

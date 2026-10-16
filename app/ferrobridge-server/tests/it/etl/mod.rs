@@ -9,6 +9,7 @@
 //! §5.1). The container-backed cases run only when `FERROBRIDGE_E2E=1`.
 
 mod cdr_aql;
+mod deletions;
 mod engine;
 mod run;
 mod visit;
@@ -16,6 +17,7 @@ mod visit;
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::etl::aql::CheckedQuery;
+use ferrobridge_server::etl::deletions::DeletionPolicy;
 use ferrobridge_server::etl::{EtlSettings, Mapper, SourceComposition, VisitSettings};
 use ferrobridge_testkit::containers::{self, Postgres};
 use ferrobridge_testkit::fixtures::{MINIMAL_EVALUATION_COMPOSITION, MINIMAL_EVALUATION_OPT};
@@ -315,6 +317,7 @@ fn settings(visits: bool) -> Result<EtlSettings, Box<dyn Error>> {
         } else {
             None
         },
+        deletions: DeletionPolicy::Remove,
     })
 }
 

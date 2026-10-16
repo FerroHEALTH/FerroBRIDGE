@@ -13,7 +13,11 @@
 //! last committed. [`CdmWriter::commit`] deletes the rows an earlier version
 //! of the composition wrote, writes the new ones under the same ids, and
 //! advances the watermark, all in one transaction, so a failure leaves the
-//! database as it was.
+//! database as it was. [`CdmWriter::remove`] deletes a composition's rows,
+//! links and watermark in one transaction the same way ([`removal`]). The
+//! `PERSON` row belongs to the person: either kind of transaction keeps it
+//! while a composition writes it or any row of the person remains, and the
+//! newest version that writes it rewrites its columns.
 //!
 //! The rows cross into PostgreSQL through binary `COPY` into a temporary
 //! staging table whose `integer` columns are binary and whose other columns
@@ -26,6 +30,7 @@
 
 pub mod error;
 pub mod input;
+pub mod removal;
 pub mod side_table;
 pub mod stage;
 
@@ -58,6 +63,8 @@ use crate::writer::side_table::delete_earlier;
 use crate::writer::side_table::earlier_rows;
 use crate::writer::side_table::person_id;
 use crate::writer::side_table::record_keys;
+use crate::writer::side_table::replace_persons;
+use crate::writer::side_table::retire_persons;
 use crate::writer::side_table::write_links;
 use crate::writer::stage::Staged;
 use crate::writer::stage::copy_rows;
@@ -299,9 +306,13 @@ impl CdmWriter {
             .map_err(database(Step::Lock))?;
 
         let earlier = earlier_rows(&transaction, bridge, versioned_object_uid).await?;
-        delete_earlier(&transaction, cdm, bridge, versioned_object_uid, &earlier).await?;
+        let deleted =
+            delete_earlier(&transaction, cdm, bridge, versioned_object_uid, &earlier).await?;
 
         let ids = assign_ids(&transaction, bridge, graph, &earlier).await?;
+        // NOTE: no specification governs this: our own design; the newest version that
+        // writes a PERSON row rewrites its columns, and a kept PERSON row is replaced.
+        replace_persons(&transaction, cdm, &ids).await?;
         let mut report = graph.report().clone();
         let mut resolver = Resolver {
             transaction: &transaction,
@@ -317,6 +328,7 @@ impl CdmWriter {
         }
         let links = write_links(&transaction, cdm, bridge, graph, &ids).await?;
         report.record_links(links);
+        retire_persons(&transaction, cdm, bridge, &deleted.persons).await?;
 
         transaction
             .execute(

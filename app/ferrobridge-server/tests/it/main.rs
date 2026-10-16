@@ -29,6 +29,7 @@ mod ingest;
 mod kds;
 mod lane_templates;
 mod mapping_walk;
+mod omop_deletion;
 mod omop_round_trip;
 mod operations;
 mod readiness;

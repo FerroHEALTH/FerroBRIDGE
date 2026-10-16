@@ -10,6 +10,9 @@
 //! `relationship_concept_id` 0. The container-backed tests run only when
 //! `FERROBRIDGE_E2E=1` admits the harness.
 
+mod person;
+mod visits;
+
 use ferrobridge_testkit::containers::{self, Postgres};
 use omop_cdm::database::{self, CdmPool};
 use omop_cdm::ddl::SchemaName;
@@ -21,6 +24,7 @@ use omop_cdm::graph::{
 use omop_cdm::value::CdmDate;
 use omop_cdm::writer::{
     CdmWriter, error::WriteError, input::PersonPolicy, input::RunId, input::VisitConcepts,
+    removal::Committed, removal::Removal,
 };
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
@@ -417,5 +421,107 @@ async fn visits_keep_their_ids_and_resolve_references() -> Result<(), Box<dyn Er
         .await?
         .get(0);
     assert_eq!(Some(1), linked);
+    Ok(())
+}
+
+/// Returns the one watermark the writer holds.
+async fn only_watermark(writer: &CdmWriter) -> Result<Committed, Box<dyn Error>> {
+    let mut committed = writer.watermarks_after(None, 10).await?;
+    assert_eq!(1, committed.len(), "one composition was committed");
+    Ok(committed.remove(0))
+}
+
+#[tokio::test]
+async fn a_removal_deletes_the_rows_links_and_watermark_and_keeps_the_person()
+-> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
+    database
+        .writer
+        .commit(&laboratory(2, 2)?, &RunId::new("run-1")?)
+        .await?;
+    let committed = only_watermark(&database.writer).await?;
+    assert_eq!(COMPOSITION, committed.versioned_object_uid().value());
+    assert_eq!(EHR, committed.ehr_id().value());
+    assert_eq!(
+        format!("{COMPOSITION}::ferrobridge.test::2"),
+        committed.version_uid().value()
+    );
+
+    let removal = database.writer.remove(&committed).await?;
+    let Removal::Removed(rows) = removal else {
+        return Err(format!("expected a removal, got {removal:?}").into());
+    };
+    assert_eq!(Some(&3), rows.get("measurement"));
+    assert_eq!(Some(&4), rows.get("fact_relationship"));
+    let client = reader(&database.postgres).await?;
+    for table in [
+        "cdm.measurement",
+        "cdm.fact_relationship",
+        "ferrobridge.record",
+        "ferrobridge.link",
+        "ferrobridge.watermark",
+    ] {
+        assert_eq!(0, count(&client, table).await?, "{table} is empty");
+    }
+    assert_eq!(
+        1,
+        count(&client, "ferrobridge.person_map").await?,
+        "the EHR keeps its person_id"
+    );
+
+    assert_eq!(
+        Removal::Superseded,
+        database.writer.remove(&committed).await?,
+        "a second removal finds no watermark"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_removal_overtaken_by_a_newer_version_deletes_nothing() -> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
+    database
+        .writer
+        .commit(&laboratory(1, 2)?, &RunId::new("run-1")?)
+        .await?;
+    let stale = only_watermark(&database.writer).await?;
+    database
+        .writer
+        .commit(&laboratory(2, 2)?, &RunId::new("run-2")?)
+        .await?;
+    assert_eq!(Removal::Superseded, database.writer.remove(&stale).await?);
+    let client = reader(&database.postgres).await?;
+    assert_eq!(3, count(&client, "cdm.measurement").await?);
+    assert_eq!(1, count(&client, "ferrobridge.watermark").await?);
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_watermarks_page_in_order_of_the_versioned_composition() -> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
+    database
+        .writer
+        .commit(&laboratory(1, 1)?, &RunId::new("run-1")?)
+        .await?;
+    let first = database.writer.watermarks_after(None, 1).await?;
+    assert_eq!(1, first.len());
+    let last = first.last().ok_or("one watermark")?;
+    assert!(
+        database
+            .writer
+            .watermarks_after(Some(last.versioned_object_uid()), 1)
+            .await?
+            .is_empty(),
+        "nothing follows the last watermark"
+    );
     Ok(())
 }
