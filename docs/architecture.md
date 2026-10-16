@@ -1320,7 +1320,11 @@ from one of two sources, in this order:
 The `PERSON` row belongs to the person. It stays while any composition writes
 it or any row of the person remains, keeping the columns its last writer
 gave it, and goes when neither holds; the person map keeps the `ehr_id`'s
-`person_id` either way.
+`person_id` either way. The side table keeps the columns each writer wrote,
+so when the newest writer is removed or a new version of it stops writing
+the row, the newest writer that remains rewrites it (our own design; a
+writer committed before the side table kept columns has none, and the row
+stays as it is while only such writers remain).
 
 ## 6. Terminology
 

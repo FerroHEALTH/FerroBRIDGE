@@ -17,9 +17,11 @@
 //! links and watermark in one transaction the same way ([`removal`]). The
 //! `PERSON` row belongs to the person: either kind of transaction keeps it
 //! while a composition writes it or any row of the person remains, and the
-//! newest version that writes it rewrites its columns. A row whose person
-//! has no `PERSON` row gets the placeholder [`person`] writes, or is refused,
-//! under the writer's [`PersonPolicy`].
+//! newest version that writes it rewrites its columns. The side table keeps
+//! the columns of each writer, so when the newest writer is removed or stops
+//! writing the row, the newest writer that remains rewrites it. A row whose
+//! person has no `PERSON` row gets the placeholder [`person`] writes, or is
+//! refused, under the writer's [`PersonPolicy`].
 //!
 //! The rows cross into PostgreSQL through binary `COPY` into a temporary
 //! staging table whose `integer` columns are binary and whose other columns
@@ -38,6 +40,7 @@ pub mod side_table;
 pub mod stage;
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
@@ -60,6 +63,8 @@ use crate::writer::input::PersonPolicy;
 use crate::writer::input::RunId;
 use crate::writer::input::VisitConcepts;
 use crate::writer::person::person_id;
+use crate::writer::person::record_person_rows;
+use crate::writer::person::restore_persons;
 use crate::writer::side_table::Ids;
 use crate::writer::side_table::allocate;
 use crate::writer::side_table::assign_ids;
@@ -334,6 +339,11 @@ impl CdmWriter {
         }
         let links = write_links(&transaction, cdm, bridge, graph, &ids).await?;
         report.record_links(links);
+        let writes: BTreeSet<i32> = written_persons(&ids).into_values().collect();
+        let recorded: Vec<i32> = writes.iter().copied().collect();
+        record_person_rows(&transaction, cdm, bridge, versioned_object_uid, &recorded).await?;
+        let stopped: Vec<i32> = deleted.written.difference(&writes).copied().collect();
+        restore_persons(&transaction, cdm, bridge, &stopped).await?;
         retire_persons(&transaction, cdm, bridge, &deleted.persons).await?;
 
         transaction

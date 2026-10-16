@@ -391,6 +391,16 @@ crates on crates.io.
 
 ### Fixed
 
+- Removing a person's newest `PERSON` writer hands the row to the writer
+  that remains (#561). When several compositions of one EHR write the
+  person's `PERSON` row and the newest of them is deleted in the CDR, or a
+  new version of it no longer writes the row, the row now takes the columns
+  of the newest writer that remains instead of keeping the removed writer's
+  demographics. The bridge schema gains a `person_row` table holding each
+  writer's columns; run `ferrobridge cdm init` once after upgrading to
+  create it. A writer committed before the upgrade has no columns recorded,
+  so a person left with only such writers keeps the row it has until one of
+  them commits again.
 - The container harness starts the reference CDR with
   `FERROEHR__USAGE_REPORT__ENABLED=false` (#582). A container does not
   inherit the CI runner's environment, so FerroEHR's own CI detection never

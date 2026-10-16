@@ -107,6 +107,85 @@ pub(super) async fn person_id(
     Ok(id)
 }
 
+/// Records the columns of the `PERSON` rows `persons` names, as the
+/// composition `versioned_object_uid` just wrote them, as the newest writes of
+/// those rows.
+///
+/// [`restore_persons`] reads them back when a newer writer of the row goes.
+pub(super) async fn record_person_rows(
+    transaction: &Transaction<'_>,
+    cdm: &SchemaName,
+    bridge: &SchemaName,
+    versioned_object_uid: &str,
+    persons: &[i32],
+) -> Result<(), WriteError> {
+    if persons.is_empty() {
+        return Ok(());
+    }
+    // NOTE: no specification governs this: our own design; a sequence orders the writes,
+    // so the newest writer that remains is the one recorded last.
+    transaction
+        .execute(
+            &format!(
+                "INSERT INTO {bridge}.person_row (versioned_object_uid, person_id, written, columns)
+                 SELECT $1, p.person_id, nextval('{bridge}.person_row_written_seq'), to_jsonb(p)
+                 FROM {cdm}.person AS p WHERE p.person_id = ANY($2) ORDER BY p.person_id"
+            ),
+            &[&versioned_object_uid, &persons],
+        )
+        .await
+        .map_err(database(Step::Record))?;
+    Ok(())
+}
+
+/// Rewrites the `PERSON` row of each of `persons` from the newest write of it
+/// that the side table still holds.
+///
+/// A person whose writers all go keeps its row for [`retire_persons`] to
+/// decide. A writer committed before the side table recorded columns has
+/// none, and every writer that has columns was committed after it, so a
+/// person left with only such writers keeps the row it has.
+///
+/// [`retire_persons`]: crate::writer::side_table::retire_persons
+pub(super) async fn restore_persons(
+    transaction: &Transaction<'_>,
+    cdm: &SchemaName,
+    bridge: &SchemaName,
+    persons: &[i32],
+) -> Result<(), WriteError> {
+    if persons.is_empty() {
+        return Ok(());
+    }
+    // NOTE: no specification governs this: our own design; CDM v5.4 PERSON holds one row
+    // per person, so the newest writer that remains gives it its columns.
+    let newest = format!(
+        "SELECT DISTINCT ON (person_id) person_id, columns FROM {bridge}.person_row
+         WHERE person_id = ANY($1) ORDER BY person_id, written DESC"
+    );
+    transaction
+        .execute(
+            &format!(
+                "DELETE FROM {cdm}.person AS p
+                 WHERE p.person_id IN (SELECT person_id FROM ({newest}) AS n)"
+            ),
+            &[&persons],
+        )
+        .await
+        .map_err(database(Step::Delete("person")))?;
+    transaction
+        .execute(
+            &format!(
+                "INSERT INTO {cdm}.person
+                 SELECT (jsonb_populate_record(NULL::{cdm}.person, n.columns)).*
+                 FROM ({newest}) AS n"
+            ),
+            &[&persons],
+        )
+        .await
+        .map_err(database(Step::Insert("person")))?;
+    Ok(())
+}
+
 /// The `PERSON` rows of a CDM schema, and how many of them are placeholders.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Persons {
