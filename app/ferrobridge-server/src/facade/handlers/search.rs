@@ -25,6 +25,9 @@ use openehr_its::rest::generated::query::ResultSetRow;
 use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
 use openehr_rm::v1_2::composition::composition::Composition;
 
+use crate::auth::Access;
+use crate::auth::Compartment;
+use crate::auth::scope::Permission;
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::facade::Facade;
@@ -64,18 +67,20 @@ const FORM: &str = "application/x-www-form-urlencoded";
 /// `GET [base]/{type}?…`.
 pub(crate) async fn search_get(
     facade: &Facade,
+    access: &Access,
     resource_type: &str,
     headers: &HeaderMap,
     uri: &Uri,
 ) -> Result<Response, Refusal> {
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
     let pairs = pairs_of(uri.query().unwrap_or_default().as_bytes());
-    search(facade, resource_type, headers, &pairs).await
+    search(facade, access, resource_type, headers, &pairs).await
 }
 
 /// `POST [base]/{type}/_search`, the parameters in the URL and the form body.
 pub(crate) async fn search_post(
     facade: &Facade,
+    access: &Access,
     resource_type: &str,
     headers: &HeaderMap,
     uri: &Uri,
@@ -85,7 +90,7 @@ pub(crate) async fn search_post(
     check_form(headers)?;
     let mut pairs = pairs_of(uri.query().unwrap_or_default().as_bytes());
     pairs.extend(pairs_of(body));
-    search(facade, resource_type, headers, &pairs).await
+    search(facade, access, resource_type, headers, &pairs).await
 }
 
 /// Returns the `name=value` pairs of a query string or a form body.
@@ -122,11 +127,15 @@ fn check_form(headers: &HeaderMap) -> Result<(), Refusal> {
 /// Runs one search.
 async fn search(
     facade: &Facade,
+    access: &Access,
     resource_type: &str,
     headers: &HeaderMap,
     pairs: &[(String, String)],
 ) -> Result<Response, Refusal> {
     crate::facade::handlers::supported(facade, resource_type)?;
+    let compartment = access
+        .reach(Permission::Search, resource_type)
+        .ok_or_else(crate::auth::guard::forbidden)?;
     let declarations = facade.search().of_type(resource_type);
     let Some(first) = declarations.first() else {
         return Err(reply::refusal(
@@ -144,7 +153,10 @@ async fn search(
     })?;
     let fingerprint = cursor::fingerprint(resource_type, &criteria.used);
     let start = start_of(&criteria, &fingerprint, declarations.len())?;
-    let resolved = resolve(facade, resource_type, &criteria)?;
+    let mut resolved = resolve(facade, resource_type, &criteria)?;
+    if let Compartment::Patient(patient) = compartment {
+        resolved.ehrs.push(compartment_ehrs(facade, &patient)?);
+    }
     let mut plans = Vec::with_capacity(declarations.len());
     for declared in declarations {
         let conditions = plan::conditions(declared, &criteria, &resolved)
@@ -239,6 +251,28 @@ fn start_of(
         )));
     }
     Ok(position)
+}
+
+/// Returns the EHRs of the patient a `patient/` token is launched for: the
+/// EHR the identity map binds to `Patient/<patient>`, or none.
+///
+/// "Patient-specific scopes allow access to specific data about a single
+/// patient" (<https://hl7.org/fhir/smart-app-launch/scopes-and-launch-context.html>),
+/// so the search is held to that patient's EHR as one more `AND`ed subject,
+/// and a patient the map does not know reaches no data (no specification
+/// governs the mapping from a compartment to an EHR: our own design).
+fn compartment_ehrs(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, Refusal> {
+    let namespace = facade.settings().subject_namespace.as_str();
+    // NOTE: no specification governs this: our own design, a patient id no
+    // person key can hold names no EHR the map binds, so the token reaches none.
+    let Ok(person) = PersonId::new(namespace, &format!("Patient/{patient}")) else {
+        return Ok(Vec::new());
+    };
+    let found = facade
+        .store()
+        .ehr_of(&person)
+        .map_err(|error| write::store_refusal(&error))?;
+    Ok(found.into_iter().collect())
 }
 
 /// Resolves the subject parameters and `_id` through the identity map.

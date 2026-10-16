@@ -48,7 +48,53 @@ crates on crates.io.
   unknown subject or id is an empty searchset with no CDR call, and a CDR
   refusal maps through the facade's status table, a query `400` to a `500` and
   a query `408` to a `502`. The `CapabilityStatement` names `search-type` and
-  exactly the declared parameters with `_id`.
+  exactly the declared parameters with `_id`. Under `[auth]`, a search needs
+  the `s` permission of its type, and a `patient/` token's search is held to
+  its patient's EHR.
+- The FHIR facade authenticates its callers as a SMART App Launch 2.x
+  resource server (#400). A new `[auth]` section, off by default, names the
+  issuer and the audience; the issuer's metadata and key set are read at
+  boot, and every request under `/fhir` needs a bearer JWT access token
+  (RFC 9068 profile by default) except `GET /fhir/metadata` and the new
+  `/.well-known/smart-configuration` document. A missing or invalid token
+  answers `401` and a token whose SMART v2 scopes (`patient/`, `user/`,
+  `system/` with `cruds`, v1 `.read` and `.write` included) do not permit
+  the request answers `403`, neither naming a claim or a scope. A
+  `patient/` token reaches only its patient's compartment, a transaction is
+  authorised entry by entry and fails whole, a create that revises a
+  resource the facade holds needs `u` beside `c`, a scopeless token gets system
+  rights only for a listed subject, and every FHIR request leaves one audit
+  line on the `ferrobridge::audit` target without the token or the body.
+  The `CapabilityStatement` carries `rest.security` with the SMART service
+  and the `oauth-uris` extension. With `[auth]` off the facade stays open,
+  and the server warns at start-up.
+- `fhir-types` 0.1.111 names each type's base type in the element table
+  (`TypeSchema::base`, from `StructureDefinition.baseDefinition`, and for a
+  backbone element the `BackboneElement` or `Element` its element names), in
+  every version, and carries the abstract types a base chain passes through
+  (`Resource`, `DomainResource`, `BackboneElement`, and from R5 `Base`,
+  `DataType` and `BackboneType`) as table-only entries.
+  `Schemas::base_of` and `Schemas::specializes` walk the chain.
+  `ferrobridge-fhirpath` reads it, so `is`, `as`, `ofType` and a leading type
+  name see `Age` as a `Quantity` and `Patient` as a `DomainResource` and a
+  `Resource`; the R4 profile validator takes a resource under an element typed
+  `DomainResource` only when its type specializes `DomainResource`, so a
+  `Binary` or a `Bundle` there is refused, and the same base chain decides the
+  profiles such an element applies and a `type` slicing discriminator (#458).
+- The R4 profile validator resolves references inside a Bundle by the method
+  of the R4 Bundle page (absolute, relative against the entry's `fullUrl`,
+  `urn:uuid:`, version-specific through `meta.versionId`), with a reference
+  that matches two entries an error, so a `resolve()` discriminator reaches
+  across entries (#441). It holds the resolved target to the element's
+  `type.targetProfile`, any of them, and the reference to its
+  `type.aggregation`; validates every resource against each profile it
+  claims in `meta.profile`, reporting a claim the package set lacks; and
+  holds a document Bundle to the content rules of R4 documents §3.3.1: every
+  resource the Composition references is in the Bundle, and the Bundle holds
+  only the Composition, what it references directly or indirectly, a CSS
+  stylesheet `Binary` and the `Provenance` of what it includes. Target and
+  claimed profiles are no longer listed as unevaluated when the validator
+  can check them.
 - `scripts/vendor/profile-packages.sh` fetches the package set of the R4
   profile validator at build time into the ignored
   `docs/specs/fhir-packages/<package>#<version>/package/` (#435), about
@@ -193,6 +239,15 @@ crates on crates.io.
 
 ### Changed
 
+- `[etl] aql` and `[etl.visits] aql` must read every `COMPOSITION` below
+  `VERSION v[LATEST_VERSION]`, and a configuration whose query reads one
+  without that scope (no `VERSION`, a bare `VERSION v`, or `ALL_VERSIONS`)
+  now refuses to load with an `etl.aql` or `etl.visits.aql` error (#494).
+  AQL 1.1.0 leaves the scope of a query without `LATEST_VERSION` open, and a
+  deleted composition's newest version holds no data (openEHR RM Common
+  1.1.0 §6.2.5), so the scope keeps deleted and superseded versions out of
+  the CDM. Add `CONTAINS VERSION v[LATEST_VERSION]` above `COMPOSITION c` in
+  an existing query.
 - The bridge builds on the `openehr-*` 0.0.86 crates, the release the
   federation gateway pins, so a project on 0.0.86 that takes `fhirconnect`
   0.1.111 or `openehr-mapping-core` 0.1.109 carries one copy of the openEHR
@@ -257,6 +312,14 @@ crates on crates.io.
 
 ### Fixed
 
+- The facade's loss log records each declared loss as a value-free kind
+  (`skipped-unresolved-reference`, `deferred-reference`, `defaulted` and the
+  rest) with its FHIRPath and its openEHR path, where it logged the loss's
+  display text, which could carry a reference literal such as `Patient/123`.
+  The `$validate` dry run renders each loss as the operations lane does, with
+  its FHIRPath in `issue.expression` and its openEHR path as a
+  `details.coding`, severity `warning` and code `incomplete`, or
+  `information` and `informational` for a defaulted composition field (#509).
 - `fhir-types` 0.1.110 writes a repeating primitive whose every position
   carries only an `id` or an `extension` as the `_name` array alone, in every
   version, where it wrote a value array of nulls beside it (`"event": [null]`);

@@ -74,6 +74,9 @@ impl<'i> Walk<'_, '_, 'i> {
                     return Ok(());
                 };
                 let location = &occurrence.location;
+                if name == "Reference" {
+                    self.reference(value, location);
+                }
                 if field.content_reference.is_none() && name == "Extension" {
                     let placement = if field.name == "modifierExtension" {
                         Placement::Modifier
@@ -157,8 +160,13 @@ impl<'i> Walk<'_, '_, 'i> {
     }
 
     /// Reports a resource of the type `kind` that none of the types of its
-    /// element names (ElementDefinition.type: "The data type or resource
-    /// that the value of this element is permitted to be").
+    /// element names or is specialized by (ElementDefinition.type: "The data
+    /// type or resource that the value of this element is permitted to be").
+    ///
+    /// A type names its specializations too: `Resource` takes any resource
+    /// and `DomainResource` any resource whose base chain reaches it
+    /// (<https://hl7.org/fhir/R4/domainresource.html>), as the element
+    /// table's base types state.
     fn resource_type(&mut self, target: Held<'_>, kind: &str, location: &str) {
         let Some(element) = target.element else {
             return;
@@ -168,12 +176,8 @@ impl<'i> Walk<'_, '_, 'i> {
             .iter()
             .filter_map(|entry| entry.code.value.as_deref())
             .collect();
-        // NOTE: no specification governs this reading: our own design until the abstract base
-        // types land (#458); `Resource` and `DomainResource` accept any concrete resource.
-        let allowed = codes.is_empty()
-            || codes
-                .iter()
-                .any(|code| *code == kind || *code == "Resource" || *code == "DomainResource");
+        let schemas = &fhir_types::r4::schema::SCHEMAS;
+        let allowed = codes.is_empty() || codes.iter().any(|code| schemas.specializes(kind, code));
         if !allowed {
             self.out.issue(
                 Severity::Error,

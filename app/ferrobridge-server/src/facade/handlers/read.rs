@@ -408,7 +408,7 @@ fn unknown(resource_type: &str, id: &str) -> Refusal {
 }
 
 /// Returns the refusal a malformed stored identifier renders as.
-fn stored_identifier(error: &impl std::fmt::Display) -> Refusal {
+pub(crate) fn stored_identifier(error: &impl std::fmt::Display) -> Refusal {
     reply::refusal(
         StatusCode::INTERNAL_SERVER_ERROR,
         Issue::error(IssueType::Exception).diagnosing(format!(

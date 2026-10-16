@@ -17,6 +17,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Account",
             path: "Account",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -336,6 +337,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AccountBalance",
             path: "Account.balance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -427,6 +429,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AccountCoverage",
             path: "Account.coverage",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -494,6 +497,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AccountDiagnosis",
             path: "Account.diagnosis",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -609,6 +613,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AccountGuarantor",
             path: "Account.guarantor",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -736,6 +741,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AccountProcedure",
             path: "Account.procedure",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -851,6 +857,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ActivityDefinition",
             path: "ActivityDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -1561,6 +1568,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ActivityDefinitionDynamicValue",
             path: "ActivityDefinition.dynamicValue",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -1628,6 +1636,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ActivityDefinitionParticipant",
             path: "ActivityDefinition.participant",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -1731,6 +1740,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ActorDefinition",
             path: "ActorDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -2101,6 +2111,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Address",
             path: "Address",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -2252,6 +2263,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AdministrableProductDefinition",
             path: "AdministrableProductDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -2499,6 +2511,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AdministrableProductDefinitionProperty",
             path: "AdministrableProductDefinition.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -2596,6 +2609,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AdministrableProductDefinitionRouteOfAdministration",
             path: "AdministrableProductDefinition.routeOfAdministration",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -2725,6 +2739,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AdministrableProductDefinitionRouteOfAdministrationTargetSpecies",
             path: "AdministrableProductDefinition.routeOfAdministration.targetSpecies",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -2794,6 +2809,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AdministrableProductDefinitionRouteOfAdministrationTargetSpeciesWithdrawalPeriod",
             path: "AdministrableProductDefinition.routeOfAdministration.targetSpecies.withdrawalPeriod",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -2873,6 +2889,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AdverseEvent",
             path: "AdverseEvent",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -3267,6 +3284,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AdverseEventParticipant",
             path: "AdverseEvent.participant",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -3334,6 +3352,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AdverseEventSuspectEntity",
             path: "AdverseEvent.suspectEntity",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -3416,6 +3435,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AdverseEventSuspectEntityCausality",
             path: "AdverseEvent.suspectEntity.causality",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -3495,6 +3515,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Age",
             path: "Age",
+            base: Some("Quantity"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -3586,6 +3607,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AllergyIntolerance",
             path: "AllergyIntolerance",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -3887,6 +3909,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AllergyIntoleranceReaction",
             path: "AllergyIntolerance.reaction",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -4014,6 +4037,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Annotation",
             path: "Annotation",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -4084,6 +4108,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Appointment",
             path: "Appointment",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -4571,6 +4596,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AppointmentParticipant",
             path: "Appointment.participant",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -4674,6 +4700,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AppointmentRecurrenceTemplate",
             path: "Appointment.recurrenceTemplate",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -4837,6 +4864,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AppointmentRecurrenceTemplateMonthlyTemplate",
             path: "Appointment.recurrenceTemplate.monthlyTemplate",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -4928,6 +4956,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AppointmentRecurrenceTemplateWeeklyTemplate",
             path: "Appointment.recurrenceTemplate.weeklyTemplate",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -4995,6 +5024,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AppointmentRecurrenceTemplateYearlyTemplate",
             path: "Appointment.recurrenceTemplate.yearlyTemplate",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -5050,6 +5080,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AppointmentResponse",
             path: "AppointmentResponse",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -5297,6 +5328,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ArtifactAssessment",
             path: "ArtifactAssessment",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -5548,6 +5580,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ArtifactAssessmentContent",
             path: "ArtifactAssessment.content",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -5699,6 +5732,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ArtifactAssessmentRelatesTo",
             path: "ArtifactAssessment.relatesTo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -5772,6 +5806,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Attachment",
             path: "Attachment",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -5959,6 +5994,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AuditEvent",
             path: "AuditEvent",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -6233,6 +6269,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AuditEventAgent",
             path: "AuditEvent.agent",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -6376,6 +6413,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AuditEventEntity",
             path: "AuditEvent.entity",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -6503,6 +6541,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AuditEventEntityDetail",
             path: "AuditEvent.entity.detail",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -6594,6 +6633,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AuditEventOutcome",
             path: "AuditEvent.outcome",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -6661,6 +6701,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AuditEventSource",
             path: "AuditEvent.source",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -6740,6 +6781,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Availability",
             path: "Availability",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -6807,6 +6849,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AvailabilityAvailableTime",
             path: "Availability.availableTime",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -6886,6 +6929,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "AvailabilityNotAvailableTime",
             path: "Availability.notAvailableTime",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -6937,10 +6981,106 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
+        #[cfg(feature = "terminology")]
+        TypeSchema {
+            name: "BackboneElement",
+            path: "BackboneElement",
+            base: Some("Element"),
+            fields: &[
+                FieldSchema {
+                    name: "id",
+                    path: "BackboneElement.id",
+                    kind: Kind::Attribute,
+                    min: 0,
+                    max: Some(1),
+                    many: false,
+                    types: &["string"],
+                    content_reference: None,
+                    is_summary: false,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "extension",
+                    path: "BackboneElement.extension",
+                    kind: Kind::Complex("Extension"),
+                    min: 0,
+                    max: None,
+                    many: true,
+                    types: &["Extension"],
+                    content_reference: None,
+                    is_summary: false,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "modifierExtension",
+                    path: "BackboneElement.modifierExtension",
+                    kind: Kind::Complex("Extension"),
+                    min: 0,
+                    max: None,
+                    many: true,
+                    types: &["Extension"],
+                    content_reference: None,
+                    is_summary: true,
+                    is_modifier: true,
+                },
+            ],
+        },
+        #[cfg(feature = "terminology")]
+        TypeSchema {
+            name: "BackboneType",
+            path: "BackboneType",
+            base: Some("DataType"),
+            fields: &[
+                FieldSchema {
+                    name: "id",
+                    path: "BackboneType.id",
+                    kind: Kind::Attribute,
+                    min: 0,
+                    max: Some(1),
+                    many: false,
+                    types: &["string"],
+                    content_reference: None,
+                    is_summary: false,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "extension",
+                    path: "BackboneType.extension",
+                    kind: Kind::Complex("Extension"),
+                    min: 0,
+                    max: None,
+                    many: true,
+                    types: &["Extension"],
+                    content_reference: None,
+                    is_summary: false,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "modifierExtension",
+                    path: "BackboneType.modifierExtension",
+                    kind: Kind::Complex("Extension"),
+                    min: 0,
+                    max: None,
+                    many: true,
+                    types: &["Extension"],
+                    content_reference: None,
+                    is_summary: true,
+                    is_modifier: true,
+                },
+            ],
+        },
+        #[cfg(feature = "terminology")]
+        TypeSchema {
+            name: "Base",
+            path: "Base",
+            base: None,
+            fields: &[],
+        },
         #[cfg(feature = "resources")]
         TypeSchema {
             name: "Basic",
             path: "Basic",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -7104,6 +7244,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Binary",
             path: "Binary",
+            base: Some("Resource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -7195,6 +7336,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "BiologicallyDerivedProduct",
             path: "BiologicallyDerivedProduct",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -7466,6 +7608,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "BiologicallyDerivedProductCollection",
             path: "BiologicallyDerivedProduct.collection",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -7572,6 +7715,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "BiologicallyDerivedProductProperty",
             path: "BiologicallyDerivedProduct.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -7659,6 +7803,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "BodyStructure",
             path: "BodyStructure",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -7846,6 +7991,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "BodyStructureIncludedStructure",
             path: "BodyStructure.includedStructure",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -7985,6 +8131,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "BodyStructureIncludedStructureBodyLandmarkOrientation",
             path: "BodyStructure.includedStructure.bodyLandmarkOrientation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -8078,6 +8225,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "BodyStructureIncludedStructureBodyLandmarkOrientationDistanceFromLandmark",
             path: "BodyStructure.includedStructure.bodyLandmarkOrientation.distanceFromLandmark",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -8145,6 +8293,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Bundle",
             path: "Bundle",
+            base: Some("Resource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -8284,6 +8433,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "BundleEntry",
             path: "Bundle.entry",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -8399,6 +8549,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "BundleEntryRequest",
             path: "Bundle.entry.request",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -8514,6 +8665,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "BundleEntryResponse",
             path: "Bundle.entry.response",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -8617,6 +8769,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "BundleEntrySearch",
             path: "Bundle.entry.search",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -8684,6 +8837,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "BundleLink",
             path: "Bundle.link",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -8751,6 +8905,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatement",
             path: "CapabilityStatement",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -9229,6 +9384,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementDocument",
             path: "CapabilityStatement.document",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -9308,6 +9464,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementImplementation",
             path: "CapabilityStatement.implementation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -9387,6 +9544,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementMessaging",
             path: "CapabilityStatement.messaging",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -9478,6 +9636,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementMessagingEndpoint",
             path: "CapabilityStatement.messaging.endpoint",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -9545,6 +9704,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementMessagingSupportedMessage",
             path: "CapabilityStatement.messaging.supportedMessage",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -9612,6 +9772,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementRest",
             path: "CapabilityStatement.rest",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -9751,6 +9912,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementRestInteraction",
             path: "CapabilityStatement.rest.interaction",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -9818,6 +9980,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementRestResource",
             path: "CapabilityStatement.rest.resource",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -10089,6 +10252,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementRestResourceInteraction",
             path: "CapabilityStatement.rest.resource.interaction",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -10156,6 +10320,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementRestResourceOperation",
             path: "CapabilityStatement.rest.resource.operation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -10235,6 +10400,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementRestResourceSearchParam",
             path: "CapabilityStatement.rest.resource.searchParam",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -10326,6 +10492,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementRestSecurity",
             path: "CapabilityStatement.rest.security",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -10405,6 +10572,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CapabilityStatementSoftware",
             path: "CapabilityStatement.software",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -10484,6 +10652,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CarePlan",
             path: "CarePlan",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -10839,6 +11008,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CarePlanActivity",
             path: "CarePlan.activity",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -10918,6 +11088,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CareTeam",
             path: "CareTeam",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -11153,6 +11324,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CareTeamParticipant",
             path: "CareTeam.participant",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -11259,6 +11431,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Claim",
             path: "Claim",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -11758,6 +11931,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimAccident",
             path: "Claim.accident",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -11840,6 +12014,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimCareTeam",
             path: "Claim.careTeam",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -11931,6 +12106,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimDiagnosis",
             path: "Claim.diagnosis",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -12022,6 +12198,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimEvent",
             path: "Claim.event",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -12092,6 +12269,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimInsurance",
             path: "Claim.insurance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -12219,6 +12397,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimItem",
             path: "Claim.item",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -12581,6 +12760,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimItemBodySite",
             path: "Claim.item.bodySite",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -12648,6 +12828,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimItemDetail",
             path: "Claim.item.detail",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -12883,6 +13064,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimItemDetailSubDetail",
             path: "Claim.item.detail.subDetail",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -13106,6 +13288,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimPayee",
             path: "Claim.payee",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -13173,6 +13356,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimProcedure",
             path: "Claim.procedure",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -13276,6 +13460,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimRelated",
             path: "Claim.related",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -13355,6 +13540,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponse",
             path: "ClaimResponse",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -13866,6 +14052,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseAddItem",
             path: "ClaimResponse.addItem",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -14228,6 +14415,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseAddItemBodySite",
             path: "ClaimResponse.addItem.bodySite",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -14295,6 +14483,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseAddItemDetail",
             path: "ClaimResponse.addItem.detail",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -14506,6 +14695,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseAddItemDetailSubDetail",
             path: "ClaimResponse.addItem.detail.subDetail",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -14705,6 +14895,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseError",
             path: "ClaimResponse.error",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -14808,6 +14999,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseEvent",
             path: "ClaimResponse.event",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -14878,6 +15070,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseInsurance",
             path: "ClaimResponse.insurance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -14981,6 +15174,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseItem",
             path: "ClaimResponse.item",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -15108,6 +15302,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseItemAdjudication",
             path: "ClaimResponse.item.adjudication",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -15211,6 +15406,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseItemDetail",
             path: "ClaimResponse.item.detail",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -15326,6 +15522,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseItemDetailSubDetail",
             path: "ClaimResponse.item.detail.subDetail",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -15429,6 +15626,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseItemReviewOutcome",
             path: "ClaimResponse.item.reviewOutcome",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -15520,6 +15718,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponsePayment",
             path: "ClaimResponse.payment",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -15635,6 +15834,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseProcessNote",
             path: "ClaimResponse.processNote",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -15738,6 +15938,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseSupportingInfo",
             path: "ClaimResponse.supportingInfo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -15987,6 +16188,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimResponseTotal",
             path: "ClaimResponse.total",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -16054,6 +16256,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClaimSupportingInfo",
             path: "Claim.supportingInfo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -16303,6 +16506,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClinicalUseDefinition",
             path: "ClinicalUseDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -16550,6 +16754,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClinicalUseDefinitionContraindication",
             path: "ClinicalUseDefinition.contraindication",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -16677,6 +16882,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClinicalUseDefinitionIndication",
             path: "ClinicalUseDefinition.indication",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -16819,6 +17025,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClinicalUseDefinitionIndicationOtherTherapy",
             path: "ClinicalUseDefinition.indication.otherTherapy",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -16886,6 +17093,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClinicalUseDefinitionInteraction",
             path: "ClinicalUseDefinition.interaction",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -17001,6 +17209,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClinicalUseDefinitionInteractionInteractant",
             path: "ClinicalUseDefinition.interaction.interactant",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -17071,6 +17280,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClinicalUseDefinitionUndesirableEffect",
             path: "ClinicalUseDefinition.undesirableEffect",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -17162,6 +17372,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ClinicalUseDefinitionWarning",
             path: "ClinicalUseDefinition.warning",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -17229,6 +17440,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CodeSystem",
             path: "CodeSystem",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -17779,6 +17991,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CodeSystemConcept",
             path: "CodeSystem.concept",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -17894,6 +18107,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CodeSystemConceptDesignation",
             path: "CodeSystem.concept.designation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -17985,6 +18199,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CodeSystemConceptProperty",
             path: "CodeSystem.concept.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -18062,6 +18277,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CodeSystemFilter",
             path: "CodeSystem.filter",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -18153,6 +18369,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CodeSystemProperty",
             path: "CodeSystem.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -18244,6 +18461,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CodeableConcept",
             path: "CodeableConcept",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -18299,6 +18517,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CodeableReference",
             path: "CodeableReference",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -18354,6 +18573,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Coding",
             path: "Coding",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -18445,6 +18665,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Communication",
             path: "Communication",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -18788,6 +19009,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CommunicationPayload",
             path: "Communication.payload",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -18848,6 +19070,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CommunicationRequest",
             path: "CommunicationRequest",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -19218,6 +19441,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CommunicationRequestPayload",
             path: "CommunicationRequest.payload",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -19278,6 +19502,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CompartmentDefinition",
             path: "CompartmentDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -19576,6 +19801,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CompartmentDefinitionResource",
             path: "CompartmentDefinition.resource",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -19667,6 +19893,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Composition",
             path: "Composition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -20046,6 +20273,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CompositionAttester",
             path: "Composition.attester",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -20125,6 +20353,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CompositionClassification",
             path: "Composition.classification",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -20192,6 +20421,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CompositionEvent",
             path: "Composition.event",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -20259,6 +20489,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CompositionParticipant",
             path: "Composition.participant",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -20350,6 +20581,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CompositionRelatesTo",
             path: "Composition.relatesTo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -20423,6 +20655,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CompositionSection",
             path: "Composition.section",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -20586,6 +20819,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConceptMap",
             path: "ConceptMap",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -21082,6 +21316,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConceptMapAdditionalAttribute",
             path: "ConceptMap.additionalAttribute",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -21173,6 +21408,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConceptMapGroup",
             path: "ConceptMap.group",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -21264,6 +21500,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConceptMapGroupElement",
             path: "ConceptMap.group.element",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -21379,6 +21616,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConceptMapGroupElementTarget",
             path: "ConceptMap.group.element.target",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -21518,6 +21756,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConceptMapGroupElementTargetDependsOn",
             path: "ConceptMap.group.element.target.dependsOn",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -21603,6 +21842,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConceptMapGroupElementTargetProperty",
             path: "ConceptMap.group.element.target.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -21680,6 +21920,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConceptMapGroupUnmapped",
             path: "ConceptMap.group.unmapped",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -21807,6 +22048,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConceptMapProperty",
             path: "ConceptMap.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -21910,6 +22152,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Condition",
             path: "Condition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -22229,6 +22472,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConditionStage",
             path: "Condition.stage",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -22308,6 +22552,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Consent",
             path: "Consent",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -22627,6 +22872,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConsentPolicyBasis",
             path: "Consent.policyBasis",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -22694,6 +22940,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConsentProvision",
             path: "Consent.provision",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -22869,6 +23116,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConsentProvisionActor",
             path: "Consent.provision.actor",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -22936,6 +23184,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConsentProvisionData",
             path: "Consent.provision.data",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -23003,6 +23252,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ConsentVerification",
             path: "Consent.verification",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -23106,6 +23356,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContactDetail",
             path: "ContactDetail",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -23161,6 +23412,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContactPoint",
             path: "ContactPoint",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -23252,6 +23504,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Contract",
             path: "Contract",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -23757,6 +24010,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractContentDefinition",
             path: "Contract.contentDefinition",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -23872,6 +24126,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractFriendly",
             path: "Contract.friendly",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -23930,6 +24185,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractLegal",
             path: "Contract.legal",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -23988,6 +24244,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractRule",
             path: "Contract.rule",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -24046,6 +24303,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractSigner",
             path: "Contract.signer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -24125,6 +24383,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractTerm",
             path: "Contract.term",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -24315,6 +24574,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractTermAction",
             path: "Contract.term.action",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -24590,6 +24850,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractTermActionSubject",
             path: "Contract.term.action.subject",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -24657,6 +24918,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractTermAsset",
             path: "Contract.term.asset",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -24880,6 +25142,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractTermAssetContext",
             path: "Contract.term.asset.context",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -24959,6 +25222,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractTermAssetValuedItem",
             path: "Contract.term.asset.valuedItem",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -25173,6 +25437,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractTermOffer",
             path: "Contract.term.offer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -25336,6 +25601,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractTermOfferAnswer",
             path: "Contract.term.offer.answer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -25417,6 +25683,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractTermOfferParty",
             path: "Contract.term.offer.party",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -25484,6 +25751,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ContractTermSecurityLabel",
             path: "Contract.term.securityLabel",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -25575,6 +25843,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Count",
             path: "Count",
+            base: Some("Quantity"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -25666,6 +25935,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Coverage",
             path: "Coverage",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -25997,6 +26267,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageClass",
             path: "Coverage.class",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -26088,6 +26359,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageCostToBeneficiary",
             path: "Coverage.costToBeneficiary",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -26218,6 +26490,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageCostToBeneficiaryException",
             path: "Coverage.costToBeneficiary.exception",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -26285,6 +26558,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageEligibilityRequest",
             path: "CoverageEligibilityRequest",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -26583,6 +26857,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageEligibilityRequestEvent",
             path: "CoverageEligibilityRequest.event",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -26653,6 +26928,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageEligibilityRequestInsurance",
             path: "CoverageEligibilityRequest.insurance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -26732,6 +27008,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageEligibilityRequestItem",
             path: "CoverageEligibilityRequest.item",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -26895,6 +27172,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageEligibilityRequestItemDiagnosis",
             path: "CoverageEligibilityRequest.item.diagnosis",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -26950,6 +27228,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageEligibilityRequestSupportingInfo",
             path: "CoverageEligibilityRequest.supportingInfo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -27029,6 +27308,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageEligibilityResponse",
             path: "CoverageEligibilityResponse",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -27339,6 +27619,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageEligibilityResponseError",
             path: "CoverageEligibilityResponse.error",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -27406,6 +27687,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageEligibilityResponseEvent",
             path: "CoverageEligibilityResponse.event",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -27476,6 +27758,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageEligibilityResponseInsurance",
             path: "CoverageEligibilityResponse.insurance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -27567,6 +27850,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageEligibilityResponseInsuranceItem",
             path: "CoverageEligibilityResponse.insurance.item",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -27778,6 +28062,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoverageEligibilityResponseInsuranceItemBenefit",
             path: "CoverageEligibilityResponse.insurance.item.benefit",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -27865,6 +28150,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "CoveragePaymentBy",
             path: "Coverage.paymentBy",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -27932,6 +28218,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DataRequirement",
             path: "DataRequirement",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -28074,6 +28361,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DataRequirementCodeFilter",
             path: "DataRequirement.codeFilter",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -28153,6 +28441,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DataRequirementDateFilter",
             path: "DataRequirement.dateFilter",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -28224,6 +28513,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DataRequirementSort",
             path: "DataRequirement.sort",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -28279,6 +28569,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DataRequirementValueFilter",
             path: "DataRequirement.valueFilter",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -28370,10 +28661,43 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
+        #[cfg(feature = "terminology")]
+        TypeSchema {
+            name: "DataType",
+            path: "DataType",
+            base: Some("Element"),
+            fields: &[
+                FieldSchema {
+                    name: "id",
+                    path: "DataType.id",
+                    kind: Kind::Attribute,
+                    min: 0,
+                    max: Some(1),
+                    many: false,
+                    types: &["string"],
+                    content_reference: None,
+                    is_summary: false,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "extension",
+                    path: "DataType.extension",
+                    kind: Kind::Complex("Extension"),
+                    min: 0,
+                    max: None,
+                    many: true,
+                    types: &["Extension"],
+                    content_reference: None,
+                    is_summary: false,
+                    is_modifier: false,
+                },
+            ],
+        },
         #[cfg(feature = "resources")]
         TypeSchema {
             name: "DetectedIssue",
             path: "DetectedIssue",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -28697,6 +29021,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DetectedIssueEvidence",
             path: "DetectedIssue.evidence",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -28764,6 +29089,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DetectedIssueMitigation",
             path: "DetectedIssue.mitigation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -28855,6 +29181,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Device",
             path: "Device",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -29258,6 +29585,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceAdditive",
             path: "Device.additive",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -29325,6 +29653,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceAlert",
             path: "DeviceAlert",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -29632,6 +29961,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceAlertDerivedFrom",
             path: "DeviceAlert.derivedFrom",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -29711,6 +30041,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceAlertSignal",
             path: "DeviceAlert.signal",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -29838,6 +30169,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceAssociation",
             path: "DeviceAssociation",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -30061,6 +30393,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceConformsTo",
             path: "Device.conformsTo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -30140,6 +30473,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinition",
             path: "DeviceDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -30762,6 +31096,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionAdditive",
             path: "DeviceDefinition.additive",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -30829,6 +31164,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionChargeItem",
             path: "DeviceDefinition.chargeItem",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -30920,6 +31256,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionClassification",
             path: "DeviceDefinition.classification",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -30987,6 +31324,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionConformsTo",
             path: "DeviceDefinition.conformsTo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -31078,6 +31416,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionCorrectiveAction",
             path: "DeviceDefinition.correctiveAction",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -31157,6 +31496,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionDeviceName",
             path: "DeviceDefinition.deviceName",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -31224,6 +31564,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionDeviceVersion",
             path: "DeviceDefinition.deviceVersion",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -31303,6 +31644,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionGuideline",
             path: "DeviceDefinition.guideline",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -31430,6 +31772,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionHasPart",
             path: "DeviceDefinition.hasPart",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -31500,6 +31843,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionLink",
             path: "DeviceDefinition.link",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -31570,6 +31914,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionMaterial",
             path: "DeviceDefinition.material",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -31649,6 +31994,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionPackaging",
             path: "DeviceDefinition.packaging",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -31764,6 +32110,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionPackagingDistributor",
             path: "DeviceDefinition.packaging.distributor",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -31831,6 +32178,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionProperty",
             path: "DeviceDefinition.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -31914,6 +32262,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionRegulatoryIdentifier",
             path: "DeviceDefinition.regulatoryIdentifier",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -32017,6 +32366,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionUdiDeviceIdentifier",
             path: "DeviceDefinition.udiDeviceIdentifier",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -32120,6 +32470,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDefinitionUdiDeviceIdentifierMarketDistribution",
             path: "DeviceDefinition.udiDeviceIdentifier.marketDistribution",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -32187,6 +32538,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceDeviceVersion",
             path: "Device.deviceVersion",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -32278,6 +32630,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceMetric",
             path: "DeviceMetric",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -32513,6 +32866,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceMetricCalibration",
             path: "DeviceMetric.calibration",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -32592,6 +32946,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceName",
             path: "Device.name",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -32671,6 +33026,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceProperty",
             path: "Device.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -32754,6 +33110,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceRequest",
             path: "DeviceRequest",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -33165,6 +33522,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceRequestParameter",
             path: "DeviceRequest.parameter",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -33237,6 +33595,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DeviceUdiCarrier",
             path: "Device.udiCarrier",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -33364,6 +33723,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DiagnosticReport",
             path: "DiagnosticReport",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -33794,6 +34154,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DiagnosticReportMedia",
             path: "DiagnosticReport.media",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -33861,6 +34222,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DiagnosticReportSupportingInfo",
             path: "DiagnosticReport.supportingInfo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -33928,6 +34290,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Distance",
             path: "Distance",
+            base: Some("Quantity"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -34019,6 +34382,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DocumentReference",
             path: "DocumentReference",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -34410,6 +34774,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DocumentReferenceAttester",
             path: "DocumentReference.attester",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -34489,6 +34854,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DocumentReferenceContent",
             path: "DocumentReference.content",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -34556,6 +34922,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DocumentReferenceContentProfile",
             path: "DocumentReference.content.profile",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -34615,6 +34982,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DocumentReferenceRelated",
             path: "DocumentReference.related",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -34682,6 +35050,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DocumentReferenceRelatesTo",
             path: "DocumentReference.relatesTo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -34747,8 +35116,113 @@ pub static SCHEMAS: Schemas = Schemas {
         },
         #[cfg(feature = "terminology")]
         TypeSchema {
+            name: "DomainResource",
+            path: "DomainResource",
+            base: Some("Resource"),
+            fields: &[
+                FieldSchema {
+                    name: "id",
+                    path: "DomainResource.id",
+                    kind: Kind::Primitive(ValueKind::Text),
+                    min: 0,
+                    max: Some(1),
+                    many: false,
+                    types: &["string"],
+                    content_reference: None,
+                    is_summary: true,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "meta",
+                    path: "DomainResource.meta",
+                    kind: Kind::Complex("Meta"),
+                    min: 0,
+                    max: Some(1),
+                    many: false,
+                    types: &["Meta"],
+                    content_reference: None,
+                    is_summary: true,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "implicitRules",
+                    path: "DomainResource.implicitRules",
+                    kind: Kind::Primitive(ValueKind::Text),
+                    min: 0,
+                    max: Some(1),
+                    many: false,
+                    types: &["uri"],
+                    content_reference: None,
+                    is_summary: true,
+                    is_modifier: true,
+                },
+                FieldSchema {
+                    name: "language",
+                    path: "DomainResource.language",
+                    kind: Kind::Primitive(ValueKind::Text),
+                    min: 0,
+                    max: Some(1),
+                    many: false,
+                    types: &["code"],
+                    content_reference: None,
+                    is_summary: false,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "text",
+                    path: "DomainResource.text",
+                    kind: Kind::Complex("Narrative"),
+                    min: 0,
+                    max: Some(1),
+                    many: false,
+                    types: &["Narrative"],
+                    content_reference: None,
+                    is_summary: false,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "contained",
+                    path: "DomainResource.contained",
+                    kind: Kind::Resource,
+                    min: 0,
+                    max: None,
+                    many: true,
+                    types: &["Resource"],
+                    content_reference: None,
+                    is_summary: false,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "extension",
+                    path: "DomainResource.extension",
+                    kind: Kind::Complex("Extension"),
+                    min: 0,
+                    max: None,
+                    many: true,
+                    types: &["Extension"],
+                    content_reference: None,
+                    is_summary: false,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "modifierExtension",
+                    path: "DomainResource.modifierExtension",
+                    kind: Kind::Complex("Extension"),
+                    min: 0,
+                    max: None,
+                    many: true,
+                    types: &["Extension"],
+                    content_reference: None,
+                    is_summary: true,
+                    is_modifier: true,
+                },
+            ],
+        },
+        #[cfg(feature = "terminology")]
+        TypeSchema {
             name: "Dosage",
             path: "Dosage",
+            base: Some("BackboneType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -34936,6 +35410,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DosageCondition",
             path: "DosageCondition",
+            base: Some("BackboneType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -35157,6 +35632,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DosageDetails",
             path: "DosageDetails",
+            base: Some("BackboneType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -35236,6 +35712,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DosageDetailsStep",
             path: "DosageDetails.step",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -35327,6 +35804,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DosageDoseAndRate",
             path: "Dosage.doseAndRate",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -35403,6 +35881,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DosageSafety",
             path: "DosageSafety",
+            base: Some("BackboneType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -35470,6 +35949,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "DosageSafetyDoseLimit",
             path: "DosageSafety.doseLimit",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -35553,6 +36033,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Duration",
             path: "Duration",
+            base: Some("Quantity"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -35644,6 +36125,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Element",
             path: "Element",
+            base: Some("Base"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -35675,6 +36157,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ElementDefinition",
             path: "ElementDefinition",
+            base: Some("BackboneType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -36548,6 +37031,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ElementDefinitionBase",
             path: "ElementDefinition.base",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -36615,6 +37099,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ElementDefinitionBinding",
             path: "ElementDefinition.binding",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -36694,6 +37179,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ElementDefinitionBindingAdditional",
             path: "ElementDefinition.binding.additional",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -36809,6 +37295,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ElementDefinitionConstraint",
             path: "ElementDefinition.constraint",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -36924,6 +37411,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ElementDefinitionExample",
             path: "ElementDefinition.example",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -37097,6 +37585,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ElementDefinitionMapping",
             path: "ElementDefinition.mapping",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -37176,6 +37665,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ElementDefinitionSlicing",
             path: "ElementDefinition.slicing",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -37255,6 +37745,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ElementDefinitionSlicingDiscriminator",
             path: "ElementDefinition.slicing.discriminator",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -37310,6 +37801,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ElementDefinitionType",
             path: "ElementDefinition.type",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -37401,6 +37893,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Encounter",
             path: "Encounter",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -37852,6 +38345,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EncounterAdmission",
             path: "Encounter.admission",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -37967,6 +38461,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EncounterBusinessStatus",
             path: "Encounter.businessStatus",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -38046,6 +38541,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EncounterDiagnosis",
             path: "Encounter.diagnosis",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -38113,6 +38609,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EncounterLocation",
             path: "Encounter.location",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -38204,6 +38701,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EncounterParticipant",
             path: "Encounter.participant",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -38283,6 +38781,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EncounterReason",
             path: "Encounter.reason",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -38350,6 +38849,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Endpoint",
             path: "Endpoint",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -38609,6 +39109,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EndpointPayload",
             path: "Endpoint.payload",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -38700,6 +39201,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EnrollmentRequest",
             path: "EnrollmentRequest",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -38887,6 +39389,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EnrollmentResponse",
             path: "EnrollmentResponse",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -39098,6 +39601,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EpisodeOfCare",
             path: "EpisodeOfCare",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -39357,6 +39861,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EpisodeOfCareDiagnosis",
             path: "EpisodeOfCare.diagnosis",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -39424,6 +39929,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EpisodeOfCareReason",
             path: "EpisodeOfCare.reason",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -39491,6 +39997,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EpisodeOfCareStatusHistory",
             path: "EpisodeOfCare.statusHistory",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -39558,6 +40065,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EventDefinition",
             path: "EventDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -40039,6 +40547,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Evidence",
             path: "Evidence",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -40541,6 +41050,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceCertainty",
             path: "Evidence.certainty",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -40656,6 +41166,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceClassification",
             path: "Evidence.classification",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -40723,6 +41234,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceRelatesTo",
             path: "Evidence.relatesTo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -40796,6 +41308,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceStatistic",
             path: "Evidence.statistic",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -40959,6 +41472,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceStatisticAttributeEstimate",
             path: "Evidence.statistic.attributeEstimate",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -41086,6 +41600,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceStatisticModelCharacteristic",
             path: "Evidence.statistic.modelCharacteristic",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -41205,6 +41720,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceStatisticModelCharacteristicVariable",
             path: "Evidence.statistic.modelCharacteristic.variable",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -41308,6 +41824,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceStatisticSampleSize",
             path: "Evidence.statistic.sampleSize",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -41423,6 +41940,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceVariable",
             path: "EvidenceVariable",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -42021,6 +42539,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceVariableCategory",
             path: "EvidenceVariable.category",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -42093,6 +42612,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceVariableConstraint",
             path: "EvidenceVariable.constraint",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -42280,6 +42800,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceVariableDataStorage",
             path: "EvidenceVariable.dataStorage",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -42371,6 +42892,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceVariableDefinition",
             path: "Evidence.variableDefinition",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -42510,6 +43032,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceVariableDefinitionModifier",
             path: "EvidenceVariable.definitionModifier",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -42597,6 +43120,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "EvidenceVariableRelatesTo",
             path: "EvidenceVariable.relatesTo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -42670,6 +43194,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExampleScenario",
             path: "ExampleScenario",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -43016,6 +43541,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExampleScenarioActor",
             path: "ExampleScenario.actor",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -43119,6 +43645,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExampleScenarioInstance",
             path: "ExampleScenario.instance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -43273,6 +43800,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExampleScenarioInstanceContainedInstance",
             path: "ExampleScenario.instance.containedInstance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -43340,6 +43868,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExampleScenarioInstanceVersion",
             path: "ExampleScenario.instance.version",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -43431,6 +43960,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExampleScenarioProcess",
             path: "ExampleScenario.process",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -43534,6 +44064,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExampleScenarioProcessStep",
             path: "ExampleScenario.process.step",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -43649,6 +44180,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExampleScenarioProcessStepAlternative",
             path: "ExampleScenario.process.step.alternative",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -43728,6 +44260,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExampleScenarioProcessStepOperation",
             path: "ExampleScenario.process.step.operation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -43891,6 +44424,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefit",
             path: "ExplanationOfBenefit",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -44582,6 +45116,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitAccident",
             path: "ExplanationOfBenefit.accident",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -44664,6 +45199,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitAddItem",
             path: "ExplanationOfBenefit.addItem",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -45038,6 +45574,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitAddItemBodySite",
             path: "ExplanationOfBenefit.addItem.bodySite",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -45105,6 +45642,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitAddItemDetail",
             path: "ExplanationOfBenefit.addItem.detail",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -45328,6 +45866,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitAddItemDetailSubDetail",
             path: "ExplanationOfBenefit.addItem.detail.subDetail",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -45539,6 +46078,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitBenefitBalance",
             path: "ExplanationOfBenefit.benefitBalance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -45678,6 +46218,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitBenefitBalanceFinancial",
             path: "ExplanationOfBenefit.benefitBalance.financial",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -45764,6 +46305,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitCareTeam",
             path: "ExplanationOfBenefit.careTeam",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -45855,6 +46397,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitDiagnosis",
             path: "ExplanationOfBenefit.diagnosis",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -45946,6 +46489,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitEvent",
             path: "ExplanationOfBenefit.event",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -46016,6 +46560,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitInsurance",
             path: "ExplanationOfBenefit.insurance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -46095,6 +46640,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitItem",
             path: "ExplanationOfBenefit.item",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -46493,6 +47039,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitItemAdjudication",
             path: "ExplanationOfBenefit.item.adjudication",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -46596,6 +47143,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitItemBodySite",
             path: "ExplanationOfBenefit.item.bodySite",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -46663,6 +47211,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitItemDetail",
             path: "ExplanationOfBenefit.item.detail",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -46934,6 +47483,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitItemDetailSubDetail",
             path: "ExplanationOfBenefit.item.detail.subDetail",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -47193,6 +47743,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitItemReviewOutcome",
             path: "ExplanationOfBenefit.item.reviewOutcome",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -47284,6 +47835,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitPayee",
             path: "ExplanationOfBenefit.payee",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -47351,6 +47903,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitPayment",
             path: "ExplanationOfBenefit.payment",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -47466,6 +48019,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitProcedure",
             path: "ExplanationOfBenefit.procedure",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -47569,6 +48123,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitProcessNote",
             path: "ExplanationOfBenefit.processNote",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -47672,6 +48227,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitRelated",
             path: "ExplanationOfBenefit.related",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -47751,6 +48307,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitSupportingInfo",
             path: "ExplanationOfBenefit.supportingInfo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -48000,6 +48557,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExplanationOfBenefitTotal",
             path: "ExplanationOfBenefit.total",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -48067,6 +48625,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Expression",
             path: "Expression",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -48158,6 +48717,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ExtendedContactDetail",
             path: "ExtendedContactDetail",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -48261,6 +48821,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Extension",
             path: "Extension",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -48434,6 +48995,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "FamilyMemberHistory",
             path: "FamilyMemberHistory",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -48755,6 +49317,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "FamilyMemberHistoryCondition",
             path: "FamilyMemberHistory.condition",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -48863,6 +49426,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "FamilyMemberHistoryProcedure",
             path: "FamilyMemberHistory.procedure",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -48972,6 +49536,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Flag",
             path: "Flag",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -49183,6 +49748,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Goal",
             path: "Goal",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -49493,6 +50059,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "GoalAcceptance",
             path: "Goal.acceptance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -49572,6 +50139,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "GoalTarget",
             path: "Goal.target",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -49670,6 +50238,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Group",
             path: "Group",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -50076,6 +50645,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "GroupCharacteristic",
             path: "Group.characteristic",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -50285,6 +50855,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "GroupMember",
             path: "Group.member",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -50376,6 +50947,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "GuidanceResponse",
             path: "GuidanceResponse",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -50699,6 +51271,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "HealthcareService",
             path: "HealthcareService",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -51090,6 +51663,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "HealthcareServiceEligibility",
             path: "HealthcareService.eligibility",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -51193,6 +51767,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "HumanName",
             path: "HumanName",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -51308,6 +51883,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Identifier",
             path: "Identifier",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -51411,6 +51987,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImagingSelection",
             path: "ImagingSelection",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -51742,6 +52319,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImagingSelectionImageRegion3D",
             path: "ImagingSelection.imageRegion3D",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -51809,6 +52387,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImagingSelectionInstance",
             path: "ImagingSelection.instance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -51960,6 +52539,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImagingSelectionInstanceImageRegion2D",
             path: "ImagingSelection.instance.imageRegion2D",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -52027,6 +52607,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImagingSelectionPerformer",
             path: "ImagingSelection.performer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -52094,6 +52675,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImagingStudy",
             path: "ImagingStudy",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -52401,6 +52983,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImagingStudySeries",
             path: "ImagingStudy.series",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -52576,6 +53159,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImagingStudySeriesInstance",
             path: "ImagingStudy.series.instance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -52679,6 +53263,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImagingStudySeriesPerformer",
             path: "ImagingStudy.series.performer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -52746,6 +53331,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Immunization",
             path: "Immunization",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -53188,6 +53774,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImmunizationPerformer",
             path: "Immunization.performer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -53255,6 +53842,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImmunizationProgramEligibility",
             path: "Immunization.programEligibility",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -53322,6 +53910,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImmunizationProtocolApplied",
             path: "Immunization.protocolApplied",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -53425,6 +54014,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImmunizationReaction",
             path: "Immunization.reaction",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -53504,6 +54094,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImplementationGuide",
             path: "ImplementationGuide",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -53898,6 +54489,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImplementationGuideDefinition",
             path: "ImplementationGuide.definition",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -54001,6 +54593,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImplementationGuideDefinitionGrouping",
             path: "ImplementationGuide.definition.grouping",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -54068,6 +54661,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImplementationGuideDefinitionPage",
             path: "ImplementationGuide.definition.page",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -54175,6 +54769,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImplementationGuideDefinitionParameter",
             path: "ImplementationGuide.definition.parameter",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -54242,6 +54837,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImplementationGuideDefinitionResource",
             path: "ImplementationGuide.definition.resource",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -54369,6 +54965,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImplementationGuideDefinitionTemplate",
             path: "ImplementationGuide.definition.template",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -54448,6 +55045,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImplementationGuideDependsOn",
             path: "ImplementationGuide.dependsOn",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -54539,6 +55137,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImplementationGuideGlobal",
             path: "ImplementationGuide.global",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -54606,6 +55205,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImplementationGuideManifest",
             path: "ImplementationGuide.manifest",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -54709,6 +55309,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImplementationGuideManifestPage",
             path: "ImplementationGuide.manifest.page",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -54788,6 +55389,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ImplementationGuideManifestResource",
             path: "ImplementationGuide.manifest.resource",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -54879,6 +55481,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Ingredient",
             path: "Ingredient",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -55102,6 +55705,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "IngredientManufacturer",
             path: "Ingredient.manufacturer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -55169,6 +55773,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "IngredientSubstance",
             path: "Ingredient.substance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -55236,6 +55841,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "IngredientSubstanceStrength",
             path: "Ingredient.substance.strength",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -55385,6 +55991,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "IngredientSubstanceStrengthReferenceStrength",
             path: "Ingredient.substance.strength.referenceStrength",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -55480,6 +56087,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "InsurancePlan",
             path: "InsurancePlan",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -55667,6 +56275,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "InsurancePlanGeneralCost",
             path: "InsurancePlan.generalCost",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -55758,6 +56367,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "InsurancePlanSpecificCost",
             path: "InsurancePlan.specificCost",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -55825,6 +56435,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "InsurancePlanSpecificCostBenefit",
             path: "InsurancePlan.specificCost.benefit",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -55892,6 +56503,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "InsurancePlanSpecificCostBenefitCost",
             path: "InsurancePlan.specificCost.benefit.cost",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -55983,6 +56595,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "InsuranceProduct",
             path: "InsuranceProduct",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -56254,6 +56867,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "InsuranceProductCoverage",
             path: "InsuranceProduct.coverage",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -56333,6 +56947,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "InsuranceProductCoverageBenefit",
             path: "InsuranceProduct.coverage.benefit",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -56412,6 +57027,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "InsuranceProductCoverageBenefitLimit",
             path: "InsuranceProduct.coverage.benefit.limit",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -56479,6 +57095,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "InsuranceProductRelated",
             path: "InsuranceProduct.related",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -56558,6 +57175,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Invoice",
             path: "Invoice",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -56868,6 +57486,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "InvoiceLineItem",
             path: "Invoice.lineItem",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -56965,6 +57584,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "InvoiceParticipant",
             path: "Invoice.participant",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -57032,6 +57652,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Library",
             path: "Library",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -57537,6 +58158,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "List",
             path: "List",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -57808,6 +58430,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ListEntry",
             path: "List.entry",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -57899,6 +58522,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Location",
             path: "Location",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -58230,6 +58854,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "LocationPosition",
             path: "Location.position",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -58309,6 +58934,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ManufacturedItemDefinition",
             path: "ManufacturedItemDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -58532,6 +59158,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ManufacturedItemDefinitionComponent",
             path: "ManufacturedItemDefinition.component",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -58647,6 +59274,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ManufacturedItemDefinitionComponentConstituent",
             path: "ManufacturedItemDefinition.component.constituent",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -58738,6 +59366,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ManufacturedItemDefinitionProperty",
             path: "ManufacturedItemDefinition.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -58823,6 +59452,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MarketingStatus",
             path: "MarketingStatus",
+            base: Some("BackboneType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -58926,6 +59556,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Measure",
             path: "Measure",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -59503,6 +60134,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureGroup",
             path: "Measure.group",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -59777,6 +60409,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureGroupComponent",
             path: "Measure.group.component",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -59856,6 +60489,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureGroupPopulation",
             path: "Measure.group.population",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -59995,6 +60629,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureGroupStratifier",
             path: "Measure.group.stratifier",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -60122,6 +60757,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureGroupStratifierComponent",
             path: "Measure.group.stratifier.component",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -60249,6 +60885,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureReport",
             path: "MeasureReport",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -60556,6 +61193,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureReportGroup",
             path: "MeasureReport.group",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -60785,6 +61423,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureReportGroupPopulation",
             path: "MeasureReport.group.population",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -60936,6 +61575,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureReportGroupStratifier",
             path: "MeasureReport.group.stratifier",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -61039,6 +61679,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureReportGroupStratifierStratum",
             path: "MeasureReport.group.stratifier.stratum",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -61164,6 +61805,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureReportGroupStratifierStratumComponent",
             path: "MeasureReport.group.stratifier.stratum.component",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -61271,6 +61913,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureReportGroupStratifierStratumPopulation",
             path: "MeasureReport.group.stratifier.stratum.population",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -61398,6 +62041,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureSupplementalData",
             path: "Measure.supplementalData",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -61525,6 +62169,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MeasureTerm",
             path: "Measure.term",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -61592,6 +62237,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Medication",
             path: "Medication",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -61803,6 +62449,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationAdministration",
             path: "MedicationAdministration",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -62162,6 +62809,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationAdministrationDosage",
             path: "MedicationAdministration.dosage",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -62280,6 +62928,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationAdministrationPerformer",
             path: "MedicationAdministration.performer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -62347,6 +62996,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationDispense",
             path: "MedicationDispense",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -62786,6 +63436,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationDispensePerformer",
             path: "MedicationDispense.performer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -62853,6 +63504,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationDispenseSubstitution",
             path: "MedicationDispense.substitution",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -62944,6 +63596,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationIngredient",
             path: "Medication.ingredient",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -63039,6 +63692,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationInstance",
             path: "Medication.instance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -63118,6 +63772,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationPackageSize",
             path: "Medication.packageSize",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -63185,6 +63840,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationRequest",
             path: "MedicationRequest",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -63676,6 +64332,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationRequestDispenseRequest",
             path: "MedicationRequest.dispenseRequest",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -63839,6 +64496,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationRequestDispenseRequestInitialFill",
             path: "MedicationRequest.dispenseRequest.initialFill",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -63906,6 +64564,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationRequestSubstitution",
             path: "MedicationRequest.substitution",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -63976,6 +64635,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationStatement",
             path: "MedicationStatement",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -64287,6 +64947,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicationStatementAdherence",
             path: "MedicationStatement.adherence",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -64354,6 +65015,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicinalProductDefinition",
             path: "MedicinalProductDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -64805,6 +65467,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicinalProductDefinitionCharacteristic",
             path: "MedicinalProductDefinition.characteristic",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -64890,6 +65553,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicinalProductDefinitionContact",
             path: "MedicinalProductDefinition.contact",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -64957,6 +65621,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicinalProductDefinitionCrossReference",
             path: "MedicinalProductDefinition.crossReference",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -65024,6 +65689,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicinalProductDefinitionName",
             path: "MedicinalProductDefinition.name",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -65115,6 +65781,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicinalProductDefinitionNamePart",
             path: "MedicinalProductDefinition.name.part",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -65182,6 +65849,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicinalProductDefinitionNameUsage",
             path: "MedicinalProductDefinition.name.usage",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -65261,6 +65929,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MedicinalProductDefinitionOperation",
             path: "MedicinalProductDefinition.operation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -65352,6 +66021,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MessageDefinition",
             path: "MessageDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -65761,6 +66431,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MessageDefinitionAllowedResponse",
             path: "MessageDefinition.allowedResponse",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -65828,6 +66499,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MessageDefinitionFocus",
             path: "MessageDefinition.focus",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -65919,6 +66591,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MessageHeader",
             path: "MessageHeader",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -66110,6 +66783,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MessageHeaderDestination",
             path: "MessageHeader.destination",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -66192,6 +66866,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MessageHeaderResponse",
             path: "MessageHeader.response",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -66271,6 +66946,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MessageHeaderSource",
             path: "MessageHeader.source",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -66389,6 +67065,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Meta",
             path: "Meta",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -66492,6 +67169,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "MonetaryComponent",
             path: "MonetaryComponent",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -66571,6 +67249,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Money",
             path: "Money",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -66626,6 +67305,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NamingSystem",
             path: "NamingSystem",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -67104,6 +67784,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NamingSystemUniqueId",
             path: "NamingSystem.uniqueId",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -67219,6 +67900,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Narrative",
             path: "Narrative",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -67274,6 +67956,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionIntake",
             path: "NutritionIntake",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -67587,6 +68270,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionIntakeNutritionItem",
             path: "NutritionIntake.nutritionItem",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -67678,6 +68362,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionIntakeNutritionItemConsumedItem",
             path: "NutritionIntake.nutritionItem.consumedItem",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -67772,6 +68457,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionIntakeNutritionItemConsumedItemTotalIntake",
             path: "NutritionIntake.nutritionItem.consumedItem.totalIntake",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -67851,6 +68537,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionIntakeNutritionItemNotConsumedItem",
             path: "NutritionIntake.nutritionItem.notConsumedItem",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -67930,6 +68617,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionIntakePerformer",
             path: "NutritionIntake.performer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -67997,6 +68685,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionOrder",
             path: "NutritionOrder",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -68352,6 +69041,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionOrderAdditive",
             path: "NutritionOrder.additive",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -68443,6 +69133,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionOrderEnteralFormula",
             path: "NutritionOrder.enteralFormula",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -68585,6 +69276,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionOrderEnteralFormulaAdministration",
             path: "NutritionOrder.enteralFormula.administration",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -68667,6 +69359,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionOrderEnteralFormulaAdministrationSchedule",
             path: "NutritionOrder.enteralFormula.administration.schedule",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -68746,6 +69439,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionOrderOralDiet",
             path: "NutritionOrder.oralDiet",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -68861,6 +69555,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionOrderOralDietNutrient",
             path: "NutritionOrder.oralDiet.nutrient",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -68928,6 +69623,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionOrderOralDietSchedule",
             path: "NutritionOrder.oralDiet.schedule",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -69007,6 +69703,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionOrderOralDietTexture",
             path: "NutritionOrder.oralDiet.texture",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -69074,6 +69771,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionOrderSupplement",
             path: "NutritionOrder.supplement",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -69189,6 +69887,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionOrderSupplementSchedule",
             path: "NutritionOrder.supplement.schedule",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -69268,6 +69967,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionProduct",
             path: "NutritionProduct",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -69503,6 +70203,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionProductCharacteristic",
             path: "NutritionProduct.characteristic",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -69584,6 +70285,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionProductIngredient",
             path: "NutritionProduct.ingredient",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -69666,6 +70368,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionProductInstance",
             path: "NutritionProduct.instance",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -69793,6 +70496,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "NutritionProductNutrient",
             path: "NutritionProduct.nutrient",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -69863,6 +70567,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Observation",
             path: "Observation",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -70357,6 +71062,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ObservationComponent",
             path: "Observation.component",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -70486,6 +71192,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ObservationDefinition",
             path: "ObservationDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -71051,6 +71758,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ObservationDefinitionComponent",
             path: "ObservationDefinition.component",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -71142,6 +71850,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ObservationDefinitionQualifiedValue",
             path: "ObservationDefinition.qualifiedValue",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -71341,6 +72050,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ObservationReferenceRange",
             path: "Observation.referenceRange",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -71468,6 +72178,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ObservationTriggeredBy",
             path: "Observation.triggeredBy",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -71547,6 +72258,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "OperationDefinition",
             path: "OperationDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -72025,6 +72737,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "OperationDefinitionOverload",
             path: "OperationDefinition.overload",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -72092,6 +72805,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "OperationDefinitionParameter",
             path: "OperationDefinition.parameter",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -72291,6 +73005,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "OperationDefinitionParameterBinding",
             path: "OperationDefinition.parameter.binding",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -72358,6 +73073,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "OperationDefinitionParameterReferencedFrom",
             path: "OperationDefinition.parameter.referencedFrom",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -72425,6 +73141,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "OperationOutcome",
             path: "OperationOutcome",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -72540,6 +73257,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "OperationOutcomeIssue",
             path: "OperationOutcome.issue",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -72643,6 +73361,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Organization",
             path: "Organization",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -72866,6 +73585,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "OrganizationAffiliation",
             path: "OrganizationAffiliation",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -73101,6 +73821,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "OrganizationQualification",
             path: "Organization.qualification",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -73204,6 +73925,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PackagedProductDefinition",
             path: "PackagedProductDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -73487,6 +74209,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PackagedProductDefinitionLegalStatusOfSupply",
             path: "PackagedProductDefinition.legalStatusOfSupply",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -73554,6 +74277,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PackagedProductDefinitionPackaging",
             path: "PackagedProductDefinition.packaging",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -73729,6 +74453,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PackagedProductDefinitionPackagingContainedItem",
             path: "PackagedProductDefinition.packaging.containedItem",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -73796,6 +74521,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PackagedProductDefinitionPackagingProperty",
             path: "PackagedProductDefinition.packaging.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -73875,6 +74601,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ParameterDefinition",
             path: "ParameterDefinition",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -73990,6 +74717,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Parameters",
             path: "Parameters",
+            base: Some("Resource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -74057,6 +74785,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ParametersParameter",
             path: "Parameters.parameter",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -74266,6 +74995,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Patient",
             path: "Patient",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -74567,6 +75297,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PatientCommunication",
             path: "Patient.communication",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -74634,6 +75365,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PatientContact",
             path: "Patient.contact",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -74797,6 +75529,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PatientLink",
             path: "Patient.link",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -74864,6 +75597,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PaymentNotice",
             path: "PaymentNotice",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -75147,6 +75881,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PaymentReconciliation",
             path: "PaymentReconciliation",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -75610,6 +76345,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PaymentReconciliationAllocation",
             path: "PaymentReconciliation.allocation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -75837,6 +76573,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PaymentReconciliationProcessNote",
             path: "PaymentReconciliation.processNote",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -75928,6 +76665,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Period",
             path: "Period",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -75983,6 +76721,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Person",
             path: "Person",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -76245,6 +76984,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PersonCommunication",
             path: "Person.communication",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -76312,6 +77052,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PersonLink",
             path: "Person.link",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -76379,6 +77120,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PlanDefinition",
             path: "PlanDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -76912,6 +77654,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PlanDefinitionAction",
             path: "PlanDefinition.action",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -77328,6 +78071,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PlanDefinitionActionCondition",
             path: "PlanDefinition.action.condition",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -77395,6 +78139,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PlanDefinitionActionDynamicValue",
             path: "PlanDefinition.action.dynamicValue",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -77462,6 +78207,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PlanDefinitionActionInput",
             path: "PlanDefinition.action.input",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -77541,6 +78287,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PlanDefinitionActionOutput",
             path: "PlanDefinition.action.output",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -77620,6 +78367,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PlanDefinitionActionParticipant",
             path: "PlanDefinition.action.participant",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -77735,6 +78483,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PlanDefinitionActionRelatedAction",
             path: "PlanDefinition.action.relatedAction",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -77829,6 +78578,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PlanDefinitionActor",
             path: "PlanDefinition.actor",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -77908,6 +78658,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PlanDefinitionActorOption",
             path: "PlanDefinition.actor.option",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -77999,6 +78750,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PlanDefinitionGoal",
             path: "PlanDefinition.goal",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -78126,6 +78878,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PlanDefinitionGoalTarget",
             path: "PlanDefinition.goal.target",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -78221,6 +78974,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Practitioner",
             path: "Practitioner",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -78459,6 +79213,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PractitionerCommunication",
             path: "Practitioner.communication",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -78526,6 +79281,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PractitionerQualification",
             path: "Practitioner.qualification",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -78629,6 +79385,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "PractitionerRole",
             path: "PractitionerRole",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -78912,6 +79669,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Procedure",
             path: "Procedure",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -79337,6 +80095,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ProcedureFocalDevice",
             path: "Procedure.focalDevice",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -79404,6 +80163,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ProcedurePerformer",
             path: "Procedure.performer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -79495,6 +80255,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ProductShelfLife",
             path: "ProductShelfLife",
+            base: Some("BackboneType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -79577,6 +80338,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Provenance",
             path: "Provenance",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -79851,6 +80613,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ProvenanceAgent",
             path: "Provenance.agent",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -79942,6 +80705,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ProvenanceEntity",
             path: "Provenance.entity",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -80021,6 +80785,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Quantity",
             path: "Quantity",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -80112,6 +80877,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Questionnaire",
             path: "Questionnaire",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -80506,6 +81272,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "QuestionnaireItem",
             path: "Questionnaire.item",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -80765,6 +81532,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "QuestionnaireItemAnswerOption",
             path: "Questionnaire.item.answerOption",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -80854,6 +81622,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "QuestionnaireItemEnableWhen",
             path: "Questionnaire.item.enableWhen",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -80959,6 +81728,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "QuestionnaireItemInitial",
             path: "Questionnaire.item.initial",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -81040,6 +81810,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "QuestionnaireResponse",
             path: "QuestionnaireResponse",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -81275,6 +82046,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "QuestionnaireResponseItem",
             path: "QuestionnaireResponse.item",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -81378,6 +82150,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "QuestionnaireResponseItemAnswer",
             path: "QuestionnaireResponse.item.answer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -81471,6 +82244,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Range",
             path: "Range",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -81526,6 +82300,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Ratio",
             path: "Ratio",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -81581,6 +82356,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RatioRange",
             path: "RatioRange",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -81648,6 +82424,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Reference",
             path: "Reference",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -81727,6 +82504,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RegulatedAuthorization",
             path: "RegulatedAuthorization",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -82010,6 +82788,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RegulatedAuthorizationCase",
             path: "RegulatedAuthorization.case",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -82116,6 +82895,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RelatedArtifact",
             path: "RelatedArtifact",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -82243,6 +83023,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RelatedPerson",
             path: "RelatedPerson",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -82502,6 +83283,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RelatedPersonCommunication",
             path: "RelatedPerson.communication",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -82569,6 +83351,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RelativeTime",
             path: "RelativeTime",
+            base: Some("BackboneType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -82687,6 +83470,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequestOrchestration",
             path: "RequestOrchestration",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -83006,6 +83790,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequestOrchestrationAction",
             path: "RequestOrchestration.action",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -83404,6 +84189,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequestOrchestrationActionCondition",
             path: "RequestOrchestration.action.condition",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -83471,6 +84257,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequestOrchestrationActionDynamicValue",
             path: "RequestOrchestration.action.dynamicValue",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -83538,6 +84325,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequestOrchestrationActionInput",
             path: "RequestOrchestration.action.input",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -83617,6 +84405,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequestOrchestrationActionOutput",
             path: "RequestOrchestration.action.output",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -83696,6 +84485,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequestOrchestrationActionParticipant",
             path: "RequestOrchestration.action.participant",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -83814,6 +84604,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequestOrchestrationActionRelatedAction",
             path: "RequestOrchestration.action.relatedAction",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -83908,6 +84699,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Requirements",
             path: "Requirements",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -84278,6 +85070,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequirementsActor",
             path: "Requirements.actor",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -84345,6 +85138,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequirementsImports",
             path: "Requirements.imports",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -84412,6 +85206,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequirementsStatement",
             path: "Requirements.statement",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -84599,6 +85394,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequirementsStatementDerivedFrom",
             path: "Requirements.statement.derivedFrom",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -84666,6 +85462,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RequirementsStatementPartOf",
             path: "Requirements.statement.partOf",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -84733,6 +85530,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchStudy",
             path: "ResearchStudy",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -85220,6 +86018,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchStudyAssociatedParty",
             path: "ResearchStudy.associatedParty",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -85323,6 +86122,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchStudyComparisonGroup",
             path: "ResearchStudy.comparisonGroup",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -85438,6 +86238,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchStudyLabel",
             path: "ResearchStudy.label",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -85517,6 +86318,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchStudyObjective",
             path: "ResearchStudy.objective",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -85608,6 +86410,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchStudyObjectiveOutcomeMeasure",
             path: "ResearchStudy.objective.outcomeMeasure",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -85771,6 +86574,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchStudyObjectiveOutcomeMeasureEventHandling",
             path: "ResearchStudy.objective.outcomeMeasure.eventHandling",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -85862,6 +86666,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchStudyProgressStatus",
             path: "ResearchStudy.progressStatus",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -85941,6 +86746,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchStudyRecruitment",
             path: "ResearchStudy.recruitment",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -86044,6 +86850,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchStudyRelatesTo",
             path: "ResearchStudy.relatesTo",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -86117,6 +86924,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchSubject",
             path: "ResearchSubject",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -86328,6 +87136,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchSubjectSubjectMilestone",
             path: "ResearchSubject.subjectMilestone",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -86407,6 +87216,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ResearchSubjectSubjectState",
             path: "ResearchSubject.subjectState",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -86494,10 +87304,67 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
+        #[cfg(feature = "terminology")]
+        TypeSchema {
+            name: "Resource",
+            path: "Resource",
+            base: Some("Base"),
+            fields: &[
+                FieldSchema {
+                    name: "id",
+                    path: "Resource.id",
+                    kind: Kind::Primitive(ValueKind::Text),
+                    min: 0,
+                    max: Some(1),
+                    many: false,
+                    types: &["id"],
+                    content_reference: None,
+                    is_summary: true,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "meta",
+                    path: "Resource.meta",
+                    kind: Kind::Complex("Meta"),
+                    min: 0,
+                    max: Some(1),
+                    many: false,
+                    types: &["Meta"],
+                    content_reference: None,
+                    is_summary: true,
+                    is_modifier: false,
+                },
+                FieldSchema {
+                    name: "implicitRules",
+                    path: "Resource.implicitRules",
+                    kind: Kind::Primitive(ValueKind::Text),
+                    min: 0,
+                    max: Some(1),
+                    many: false,
+                    types: &["uri"],
+                    content_reference: None,
+                    is_summary: true,
+                    is_modifier: true,
+                },
+                FieldSchema {
+                    name: "language",
+                    path: "Resource.language",
+                    kind: Kind::Primitive(ValueKind::Text),
+                    min: 0,
+                    max: Some(1),
+                    many: false,
+                    types: &["code"],
+                    content_reference: None,
+                    is_summary: false,
+                    is_modifier: false,
+                },
+            ],
+        },
         #[cfg(feature = "resources")]
         TypeSchema {
             name: "RiskAssessment",
             path: "RiskAssessment",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -86796,6 +87663,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "RiskAssessmentPrediction",
             path: "RiskAssessment.prediction",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -86918,6 +87786,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SampledData",
             path: "SampledData",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -87069,6 +87938,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Schedule",
             path: "Schedule",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -87280,6 +88150,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SearchParameter",
             path: "SearchParameter",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -87770,6 +88641,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SearchParameterComponent",
             path: "SearchParameter.component",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -87837,6 +88709,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ServiceRequest",
             path: "ServiceRequest",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -88320,6 +89193,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ServiceRequestOrderDetail",
             path: "ServiceRequest.orderDetail",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -88391,6 +89265,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ServiceRequestOrderDetailParameter",
             path: "ServiceRequest.orderDetail.parameter",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -88474,6 +89349,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ServiceRequestPatientInstruction",
             path: "ServiceRequest.patientInstruction",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -88532,6 +89408,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Signature",
             path: "Signature",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -88647,6 +89524,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Slot",
             path: "Slot",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -88882,6 +89760,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Specimen",
             path: "Specimen",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -89177,6 +90056,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SpecimenCollection",
             path: "Specimen.collection",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -89334,6 +90214,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SpecimenContainer",
             path: "Specimen.container",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -89401,6 +90282,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SpecimenDefinition",
             path: "SpecimenDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -89843,6 +90725,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SpecimenDefinitionTypeTested",
             path: "SpecimenDefinition.typeTested",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -90006,6 +90889,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SpecimenDefinitionTypeTestedContainer",
             path: "SpecimenDefinition.typeTested.container",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -90103,6 +90987,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SpecimenDefinitionTypeTestedContainerAdditive",
             path: "SpecimenDefinition.typeTested.container.additive",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -90170,6 +91055,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SpecimenDefinitionTypeTestedHandling",
             path: "SpecimenDefinition.typeTested.handling",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -90261,6 +91147,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SpecimenFeature",
             path: "Specimen.feature",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -90328,6 +91215,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SpecimenProcessing",
             path: "Specimen.processing",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -90447,6 +91335,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SpecimenProcessingAdditive",
             path: "Specimen.processing.additive",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -90514,6 +91403,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureDefinition",
             path: "StructureDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -90968,6 +91858,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureDefinitionContext",
             path: "StructureDefinition.context",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -91035,6 +91926,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureDefinitionDifferential",
             path: "StructureDefinition.differential",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -91090,6 +91982,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureDefinitionMapping",
             path: "StructureDefinition.mapping",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -91181,6 +92074,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureDefinitionSnapshot",
             path: "StructureDefinition.snapshot",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -91236,6 +92130,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureMap",
             path: "StructureMap",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -91594,6 +92489,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureMapConst",
             path: "StructureMap.const",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -91661,6 +92557,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureMapGroup",
             path: "StructureMap.group",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -91776,6 +92673,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureMapGroupInput",
             path: "StructureMap.group.input",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -91867,6 +92765,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureMapGroupRule",
             path: "StructureMap.group.rule",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -91982,6 +92881,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureMapGroupRuleDependent",
             path: "StructureMap.group.rule.dependent",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -92049,6 +92949,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureMapGroupRuleSource",
             path: "StructureMap.group.rule.source",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -92224,6 +93125,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureMapGroupRuleTarget",
             path: "StructureMap.group.rule.target",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -92351,6 +93253,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureMapGroupRuleTargetParameter",
             path: "StructureMap.group.rule.target.parameter",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -92417,6 +93320,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "StructureMapStructure",
             path: "StructureMap.structure",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -92508,6 +93412,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Subscription",
             path: "Subscription",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -92815,6 +93720,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubscriptionFilterBy",
             path: "Subscription.filterBy",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -92930,6 +93836,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubscriptionParameter",
             path: "Subscription.parameter",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -92997,6 +93904,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubscriptionStatus",
             path: "SubscriptionStatus",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -93184,6 +94092,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubscriptionStatusNotificationEvent",
             path: "SubscriptionStatus.notificationEvent",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -93311,6 +94220,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubscriptionStatusNotificationEventAuthorizationHint",
             path: "SubscriptionStatus.notificationEvent.authorizationHint",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -93378,6 +94288,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubscriptionStatusNotificationEventRelatedQuery",
             path: "SubscriptionStatus.notificationEvent.relatedQuery",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -93445,6 +94356,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubscriptionTopic",
             path: "SubscriptionTopic",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -93815,6 +94727,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubscriptionTopicTrigger",
             path: "SubscriptionTopic.trigger",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -93954,6 +94867,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubscriptionTopicTriggerCanFilterBy",
             path: "SubscriptionTopic.trigger.canFilterBy",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -94069,6 +94983,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubscriptionTopicTriggerNotificationShape",
             path: "SubscriptionTopic.trigger.notificationShape",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -94160,6 +95075,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubscriptionTopicTriggerNotificationShapeRelatedQuery",
             path: "SubscriptionTopic.trigger.notificationShape.relatedQuery",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -94227,6 +95143,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubscriptionTopicTriggerQueryCriteria",
             path: "SubscriptionTopic.trigger.queryCriteria",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -94330,6 +95247,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Substance",
             path: "Substance",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -94517,6 +95435,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinition",
             path: "SubstanceDefinition",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -94896,6 +95815,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionCharacterization",
             path: "SubstanceDefinition.characterization",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -94987,6 +95907,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionCode",
             path: "SubstanceDefinition.code",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -95090,6 +96011,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionMoiety",
             path: "SubstanceDefinition.moiety",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -95232,6 +96154,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionMolecularWeight",
             path: "SubstanceDefinition.molecularWeight",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -95311,6 +96234,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionName",
             path: "SubstanceDefinition.name",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -95486,6 +96410,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionNameOfficial",
             path: "SubstanceDefinition.name.official",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -95565,6 +96490,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionNucleicAcid",
             path: "SubstanceDefinition.nucleicAcid",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -95692,6 +96618,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionNucleicAcidGene",
             path: "SubstanceDefinition.nucleicAcid.gene",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -95771,6 +96698,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionNucleicAcidGeneElement",
             path: "SubstanceDefinition.nucleicAcid.geneElement",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -95850,6 +96778,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionNucleicAcidSubunit",
             path: "SubstanceDefinition.nucleicAcid.subunit",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -95989,6 +96918,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionNucleicAcidSubunitLinkage",
             path: "SubstanceDefinition.nucleicAcid.subunit.linkage",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -96068,6 +96998,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionNucleicAcidSubunitSugar",
             path: "SubstanceDefinition.nucleicAcid.subunit.sugar",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -96135,6 +97066,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionPolymer",
             path: "SubstanceDefinition.polymer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -96250,6 +97182,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionPolymerMonomerSet",
             path: "SubstanceDefinition.polymer.monomerSet",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -96317,6 +97250,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionPolymerMonomerSetStartingMaterial",
             path: "SubstanceDefinition.polymer.monomerSet.startingMaterial",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -96408,6 +97342,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionPolymerRepeat",
             path: "SubstanceDefinition.polymer.repeat",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -96487,6 +97422,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionPolymerRepeatRepeatUnit",
             path: "SubstanceDefinition.polymer.repeat.repeatUnit",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -96592,6 +97528,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionPolymerRepeatRepeatUnitDegreeOfPolymerisation",
             path: "SubstanceDefinition.polymer.repeat.repeatUnit.degreeOfPolymerisation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -96683,6 +97620,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionProperty",
             path: "SubstanceDefinition.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -96764,6 +97702,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionProtein",
             path: "SubstanceDefinition.protein",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -96879,6 +97818,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionProteinSubunit",
             path: "SubstanceDefinition.protein.subunit",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -96994,6 +97934,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionRelationship",
             path: "SubstanceDefinition.relationship",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -97166,6 +98107,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionSourceMaterial",
             path: "SubstanceDefinition.sourceMaterial",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -97269,6 +98211,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionStructure",
             path: "SubstanceDefinition.structure",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -97408,6 +98351,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "SubstanceDefinitionStructureRepresentation",
             path: "SubstanceDefinition.structure.representation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -97499,6 +98443,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Task",
             path: "Task",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -97974,6 +98919,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TaskFocus",
             path: "Task.focus",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -98032,6 +98978,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TaskInput",
             path: "Task.input",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -98217,6 +99164,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TaskOutput",
             path: "Task.output",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -98402,6 +99350,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TaskPerformer",
             path: "Task.performer",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -98469,6 +99418,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TaskRestriction",
             path: "Task.restriction",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -98548,6 +99498,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TerminologyCapabilities",
             path: "TerminologyCapabilities",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -98978,6 +99929,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TerminologyCapabilitiesCodeSystem",
             path: "TerminologyCapabilities.codeSystem",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -99096,6 +100048,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TerminologyCapabilitiesCodeSystemVersion",
             path: "TerminologyCapabilities.codeSystem.version",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -99235,6 +100188,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TerminologyCapabilitiesCodeSystemVersionFilter",
             path: "TerminologyCapabilities.codeSystem.version.filter",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -99302,6 +100256,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TerminologyCapabilitiesExpansion",
             path: "TerminologyCapabilities.expansion",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -99405,6 +100360,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TerminologyCapabilitiesExpansionParameter",
             path: "TerminologyCapabilities.expansion.parameter",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -99472,6 +100428,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TerminologyCapabilitiesImplementation",
             path: "TerminologyCapabilities.implementation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -99563,6 +100520,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TerminologyCapabilitiesSoftware",
             path: "TerminologyCapabilities.software",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -99630,6 +100588,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TerminologyCapabilitiesSupplements",
             path: "TerminologyCapabilities.supplements",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -99685,6 +100644,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TerminologyCapabilitiesTranslation",
             path: "TerminologyCapabilities.translation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -99740,6 +100700,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TerminologyCapabilitiesValidateCode",
             path: "TerminologyCapabilities.validateCode",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -99795,6 +100756,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "Timing",
             path: "Timing",
+            base: Some("BackboneType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -99874,6 +100836,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TimingRepeat",
             path: "Timing.repeat",
+            base: Some("Element"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -100113,6 +101076,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "TriggerDefinition",
             path: "TriggerDefinition",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -100232,6 +101196,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "UsageContext",
             path: "UsageContext",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -100299,6 +101264,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ValueSet",
             path: "ValueSet",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -100753,6 +101719,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ValueSetCompose",
             path: "ValueSet.compose",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -100856,6 +101823,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ValueSetComposeInclude",
             path: "ValueSet.compose.include",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -100971,6 +101939,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ValueSetComposeIncludeConcept",
             path: "ValueSet.compose.include.concept",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -101050,6 +102019,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ValueSetComposeIncludeConceptDesignation",
             path: "ValueSet.compose.include.concept.designation",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -101141,6 +102111,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ValueSetComposeIncludeFilter",
             path: "ValueSet.compose.include.filter",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -101232,6 +102203,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ValueSetExpansion",
             path: "ValueSet.expansion",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -101371,6 +102343,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ValueSetExpansionContains",
             path: "ValueSet.expansion.contains",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -101522,6 +102495,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ValueSetExpansionContainsProperty",
             path: "ValueSet.expansion.contains.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -101611,6 +102585,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ValueSetExpansionContainsPropertySubProperty",
             path: "ValueSet.expansion.contains.property.subProperty",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -101688,6 +102663,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ValueSetExpansionParameter",
             path: "ValueSet.expansion.parameter",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -101765,6 +102741,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "ValueSetExpansionProperty",
             path: "ValueSet.expansion.property",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -101832,6 +102809,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "VirtualServiceDetail",
             path: "VirtualServiceDetail",
+            base: Some("DataType"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -101931,6 +102909,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "VisionPrescription",
             path: "VisionPrescription",
+            base: Some("DomainResource"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -102190,6 +103169,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "VisionPrescriptionLensSpecification",
             path: "VisionPrescription.lensSpecification",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",
@@ -102401,6 +103381,7 @@ pub static SCHEMAS: Schemas = Schemas {
         TypeSchema {
             name: "VisionPrescriptionLensSpecificationPrism",
             path: "VisionPrescription.lensSpecification.prism",
+            base: Some("BackboneElement"),
             fields: &[
                 FieldSchema {
                     name: "id",

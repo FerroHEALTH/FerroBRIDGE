@@ -346,6 +346,7 @@ testInheritance/testFHIRPathIsFunction5
 testInheritance/testFHIRPathIsFunction6
 testInheritance/testFHIRPathIsFunction7
 testInheritance/testFHIRPathIsFunction8
+testInheritance/testFHIRPathIsFunction9
 testIntersect/testIntersect1
 testIntersect/testIntersect2
 testIntersect/testIntersect3

@@ -13,7 +13,7 @@
 //! the generated ITS-REST client a bearer credential per attempt.
 
 pub mod cache;
-mod endpoint;
+pub(crate) mod endpoint;
 
 use std::sync::Arc;
 use std::time::Duration;

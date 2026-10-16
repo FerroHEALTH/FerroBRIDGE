@@ -248,14 +248,18 @@ pub struct TypeDef {
     pub kind: TypeKind,
     /// Whether the type is a FHIR primitive.
     pub is_primitive: bool,
-    /// Whether the type is a root-set resource.
+    /// Whether the type is a root-set resource, or an abstract resource the
+    /// element table carries alone (`Resource`, `DomainResource`).
     pub is_resource: bool,
     /// Whether the type is emitted into the element table alone, with no Rust
     /// type of its own ([`crate::closure::ELEMENT_TYPE`]).
     pub table_only: bool,
-    /// The Rust name of the type this one specializes (`baseDefinition`), for
-    /// a primitive: `Code` and `Id` specialize `String`, `Canonical` and `Url`
-    /// specialize `Uri` (<https://hl7.org/fhir/R5/datatypes.html#primitive>).
+    /// The Rust name of the type this one specializes: the structure's
+    /// `baseDefinition` (`Code` and `Id` specialize `String`, `Age` specializes
+    /// `Quantity`, `Patient` specializes `DomainResource`,
+    /// <https://hl7.org/fhir/R5/types.html>), and for a backbone element the
+    /// type its element names (`BackboneElement` or `Element`). `None` at the
+    /// root of the hierarchy and for a choice enum.
     pub base: Option<String>,
     /// The narrowest root set that reaches the type, so the feature it is
     /// gated behind.
@@ -307,8 +311,27 @@ struct Placement<'a> {
     is_primitive: bool,
     /// Whether the structure is a root-set resource.
     is_resource: bool,
-    /// Whether the structure is emitted into the element table alone.
-    table_only: bool,
+    /// Where the lowered type is held.
+    entry: Entry,
+}
+
+/// Where a lowered type is held in the model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Entry {
+    /// A Rust type in [`VersionModule::types`], with its element table entry.
+    Emitted,
+    /// An element table entry alone, in [`VersionModule::types`].
+    TableOnly,
+    /// An abstract base's element table entry alone, in
+    /// [`VersionModule::abstract_types`].
+    AbstractBase,
+}
+
+impl Entry {
+    /// Whether the type has an element table entry and no Rust type.
+    const fn table_only(self) -> bool {
+        matches!(self, Self::TableOnly | Self::AbstractBase)
+    }
 }
 
 impl<'a> Placement<'a> {
@@ -320,7 +343,11 @@ impl<'a> Placement<'a> {
             scope: self.scope,
             is_primitive: false,
             is_resource: false,
-            table_only: self.table_only,
+            entry: if self.entry.table_only() {
+                Entry::TableOnly
+            } else {
+                Entry::Emitted
+            },
         }
     }
 }
@@ -338,6 +365,11 @@ pub struct VersionModule {
     pub package_version: String,
     /// Every type, keyed by Rust name.
     pub types: BTreeMap<String, TypeDef>,
+    /// The abstract bases the element table carries alone
+    /// ([`TypeClosure::bases`]), keyed by name, apart from [`Self::types`]
+    /// because the abstract `Resource` shares its name with the
+    /// [`RESOURCE_ENUM`].
+    pub abstract_types: BTreeMap<String, TypeDef>,
 }
 
 impl VersionModule {
@@ -363,6 +395,7 @@ impl VersionModule {
             package_version: package_version.to_owned(),
             operations: Vec::new(),
             types: BTreeMap::new(),
+            abstract_types: BTreeMap::new(),
         };
         // NOTE: the two emitter-owned modules are claimed first, so a FHIR
         // type whose module name would land in one is reported, never merged.
@@ -405,10 +438,11 @@ impl VersionModule {
                     .unwrap_or(RootScope::Resources),
                 is_primitive,
                 is_resource: closure.roots().contains(&structure.name),
-                table_only: false,
+                entry: Entry::Emitted,
             };
             lower_struct(&mut model, structure, &root_path, placement)?;
         }
+        model.lower_abstract_bases(closure)?;
         let resources: Vec<String> = closure.roots().iter().map(|name| type_name(name)).collect();
         model.insert(TypeDef {
             name: RESOURCE_ENUM.to_owned(),
@@ -449,6 +483,42 @@ impl VersionModule {
         model.box_cycles();
         model.box_wide_variants();
         Ok(model)
+    }
+
+    /// Lowers every abstract base of `closure` into [`Self::abstract_types`].
+    fn lower_abstract_bases(&mut self, closure: &TypeClosure) -> Result<(), LowerError> {
+        for structure in closure.bases().values() {
+            let name = type_name(&structure.name);
+            let module = module_name(&name);
+            let root_path = structure
+                .elements
+                .first()
+                .map_or_else(|| structure.name.clone(), |e| e.path.clone());
+            let placement = Placement {
+                name: &name,
+                module: &module,
+                scope: closure
+                    .scope(&structure.name)
+                    .unwrap_or(RootScope::Resources),
+                is_primitive: false,
+                is_resource: structure.kind == StructureKind::Resource,
+                entry: Entry::AbstractBase,
+            };
+            lower_struct(self, structure, &root_path, placement)?;
+        }
+        Ok(())
+    }
+
+    fn insert_abstract(&mut self, ty: TypeDef, origin: &str) -> Result<(), LowerError> {
+        if let Some(existing) = self.abstract_types.get(&ty.name) {
+            return Err(LowerError::NameCollision {
+                name: ty.name.clone(),
+                first: existing.path.clone(),
+                second: origin.to_owned(),
+            });
+        }
+        self.abstract_types.insert(ty.name.clone(), ty);
+        Ok(())
     }
 
     fn insert(&mut self, ty: TypeDef, origin: &str) -> Result<(), LowerError> {

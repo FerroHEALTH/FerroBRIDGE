@@ -190,11 +190,12 @@ fn children<'i>(node: &Node<'i>, name: &str) -> Vec<Node<'i>> {
     }
 }
 
-/// Answers whether `node` is of the type `name`.
-fn is_type(node: &Node<'_>, name: &str) -> bool {
+/// Answers whether `node` is of the type `name`; a resource is also of
+/// every type its base chain reaches (`DomainResource`, `Resource`).
+pub(super) fn is_type(node: &Node<'_>, name: &str) -> bool {
     node.type_name() == name
         || (matches!(node.kind, NodeKind::Resource(_))
-            && (name == "Resource" || name == "DomainResource"))
+            && SCHEMAS.specializes(node.type_name(), name))
 }
 
 impl<'i> Walk<'_, '_, 'i> {
@@ -257,8 +258,11 @@ impl<'i> Walk<'_, '_, 'i> {
             return Err(Reason::ReferenceOutOfScope);
         };
         match self.validator().resolver().resolve(reference, self.scope()) {
-            Resolution::Found(value) => node_of_resource(value).ok_or(Reason::UnresolvedReference),
+            Resolution::Found { target, .. } => {
+                node_of_resource(target).ok_or(Reason::UnresolvedReference)
+            }
             Resolution::OutOfScope => Err(Reason::ReferenceOutOfScope),
+            Resolution::Ambiguous => Err(Reason::AmbiguousReference),
             Resolution::Missing => {
                 self.out().issue(
                     Severity::Warning,
@@ -266,7 +270,7 @@ impl<'i> Walk<'_, '_, 'i> {
                     MessageId::UnresolvedReference,
                     location,
                     format!(
-                        "the reference {reference} resolves to nothing, so the discriminator {path} is not evaluated"
+                        "the reference resolves to nothing, so the discriminator {path} is not evaluated"
                     ),
                 );
                 Err(Reason::UnresolvedReference)

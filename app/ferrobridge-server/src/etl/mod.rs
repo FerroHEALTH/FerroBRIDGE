@@ -496,7 +496,7 @@ mod tests {
     fn the_versioned_object_is_read_from_the_version_when_the_query_selects_none() {
         let query = CheckedQuery::compositions(
             "SELECT e/ehr_id/value AS ehr_id, v/uid/value AS version_uid, c AS composition \
-             FROM EHR e CONTAINS VERSION v CONTAINS COMPOSITION c ORDER BY v/uid/value",
+             FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY v/uid/value",
         )
         .expect("the query checks");
         let read =
@@ -512,7 +512,7 @@ mod tests {
         let query = CheckedQuery::compositions(
             "SELECT e/ehr_id/value AS ehr_id, vo/uid/value AS versioned_object_uid, \
              v/uid/value AS version_uid, c AS composition \
-             FROM EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v CONTAINS COMPOSITION c \
+             FROM EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
              ORDER BY v/uid/value",
         )
         .expect("the query checks");

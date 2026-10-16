@@ -233,6 +233,25 @@ pub enum MessageId {
     NotInPreferredValueSet,
     /// A coding whose display is none the code system defines for its code.
     DisplayMismatch,
+    /// A reference that matches more than one entry of the Bundle around it
+    /// (bundle.html §2.36.4.1).
+    AmbiguousReference,
+    /// A reference whose target conforms to none of the target profiles of
+    /// its element.
+    TargetProfileMismatch,
+    /// A reference aggregated in a way the aggregation of its element does
+    /// not allow (elementdefinition.html §2.30.0.4.4).
+    AggregationMismatch,
+    /// A resource that does not conform to a profile it claims in
+    /// `meta.profile`.
+    ClaimedProfileMismatch,
+    /// A resource the Composition of a document references that the document
+    /// Bundle does not hold (documents.html §3.3.1).
+    DocumentReferenceMissing,
+    /// An entry of a document Bundle that is neither referenced from the
+    /// Composition, directly or indirectly, nor a stylesheet Binary or a
+    /// Provenance of the document (documents.html §3.3.1).
+    DocumentEntryUnreferenced,
     /// A constraint the validator does not evaluate.
     ConstraintUnevaluated,
     /// The instance raised no issue and every constraint was evaluated.
@@ -281,6 +300,12 @@ impl MessageId {
             Self::NotInExtensibleValueSet => "not-in-extensible-value-set",
             Self::NotInPreferredValueSet => "not-in-preferred-value-set",
             Self::DisplayMismatch => "display-mismatch",
+            Self::AmbiguousReference => "ambiguous-reference",
+            Self::TargetProfileMismatch => "target-profile-mismatch",
+            Self::AggregationMismatch => "aggregation-mismatch",
+            Self::ClaimedProfileMismatch => "claimed-profile-mismatch",
+            Self::DocumentReferenceMissing => "document-reference-missing",
+            Self::DocumentEntryUnreferenced => "document-entry-unreferenced",
             Self::ConstraintUnevaluated => "constraint-unevaluated",
             Self::AllOk => "all-ok",
         }

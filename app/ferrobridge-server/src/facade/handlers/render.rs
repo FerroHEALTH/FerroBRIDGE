@@ -15,6 +15,8 @@
 use crate::cdr::ids::EhrId;
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
+use fhirconnect::engine::outcome::Loss;
+use fhirconnect::engine::outcome::SkipReason;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::resolve::program::Program;
 use http::StatusCode;
@@ -227,10 +229,10 @@ fn relocate(value: &mut Value, local: &[(String, String)]) {
 /// Records what the facade filled on one rendered resource and the declared
 /// set of losses its outbound run took.
 ///
-/// A fill is counted with the element paths it wrote, and a warning is a loss
-/// the specification itself declares, never a swallowed failure, carrying a
-/// mapping name and an element path rather than a value, so neither line
-/// holds clinical content.
+/// A fill is counted with the element paths it wrote. A warning is a loss the
+/// specification itself declares, never a swallowed failure, and is logged as
+/// its [`loss_kind`] and its location, never its display text, which can
+/// hold a reference literal. Neither line holds clinical content.
 pub(crate) fn log_outcome(rendered: &Rendered) {
     if !rendered.filled.is_empty() {
         tracing::info!(
@@ -247,11 +249,43 @@ pub(crate) fn log_outcome(rendered: &Rendered) {
         losses = rendered
             .warnings
             .iter()
-            .map(ToString::to_string)
+            .map(located)
             .collect::<Vec<String>>()
             .join("; "),
         "the outbound mapping declared losses"
     );
+}
+
+/// Returns the value-free label of one declared loss.
+///
+/// The label names the variant of [`Loss`], and of [`SkipReason`] for a
+/// skipped mapping, and carries none of the strings either holds. No
+/// specification governs the labels: our own design.
+pub(crate) const fn loss_kind(loss: &Loss) -> &'static str {
+    match *loss {
+        Loss::Skipped { ref reason, .. } => match *reason {
+            SkipReason::Unidirectional => "skipped-unidirectional",
+            SkipReason::PreprocessorGate { .. } => "skipped-preprocessor-gate",
+            SkipReason::UnresolvedReference { .. } => "skipped-unresolved-reference",
+            SkipReason::EmptyReference => "skipped-empty-reference",
+        },
+        Loss::Defaulted { .. } => "defaulted",
+        Loss::LastOfMany { .. } => "last-of-many",
+        Loss::OneWayFallback { .. } => "one-way-fallback",
+        Loss::DeferredReference { .. } => "deferred-reference",
+    }
+}
+
+/// Returns one warning as its kind and the paths of its location, for the
+/// loss log.
+fn located(warning: &Warning) -> String {
+    let location = warning.location();
+    format!(
+        "{} fhir={} openehr={}",
+        loss_kind(warning.loss()),
+        location.fhir().unwrap_or("-"),
+        location.openehr().unwrap_or("-")
+    )
 }
 
 /// Returns the ITS-REST URL of one composition version.
@@ -277,9 +311,13 @@ pub(crate) fn composition_url(
 
 #[cfg(test)]
 mod tests {
-    use super::{composition_url, contain, resource_object};
+    use super::{Rendered, composition_url, contain, log_outcome, resource_object};
     use crate::cdr::ids::EhrId;
     use fhir_types::codec::Value;
+    use fhirconnect::engine::outcome::Location;
+    use fhirconnect::engine::outcome::Loss;
+    use fhirconnect::engine::outcome::SkipReason;
+    use fhirconnect::engine::outcome::Warning;
     use http::StatusCode;
     use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 
@@ -305,6 +343,95 @@ mod tests {
             !text.contains(MARKER),
             "the produced value reached the wire: {text}"
         );
+    }
+
+    #[test]
+    fn the_loss_log_carries_kinds_and_locations_and_no_reference_literal() {
+        let warnings = vec![
+            Warning::new(
+                Loss::Skipped {
+                    mapping: String::from("asserter"),
+                    reason: SkipReason::UnresolvedReference {
+                        reference: String::from("Patient/123"),
+                    },
+                },
+                Location::default()
+                    .with_fhir("Condition.asserter")
+                    .with_openehr("/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"),
+            ),
+            Warning::new(
+                Loss::DeferredReference {
+                    reference: String::from("Dr. Jane Synthetic-Marker"),
+                },
+                Location::default().with_fhir("Condition.recorder"),
+            ),
+        ];
+        let rendered = Rendered {
+            body: fhir_types::codec::Object::default(),
+            warnings,
+            filled: Vec::new(),
+        };
+        let logs = Capture::default();
+        let subscriber = crate::telemetry::subscriber(
+            crate::telemetry::Rendering::Json,
+            "debug",
+            false,
+            logs.clone(),
+        );
+        tracing::subscriber::with_default(subscriber, || log_outcome(&rendered));
+        let text = logs.text();
+        assert!(
+            text.contains("declared losses"),
+            "the loss line is written: {text}"
+        );
+        assert!(
+            text.contains("skipped-unresolved-reference fhir=Condition.asserter"),
+            "{text}"
+        );
+        assert!(
+            text.contains("deferred-reference fhir=Condition.recorder"),
+            "{text}"
+        );
+        assert!(
+            !text.contains("Patient/123"),
+            "a reference literal reached the log: {text}"
+        );
+        assert!(
+            !text.contains("Synthetic-Marker"),
+            "a display name reached the log: {text}"
+        );
+    }
+
+    /// A `tracing` writer that keeps every line in memory.
+    #[derive(Debug, Clone, Default)]
+    struct Capture(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+    impl Capture {
+        fn text(&self) -> String {
+            String::from_utf8_lossy(&self.0.lock().expect("the capture lock holds")).into_owned()
+        }
+    }
+
+    impl std::io::Write for Capture {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0
+                .lock()
+                .expect("the capture lock holds")
+                .extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Capture {
+        type Writer = Self;
+
+        fn make_writer(&'a self) -> Self::Writer {
+            self.clone()
+        }
     }
 
     #[test]

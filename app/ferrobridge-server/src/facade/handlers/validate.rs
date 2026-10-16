@@ -20,11 +20,16 @@
 //! that `build_composition` performs, and the strict RM read. The outcome says
 //! so in `issue.details`.
 
+use fhir_types::r4::operation_outcome::OperationOutcome;
+use fhirconnect::operations::issues::of_warning;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
 use openehr_rm::v1_2::composition::composition::Composition;
 
+use crate::auth::Access;
+use crate::auth::compartment;
+use crate::auth::scope::Permission;
 use crate::facade::Facade;
 use crate::facade::ehr::Policy;
 use crate::facade::engine;
@@ -43,6 +48,7 @@ const VALIDATOR: &str = "the FerroBRIDGE mapping engine, the Web Template valida
 /// `POST [base]/{type}/$validate`.
 pub(crate) fn validate(
     facade: &Facade,
+    access: &Access,
     resource_type: &str,
     headers: &HeaderMap,
     uri: &Uri,
@@ -65,6 +71,15 @@ pub(crate) fn validate(
             ));
         }
     };
+    let admitted = [Permission::Create, Permission::Update]
+        .into_iter()
+        .any(|permission| {
+            compartment::admit_person(facade, access, permission, resource_type, Some(&person))
+                .is_ok()
+        });
+    if !admitted {
+        return Err(crate::auth::guard::forbidden());
+    }
     // NOTE: no specification governs this: our own design, one instant serves
     // every defaulted time of one run, and this one is discarded with the
     // composition it builds.
@@ -90,7 +105,7 @@ pub(crate) fn validate(
     if let Err(error) = openehr_its::json::from_canonical_json::<Composition>(&text) {
         return Ok(invalid(&error.to_string()));
     }
-    let mut issues = vec![
+    let issues = [
         Issue::information(IssueType::Informational)
             .diagnosing(format!(
                 "the resource maps to a composition of {} that this server would commit",
@@ -101,10 +116,18 @@ pub(crate) fn validate(
             .diagnosing(disposition(facade, &person)?)
             .detailing(VALIDATOR),
     ];
-    for warning in built.warnings() {
-        issues.push(Issue::warning(IssueType::Informational).diagnosing(warning.to_string()));
-    }
-    Ok(reply::issues(StatusCode::OK, &issues, &[]))
+    // NOTE: `engine/rest-api.adoc` §Reporting partial results with `OperationOutcome`;
+    // each declared loss renders as the operations lane renders it, located by its
+    // FHIRPath in `expression` and its openEHR path in a `details.coding`.
+    let outcome = OperationOutcome {
+        issue: issues
+            .iter()
+            .map(Issue::build)
+            .chain(built.warnings().iter().map(of_warning))
+            .collect(),
+        ..OperationOutcome::default()
+    };
+    Ok(reply::built(StatusCode::OK, &outcome, &[]))
 }
 
 /// Returns where the composition would be written, as the create path would

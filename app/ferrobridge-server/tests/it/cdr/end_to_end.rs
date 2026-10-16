@@ -38,8 +38,9 @@ const SUBJECT_NAMESPACE: &str = "ferrobridge-test";
 /// The synthetic subject the EHR is created for.
 const SUBJECT_ID: &str = "synthetic-subject-0001";
 
-/// The query that finds every composition of the repository.
-const AQL: &str = "SELECT c/uid/value FROM EHR e CONTAINS COMPOSITION c";
+/// The query that finds the latest version of every composition, in a fixed
+/// order.
+const AQL: &str = "SELECT c/uid/value FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/uid/value";
 
 /// `creation` in the openEHR Audit Change Type vocabulary.
 const CREATION: &str = "249";

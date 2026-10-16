@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::closure::STRUCTURAL_TYPES;
 use crate::lower::Cardinality;
 use crate::lower::Docs;
+use crate::lower::Entry;
 use crate::lower::Field;
 use crate::lower::FieldType;
 use crate::lower::LowerError;
@@ -109,7 +110,7 @@ pub(super) fn lower_element_table_entry(
         scope: RootScope::Terminology,
         is_primitive: false,
         is_resource: false,
-        table_only: true,
+        entry: Entry::TableOnly,
     };
     lower_struct(model, structure, &structure.name, placement)
 }
@@ -126,8 +127,9 @@ pub(super) fn lower_struct(
         scope,
         is_primitive,
         is_resource,
-        table_only,
+        entry,
     } = placement;
+    let table_only = entry.table_only();
     let root_docs = structure.element(path).map(docs_of).unwrap_or_default();
     let value_regex = if is_primitive {
         value_lexical_form(structure, path)?
@@ -170,7 +172,7 @@ pub(super) fn lower_struct(
                         is_primitive: false,
                         base: None,
                         is_resource: false,
-                        table_only: placement.table_only,
+                        table_only,
                         scope,
                         value_regex: None,
                     },
@@ -200,26 +202,40 @@ pub(super) fn lower_struct(
             is_modifier: element.is_modifier,
         });
     }
-    model.insert(
-        TypeDef {
-            name: name.to_owned(),
-            path: path.to_owned(),
-            module: module.to_owned(),
-            docs: root_docs,
-            kind: TypeKind::Struct { fields },
-            is_primitive,
-            is_resource,
-            table_only,
-            base: is_primitive
-                .then_some(structure.base_definition.as_deref())
-                .flatten()
-                .and_then(|url| url.rsplit('/').next())
-                .map(type_name),
-            scope,
-            value_regex,
-        },
-        path,
-    )
+    let ty = TypeDef {
+        name: name.to_owned(),
+        path: path.to_owned(),
+        module: module.to_owned(),
+        docs: root_docs,
+        kind: TypeKind::Struct { fields },
+        is_primitive,
+        is_resource,
+        table_only,
+        base: base_of(structure, path),
+        scope,
+        value_regex,
+    };
+    if entry == Entry::AbstractBase {
+        model.insert_abstract(ty, path)
+    } else {
+        model.insert(ty, path)
+    }
+}
+
+/// The Rust name of the type the structure at `path` specializes.
+///
+/// The root specializes the structure's `baseDefinition`; a backbone element
+/// specializes the type its element names, `BackboneElement` or `Element`
+/// (<https://hl7.org/fhir/R4/backboneelement.html>).
+fn base_of(structure: &ResolvedStructure, path: &str) -> Option<String> {
+    match structure.element(path).map(|element| &element.shape) {
+        Some(ElementShape::Typed(types)) => types.first().map(|only| type_name(&only.code)),
+        _ => structure
+            .base_definition
+            .as_deref()
+            .and_then(|url| url.rsplit('/').next())
+            .map(type_name),
+    }
 }
 
 /// The lexical form of a primitive's `value` element, checked to compile.

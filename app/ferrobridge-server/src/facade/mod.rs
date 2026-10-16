@@ -221,24 +221,21 @@ impl Facade {
 /// type-level create and search (`GET` and `POST _search`), `$validate`, an
 /// instance read and update, a vread, and a system-level transaction. Batch has
 /// no route, so a request for it answers `404`
-/// (<https://hl7.org/fhir/R4/http.html>). `operations`
-/// is whether the same router serves the FHIRconnect operations, which the
-/// conformance statement declares only then, and `hl7v2` whether the HL7 v2
-/// face runs, which the statement's implementation description names only
-/// then.
-pub fn routes(
-    facade: Arc<Facade>,
-    operations: capability::Operations,
-    hl7v2: capability::Hl7v2,
-) -> Router {
+/// (<https://hl7.org/fhir/R4/http.html>). `shape`
+/// says whether the same router serves the FHIRconnect operations, whether
+/// the HL7 v2 face runs and which authorization server guards the facade,
+/// which the conformance statement declares only then.
+pub fn routes(facade: Arc<Facade>, shape: capability::Shape) -> Router {
+    let shape = Arc::new(shape);
     Router::new()
         .route(
             &format!("{BASE_PATH}/metadata"),
             get(
                 move |axum::extract::State(facade): axum::extract::State<Arc<Facade>>,
                       headers: http::HeaderMap,
-                      uri: http::Uri| async move {
-                    handlers::metadata_route(&facade, &headers, &uri, operations, hl7v2)
+                      uri: http::Uri| {
+                    let shape = Arc::clone(&shape);
+                    async move { handlers::metadata_route(&facade, &headers, &uri, &shape) }
                 },
             ),
         )
