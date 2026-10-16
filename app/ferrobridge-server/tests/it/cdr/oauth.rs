@@ -13,9 +13,9 @@ use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::cdr::error::CdrError;
 use ferrobridge_server::cdr::ids::EhrId;
 use ferrobridge_server::cdr::oauth::cache::{Clock, TokenSource};
-use ferrobridge_server::cdr::oauth::{ClientAuth, Endpoint, OAuthConfig, RenewalError, TokenError};
+use ferrobridge_server::cdr::oauth::{ClientAuth, Endpoint, OAuthConfig, TokenError};
 use http::StatusCode;
-use openehr_its::rest::client::{ClientError, RetryPolicy, TransportError};
+use openehr_its::rest::client::{ClientError, RetryPolicy};
 use openehr_its::rest::generated::ehr::client::EhrGetByIdOutcome;
 use secrecy::SecretString;
 use std::error::Error;
@@ -637,22 +637,75 @@ async fn a_renewal_that_fails_after_a_refusal_carries_the_token_error() -> Resul
         .create_ehr(None, Prefer::Minimal)
         .await
         .expect_err("no renewed token, no second send");
-    let CdrError::Client { source, .. } = &error else {
-        return Err(format!("expected a refusal of the generated client, got {error:?}").into());
-    };
-    let ClientError::Transport {
-        source: TransportError::Send { source },
-        ..
-    } = source.as_ref()
+    let CdrError::Renewal {
+        source: renewal,
+        upstream,
+    } = &error
     else {
-        return Err(format!("expected the renewal failure, got {source:?}").into());
+        return Err(format!("expected the renewal failure, got {error:?}").into());
     };
-    let renewal = source
-        .downcast_ref::<RenewalError>()
-        .ok_or("the transport refusal is the renewal failure")?;
     assert!(
         matches!(renewal.token_error(), TokenError::Refused { error: Some(oauth), .. } if oauth.error == "invalid_client"),
         "{renewal:?}"
+    );
+    assert_eq!(
+        Some(StatusCode::UNAUTHORIZED),
+        upstream.as_ref().map(|upstream| upstream.status()),
+        "the refused attempt's answer stays"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_refused_renewal_is_not_retried() -> Result<(), Box<dyn Error>> {
+    // NOTE: RFC 6749 §5.2, `invalid_grant` is final for the grant, so the call
+    // ends after one renewal and the token endpoint is never asked again.
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(TOKEN_PATH))
+        .respond_with(issued("synthetic-token-1", 300))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path(TOKEN_PATH))
+        .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+            "error": "invalid_grant",
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path(format!("/v1/ehr/{EHR}")))
+        .respond_with(ResponseTemplate::new(401).insert_header("WWW-Authenticate", "Bearer"))
+        .mount(&server)
+        .await;
+
+    let client = CdrClient::new(
+        &CdrConfig::new(format!("{}/v1", server.uri()).parse()?)
+            .with_retry(RetryPolicy {
+                max_attempts: 3,
+                initial_backoff: Duration::from_millis(1),
+                max_backoff: Duration::from_millis(2),
+            })
+            .with_oauth(grant(&server)?),
+    )?;
+    let error = client
+        .ehr(&EhrId::new(EHR)?)
+        .await
+        .expect_err("a refused renewal is refused");
+    assert!(
+        matches!(&error, CdrError::Renewal { source, .. } if matches!(source.token_error(), TokenError::Refused { error: Some(oauth), .. } if oauth.error == "invalid_grant")),
+        "{error:?}"
+    );
+    assert_eq!(
+        2,
+        received(&server, TOKEN_PATH).await?,
+        "the first token and one refused renewal"
+    );
+    assert_eq!(
+        1,
+        received(&server, &format!("/v1/ehr/{EHR}")).await?,
+        "the CDR is asked once"
     );
     Ok(())
 }

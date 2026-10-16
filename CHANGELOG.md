@@ -32,6 +32,11 @@ crates on crates.io.
 
 ### Fixed
 
+- A CDR call whose token the CDR refused, and whose renewal the token
+  endpoint then refused, is no longer retried (#663). The client asked the
+  refusing token endpoint again on every retry of a `GET`; it now ends the
+  call after the one renewal, with the `401` standing and the token error as
+  its cause, and the facade still answers it with the credentials `502`.
 - A CDR that does not answer the boot template fetch yet no longer fails the
   start (#422). `serve` binds its listen address, answers liveness `200` and
   readiness `503` with a `startup` indicator naming the attempt and its
