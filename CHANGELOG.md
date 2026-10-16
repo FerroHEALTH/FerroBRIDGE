@@ -452,6 +452,29 @@ crates on crates.io.
   the one resource and lost its other entries. `If-Match` names the
   composition version every entry shares, and an `If-Match` naming a version
   the CDR does not hold is `412`.
+- A CDR credential the token endpoint will not issue answers the FHIR caller
+  `502` (#518). When the OAuth 2.0 client credentials fetch fails, because the
+  token endpoint is unreachable or refuses the bridge's own credentials, the
+  facade answers `502 Bad Gateway` with the token endpoint's status and OAuth
+  error in the `OperationOutcome` diagnostics, never the client secret. It
+  used to answer `500`.
+- A request under `/fhir` over the body ceiling or past the request timeout
+  answers an `OperationOutcome` (#548). The ceiling answers `413` with the
+  `too-long` issue and the timeout answers `504 Gateway Timeout` with the
+  `timeout` issue, both as `application/fhir+json` with the limit named in
+  the diagnostics. A timed-out FHIR request used to answer a plain `408`,
+  which tells a client it may resend a write the CDR may already hold. Every
+  other route keeps its plain `408` and `413`.
+- A handler panic under `/fhir` answers an `OperationOutcome` (#655): `500`
+  as `application/fhir+json` with the `exception` issue and the request id in
+  the diagnostics, never the panic message. It used to answer the plain JSON
+  body every other route keeps.
+- A CDR token refusal the bridge cannot renew answers the FHIR caller with the
+  token endpoint's refusal (#654). When the CDR answers `401` and the one
+  renewal of the OAuth token fails, the facade answers the credentials `502`
+  with the token endpoint's status and OAuth error (RFC 6749 §5.2) in the
+  diagnostics, never the client secret. It used to answer "the openEHR
+  service could not be reached".
 - A facade search that binds no node, such as `Condition?patient=…`, answers
   every entry of the context's archetype in each matching composition, each
   with its own id, where it answered only the first (#658). `Bundle.total`
