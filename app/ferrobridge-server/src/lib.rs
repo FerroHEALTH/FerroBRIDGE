@@ -537,17 +537,24 @@ pub fn router(state: Arc<AppState>, server: &ServerSettings) -> Router {
 ///
 /// Outermost first: the request-id normalizer, the layer that mints one, the
 /// panic renderer, the layer that propagates the id onto the response, the
-/// request log, the panic catcher, the request timeout and the body-size
-/// ceiling. The renderer sits outside the propagate layer because it reads the
-/// id from the response the propagate layer has just stamped. The log sits
-/// outside the catcher, the timeout and the ceiling so a caught panic, a `408`
-/// and a `413` each leave their one request line like every other outcome.
+/// request log, the panic catcher, the FHIR edge renderer, the request timeout
+/// and the body-size ceiling. The renderer sits outside the propagate layer
+/// because it reads the id from the response the propagate layer has just
+/// stamped. The edge renderer turns the timeout's and the ceiling's answer on
+/// a `/fhir` route into an `OperationOutcome` ([`facade::edge`]). The log sits
+/// outside the catcher, the timeout and the ceiling so a caught panic, a
+/// timeout and a `413` each leave their one request line like every other
+/// outcome.
 pub fn with_middleware(router: Router, state: Arc<AppState>, server: &ServerSettings) -> Router {
     router
         .layer(RequestBodyLimitLayer::new(server.body_limit))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             server.request_timeout,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            facade::edge::Edge::new(server.body_limit, server.request_timeout),
+            facade::edge::render,
         ))
         .layer(CatchPanicLayer::custom(panic::caught))
         .layer(axum::middleware::from_fn_with_state(

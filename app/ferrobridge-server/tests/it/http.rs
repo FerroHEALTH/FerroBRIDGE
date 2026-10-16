@@ -259,6 +259,143 @@ async fn a_body_over_the_ceiling_yields_four_hundred_and_thirteen() -> Result<()
     Ok(())
 }
 
+/// Returns the media type and the first issue of an `OperationOutcome`
+/// answer, asserting it is one.
+async fn edge_outcome(
+    response: Response<Body>,
+) -> Result<(String, serde_json::Value), Box<dyn StdError>> {
+    let media = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .ok_or("the answer carries a media type")?
+        .to_str()?
+        .to_owned();
+    let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
+    let document: serde_json::Value = serde_json::from_slice(&bytes)?;
+    assert_eq!(
+        Some("OperationOutcome"),
+        document["resourceType"].as_str(),
+        "{document}"
+    );
+    Ok((media, document["issue"][0].clone()))
+}
+
+/// Returns a stack whose `/fhir/slow` and `/slow` routes outlast a 20 ms
+/// timeout and whose `/fhir/echo` route reads its body.
+fn edge_app() -> Router {
+    let mut settings = support::settings();
+    settings.request_timeout = Duration::from_millis(20);
+    let slow = || async {
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        StatusCode::OK
+    };
+    with_middleware(
+        Router::new()
+            .route("/fhir/slow", get(slow))
+            .route("/slow", get(slow))
+            .route(
+                "/fhir/echo",
+                axum::routing::post(|body: axum::body::Bytes| async move { body }),
+            ),
+        support::state(),
+        &settings,
+    )
+}
+
+#[tokio::test]
+async fn a_fhir_request_past_the_timeout_answers_a_504_operation_outcome()
+-> Result<(), Box<dyn StdError>> {
+    // NOTE: R4 http.html §3.1.0.4 asks for an OperationOutcome on an error;
+    // the 504 over a 408 is our own design (RFC 9110 §15.6.5, §15.5.9).
+    let response = raw(edge_app(), Request::get("/fhir/slow").body(Body::empty())?).await?;
+    assert_eq!(StatusCode::GATEWAY_TIMEOUT, response.status());
+    let (media, issue) = edge_outcome(response).await?;
+    assert_eq!("application/fhir+json", media);
+    assert_eq!(Some("error"), issue["severity"].as_str());
+    assert_eq!(Some("timeout"), issue["code"].as_str());
+    assert!(
+        issue["diagnostics"]
+            .as_str()
+            .is_some_and(|text| text.contains("20 ms")),
+        "{issue}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_request_past_the_timeout_off_the_fhir_surface_keeps_its_plain_408()
+-> Result<(), Box<dyn StdError>> {
+    let response = raw(edge_app(), Request::get("/slow").body(Body::empty())?).await?;
+    assert_eq!(StatusCode::REQUEST_TIMEOUT, response.status());
+    assert!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .is_none_or(|value| !value.starts_with("application/fhir+json")),
+        "a non-FHIR route answers no FHIR document"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_fhir_body_declared_over_the_ceiling_answers_a_413_operation_outcome()
+-> Result<(), Box<dyn StdError>> {
+    let oversized = "x".repeat(support::settings().body_limit + 1);
+    let request = Request::post("/fhir/echo")
+        .header(header::CONTENT_LENGTH, oversized.len())
+        .body(Body::from(oversized))?;
+
+    let response = raw(edge_app(), request).await?;
+    assert_eq!(StatusCode::PAYLOAD_TOO_LARGE, response.status());
+    let (media, issue) = edge_outcome(response).await?;
+    assert_eq!("application/fhir+json", media);
+    assert_eq!(Some("too-long"), issue["code"].as_str());
+    assert!(
+        issue["diagnostics"]
+            .as_str()
+            .is_some_and(|text| text.contains("1024-byte")),
+        "{issue}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_streamed_fhir_body_over_the_ceiling_answers_a_413_operation_outcome()
+-> Result<(), Box<dyn StdError>> {
+    let oversized = "x".repeat(support::settings().body_limit + 1);
+    let chunks = futures_util::stream::iter([Ok::<_, std::io::Error>(oversized)]);
+    let request = Request::post("/fhir/echo").body(Body::from_stream(chunks))?;
+
+    let response = raw(edge_app(), request).await?;
+    assert_eq!(StatusCode::PAYLOAD_TOO_LARGE, response.status());
+    let (media, issue) = edge_outcome(response).await?;
+    assert_eq!("application/fhir+json", media);
+    assert_eq!(Some("too-long"), issue["code"].as_str());
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_body_over_the_ceiling_off_the_fhir_surface_keeps_its_plain_413()
+-> Result<(), Box<dyn StdError>> {
+    let oversized = "x".repeat(support::settings().body_limit + 1);
+    let request = Request::post("/health/liveness")
+        .header(header::CONTENT_LENGTH, oversized.len())
+        .body(Body::from(oversized))?;
+
+    let response = raw(app(), request).await?;
+    assert_eq!(StatusCode::PAYLOAD_TOO_LARGE, response.status());
+    assert!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .is_none_or(|value| !value.starts_with("application/fhir+json")),
+        "a non-FHIR route answers no FHIR document"
+    );
+    Ok(())
+}
+
 #[test]
 fn the_request_log_carries_the_route_and_never_a_body_or_an_unlisted_query_value() {
     let logs = support::Logs::default();

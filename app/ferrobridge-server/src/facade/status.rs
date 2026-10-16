@@ -20,6 +20,8 @@
 //! - a CDR `405` or `415` is a `500`, because the bridge chose a call the CDR
 //!   does not offer;
 //! - any CDR `5xx` is a `502` carrying the upstream status;
+//! - a CDR credential the token endpoint would not issue is a `502` carrying
+//!   the token endpoint's refusal;
 //! - a CDR `400` on a search query is a `500`, because the bridge wrote the
 //!   AQL, and a CDR `408` on one is a `502`;
 //! - a connect failure or a timeout is a `502`.
@@ -145,6 +147,21 @@ pub const UPSTREAM: Row = Row {
     status: StatusCode::BAD_GATEWAY,
     issue: IssueType::Transient,
     openehr: "ITS-REST 1.1.0, Requests and responses, HTTP status codes: 5xx",
+    fhir: "hl7.org/fhir/R4/http.html, the server is a gateway to the CDR",
+};
+
+/// The credential for a CDR call could not be obtained.
+///
+/// The token endpoint the bridge fetches its CDR credential from was
+/// unreachable, refused the bridge's own client credentials, or answered no
+/// usable token. That is a fault of a server upstream of the bridge, so the
+/// answer is a `502` (RFC 9110 §15.6.3) and never a `401` to a caller whose
+/// own credentials were fine. No CDR call was made, so no ITS-REST status
+/// applies: no specification governs this: our own design.
+pub const CREDENTIALS: Row = Row {
+    status: StatusCode::BAD_GATEWAY,
+    issue: IssueType::Exception,
+    openehr: "no CDR call was made: the credential for it could not be obtained",
     fhir: "hl7.org/fhir/R4/http.html, the server is a gateway to the CDR",
 };
 
@@ -318,6 +335,15 @@ fn of_generated_error(error: &ClientError) -> Answer {
         ClientError::ServiceFailure {
             status, ref body, ..
         } => Answer::new(UPSTREAM, diagnostics(status, body)),
+        // The diagnostics walk the provider's error chain, whose token
+        // errors carry the status and the OAuth error and never the secret.
+        ClientError::Credentials { ref source, .. } => Answer::new(
+            CREDENTIALS,
+            format!(
+                "no credential for the openEHR service could be obtained: {}",
+                crate::facade::outcome::chain(source)
+            ),
+        ),
         ClientError::Transport { .. } => Answer::new(
             UPSTREAM,
             String::from("the openEHR service could not be reached"),
@@ -350,9 +376,9 @@ fn of_generated_error(error: &ClientError) -> Answer {
 #[cfg(test)]
 mod tests {
     use super::{
-        BAD_REQUEST, GONE, NOT_FOUND, PRECONDITION_FAILED, QUERY_REFUSED, QUERY_TIMEOUT,
-        UNAUTHORIZED, UNDOCUMENTED, UNPROCESSABLE, UPSTREAM, diagnostics, of_client_error,
-        of_query_refusal,
+        BAD_REQUEST, CREDENTIALS, GONE, NOT_FOUND, PRECONDITION_FAILED, QUERY_REFUSED,
+        QUERY_TIMEOUT, UNAUTHORIZED, UNDOCUMENTED, UNPROCESSABLE, UPSTREAM, diagnostics,
+        of_client_error, of_query_refusal,
     };
     use crate::cdr::error::CdrError;
     use http::{Method, StatusCode};
@@ -375,6 +401,7 @@ mod tests {
             UPSTREAM,
             QUERY_REFUSED,
             QUERY_TIMEOUT,
+            CREDENTIALS,
         ] {
             assert!(
                 !row.openehr_citation().is_empty() && !row.fhir_citation().is_empty(),
@@ -434,6 +461,30 @@ mod tests {
                 .and_then(|text| text.value)
                 .is_some_and(|text| text.contains("503")),
             "the 502 does not carry the upstream status"
+        );
+    }
+
+    #[test]
+    fn a_credential_that_cannot_be_obtained_is_a_502_naming_the_provider_failure() {
+        let error = CdrError::client(
+            ClientError::Credentials {
+                method: Method::GET,
+                path: String::from("/ehr"),
+                source: openehr_its::rest::client::CredentialsError::new(
+                    "the token endpoint answered 401 Unauthorized: invalid_client",
+                ),
+            },
+            None,
+        );
+        let answer = of_client_error(&error);
+        assert_eq!(CREDENTIALS, answer.row());
+        assert_eq!(StatusCode::BAD_GATEWAY, answer.status());
+        assert!(
+            answer
+                .issue()
+                .diagnostics()
+                .is_some_and(|text| text.contains("invalid_client")),
+            "the 502 does not carry the token endpoint's refusal"
         );
     }
 
