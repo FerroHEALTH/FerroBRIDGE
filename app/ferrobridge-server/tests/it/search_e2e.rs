@@ -161,7 +161,8 @@ async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
         .with_search(catalog, search::Limits::default()),
     );
 
-    let input: serde_json::Value = serde_json::from_str(fixtures::KDS_DIAGNOSE_CONDITION)?;
+    let input: serde_json::Value = serde_json::from_str(fixtures::KDS_DIAGNOSE_CONDITION)
+        .map_err(|error| format!("the KDS Condition fixture is not JSON: {error}"))?;
     let (status, created) = call(
         app(&facade),
         Request::post("/fhir/Condition")
@@ -232,17 +233,27 @@ async fn commit_two_diagnoses(
             None,
         )
         .await?;
+    let read_status = answered.upstream.status();
     let openehr_its::rest::generated::ehr::client::CompositionGetOutcome::Ok { body, .. } =
         answered.outcome
     else {
-        return Err("the committed composition reads back".into());
+        return Err(format!(
+            "GET composition {versioned_object_uid} answered {read_status}, not the committed composition"
+        )
+        .into());
     };
     let mut document: serde_json::Value =
-        serde_json::from_str(&openehr_its::json::to_canonical_json(&body))?;
+        serde_json::from_str(&openehr_its::json::to_canonical_json(&body)).map_err(|error| {
+            format!("the composition the CDR served does not render as canonical JSON: {error}")
+        })?;
     let first = document["content"][0].clone();
     let (system_one, code_one) = coded(&first).ok_or("the first diagnosis is coded")?;
     let mut second = first.clone();
     recode(&mut second, "SYNTHETIC-B", "SYN-B2").ok_or("the second diagnosis is coded")?;
+    // The copy is a second entry, so it carries no `LOCATABLE.uid` of the first.
+    if let Some(entry) = second.as_object_mut() {
+        entry.remove("uid");
+    }
     if let Some(content) = document["content"].as_array_mut() {
         content.push(second);
     }
@@ -251,7 +262,10 @@ async fn commit_two_diagnoses(
     }
     let two = openehr_its::json::from_canonical_json::<
         openehr_rm::v1_2::composition::composition::Composition,
-    >(&document.to_string())?;
+    >(&document.to_string())
+    .map_err(|error| {
+        format!("the composition with two diagnoses is no canonical COMPOSITION: {error}")
+    })?;
     let commit = ferrobridge_server::facade::commit::context(
         ferrobridge_server::facade::commit::Change::Creation,
         "ferrobridge.e2e",
@@ -270,7 +284,9 @@ async fn commit_two_diagnoses(
             committed.outcome,
             openehr_its::rest::generated::ehr::client::CompositionCreateOutcome::Created { .. }
         ),
-        "the CDR refused the composition with two diagnoses"
+        "POST composition answered {}: {}, not the commit of the composition with two diagnoses",
+        committed.upstream.status(),
+        committed.upstream.body()
     );
     Ok((system_one, code_one))
 }
@@ -307,7 +323,8 @@ fn recode(entry: &mut serde_json::Value, system: &str, code: &str) -> Option<()>
 /// Returns a create of the synthetic `Condition` under the sender id
 /// `sender`, coded `code`, its subject a literal reference.
 fn post_condition(sender: &str, code: &str) -> Result<Request<Body>, Box<dyn StdError>> {
-    let mut resource: serde_json::Value = serde_json::from_str(fixtures::R4_CONDITION)?;
+    let mut resource: serde_json::Value = serde_json::from_str(fixtures::R4_CONDITION)
+        .map_err(|error| format!("the synthetic Condition fixture is not JSON: {error}"))?;
     resource["id"] = serde_json::json!(sender);
     resource["meta"] = serde_json::json!({ "profile": [PROFILE] });
     resource["code"]["coding"][0]["code"] = serde_json::json!(code);
@@ -353,18 +370,46 @@ async fn get(
 }
 
 /// Returns the application over `facade`.
+///
+/// The body ceiling is the facade suite's, 1 MiB: the shared test settings
+/// cap a body at 1024 bytes, which the KDS `Condition` exceeds, so its create
+/// would meet the `413` of the ceiling rather than the facade.
 fn app(facade: &Arc<Facade>) -> Router {
     let state = AppState::with_health(Registry::default()).with_facade(Arc::clone(facade));
-    ferrobridge_server::router(Arc::new(state), &crate::support::settings())
+    ferrobridge_server::router(
+        Arc::new(state),
+        &ferrobridge_server::config::ServerSettings {
+            body_limit: 1024 * 1024,
+            request_timeout: core::time::Duration::from_secs(30),
+            ..crate::support::settings()
+        },
+    )
 }
 
 /// Sends `request` and reads the status and the JSON body.
+///
+/// A body that is not JSON is an error naming the call, the status, the
+/// `Content-Type` and the start of the body, so a failure says which answer
+/// it met.
 async fn call(
     app: Router,
     request: Request<Body>,
 ) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+    let call = format!("{} {}", request.method(), request.uri());
     let response = app.oneshot(request).await?;
     let status = response.status();
+    let content_type = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("no Content-Type")
+        .to_owned();
     let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await?;
-    Ok((status, serde_json::from_slice(&bytes)?))
+    let body = serde_json::from_slice(&bytes).map_err(|error| {
+        format!(
+            "{call} answered {status} ({content_type}) with a body that is not JSON ({error}): {:?}",
+            String::from_utf8_lossy(bytes.get(..bytes.len().min(200)).unwrap_or_default())
+        )
+    })?;
+    Ok((status, body))
 }
