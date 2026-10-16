@@ -34,6 +34,7 @@ mod omop_round_trip;
 mod operations;
 mod readiness;
 mod run;
+mod search_e2e;
 mod shutdown;
 mod support;
 mod telemetry;

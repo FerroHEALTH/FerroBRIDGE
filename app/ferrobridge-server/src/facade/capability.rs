@@ -5,9 +5,11 @@
 //!
 //! It names exactly what the loaded programs support
 //! (<https://hl7.org/fhir/R4/capabilitystatement.html>): one `rest.resource`
-//! per resource type a program maps, with the interactions this milestone
-//! implements, the `$validate` operation, and no search parameter. A type with
-//! no program is absent here and answers `404` with `not-supported` on the
+//! per resource type a program maps, with the interactions the facade
+//! implements and the `$validate` operation. A type a search declaration
+//! answers also names `search-type` and exactly its declared parameters with
+//! `_id`; every other type names no search parameter. A type with no program
+//! is absent here and answers `404` with `not-supported` on the
 //! wire (`docs/architecture.md` §4.6).
 //!
 //! The statement declares `updateCreate: false`, because a `PUT` to an
@@ -21,6 +23,7 @@ use fhir_types::r4::capability_statement::CapabilityStatementRestInteraction;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResource;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResourceInteraction;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResourceOperation;
+use fhir_types::r4::capability_statement::CapabilityStatementRestResourceSearchParam;
 use fhir_types::r4::capability_statement::CapabilityStatementRestSecurity;
 use fhir_types::r4::capability_statement::CapabilityStatementSoftware;
 use fhir_types::r4::codeable_concept::CodeableConcept;
@@ -29,6 +32,7 @@ use fhir_types::r4::extension::Extension;
 use fhir_types::r4::extension::ExtensionValue;
 
 use crate::facade::programs::Programs;
+use crate::facade::search::Catalog;
 use crate::state;
 
 /// The FHIR release this facade speaks.
@@ -51,6 +55,13 @@ const VALIDATE_DEFINITION: &str = "http://hl7.org/fhir/OperationDefinition/Resou
 /// The codes are of `http://hl7.org/fhir/ValueSet/type-restful-interaction`
 /// (<https://hl7.org/fhir/R4/capabilitystatement.html>).
 const RESOURCE_INTERACTIONS: [&str; 4] = ["create", "read", "vread", "update"];
+
+/// The type-level interaction a type with a search declaration adds.
+const SEARCH_INTERACTION: &str = "search-type";
+
+/// The canonical `SearchParameter` of `_id`, which every searchable type
+/// answers through the identity map.
+const ID_DEFINITION: &str = "http://hl7.org/fhir/SearchParameter/Resource-id";
 
 /// The canonical `OperationDefinition` of `$tofhir`.
 ///
@@ -143,10 +154,17 @@ const HL7V2_SENTENCE: &str = "An HL7 v2 face over MLLP is another inbound path i
 /// [`statement_with`] states the face.
 #[must_use]
 pub fn statement(programs: &Programs, base: &str, operations: Operations) -> CapabilityStatement {
-    statement_with(programs, base, operations, Hl7v2::Absent)
+    statement_with(
+        programs,
+        &Catalog::default(),
+        base,
+        operations,
+        Hl7v2::Absent,
+    )
 }
 
-/// Returns the statement the loaded `programs` support.
+/// Returns the statement the loaded `programs` and the `search` declarations
+/// support.
 ///
 /// `base` is the absolute URL the facade is reachable at, which the statement
 /// records as its implementation description. With [`Operations::Served`],
@@ -162,12 +180,14 @@ pub fn statement(programs: &Programs, base: &str, operations: Operations) -> Cap
 #[must_use]
 pub fn statement_with(
     programs: &Programs,
+    search: &Catalog,
     base: &str,
     operations: Operations,
     hl7v2: Hl7v2,
 ) -> CapabilityStatement {
     statement_of(
         programs,
+        search,
         base,
         &Shape {
             operations,
@@ -177,7 +197,8 @@ pub fn statement_with(
     )
 }
 
-/// Returns the statement the loaded `programs` support under `shape`.
+/// Returns the statement the loaded `programs` and the `search` declarations
+/// support under `shape`.
 ///
 /// With a [`Shape::security`], `rest.security` names the SMART service and
 /// carries the `oauth-uris` extension with the authorization server's
@@ -185,7 +206,12 @@ pub fn statement_with(
 /// existing clients while it calls it deprecated
 /// (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
 #[must_use]
-pub fn statement_of(programs: &Programs, base: &str, shape: &Shape) -> CapabilityStatement {
+pub fn statement_of(
+    programs: &Programs,
+    search: &Catalog,
+    base: &str,
+    shape: &Shape,
+) -> CapabilityStatement {
     let (operations, hl7v2) = (shape.operations, shape.hl7v2);
     let description = match hl7v2 {
         Hl7v2::Absent => String::from(DESCRIPTION),
@@ -220,7 +246,7 @@ pub fn statement_of(programs: &Programs, base: &str, shape: &Shape) -> Capabilit
             resource: programs
                 .resource_types()
                 .iter()
-                .map(|name| resource(name))
+                .map(|name| resource(name, search))
                 .collect(),
             // NOTE: `transaction` is a system-level interaction of
             // `http://hl7.org/fhir/ValueSet/system-restful-interaction`; batch
@@ -302,17 +328,52 @@ fn system_operations(operations: Operations) -> Vec<CapabilityStatementRestResou
     }
 }
 
+/// Returns the `rest.resource.searchParam` entries of one searchable type:
+/// `_id`, then the declared parameters in name order.
+///
+/// A declared parameter carries no `definition`: the declaration names it and
+/// states its type, and R4 lets a statement name "additional ones defined
+/// for/by the implementation"
+/// (<https://hl7.org/fhir/R4/capabilitystatement-definitions.html#CapabilityStatement.rest.resource.searchParam>).
+fn search_params(
+    surface: &std::collections::BTreeMap<String, crate::facade::search::declaration::ParameterType>,
+) -> Vec<CapabilityStatementRestResourceSearchParam> {
+    std::iter::once(CapabilityStatementRestResourceSearchParam {
+        name: "_id".into(),
+        definition: Some(ID_DEFINITION.into()),
+        r#type: "token".into(),
+        ..CapabilityStatementRestResourceSearchParam::default()
+    })
+    .chain(
+        surface
+            .iter()
+            .map(|(name, kind)| CapabilityStatementRestResourceSearchParam {
+                name: name.as_str().into(),
+                r#type: kind.as_str().into(),
+                ..CapabilityStatementRestResourceSearchParam::default()
+            }),
+    )
+    .collect()
+}
+
 /// Returns the `rest.resource` entry of one supported type.
-fn resource(name: &str) -> CapabilityStatementRestResource {
+fn resource(name: &str, search: &Catalog) -> CapabilityStatementRestResource {
+    let surface = search.surface(name);
+    let searched = surface.as_ref().map(|_surface| SEARCH_INTERACTION);
     CapabilityStatementRestResource {
         r#type: name.into(),
         interaction: RESOURCE_INTERACTIONS
             .iter()
+            .copied()
+            .chain(searched)
             .map(|code| CapabilityStatementRestResourceInteraction {
-                code: (*code).into(),
+                code: code.into(),
                 ..CapabilityStatementRestResourceInteraction::default()
             })
             .collect(),
+        search_param: surface
+            .map(|surface| search_params(&surface))
+            .unwrap_or_default(),
         update_create: Some(false.into()),
         conditional_create: Some(true.into()),
         conditional_update: Some(true.into()),
@@ -337,6 +398,7 @@ mod tests {
     fn description(hl7v2: Hl7v2) -> Option<String> {
         statement_with(
             &Programs::default(),
+            &crate::facade::search::Catalog::default(),
             "http://localhost:8080/fhir",
             Operations::Absent,
             hl7v2,
