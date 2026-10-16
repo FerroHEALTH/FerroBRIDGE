@@ -405,6 +405,11 @@ crates on crates.io.
   FHIRconnect applies to FHIR input alone, so out of openEHR it wrote the
   ICD-10-GM system over a SNOMED CT or any other coding. It now carries an
   `openehrCondition` on the stored terminology as well.
+- A KDS diagnosis read no longer carries an
+  `icd-10-gm-diagnosesicherheit` extension with a url and no value, which
+  FHIR R4 ext-1 forbids (#629). The extension method of the same append had
+  the same one-sided gate, so its url manual ran for every read; it now runs
+  only when the composition holds a diagnostic certainty.
 - Removing a person's newest `PERSON` writer hands the row to the writer
   that remains (#561). When several compositions of one EHR write the
   person's `PERSON` row and the newest of them is deleted in the CDR, or a

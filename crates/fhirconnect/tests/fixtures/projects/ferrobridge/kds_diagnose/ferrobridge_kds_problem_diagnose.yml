@@ -17,6 +17,10 @@
 #            its codingSystem manual stamped the ICD-10-GM system on every
 #            diagnosis (#379); an openehrCondition on the stored terminology
 #            gates the other direction the same way.
+#   84-93    the codeIcd10Diagnosesicherheit method has the same one-sided
+#            gate, so out of openEHR its extensionUrl manual wrote an
+#            extension with a url and no value, which FHIR R4 ext-1 forbids
+#            (#629); an openehrCondition runs it only when at0073 holds one.
 #   100      `"extensionValue"#TODO` puts a `#` against a token, which YAML
 #            1.2.2 section 6.6 does not admit as a comment (#101); the
 #            comment is dropped, and the method is renamed extensionValueText
@@ -124,6 +128,10 @@ mappings:
                   targetAttribute: "url"
                   operator: "one of"
                   criteria: "http://fhir.de/StructureDefinition/icd-10-gm-diagnosesicherheit"
+                openehrCondition:
+                  targetRoot: "$openehrRoot"
+                  targetAttribute: "data[at0001]/items[at0073]"
+                  operator: "not empty"
                 followedBy:
                   mappings:
                     - name: "extensionValue"
