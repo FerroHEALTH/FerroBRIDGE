@@ -354,8 +354,10 @@ fn entries_at(composition: &CanonicalComposition, archetype: &str) -> Vec<Entry>
         .collect()
 }
 
-/// Returns the archetype the start model mapping of `program` declares.
-fn archetype_of(program: &Program) -> Option<String> {
+/// Returns the archetype the start model mapping of `program` declares, the
+/// archetype of every entry [`entries_of`] reads.
+#[must_use]
+pub fn archetype_of(program: &Program) -> Option<String> {
     program
         .models()
         .iter()

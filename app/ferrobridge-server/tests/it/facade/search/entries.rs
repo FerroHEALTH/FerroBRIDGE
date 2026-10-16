@@ -20,13 +20,17 @@ use super::super::VERSION_ONE;
 use super::super::condition;
 use super::super::stub::mount_read;
 use super::AQL;
+use super::DIAGNOSIS;
 use super::OTHER_CONTAINER;
+use super::counts;
 use super::diagnosis;
 use super::get;
 use super::link;
 use super::matches;
+use super::mount_count;
 use super::mount_rows;
 use super::node_row;
+use super::queries;
 use super::result_set;
 use super::row;
 use super::searching;
@@ -257,6 +261,7 @@ async fn paging_a_search_binding_no_node_answers_each_entry_once() -> Result<(),
     let harness = searching().await;
     let (composition, _, _) = two_diagnoses(&harness);
     mount_rows(&harness.cdr, &[row(VERSION_ONE, &composition)]).await;
+    mount_count(&harness.cdr, std::slice::from_ref(&composition)).await;
     let (status, page_one) =
         get(&harness, "Condition?patient=p-1&_count=1&_total=accurate").await?;
     assert_eq!(StatusCode::OK, status, "{page_one}");
@@ -302,14 +307,69 @@ async fn paging_a_search_binding_no_node_answers_each_entry_once() -> Result<(),
 async fn a_count_of_a_search_binding_no_node_counts_entries() -> Result<(), Box<dyn StdError>> {
     // R4 search.html §3.1.1.5.3: _count=0 reports in Bundle.total the number
     // of resources that match, here three entries in two compositions.
+    // The count is one AQL query over the entry and reads no composition (#661).
     let harness = searching().await;
     let (two, _, _) = two_diagnoses(&harness);
     let one = harness.composition();
     let second = second_version();
     mount_rows(&harness.cdr, &[row(VERSION_ONE, &two), row(&second, &one)]).await;
+    mount_count(&harness.cdr, &[two, one]).await;
     let (status, body) = get(&harness, "Condition?patient=p-1&_count=0").await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     assert_eq!(Some(3), body["total"].as_u64(), "{body}");
     assert!(matches(&body).is_empty(), "{body}");
+    let sent = queries(&harness).await;
+    assert_eq!(1, sent.len(), "one count query and no row read: {sent:?}");
+    let text = counts(&sent)
+        .first()
+        .copied()
+        .ok_or("the count query ran")?;
+    assert!(
+        text.contains(&format!("CONTAINS EVALUATION x[{DIAGNOSIS}] WHERE")),
+        "{text}"
+    );
+    assert!(!text.contains("AS composition"), "{text}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_accurate_total_is_one_count_query_for_one_and_two_entry_compositions()
+-> Result<(), Box<dyn StdError>> {
+    // R4 search.html §3.1.1.5.2: _total=accurate asks for the exact number;
+    // a page that leaves a next page gets it from one count query (#661).
+    for (two_entries, one_entry, expected) in [(0_usize, 2_usize, 2_u64), (2, 0, 4), (1, 1, 3)] {
+        let harness = searching().await;
+        let (two, _, _) = two_diagnoses(&harness);
+        let one = harness.composition();
+        let held: Vec<serde_json::Value> = std::iter::repeat_n(two, two_entries)
+            .chain(std::iter::repeat_n(one, one_entry))
+            .collect();
+        let rows: Vec<serde_json::Value> = held
+            .iter()
+            .enumerate()
+            .map(|(place, composition)| {
+                let version = if place == 0 {
+                    String::from(VERSION_ONE)
+                } else {
+                    second_version()
+                };
+                row(&version, composition)
+            })
+            .collect();
+        mount_rows(&harness.cdr, &rows).await;
+        mount_count(&harness.cdr, &held).await;
+        let (status, body) =
+            get(&harness, "Condition?patient=p-1&_count=1&_total=accurate").await?;
+        assert_eq!(StatusCode::OK, status, "{body}");
+        assert_eq!(1, matches(&body).len(), "{body}");
+        assert_eq!(Some(expected), body["total"].as_u64(), "{body}");
+        let sent = queries(&harness).await;
+        assert_eq!(1, counts(&sent).len(), "{sent:?}");
+        assert_eq!(
+            1,
+            sent.len().saturating_sub(counts(&sent).len()),
+            "the page is the only row read: {sent:?}"
+        );
+    }
     Ok(())
 }

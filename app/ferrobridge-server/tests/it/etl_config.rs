@@ -278,3 +278,97 @@ fn an_unknown_deletion_policy_refuses_to_boot() -> Result<(), Box<dyn StdError>>
     }
     Ok(())
 }
+
+/// Returns `ETL` with `table` under `[etl.vocabulary_aliases]`.
+fn with_aliases(table: &str) -> String {
+    format!("{ETL}[etl.vocabulary_aliases]\n{table}\n")
+}
+
+#[test]
+fn the_default_aliases_read_the_terminologies_the_laboratory_compositions_name()
+-> Result<(), Box<dyn StdError>> {
+    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
+    let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
+    assert_eq!("LOINC", etl.aliases.vocabulary_of("LOINC"));
+    assert_eq!("SNOMED", etl.aliases.vocabulary_of("SNOMED-CT"));
+    assert_eq!("FB-SOURCE", etl.aliases.vocabulary_of("FB-SOURCE"));
+    Ok(())
+}
+
+#[test]
+fn a_table_of_aliases_resolves_over_the_defaults() -> Result<(), Box<dyn StdError>> {
+    let text = with_aliases(
+        "\"http://terminology.hl7.org/CodeSystem/v2-0001\" = \"Gender\"\n\
+         \"urn:oid:2.16.840.1.113883.6.1\" = \"LOINC\"\n\
+         \"SNOMED-CT\" = \"FB-SNOMED\"",
+    );
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let aliases = &settings
+        .etl
+        .as_ref()
+        .ok_or("the ETL is configured")?
+        .aliases;
+    assert_eq!(
+        "Gender",
+        aliases.vocabulary_of("http://terminology.hl7.org/CodeSystem/v2-0001")
+    );
+    assert_eq!(
+        "LOINC",
+        aliases.vocabulary_of("urn:oid:2.16.840.1.113883.6.1")
+    );
+    assert_eq!("FB-SNOMED", aliases.vocabulary_of("SNOMED-CT"));
+    assert_eq!("LOINC", aliases.vocabulary_of("LOINC"), "a default stays");
+    Ok(())
+}
+
+#[test]
+fn an_alias_with_an_empty_terminology_id_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    let error = refusal(&with_aliases("\"\" = \"Gender\""))?;
+    match &error {
+        Error::AliasTerminology { key } => assert_eq!("etl.vocabulary_aliases", key),
+        other => return Err(format!("expected an alias refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn an_alias_with_an_empty_vocabulary_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    let error = refusal(&with_aliases("\"urn:oid:2.16.840.1.113883.6.1\" = \"\""))?;
+    match &error {
+        Error::Missing { key } => {
+            assert_eq!(
+                "etl.vocabulary_aliases.\"urn:oid:2.16.840.1.113883.6.1\"",
+                key
+            );
+        }
+        other => return Err(format!("expected a missing vocabulary, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn an_alias_to_a_vocabulary_wider_than_the_cdm_column_refuses_to_boot()
+-> Result<(), Box<dyn StdError>> {
+    // OMOP CDM v5.4 `VOCABULARY.vocabulary_id` is `varchar(20)`.
+    let error = refusal(&with_aliases("\"LOCAL\" = \"A-VOCABULARY-OF-21-CH\""))?;
+    match &error {
+        Error::AliasVocabulary { key, value, .. } => {
+            assert_eq!("etl.vocabulary_aliases.\"LOCAL\"", key);
+            assert_eq!("A-VOCABULARY-OF-21-CH", value);
+        }
+        other => return Err(format!("expected an alias refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn an_alias_that_is_no_string_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    let error = Config::from_sources(Some(&with_aliases("\"LOCAL\" = 7")), &BTreeMap::new())
+        .err()
+        .ok_or("an alias of 7 resolved")?;
+    let Error::Parse { source } = &error else {
+        return Err(format!("expected a parse error, got {error:?}").into());
+    };
+    assert!(source.to_string().contains("LOCAL"), "{source}");
+    Ok(())
+}

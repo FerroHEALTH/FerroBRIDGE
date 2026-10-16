@@ -20,11 +20,11 @@ use super::super::VERSION_ONE;
 use super::AQL;
 use super::OTHER_CONTAINER;
 use super::bound;
+use super::counts;
 use super::diagnosis;
 use super::get;
 use super::link;
 use super::matches;
-use super::mount_count;
 use super::mount_rows;
 use super::node_row;
 use super::queries;
@@ -133,11 +133,14 @@ async fn paging_and_the_total_count_compositions_and_never_nodes() -> Result<(),
             .mount(&harness.cdr)
             .await;
     }
-    mount_count(&harness.cdr, 2).await;
     let (status, first) = get(&harness, "Condition?code=SYN-001&_count=1&_total=accurate").await?;
     assert_eq!(StatusCode::OK, status, "{first}");
     assert_eq!(1, matches(&first).len(), "{first}");
     assert_eq!(Some(2), first["total"].as_u64(), "{first}");
+    assert!(
+        counts(&queries(&harness).await).is_empty(),
+        "a node search counts its matches from the rows"
+    );
     let next = link(&first, "next").ok_or("a second composition is left")?;
     assert!(
         next.contains("_cursor=0.2."),

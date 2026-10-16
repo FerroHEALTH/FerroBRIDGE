@@ -4,6 +4,7 @@
 //! The resolution of each lane of the tree into the settings the run path
 //! holds.
 
+use omocl::engine::concept::VocabularyAliases;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
@@ -374,6 +375,37 @@ fn query_of(
     })
 }
 
+/// Returns the engine's vocabulary aliases with every alias `aliases` names
+/// added over them, refusing an empty terminology id, an empty vocabulary and
+/// a vocabulary wider than OMOP CDM v5.4 `VOCABULARY.vocabulary_id`.
+///
+/// No specification governs this table: our own design. An alias only names
+/// the `vocabulary_id` a terminology id is looked up under; the concept is
+/// still found by SQL over the loaded vocabulary.
+fn resolve_aliases(aliases: &BTreeMap<String, String>) -> Result<VocabularyAliases, Error> {
+    let mut table = VocabularyAliases::default();
+    for (terminology, vocabulary) in aliases {
+        if terminology.is_empty() {
+            return Err(Error::AliasTerminology {
+                key: String::from("etl.vocabulary_aliases"),
+            });
+        }
+        let key = format!("etl.vocabulary_aliases.\"{terminology}\"");
+        if vocabulary.is_empty() {
+            return Err(Error::Missing { key });
+        }
+        if let Err(source) = omop_cdm::vocabulary::VocabularyId::new(vocabulary.as_str()) {
+            return Err(Error::AliasVocabulary {
+                key,
+                value: vocabulary.clone(),
+                source,
+            });
+        }
+        table = table.with(terminology.as_str(), vocabulary.as_str());
+    }
+    Ok(table)
+}
+
 /// Returns the ETL job `etl` describes, with both queries checked.
 pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
     let compositions = query_of(
@@ -429,6 +461,7 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
         )?,
         visits,
         deletions,
+        aliases: resolve_aliases(&etl.vocabulary_aliases)?,
     })
 }
 
