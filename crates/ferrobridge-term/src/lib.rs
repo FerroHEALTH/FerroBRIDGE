@@ -33,8 +33,8 @@ mod wire;
 
 /// The HL7 FHIR release this crate targets.
 ///
-/// The release is published at <https://hl7.org/fhir/R4/>. R4B is accepted on
-/// the wire as well ([`WireVersion`](config::WireVersion)).
+/// The release is published at <https://hl7.org/fhir/R4/>. STU3 and R4B are
+/// accepted on the wire as well ([`WireVersion`](config::WireVersion)).
 pub const FHIR_VERSION: &str = "R4";
 
 /// `CodeSystem/$lookup`, as the operation is invoked

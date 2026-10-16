@@ -184,7 +184,7 @@ pub enum Error {
         source: url::ParseError,
     },
     /// A FHIR release name is not one this client speaks.
-    #[error("{key} is `{value}`; the releases this client speaks are r4 and r4b")]
+    #[error("{key} is `{value}`; the releases this client speaks are stu3, r4 and r4b")]
     WireVersion {
         /// The key that holds it.
         key: String,

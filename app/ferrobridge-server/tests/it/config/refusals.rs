@@ -92,6 +92,10 @@ fn a_bad_listen_address_a_bad_url_and_a_bad_release_each_name_their_key()
         Error::WireVersion { key, value } => {
             assert_eq!("terminology.wire_version", key);
             assert_eq!("r5", value);
+            assert!(
+                release.to_string().contains("stu3, r4 and r4b"),
+                "the refusal lists every release: {release}"
+            );
         }
         other => return Err(format!("expected a release error, got {other:?}").into()),
     }

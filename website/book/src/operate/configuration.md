@@ -236,7 +236,7 @@ the engines fail closed on anything that would need one.
 | Key | Default | Meaning |
 |---|---|---|
 | `base_url` | none, required | The FHIR service base URL |
-| `wire_version` | `r4` | `r4` or `r4b`, the release the server answers in |
+| `wire_version` | `r4` | `stu3`, `r4` or `r4b`, the release the server answers in |
 | `timeout_ms` | `30000` | How long one call may take, connection included |
 
 ### `[cdm]`
