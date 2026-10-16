@@ -11,14 +11,17 @@
 //! [`ferrobridge_testkit::laws::declared`] compares), and a second create and
 //! read of that answer gives it back unchanged. What a mapping does not reach
 //! is lost, and is counted beside the verdict. An example of a type no
-//! context maps is set aside by type, never failed. The identity, the version
-//! and the subject are the facade's own and leave every comparison. No
-//! specification governs the instrument: our own design.
+//! context maps is set aside by type, never failed. An example the claimed
+//! profile requires the facade to refuse is an expected refusal below, each
+//! with its citation, and passes only on that refusal. The identity, the
+//! version and the subject are the facade's own and leave every comparison.
+//! No specification governs the instrument: our own design.
 
 mod e2e;
 
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
+use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -53,6 +56,68 @@ use super::diagnostics_of;
 use super::handle;
 use super::server_settings;
 use super::stub::mount_ehr;
+
+/// A case whose create the profile it claims requires the facade to refuse.
+#[derive(Debug, Clone, Copy)]
+struct Refusal {
+    /// The case id.
+    id: &'static str,
+    /// What one diagnostic of the refusal names.
+    names: &'static str,
+}
+
+/// The expected refusals: each passes when its create answers `422` with a
+/// diagnostic naming what is refused, and fails on any other answer.
+const REFUSALS: [Refusal; 1] = [
+    // NOTE: FHIRconnect v1.0.0 DV_CODED_TEXT.adoc §CodeableConcept, the code is
+    // KDS_Diagnose's DV_CODED_TEXT, whose defining_code is 1..1 from coding.
+    Refusal {
+        id: "kds_diagnose/Condition-example2.json",
+        names: "defining_code",
+    },
+];
+
+/// Why a round trip stopped.
+#[derive(Debug)]
+enum Stopped {
+    /// The create answered another status than `201`.
+    Create {
+        /// The status the create answered.
+        status: StatusCode,
+        /// The diagnostics of the answer.
+        diagnostics: Vec<String>,
+    },
+    /// Anything else, described.
+    Other(String),
+}
+
+impl fmt::Display for Stopped {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Create {
+                status,
+                diagnostics,
+            } => write!(
+                formatter,
+                "the create answered {status}: {}",
+                diagnostics.join("; ")
+            ),
+            Self::Other(reason) => formatter.write_str(reason),
+        }
+    }
+}
+
+impl From<String> for Stopped {
+    fn from(reason: String) -> Self {
+        Self::Other(reason)
+    }
+}
+
+impl From<&str> for Stopped {
+    fn from(reason: &str) -> Self {
+        Self::Other(reason.to_owned())
+    }
+}
 
 /// A context the examples are run through.
 #[derive(Debug, Clone, Copy)]
@@ -206,7 +271,7 @@ fn claiming(resource: &serde_json::Value, profile: &str) -> serde_json::Value {
 async fn trip(
     compiled: &Compiled,
     resource: &serde_json::Value,
-) -> Result<serde_json::Value, String> {
+) -> Result<serde_json::Value, Stopped> {
     let cdr = MockServer::start().await;
     mount_ehr(&cdr).await;
     let kept = Arc::new(Mutex::new(None));
@@ -242,10 +307,13 @@ async fn trip(
         .await
         .map_err(|error| format!("the create did not answer: {error}"))?;
     if status != StatusCode::CREATED {
-        return Err(format!(
-            "the create answered {status}: {}",
-            diagnostics_of(&created).join("; ")
-        ));
+        return Err(Stopped::Create {
+            status,
+            diagnostics: diagnostics_of(&created)
+                .into_iter()
+                .map(str::to_owned)
+                .collect(),
+        });
     }
     let id = created["id"]
         .as_str()
@@ -260,7 +328,8 @@ async fn trip(
         return Err(format!(
             "the read answered {status}: {}",
             diagnostics_of(&body).join("; ")
-        ));
+        )
+        .into());
     }
     Ok(body)
 }
@@ -297,11 +366,50 @@ fn first(set: &serde_json::Value, list: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// Runs an expected refusal and returns its verdict.
+async fn refused(
+    compiled: &Compiled,
+    id: String,
+    resource: &serde_json::Value,
+    refusal: Refusal,
+) -> Case {
+    match trip(compiled, resource).await {
+        Err(Stopped::Create {
+            status,
+            diagnostics,
+        }) if status == StatusCode::UNPROCESSABLE_ENTITY => {
+            if diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.contains(refusal.names))
+            {
+                Case::pass(id)
+            } else {
+                Case::fail(
+                    id,
+                    format!(
+                        "the expected refusal names no {}: {}",
+                        refusal.names,
+                        diagnostics.join("; ")
+                    ),
+                )
+            }
+        }
+        Err(stopped) => Case::fail(
+            id,
+            format!("an expected refusal stopped otherwise: {stopped}"),
+        ),
+        Ok(_) => Case::fail(id, "an expected refusal was created and read back"),
+    }
+}
+
 /// Runs one example through one context and returns its verdict.
 async fn case(compiled: &Compiled, id: String, resource: &serde_json::Value) -> Case {
+    if let Some(refusal) = REFUSALS.iter().find(|refusal| refusal.id == id) {
+        return refused(compiled, id, resource, *refusal).await;
+    }
     let read = match trip(compiled, resource).await {
         Ok(read) => read,
-        Err(reason) => return Case::fail(id, reason),
+        Err(reason) => return Case::fail(id, reason.to_string()),
     };
     if let Some(reason) = invalid(&read) {
         return Case::fail(id, reason);
@@ -399,6 +507,13 @@ async fn conformance_the_fhir_r4_examples_hold_their_facade_pass_list()
         !cases.is_empty(),
         "no R4 example is of a type a context maps"
     );
+    for refusal in REFUSALS {
+        assert!(
+            cases.iter().any(|case| case.id() == refusal.id),
+            "the expected refusal {} is no case of the corpus",
+            refusal.id
+        );
+    }
     let outcome = record_set_aside(Corpus::FhirR4Facade, &cases, &set_aside)?;
     assert!(
         outcome.regressed.is_empty(),
