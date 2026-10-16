@@ -16,7 +16,10 @@
 //! it answers, so a second create of the same `id` that arrives meanwhile is a
 //! `409` and commits nothing. Update needs the map to know the id, because
 //! this milestone declares `updateCreate: false`, and it checks the CDR's
-//! current `ETag` when the client sends no `If-Match`.
+//! current `ETag` when the client sends no `If-Match`. An update of one
+//! entry's resource commits the composition version it follows with that
+//! entry replaced and every other entry as it stood
+//! ([`Ingest::revise_resource`]).
 //!
 //! The handlers own the HTTP half: the media types, the `templateId` pin,
 //! `If-None-Exist`, `If-Match` and `Prefer`. The map, the EHR resolution, the
@@ -31,6 +34,7 @@ use http::Uri;
 use http::header;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
+use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::auth::Access;
 use crate::auth::compartment;
@@ -41,12 +45,15 @@ use crate::facade::handlers::Refusal;
 use crate::facade::handlers::conditional;
 use crate::facade::handlers::read;
 use crate::facade::handlers::render;
+use crate::facade::identity::FhirResourceId;
+use crate::facade::identity::record::CompositionBinding;
 use crate::facade::identity::record::ConsumedSource;
 use crate::facade::ingest;
 use crate::facade::ingest::Ingest;
 use crate::facade::ingest::Provenance;
 use crate::facade::ingest::Recognised;
 use crate::facade::ingest::Refused;
+use crate::facade::ingest::Revision;
 use crate::facade::ingest::Written;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
@@ -93,7 +100,8 @@ pub(crate) async fn create(
             // NOTE: SMART App Launch 2.x scopes-and-launch-context maps `u` to update, and a
             // create that revises a known resource is an update in effect (our own design).
             compartment::admit_ehr(facade, access, Permission::Update, resource_type, &ehr_id)?;
-            return resend(facade, &ingest, program, &inbound, &known, headers).await;
+            let binding = binding_of(facade, resource_type, &known)?;
+            return resend(facade, &ingest, program, &inbound, &binding, headers).await;
         }
         Recognised::Unknown => {}
     }
@@ -138,14 +146,26 @@ pub(crate) async fn update(
     let inbound = read::parse(body, resource_type)?;
     compartment::admit_inbound(facade, access, Permission::Update, &inbound)?;
     let program = select_program(facade, &inbound, headers)?;
-    let known = ConsumedSource {
-        ehr_id: binding.ehr_id.clone(),
-        versioned_object_uid: binding.versioned_object_uid.clone(),
-        internal_id: String::from(internal.as_str()),
-        context: binding.context.clone(),
-    };
     let ingest = facade.ingest(facade.client_for(headers));
-    resend(facade, &ingest, program, &inbound, &known, headers).await
+    resend(facade, &ingest, program, &inbound, &binding, headers).await
+}
+
+/// Returns the binding of the resource a consumed source produced.
+fn binding_of(
+    facade: &Facade,
+    resource_type: &str,
+    known: &ConsumedSource,
+) -> Result<CompositionBinding, Refusal> {
+    let id = FhirResourceId::new(&known.internal_id).map_err(|error| store_identifier(&error))?;
+    read::binding(facade, resource_type, &id)?.ok_or_else(|| {
+        reply::refusal(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Issue::error(IssueType::Exception).diagnosing(format!(
+                "the identity map consumed a source as {resource_type}/{} and binds that id to no entry",
+                id.as_str()
+            )),
+        )
+    })
 }
 
 /// Runs the update path of a resource the identity map already placed.
@@ -154,20 +174,24 @@ async fn resend(
     ingest: &Ingest<'_>,
     program: &Loaded,
     inbound: &Inbound,
-    known: &ConsumedSource,
+    binding: &CompositionBinding,
     headers: &HeaderMap,
 ) -> Result<axum::response::Response, Refusal> {
-    let ehr_id = EhrId::new(&known.ehr_id).map_err(|error| store_identifier(&error))?;
-    let container =
-        HierObjectId::new(&known.versioned_object_uid).map_err(|error| store_identifier(&error))?;
-    let preceding = precondition(ingest.client(), headers, &ehr_id, &container).await?;
+    let ehr_id = EhrId::new(&binding.ehr_id).map_err(|error| store_identifier(&error))?;
+    let container = HierObjectId::new(&binding.versioned_object_uid)
+        .map_err(|error| store_identifier(&error))?;
+    let (preceding, standing) = precondition(ingest.client(), headers, &ehr_id, &container).await?;
     let written = ingest
         .revise_resource(
             inbound,
             program,
-            &ehr_id,
-            &container,
-            &preceding,
+            &Revision {
+                ehr_id: &ehr_id,
+                container: &container,
+                preceding: &preceding,
+                standing: &standing,
+                entry_path: &binding.entry_path,
+            },
             &Provenance::EachResource,
         )
         .await?;
@@ -229,27 +253,34 @@ fn answer(
     }
 }
 
-/// Returns the version a write must follow, from `If-Match` or from the CDR.
+/// Returns the version a write must follow, from `If-Match` or from the CDR,
+/// with the composition the CDR holds as that version.
 ///
 /// A missing `If-Match` checks the CDR's current `ETag` (no specification
 /// governs this: our own design): the facade reads the latest version and uses
-/// it, so a concurrent writer still produces the `412` the CDR answers.
+/// it, so a concurrent writer still produces the `412` the CDR answers. The
+/// composition is what the update replaces one entry of.
 async fn precondition(
     client: &CdrClient,
     headers: &HeaderMap,
     ehr_id: &EhrId,
     container: &HierObjectId,
-) -> Result<ObjectVersionId, Refusal> {
-    if let Some(value) = headers.get(header::IF_MATCH) {
-        let text = value.to_str().map_err(|_unreadable| {
-            reply::refusal(
-                StatusCode::BAD_REQUEST,
-                Issue::error(IssueType::Invalid).diagnosing("the If-Match header is not text"),
-            )
-        })?;
-        return read::version_of_etag(client, ehr_id, container, text).await;
-    }
-    read::latest_version(client, ehr_id, container).await
+) -> Result<(ObjectVersionId, Composition), Refusal> {
+    let Some(value) = headers.get(header::IF_MATCH) else {
+        return read::latest(client, ehr_id, container).await;
+    };
+    let text = value.to_str().map_err(|_unreadable| {
+        reply::refusal(
+            StatusCode::BAD_REQUEST,
+            Issue::error(IssueType::Invalid).diagnosing("the If-Match header is not text"),
+        )
+    })?;
+    let (version, held) = read::version_of_etag(client, ehr_id, container, text).await?;
+    let composition = match held {
+        Some(composition) => composition,
+        None => read::followed_version(client, ehr_id, &version).await?,
+    };
+    Ok((version, composition))
 }
 
 /// Selects the program one inbound resource runs.

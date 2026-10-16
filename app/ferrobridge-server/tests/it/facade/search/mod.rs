@@ -6,6 +6,7 @@
 
 mod correlation;
 mod entries;
+mod entry_update;
 mod load;
 mod paging;
 mod parameters;
