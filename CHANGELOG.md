@@ -399,6 +399,12 @@ crates on crates.io.
 
 ### Fixed
 
+- A CDR credential the token endpoint will not issue answers the FHIR caller
+  `502` (#518). When the OAuth 2.0 client credentials fetch fails, because the
+  token endpoint is unreachable or refuses the bridge's own credentials, the
+  facade answers `502 Bad Gateway` with the token endpoint's status and OAuth
+  error in the `OperationOutcome` diagnostics, never the client secret. It
+  used to answer `500`.
 - A request under `/fhir` over the body ceiling or past the request timeout
   answers an `OperationOutcome` (#548). The ceiling answers `413` with the
   `too-long` issue and the timeout answers `504 Gateway Timeout` with the

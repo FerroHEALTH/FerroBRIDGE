@@ -387,6 +387,7 @@ both sides, and one wire test asserts each row.
 | `400` on a search query | `500`: the bridge wrote the AQL the CDR refused |
 | `408` on a search query | `502` carrying the upstream status |
 | no answer: a connect failure or a timeout | `502` |
+| no call: the token endpoint for the CDR credential fails or refuses | `502` naming the token endpoint's refusal, never the secret |
 
 Two answers come from the server itself, before or around the handler, and
 under `/fhir` both are an `OperationOutcome`: a body over
