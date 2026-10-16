@@ -20,6 +20,17 @@ another value (`PutGet`), and a second create and read of that answer gives it
 back unchanged. The identity, `meta` and the subject are the facade's own and
 leave every comparison.
 
+Every example is created with the context's profile claimed. Where that
+profile requires the facade to refuse the example, the case is an expected
+refusal: the harness names it in `REFUSALS` beside the citation that requires
+the refusal, and the case passes only when the create answers `422` with a
+diagnostic naming what is refused. Any other answer for it, a `201` included,
+fails it. The one expected refusal is `kds_diagnose/Condition-example2.json`:
+its `code` carries `text` and no `coding`, and the KDS diagnosis context maps
+`code` to a `DV_CODED_TEXT` whose `defining_code` is 1..1 from `coding`
+(FHIRconnect v1.0.0, DV_CODED_TEXT, §CodeableConcept), so the create answers
+`422` naming the `defining_code`.
+
 The list is written by
 `facade::examples::conformance_the_fhir_r4_examples_hold_their_facade_pass_list`
 in `app/ferrobridge-server/tests/it/facade/examples/mod.rs`, under
