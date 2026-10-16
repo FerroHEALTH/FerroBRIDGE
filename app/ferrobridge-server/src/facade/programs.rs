@@ -247,10 +247,12 @@ impl Programs {
 /// Returns [`LoadError::Directory`] when the directory cannot be listed.
 pub fn mapping_files(directory: &Path) -> Result<Vec<PathBuf>, LoadError> {
     crate::walk::files(directory, |path| {
-        path.extension()
-            .and_then(std::ffi::OsStr::to_str)
-            .map(str::to_ascii_lowercase)
-            .is_some_and(|found| MAPPING_EXTENSIONS.contains(&found.as_str()))
+        !crate::facade::search::declaration::is_declaration(path)
+            && path
+                .extension()
+                .and_then(std::ffi::OsStr::to_str)
+                .map(str::to_ascii_lowercase)
+                .is_some_and(|found| MAPPING_EXTENSIONS.contains(&found.as_str()))
     })
     .map_err(|crate::walk::Error { path, source }| LoadError::Directory { path, source })
 }

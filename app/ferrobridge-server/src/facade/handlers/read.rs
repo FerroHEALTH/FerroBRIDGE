@@ -247,7 +247,7 @@ pub(crate) async fn fetch(
 }
 
 /// Returns the canonical form of one composition the CDR served.
-fn canonical(
+pub(crate) fn canonical(
     facade: &Facade,
     composition: &Composition,
     template_id: &str,

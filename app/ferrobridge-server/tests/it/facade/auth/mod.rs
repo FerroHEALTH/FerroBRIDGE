@@ -10,7 +10,9 @@
 mod audit;
 mod compartment;
 mod discovery;
+mod routes;
 mod scope;
+mod search;
 mod token;
 
 use std::sync::Arc;
