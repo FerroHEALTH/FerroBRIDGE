@@ -220,75 +220,65 @@ impl<'i> Walk<'_, '_, 'i> {
     ) {
         let key = constraint.key.value.as_deref().unwrap_or_default();
         let source = source(constraint, structure);
+        // NOTE: no specification governs this: our own design; a constraint a snapshot repeats
+        // from its base, or two definitions in play share, is evaluated once per occurrence.
         if !self.first_invariant(subject.location, key, source) {
             return;
         }
-        let id = element
-            .id
-            .as_deref()
-            .or(element.path.value.as_deref())
-            .unwrap_or_default();
+        match self.answer(constraint, structure, subject) {
+            Ok(true) => {}
+            Ok(false) => {
+                let issue = self.failure(constraint, source, subject.location);
+                self.out().push(issue);
+            }
+            Err(reason) => {
+                let id = element
+                    .id
+                    .as_deref()
+                    .or(element.path.value.as_deref())
+                    .unwrap_or_default();
+                self.out().unevaluated(
+                    structure.url(),
+                    id,
+                    listed(constraint),
+                    subject.location,
+                    reason,
+                );
+            }
+        }
+    }
+
+    /// Answers `constraint` on `subject`: the Boolean its expression
+    /// evaluates to, or why it was not evaluated.
+    fn answer(
+        &self,
+        constraint: &ElementDefinitionConstraint,
+        structure: &Structure,
+        subject: &Subject<'_, 'i>,
+    ) -> Result<bool, Reason> {
+        let key = constraint.key.value.as_deref().unwrap_or_default();
         let refuse = |stage, error| Reason::InvariantRefused {
             stage,
             error,
-            upstream: upstream(source, key),
+            upstream: upstream(source(constraint, structure), key),
         };
-        let Some(text) = constraint
+        let text = constraint
             .expression
             .as_ref()
             .and_then(|expression| expression.value.as_deref())
-        else {
-            self.out().unevaluated(
-                structure.url(),
-                id,
-                listed(constraint),
-                subject.location,
-                Reason::NoExpression,
-            );
-            return;
-        };
-        let expression = match self.validator().expression(text) {
-            Ok(expression) => expression,
-            Err(error) => {
-                let reason = refuse(InvariantStage::Parse, error);
-                self.out().unevaluated(
-                    structure.url(),
-                    id,
-                    listed(constraint),
-                    subject.location,
-                    reason,
-                );
-                return;
-            }
-        };
-        if let Err(error) = self.validator().check(&expression, subject.type_name) {
-            let reason = refuse(InvariantStage::Check, error);
-            self.out().unevaluated(
-                structure.url(),
-                id,
-                listed(constraint),
-                subject.location,
-                reason,
-            );
-            return;
-        }
-        match self.evaluate(&expression, structure, subject) {
-            Ok(Some(true)) => {}
-            Ok(answer) => {
-                let issue = self.failure(constraint, source, subject.location, answer.is_none());
-                self.out().push(issue);
-            }
-            Err(error) => {
-                let reason = refuse(InvariantStage::Evaluate, error);
-                self.out().unevaluated(
-                    structure.url(),
-                    id,
-                    listed(constraint),
-                    subject.location,
-                    reason,
-                );
-            }
-        }
+            .ok_or(Reason::NoExpression)?;
+        let expression = self
+            .validator()
+            .expression(text)
+            .map_err(|error| refuse(InvariantStage::Parse, error))?;
+        self.validator()
+            .check(&expression, subject.type_name)
+            .map_err(|error| refuse(InvariantStage::Check, error))?;
+        // NOTE: conformance-rules.html §2.1.0.6 asks for "true" and N1 §6.2 and §6.5 carry empty
+        // as the unknown of three-valued logic, so an empty answer neither meets nor breaks it.
+        self.evaluate(&expression, structure, subject)
+            .map_err(|error| refuse(InvariantStage::Evaluate, error))?
+            .ok_or(Reason::InvariantEmpty)
     }
 
     /// Evaluates `expression` on `subject` as a Boolean (N1 §4.5): `None`
@@ -301,6 +291,8 @@ impl<'i> Walk<'_, '_, 'i> {
     ) -> Result<Option<bool>, String> {
         let scope = self.scope();
         let resource = scope.last().copied();
+        // NOTE: fhirpath.html §2.9.1.4: %rootResource is the container of a contained %resource
+        // and %resource itself otherwise, so a Bundle entry is its own root.
         let root = container(scope);
         let Some(anchor) = subject.value.or(subject.element) else {
             return Err("the occurrence carries nothing to evaluate on".to_owned());
@@ -330,7 +322,6 @@ impl<'i> Walk<'_, '_, 'i> {
         constraint: &ElementDefinitionConstraint,
         source: &str,
         location: &str,
-        empty: bool,
     ) -> Issue {
         let key = constraint.key.value.clone().unwrap_or_default();
         let severity = if best_practice(constraint) {
@@ -344,13 +335,7 @@ impl<'i> Walk<'_, '_, 'i> {
             Severity::Error
         };
         let human = constraint.human.value.as_deref().unwrap_or_default();
-        // NOTE: conformance-rules.html §2.1.0.6: the expression "must evaluate to true", so an
-        // empty result fails it as false does, the reading the HL7 FHIR Validator also takes.
-        let message = if empty {
-            format!("{key}: {human} (the expression answered empty)")
-        } else {
-            format!("{key}: {human}")
-        };
+        let message = format!("{key}: {human}");
         Issue {
             severity,
             code: IssueType::Invariant,

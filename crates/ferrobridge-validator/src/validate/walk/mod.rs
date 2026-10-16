@@ -573,17 +573,19 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
     }
 }
 
-/// The FHIR type an occurrence is evaluated as: the type a resource names
-/// for itself, the element path of a backbone element, or the type `code`.
+/// The FHIR type an occurrence is evaluated as: the type a resource in a
+/// resource-typed element names for itself, the element path of a backbone
+/// element, or the type `code`.
 fn occurrence_type(value: Option<&Value>, code: Option<&str>) -> Option<String> {
+    let code = code?;
     let named = value
+        .filter(|_| SCHEMAS.specializes(code, "Resource"))
         .and_then(|value| value.get("resourceType"))
         .and_then(Value::as_str)
         .filter(|name| SCHEMAS.is_resource(name));
     if let Some(name) = named {
         return Some(name.to_owned());
     }
-    let code = code?;
     Some(
         SCHEMAS
             .type_named(code)

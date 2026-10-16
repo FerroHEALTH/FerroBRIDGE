@@ -125,6 +125,9 @@ pub enum Reason {
     DefaultSliceNotClosed,
     /// The constraint carries no FHIRPath expression to evaluate.
     NoExpression,
+    /// The invariant's expression evaluated to an empty collection, which is
+    /// neither the `true` the rule asks for nor `false`.
+    InvariantEmpty,
     /// The invariant's expression could not be used or did not evaluate.
     InvariantRefused {
         /// Where it stopped.
@@ -221,6 +224,9 @@ impl fmt::Display for Reason {
                 "the @default slice is not used, because the slicing rules are not closed",
             ),
             Self::NoExpression => f.write_str("the constraint carries no FHIRPath expression"),
+            Self::InvariantEmpty => f.write_str(
+                "the expression answered empty, so the rule is neither met nor broken",
+            ),
             Self::InvariantRefused {
                 stage,
                 error,

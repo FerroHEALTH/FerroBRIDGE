@@ -79,6 +79,8 @@ impl seam::Resolver for References<'_, '_, '_, '_> {
         _context: ResolveContext<'_>,
     ) -> Result<Option<Value>, SeamError> {
         let mut found = self.validator.resolver().resolve(reference, self.scope);
+        // NOTE: no specification governs this: our own design; on the Bundle element no entry
+        // holds the reference, so only an absolute one resolves, against the entries' fullUrls.
         if matches!(found, Resolution::OutOfScope)
             && let Some(&innermost) = self.scope.last()
             && innermost.get("resourceType").and_then(Value::as_str) == Some("Bundle")
@@ -87,8 +89,8 @@ impl seam::Resolver for References<'_, '_, '_, '_> {
         }
         match found {
             Resolution::Found { target, .. } => Ok(Some(target.clone())),
-            // NOTE: fhirpath.html §2.9.1.5: "If resolution fails, the reference is dropped from
-            // the output", for a reference into the resources searched that names none of them.
+            // NOTE: fhirpath.html §2.9.1.5: an item that "does not resolve to a resource" is
+            // ignored, for a reference into the resources searched that names none of them.
             Resolution::Missing => Ok(None),
             Resolution::OutOfScope => {
                 Err(Box::new(Unanswered::Reason(Reason::ReferenceOutOfScope)))

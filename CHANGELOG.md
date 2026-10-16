@@ -42,6 +42,26 @@ crates on crates.io.
   The `CapabilityStatement` carries `rest.security` with the SMART service
   and the `oauth-uris` extension. With `[auth]` off the facade stays open,
   and the server warns at start-up.
+- The R4 profile validator evaluates every invariant on every element in
+  play, the core definitions' and each profile's, with `ferrobridge-fhirpath`
+  on each occurrence of its element (#439). The focus is the element,
+  `%resource` the resource holding it and `%rootResource` its container when
+  it is contained. A failed invariant is an issue of type `invariant` under
+  its key and declaring canonical with the constraint's own severity; a
+  best-practice one (`elementdefinition-bestpractice`) is a warning unless
+  `Validator::with_best_practice(BestPractice::Error)` asks for errors. An
+  empty result neither meets nor breaks the rule, which asks for "true"
+  (conformance-rules.html §2.1.0.6), and is listed (`Reason::InvariantEmpty`). `resolve()` reaches contained resources
+  and Bundle entries, `memberOf()` reads the value sets of the package set
+  and `conformsTo()` validates against a profile of it. An invariant whose
+  expression does not parse, does not fit its element's type or does not
+  evaluate, including a call the run cannot answer, is listed as unevaluated
+  with the error (`Reason::InvariantRefused` and `Reason::NoExpression`
+  replace `Reason::Invariants`), and the published defects of
+  `cid-0`, `inv-1` and `dom-3` name their upstream report. A constraint the
+  snapshot repeats from the core is evaluated once per occurrence.
+  `ferrobridge-fhirpath` adds `Focus::within` to name the resources
+  `%resource` and `%rootResource` stand for.
 - `fhir-types` 0.1.111 names each type's base type in the element table
   (`TypeSchema::base`, from `StructureDefinition.baseDefinition`, and for a
   backbone element the `BackboneElement` or `Element` its element names), in
