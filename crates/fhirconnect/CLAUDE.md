@@ -36,7 +36,9 @@ through: `where()`, `first()`, `last()`, an index filter and `resolve()` all
 make the whole expression read-only, and a write through one is a typed
 refusal naming the offending step. `extension(url)` stays writable, because the
 url is the identity of the extension and so names one element to create
-(<https://hl7.org/fhir/R4/extensibility.html>).
+(<https://hl7.org/fhir/R4/extensibility.html>). `value` on a primitive names the
+primitive itself (R4 defines `code.value` and its kin), so it adds no move and
+nothing lies below it.
 
 The point is a defect the retired CDR connector had: it let filtering paths
 through and its reverse direction then wrote nothing, silently.
@@ -133,7 +135,9 @@ engine writes them as the `_feeder_audit`, `_link:i` and
 `ENTRY.other_participations` and `EVENT_CONTEXT.participations`
 (`_participation:i` under `context`), the same `PARTICIPATION` list.
 `ENTRY.provider` is a tail of the entry node whose value the cell writes as
-the `_provider` family (`rm::Carried::Family`, `family::provider`). These
+the `_provider` family (`rm::Carried::Family`, `family::provider`), and
+`EVENT_CONTEXT.health_care_facility` the `_health_care_facility` family of
+the `context` node the same way. These
 families are the one place the engine still spells FLAT keys, because the
 builder takes no `|raw` on a `_`-prefixed family (the `TODO(#241)` in
 `engine::family`). Reading them back decodes typed `LINK` and

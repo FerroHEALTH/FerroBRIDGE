@@ -264,7 +264,7 @@ async fn send(app: Router, request: Request<Body>) -> Result<Answered, Box<dyn S
 }
 
 /// Returns the application under test.
-fn app(facade: &Arc<Facade>) -> Router {
+pub(crate) fn app(facade: &Arc<Facade>) -> Router {
     let state = AppState::with_health(Registry::default()).with_facade(Arc::clone(facade));
     ferrobridge_server::router(
         Arc::new(state),
@@ -308,10 +308,15 @@ fn post_condition() -> Result<Request<Body>, Box<dyn StdError>> {
 
 /// Uploads the published `KDS_Diagnose` template through the CDR's own route.
 pub(crate) async fn upload_kds_template(base_url: &str) -> Result<(), Box<dyn StdError>> {
+    upload_published(base_url, fixtures::KDS_DIAGNOSE_OPT).await
+}
+
+/// Uploads one published operational template through the CDR's own route.
+pub(crate) async fn upload_published(base_url: &str, opt: &str) -> Result<(), Box<dyn StdError>> {
     let response = reqwest::Client::new()
         .post(format!("{base_url}/definition/template/adl1.4"))
         .header(header::CONTENT_TYPE, "application/xml")
-        .body(fixtures::KDS_DIAGNOSE_OPT)
+        .body(String::from(opt))
         .send()
         .await?;
     assert_eq!(
@@ -648,7 +653,7 @@ async fn a_transaction_commits_once_and_reads_each_entry_back_from_a_real_cdr()
 }
 
 /// Sends `request` through `app` and reads the status and the body.
-async fn call(
+pub(crate) async fn call(
     app: Router,
     request: Request<Body>,
 ) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {

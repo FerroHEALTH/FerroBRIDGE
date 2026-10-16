@@ -16,6 +16,7 @@ use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::outcome::chain;
 use crate::facade::request::Inbound;
+use crate::facade::request::person_by_identifier;
 
 use super::Ingest;
 use super::Mapped;
@@ -51,20 +52,7 @@ fn local_subject(
         return None;
     }
     let target = locals.get(reference.get("reference")?.as_str()?)?;
-    // NOTE: no specification governs this: our own design; the first identifier
-    // in document order keys the person, as PID-3's first repetition does.
-    let identifier = target
-        .get("identifier")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .find(|identifier| identifier.get("value").and_then(Value::as_str).is_some())?;
-    let value = identifier.get("value").and_then(Value::as_str)?;
-    let system = identifier
-        .get("system")
-        .and_then(Value::as_str)
-        .unwrap_or(namespace);
-    Some(PersonId::new(system, value))
+    person_by_identifier(target, namespace)
 }
 
 /// Returns the refusal of a Bundle no entry of which mapped, naming every

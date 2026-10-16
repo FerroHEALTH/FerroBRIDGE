@@ -19,6 +19,8 @@ use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::period::Period;
+use fhir_types::r4::primitives::Boolean;
+use fhir_types::r4::primitives::Date;
 use fhir_types::r4::primitives::DateTime;
 use fhir_types::r4::primitives::String as FhirString;
 use fhir_types::r4::quantity::Quantity;
@@ -37,8 +39,12 @@ use crate::tree::element::Location;
 pub enum FhirKind {
     /// A `string`, and every other primitive that travels as text.
     String,
+    /// A `date`.
+    Date,
     /// A `dateTime`.
     DateTime,
+    /// A `boolean`.
+    Boolean,
     /// A `Coding`.
     Coding,
     /// A `CodeableConcept`.
@@ -80,7 +86,9 @@ impl FhirKind {
     pub fn of_code(code: &str) -> Option<Self> {
         match code {
             "string" => Some(Self::String),
+            "date" => Some(Self::Date),
             "dateTime" => Some(Self::DateTime),
+            "boolean" => Some(Self::Boolean),
             "Coding" => Some(Self::Coding),
             "CodeableConcept" => Some(Self::CodeableConcept),
             "Period" => Some(Self::Period),
@@ -122,7 +130,9 @@ impl FhirKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::String => "string",
+            Self::Date => "date",
             Self::DateTime => "dateTime",
+            Self::Boolean => "boolean",
             Self::Coding => "Coding",
             Self::CodeableConcept => "CodeableConcept",
             Self::Period => "Period",
@@ -138,8 +148,12 @@ impl FhirKind {
 pub enum FhirValue {
     /// A `string`.
     String(FhirString),
+    /// A `date`.
+    Date(Date),
     /// A `dateTime`.
     DateTime(DateTime),
+    /// A `boolean`.
+    Boolean(Boolean),
     /// A `Coding`.
     Coding(Box<Coding>),
     /// A `CodeableConcept`.
@@ -193,7 +207,9 @@ impl FhirValue {
     pub const fn kind(&self) -> FhirKind {
         match *self {
             Self::String(_) => FhirKind::String,
+            Self::Date(_) => FhirKind::Date,
             Self::DateTime(_) => FhirKind::DateTime,
+            Self::Boolean(_) => FhirKind::Boolean,
             Self::Coding(_) => FhirKind::Coding,
             Self::CodeableConcept(_) => FhirKind::CodeableConcept,
             Self::Period(_) => FhirKind::Period,
@@ -220,8 +236,14 @@ impl FhirValue {
             FhirKind::String => FhirString::from_json_parts(Some(value), None, &mut path)
                 .map(Self::String)
                 .map_err(refuse),
+            FhirKind::Date => Date::from_json_parts(Some(value), None, &mut path)
+                .map(Self::Date)
+                .map_err(refuse),
             FhirKind::DateTime => DateTime::from_json_parts(Some(value), None, &mut path)
                 .map(Self::DateTime)
+                .map_err(refuse),
+            FhirKind::Boolean => Boolean::from_json_parts(Some(value), None, &mut path)
+                .map(Self::Boolean)
                 .map_err(refuse),
             FhirKind::Coding => object(value, element, kind)
                 .and_then(|object| Coding::from_json(object, &mut path).map_err(refuse))
@@ -268,7 +290,9 @@ impl FhirValue {
         };
         match *self {
             Self::String(ref text) => primitive(text.value_json()),
+            Self::Date(ref date) => primitive(date.value_json()),
             Self::DateTime(ref date) => primitive(date.value_json()),
+            Self::Boolean(ref boolean) => primitive(boolean.value_json()),
             Self::Coding(ref coding) => complex(coding.to_json()),
             Self::CodeableConcept(ref concept) => complex(concept.to_json()),
             Self::Period(ref period) => complex(period.to_json()),

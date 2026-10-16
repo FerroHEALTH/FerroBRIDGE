@@ -8,9 +8,10 @@
 //! under `http://example.org`, which RFC 6761 §6.5 reserves for documentation
 //! and examples, except where a FHIR required binding fixes the system.
 //!
-//! Two fixtures name systems outside that domain. [`KDS_DIAGNOSE_OPT`] is a
-//! published operational template vendored verbatim with its provenance beside
-//! it: a template carries constraints, never patient content.
+//! Some fixtures name systems outside that domain. [`KDS_DIAGNOSE_OPT`] and
+//! [`KDS_PERSON_OPT`] are published operational templates vendored verbatim
+//! with their provenance beside them: a template carries constraints, never
+//! patient content.
 //! [`KDS_DIAGNOSE_CONDITION`] is synthetic, and names the profile and the
 //! systems and extension URLs the published KDS mappings match on, because a
 //! mapping condition only admits the value it names.
@@ -64,6 +65,19 @@ pub const KDS_DIAGNOSE_OPT: &str = include_str!("../fixtures/opt/kds/KDS_Diagnos
 
 /// The template identifier [`KDS_DIAGNOSE_OPT`] declares.
 pub const KDS_DIAGNOSE_TEMPLATE_ID: &str = "KDS_Diagnose";
+
+/// The published `KDS_Person` operational template, vendored verbatim.
+///
+/// One `COMPOSITION.person.v0` holding `ADMIN_ENTRY.person_data.v0` with its
+/// slotted person, name, address and birth clusters, `EVALUATION.gender.v1`
+/// and `ADMIN_ENTRY.versicherungsinformationen.v0`, the template the FHIR
+/// `Patient` round trip runs against. `scripts/vendor/kds-person-opt.sh`
+/// fetches it at the commit `docs/VERSIONS.md` pins, and `PROVENANCE.md`
+/// beside it records its source and licence.
+pub const KDS_PERSON_OPT: &str = include_str!("../fixtures/opt/kds-person/KDS_Person.opt");
+
+/// The template identifier [`KDS_PERSON_OPT`] declares.
+pub const KDS_PERSON_TEMPLATE_ID: &str = "KDS_Person";
 
 /// A synthetic canonical COMPOSITION built against
 /// [`MINIMAL_EVALUATION_OPT`].
@@ -131,6 +145,15 @@ pub const R4_CONDITION: &str = include_str!("../fixtures/fhir/r4/condition.json"
 /// is invented under `http://example.org`.
 pub const KDS_DIAGNOSE_CONDITION: &str =
     include_str!("../fixtures/fhir/r4/kds_diagnose_condition.json");
+
+/// A synthetic FHIR R4 `Patient` shaped like the MII Person profile.
+///
+/// It claims the profile the `KDS_Person` mappings compile against, carries
+/// one identifier in an invented system and one in the statutory insurance
+/// system the published mappings match on, an official and a maiden name, a
+/// gender, a birth date, a deceased flag and a managing organization by
+/// display. Every name and number is invented.
+pub const KDS_PERSON_PATIENT: &str = include_str!("../fixtures/fhir/r4/kds_person_patient.json");
 
 /// A synthetic FHIR R4 `Observation`.
 pub const R4_OBSERVATION: &str = include_str!("../fixtures/fhir/r4/observation.json");
@@ -204,6 +227,16 @@ mod tests {
         assert!(
             KDS_DIAGNOSE_OPT.contains(&declared),
             "the vendored KDS template does not declare {KDS_DIAGNOSE_TEMPLATE_ID}"
+        );
+    }
+
+    #[test]
+    fn the_kds_person_template_declares_its_identifier() {
+        use super::{KDS_PERSON_OPT, KDS_PERSON_TEMPLATE_ID};
+        let declared = format!("<template_id>\n        <value>{KDS_PERSON_TEMPLATE_ID}</value>");
+        assert!(
+            KDS_PERSON_OPT.contains(&declared),
+            "the vendored KDS person template does not declare {KDS_PERSON_TEMPLATE_ID}"
         );
     }
 

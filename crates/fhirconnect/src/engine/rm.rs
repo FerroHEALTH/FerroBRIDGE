@@ -20,7 +20,9 @@ use openehr_its::json::JsonParseError;
 use openehr_its::json::from_canonical_value;
 use openehr_its::json::to_canonical_value;
 use openehr_rm::v1_2::common::generic::party_identified::PartyIdentifiedData;
+use openehr_rm::v1_2::data_types::basic::dv_boolean::DvBoolean;
 use openehr_rm::v1_2::data_types::basic::dv_identifier::DvIdentifier;
+use openehr_rm::v1_2::data_types::quantity::date_time::dv_date::DvDate;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_date_time::DvDateTime;
 use openehr_rm::v1_2::data_types::quantity::dv_interval::DvInterval;
 use openehr_rm::v1_2::data_types::quantity::dv_proportion::DvProportion;
@@ -50,6 +52,8 @@ pub enum RmValue {
     CodedText(Box<DvCodedText>),
     /// A `CODE_PHRASE`.
     CodePhrase(CodePhrase),
+    /// A `DV_DATE`.
+    Date(Box<DvDate>),
     /// A `DV_DATE_TIME`.
     DateTime(Box<DvDateTime>),
     /// A `DV_INTERVAL<DV_DATE_TIME>`.
@@ -60,6 +64,8 @@ pub enum RmValue {
     Identifier(DvIdentifier),
     /// A `DV_PROPORTION`.
     Proportion(Box<DvProportion>),
+    /// A `DV_BOOLEAN`.
+    Boolean(DvBoolean),
 }
 
 /// Why a reference-model value could not be read or written.
@@ -112,11 +118,13 @@ impl RmValue {
             Self::Text(_) => "DV_TEXT",
             Self::CodedText(_) => "DV_CODED_TEXT",
             Self::CodePhrase(_) => "CODE_PHRASE",
+            Self::Date(_) => "DV_DATE",
             Self::DateTime(_) => "DV_DATE_TIME",
             Self::DateTimeInterval(_) => "DV_INTERVAL",
             Self::Party(_) => "PARTY_IDENTIFIED",
             Self::Identifier(_) => "DV_IDENTIFIER",
             Self::Proportion(_) => "DV_PROPORTION",
+            Self::Boolean(_) => "DV_BOOLEAN",
         }
     }
 
@@ -147,6 +155,12 @@ impl RmValue {
                 .map_err(refuse),
             "CODE_PHRASE" => from_canonical_value(value)
                 .map(Self::CodePhrase)
+                .map_err(refuse),
+            "DV_DATE" => from_canonical_value(value)
+                .map(|date| Self::Date(Box::new(date)))
+                .map_err(refuse),
+            "DV_BOOLEAN" => from_canonical_value(value)
+                .map(Self::Boolean)
                 .map_err(refuse),
             "DV_DATE_TIME" => from_canonical_value(value)
                 .map(|date| Self::DateTime(Box::new(date)))
@@ -181,6 +195,8 @@ impl RmValue {
             Self::Text(ref text) => to_canonical_value(text),
             Self::CodedText(ref coded) => to_canonical_value(coded.as_ref()),
             Self::CodePhrase(ref code) => to_canonical_value(code),
+            Self::Date(ref date) => to_canonical_value(date.as_ref()),
+            Self::Boolean(ref boolean) => to_canonical_value(boolean),
             Self::DateTime(ref date) => to_canonical_value(date.as_ref()),
             Self::DateTimeInterval(ref interval) => to_canonical_value(interval.as_ref()),
             Self::Party(ref party) => to_canonical_value(party),
@@ -311,9 +327,9 @@ fn held(declared_type: &str) -> Option<Carried> {
     }
 }
 
-// TODO(#241): the `_provider` family is spelled here and in `family::provider`
-// until openehr-sdt honours `|raw` on `_`-prefixed attribute families (sibling
-// request S1).
+// TODO(#241): the `_provider` and `_health_care_facility` families are spelled
+// here and in `family::provider` until openehr-sdt honours `|raw` on
+// `_`-prefixed attribute families (sibling request S1).
 /// The attributes of a structural class FLAT writes as a `_`-prefixed family
 /// of the class's node.
 ///
@@ -322,7 +338,14 @@ fn held(declared_type: &str) -> Option<Carried> {
 /// and Simplified Formats spells it `_provider` under the entry's node
 /// (`docs/specs/its-rest/docs/simplified_formats/master05-rm_mapping.adoc`,
 /// §OBSERVATION), the shape `family` spells `_other_participation` in.
-pub const FAMILIES: &[(&str, &str)] = &[("ENTRY", "provider")];
+/// `EVENT_CONTEXT.health_care_facility` is a `PARTY_IDENTIFIED`
+/// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/ehr.html#_event_context_class>),
+/// spelled `_health_care_facility` under the `context` node (the same file,
+/// the `EVENT_CONTEXT` section).
+pub const FAMILIES: &[(&str, &str)] = &[
+    ("ENTRY", "provider"),
+    ("EVENT_CONTEXT", "health_care_facility"),
+];
 
 /// Returns the FLAT family a tail of [`Carried::Family`] is written under.
 #[must_use]
@@ -500,5 +523,14 @@ mod tests {
             carried("EVALUATION", &["provider"]),
             Some(("ENTRY", Carried::Family))
         );
+    }
+
+    #[test]
+    fn the_context_health_care_facility_is_a_family() {
+        assert_eq!(
+            carried("EVENT_CONTEXT", &["health_care_facility"]),
+            Some(("EVENT_CONTEXT", Carried::Family))
+        );
+        assert_eq!(carried("EVENT_CONTEXT", &["location"]), None);
     }
 }
