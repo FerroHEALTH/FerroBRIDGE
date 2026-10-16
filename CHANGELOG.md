@@ -302,6 +302,18 @@ crates on crates.io.
   refused grant is an error carrying the token endpoint's status and its
   OAuth `error` and `error_description`, and a token that cannot be
   obtained takes the `cdr` readiness indicator down with that reason.
+- The `ferrobridge-fhirpath` static check narrows the focus under a type
+  guard (#571). A test `$this is T`, `$this.is(T)` or `is(T)`, its `not()`,
+  and an `and` or `or` of such tests, narrows what the focus reaches: the
+  right operand of `and` and `implies` sees the test true, the right operand
+  of `or` sees it false, `iif()` checks its second argument with the
+  criterion true and its third with it false, and `where()` answers the
+  types its criterion keeps. A member or call in a branch no type reaches is
+  not refused, and a member only a type the guard excludes defines is.
+  `toString()` on an input none of whose types is a primitive or
+  a `Quantity` is refused as `SemanticError::Input` (N1 §5.5.8, §11). The
+  `fhirpath-r4` corpus checks a case against the types its `contextType`
+  names.
 
 ### Changed
 

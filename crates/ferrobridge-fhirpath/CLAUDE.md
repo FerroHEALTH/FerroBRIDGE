@@ -45,7 +45,10 @@ and its own type lacks navigates to empty (N1 §3.2 "all kinds of value", §4.4)
 a member no admitted type defines stays the N1 §3 error.
 
 `Expression::check` is the static half: it follows the reachable FHIR types
-and refuses what the model refuses, and passes anything it cannot type.
+and refuses what the model refuses, and passes anything it cannot type. A type
+test of the focus narrows it for the operand of `and`, `or`, `implies` and
+the branch of `iif()` whose outcome the test fixes, and for the output of
+`where()`; a branch no type reaches refuses nothing.
 
 ## What an evaluation calls out to is a seam
 
