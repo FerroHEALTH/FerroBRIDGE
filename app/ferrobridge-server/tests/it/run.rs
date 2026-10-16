@@ -19,7 +19,7 @@ fn rendered(code: ExitCode) -> String {
 /// The jobs that parse and do not run yet, with the issue each names.
 const PENDING: [(&[&str], &str); 2] = [
     (&["vocab", "load", "/srv/athena", "--schema", "cdm"], "#233"),
-    (&["mapping", "check"], "#82"),
+    (&["mapping", "check"], "#595"),
 ];
 
 #[test]
