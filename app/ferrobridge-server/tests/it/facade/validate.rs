@@ -9,7 +9,10 @@ use http::StatusCode;
 use http::header;
 use std::error::Error as StdError;
 
+use fhirconnect::operations::issues::OPENEHR_PATH_SYSTEM;
+
 use super::EHR_ID;
+use super::ONE_WAY_FIXTURES;
 use super::VALIDATE;
 use super::assert_nothing_written;
 use super::call;
@@ -18,6 +21,7 @@ use super::create_one;
 use super::diagnostics_of;
 use super::first_issue;
 use super::harness;
+use super::harness_over;
 use super::settings;
 
 #[tokio::test]
@@ -253,6 +257,77 @@ async fn validate_refuses_at_the_operation_level_as_create_does() -> Result<(), 
             "create and $validate refuse with the same issue code for {body}"
         );
     }
+    assert_nothing_written(&harness).await;
+    Ok(())
+}
+
+/// Returns the issues of a dry-run outcome whose `details.text` contains
+/// `text`.
+fn issues_naming<'a>(body: &'a serde_json::Value, text: &str) -> Vec<&'a serde_json::Value> {
+    body["issue"]
+        .as_array()
+        .map(|issues| {
+            issues
+                .iter()
+                .filter(|issue| {
+                    issue["details"]["text"]
+                        .as_str()
+                        .is_some_and(|found| found.contains(text))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[tokio::test]
+async fn validate_locates_a_loss_by_its_fhirpath_and_its_openehr_path()
+-> Result<(), Box<dyn StdError>> {
+    // `engine/rest-api.adoc` §Reporting partial results with `OperationOutcome`:
+    // the gap is explicit, and R4 `OperationOutcome.issue.expression` is where
+    // the FHIRPath of the element it concerns goes.
+    let harness = harness_over(ONE_WAY_FIXTURES, settings()).await;
+    let request = Request::post(VALIDATE)
+        .header(header::CONTENT_TYPE, "application/fhir+json")
+        .body(Body::from(condition().to_string()))?;
+    let (status, body) = call(harness.app(), request).await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let skipped = issues_naming(&body, "the mapping comment did not run");
+    let issue = skipped
+        .first()
+        .ok_or("the one-way mapping is a declared loss")?;
+    assert_eq!(Some("warning"), issue["severity"].as_str(), "{body}");
+    assert_eq!(Some("incomplete"), issue["code"].as_str(), "{body}");
+    assert_eq!(
+        serde_json::json!(["Condition.note.text"]),
+        issue["expression"],
+        "the loss carries its FHIRPath: {body}"
+    );
+    assert_eq!(
+        Some(OPENEHR_PATH_SYSTEM),
+        issue["details"]["coding"][0]["system"].as_str(),
+        "the loss carries its openEHR path: {body}"
+    );
+    assert!(
+        issue["details"]["coding"][0]["code"]
+            .as_str()
+            .is_some_and(|path| path.ends_with("/data[at0001]/items[at0069]/value")),
+        "{body}"
+    );
+    let defaulted = issues_naming(&body, "the engine filled /composer");
+    let issue = defaulted
+        .first()
+        .ok_or("a defaulted field is a declared loss")?;
+    assert_eq!(Some("information"), issue["severity"].as_str(), "{body}");
+    assert_eq!(
+        serde_json::Value::Null,
+        issue["expression"],
+        "a defaulted composition field has no FHIR element: {body}"
+    );
+    assert_eq!(
+        Some("/composer"),
+        issue["details"]["coding"][0]["code"].as_str(),
+        "{body}"
+    );
     assert_nothing_written(&harness).await;
     Ok(())
 }
