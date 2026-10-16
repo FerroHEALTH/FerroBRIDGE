@@ -33,6 +33,7 @@ use omop_cdm::value::CdmDate;
 use omop_cdm::writer::{CdmWriter, input::PersonPolicy, input::VisitConcepts};
 use serde_json::json;
 use std::error::Error;
+use testcontainers::core::{CmdWaitFor, ExecCommand};
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -324,24 +325,30 @@ fn settings(visits: bool) -> Result<EtlSettings, Box<dyn Error>> {
 
 /// Returns the data of the CDM and bridge schemas as `pg_dump` writes it,
 /// with each table's rows sorted and the watermark's run columns cut, since
-/// a re-run records its own run id and commit time.
-pub(crate) fn dump(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
-    let output = std::process::Command::new("docker")
-        .args([
-            "exec",
-            postgres.container().id(),
-            "pg_dump",
-            "--username=ferrobridge",
-            "--data-only",
-            "--schema=cdm",
-            "--schema=ferrobridge",
-            "ferrobridge",
-        ])
-        .output()?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).into_owned().into());
+/// a re-run records its own run id and commit time. `pg_dump` runs inside
+/// the PostgreSQL container through the container engine's exec API, so the
+/// host needs no `docker` binary and a Podman socket serves as well.
+pub(crate) async fn dump(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
+    let mut exec = postgres
+        .container()
+        .exec(
+            ExecCommand::new([
+                "pg_dump",
+                "--username=ferrobridge",
+                "--data-only",
+                "--schema=cdm",
+                "--schema=ferrobridge",
+                "ferrobridge",
+            ])
+            .with_cmd_ready_condition(CmdWaitFor::exit()),
+        )
+        .await?;
+    let stdout = exec.stdout_to_vec().await?;
+    let stderr = exec.stderr_to_vec().await?;
+    if exec.exit_code().await? != Some(0) {
+        return Err(String::from_utf8_lossy(&stderr).into_owned().into());
     }
-    let text = String::from_utf8(output.stdout)?;
+    let text = String::from_utf8(stdout)?;
     let mut out = Vec::new();
     let mut block: Option<(bool, Vec<String>)> = None;
     for line in text.lines() {

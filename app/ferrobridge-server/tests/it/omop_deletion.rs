@@ -121,14 +121,14 @@ async fn a_composition_deleted_in_the_cdr_loses_its_rows_on_the_next_run()
         "the observation period no longer reaches the deleted composition's day"
     );
     assert_eq!(0, crate::etl::orphans(&postgres).await?, "{second}");
-    let after_removal = crate::etl::dump(&postgres)?;
+    let after_removal = crate::etl::dump(&postgres).await?;
 
     let third = etl_run(&config).await?;
     assert_eq!(0, third.deletions.checked, "{third}");
     assert!(third.deletions.removed.is_empty(), "{third}");
     assert_eq!(
         after_removal,
-        crate::etl::dump(&postgres)?,
+        crate::etl::dump(&postgres).await?,
         "a run after the removal changes nothing"
     );
 

@@ -1224,6 +1224,7 @@ dependencies = [
  "sha2 0.11.0",
  "sqlx",
  "tempfile",
+ "testcontainers",
  "thiserror",
  "tokio",
  "tokio-postgres",

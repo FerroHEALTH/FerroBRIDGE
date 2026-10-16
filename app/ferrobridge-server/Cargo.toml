@@ -100,6 +100,8 @@ openehr-sdt.workspace = true
 # The shutdown cases drive a real socket, so they need a real HTTP client.
 reqwest.workspace = true
 tempfile.workspace = true
+# The ETL cases dump the CDM through the container engine's exec API.
+testcontainers.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time", "net"] }
 # The ETL cases read back what the writer wrote.
 tokio-postgres.workspace = true

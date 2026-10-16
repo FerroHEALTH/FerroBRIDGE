@@ -77,20 +77,20 @@ async fn a_run_writes_the_laboratory_rows_and_a_second_run_changes_nothing()
         )
         .await?
     );
-    let before = dump(&harness.postgres)?;
+    let before = dump(&harness.postgres).await?;
 
     let second = run_once(&mut harness, &MAP_ALL, false, false, "run-2").await?;
     assert_eq!(3, second.compositions.committed);
     assert_eq!(
         before,
-        dump(&harness.postgres)?,
+        dump(&harness.postgres).await?,
         "a re-run leaves the data as it was"
     );
 
     let resumed = run_once(&mut harness, &MAP_ALL, false, true, "run-3").await?;
     assert_eq!(3, resumed.compositions.skipped);
     assert_eq!(0, resumed.compositions.committed);
-    assert_eq!(before, dump(&harness.postgres)?);
+    assert_eq!(before, dump(&harness.postgres).await?);
     Ok(())
 }
 
