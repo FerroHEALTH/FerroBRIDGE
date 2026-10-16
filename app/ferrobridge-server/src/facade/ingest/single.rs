@@ -5,15 +5,14 @@
 //! resource, the first version of its composition, and a later one.
 
 use http::StatusCode;
-use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
-use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::ehr::client::CompositionCreateOutcome;
 use openehr_its::rest::generated::ehr::client::CompositionUpdateOutcome;
+use openehr_mapping_core::composition::CanonicalComposition;
 
 use crate::cdr::Prefer;
-use crate::cdr::ids::EhrId;
 use crate::facade::commit;
 use crate::facade::ehr;
+use crate::facade::engine;
 use crate::facade::identity::claims::Claim;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
@@ -26,7 +25,9 @@ use super::Ingest;
 use super::Provenance;
 use super::Recognised;
 use super::Refused;
+use super::Revision;
 use super::Written;
+use super::binding::canonical_of;
 use super::binding::representation;
 use super::binding::resource_source;
 use super::binding::strict_read;
@@ -246,27 +247,40 @@ impl Ingest<'_> {
         self.record(program, inbound, &ehr_id, &version, &stored)
     }
 
-    /// Commits a later version of the composition `container` holds.
+    /// Commits a later version of the composition `revision` names, in which
+    /// the entry it names is the one `inbound` maps to.
     ///
-    /// `preceding` is the version the write follows, so a concurrent writer
-    /// meets the `412` the CDR answers.
+    /// R4 update replaces the resource named
+    /// (<https://hl7.org/fhir/R4/http.html#update>), and every other entry of
+    /// the program's archetype is a resource of its own, so the new version is
+    /// the standing one with that entry's item replaced and every other item
+    /// and field as it stood. A composition whose only entry is the updated
+    /// one is the composition the resource maps to, built whole. No
+    /// specification governs how one entry is spliced into a composition: our
+    /// own design.
     ///
     /// # Errors
     ///
-    /// Returns a [`Refused`] for a resource the program cannot map, a
-    /// composition the strict reader refuses, every CDR refusal through the
-    /// status table (a `412` carrying the latest version as its `ETag`), and
-    /// an identity store that cannot be written.
+    /// Returns a [`Refused`] for a resource the program cannot map, a `404`
+    /// when the standing composition no longer holds the entry, a composition
+    /// the strict reader refuses, every CDR refusal through the status table
+    /// (a `412` carrying the latest version as its `ETag`), and an identity
+    /// store that cannot be written.
     pub async fn revise_resource(
         &self,
         inbound: &Inbound,
         program: &Loaded,
-        ehr_id: &EhrId,
-        container: &HierObjectId,
-        preceding: &ObjectVersionId,
+        revision: &Revision<'_>,
         provenance: &Provenance,
     ) -> Result<Written, Refused> {
-        let composition = self.build(program, inbound, provenance)?;
+        let Revision {
+            ehr_id,
+            container,
+            preceding,
+            ..
+        } = *revision;
+        let built = self.build(program, inbound, provenance)?;
+        let composition = splice(program, &built, revision)?;
         let rm = strict_read(&composition)?;
         let context = self.commit_context(commit::Change::Modification, &composition)?;
         let answered = self
@@ -338,6 +352,59 @@ impl Ingest<'_> {
                 ));
             }
         };
-        self.record(program, inbound, ehr_id, &version, &stored)
+        self.record_entry(
+            program,
+            inbound,
+            ehr_id,
+            &version,
+            &stored,
+            revision.entry_path,
+        )
     }
+}
+
+/// Returns the composition an update of one entry commits: the standing
+/// composition with that entry's item replaced by the one `built` carries.
+///
+/// The standing `uid` names the version the update follows, so the spliced
+/// composition leaves it out, as a built one carries none (no specification
+/// governs this: our own design).
+fn splice(
+    program: &Loaded,
+    built: &CanonicalComposition,
+    revision: &Revision<'_>,
+) -> Result<CanonicalComposition, Refused> {
+    let standing = canonical_of(revision.standing, built)?;
+    let target = engine::entry_named(program.program(), &standing, revision.entry_path)
+        .ok_or_else(|| {
+            Refused::new(
+                StatusCode::NOT_FOUND,
+                Issue::error(IssueType::NotFound).diagnosing(format!(
+                    "the composition version {} no longer holds the entry the resource names",
+                    revision.preceding.value()
+                )),
+            )
+        })?;
+    if engine::entries_of(program.program(), &standing).len() <= 1 {
+        return Ok(built.clone());
+    }
+    let item = engine::entry_of(program.program(), built)
+        .and_then(|entry| entry.item(built).cloned())
+        .ok_or_else(|| {
+            Refused::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                Issue::error(IssueType::Processing)
+                    .diagnosing("the resource maps to no entry of the archetype the program maps"),
+            )
+        })?;
+    let spliced = target.replaced(&standing, item);
+    let mut value = spliced.value().clone();
+    if let Some(members) = value.as_object_mut() {
+        members.remove("uid");
+    }
+    Ok(CanonicalComposition::new(
+        value,
+        spliced.template_id(),
+        spliced.generation(),
+    ))
 }

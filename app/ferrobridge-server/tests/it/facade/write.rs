@@ -37,6 +37,7 @@ use super::stub::mount_ehr;
 use super::stub::mount_no_ehr;
 use super::stub::mount_read;
 use super::stub::mount_update;
+use super::stub::mount_version_read;
 use super::stub::mount_version_two;
 use super::writes;
 
@@ -181,6 +182,7 @@ async fn a_cdr_precondition_failure_is_four_hundred_and_twelve_with_the_current_
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
+    mount_version_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
     mount_update(
         &harness.cdr,
         ResponseTemplate::new(412).insert_header("ETag", format!("W/\"{VERSION_TWO}\"")),
@@ -302,6 +304,7 @@ async fn an_update_carrying_the_cdr_version_id_passes_it_through() -> Result<(),
 {
     let harness = harness().await;
     let id = create_one(&harness).await?;
+    mount_version_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
     Mock::given(matchers::method("PUT"))
         .and(matchers::path(format!(
             "/ehr/{EHR_ID}/composition/{CONTAINER}"
@@ -322,13 +325,49 @@ async fn an_update_carrying_the_cdr_version_id_passes_it_through() -> Result<(),
     .await?;
     assert_eq!(StatusCode::OK, response.status());
     assert_eq!(Some("W/\"2\""), header_text(&response, &header::ETAG));
+    let reads: Vec<String> = harness
+        .cdr
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .iter()
+        .filter(|request| request.method.as_str() == "GET")
+        .map(|request| request.url.path().to_owned())
+        .filter(|path| path.starts_with(&format!("/ehr/{EHR_ID}/composition/")))
+        .collect();
     assert_eq!(
-        0,
-        harness
-            .received("GET", &format!("/ehr/{EHR_ID}/composition/{CONTAINER}"))
-            .await,
-        "the CDR checks its own version id, so the facade reads nothing first"
+        vec![format!("/ehr/{EHR_ID}/composition/{VERSION_ONE}")],
+        reads,
+        "the CDR checks its own version id, so the facade reads no latest version first, only \
+         the version it follows, whose entries the update keeps"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_update_carrying_a_cdr_version_id_the_cdr_does_not_hold_is_four_hundred_and_twelve()
+-> Result<(), Box<dyn StdError>> {
+    // The update follows the version If-Match names, and one the CDR does not
+    // hold cannot be followed (<https://hl7.org/fhir/R4/http.html#concurrency>).
+    let harness = harness().await;
+    let id = create_one(&harness).await?;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path(format!(
+            "/ehr/{EHR_ID}/composition/{VERSION_TWO}"
+        )))
+        .respond_with(ferrobridge_testkit::stubs::its_rest::not_found(
+            "no such version",
+        ))
+        .mount(&harness.cdr)
+        .await;
+    mount_version_two(&harness).await;
+    let (status, body) = call(
+        harness.app(),
+        put_if_match(&id, &format!("W/\"{VERSION_TWO}\""))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::PRECONDITION_FAILED, status, "{body}");
+    assert_eq!(0, writes(&harness).await.1, "no update reached the CDR");
     Ok(())
 }
 

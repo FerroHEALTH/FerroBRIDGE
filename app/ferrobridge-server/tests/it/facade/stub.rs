@@ -57,6 +57,23 @@ pub(super) async fn mount_read(cdr: &MockServer, version: &str, body: &serde_jso
         .await;
 }
 
+/// Mounts the read of the composition version `version` names, answering
+/// `200` with `body`.
+pub(super) async fn mount_version_read(cdr: &MockServer, version: &str, body: &serde_json::Value) {
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path(format!(
+            "/ehr/{EHR_ID}/composition/{version}"
+        )))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("ETag", format!("W/\"{version}\""))
+                .insert_header("Content-Type", "application/json")
+                .set_body_string(body.to_string()),
+        )
+        .mount(cdr)
+        .await;
+}
+
 /// Mounts the composition update that answers with `response`.
 pub(super) async fn mount_update(cdr: &MockServer, response: ResponseTemplate) {
     Mock::given(matchers::method("PUT"))

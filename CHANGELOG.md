@@ -445,6 +445,13 @@ crates on crates.io.
   leaves the composer to its default, and a composer with an external
   reference travels as `ctx/composer_id`, `ctx/id_namespace` and
   `ctx/id_scheme` (Simplified Formats, §Composer).
+- A facade update of one entry's resource keeps the composition's other
+  entries (#657). A `PUT` of an entry's id, and a create that revises a known
+  source, commit the composition version they follow with that entry replaced
+  and every other item as it stood; before, the composition was rebuilt from
+  the one resource and lost its other entries. `If-Match` names the
+  composition version every entry shares, and an `If-Match` naming a version
+  the CDR does not hold is `412`.
 - A CDR credential the token endpoint will not issue answers the FHIR caller
   `502` (#518). When the OAuth 2.0 client credentials fetch fails, because the
   token endpoint is unreachable or refuses the bridge's own credentials, the

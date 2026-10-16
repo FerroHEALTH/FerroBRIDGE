@@ -195,14 +195,43 @@ impl Entry {
         CanonicalComposition::new(value, composition.template_id(), composition.generation())
     }
 
-    /// Whether the entry's item in `composition` is `node` or holds it.
+    /// Returns the entry's item in `composition`.
     #[must_use]
-    pub fn holds(&self, composition: &CanonicalComposition, node: &serde_json::Value) -> bool {
+    pub fn item<'c>(&self, composition: &'c CanonicalComposition) -> Option<&'c serde_json::Value> {
         composition
             .value()
             .get("content")
             .and_then(serde_json::Value::as_array)
             .and_then(|content| content.get(self.index))
+    }
+
+    /// Returns `composition` with the entry's item replaced by `item`, and
+    /// every other item and field as it stands.
+    ///
+    /// An update of one entry's resource replaces that entry alone, because
+    /// every other entry is a resource of its own (no specification governs
+    /// how one entry is spliced into a composition: our own design).
+    #[must_use]
+    pub fn replaced(
+        &self,
+        composition: &CanonicalComposition,
+        item: serde_json::Value,
+    ) -> CanonicalComposition {
+        let mut value = composition.value().clone();
+        if let Some(slot) = value
+            .get_mut("content")
+            .and_then(serde_json::Value::as_array_mut)
+            .and_then(|content| content.get_mut(self.index))
+        {
+            *slot = item;
+        }
+        CanonicalComposition::new(value, composition.template_id(), composition.generation())
+    }
+
+    /// Whether the entry's item in `composition` is `node` or holds it.
+    #[must_use]
+    pub fn holds(&self, composition: &CanonicalComposition, node: &serde_json::Value) -> bool {
+        self.item(composition)
             .is_some_and(|item| contains(item, node))
     }
 }
@@ -445,6 +474,36 @@ mod tests {
         );
         assert!(second.holds(&built, &serde_json::json!("two")));
         assert!(!second.holds(&built, &serde_json::json!("one")));
+    }
+
+    #[test]
+    fn a_replaced_entry_leaves_every_other_item_as_it_stood() {
+        let built = composition(&serde_json::json!([
+            { "archetype_node_id": "openEHR-EHR-OBSERVATION.body_weight.v2" },
+            { "archetype_node_id": DIAGNOSIS, "name": "one" },
+            { "archetype_node_id": DIAGNOSIS, "name": "two" }
+        ]));
+        let second = entries_at(&built, DIAGNOSIS)
+            .into_iter()
+            .nth(1)
+            .expect("two entries");
+        assert_eq!(
+            Some(&serde_json::json!({ "archetype_node_id": DIAGNOSIS, "name": "two" })),
+            second.item(&built)
+        );
+        let replaced = second.replaced(
+            &built,
+            serde_json::json!({ "archetype_node_id": DIAGNOSIS, "name": "three" }),
+        );
+        assert_eq!(
+            serde_json::json!([
+                { "archetype_node_id": "openEHR-EHR-OBSERVATION.body_weight.v2" },
+                { "archetype_node_id": DIAGNOSIS, "name": "one" },
+                { "archetype_node_id": DIAGNOSIS, "name": "three" }
+            ]),
+            replaced.value()["content"]
+        );
+        assert_eq!(built.template_id(), replaced.template_id());
     }
 
     #[test]

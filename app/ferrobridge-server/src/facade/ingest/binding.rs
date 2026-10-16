@@ -115,21 +115,34 @@ pub(super) fn representation(
     built: &CanonicalComposition,
 ) -> Result<CanonicalComposition, Refused> {
     match returned {
-        Returned::Representation(stored) => {
-            let value = openehr_its::json::to_canonical_json(stored.as_ref())
-                .parse::<serde_json::Value>()
-                .map_err(|source| {
-                    let error = RepresentationError::Unreadable { source };
-                    Refused::of_answer(&status::Answer::new(status::INTERNAL, chain(&error)))
-                })?;
-            Ok(CanonicalComposition::new(
-                value,
-                built.template_id(),
-                built.generation(),
-            ))
-        }
+        Returned::Representation(stored) => canonical_of(stored.as_ref(), built),
         Returned::Minimal | Returned::Identifier(_) => Ok(built.clone()),
     }
+}
+
+/// Returns the canonical form of a composition the CDR served, under the
+/// template and generation of `like`.
+///
+/// # Errors
+///
+/// Returns a [`Refused`] carrying [`RepresentationError::Unreadable`] when the
+/// composition does not read back, on the status table's [`status::INTERNAL`]
+/// row.
+pub(super) fn canonical_of(
+    stored: &Composition,
+    like: &CanonicalComposition,
+) -> Result<CanonicalComposition, Refused> {
+    let value = openehr_its::json::to_canonical_json(stored)
+        .parse::<serde_json::Value>()
+        .map_err(|source| {
+            let error = RepresentationError::Unreadable { source };
+            Refused::of_answer(&status::Answer::new(status::INTERNAL, chain(&error)))
+        })?;
+    Ok(CanonicalComposition::new(
+        value,
+        like.template_id(),
+        like.generation(),
+    ))
 }
 
 impl Ingest<'_> {
@@ -192,17 +205,78 @@ impl Ingest<'_> {
         version: &ObjectVersionId,
         composition: &CanonicalComposition,
     ) -> Result<Written, Refused> {
-        let resource_type = inbound.resource_type();
-        let (id, stood) = self.bind(program, resource_type, ehr_id, version, composition)?;
+        let (id, stood) = self.bind(
+            program,
+            inbound.resource_type(),
+            ehr_id,
+            version,
+            composition,
+        )?;
+        self.finish_write(inbound, id, &stood, ehr_id, version, composition.clone())
+    }
+
+    /// Records the identity of a committed update of the entry `path` names,
+    /// and returns what stands, narrowed to that entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `500` [`Refused`] when the committed composition holds no
+    /// entry at `path`, and an identity store that cannot be written.
+    pub(super) fn record_entry(
+        &self,
+        program: &Loaded,
+        inbound: &Inbound,
+        ehr_id: &EhrId,
+        version: &ObjectVersionId,
+        composition: &CanonicalComposition,
+        path: &str,
+    ) -> Result<Written, Refused> {
+        let entry = engine::entry_named(program.program(), composition, path).ok_or_else(|| {
+            Refused::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Issue::error(IssueType::Exception).diagnosing(
+                    "the committed composition holds no entry where the updated resource's entry was",
+                ),
+            )
+        })?;
+        let (id, stood) = self.bind_entry(
+            program,
+            inbound.resource_type(),
+            ehr_id,
+            version,
+            composition,
+            &entry,
+        )?;
+        self.finish_write(
+            inbound,
+            id,
+            &stood,
+            ehr_id,
+            version,
+            entry.isolate(composition),
+        )
+    }
+
+    /// Indexes and consumes the source of one bound write, and returns what
+    /// stands.
+    fn finish_write(
+        &self,
+        inbound: &Inbound,
+        id: FhirResourceId,
+        stood: &CompositionBinding,
+        ehr_id: &EhrId,
+        version: &ObjectVersionId,
+        composition: CanonicalComposition,
+    ) -> Result<Written, Refused> {
         self.index(inbound, &id)?;
         if let Some(source) = resource_source(inbound) {
-            self.consume(&source, &stood, &id)?;
+            self.consume(&source, stood, &id)?;
         }
         Ok(Written {
             id,
             ehr_id: ehr_id.clone(),
             version: version.clone(),
-            composition: composition.clone(),
+            composition,
             delivery: Delivery::Committed,
         })
     }
