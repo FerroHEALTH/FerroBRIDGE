@@ -38,7 +38,7 @@ pub const RESOURCE_MODULE: &str = "resource";
 /// The name of the enum over the root-set resources.
 pub const RESOURCE_ENUM: &str = "Resource";
 
-/// The name of the struct carrying a resource outside the root set.
+/// The name of the struct carrying any resource as its JSON body.
 pub const UNKNOWN_RESOURCE: &str = "UnknownResource";
 
 /// A failure while lowering.
@@ -227,7 +227,7 @@ pub enum TypeKind {
         /// The resource type names, in name order.
         resources: Vec<String>,
     },
-    /// The struct carrying a resource outside the root set.
+    /// The struct carrying any resource as its JSON body.
     UnknownResource,
 }
 
@@ -451,7 +451,7 @@ impl VersionModule {
             docs: Docs {
                 short: Some(String::from("A resource of the root set, or an unknown resource carried as JSON.")),
                 definition: Some(
-                    format!("The abstract Resource type (https://hl7.org/fhir/{}/resource.html) as the root set closes over it: one variant per root-set resource the enabled features select, and UnknownResource for any other resource type met inside a Bundle entry or a contained list.", version_module.to_uppercase()),
+                    format!("The abstract Resource type (https://hl7.org/fhir/{}/resource.html) as the root set closes over it: one variant per root-set resource the enabled features select, and Unknown, which a decode yields for any other resource type met inside a Bundle entry or a contained list and an encode writes for any resource carried as its JSON body.", version_module.to_uppercase()),
                 ),
             },
             kind: TypeKind::ResourceEnum { resources },
@@ -467,9 +467,9 @@ impl VersionModule {
             path: UNKNOWN_RESOURCE.to_owned(),
             module: RESOURCE_MODULE.to_owned(),
             docs: Docs {
-                short: Some(String::from("A resource outside the root set, kept as its JSON body.")),
+                short: Some(String::from("Any resource kept as its complete JSON object, root-set types included.")),
                 definition: Some(String::from(
-                    "Carries the resourceType and the complete JSON object so a Bundle or a contained resource of a type outside the root set round-trips unchanged.",
+                    "Carries the resourceType and the complete JSON object of any resource, a type of the root set included, so a Bundle entry or a contained resource can relay another server's JSON beside typed entries. The encoder writes the body with its values as given, a decimal in its lexical form, and its members in sorted key order, because codec::Object is a BTreeMap. Decoding yields the typed variant for every resource type the enabled features select and this struct for any other, so for a root-set type the raw form is a write-side carrier. Read raw JSON into the body through the Deserialize impl of codec::Value, which keeps every number in the text the document carried.",
                 )),
             },
             kind: TypeKind::UnknownResource,

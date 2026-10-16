@@ -326,6 +326,14 @@ crates on crates.io.
 
 ### Changed
 
+- `fhir-types` documents `UnknownResource`, in every FHIR version, as the
+  carrier of any resource's JSON body, a root-set type such as
+  `MedicationRequest` included, so a relay can write another server's resource
+  beside typed entries in one Bundle (#569). The encoder writes the body with
+  its values as given, decimals in their lexical form, and its members in
+  sorted key order; a decode still yields the typed variant for every resource
+  type the enabled features select. A test pins an R4 Bundle carrying both.
+  `fhir-types` 0.1.115 and `fhirconnect` 0.1.119.
 - The `openehr-*` crates move to 0.0.87, the line the federation gateway pins; `fhirconnect` 0.1.117 and `openehr-mapping-core` 0.1.111 build on it.
 - `[etl] aql` and `[etl.visits] aql` must read every `COMPOSITION` below
   `VERSION v[LATEST_VERSION]`, and a configuration whose query reads one

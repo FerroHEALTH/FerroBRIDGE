@@ -31,6 +31,7 @@ mod serialize;
 mod snapshot;
 mod stu3;
 mod terminology;
+mod unknown_resource;
 mod v2;
 mod v2_legacy;
 mod value_conversion;
