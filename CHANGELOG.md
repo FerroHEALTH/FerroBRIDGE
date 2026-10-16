@@ -378,6 +378,15 @@ crates on crates.io.
 
 ### Fixed
 
+- An invariant on a choice element reads every type the choice admits
+  (#563). The FHIRPath evaluator checks an expression whose context is a
+  choice element against all of its types, and on an occurrence of a choice
+  a member only another of its types defines is empty, as
+  `Observation.value.unit` is on a string value (FHIRPath N1 §3.2). R4
+  `ras-1` now holds on a decimal `RiskAssessment.prediction.probability`
+  where the R4 profile validator listed it as unevaluable, and the
+  core-constraint sweep checks the 191 invariants on choice elements it
+  skipped. A member no type of the choice defines is still refused.
 - The R4 profile validator reports an extension whose `url` the package set
   cannot resolve to a definition (a `#` fragment, or two definitions under
   one canonical) as an unknown extension at that extension, a warning or an
@@ -433,6 +442,23 @@ crates on crates.io.
   one of two sibling clusters that share a node id (the `Straßenanschrift` and
   `Postfach` addresses of `KDS_Person`) names the node below that cluster
   alone (#468).
+- Every `person_id` an `etl run` writes names a `PERSON` row, where the
+  rows of a person no mapping wrote a `PERSON` row for named a `person_id`
+  that `PERSON` did not hold, against the CDM v5.4 foreign key (#541). A
+  `PERSON` row an OMOCL mapping writes is the person's source; otherwise
+  `[cdm] person_policy = "create_on_first_sight"` writes a placeholder row
+  (every concept 0, `year_of_birth` 0, the `ehr_id` as
+  `person_source_value`) that such a mapping later replaces, and `existing`
+  refuses the row, also when the person map knows the EHR but its `PERSON`
+  row is gone. The run report counts the `PERSON` rows and the placeholders
+  (`persons`).
+- A second composition of an EHR writing the `PERSON` row another
+  composition of the EHR already writes commits, where the bridge's side
+  table refused it and the commit failed (#540). Each writer is recorded,
+  the one committed last rewrites the columns, and the row stays while any
+  writer or any row of the person remains; every other table keeps its
+  one-row-per-id guarantee. Run `ferrobridge cdm init` once after upgrading
+  to bring an existing bridge schema to this shape.
 - FHIRPath quantity products and quotients carry the UCUM unit with
   identical units merged, so `12 'cm' * 3 'cm'` answers `36 'cm2'` and
   `12 'cm2' / 3 'cm'` answers `4 'cm'` as FHIRPath N1 §6.6.1 and §6.6.2

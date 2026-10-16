@@ -18,7 +18,7 @@ use std::sync::LazyLock;
 use ferrobridge_fhirpath::eval::{Environment, Focus};
 use ferrobridge_fhirpath::expression::Expression;
 use ferrobridge_fhirpath::model::r4::R4;
-use ferrobridge_fhirpath::model::{named_type, path_type};
+use ferrobridge_fhirpath::model::{choice_element, named_type, path_types};
 use ferrobridge_fhirpath::value::Collection;
 use fhir_types::codec::Value;
 use serde::Deserialize;
@@ -188,16 +188,20 @@ fn every_r4_core_constraint_parses() {
 #[test]
 fn every_r4_core_constraint_checks_against_its_element() {
     let mut checked = 0;
+    let mut on_choices = Vec::new();
     let mut refused = Vec::new();
     let mut expected = Vec::new();
     for (key, path, expression) in R4_CORE.iter() {
-        let Some(context) = path_type(&R4, path) else {
+        let Some(contexts) = path_types(&R4, path) else {
             continue;
         };
+        if choice_element(&R4, path).is_some() {
+            on_choices.push(key.clone());
+        }
         let parsed = Expression::parse(expression).expect("the invariant should parse");
         checked += 1;
         match (
-            parsed.check(&R4, context),
+            parsed.check_any(&R4, &contexts),
             defective("hl7.fhir.r4.core", key, path),
         ) {
             (Err(_), true) => expected.push(key.clone()),
@@ -207,6 +211,19 @@ fn every_r4_core_constraint_checks_against_its_element() {
             )),
             (Ok(()), false) => {}
         }
+    }
+    // R4 §2.9.1.1: an invariant on a choice element is checked against every
+    // type the choice admits.
+    assert_eq!(
+        on_choices.len(),
+        191,
+        "the R4 core package holds 191 invariants on choice elements"
+    );
+    for key in ["ras-1", "vs-1"] {
+        assert!(
+            on_choices.iter().any(|found| found == key),
+            "{key} sits on a choice element and is checked"
+        );
     }
     assert!(
         checked > 1000,
@@ -438,4 +455,95 @@ fn txt_1_and_txt_2_read_the_narrative() {
     assert_eq!(truth(&div(&good)), Some(true));
     assert_eq!(truth(&div(&script)), Some(false));
     assert_eq!(truth(&div(&blank)), Some(false));
+}
+
+/// The element `ras-1` constrains, a choice of `decimal` and `Range`.
+const PROBABILITY: &str = "RiskAssessment.prediction.probability[x]";
+
+#[test]
+fn ras_1_holds_on_a_decimal_probability() {
+    // N1 §3.2 and §4.4, FHIR R4 §2.9.1.1: `low` and `high` belong to the
+    // Range the choice admits, so on a decimal they are no nodes.
+    let assessment = json(r#"{"resourceType": "RiskAssessment", "status": "final"}"#);
+    let probability = json("0.25");
+    let focus =
+        Focus::primitive(Some(&probability), None, "decimal", &assessment).defined_by(PROBABILITY);
+    assert_eq!(truth(&invariant("ras-1", focus)), Some(true));
+}
+
+#[test]
+fn ras_1_reads_the_units_of_a_range_probability() {
+    let assessment = json(r#"{"resourceType": "RiskAssessment", "status": "final"}"#);
+    let range = |code: &str| {
+        json(&format!(
+            r#"{{"low": {{"value": 10, "system": "http://unitsofmeasure.org", "code": "{code}"}},
+                "high": {{"value": 20, "system": "http://unitsofmeasure.org", "code": "{code}"}}}}"#
+        ))
+    };
+    let percent = range("%");
+    let milligrams = range("mg");
+    let evaluate = |value| {
+        invariant(
+            "ras-1",
+            Focus::element(value, "Range", &assessment).defined_by(PROBABILITY),
+        )
+    };
+    assert_eq!(truth(&evaluate(&percent)), Some(true));
+    assert_eq!(truth(&evaluate(&milligrams)), Some(false));
+}
+
+#[test]
+fn a_decimal_not_named_as_a_choice_occurrence_has_no_low() {
+    // N1 §3: an identifier the context's type cannot resolve is an error.
+    let assessment = json(r#"{"resourceType": "RiskAssessment", "status": "final"}"#);
+    let probability = json("0.25");
+    let focus = Focus::primitive(Some(&probability), None, "decimal", &assessment);
+    let result = Expression::parse("low.empty()")
+        .expect("the expression should parse")
+        .evaluate(&Environment::new(&R4), focus);
+    assert!(result.is_err(), "decimal defines no low: {result:?}");
+}
+
+#[test]
+fn a_member_no_type_of_the_choice_defines_is_refused() {
+    let contexts = path_types(&R4, PROBABILITY).expect("the choice should have types");
+    let names: Vec<&str> = contexts.iter().map(|ty| ty.name).collect();
+    assert_eq!(names, ["decimal", "Range"]);
+    let typo = Expression::parse("loww.empty()").expect("the expression should parse");
+    assert!(typo.check_any(&R4, &contexts).is_err());
+    let range_member = Expression::parse("low.empty()").expect("the expression should parse");
+    assert_eq!(range_member.check_any(&R4, &contexts), Ok(()));
+}
+
+#[test]
+fn a_member_no_type_of_the_choice_defines_fails_the_evaluation() {
+    let assessment = json(r#"{"resourceType": "RiskAssessment", "status": "final"}"#);
+    let probability = json("0.25");
+    let focus =
+        Focus::primitive(Some(&probability), None, "decimal", &assessment).defined_by(PROBABILITY);
+    let result = Expression::parse("loww.empty()")
+        .expect("the expression should parse")
+        .evaluate(&Environment::new(&R4), focus);
+    assert!(
+        result.is_err(),
+        "no type of the choice defines loww: {result:?}"
+    );
+}
+
+#[test]
+fn a_path_over_a_choice_ignores_the_type_of_each_value() {
+    // N1 §3.2: `Observation.value.unit` reads "all kinds of value".
+    let observation = json(
+        r#"{"resourceType": "Observation", "status": "final", "code": {"text": "x"},
+            "valueString": "high"}"#,
+    );
+    let unit = Expression::parse("Observation.value.unit")
+        .expect("the expression should parse")
+        .evaluate(&Environment::new(&R4), Focus::resource(&observation))
+        .expect("the path should evaluate");
+    assert!(unit.is_empty());
+    let typo = Expression::parse("Observation.value.unitt")
+        .expect("the expression should parse")
+        .evaluate(&Environment::new(&R4), Focus::resource(&observation));
+    assert!(typo.is_err(), "no type of Observation.value defines unitt");
 }

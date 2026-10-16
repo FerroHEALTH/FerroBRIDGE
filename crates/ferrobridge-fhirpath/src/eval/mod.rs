@@ -129,11 +129,13 @@ impl<'a> Environment<'a> {
 enum Start<'a> {
     /// A resource.
     Resource(&'a Value),
-    /// An element of the named type, with a primitive's `_name` object.
+    /// An element of the named type, with a primitive's `_name` object and
+    /// the element path of its definition.
     Element {
         value: Option<&'a Value>,
         element: Option<&'a Value>,
         type_name: String,
+        definition: Option<String>,
     },
     /// Items from an earlier evaluation.
     Items(Collection<'a>),
@@ -199,6 +201,7 @@ impl<'a> Focus<'a> {
                 value: Some(value),
                 element: None,
                 type_name: type_name.into(),
+                definition: None,
             },
             resource: Some(resource),
             root: Some(resource),
@@ -219,10 +222,26 @@ impl<'a> Focus<'a> {
                 value,
                 element,
                 type_name: type_name.into(),
+                definition: None,
             },
             resource: Some(resource),
             root: Some(resource),
         }
+    }
+
+    /// Names the element definition an element context is an occurrence
+    /// of, by its element path (`RiskAssessment.prediction.probability[x]`);
+    /// any other context is left as it was.
+    ///
+    /// On an occurrence of a choice element, a member another type of the
+    /// choice defines navigates to an empty collection where the
+    /// occurrence's own type lacks it (N1 §3.2, FHIR R4 §2.9.1.1).
+    #[must_use]
+    pub fn defined_by(mut self, path: impl Into<String>) -> Self {
+        if let Start::Element { definition, .. } = &mut self.start {
+            *definition = Some(path.into());
+        }
+        self
     }
 
     /// Items from an earlier evaluation as the context.
@@ -309,25 +328,38 @@ pub(crate) fn evaluate<'a>(
             value,
             element,
             type_name,
+            definition,
         } => {
             let ty = path_type(model, &type_name)
                 .or_else(|| named_type(model, &type_name))
                 .ok_or(EvalError::UnknownType { name: type_name })?;
-            match value {
-                Some(value) => vec![Item::Node(Node::typed(
+            let definition = match definition {
+                Some(path) => match model.schemas().element(&path) {
+                    Some((_, field)) => Some(field.path),
+                    None => return Err(EvalError::UnknownType { name: path }),
+                },
+                None => None,
+            };
+            let node = match (value, element) {
+                (Some(value), element) => Some(Node::typed(
                     ty,
                     Doc::Borrowed(value),
                     element.map(Doc::Borrowed),
-                ))],
-                None => match element {
-                    Some(element) => vec![Item::Node(Node::typed(
-                        ty,
-                        Doc::Owned(Arc::new(Value::Null)),
-                        Some(Doc::Borrowed(element)),
-                    ))],
-                    None => Vec::new(),
-                },
-            }
+                )),
+                (None, Some(element)) => Some(Node::typed(
+                    ty,
+                    Doc::Owned(Arc::new(Value::Null)),
+                    Some(Doc::Borrowed(element)),
+                )),
+                (None, None) => None,
+            };
+            node.map(|node| match definition {
+                Some(path) => node.with_definition(path),
+                None => node,
+            })
+            .map(Item::Node)
+            .into_iter()
+            .collect()
         }
         Start::Items(items) => items,
     };

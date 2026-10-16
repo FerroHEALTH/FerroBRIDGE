@@ -13,7 +13,7 @@
 //! evaluation's own checks apply.
 
 use crate::ast::{BinaryOp, Expr, Literal, TypeSpecifier};
-use crate::model::{FhirType, Model, choice_code, field_type, is_a, named_type};
+use crate::model::{FhirType, Model, field_type, is_a, named_type, variant_type};
 use fhir_types::schema::Kind;
 
 /// A path the model refuses.
@@ -61,7 +61,24 @@ type Reach = Option<Vec<FhirType>>;
 ///
 /// Returns the first [`SemanticError`] found.
 pub fn check(expr: &Expr, model: &dyn Model, context: FhirType) -> Result<(), SemanticError> {
-    let reach = Some(vec![context]);
+    check_any(expr, model, &[context])
+}
+
+/// Checks `expr` with a context that may hold any of the types `contexts`,
+/// as an occurrence of a choice element does (R4 §2.9.1.1): a member is
+/// accepted when one of them defines it.
+///
+/// # Errors
+///
+/// Returns the first [`SemanticError`] found.
+pub fn check_any(
+    expr: &Expr,
+    model: &dyn Model,
+    contexts: &[FhirType],
+) -> Result<(), SemanticError> {
+    // NOTE: N1 §11 lets an implementation choose its compile-time strictness, and lists a
+    // choice[x] member as one a compiler cannot type, so the union of its types is the bound.
+    let reach = Some(contexts.to_vec());
     Checker { model }.infer(expr, &reach, &reach).map(|_| ())
 }
 
@@ -184,17 +201,7 @@ impl Checker<'_> {
             match field.kind {
                 Kind::Choice(variants) => {
                     for (suffix, kind) in variants {
-                        let reached_type =
-                            field_type(self.model, field, *kind).map(|found| {
-                                match (kind, choice_code(field, suffix)) {
-                                    (Kind::Complex(_), _) | (_, None) => found,
-                                    (_, Some(code)) => FhirType {
-                                        name: code,
-                                        ..found
-                                    },
-                                }
-                            });
-                        match reached_type {
+                        match variant_type(self.model, field, suffix, *kind) {
                             Some(found) if !reached.contains(&found) => reached.push(found),
                             Some(_) => {}
                             None => known = false,

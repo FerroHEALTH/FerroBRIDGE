@@ -33,7 +33,7 @@ use crate::cdr::CdrClient;
 use crate::cdr::query::{PageSize, QueryPageError};
 use crate::etl::aql::{CheckedQuery, SINCE_PARAMETER};
 use crate::etl::deletions::{CheckError, DeletionPolicy, Sweep};
-use crate::etl::report::RunReport;
+use crate::etl::report::{Persons, RunReport};
 use crate::etl::tie::{Tie, Windows};
 use futures_util::StreamExt;
 use omop_cdm::derived;
@@ -434,7 +434,8 @@ async fn read_visits(
 }
 
 /// Retires the visits the visit query no longer answers, then rebuilds the
-/// derived tables whole, after every commit and removal of the run.
+/// derived tables whole, after every commit and removal of the run, and
+/// counts the `PERSON` rows.
 async fn derive(
     settings: &EtlSettings,
     writer: &mut CdmWriter,
@@ -459,6 +460,11 @@ async fn derive(
     report.derived.drug_era = derived::drug_era(writer)
         .await
         .map_err(RunError::Database)?;
+    let persons = writer.persons().await.map_err(RunError::Database)?;
+    report.persons = Persons {
+        total: persons.total,
+        placeholders: persons.placeholders,
+    };
     Ok(())
 }
 

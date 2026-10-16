@@ -19,7 +19,7 @@ use ferrobridge_server::cdr::commit::CommitContext;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::cdr::ids::{EhrId, template_id, versioned_object_uid};
 use ferrobridge_server::etl::RunOptions;
-use ferrobridge_server::etl::report::RunReport;
+use ferrobridge_server::etl::report::{Persons, RunReport};
 use ferrobridge_testkit::containers::{self, Cdr, Postgres};
 use ferrobridge_testkit::fixtures::{
     LABORATORY_REPORT_FLAT, LABORATORY_REPORT_OPT, LABORATORY_REPORT_TEMPLATE_ID,
@@ -549,6 +549,34 @@ const VISITS_AND_PERIODS: &str = "SELECT 'visit', p.ehr_id, v.visit_source_value
     o.period_type_concept_id \
     FROM cdm.observation_period o JOIN ferrobridge.person_map p ON p.person_id = o.person_id";
 
+/// The projection of the `PERSON` rows: the EHR in place of the surrogate id.
+const PERSONS: &str = "SELECT m.ehr_id, p.gender_concept_id, p.year_of_birth, \
+    p.race_concept_id, p.ethnicity_concept_id, p.person_source_value \
+    FROM cdm.person p JOIN ferrobridge.person_map m ON m.person_id = p.person_id";
+
+/// Asserts that each of the two EHRs has its placeholder `PERSON` row, since
+/// the laboratory files map no `PERSON`, and that no row names a missing
+/// person.
+async fn assert_placeholders(
+    postgres: &Postgres,
+    report: &RunReport,
+) -> Result<(), Box<dyn Error>> {
+    assert_eq!(
+        Persons {
+            total: 2,
+            placeholders: 2,
+        },
+        report.persons,
+        "{report}"
+    );
+    assert_eq!(
+        0,
+        crate::etl::orphans(postgres).await?,
+        "every person_id names a PERSON"
+    );
+    Ok(())
+}
+
 /// Renders the rows of `query`, identifiers replaced by the names in
 /// `names`, sorted.
 async fn projected(
@@ -576,7 +604,8 @@ async fn projection(
     names: &BTreeMap<String, String>,
 ) -> Result<String, Box<dyn Error>> {
     Ok(format!(
-        "MEASUREMENT\n{}\n\nSPECIMEN\n{}\n\nFACT_RELATIONSHIP\n{}\n\nVISIT_OCCURRENCE and OBSERVATION_PERIOD\n{}\n",
+        "PERSON\n{}\n\nMEASUREMENT\n{}\n\nSPECIMEN\n{}\n\nFACT_RELATIONSHIP\n{}\n\nVISIT_OCCURRENCE and OBSERVATION_PERIOD\n{}\n",
+        projected(postgres, PERSONS, names).await?,
         projected(postgres, MEASUREMENTS, names).await?,
         projected(postgres, SPECIMENS, names).await?,
         projected(postgres, FACTS, names).await?,
@@ -632,6 +661,7 @@ async fn the_laboratory_round_trip_writes_the_reviewed_rows_and_a_rerun_changes_
     assert_eq!(Some(&1), first.rows.get("specimen"), "{first}");
     assert_eq!(2, first.derived.visit_occurrence, "{first}");
     assert_eq!(2, first.derived.observation_period, "{first}");
+    assert_placeholders(&postgres, &first).await?;
     let zero = first
         .mappings
         .get("Laboratory_test_analyte_v1")

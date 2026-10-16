@@ -305,3 +305,65 @@ fn a_valid_patient_raises_no_invariant_and_lists_none() -> TestResult {
     assert!(unevaluated.is_empty(), "{unevaluated:#?}");
     Ok(())
 }
+
+/// A synthetic `RiskAssessment` with one prediction whose probability is
+/// `probability` under the JSON member `member`.
+fn assessment(member: &str, probability: &serde_json::Value) -> serde_json::Value {
+    let mut prediction = json!({"outcome": {"text": "synthetic"}});
+    prediction[member] = probability.clone();
+    json!({
+        "resourceType": "RiskAssessment",
+        "text": text(),
+        "status": "final",
+        "subject": {"reference": "Patient/p1"},
+        "prediction": [prediction]
+    })
+}
+
+/// A `Range` from 10 to 20 in the UCUM unit `code`.
+fn range(code: &str) -> serde_json::Value {
+    let bound =
+        |value: u8| json!({"value": value, "system": "http://unitsofmeasure.org", "code": code});
+    json!({"low": bound(10), "high": bound(20)})
+}
+
+#[test]
+fn ras_1_holds_on_a_decimal_probability() -> TestResult {
+    // fhirpath.html §2.9.1.1 and N1 §3.2: ras-1 reads the Range the choice
+    // admits, and on a decimal `low` and `high` are empty.
+    let report = against_core(&assessment("probabilityDecimal", &json!(0.25)))?;
+    assert!(
+        failed_at(&report, "ras-1").is_empty(),
+        "{:#?}",
+        report.issues()
+    );
+    assert!(
+        listed(&report, "ras-1").is_empty(),
+        "{:#?}",
+        report.unevaluated()
+    );
+    Ok(())
+}
+
+#[test]
+fn ras_1_reads_the_units_of_a_range_probability() -> TestResult {
+    let percent = against_core(&assessment("probabilityRange", &range("%")))?;
+    assert!(
+        failed_at(&percent, "ras-1").is_empty(),
+        "{:#?}",
+        percent.issues()
+    );
+    assert!(
+        listed(&percent, "ras-1").is_empty(),
+        "{:#?}",
+        percent.unevaluated()
+    );
+    let milligrams = against_core(&assessment("probabilityRange", &range("mg")))?;
+    assert_eq!(
+        failed_at(&milligrams, "ras-1"),
+        ["RiskAssessment.prediction[0].probability.ofType(Range)"],
+        "{:#?}",
+        milligrams.issues()
+    );
+    Ok(())
+}

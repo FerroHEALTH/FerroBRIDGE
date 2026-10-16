@@ -32,7 +32,6 @@ isSemanticChecks/isGuardOrInnerImplies
 isSemanticChecks/isGuardOrTypesImplies
 isSemanticChecks/isGuardOrTypesImpliesAll
 isSemanticChecks/isGuardOtherAndImplies
-isSemanticChecks/isGuardOtherExpressionBad
 isSemanticChecks/isGuardXorBad2
 miscEngineTests/testContainedId
 miscEngineTests/testPrimitiveExtensions
