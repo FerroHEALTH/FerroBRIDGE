@@ -40,6 +40,11 @@ pub(super) fn matches_ancestor(query: &RmPath, node_path: &RmPath, name: Option<
 }
 
 /// Whether the leading segments of `query` match the node at `node_path`.
+///
+/// The node's own segment compares against the name the template fixes for
+/// it. An ancestor segment compares against the name predicate the node's
+/// `aqlPath` carries there, which is how a Web Template tells apart two
+/// siblings of one node id (Simplified Formats, §Web Template, `aqlPath`).
 fn matches_prefix(query: &RmPath, node_path: &RmPath, name: Option<&str>) -> bool {
     let last = node_path.segments.len().saturating_sub(1);
     node_path
@@ -48,12 +53,12 @@ fn matches_prefix(query: &RmPath, node_path: &RmPath, name: Option<&str>) -> boo
         .enumerate()
         .all(|(position, node_segment)| {
             query.segments.get(position).is_some_and(|query_segment| {
-                let carries_name = position == last;
-                matches_segment(
-                    query_segment,
-                    node_segment,
-                    carries_name.then_some(name).flatten(),
-                )
+                let carried = if position == last {
+                    name.or(node_segment.predicate.name_value.as_deref())
+                } else {
+                    node_segment.predicate.name_value.as_deref()
+                };
+                matches_segment(query_segment, node_segment, carried)
             })
         })
 }
@@ -198,6 +203,25 @@ mod tests {
         assert!(matches_node(&query, &node, Some("systolic")));
         assert!(!matches_node(&query, &node, Some("diastolic")));
         assert!(matches_node(&query, &node, None));
+    }
+
+    #[test]
+    fn a_name_predicate_on_an_ancestor_selects_the_sibling_it_names() {
+        let street = path(
+            "/data[at0001]/items[openEHR-EHR-CLUSTER.address.v1,'Street']/items[at0010]/value",
+        );
+        let postal = path(
+            "/data[at0001]/items[openEHR-EHR-CLUSTER.address.v1,'Postal']/items[at0010]/value",
+        );
+        let query = path(
+            "/data[at0001]/items[openEHR-EHR-CLUSTER.address.v1 and name/value='Street']/items[at0010]/value",
+        );
+        assert!(matches_node(&query, &street, None));
+        assert!(!matches_node(&query, &postal, None));
+        let unnamed =
+            path("/data[at0001]/items[openEHR-EHR-CLUSTER.address.v1]/items[at0010]/value");
+        assert!(matches_node(&unnamed, &street, None));
+        assert!(matches_node(&unnamed, &postal, None));
     }
 
     #[test]

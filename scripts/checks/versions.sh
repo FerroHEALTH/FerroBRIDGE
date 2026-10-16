@@ -539,6 +539,7 @@ docs/specs/its-rest|openEHR ITS-REST OpenAPI
 docs/specs/fhirpath-tests|FHIRPath test suite (R4)
 crates/ferrobridge-fhirpath/vendor/ucum|UCUM essence
 tools/ferrobridge-testkit/fixtures/opt/kds|KDS Diagnose operational template (fixture)
+tools/ferrobridge-testkit/fixtures/opt/kds-person|KDS Person operational template (fixture)
 tools/fhir-codegen/vendor/hl7-v2ig|HL7 v2 definitions (v2ig source of truth, never committed)
 tools/fhir-codegen/vendor/hl7-v2ig|HL7 v2+ licence page
 tools/fhir-codegen/vendor/hl7-v2-legacy|HL7 v2 legacy tables (NIST IGAMT export, never committed)
@@ -739,7 +740,7 @@ if [ -f LICENSE ]; then
   done < <(git grep -n -E '^[[:space:]]*([/#*]+|<!--)?[[:space:]]*SPDX-License-Identifier: (MIT|Apache-2\.0)|License-MIT|License-Apache|^license = "(MIT|Apache-2\.0)"|^license: (MIT|Apache-2\.0)|image\.licenses="?(MIT|Apache)' \
     -- ':!LICENSE' ':!CHANGELOG.md' ':!scripts/checks/versions.sh' ':(glob,exclude)**/vendor/**' \
     ':(glob,exclude)docs/specs/**' ':(glob,exclude)crates/fhir-types/**' ':(glob,exclude)crates/hl7v2-types/**' \
-    ':(glob,exclude)crates/fhirconnect/tests/fixtures/projects/ferrobridge/kds_diagnose/**' \
+    ':(glob,exclude)crates/fhirconnect/tests/fixtures/projects/ferrobridge/kds_*/**' \
     ':(glob,exclude)crates/omop-cdm/sql/*.sql' || true)
   [ "$stale" -eq 0 ] && note "OK: every first-party file names BUSL-1.1 (crates/fhir-types, crates/hl7v2-types, the KDS project fixtures and the omop-cdm era scripts excepted, Apache-2.0)"
 else
