@@ -14,7 +14,12 @@
 #      Cargo.toml. Every cargo lane is skipped cleanly until the workspace
 #      lands and then activates by itself, with no workflow edit. hashFiles()
 #      cannot gate a job at `if:` time, because the workspace is empty before
-#      checkout, so a real detection job is the correct primitive.
+#      checkout, so a real detection job is the correct primitive. The same
+#      job reads which packages a pull request reaches
+#      (scripts/checks/affected.sh): a lane whose inputs the change does not
+#      reach is skipped, the test, clippy and msrv lanes run the reached
+#      packages in shards, and a push to main, a merge group and a dispatch
+#      run everything.
 #
 # The `conclusion` job is the single required status check on main; it is what
 # makes a mostly-skipped pipeline enforceable (docs/ci-cd.md).
@@ -297,20 +302,37 @@ jobs:
 
   # ---- Tier 2: the Rust lanes, gated on the workspace existing --------------
 
-  # The one job that decides whether the cargo tier runs at all: it checks out
-  # and looks for a root Cargo.toml. Every Rust job below `needs` it.
+  # The one job that decides whether the cargo tier runs at all, and which of
+  # its lanes a change needs: it checks out, looks for a root Cargo.toml, and
+  # reads the packages the change reaches (docs/ci-cd.md, "Lanes that run only
+  # when their inputs change"). Every Rust job below `needs` it.
   detect:
-    name: detect workspace
+    name: detect workspace and changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
     outputs:
       cargo: ${{ steps.check.outputs.cargo }}
+      all: ${{ steps.affected.outputs.all }}
+      packages: ${{ steps.affected.outputs.packages }}
+      rust: ${{ steps.affected.outputs.rust }}
+      fhir-types: ${{ steps.affected.outputs.fhir_types }}
+      codegen: ${{ steps.affected.outputs.codegen }}
+      omop-codegen: ${{ steps.affected.outputs.omop_codegen }}
+      sqlx: ${{ steps.affected.outputs.sqlx }}
+      conformance: ${{ steps.affected.outputs.conformance }}
+      e2e: ${{ steps.affected.outputs.e2e }}
+      e2e-packages: ${{ steps.affected.outputs.e2e_packages }}
+      test-matrix: ${{ steps.affected.outputs.test_matrix }}
+      lint-matrix: ${{ steps.affected.outputs.lint_matrix }}
     steps:
+      # Two commits: a pull request runs on GitHub's merge commit, whose first
+      # parent is the base it merges into, so HEAD^1..HEAD is the change.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - id: check
         run: |
           set -euo pipefail
@@ -320,6 +342,27 @@ jobs:
           else
             echo "cargo=false" >> "$GITHUB_OUTPUT"
             echo "No Cargo.toml: the Rust lanes are skipped (repository in its design phase)."
+          fi
+      # The runner's own stable cargo reads the manifests, so a job that
+      # compiles nothing installs no toolchain for `cargo metadata --no-deps`.
+      - name: The classification still answers as designed
+        if: steps.check.outputs.cargo == 'true'
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: bash scripts/checks/affected.sh --self-test
+      - name: The packages this change reaches
+        id: affected
+        if: steps.check.outputs.cargo == 'true'
+        env:
+          EVENT: ${{ github.event_name }}
+          RUSTUP_TOOLCHAIN: stable
+        run: |
+          set -euo pipefail
+          parents="$(git rev-list --parents -n 1 HEAD | wc -w)"
+          if [ "$EVENT" = pull_request ] && [ "$parents" -eq 3 ]; then
+            bash scripts/checks/affected.sh --base HEAD^1 --head HEAD | tee -a "$GITHUB_OUTPUT"
+          else
+            bash scripts/checks/affected.sh --all | tee -a "$GITHUB_OUTPUT"
           fi
 
   fmt:
@@ -334,19 +377,28 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # rustfmt compiles nothing, so this lane keeps no build cache.
       - uses: ./.github/actions/setup-rust
         with:
           components: rustfmt
+          cache: "false"
       - run: cargo fmt --all --check
 
+  # The reached packages in the shards detect packs by measured cost, each
+  # shard with a cache of its own; a push to main lints every package. The
+  # build caches of every lane are saved from main only, so a pull request
+  # restores main's and never evicts it.
   clippy:
-    name: clippy
+    name: clippy (${{ matrix.packages }})
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.lint-matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -354,6 +406,8 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           components: clippy
+          cache-shared-key: clippy-${{ matrix.shard }}
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-hack
@@ -364,12 +418,19 @@ jobs:
       # features here; the per-version `resources` surface of fhir-types is
       # linted by clippy-fhir-types below, and the all-features union (five
       # versions, every resource, one crate) is no consumer's surface.
-      - run: cargo hack clippy --workspace --all-targets --locked -- -D warnings
+      - env:
+          PACKAGES: ${{ matrix.packages }}
+        run: |
+          set -euo pipefail
+          read -ra packages <<<"$PACKAGES"
+          args=()
+          for package in "${packages[@]}"; do args+=(-p "$package"); done
+          cargo hack clippy "${args[@]}" --all-targets --locked -- -D warnings
 
   clippy-fhir-types:
     name: clippy-fhir-types (${{ matrix.version }}, resources)
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.fhir-types == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -385,25 +446,33 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           components: clippy
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       # One version with every resource is what a consumer builds; each is one
       # crate compile and fits the runner.
       - env:
           VERSION: ${{ matrix.version }}
         run: cargo clippy --locked -p fhir-types --all-targets --no-default-features --features "$VERSION,resources" -- -D warnings
 
+  # The reached packages in shards, as the clippy lane runs them.
   test:
-    name: test
+    name: test (${{ matrix.packages }})
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.test-matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-shared-key: test-${{ matrix.shard }}
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-nextest,cargo-hack
@@ -484,10 +553,17 @@ jobs:
         run: bash scripts/vendor/profile-packages.sh
       # One package at a time, as the clippy and msrv lanes do: a workspace-wide
       # test build schedules the generated giants side by side and the runner
-      # kills it with exit 143 (docs/ci-cd.md).
-      - run: cargo hack nextest run --workspace --locked --no-tests=pass
-      # nextest does not run doctests, so they get their own compile.
-      - run: cargo hack test --doc --workspace --locked
+      # kills it with exit 143 (docs/ci-cd.md). nextest does not run doctests,
+      # so they get their own compile.
+      - env:
+          PACKAGES: ${{ matrix.packages }}
+        run: |
+          set -euo pipefail
+          read -ra packages <<<"$PACKAGES"
+          args=()
+          for package in "${packages[@]}"; do args+=(-p "$package"); done
+          cargo hack nextest run "${args[@]}" --locked --no-tests=pass
+          cargo hack test --doc "${args[@]}" --locked
 
   # The conformance gate (#24): the corpus tests measure the vendored
   # FHIRconnect and OMOCL libraries, the round-trip chains, the draft REST
@@ -503,7 +579,7 @@ jobs:
   conformance:
     name: conformance
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.conformance == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -513,6 +589,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-nextest
@@ -556,13 +634,15 @@ jobs:
   # PostgreSQL and the reference CDR actually start. testcontainers talks to
   # the runner's own Docker daemon, so `services:` is not used: the harness
   # creates the network and both containers itself and tears them down on drop.
-  # The images are public, so no registry credential is needed. Per package,
-  # never --workspace: a workspace-wide compile schedules the generated giants
-  # side by side and the runner runs out of memory.
+  # The images are public, so no registry credential is needed. Named
+  # packages, never --workspace: a workspace-wide compile schedules the
+  # generated giants side by side and the runner runs out of memory. The
+  # packages are the ones of omop-cdm, ferrobridge-server, ferrobridge-term
+  # and ferrobridge-testkit that the change reaches (affected.sh names them).
   e2e:
     name: e2e (containers)
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -574,10 +654,19 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-nextest
-      - run: cargo nextest run --locked -p omop-cdm -p ferrobridge-server -p ferrobridge-term -p ferrobridge-testkit --no-tests=pass
+      - env:
+          PACKAGES: ${{ needs.detect.outputs.e2e-packages }}
+        run: |
+          set -euo pipefail
+          read -ra packages <<<"$PACKAGES"
+          args=()
+          for package in "${packages[@]}"; do args+=(-p "$package"); done
+          cargo nextest run --locked "${args[@]}" --no-tests=pass
 
   # The sqlx query metadata of omop-cdm (#89). The crate's queries compile
   # offline from crates/omop-cdm/.sqlx/; this job builds the CDM schema from
@@ -590,7 +679,7 @@ jobs:
   sqlx-offline:
     name: sqlx-offline
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.sqlx == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -614,6 +703,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: sqlx-cli@0.9.0
@@ -624,7 +715,7 @@ jobs:
   doc:
     name: rustdoc
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -638,8 +729,11 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo doc --locked --workspace --no-deps --all-features --document-private-items
 
+  # Runs on every change: the advisory database moves without one.
   cargo-deny:
     name: cargo-deny
     needs: detect
@@ -652,7 +746,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # cargo-deny reads the lockfile and the registry index and compiles
+      # nothing, so this lane keeps no build cache.
       - uses: ./.github/actions/setup-rust
+        with:
+          cache: "false"
       - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-deny
@@ -660,25 +758,39 @@ jobs:
       # yanked, licences, bans and sources, so there is no separate audit job.
       - run: cargo deny check
 
+  # The reached packages in the clippy lane's shards.
   msrv:
-    name: msrv (cargo-hack)
+    name: msrv (${{ matrix.packages }})
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.lint-matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-shared-key: msrv-${{ matrix.shard }}
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-hack
       # The Cargo book's named tool for verifying the declared rust-version,
       # which it reads from the workspace `rust-version`.
-      - run: cargo hack check --rust-version --workspace --locked --all-targets
+      - env:
+          PACKAGES: ${{ matrix.packages }}
+        run: |
+          set -euo pipefail
+          read -ra packages <<<"$PACKAGES"
+          args=()
+          for package in "${packages[@]}"; do args+=(-p "$package"); done
+          cargo hack check --rust-version "${args[@]}" --locked --all-targets
 
   # The feature matrix of the generated crate (#120): one tree holds the union
   # of the declared root sets, so every feature combination the emitter
@@ -686,7 +798,7 @@ jobs:
   fhir-types-features:
     name: fhir-types-features (cargo-hack)
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.fhir-types == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -696,6 +808,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-hack
@@ -714,7 +828,7 @@ jobs:
   codegen-drift:
     name: codegen-drift
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.codegen == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -726,6 +840,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           components: rustfmt
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       # The HL7 v2 definitions are fetched at build time and never committed
       # (tools/fhir-codegen/vendor/hl7-v2ig/PROVENANCE.md). The cache is keyed
       # on the pinned commit, and the script verifies the file count and tree
@@ -760,26 +875,43 @@ jobs:
   # binary reads (tools/fhir-codegen/tests/it/main.rs); the `test` and coverage
   # jobs skip them. They run beside codegen-drift because the two halves in
   # one job outgrew its 30-minute timeout (#388).
+  #
+  # The `emit` profile (root Cargo.toml) optimises the emitter and leaves the
+  # two generated crates the test binary links unoptimised: optimising them
+  # was 35 of this lane's 47 minutes, and at opt-level 0 they fit the runner
+  # two crates at a time, as in the test lane. The two longest tests (four
+  # and three full emits of hl7v2-types) each take a shard of their own, and
+  # the third shard runs every other test: its filter is the complement of
+  # the first two, so a test belongs to exactly one shard, and a renamed one
+  # falls into the third while its old shard fails on `--no-tests=fail`.
   codegen-emit-tests:
-    name: codegen-emit-tests
+    name: codegen-emit-tests (${{ matrix.shard }})
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.codegen == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    # fhir-types (five versions) and hl7v2-types each fill most of the runner's
-    # memory in release; one job builds them one after the other (#505). One
-    # crate at a time took 51 minutes on 2026-10-15, so the timeout is 90.
-    env:
-      CARGO_BUILD_JOBS: "1"
+    timeout-minutes: 45
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: v2-check
+            filter: test(=v2::emit::check_reports_edited_missing_and_stale_files)
+          - shard: v2-twice
+            filter: test(=v2::emit::emitting_twice_is_byte_identical_and_check_passes)
+          - shard: rest
+            filter: not (test(=v2::emit::check_reports_edited_missing_and_stale_files) | test(=v2::emit::emitting_twice_is_byte_identical_and_check_passes))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # One build serves every shard, so the shards share one cache.
       - uses: ./.github/actions/setup-rust
         with:
           components: rustfmt
+          cache-shared-key: codegen-emit-tests
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       # The HL7 v2 definitions are fetched at build time and never committed
       # (tools/fhir-codegen/vendor/hl7-v2ig/PROVENANCE.md). The cache is keyed
       # on the pinned commit, and the script verifies the file count and tree
@@ -809,16 +941,17 @@ jobs:
       - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-nextest
-      - run: cargo nextest run --locked --release -p fhir-codegen --no-tests=pass
+      - run: cargo nextest run --locked --cargo-profile emit -p fhir-codegen --no-tests=fail -E "$FILTER"
         env:
           FERROBRIDGE_CODEGEN_EMIT: "1"
+          FILTER: ${{ matrix.filter }}
 
   # The same gate for the OMOP side: regenerate crates/omop-cdm from the
   # vendored OHDSI CommonDataModel definitions and fail on any difference.
   omop-cdm-codegen-drift:
     name: omop-cdm-codegen-drift
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.omop-codegen == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -830,6 +963,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           components: rustfmt
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo run --locked -p omop-cdm-codegen -- emit --check
 
   # The per-crate bump rule (.claude/rules/crates-publishing.md): a pull
@@ -861,7 +995,7 @@ jobs:
   publish-dry-run:
     name: publish-dry-run
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

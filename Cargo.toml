@@ -294,3 +294,18 @@ deref_by_slicing = "warn"
 panic = "unwind"
 overflow-checks = true
 debug = "line-tables-only"
+
+# The full-emit tests of fhir-codegen (`cargo nextest run --cargo-profile emit
+# -p fhir-codegen`): the emitter runs optimised, while the two generated crates
+# its tests link stay unoptimised, as in a test build, because optimising them
+# took 35 of the 47 minutes of that CI job and no full-emit test runs their
+# code. No specification governs this: our own design.
+[profile.emit]
+inherits = "release"
+debug = false
+
+[profile.emit.package.fhir-types]
+opt-level = 0
+
+[profile.emit.package.hl7v2-types]
+opt-level = 0

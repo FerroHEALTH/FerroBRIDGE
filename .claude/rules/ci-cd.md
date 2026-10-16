@@ -127,6 +127,14 @@ the committed pass lists under `conformance/` against the corpus tests' own
 verdicts, a regression or an unrecorded pass failing the lane). **Always `--locked`**, so CI fails on
 lockfile drift rather than on registry drift. Commit `Cargo.lock`.
 
+**On a pull request a lane runs only where the change reaches its inputs**
+(`scripts/checks/affected.sh`, the map in `docs/ci-cd.md`); a push to `main`
+runs every lane over every package. A path the script does not know reaches
+everything, so a new input is guarded by default: map it in `classify`
+rather than letting it fall into the inert list, and never mark a path inert
+that a build, a test or a lane script reads. `scripts/checks/fast.sh` is the
+local form of the same selection and the default gate for a worker.
+
 ## Supply chain (the release lane, `docs/release.md`)
 
 - **A release builds in a REUSABLE workflow** (`on: workflow_call`) so the
