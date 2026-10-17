@@ -769,7 +769,10 @@ jobs:
         run: |
           bash scripts/release/viewer-tools.sh "$RUNNER_TEMP/viewer-tools"
           echo "$RUNNER_TEMP/viewer-tools/bin" >> "$GITHUB_PATH"
-      - run: bash scripts/release/viewer-site.sh --release
+      # setup-rust-toolchain v1 exports RUSTFLAGS=-D warnings, and a RUSTFLAGS
+      # in the environment overrides the per-target flags that remap the
+      # build host's paths, so the site build runs without it.
+      - run: env -u RUSTFLAGS bash scripts/release/viewer-site.sh --release
       # The bundle's raw and compressed sizes go to the job summary, and the
       # step fails above the budget of .claude/rules/leptos-ui.md §12.
       - name: Measure the bundle against its budget
