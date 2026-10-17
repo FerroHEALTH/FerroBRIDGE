@@ -22,6 +22,7 @@ use super::create_one;
 use super::first_issue;
 use super::harness;
 use super::stub::mount_read;
+use super::stub::mount_version_read;
 
 #[tokio::test]
 async fn the_same_composition_read_twice_yields_the_same_id() -> Result<(), Box<dyn StdError>> {
@@ -52,6 +53,7 @@ async fn a_read_names_the_subject_the_identity_map_binds_to_the_ehr()
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
+    mount_version_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
     let (status, body) = call(
         harness.app(),
         Request::get(format!("/fhir/Condition/{id}")).body(Body::empty())?,
@@ -97,6 +99,7 @@ async fn a_read_whose_ehr_has_no_recorded_person_is_refused_naming_the_element()
             entry_path: String::from("/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"),
             split: 0,
             context: String::from("ferrobridge_facade.context"),
+            derivation: Some(ferrobridge_server::facade::identity::derive::DERIVATION),
         },
     )?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;

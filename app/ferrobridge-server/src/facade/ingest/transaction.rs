@@ -50,7 +50,6 @@ use super::claim::claim_keys;
 use super::claim::contended_entries;
 use super::entries::nothing_mapped;
 use super::reconcile::one_contribution;
-use super::reconcile::versions_of;
 use super::refusal::cdr_refusal;
 use super::refusal::ehr_refusal;
 use super::refusal::refuse_all;
@@ -354,7 +353,7 @@ impl Ingest<'_> {
                 Scope::Whole,
             )
             .await?;
-        let mut placed = self.place(&partition.mapped, &sources, &ehr_id, versions_of(versions))?;
+        let mut placed = self.place(&partition.mapped, &sources, &ehr_id, versions)?;
         for (place, prior) in placed.iter_mut().zip(&preceding) {
             place.change = Some(change_of(prior.as_ref()));
         }

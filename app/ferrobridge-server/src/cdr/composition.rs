@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The composition operations: create, update, read and delete.
+//! The composition operations: create, update, read, delete and the revision
+//! history.
 
 use http::HeaderMap;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
@@ -11,11 +12,13 @@ use openehr_its::rest::generated::ehr::CompositionCreateParams;
 use openehr_its::rest::generated::ehr::CompositionDeleteParams;
 use openehr_its::rest::generated::ehr::CompositionGetParams;
 use openehr_its::rest::generated::ehr::CompositionUpdateParams;
+use openehr_its::rest::generated::ehr::VersionedCompositionRevisionHistoryParams;
 use openehr_its::rest::generated::ehr::client::CompositionCreateOutcome;
 use openehr_its::rest::generated::ehr::client::CompositionDeleteOutcome;
 use openehr_its::rest::generated::ehr::client::CompositionGetOutcome;
 use openehr_its::rest::generated::ehr::client::CompositionUpdateOutcome;
 use openehr_its::rest::generated::ehr::client::EhrClient;
+use openehr_its::rest::generated::ehr::client::VersionedCompositionRevisionHistoryOutcome;
 use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::cdr::commit::CommitContext;
@@ -156,6 +159,30 @@ impl CdrClient {
             openehr_audit_details: None,
         };
         let answered = EhrClient::new(&client).composition_delete(&params).await;
+        answered_by(&client, answered)
+    }
+
+    /// Retrieves the revision history of the composition container
+    /// `versioned_object_uid`: every version it holds, each with its audits
+    /// (`ehr-codegen.openapi.yaml`, `versioned_composition_revision_history`).
+    ///
+    /// # Errors
+    /// Returns [`CdrError`] when the call did not reach a documented answer.
+    pub async fn revision_history(
+        &self,
+        ehr_id: &EhrId,
+        versioned_object_uid: &HierObjectId,
+    ) -> Result<Answered<VersionedCompositionRevisionHistoryOutcome>, CdrError> {
+        let client = self.call(HeaderMap::new())?;
+        let params = VersionedCompositionRevisionHistoryParams {
+            ehr_id: String::from(ehr_id.as_str()),
+            versioned_object_uid: String::from(versioned_object_uid.value()),
+            accept: None,
+            content_type: None,
+        };
+        let answered = EhrClient::new(&client)
+            .versioned_composition_revision_history(&params)
+            .await;
         answered_by(&client, answered)
     }
 }
