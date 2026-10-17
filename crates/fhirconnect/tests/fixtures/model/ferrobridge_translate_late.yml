@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that translates the certainty through
+# a concept map and then requires the problem name, which the synthetic
+# ferrobridge.diagnose.v1 template constrains to 1..1. Driven over an input
+# with no code, the unit refuses after the translation (Fail.adoc). The
+# concept map URL is example.org, which RFC 6761 section 6.5 reserves for
+# examples.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_translate_late
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "diagnosis"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "certainty"
+          with:
+            fhir: "verificationStatus"
+            openehr: "data[at0001]/items[at0073]"
+            type: "CODEABLECONCEPT"
+          conceptmap: "http://example.org/fhir/ConceptMap/ferrobridge-certainty"
+        - name: "problemName"
+          with:
+            fhir: "code"
+            openehr: "data[at0001]/items[at0002]"
+            type: "CODEABLECONCEPT"

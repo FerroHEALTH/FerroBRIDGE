@@ -43,6 +43,19 @@ crates on crates.io.
   products fit together, and licensing and trademarks.
 ### Added
 
+- `fhirconnect` 0.1.128 translates the codes of a mapping that names a
+  `conceptmap` through `ConceptMap/$translate` (#219), over a new
+  `engine::terminology::Terminology` seam that `Seams::with_terminology`
+  sets. With no server configured the run refuses
+  (`EngineError::Terminology`), so a code is never passed through under a
+  system it was not translated into. Each distinct code is translated once,
+  with the resource's own system and code, before the composition is built;
+  only an `equivalent` or `equal` match counts, and the translated concept's
+  display wins over the source text. An untranslatable code at an optional
+  element writes nothing and is declared as `SkipReason::Untranslated`; at a
+  required element it refuses the unit (`EngineError::Untranslated`).
+  Breaking for a consumer that matches `SkipReason` exhaustively: add an arm
+  for `Untranslated`.
 - `fhir-types` 0.1.117 carries a search parameter registry per FHIR version
   behind `resources` (#522): `<version>::search_parameters::SEARCH_PARAMETERS`
   holds every `SearchParameter` of the core package, apart from its examples,

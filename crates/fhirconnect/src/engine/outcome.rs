@@ -7,7 +7,8 @@
 //! governs this: our own design), so a warning here is never "something went
 //! wrong and the run carried on". Each variant of [`Loss`] is a loss the
 //! specification itself declares: a mapping the direction skips (a gate, a
-//! `unidirectional` marker, or a reference that resolves to nothing), a
+//! `unidirectional` marker, a reference that resolves to nothing, or an
+//! optional code its concept map does not translate), a
 //! `TERM_MAPPING` whose `match` is not `=` and so has no FHIR form, a
 //! composition field the engine defaulted, the occurrences a `0..n` into a
 //! `0..1` dropped, a one-way row a data-type cell took, and a reference whose
@@ -340,6 +341,12 @@ pub enum SkipReason {
     /// The `Reference` carries no literal reference and no display, so it
     /// names nothing to map.
     EmptyReference,
+    /// The concept map the mapping names translates the input code to no
+    /// equivalent concept, so the optional output element is not written.
+    Untranslated {
+        /// The `ConceptMap.url` the mapping names.
+        conceptmap: String,
+    },
     /// A `TERM_MAPPING` of the value has a `match` FHIR cannot carry.
     ///
     /// `match` is "hard coded to `=`, other operators not mappable to FHIR"
@@ -371,6 +378,12 @@ impl fmt::Display for SkipReason {
                 write!(f, "the reference {reference} resolves to no resource")
             }
             Self::EmptyReference => f.write_str("the Reference names no resource"),
+            Self::Untranslated { ref conceptmap } => {
+                write!(
+                    f,
+                    "{conceptmap} translates its code to no equivalent concept"
+                )
+            }
             Self::TermMappingMatch {
                 match_code,
                 ref terminology,

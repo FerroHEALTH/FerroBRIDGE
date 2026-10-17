@@ -18,6 +18,7 @@ mod links;
 mod reference;
 mod split;
 mod tail;
+mod translate;
 
 use core::cell::RefCell;
 use core::error::Error;
