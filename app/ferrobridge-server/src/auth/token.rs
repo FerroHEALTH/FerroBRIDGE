@@ -90,13 +90,16 @@ pub(super) async fn validate(authority: &Authority, token: &str) -> Result<Calle
     }
     let subject = claims.sub.ok_or_else(|| invalid("sub is missing"))?;
     let scopeless = settings.scopeless_subjects.contains(&subject);
-    Ok(Caller::new(
-        subject,
-        claims.client_id,
-        claims.scope.as_deref().unwrap_or_default(),
-        claims.patient,
-        scopeless,
-    ))
+    let scope = claims.scope.as_deref().unwrap_or_default();
+    // NOTE: RFC 6749 §3.3, the scope claim is space-delimited tokens; the
+    // operator scope is one of them (no specification governs it: our own design).
+    let operator = scope
+        .split(' ')
+        .any(|token| token == settings.operator_scope);
+    Ok(
+        Caller::new(subject, claims.client_id, scope, claims.patient, scopeless)
+            .with_operator(operator),
+    )
 }
 
 /// Returns the rejection of a token that does not hold for `reason`.

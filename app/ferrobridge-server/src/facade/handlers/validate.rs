@@ -71,12 +71,15 @@ pub(crate) fn validate(
             ));
         }
     };
-    let admitted = [Permission::Create, Permission::Update]
-        .into_iter()
-        .any(|permission| {
-            compartment::admit_person(facade, access, permission, resource_type, Some(&person))
-                .is_ok()
-        });
+    // NOTE: no specification governs this: our own design, a dry run commits
+    // nothing, so the operator scope admits it like the guard does.
+    let admitted = access.is_operator()
+        || [Permission::Create, Permission::Update]
+            .into_iter()
+            .any(|permission| {
+                compartment::admit_person(facade, access, permission, resource_type, Some(&person))
+                    .is_ok()
+            });
     if !admitted {
         return Err(crate::auth::guard::forbidden());
     }

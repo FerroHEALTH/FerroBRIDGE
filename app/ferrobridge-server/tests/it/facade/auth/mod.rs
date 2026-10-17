@@ -53,7 +53,7 @@ const JWKS_PATH: &str = "/jwks";
 const TOKEN_PATH: &str = "/token";
 
 /// One signing key, generated for the case.
-pub(super) struct SigningKey {
+pub(crate) struct SigningKey {
     /// The `kid` the key is published and used under.
     kid: String,
     /// The algorithm it signs with.
@@ -65,7 +65,7 @@ pub(super) struct SigningKey {
 }
 
 /// Returns a fresh ECDSA key for `alg` (ES256 or ES384) published as `kid`.
-pub(super) fn ec_key(kid: &str, alg: Algorithm) -> SigningKey {
+pub(crate) fn ec_key(kid: &str, alg: Algorithm) -> SigningKey {
     let curve = match alg {
         Algorithm::ES384 => &ECDSA_P384_SHA384_FIXED_SIGNING,
         _ => &ECDSA_P256_SHA256_FIXED_SIGNING,
@@ -86,7 +86,7 @@ pub(super) fn ec_key(kid: &str, alg: Algorithm) -> SigningKey {
 }
 
 /// The stub authorization server.
-pub(super) struct Issuer {
+pub(crate) struct Issuer {
     /// The server, kept alive for the case.
     server: MockServer,
 }
@@ -94,7 +94,7 @@ pub(super) struct Issuer {
 impl Issuer {
     /// Starts an issuer whose RFC 8414 metadata names the key set holding
     /// `keys`.
-    pub(super) async fn start(keys: &[&SigningKey]) -> Self {
+    pub(crate) async fn start(keys: &[&SigningKey]) -> Self {
         let issuer = Self::bare().await;
         issuer
             .mount_metadata("/.well-known/oauth-authorization-server")
@@ -111,7 +111,7 @@ impl Issuer {
     }
 
     /// Returns the issuer identifier.
-    pub(super) fn uri(&self) -> String {
+    pub(crate) fn uri(&self) -> String {
         self.server.uri()
     }
 
@@ -181,14 +181,14 @@ impl Issuer {
 
     /// Returns the settings of a resource server for this issuer, reading
     /// the key set again on every unknown `kid`.
-    pub(super) fn settings(&self) -> AuthSettings {
+    pub(crate) fn settings(&self) -> AuthSettings {
         let mut settings = AuthSettings::new(self.uri(), AUDIENCE);
         settings.jwks_refresh_interval = Duration::ZERO;
         settings
     }
 
     /// Returns the claims of a valid token granting `scope`.
-    pub(super) fn claims(&self, scope: &str) -> serde_json::Value {
+    pub(crate) fn claims(&self, scope: &str) -> serde_json::Value {
         let now = now();
         serde_json::json!({
             "iss": self.uri(),
@@ -204,12 +204,12 @@ impl Issuer {
 }
 
 /// Returns the current time in seconds.
-pub(super) fn now() -> i64 {
+pub(crate) fn now() -> i64 {
     jiff::Timestamp::now().as_second()
 }
 
 /// Returns `claims` signed by `key` with `typ` of `at+jwt`.
-pub(super) fn mint(key: &SigningKey, claims: &serde_json::Value) -> String {
+pub(crate) fn mint(key: &SigningKey, claims: &serde_json::Value) -> String {
     let mut header = Header::new(key.alg);
     header.kid = Some(key.kid.clone());
     header.typ = Some(String::from("at+jwt"));
@@ -222,7 +222,7 @@ pub(super) fn mint_with(key: &SigningKey, header: &Header, claims: &serde_json::
 }
 
 /// Returns the resource server `settings` describe.
-pub(super) async fn authority(settings: AuthSettings) -> Arc<Authority> {
+pub(crate) async fn authority(settings: AuthSettings) -> Arc<Authority> {
     Arc::new(
         Authority::discover(settings)
             .await
@@ -239,7 +239,7 @@ pub(super) fn secured(harness: &Harness, authority: &Arc<Authority>) -> Router {
 }
 
 /// Returns `request` carrying `token` as its bearer credential.
-pub(super) fn bearing(mut request: Request<Body>, token: &str) -> Request<Body> {
+pub(crate) fn bearing(mut request: Request<Body>, token: &str) -> Request<Body> {
     request.headers_mut().insert(
         header::AUTHORIZATION,
         format!("Bearer {token}")
@@ -257,7 +257,7 @@ pub(super) fn get(path: &str) -> Request<Body> {
 }
 
 /// Returns the `WWW-Authenticate` challenge of `response`.
-pub(super) fn challenge(response: &http::Response<Body>) -> Option<String> {
+pub(crate) fn challenge(response: &http::Response<Body>) -> Option<String> {
     response
         .headers()
         .get(header::WWW_AUTHENTICATE)

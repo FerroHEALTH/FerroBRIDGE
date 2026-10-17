@@ -115,10 +115,10 @@ on the resource type in the path or in the entry:
 | read, vread | `r` |
 | search (`GET [base]/{type}`, `POST [base]/{type}/_search`) | `s` |
 | update | `u` |
-| `$validate` | `c` or `u` |
+| `$validate` | `c` or `u`, or the operator scope (`auth.operator_scope`): the dry run commits nothing, so an operator console needs no clinical write scope |
 | transaction | the permission of each entry's `request.method`: `c` for `POST`, `u` for `PUT`, `r` for `GET`, `d` for `DELETE` |
 | batch | per entry, the permission of the interaction its `request` names: `c` for a create, `u` for an update, `r` for a read or vread, `s` for a search |
-| `$tofhir`, `$toopenehr` | a valid token, no clinical scope: they transform the request body and reach no CDR |
+| `$tofhir`, `$toopenehr` | a valid token, no clinical scope, the operator scope included: they transform the request body and reach no CDR |
 
 A scope reads `patient/`, `user/` or `system/`, then a resource type or `*`,
 then the letters in the order `cruds`, such as `system/*.crs` or

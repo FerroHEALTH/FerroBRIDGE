@@ -17,7 +17,8 @@ use tokio::net::TcpListener;
 use crate::config::{self, ServerSettings, Settings};
 use crate::serve_until;
 use crate::state::{self, AppState};
-use crate::{auth, cdr, facade, hl7v2, startup};
+use crate::{auth, cdr, check, facade, hl7v2, operator, startup};
+use std::collections::BTreeMap;
 
 /// Every lane of one start, built and ready to serve.
 pub(crate) struct Started {
@@ -68,6 +69,12 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             .context("starting the FHIR facade")?;
         state = state.with_facade(Arc::new(mounted));
         set_counts(&mut lanes, "facade", counts);
+    }
+    if settings.operator {
+        let operator = build_operator(settings, state.facade().map(Arc::as_ref))
+            .await
+            .context("starting the operator API")?;
+        state = state.with_operator(Arc::new(operator));
     }
     if let Some(operations) = state.operations() {
         set_counts(&mut lanes, "operations", operation_counts(operations));
@@ -214,6 +221,68 @@ fn operation_counts(lane: &state::OperationsLane) -> startup::MappingCounts {
         programs: programs.len(),
         templates: templates.len(),
     }
+}
+
+/// Builds the operator API over the configured mapping directories, with the
+/// running load as the checker sees it.
+///
+/// The check runs once here, over the inputs `mapping check` reads, and the
+/// search declaration of each context comes from the facade when it runs
+/// (no specification governs the operator surface: our own design).
+async fn build_operator(
+    settings: &Settings,
+    facade: Option<&facade::Facade>,
+) -> anyhow::Result<operator::Operator> {
+    use anyhow::Context;
+
+    let needs_cdr = settings.mapping_directory.is_some() && settings.mappings.is_none();
+    let cdr = match settings.cdr.as_ref() {
+        Some(config) if needs_cdr => Some(
+            cdr::CdrClient::new(config)
+                .context("building the CDR client the templates are fetched through")?,
+        ),
+        _ => None,
+    };
+    let report = match check::inputs(settings, cdr.as_ref()) {
+        Ok(inputs) => check::check(inputs)
+            .await
+            .context("checking the mapping set")?,
+        Err(check::Error::NothingConfigured) => check::Report::default(),
+        Err(error) => return Err(error).context("reading the mapping inputs"),
+    };
+    let mut roots = Vec::new();
+    if let Some(directory) = settings.mapping_directory.as_ref() {
+        roots.push(operator::files::Root::new(
+            operator::files::Language::Fhirconnect,
+            directory.clone(),
+        ));
+    }
+    if let Some(directory) = settings.omocl_directory.as_ref() {
+        roots.push(operator::files::Root::new(
+            operator::files::Language::Omocl,
+            directory.clone(),
+        ));
+    }
+    let searches = facade.map_or_else(BTreeMap::new, |facade| {
+        let catalog = facade.search();
+        facade
+            .programs()
+            .resource_types()
+            .iter()
+            .flat_map(|resource_type| catalog.of_type(resource_type))
+            .map(|declared| (declared.context().to_owned(), declared.file().to_path_buf()))
+            .collect()
+    });
+    tracing::info!(
+        lane = "operator",
+        roots = roots.len(),
+        diagnostics = report.diagnostics().len(),
+        "the operator API is mounted under /operator"
+    );
+    Ok(operator::Operator::new(
+        roots,
+        operator::snapshot::Snapshot::new(report, searches),
+    ))
 }
 
 /// Builds the FHIR facade this deployment mounts and returns it with what its

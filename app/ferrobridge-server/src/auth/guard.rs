@@ -152,6 +152,14 @@ impl Interaction {
         }
     }
 
+    /// Returns whether a token carrying the operator scope is admitted without
+    /// a SMART permission: `$validate` and the two FHIRconnect operations
+    /// commit nothing to the CDR (no specification governs this: our own
+    /// design).
+    const fn admits_operator(self) -> bool {
+        matches!(self, Self::Validate | Self::Operation)
+    }
+
     /// Returns whether a client reaches the route without a token.
     const fn public(self) -> bool {
         matches!(self, Self::Capabilities | Self::Discovery)
@@ -318,6 +326,9 @@ async fn authenticate(
 /// Checks that `access` grants a permission the interaction needs on the
 /// resource type the path names.
 fn authorize(access: &Access, target: &Target) -> Result<(), Refusal> {
+    if target.interaction.admits_operator() && access.is_operator() {
+        return Ok(());
+    }
     let permissions = target.interaction.permissions();
     if let Some(resource_type) = target.resource_type.as_deref()
         && !permissions.is_empty()
@@ -334,7 +345,7 @@ fn authorize(access: &Access, target: &Target) -> Result<(), Refusal> {
 /// compared case-insensitively (RFC 9110 §11.1).
 ///
 /// A request with another scheme carries no bearer token.
-fn bearer(headers: &HeaderMap) -> Option<&str> {
+pub(crate) fn bearer(headers: &HeaderMap) -> Option<&str> {
     let value = headers.get(http::header::AUTHORIZATION)?.to_str().ok()?;
     let (scheme, token) = value.split_once(' ')?;
     if !scheme.eq_ignore_ascii_case("Bearer") {

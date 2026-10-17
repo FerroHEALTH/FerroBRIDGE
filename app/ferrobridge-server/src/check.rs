@@ -21,6 +21,7 @@ use std::sync::Arc;
 use fhirconnect::model::load::MappingSet;
 use fhirconnect::model::semantic::StaticMappingCodes;
 use fhirconnect::resolve::compile::compile;
+use fhirconnect::resolve::program::Program;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::DiagnosticCode;
 use openehr_mapping_core::diagnostic::LanguageCode;
@@ -121,6 +122,46 @@ pub struct Report {
     diagnostics: Vec<Diagnostic>,
     /// What was read.
     counts: Counts,
+    /// The FHIRconnect set, when it loaded.
+    set: Option<MappingSet>,
+    /// The programs the contexts compiled into, in context-name order.
+    programs: Vec<Arc<Program>>,
+    /// The templates the contexts compiled against.
+    templates: Vec<TemplateEntry>,
+    /// The OMOCL files read.
+    omocl_files: Vec<PathBuf>,
+}
+
+/// Where one template came from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TemplateOrigin {
+    /// An `.opt` file of the template directory.
+    File(PathBuf),
+    /// The CDR.
+    Cdr,
+}
+
+/// One template the contexts compiled against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TemplateEntry {
+    /// The template identifier.
+    id: String,
+    /// Where it came from.
+    origin: TemplateOrigin,
+}
+
+impl TemplateEntry {
+    /// Returns the template identifier.
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Returns where it came from.
+    #[must_use]
+    pub const fn origin(&self) -> &TemplateOrigin {
+        &self.origin
+    }
 }
 
 impl Report {
@@ -134,6 +175,30 @@ impl Report {
     #[must_use]
     pub const fn counts(&self) -> Counts {
         self.counts
+    }
+
+    /// Returns the FHIRconnect set, when it loaded.
+    #[must_use]
+    pub const fn fhirconnect_set(&self) -> Option<&MappingSet> {
+        self.set.as_ref()
+    }
+
+    /// Returns the programs the contexts compiled into.
+    #[must_use]
+    pub fn programs(&self) -> &[Arc<Program>] {
+        &self.programs
+    }
+
+    /// Returns the templates the contexts compiled against, by identifier.
+    #[must_use]
+    pub fn templates(&self) -> &[TemplateEntry] {
+        &self.templates
+    }
+
+    /// Returns the OMOCL files read.
+    #[must_use]
+    pub fn omocl_files(&self) -> &[PathBuf] {
+        &self.omocl_files
     }
 
     /// Returns how many diagnostics carry `severity`.
@@ -161,7 +226,7 @@ impl Report {
         serde_json::json!({
             "clean": self.is_clean(),
             "counts": self.counts,
-            "diagnostics": self.diagnostics.iter().map(json).collect::<Vec<serde_json::Value>>(),
+            "diagnostics": self.diagnostics.iter().map(|diagnostic| diagnostic_json(diagnostic, &diagnostic.file().display().to_string())).collect::<Vec<serde_json::Value>>(),
         })
     }
 }
@@ -187,11 +252,12 @@ impl fmt::Display for Report {
     }
 }
 
-/// Returns one diagnostic as a JSON object.
-fn json(diagnostic: &Diagnostic) -> serde_json::Value {
+/// Returns one diagnostic as a JSON object, its file named `file`.
+#[must_use]
+pub fn diagnostic_json(diagnostic: &Diagnostic, file: &str) -> serde_json::Value {
     let position = diagnostic.position();
     serde_json::json!({
-        "file": diagnostic.file().display().to_string(),
+        "file": file,
         "line": position.map(openehr_mapping_core::position::Position::line),
         "column": position.map(openehr_mapping_core::position::Position::column),
         "severity": diagnostic.severity().to_string(),
@@ -288,6 +354,7 @@ async fn check_fhirconnect(
     };
     report.counts.templates = indexes.len();
     compile_contexts(&set, &indexes, report);
+    report.set = Some(set);
     Ok(())
 }
 
@@ -310,6 +377,10 @@ fn directory_templates(
         let built = TemplateSource::opt14(&xml).and_then(|source| WebTemplateIndex::build(&source));
         match built {
             Ok(index) => {
+                report.templates.push(TemplateEntry {
+                    id: index.template_id().to_owned(),
+                    origin: TemplateOrigin::File(path.clone()),
+                });
                 indexes.insert(index.template_id().to_owned(), Arc::new(index));
             }
             Err(error) => report.diagnostics.push(Diagnostic::error(
@@ -342,6 +413,10 @@ async fn cdr_templates(
     for (template, file) in wanted {
         match crate::mappings::template_index(client, &template).await {
             Ok(index) => {
+                report.templates.push(TemplateEntry {
+                    id: template.clone(),
+                    origin: TemplateOrigin::Cdr,
+                });
                 indexes.insert(template, Arc::new(index));
             }
             Err(crate::mappings::Error::TemplateNotHeld { status, .. }) => {
@@ -426,6 +501,7 @@ fn compile_contexts(
                 report
                     .diagnostics
                     .extend(program.warnings().iter().cloned());
+                report.programs.push(program);
             }
             Err(mut diagnostics) => report.diagnostics.append(&mut diagnostics),
         }
@@ -439,14 +515,14 @@ fn check_omocl(directory: &Path, report: &mut Report) -> Result<(), Error> {
     })
     .map_err(read_error)?;
     report.counts.omocl_files = files.len();
-    if let Err(mut diagnostics) =
-        omocl::model::load::load_set(&files, &omocl::model::semantic::FirstPartyConverters)
-    {
+    let loaded =
+        omocl::model::load::load_set(&files, &omocl::model::semantic::FirstPartyConverters);
+    report.omocl_files = files;
+    if let Err(mut diagnostics) = loaded {
         report.diagnostics.append(&mut diagnostics);
     }
     Ok(())
 }
-
 /// Returns the template identifier one context names, if it names one.
 fn template_of(context: &fhirconnect::model::ast::ContextMappingFile) -> Option<String> {
     context
