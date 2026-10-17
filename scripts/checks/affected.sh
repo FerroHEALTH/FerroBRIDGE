@@ -175,6 +175,8 @@ classify() {
     conformance/*/*) corpus_class "$(cut -d/ -f2 <<<"$1")" ;;
     conformance/* | scripts/checks/conformance.sh | README.md) echo "packages $(conformance_packages)" ;;
     scripts/checks/sqlx-offline.sh) echo "packages omop-cdm" ;;
+    # Writes only the vendored FerroPULSE schema the server's tests read.
+    scripts/vendor/ferropulse-schemas.sh) echo "packages ferrobridge-server" ;;
     crates/* | app/* | tools/*) echo member ;;
     *) echo global ;;
   esac
@@ -513,6 +515,8 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+fhir-types +ferrobridge-testkit +fhirconnect +ferrobridge-validator +ferrobridge-server +fhir-codegen -omop-cdm-codegen"
   check "the testkit reaches every member testing with it" "tools/ferrobridge-testkit/src/lib.rs" false \
     "+ferrobridge-testkit +openehr-mapping-core +omocl +omop-cdm +ferrobridge-server -fhir-types -fhir-codegen"
+  check "the FerroPULSE vendor script reaches the server alone" "scripts/vendor/ferropulse-schemas.sh" false \
+    "+ferrobridge-server -ferrobridge-testkit -fhir-codegen"
   check "the sqlx script reaches omop-cdm" "scripts/checks/sqlx-offline.sh" false \
     "+omop-cdm +omocl +ferrobridge-server"
   local every_corpus_package
