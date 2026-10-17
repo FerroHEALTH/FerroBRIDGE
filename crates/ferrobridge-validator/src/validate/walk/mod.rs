@@ -37,7 +37,6 @@ use crate::validate::slicing::Site;
 use crate::validate::structure::Structure;
 use crate::validate::terminology::binding::Bound;
 use members::forms;
-use members::knows;
 
 /// The definition an object is held to: a snapshot and the id of the
 /// object's own element in it.
@@ -408,7 +407,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             if resource && key == "resourceType" {
                 continue;
             }
-            if !knows(schema, key) {
+            if schema.member(key).is_none() {
                 self.out.issue(
                     Severity::Error,
                     IssueType::Structure,

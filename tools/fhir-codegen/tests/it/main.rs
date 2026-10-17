@@ -23,6 +23,7 @@ mod element_table;
 mod emit;
 mod layout;
 mod lexical_forms;
+mod member;
 mod operations;
 mod package;
 mod precision;
