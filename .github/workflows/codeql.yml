@@ -9,11 +9,11 @@
 #     code holding tokens that can publish releases, so they get the same
 #     scrutiny as source. Build-mode "none".
 #   * rust: GUARDED behind a detection job that checks for a root Cargo.toml,
-#     the same primitive ci.yml uses. It is skipped cleanly while the repository
-#     is pre-code and activates by itself when the Cargo workspace lands, with no
-#     workflow edit. `rust` is a generally-available CodeQL language (GA
-#     2025-10-14), build-mode "none", so it never contends for cargo's build
-#     tree.
+#     the same primitive ci.yml uses, and on a pull request runs only when the
+#     change reaches Rust, over the hand-written tree. A push to main and the
+#     weekly schedule analyze the whole tree. `rust` is a generally-available
+#     CodeQL language (GA 2025-10-14), build-mode "none", so it never contends
+#     for cargo's build tree.
 #
 # Code scanning must be the ADVANCED setup for this workflow to run: GitHub
 # rejects an advanced-config analysis while the CodeQL default setup is enabled
@@ -31,6 +31,7 @@ on:
       - "**/*.rs"
       - "**/Cargo.toml"
       - "Cargo.lock"
+      - "rust-toolchain.toml"
   pull_request:
     branches: [main]
     paths:
@@ -39,6 +40,7 @@ on:
       - "**/*.rs"
       - "**/Cargo.toml"
       - "Cargo.lock"
+      - "rust-toolchain.toml"
   schedule:
     - cron: "23 5 * * 1" # Mondays 05:23 UTC (off-the-hour to dodge load spikes)
 
@@ -76,9 +78,12 @@ jobs:
         with:
           category: "/language:actions"
 
-  # Decides whether the Rust analysis runs at all: it checks out and looks for a
-  # root Cargo.toml. hashFiles() cannot gate at `if:` time on a pre-code tree, so
-  # a real detection job is the correct primitive (the ci.yml pattern).
+  # Decides whether the Rust analysis runs at all. It checks out and looks for
+  # a root Cargo.toml: hashFiles() cannot gate at `if:` time on a pre-code
+  # tree, so a real detection job is the correct primitive (the ci.yml
+  # pattern). On a pull request it also asks whether the change reaches Rust:
+  # the workflow's paths filter lets a workflow-only change in for the actions
+  # analysis, and the Rust analysis has nothing new to read in one.
   detect:
     name: detect workspace
     runs-on: ubuntu-latest
@@ -87,26 +92,55 @@ jobs:
       contents: read
     outputs:
       cargo: ${{ steps.check.outputs.cargo }}
+      rust: ${{ steps.check.outputs.rust }}
     steps:
+      # Two commits: a pull request runs on GitHub's merge commit, whose first
+      # parent is the base it merges into, so HEAD^1..HEAD is the change.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - id: check
+        env:
+          EVENT: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          if [ -f Cargo.toml ]; then
-            echo "cargo=true" >> "$GITHUB_OUTPUT"
-            echo "Cargo.toml present: the Rust analysis will run."
-          else
+          if [ ! -f Cargo.toml ]; then
             echo "cargo=false" >> "$GITHUB_OUTPUT"
+            echo "rust=false" >> "$GITHUB_OUTPUT"
             echo "No Cargo.toml: the Rust analysis is skipped (repository in discovery)."
+            exit 0
+          fi
+          echo "cargo=true" >> "$GITHUB_OUTPUT"
+          parents="$(git rev-list --parents -n 1 HEAD | wc -w)"
+          if [ "$EVENT" != pull_request ] || [ "$parents" -ne 3 ]; then
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+            echo "Not a pull request: the Rust analysis runs in full."
+            exit 0
+          fi
+          # The Rust sources and manifests the extractor reads, the toolchain
+          # pin it builds them with, and this workflow.
+          if git diff --name-only HEAD^1 HEAD -- \
+            '*.rs' '*Cargo.toml' Cargo.lock rust-toolchain.toml .github/workflows/codeql.yml |
+            grep -q .; then
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+            echo "The change reaches Rust: the Rust analysis will run."
+          else
+            echo "rust=false" >> "$GITHUB_OUTPUT"
+            echo "The change reaches no Rust: the Rust analysis is skipped."
           fi
 
-  # The Rust analysis self-activates once the workspace lands.
+  # The Rust analysis. A push to main and the weekly schedule extract the
+  # whole tree. A pull request leaves out the generated trees (the FHIR model,
+  # the HL7 v2 tables and the OMOP CDM row types, 4711 files): extracting and
+  # querying them held a pull-request run at 24 to 32 minutes (#703), their
+  # correctness belongs to the generator, which is analyzed, and main still
+  # analyzes them after the merge. paths-ignore applies to Rust without a
+  # build ("Customizing your advanced setup for code scanning", GitHub Docs).
   analyze-rust:
     name: Analyze (rust)
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -119,11 +153,24 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Initialize CodeQL
+      - name: Initialize CodeQL over the whole tree
+        if: github.event_name != 'pull_request'
         uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           languages: rust
           build-mode: none
+
+      - name: Initialize CodeQL over the hand-written tree
+        if: github.event_name == 'pull_request'
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: rust
+          build-mode: none
+          config: |
+            paths-ignore:
+              - crates/fhir-types/src
+              - crates/hl7v2-types/src
+              - crates/omop-cdm/src/generated
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3

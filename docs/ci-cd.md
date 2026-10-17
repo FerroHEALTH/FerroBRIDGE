@@ -412,6 +412,45 @@ which is what a consumer builds; the all-features union (five versions, every
 resource, one crate) is no consumer's surface and is not linted in CI. No
 specification governs this: our own design.
 
+## The advisory analyzers beside this one
+
+`sonar.yml` (SonarQube Cloud) and `codeql.yml` (CodeQL) gate no merge
+(`.claude/rules/ai-code-review.md`), so neither is a `conclusion` input. Both
+narrow their work on a pull request and keep the full run on `main`, for the
+same reason the Rust lanes do: a pull-request analysis that is cancelled at
+its limit reports nothing, and both held runners the gating lanes need.
+
+**SonarQube Cloud.** The `analyze` job runs `affected.sh` the way `detect`
+does: `--base HEAD^1 --head HEAD` on a pull request, `--all` on a push to
+`main`. It instruments the reached packages one at a time with
+`cargo llvm-cov nextest`, leaving out `fhir-types` and `hl7v2-types`, whose
+sources the scan excludes, and fetches only the build-time corpora those
+packages read (the same rule `fast.sh` applies). A pull request that reaches
+no package skips the toolchain, the corpora and the coverage step, and the
+scan runs without `lcov.info`, which the scanner reports as a warning. The
+coverage of a pull request is therefore partial. That is acceptable for an
+advisory analyzer: a pull-request analysis applies only the quality gate's
+conditions on new code, and every file the change touches belongs to a
+reached package, so its new lines carry coverage. SonarQube Cloud's
+documentation describes no import of the target branch's coverage for
+unchanged files, and none is attempted.
+
+`sonar-project.properties` excludes every generated tree, the same rule it
+already applied to `crates/omop-cdm/src/generated`. Before that, the
+copy-paste detector spent 625 of the scan's 968 seconds on the 4711
+generated files of `fhir-types` and `hl7v2-types` (run 39007151631).
+A newer push to a pull request cancels its running analysis.
+
+**CodeQL.** The Rust analysis runs on a pull request only when the change
+touches a `.rs` file, a `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` or
+`codeql.yml`, and then over the hand-written tree: a `paths-ignore` list
+leaves out the three generated trees, which held the job at 24 to 32
+minutes. A push to `main` and the Monday schedule analyze the whole tree,
+generated code included. The actions analysis is unchanged.
+
+The measured durations before and after are on #703. No specification
+governs this: our own design.
+
 ## The release lane beside this one
 
 `release.yml` is dormant until a `v*` tag is pushed, and it calls two reusable
@@ -501,6 +540,10 @@ instead, which keeps the ruleset stable as the pipeline grows.
   <https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository>
   and
   <https://github.com/licensee/licensee/blob/main/docs/what-we-look-at.md>
+- SonarQube Cloud pull request analysis:
+  <https://docs.sonarsource.com/sonarqube-cloud/improving/pull-request-analysis/>
+- CodeQL configuration, `paths-ignore`:
+  <https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning>
 - Scorecard checks:
   <https://github.com/ossf/scorecard/blob/main/docs/checks.md>
 - Required status checks and rulesets:

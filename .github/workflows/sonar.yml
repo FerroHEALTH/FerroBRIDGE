@@ -7,12 +7,13 @@
 # quality gate is the built-in "Sonar way" default.
 #
 # The multi-language sweep over shell, YAML, JSON and the other config surfaces
-# the Rust gates never see runs on every scan, including today, on a repository
-# with no code. The Rust steps (the pinned toolchain, the instrumented coverage
-# run, the projectVersion derivation) are guarded on a root Cargo.toml, so they
-# skip until the workspace lands and then activate by themselves. hashFiles()
-# is the correct primitive HERE, unlike in ci.yml: the checkout above it has
-# already populated the workspace when the step-level `if:` is evaluated.
+# the Rust gates never see runs on every scan. The instrumented coverage run
+# covers the packages the change reaches (scripts/checks/affected.sh, the
+# selection ci.yml's detect job makes): every package on a push to main, the
+# reached ones on a pull request, and none when a pull request reaches no
+# package, which then analyzes without a coverage report. A pull-request
+# analysis applies only the new-code conditions of the quality gate, so the
+# lines a change adds are the lines whose coverage it reads (docs/ci-cd.md).
 #
 # Scan SCOPE lives in sonar-project.properties; do not restate it here.
 # SONAR_HOST_URL is not needed for SonarQube Cloud (SonarSource/
@@ -24,6 +25,13 @@ on:
     branches: [main]
   pull_request:
     types: [opened, synchronize, reopened]
+
+# A newer push to a pull request cancels its running analysis. On main a
+# running analysis finishes, and a queued one gives way to the newer merge,
+# so main is analyzed at its latest commit.
+concurrency:
+  group: sonar-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions: {}
 
@@ -48,8 +56,52 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install the Rust toolchain
+      # A pull request runs on GitHub's merge commit, whose first parent is the
+      # base it merges into, so HEAD^1..HEAD is the change; anything else
+      # instruments the whole workspace. The two generated crates are dropped:
+      # sonar-project.properties excludes their sources, so their own tests
+      # add no coverage Sonar reads. The corpus flags are the ones
+      # scripts/checks/fast.sh fetches for the same packages. The runner's own
+      # stable cargo reads the manifests, as in ci.yml's detect job.
+      - name: The packages this change reaches
+        id: affected
         if: ${{ hashFiles('Cargo.toml') != '' }}
+        env:
+          EVENT: ${{ github.event_name }}
+          RUSTUP_TOOLCHAIN: stable
+        run: |
+          set -euo pipefail
+          parents="$(git rev-list --parents -n 1 HEAD | wc -w)"
+          if [ "$EVENT" = pull_request ] && [ "$parents" -eq 3 ]; then
+            out="$(bash scripts/checks/affected.sh --base HEAD^1 --head HEAD)"
+          else
+            out="$(bash scripts/checks/affected.sh --all)"
+          fi
+          reached="$(sed -n 's/^packages=//p' <<<"$out")"
+          packages=""
+          for p in $reached; do
+            case "$p" in
+              fhir-types | hl7v2-types) ;;
+              *) packages+="${packages:+ }$p" ;;
+            esac
+          done
+          has() { case " $packages " in *" $1 "*) echo true ;; *) echo false ;; esac; }
+          if [ -n "$packages" ]; then coverage=true; else coverage=false; fi
+          examples=false
+          for p in ferrobridge-testkit ferrobridge-server ferrobridge-validator; do
+            if [ "$(has "$p")" = true ]; then examples=true; fi
+          done
+          {
+            echo "packages=$packages"
+            echo "coverage=$coverage"
+            echo "v2=$(has fhir-codegen)"
+            echo "hl7v2-samples=$(has ferrobridge-hl7v2)"
+            echo "fhir-examples=$examples"
+            echo "profile-packages=$(has ferrobridge-validator)"
+          } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Install the Rust toolchain
+        if: steps.affected.outputs.coverage == 'true'
         uses: ./.github/actions/setup-rust
         with:
           # llvm-tools-preview carries the profdata reader cargo-llvm-cov needs.
@@ -58,48 +110,69 @@ jobs:
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install cargo-llvm-cov and cargo-nextest
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.coverage == 'true'
         uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-llvm-cov,cargo-nextest
 
-      # The fhir-codegen tests read the HL7 v2 definitions, which are fetched
-      # at build time and never committed (ci.yml codegen-drift).
+      # The fhir-codegen tests read the HL7 v2 definitions and the legacy
+      # tables, which are fetched at build time and never committed (ci.yml
+      # codegen-drift).
       - name: Read the pinned HL7 v2 definitions commit
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.v2 == 'true'
         id: v2ig
         run: echo "commit=$(bash scripts/vendor/v2ig.sh --commit)" >> "$GITHUB_OUTPUT"
       - name: Restore the HL7 v2 definitions
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.v2 == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: tools/fhir-codegen/vendor/hl7-v2ig/input
           key: hl7-v2ig-${{ steps.v2ig.outputs.commit }}
       - name: Fetch and verify the HL7 v2 definitions
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.v2 == 'true'
         run: bash scripts/vendor/v2ig.sh
       - name: Read the pinned HL7 v2 legacy tables commit
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.v2 == 'true'
         id: v2-legacy
         run: echo "commit=$(bash scripts/vendor/v2-legacy.sh --commit)" >> "$GITHUB_OUTPUT"
       - name: Restore the HL7 v2 legacy tables
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.v2 == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: tools/fhir-codegen/vendor/hl7-v2-legacy/src
           key: hl7-v2-legacy-${{ steps.v2-legacy.outputs.commit }}
       - name: Fetch and verify the HL7 v2 legacy tables
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.v2 == 'true'
         run: bash scripts/vendor/v2-legacy.sh
+
+      # The hl7v2-smoke corpus test reads the NIST and AIRA message sets,
+      # fetched at build time and never committed (ci.yml test).
+      - name: Read the pinned HL7 v2 sample sets
+        if: steps.affected.outputs.hl7v2-samples == 'true'
+        id: hl7v2-samples
+        run: echo "key=$(bash scripts/vendor/hl7v2-samples.sh --cache-key)" >> "$GITHUB_OUTPUT"
+      - name: Restore the HL7 v2 sample sets
+        if: steps.affected.outputs.hl7v2-samples == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            crates/ferrobridge-hl7v2/vendor/nist/lri-r2
+            crates/ferrobridge-hl7v2/vendor/nist/loi-r1
+            crates/ferrobridge-hl7v2/vendor/nist/ss-r2
+            crates/ferrobridge-hl7v2/vendor/aira-mqe/examples
+          key: hl7v2-samples-${{ steps.hl7v2-samples.outputs.key }}
+      - name: Fetch and verify the HL7 v2 sample sets
+        if: steps.affected.outputs.hl7v2-samples == 'true'
+        run: bash scripts/vendor/hl7v2-samples.sh --build-time
 
       # The FHIR model corpora and the R4 facade corpus read the HL7 examples
       # packages, fetched at build time and never committed (ci.yml test).
       - name: Read the pinned FHIR examples packages
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.fhir-examples == 'true'
         id: fhir-examples
         run: echo "key=$(bash scripts/vendor/fhir-packages.sh --cache-key)" >> "$GITHUB_OUTPUT"
       - name: Restore the FHIR examples packages
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.fhir-examples == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -110,49 +183,49 @@ jobs:
             tools/ferrobridge-testkit/vendor/hl7.fhir.r6.examples/package
           key: fhir-examples-${{ steps.fhir-examples.outputs.key }}
       - name: Fetch and verify the FHIR examples packages
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.fhir-examples == 'true'
         run: bash scripts/vendor/fhir-packages.sh --build-time
 
       # The profile validator's package-gated tests read the profile packages,
       # fetched at build time and never committed, and fail under CI when
       # they are absent (ci.yml test).
       - name: Read the pinned profile packages
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.profile-packages == 'true'
         id: profile-packages
         run: echo "key=$(bash scripts/vendor/profile-packages.sh --cache-key)" >> "$GITHUB_OUTPUT"
       - name: Restore the profile packages
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.profile-packages == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: docs/specs/fhir-packages/*/package
           key: profile-packages-${{ steps.profile-packages.outputs.key }}
       - name: Fetch and verify the profile packages
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.profile-packages == 'true'
         run: bash scripts/vendor/profile-packages.sh
 
       # The lcov file sonar.rust.lcov.reportPaths names. One package at a time:
       # a workspace-wide instrumented build schedules the two generated giants
       # side by side and the runner kills it with exit 143 (#146), the same
       # shape the clippy lane moved off. --no-report accumulates the profiles,
-      # the report step merges them into the single file Sonar imports.
-      # --no-tests=pass keeps a member with no tests from failing the run, the
-      # same flag the ci.yml test lane uses.
+      # the report step merges them into the single file Sonar imports, minus
+      # the generated trees Sonar does not analyze. --no-tests=pass keeps a
+      # member with no tests from failing the run, the same flag the ci.yml
+      # test lane uses.
       - name: Instrumented tests to lcov, one package at a time
-        if: ${{ hashFiles('Cargo.toml') != '' }}
+        if: steps.affected.outputs.coverage == 'true'
         env:
           CARGO_BUILD_JOBS: "2"
+          PACKAGES: ${{ steps.affected.outputs.packages }}
         run: |
           set -euo pipefail
           cargo llvm-cov clean --workspace
-          cargo metadata --no-deps --format-version 1 \
-            | jq -r '.packages[].name' \
-            | sort \
-            | while read -r package; do
-                echo "::group::${package}"
-                cargo llvm-cov nextest --locked --no-report --no-tests=pass -p "${package}"
-                echo "::endgroup::"
-              done
-          cargo llvm-cov report --lcov --output-path lcov.info
+          for package in $PACKAGES; do
+            echo "::group::${package}"
+            cargo llvm-cov nextest --locked --no-report --no-tests=pass -p "${package}"
+            echo "::endgroup::"
+          done
+          cargo llvm-cov report --lcov --output-path lcov.info \
+            --ignore-filename-regex '/crates/(fhir-types|hl7v2-types)/src/|/crates/omop-cdm/src/generated/'
           lines="$(grep -c '^DA:' lcov.info || true)"
           echo "lcov.info carries ${lines} line records"
           if [ "${lines}" = "0" ]; then
