@@ -13,12 +13,12 @@ asks a FHIR terminology server for code systems and value sets.
 
 ## Where the project is
 
-FerroBRIDGE is in its design phase. The research pass over the primary sources
-is complete and the design it produced is recorded in the
-[architecture](evaluate/architecture.md). There is no Cargo workspace, no
-release, and no binary to run yet. Nothing in this book describes software you
-can download today, and every page says which parts are decided and which are
-still open.
+FerroBRIDGE is on the 0.0.x release line. Each release ships the `ferrobridge`
+binary for Linux (x86_64 and aarch64, glibc and musl), the container image
+and the published library crates, and the [changelog](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/CHANGELOG.md)
+says what each one added. The design is recorded in the
+[architecture](evaluate/architecture.md), and the build order there names what
+the next releases add.
 
 What the design settles: one shared mapping foundation with two interpreters
 and two sinks, FHIRconnect v1.0.0 on FHIR R4 and OMOCL v1.0.0 on OMOP CDM v5.4,
