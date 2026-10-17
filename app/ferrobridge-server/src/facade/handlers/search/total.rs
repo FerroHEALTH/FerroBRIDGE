@@ -17,6 +17,7 @@ use crate::facade::handlers::search::Plan;
 use crate::facade::handlers::search::malformed_answer;
 use crate::facade::handlers::search::matched;
 use crate::facade::handlers::search::read_row;
+use crate::facade::handlers::search::render_entry;
 use crate::facade::handlers::search::rows_of;
 use crate::facade::search::aql;
 use crate::facade::search::aql::Conditions;
@@ -24,6 +25,9 @@ use crate::facade::search::criteria::Criteria;
 use crate::facade::search::criteria::Total;
 use crate::facade::search::cursor::Position;
 use crate::facade::search::declaration::Node;
+use fhirconnect::resolve::program::hierarchy::Create;
+use fhirconnect::resolve::program::hierarchy::Hierarchy;
+use fhirconnect::resolve::program::hierarchy::Split;
 
 /// Returns the `Bundle.total` of one page, when it is known or asked for.
 ///
@@ -78,8 +82,8 @@ impl Accuracy {
 ///
 /// A declaration whose matches one AQL count gives exactly, and every
 /// declaration under [`Accuracy::Estimate`], costs one count query that reads
-/// no composition. Any other declaration reads its rows and counts each
-/// entry [`matched`] answers once.
+/// no composition. Any other declaration reads its rows and counts the
+/// resources each entry [`matched`] answers once.
 pub(super) async fn count_all(
     facade: &Facade,
     client: &CdrClient,
@@ -114,6 +118,7 @@ pub(super) async fn count_all(
 fn counts_exactly(plan: &Plan<'_>, conditions: &Conditions) -> bool {
     conditions.node_count() == 0
         && plan.ids.is_empty()
+        && !splits_into_resources(plan)
         && plan
             .declared
             .placement()
@@ -133,7 +138,26 @@ async fn count_query(
         .ok_or_else(|| malformed_answer("the CDR answered the count query with no readable count"))
 }
 
-/// Returns the number of entries the rows of one declaration answer.
+/// Whether the context of `plan` splits an entry into more than one resource
+/// of its own type going out of openEHR.
+///
+/// "Each occurrence of an event (if there is more than one) will create a new
+/// `DiagnosticReport`" (`types-of-mappings/concept-type/HierarchyMappings.adoc`,
+/// §split), so such an entry answers as many resources as the run creates.
+fn splits_into_resources(plan: &Plan<'_>) -> bool {
+    plan.program
+        .program()
+        .hierarchy()
+        .and_then(Hierarchy::split_fhir)
+        .and_then(Split::create)
+        == Some(Create::Resource)
+}
+
+/// Returns the number of resources the rows of one declaration answer.
+///
+/// Each entry answers one resource, unless its context splits it into more
+/// or an `_id` names the resources it keeps; then the entry is mapped and
+/// the resources [`render_entry`] keeps are counted.
 async fn count_entries(
     facade: &Facade,
     client: &CdrClient,
@@ -142,6 +166,8 @@ async fn count_entries(
 ) -> Result<usize, Refusal> {
     let fetch = i64::from(facade.search_limits().max_count.max(1));
     let mut counted: BTreeSet<(String, usize)> = BTreeSet::new();
+    let by_resource = splits_into_resources(plan) || !plan.named.is_empty();
+    let mut resources: usize = 0;
     let mut offset: i64 = 0;
     loop {
         let request = aql::rows_request(conditions, &plan.order, offset, fetch);
@@ -149,12 +175,20 @@ async fn count_entries(
         for (position, row) in rows.iter().enumerate() {
             let read = read_row(facade, plan, row, position)?;
             for entry in matched(plan, &read, row, position)? {
-                counted.insert((read.version.value().to_owned(), entry.ordinal()));
+                let fresh = counted.insert((read.version.value().to_owned(), entry.ordinal()));
+                if fresh && by_resource {
+                    resources = resources
+                        .saturating_add(render_entry(facade, client, plan, &read, &entry)?.len());
+                }
             }
         }
         let fetched = i64::try_from(rows.len()).unwrap_or(i64::MAX);
         if fetched < fetch {
-            return Ok(counted.len());
+            return Ok(if by_resource {
+                resources
+            } else {
+                counted.len()
+            });
         }
         offset = offset.saturating_add(fetched);
     }

@@ -845,9 +845,12 @@ expression is a load error: the reference CDR's connector let `where()` and
   one is refused at load. Rows are grouped by version uid, each entry of
   the context's archetype is answered once, and the total counts entries
   (#530, #658) with one AQL count where that count agrees with the answer
-  (#661). One resource type answers one
-  parameter set, and two declarations of one type over one template are
-  refused at load. A parameter outside the set is refused unless the client
+  (#661). An entry whose context splits it with `create: resource` answers
+  every resource the split creates beside its own, each once, a page and
+  the total count those resources, the count reads the rows, and an `_id`
+  naming a created resource answers it alone (#731). One resource type
+  answers one parameter set, and two declarations of one type over one
+  template are refused at load. A parameter outside the set is refused unless the client
   sends `Prefer: handling=lenient` (R4 search §3.1.1.3); an unsupported
   modifier is always refused (§3.1.1.4.4); `_count=0` answers the total
   alone, as R4 treats it as `_summary=count` (§3.1.1.5.3).

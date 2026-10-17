@@ -25,6 +25,13 @@ crates on crates.io.
 
 ### Changed
 
+- A facade search lists every resource a `hierarchy.split` with
+  `create: resource` creates beside the entry's own resource, each once
+  (#731). A page holds at most `_count` resources and may end between two
+  occurrences of one entry, `Bundle.total` counts every resource (the count
+  reads the rows for such a context), and an `_id` naming a created resource
+  answers that resource alone instead of matching nothing.
+
 - `ferrobridge-term` translates by concept map with an optional target
   system and an optional `reverse` (#721). This breaks the crate's public
   API: `Client::translate` takes a `Translation` (`Translation::new(system,

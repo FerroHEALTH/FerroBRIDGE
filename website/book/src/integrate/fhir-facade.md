@@ -250,9 +250,13 @@ maps the parent's entry again and returns the created resource of that id,
 with the parent's `meta.versionId` and `meta.source` and no `meta.profile`.
 A version that no longer creates it answers `404`. A `PUT` of a created
 resource answers `405 Method Not Allowed` with `not-supported`, because its
-content is the parent's entry: update the parent. Search does not list a
-created resource yet, and an `_id` that names one matches nothing (#731). No
-specification governs the identity of a created resource: it is
+content is the parent's entry: update the parent. A search of the parent's
+type lists every split occurrence beside the entry's own resource, each
+once: a page holds at most `_count` resources and may end between two
+occurrences of one entry, `Bundle.total` counts every resource, and an
+`_id` that names a created resource answers that resource alone. A type
+only a `reference` creates declares no search. No specification governs the
+identity of a created resource or how a search reaches it: it is
 FerroBRIDGE's own design.
 
 ## A read is a valid instance

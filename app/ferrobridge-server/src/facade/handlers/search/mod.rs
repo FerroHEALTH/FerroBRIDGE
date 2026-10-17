@@ -173,6 +173,7 @@ async fn search(
             conditions,
             order: plan::order(declared, &criteria),
             ids: ids_of(&resolved, declared),
+            named: named_of(&criteria),
         });
     }
     let limits = facade.search_limits();
@@ -246,6 +247,9 @@ struct Plan<'a> {
     program: &'a Loaded,
     /// Each `_id` occurrence, the entries of this context its ids name.
     ids: Vec<Vec<CompositionBinding>>,
+    /// Each `_id` occurrence, the logical ids it names, which every resource
+    /// answered carries one of.
+    named: Vec<BTreeSet<String>>,
     /// The conditions, or `None` when it can match nothing.
     conditions: Option<Conditions>,
     /// The `ORDER BY`.
@@ -338,10 +342,7 @@ fn resolve(facade: &Facade, resource_type: &str, criteria: &Criteria) -> Result<
             let Ok(internal) = FhirResourceId::new(id) else {
                 continue;
             };
-            // TODO(#731): answer an `_id` that names a created resource with it.
-            if let Some(binding) = read::binding(facade, resource_type, &internal)?
-                && binding.created.is_none()
-            {
+            if let Some(binding) = read::binding(facade, resource_type, &internal)? {
                 bindings.push(binding);
             }
         }
@@ -353,7 +354,9 @@ fn resolve(facade: &Facade, resource_type: &str, criteria: &Criteria) -> Result<
 /// Reads one page, starting at `start`, of at most `size` matches.
 ///
 /// Each entry of the program's archetype is a resource of its own, and a row
-/// answers the entries [`matched`] finds in it. A query that binds a node
+/// answers the entries [`matched`] finds in it, each with the resources of
+/// the searched type its mapping creates; `skip` and the room count every
+/// resource answered. A query that binds a node
 /// answers a row per matching node, so the rows of one composition sit
 /// together under the composition-level order, and an entry a row of the
 /// page already answered is passed over. Each query asks one row more than
@@ -398,24 +401,26 @@ async fn page(
                     if !held.insert((current.version.clone(), entry.ordinal())) {
                         continue;
                     }
-                    if skip > 0 {
-                        skip = skip.saturating_sub(1);
+                    for unit in render_entry(facade, client, plan, &read, &entry)? {
+                        if skip > 0 {
+                            skip = skip.saturating_sub(1);
+                            current.answered = current.answered.saturating_add(1);
+                            continue;
+                        }
+                        if room == 0 {
+                            return Ok((
+                                matches,
+                                Some(Position {
+                                    declaration: index,
+                                    offset: current.first_row,
+                                    skip: current.answered,
+                                }),
+                            ));
+                        }
+                        matches.push(unit);
                         current.answered = current.answered.saturating_add(1);
-                        continue;
+                        room = room.saturating_sub(1);
                     }
-                    if room == 0 {
-                        return Ok((
-                            matches,
-                            Some(Position {
-                                declaration: index,
-                                offset: current.first_row,
-                                skip: current.answered,
-                            }),
-                        ));
-                    }
-                    matches.push(render_entry(facade, client, plan, &read, &entry)?);
-                    current.answered = current.answered.saturating_add(1);
-                    room = room.saturating_sub(1);
                 }
             }
             let fetched = i64::try_from(rows.len()).unwrap_or(i64::MAX);
@@ -587,15 +592,17 @@ async fn rows_of(
     }
 }
 
-/// Maps one entry of a row back to the resource it is, with the id the
-/// identity map holds for that entry.
+/// Maps one entry of a row back to the resources it answers, with the ids
+/// the identity map holds: the entry's own resource and every resource of
+/// the searched type its mapping creates ([`render::render_units`]), each
+/// kept when it carries an id every `_id` occurrence names.
 fn render_entry(
     facade: &Facade,
     client: &CdrClient,
     plan: &Plan<'_>,
     read: &Row,
     entry: &Entry,
-) -> Result<Match, Refusal> {
+) -> Result<Vec<Match>, Refusal> {
     let Row {
         ehr_id,
         version,
@@ -612,7 +619,7 @@ fn render_entry(
     )?;
     let source = render::composition_url(client.base_url(), ehr_id, version)?;
     let subject = render::subject_of(facade, ehr_id)?;
-    let rendered = render::render(
+    let units = render::render_units(
         program.program(),
         program.index(),
         &entry.isolate(composition),
@@ -624,11 +631,27 @@ fn render_entry(
             store: facade.store(),
         },
     )?;
-    render::log_outcome(&rendered);
-    Ok(Match {
-        id,
-        resource: rendered.body,
-    })
+    let mut matches = Vec::with_capacity(units.len());
+    for (unit, rendered) in units {
+        render::log_outcome(&rendered);
+        if plan.named.iter().all(|named| named.contains(unit.as_str())) {
+            matches.push(Match {
+                id: unit,
+                resource: rendered.body,
+            });
+        }
+    }
+    Ok(matches)
+}
+
+/// Returns, for each `_id` occurrence of `criteria`, the logical ids it
+/// names.
+fn named_of(criteria: &Criteria) -> Vec<BTreeSet<String>> {
+    criteria
+        .ids
+        .iter()
+        .map(|ids| ids.iter().cloned().collect())
+        .collect()
 }
 
 /// Returns the `502` a row the bridge cannot read answers.
