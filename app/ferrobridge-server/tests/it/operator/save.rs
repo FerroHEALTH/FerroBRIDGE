@@ -31,6 +31,7 @@ use super::{FIXTURES, OMOCL_FILE, OPERATOR, bytes, digest};
 use crate::facade::auth::{Issuer, SigningKey, authority, bearing, ec_key, mint};
 
 mod search;
+mod unprovisioned;
 
 /// The analyte file of the OMOCL corpus, provisioned beside the FHIRconnect
 /// tree.
