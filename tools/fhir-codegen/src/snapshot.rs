@@ -22,6 +22,9 @@ const FHIR_TYPE_EXTENSION: &str =
 /// The path of the id every element inherits from `Element`.
 const ELEMENT_ID: &str = "Element.id";
 
+/// The path of the logical id every resource inherits from `Resource`.
+const RESOURCE_ID: &str = "Resource.id";
+
 /// The extension carrying the lexical form of a primitive's value, from R4.
 const REGEX_EXTENSION: &str = "http://hl7.org/fhir/StructureDefinition/regex";
 
@@ -188,6 +191,10 @@ impl TypeRef {
             // NOTE: R4B element-definitions.html and R5 types-definitions.html type Element.id
             // as string, against the `id` the 4.3.0 and 5.0.0 snapshots state (#672).
             String::from("string")
+        } else if code == "string" && is_resource_id(element) {
+            // NOTE: R4 resource-definitions.html#Resource.id types Resource.id as id, against
+            // the `string` the 4.0.1 package's fhir-type extension states (#798).
+            String::from("id")
         } else {
             code
         };
@@ -275,6 +282,16 @@ fn is_element_id(element: &ElementDefinition) -> bool {
             .base
             .as_ref()
             .is_some_and(|base| base.path == ELEMENT_ID)
+}
+
+/// Whether `element` is `Resource.id` or an element inheriting it, the
+/// logical id of a resource (<https://hl7.org/fhir/R4/resource.html#id>).
+fn is_resource_id(element: &ElementDefinition) -> bool {
+    element.path == RESOURCE_ID
+        || element
+            .base
+            .as_ref()
+            .is_some_and(|base| base.path == RESOURCE_ID)
 }
 
 /// Whether `element` is an XML attribute other than a primitive's value.

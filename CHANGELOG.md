@@ -98,6 +98,19 @@ crates on crates.io.
   to the core definition of the type declaring it (#484), so the core
   bindings, invariants and fixed values of that child apply. Before, a
   partial snapshot left such a child with no element definition at all.
+- `fhir-types` 0.1.119 holds the logical id of every resource to the `id`
+  form, `[A-Za-z0-9\-\.]{1,64}`, in every version (#482). The published
+  definitions type `Resource.id` as `id`
+  (R4 resource-definitions.html#Resource.id), while the R4 4.0.1 package
+  and 123 resource snapshots of the R6 ballot5 package state `string`
+  (upstream report #798). The R4 and R6 element tables now list `id` for
+  every resource's `id`, the generated decoders refuse an R4 or R6 resource
+  whose id has a space, another character outside the form or more than
+  64 characters, and the profile validator reports it as `lexical-form`.
+  A consumer that decoded such a resource before gets a `BadValue` error
+  at `<Type>.id`. One R4 example leaves the `fhir-r4` pass list, a
+  `SearchParameter` whose 67-character id breaks the form.
+  `fhirconnect` moves to 0.1.133 with the requirement.
 
 ## [0.0.7] - 2026-10-17
 

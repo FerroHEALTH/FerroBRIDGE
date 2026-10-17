@@ -3257,7 +3257,6 @@ SearchParameter-observation-genetic-Observation-gene-identifier.json
 SearchParameter-patient-extensions-Patient-age.json
 SearchParameter-patient-extensions-Patient-birthOrderBoolean.json
 SearchParameter-patient-extensions-Patient-mothersMaidenName.json
-SearchParameter-questionnaireresponse-extensions-QuestionnaireResponse-item-subject.json
 SearchParameter-valueset-extensions-ValueSet-author.json
 SearchParameter-valueset-extensions-ValueSet-effective.json
 SearchParameter-valueset-extensions-ValueSet-end.json
