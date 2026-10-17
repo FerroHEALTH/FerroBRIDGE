@@ -23,6 +23,8 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-10-17
+
 ### Changed
 
 - A facade search translates a `conceptmap` code once per request (#763):
@@ -109,6 +111,12 @@ crates on crates.io.
   `scripts/checks/fast.sh`. The README and the book's introduction link the
   family book for the manufacturer, the Cyber Resilience Act, how the
   products fit together, and licensing and trademarks.
+- The identity store records its schema (#298): a file with no schema row,
+  which 0.0.6 or earlier wrote, reads as schema 1 and is stamped on open, and
+  a file in a schema this build does not read stops the start with an error
+  naming the file, the schema found and the schemas this build reads, leaving
+  the file unchanged. The schema this build writes is in the entry for #225.
+
 ### Added
 
 - The console shows the engine state (#604). The dashboard has the
@@ -360,14 +368,6 @@ crates on crates.io.
   resource the record belongs to, the field and the value (#280). Before, the issue named
   neither the resource nor the field. The Operate page on failure and
   identity states the rule.
-
-### Changed
-
-- The identity store records its schema (#298). This build writes schema 2
-  and reads schemas 1 and 2; a file with no schema row, which 0.0.6 or
-  earlier wrote, reads as schema 1 and is stamped on open. A file in another
-  schema stops the start with an error naming the file, the schema found and
-  the schemas this build reads, and the file is left unchanged.
 
 ### Security
 
@@ -2963,7 +2963,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.6...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.7...HEAD
+[0.0.7]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.3...v0.0.4

@@ -1414,7 +1414,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-server"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1486,7 +1486,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-testkit"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "aws-lc-rs",
  "fhir-types",
@@ -1527,7 +1527,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-viewer"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1574,7 +1574,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-codegen"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "clap",
@@ -3270,7 +3270,7 @@ dependencies = [
 
 [[package]]
 name = "omop-cdm-codegen"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "clap",
