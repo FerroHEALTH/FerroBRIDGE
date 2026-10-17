@@ -9,8 +9,11 @@
 //! is a [`BridgeError::Refused`] carrying its status and body, never an
 //! empty value. No specification governs the console: our own design.
 
-use http::StatusCode;
-use http::header::ACCEPT;
+use std::fmt;
+
+use http::header::{ACCEPT, AUTHORIZATION};
+use http::{HeaderValue, StatusCode};
+use secrecy::{ExposeSecret as _, SecretString};
 use url::Url;
 
 use fhir_types::codec::{Json as _, Path, Value};
@@ -48,6 +51,10 @@ pub enum BridgeError {
         #[source]
         source: url::ParseError,
     },
+    /// The operator's access token holds a character an HTTP header cannot
+    /// carry (RFC 9110 §5.5), so it cannot be sent.
+    #[error("the operator's access token cannot be sent as a header")]
+    Token,
     /// The bridge answered with a status other than success.
     #[error("the bridge answered {status}")]
     Refused {
@@ -84,6 +91,39 @@ pub enum BridgeError {
     },
 }
 
+impl BridgeError {
+    /// The bridge's status and the start of its body, when the bridge
+    /// answered and refused.
+    #[must_use]
+    pub fn refusal(&self) -> Option<(StatusCode, &str)> {
+        match self {
+            Self::Refused { status, body } => Some((*status, body.as_str())),
+            _ => None,
+        }
+    }
+}
+
+/// The signed-in operator's access token, which every call to the bridge
+/// carries as a bearer token (RFC 6750 §2.1).
+///
+/// It never renders its value, so no `Debug` output or log line shows it.
+#[derive(Clone)]
+pub struct AccessToken(SecretString);
+
+impl AccessToken {
+    /// Wraps the access token `token`.
+    #[must_use]
+    pub fn new(token: SecretString) -> Self {
+        Self(token)
+    }
+}
+
+impl fmt::Debug for AccessToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("AccessToken(..)")
+    }
+}
+
 /// The client of one bridge.
 #[derive(Debug, Clone)]
 pub struct Bridge {
@@ -118,7 +158,8 @@ impl Bridge {
     }
 
     /// Reads the bridge's `CapabilityStatement` from `GET {base}fhir/metadata`,
-    /// the capabilities interaction of the FHIR R4 REST API (`http.html`).
+    /// the capabilities interaction of the FHIR R4 REST API (`http.html`),
+    /// as the operator whose access token is `token`.
     ///
     /// # Errors
     /// Returns [`BridgeError::Route`] when the route does not join onto the
@@ -127,9 +168,11 @@ impl Bridge {
     /// [`BridgeError::TooLarge`], [`BridgeError::Payload`],
     /// [`BridgeError::NotAnObject`] and [`BridgeError::Decode`] for a body
     /// that is no R4 `CapabilityStatement`.
-    pub async fn capability_statement(&self) -> Result<CapabilityStatement, BridgeError> {
-        // TODO(#600): send the signed-in operator's access token.
-        let object = self.fhir_object("fhir/metadata").await?;
+    pub async fn capability_statement(
+        &self,
+        token: &AccessToken,
+    ) -> Result<CapabilityStatement, BridgeError> {
+        let object = self.fhir_object("fhir/metadata", token).await?;
         CapabilityStatement::from_json(&object, &mut Path::root("CapabilityStatement")).map_err(
             |source| BridgeError::Decode {
                 expected: "CapabilityStatement",
@@ -138,17 +181,22 @@ impl Bridge {
         )
     }
 
-    /// Sends `GET {base}{route}` for FHIR JSON and reads the JSON object
-    /// the bridge answers.
+    /// Sends `GET {base}{route}` for FHIR JSON as the operator whose access
+    /// token is `token`, and reads the JSON object the bridge answers.
     async fn fhir_object(
         &self,
         route: &'static str,
+        token: &AccessToken,
     ) -> Result<fhir_types::codec::Object, BridgeError> {
         let url = self.url(route)?;
+        let mut bearer = HeaderValue::from_str(&format!("Bearer {}", token.0.expose_secret()))
+            .map_err(|_invalid| BridgeError::Token)?;
+        bearer.set_sensitive(true);
         let response = self
             .client
             .get(url)
             .header(ACCEPT, FHIR_JSON)
+            .header(AUTHORIZATION, bearer)
             .send()
             .await
             .map_err(|source| BridgeError::Transport { source })?;

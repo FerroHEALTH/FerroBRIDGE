@@ -16,6 +16,11 @@
 mod boundary;
 mod bridge;
 mod config;
+mod pages;
+mod refresh;
 mod run;
 mod server;
+mod server_functions;
+mod sign_in;
+mod sign_out;
 mod support;

@@ -10,8 +10,20 @@ use http::StatusCode;
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use ferrobridge_viewer::bridge::{BODY_LIMIT, Bridge, BridgeError, FHIR_JSON, REFUSAL_LIMIT};
+use secrecy::SecretString;
+
+use ferrobridge_viewer::bridge::{
+    AccessToken, BODY_LIMIT, Bridge, BridgeError, FHIR_JSON, REFUSAL_LIMIT,
+};
 use ferrobridge_viewer::config::settings::BridgeSettings;
+
+/// The synthetic access token every call is made with.
+const TOKEN: &str = "synthetic-operator-token";
+
+/// The operator's access token, [`TOKEN`].
+fn token() -> AccessToken {
+    AccessToken::new(SecretString::from(TOKEN))
+}
 
 /// A synthetic R4 `CapabilityStatement` with the elements R4 requires.
 const STATEMENT: &str = r#"{
@@ -37,6 +49,7 @@ async fn answering(template: ResponseTemplate) -> MockServer {
     Mock::given(method("GET"))
         .and(path("/bridge/fhir/metadata"))
         .and(header("accept", FHIR_JSON))
+        .and(header("authorization", format!("Bearer {TOKEN}").as_str()))
         .respond_with(template)
         .mount(&server)
         .await;
@@ -49,7 +62,7 @@ async fn the_capability_statement_is_read_under_the_base_path() {
         answering(ResponseTemplate::new(200).set_body_raw(STATEMENT, "application/fhir+json"))
             .await;
     let statement = client(&server, "/bridge/")
-        .capability_statement()
+        .capability_statement(&token())
         .await
         .expect("the statement decodes");
     assert_eq!(Some("4.0.1"), statement.fhir_version.value.as_deref());
@@ -61,7 +74,7 @@ async fn a_refusal_keeps_the_bridge_status_and_body() {
     let outcome = r#"{"resourceType":"OperationOutcome","issue":[]}"#;
     let server = answering(ResponseTemplate::new(401).set_body_string(outcome)).await;
     let error = client(&server, "/bridge/")
-        .capability_statement()
+        .capability_statement(&token())
         .await
         .expect_err("a refusal");
     let BridgeError::Refused { status, body } = error else {
@@ -76,7 +89,7 @@ async fn a_refusal_body_is_cut_at_its_limit() {
     let long = "x".repeat(REFUSAL_LIMIT + 100);
     let server = answering(ResponseTemplate::new(503).set_body_string(long)).await;
     let error = client(&server, "/bridge/")
-        .capability_statement()
+        .capability_statement(&token())
         .await
         .expect_err("a refusal");
     let BridgeError::Refused { status, body } = error else {
@@ -91,7 +104,7 @@ async fn an_accepted_body_over_the_limit_is_refused() {
     let big = vec![b' '; BODY_LIMIT + 1];
     let server = answering(ResponseTemplate::new(200).set_body_bytes(big)).await;
     let error = client(&server, "/bridge/")
-        .capability_statement()
+        .capability_statement(&token())
         .await
         .expect_err("too large");
     assert!(matches!(error, BridgeError::TooLarge { .. }), "{error:?}");
@@ -109,7 +122,7 @@ async fn a_body_that_is_not_the_resource_is_a_typed_error() {
     ] {
         let server = answering(ResponseTemplate::new(200).set_body_string(body)).await;
         let error = client(&server, "/bridge/")
-            .capability_statement()
+            .capability_statement(&token())
             .await
             .expect_err("no statement");
         let matched = match shape {
@@ -119,6 +132,42 @@ async fn a_body_that_is_not_the_resource_is_a_typed_error() {
         };
         assert!(matched, "{body}: {error:?}");
     }
+}
+
+// RFC 6750 §2.1: the operator's token travels as a bearer credential, and the
+// stub answers only a request that carries it.
+#[tokio::test]
+async fn the_call_carries_the_operators_token_and_no_other() {
+    let server =
+        answering(ResponseTemplate::new(200).set_body_raw(STATEMENT, "application/fhir+json"))
+            .await;
+    let other = AccessToken::new(SecretString::from("another-token"));
+    let error = client(&server, "/bridge/")
+        .capability_statement(&other)
+        .await
+        .expect_err("the stub answers only the operator's token");
+    assert!(
+        matches!(&error, BridgeError::Refused { status, .. } if *status == StatusCode::NOT_FOUND),
+        "{error:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_token_no_header_can_carry_is_refused_before_the_call_and_never_shown() {
+    let server = MockServer::start().await;
+    let broken = AccessToken::new(SecretString::from("synthetic\ntoken"));
+    assert_eq!("AccessToken(..)", format!("{broken:?}"));
+    let error = client(&server, "/")
+        .capability_statement(&broken)
+        .await
+        .expect_err("no header carries a line break");
+    assert!(matches!(error, BridgeError::Token), "{error:?}");
+    let asked = server.received_requests().await.expect("recorded");
+    assert!(
+        asked.is_empty(),
+        "the bridge was asked {} times",
+        asked.len()
+    );
 }
 
 #[tokio::test]
@@ -132,7 +181,7 @@ async fn a_bridge_that_does_not_answer_is_a_transport_error() {
     })
     .expect("the client builds");
     let error = bridge
-        .capability_statement()
+        .capability_statement(&token())
         .await
         .expect_err("nothing listens");
     assert!(matches!(error, BridgeError::Transport { .. }), "{error:?}");

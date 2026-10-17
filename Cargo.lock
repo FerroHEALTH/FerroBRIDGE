@@ -899,6 +899,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cookie"
+version = "0.18.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a373e3602691c3cdea496d2f0ee5935151e6168fe87739483c463db1b2f2f87"
+dependencies = [
+ "time",
+ "version_check",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1478,8 +1488,12 @@ dependencies = [
 name = "ferrobridge-testkit"
 version = "0.0.6"
 dependencies = [
+ "aws-lc-rs",
  "fhir-types",
+ "jiff",
+ "jsonwebtoken",
  "reqwest",
+ "serde",
  "serde_json",
  "sha2 0.11.0",
  "socket2",
@@ -1515,11 +1529,16 @@ dependencies = [
 name = "ferrobridge-viewer"
 version = "0.0.6"
 dependencies = [
+ "aws-lc-rs",
  "axum",
+ "base64 0.23.1",
  "clap",
  "console_error_panic_hook",
+ "cookie",
+ "ferrobridge-testkit",
  "fhir-types",
  "http",
+ "jsonwebtoken",
  "leptos",
  "leptos_axum",
  "leptos_meta",

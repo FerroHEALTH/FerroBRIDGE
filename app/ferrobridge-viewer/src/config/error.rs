@@ -198,6 +198,21 @@ pub enum Error {
         /// The key.
         key: String,
     },
+    /// A scope list names a value its key does not admit.
+    #[error("`{key}` {reason}")]
+    Scope {
+        /// The key.
+        key: String,
+        /// What the key requires.
+        reason: &'static str,
+    },
+    /// Cookies without `Secure` on a console that is not plain HTTP on
+    /// loopback, where they would travel in the clear.
+    #[error("`{key}` may be false only for a console whose redirect_uri is http on loopback")]
+    InsecureCookie {
+        /// The key.
+        key: String,
+    },
     /// A secret is set inline and through its `_file` sibling.
     #[error("`{key}` and `{key}_file` are both set; set one")]
     Conflict {

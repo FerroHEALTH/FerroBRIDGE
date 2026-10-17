@@ -182,6 +182,12 @@ leptos_meta = "0.8.7"
 leptos_router = "0.8.17"
 wasm-bindgen = "0.2.129"
 console_error_panic_hook = "0.1.7"
+# The console's operator sign-in (#600): the `__Host-` session cookies it
+# writes and reads, and the base64url of its random ids and PKCE challenge
+# (RFC 7636 §4.2) and of a confidential client's Basic credentials. base64
+# 0.23.1 is in the lock already. Verified against crates.io on 2026-10-17.
+cookie = { version = "0.18.2", default-features = false }
+base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 # Test-only.
 wiremock = "0.6.5"
 # The end-to-end lane's container harness and the PostgreSQL client the CDM

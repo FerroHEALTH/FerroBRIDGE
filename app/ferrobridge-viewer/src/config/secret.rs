@@ -10,8 +10,6 @@
 //! [`SecretString`] that never renders its value. No specification governs
 //! this: our own design.
 
-// TODO(#600): the OpenID Connect client secret is the first key read through this.
-
 use std::path::Path;
 
 use secrecy::SecretString;

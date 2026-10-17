@@ -6,9 +6,13 @@
 //! bridge.
 //!
 //! The console is one more client of the bridge's public HTTP surface: its
-//! server reaches the bridge through [`bridge`], server to server, and never
-//! compiles or runs a mapping itself. [`app`] is the page tree both halves
-//! share; [`server`] serves it with the health route under the browser
+//! server reaches the bridge through [`bridge`], server to server, with the
+//! signed-in operator's own access token, and never compiles or runs a
+//! mapping itself. It holds the operator's sign-in session on the server
+//! ([`session`], [`oidc`]), so the browser carries an opaque cookie and never
+//! a token. [`app`] is the page tree both halves share, filled through the
+//! server functions of [`status`] with the view models of [`model`];
+//! [`server`] serves it with the health and sign-in routes under the browser
 //! security headers, [`config`] reads the TOML configuration, [`cli`] and
 //! [`command`] run the binary, and [`healthcheck`] is the job a container
 //! runtime runs beside it. No specification governs the console: our own
@@ -20,6 +24,17 @@
 #![doc(test(attr(deny(warnings))))]
 
 pub mod app;
+pub mod model;
+// The browser half of a server function, which the server macro writes, is a
+// network call that awaits nothing, and the lint names the macro alone.
+#[cfg_attr(
+    target_arch = "wasm32",
+    expect(
+        clippy::unused_async_trait_impl,
+        reason = "written by the server_fn #[server] macro for the browser half, whose call awaits nothing here (https://docs.rs/server_fn/0.8/server_fn/attr.server.html)"
+    )
+)]
+pub mod status;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod bridge;
@@ -32,7 +47,11 @@ pub mod config;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod healthcheck;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod oidc;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod server;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod session;
 
 /// Attaches the browser half to the page the server rendered.
 #[cfg(target_arch = "wasm32")]
