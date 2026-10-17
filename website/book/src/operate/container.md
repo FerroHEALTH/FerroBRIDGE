@@ -267,8 +267,9 @@ FERROBRIDGE_VOCAB_DIR=/srv/athena/2026-09 \
 
 `vocab load DIR --schema NAME` exits 2 today with a line naming #233, the
 loader that waits on the observed export format, so that service is the shape
-the job runs in rather than a working load. `etl run` exits 2 the same way,
-naming #90, the OMOCL engine the run maps compositions with.
+the job runs in rather than a working load. `etl run` is a working job; the image runs it as
+`ferrobridge etl run` with the `[etl]` section the configuration page
+describes.
 
 ## Sources
 
