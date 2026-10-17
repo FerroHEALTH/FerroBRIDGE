@@ -279,7 +279,7 @@ at the line's current value.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `fhir-types` | 0.1.115 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
+| `fhir-types` | 0.1.116 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
 
 ## Language and runtime
 

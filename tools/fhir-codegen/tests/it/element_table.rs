@@ -102,6 +102,21 @@ fn type_code(path: &str, entry: &Value) -> String {
         .to_owned()
 }
 
+/// The code `Element.id` and every element inheriting it take: `string`, as
+/// the published definitions type `Element.id` in every version
+/// (<https://hl7.org/fhir/R4B/element-definitions.html#Element.id>,
+/// <https://hl7.org/fhir/R5/types-definitions.html#Element.id>), where the
+/// 4.3.0 and 5.0.0 snapshots state `id` (#672).
+fn element_id_code(element: &Value, code: String) -> String {
+    let element_id = element.get("path").and_then(Value::as_str) == Some("Element.id")
+        || element.pointer("/base/path").and_then(Value::as_str) == Some("Element.id");
+    if element_id && code == "id" {
+        String::from("string")
+    } else {
+        code
+    }
+}
+
 /// The maximum cardinality as a bound, `None` for `*`.
 fn max_of(element: &Value) -> Option<u32> {
     let max = element
@@ -143,7 +158,8 @@ fn children_of(elements: &[Value], parent: &str) -> Vec<Expected> {
                         .and_then(Value::as_array)
                         .into_iter()
                         .flatten()
-                        .map(|entry| type_code(path, entry)),
+                        .map(|entry| type_code(path, entry))
+                        .map(|code| element_id_code(element, code)),
                 ),
                 content_reference: element.get("contentReference").and_then(Value::as_str).map(
                     |reference| {
@@ -412,15 +428,16 @@ fn a_path_the_table_does_not_know_resolves_to_nothing() {
 /// kind, the cardinality bounds and the type codes.
 type Member<'a> = (&'a str, Kind, u32, Option<u32>, &'a [&'a str]);
 
-/// The FHIR type each package names behind `Element.id`'s `System.String`.
+/// The FHIR type each version's table names behind `Element.id`.
 ///
-/// The 4.3.0 package types it `id` where the other four type it `string`
-/// (3.0.2 with the code itself), so the emitted table carries the package's
-/// own answer per version.
+/// The published definitions type `Element.id` as `string` in every version
+/// (<https://hl7.org/fhir/R4B/element-definitions.html#Element.id>), so the
+/// table says `string` in 4.3.0 too, where the package's snapshot states
+/// `id` (#672).
 const ELEMENT_ID_TYPE: [(&str, &str); 5] = [
     ("stu3", "string"),
     ("r4", "string"),
-    ("r4b", "id"),
+    ("r4b", "string"),
     ("r5", "string"),
     ("r6", "string"),
 ];

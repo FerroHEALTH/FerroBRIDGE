@@ -67,25 +67,34 @@ fn committed_ids(committed: &CommittedSource) -> Result<(EhrId, ContributionUid)
 ///
 /// Two versions of one `id` that name two compositions leave no one
 /// composition a later version revises, so the create is refused with the
-/// record intact (no specification governs this: our own design).
+/// record intact. Each of those compositions is a resource of its own, so
+/// the refusal names each resource id: an update of the one the sender means
+/// (`PUT [base]/[type]/[id]`, <https://hl7.org/fhir/R4/http.html#update>)
+/// revises it (no specification governs the identity map: our own design).
 pub(super) fn one_composition(
     source: &SourceVersion,
-    versions: Vec<ConsumedSource>,
+    versions: &[ConsumedSource],
 ) -> Result<Option<ConsumedSource>, Refused> {
-    let mut versions = versions.into_iter();
-    let Some(first) = versions.next() else {
+    let Some(first) = versions.first().cloned() else {
         return Ok(None);
     };
-    let split = versions.any(|other| {
+    let split = versions.iter().any(|other| {
         other.ehr_id != first.ehr_id || other.versioned_object_uid != first.versioned_object_uid
     });
     if split {
+        let mut resources: Vec<String> = versions
+            .iter()
+            .map(|held| format!("{}/{}", source.resource_type(), held.internal_id))
+            .collect();
+        resources.sort();
+        resources.dedup();
         return Err(Refused::new(
             StatusCode::CONFLICT,
             Issue::error(IssueType::Conflict)
-                .diagnosing(
-                    "the identity map binds versions of this resource to more than one composition, so none is the one this version revises",
-                )
+                .diagnosing(format!(
+                    "the identity map binds versions of this resource to more than one composition, so none is the one this version revises; send the change as an update (PUT) of the resource it revises, one of {}",
+                    resources.join(", ")
+                ))
                 .at(format!("{}/{}", source.resource_type(), source.id())),
         ));
     }
@@ -100,11 +109,6 @@ pub(super) fn one_contribution(committed: &[Option<CommittedSource>]) -> Option<
         .iter()
         .all(|record| record.as_ref() == Some(first))
         .then_some(first)
-}
-
-/// Returns the versions of `paired`, in order.
-pub(super) fn versions_of(paired: Vec<(ObjectVersionId, Composition)>) -> Vec<ObjectVersionId> {
-    paired.into_iter().map(|(version, _)| version).collect()
 }
 
 /// Returns the versions a committed contribution names.
@@ -212,7 +216,12 @@ impl Ingest<'_> {
                 "its versions do not bind the resource once",
             ));
         };
-        let placed = self.place(&mapped, &[Some(source)], &ehr_id, vec![version.clone()])?;
+        let placed = self.place(
+            &mapped,
+            &[Some(source)],
+            &ehr_id,
+            vec![(version.clone(), stored.clone())],
+        )?;
         let [ref entry] = mapped;
         let Ok([place]) = <[Placed; 1]>::try_from(placed) else {
             return Err(unbound(
@@ -253,7 +262,7 @@ impl Ingest<'_> {
                 Scope::Whole,
             )
             .await?;
-        let placed = self.place(&partition.mapped, sources, &ehr_id, versions_of(versions))?;
+        let placed = self.place(&partition.mapped, sources, &ehr_id, versions)?;
         Ok(Ingested {
             ehr_id,
             commit: Commit::AlreadyConsumed,
@@ -324,7 +333,7 @@ impl Ingest<'_> {
         Ok(Recorded {
             consumed: None,
             committed: None,
-            revised: one_composition(source, versions)?,
+            revised: one_composition(source, &versions)?,
         })
     }
 

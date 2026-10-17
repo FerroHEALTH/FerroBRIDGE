@@ -9,6 +9,7 @@ use http::StatusCode;
 use crate::cdr::error::CdrError;
 use crate::cdr::ids::ContributionUid;
 use crate::facade::ehr;
+use crate::facade::engine;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::outcome::chain;
@@ -85,6 +86,18 @@ pub(super) fn stored_identifier(error: &impl std::fmt::Display) -> Refused {
             "the identity map holds an openEHR identifier this version cannot read: {error}"
         )),
     )
+}
+
+/// The refusal a stored entry path that names two entries renders as: a
+/// `500`, since the identity map holds a binding it cannot resolve (no
+/// specification governs the identity map: our own design).
+impl From<engine::AmbiguousEntry> for Refused {
+    fn from(error: engine::AmbiguousEntry) -> Self {
+        Self::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Issue::error(IssueType::Exception).diagnosing(chain(&error)),
+        )
+    }
 }
 
 /// Returns the refusal of a committed contribution whose answer cannot bind
