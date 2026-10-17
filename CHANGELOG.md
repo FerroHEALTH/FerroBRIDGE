@@ -88,6 +88,13 @@ crates on crates.io.
   exits 0 when no diagnostic is an error, 1 when one is, 69 when the check
   cannot run and 78 when the configuration names nothing to check. The
   checker is the library module `check`, which the operator API reuses.
+- `openehr-mapping-core` 0.1.113: `Diagnostic` has a serde form (#726), one
+  flat object with `file`, `line`, `column`, `severity`, `code`, `message`,
+  `mapping` and `model_path`, and reading it back refuses an invalid code or
+  mapping name as the constructors do. `DiagnosticCode::parse` reads a code
+  from its stable spelling. `fhirconnect` moves to 0.1.129 with it, since it
+  pins `openehr-mapping-core` exactly.
+
 - `scripts/deploy-probe.sh` probes a running deployment at a base URL (#220)
   and reports each lane (health, the facade under `/fhir`, the FHIRconnect
   operations) as `on`, `off`, `failing` or `uncovered`. An `uncovered` lane

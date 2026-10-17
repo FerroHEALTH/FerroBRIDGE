@@ -12,11 +12,16 @@ use core::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 
+use serde::Deserialize;
+use serde::Serialize;
+
 use crate::header::metadata::MappingName;
+use crate::header::metadata::MappingNameError;
 use crate::position::Position;
 
 /// How bad a diagnostic is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Severity {
     /// The input is refused.
     Error,
@@ -186,6 +191,47 @@ impl DiagnosticCode {
             Self::Language(ref code) => code.as_str(),
         }
     }
+
+    /// Returns the code a stable spelling names.
+    ///
+    /// A spelling of one of this crate's codes reads as that code, and any
+    /// other as a [`DiagnosticCode::Language`] code.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LanguageCodeError`] when the spelling is no code of this crate
+    /// and is not a valid language code either.
+    pub fn parse(code: &str) -> Result<Self, LanguageCodeError> {
+        match Self::BUILT_IN.iter().find(|known| known.as_str() == code) {
+            Some(known) => Ok(known.clone()),
+            None => LanguageCode::new(code).map(Self::Language),
+        }
+    }
+
+    /// Every code this crate owns, in declaration order.
+    const BUILT_IN: [Self; 21] = [
+        Self::Unreadable,
+        Self::YamlSyntax,
+        Self::YamlDuplicateKey,
+        Self::YamlUnresolvedAlias,
+        Self::EmptyDocument,
+        Self::UnexpectedNodeKind,
+        Self::MissingKey,
+        Self::UnknownGrammarLanguage,
+        Self::MalformedGrammarVersion,
+        Self::UnknownMappingType,
+        Self::InvalidMappingName,
+        Self::InvalidArchetypeId,
+        Self::DuplicateMappingName,
+        Self::MalformedPath,
+        Self::PathAboveAnchorRoot,
+        Self::PositionalPredicateInPath,
+        Self::TemplateBuild,
+        Self::IdCodedTemplate,
+        Self::MalformedTemplate,
+        Self::UnknownTemplatePath,
+        Self::InvalidComposition,
+    ];
 }
 
 impl fmt::Display for DiagnosticCode {
@@ -195,7 +241,8 @@ impl fmt::Display for DiagnosticCode {
 }
 
 /// One step of a path into the document model.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum ModelPathSegment {
     /// A mapping key.
     Field(String),
@@ -276,7 +323,15 @@ impl fmt::Display for ModelPath {
 }
 
 /// One refusal or remark about one place in one mapping file.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Its serde form is one flat object: `file`, `line` and `column` (both
+/// `null` when no position is known), `severity`, `code`, `message`,
+/// `mapping` (`null` when unknown) and `model_path` as an array of keys and
+/// indices. Reading it back runs the same checks as the constructors, so an
+/// invalid code or mapping name is refused (no specification governs the
+/// shape: our own design).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "DiagnosticWire", into = "DiagnosticWire")]
 pub struct Diagnostic {
     file: PathBuf,
     position: Option<Position>,
@@ -421,6 +476,70 @@ impl fmt::Display for Diagnostic {
     }
 }
 
+/// The flat serde form of a [`Diagnostic`].
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DiagnosticWire {
+    file: PathBuf,
+    line: Option<u64>,
+    column: Option<u64>,
+    severity: Severity,
+    code: String,
+    message: String,
+    mapping: Option<String>,
+    model_path: Vec<ModelPathSegment>,
+}
+
+/// Why the serde form of a diagnostic was refused.
+#[derive(Debug, thiserror::Error)]
+enum DiagnosticWireError {
+    /// The code is no code of this crate and no valid language code.
+    #[error(transparent)]
+    Code(#[from] LanguageCodeError),
+    /// The mapping name is not a valid mapping name.
+    #[error(transparent)]
+    MappingName(#[from] MappingNameError),
+    /// Only one of the line and the column is present.
+    #[error("a diagnostic position carries both a line and a column, or neither")]
+    HalfPosition,
+}
+
+impl From<Diagnostic> for DiagnosticWire {
+    fn from(diagnostic: Diagnostic) -> Self {
+        Self {
+            file: diagnostic.file,
+            line: diagnostic.position.map(Position::line),
+            column: diagnostic.position.map(Position::column),
+            severity: diagnostic.severity,
+            code: diagnostic.code.as_str().to_owned(),
+            message: diagnostic.message,
+            mapping: diagnostic.mapping_name.map(|name| name.as_str().to_owned()),
+            model_path: diagnostic.model_path.0,
+        }
+    }
+}
+
+impl TryFrom<DiagnosticWire> for Diagnostic {
+    type Error = DiagnosticWireError;
+
+    fn try_from(wire: DiagnosticWire) -> Result<Self, Self::Error> {
+        let position = match (wire.line, wire.column) {
+            (Some(line), Some(column)) => Some(Position::new(line, column)),
+            (None, None) => None,
+            _ => return Err(DiagnosticWireError::HalfPosition),
+        };
+        Ok(Self {
+            file: wire.file,
+            position,
+            mapping_name: wire.mapping.map(MappingName::new).transpose()?,
+            model_path: ModelPath(wire.model_path),
+            severity: wire.severity,
+            code: DiagnosticCode::parse(&wire.code)?,
+            message: wire.message,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Diagnostic;
@@ -431,6 +550,17 @@ mod tests {
     use super::Severity;
     use crate::header::metadata::MappingName;
     use crate::position::Position;
+
+    #[test]
+    #[expect(clippy::panic_in_result_fn, reason = "test assertions")]
+    fn every_built_in_code_reads_back_from_its_spelling() -> Result<(), LanguageCodeError> {
+        let mut spellings = std::collections::BTreeSet::new();
+        for code in DiagnosticCode::BUILT_IN {
+            assert_eq!(DiagnosticCode::parse(code.as_str())?, code);
+            assert!(spellings.insert(code.as_str().to_owned()));
+        }
+        Ok(())
+    }
 
     #[test]
     fn a_model_path_renders_fields_and_indices() {
