@@ -844,7 +844,10 @@ impl super::super::codec::Json for StructureDefinition {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -858,7 +861,10 @@ impl super::super::codec::Json for StructureDefinition {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -872,7 +878,10 @@ impl super::super::codec::Json for StructureDefinition {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -893,7 +902,10 @@ impl super::super::codec::Json for StructureDefinition {
         })?;
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -943,7 +955,10 @@ impl super::super::codec::Json for StructureDefinition {
         };
         let mut field_contact = Vec::new();
         if let Some(raw) = raw_contact {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contact", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -963,7 +978,10 @@ impl super::super::codec::Json for StructureDefinition {
         };
         let mut field_use_context = Vec::new();
         if let Some(raw) = raw_use_context {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("useContext", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -977,7 +995,10 @@ impl super::super::codec::Json for StructureDefinition {
         }
         let mut field_jurisdiction = Vec::new();
         if let Some(raw) = raw_jurisdiction {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("jurisdiction", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1003,7 +1024,10 @@ impl super::super::codec::Json for StructureDefinition {
         };
         let mut field_keyword = Vec::new();
         if let Some(raw) = raw_keyword {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("keyword", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1023,7 +1047,10 @@ impl super::super::codec::Json for StructureDefinition {
         };
         let mut field_mapping = Vec::new();
         if let Some(raw) = raw_mapping {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("mapping", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1052,23 +1079,28 @@ impl super::super::codec::Json for StructureDefinition {
             })?),
         };
         let mut field_context = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_context, raw_context_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("context", |path| {
+                super::super::codec::pair_arrays(raw_context, raw_context_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_context.push(path.with_index("context", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_context_invariant = Vec::new();
-        for (index, (value, element)) in super::super::codec::pair_arrays(
-            raw_context_invariant,
-            raw_context_invariant_element,
-            path,
-        )?
-        .into_iter()
-        .enumerate()
+        for (index, (value, element)) in path
+            .with("contextInvariant", |path| {
+                super::super::codec::pair_arrays(
+                    raw_context_invariant,
+                    raw_context_invariant_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_context_invariant.push(path.with_index("contextInvariant", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -1460,7 +1492,10 @@ impl super::super::codec::Json for StructureDefinitionDifferential {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1474,7 +1509,10 @@ impl super::super::codec::Json for StructureDefinitionDifferential {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1492,7 +1530,10 @@ impl super::super::codec::Json for StructureDefinitionDifferential {
         }
         let mut field_element = Vec::new();
         if let Some(raw) = raw_element {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("element", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1736,7 +1777,10 @@ impl super::super::codec::Json for StructureDefinitionMapping {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1750,7 +1794,10 @@ impl super::super::codec::Json for StructureDefinitionMapping {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1978,7 +2025,10 @@ impl super::super::codec::Json for StructureDefinitionSnapshot {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1992,7 +2042,10 @@ impl super::super::codec::Json for StructureDefinitionSnapshot {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2010,7 +2063,10 @@ impl super::super::codec::Json for StructureDefinitionSnapshot {
         }
         let mut field_element = Vec::new();
         if let Some(raw) = raw_element {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("element", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

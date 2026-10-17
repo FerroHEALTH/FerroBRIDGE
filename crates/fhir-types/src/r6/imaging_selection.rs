@@ -637,7 +637,10 @@ impl super::super::codec::Json for ImagingSelection {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -651,7 +654,10 @@ impl super::super::codec::Json for ImagingSelection {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -665,7 +671,10 @@ impl super::super::codec::Json for ImagingSelection {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -683,7 +692,10 @@ impl super::super::codec::Json for ImagingSelection {
         }
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -700,7 +712,10 @@ impl super::super::codec::Json for ImagingSelection {
         })?;
         let mut field_category = Vec::new();
         if let Some(raw) = raw_category {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("category", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -757,7 +772,10 @@ impl super::super::codec::Json for ImagingSelection {
         };
         let mut field_performer = Vec::new();
         if let Some(raw) = raw_performer {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("performer", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -771,7 +789,10 @@ impl super::super::codec::Json for ImagingSelection {
         }
         let mut field_based_on = Vec::new();
         if let Some(raw) = raw_based_on {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("basedOn", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -825,7 +846,10 @@ impl super::super::codec::Json for ImagingSelection {
         };
         let mut field_body_site = Vec::new();
         if let Some(raw) = raw_body_site {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("bodySite", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -839,7 +863,8 @@ impl super::super::codec::Json for ImagingSelection {
         }
         let mut field_focus = Vec::new();
         if let Some(raw) = raw_focus {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("focus", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -853,7 +878,10 @@ impl super::super::codec::Json for ImagingSelection {
         }
         let mut field_endpoint = Vec::new();
         if let Some(raw) = raw_endpoint {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("endpoint", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -867,7 +895,10 @@ impl super::super::codec::Json for ImagingSelection {
         }
         let mut field_instance = Vec::new();
         if let Some(raw) = raw_instance {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("instance", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -881,7 +912,10 @@ impl super::super::codec::Json for ImagingSelection {
         }
         let mut field_image_region3_d = Vec::new();
         if let Some(raw) = raw_image_region3_d {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("imageRegion3D", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1203,7 +1237,10 @@ impl super::super::codec::Json for ImagingSelectionImageRegion3D {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1217,7 +1254,10 @@ impl super::super::codec::Json for ImagingSelectionImageRegion3D {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1241,10 +1281,12 @@ impl super::super::codec::Json for ImagingSelectionImageRegion3D {
             )
         })?;
         let mut field_coordinate = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_coordinate, raw_coordinate_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("coordinate", |path| {
+                super::super::codec::pair_arrays(raw_coordinate, raw_coordinate_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_coordinate.push(path.with_index("coordinate", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -1618,7 +1660,10 @@ impl super::super::codec::Json for ImagingSelectionInstance {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1632,7 +1677,10 @@ impl super::super::codec::Json for ImagingSelectionInstance {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1664,23 +1712,28 @@ impl super::super::codec::Json for ImagingSelectionInstance {
             })?),
         };
         let mut field_frame_number = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_frame_number, raw_frame_number_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("frameNumber", |path| {
+                super::super::codec::pair_arrays(raw_frame_number, raw_frame_number_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_frame_number.push(path.with_index("frameNumber", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_referenced_content_item_identifier = Vec::new();
-        for (index, (value, element)) in super::super::codec::pair_arrays(
-            raw_referenced_content_item_identifier,
-            raw_referenced_content_item_identifier_element,
-            path,
-        )?
-        .into_iter()
-        .enumerate()
+        for (index, (value, element)) in path
+            .with("referencedContentItemIdentifier", |path| {
+                super::super::codec::pair_arrays(
+                    raw_referenced_content_item_identifier,
+                    raw_referenced_content_item_identifier_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_referenced_content_item_identifier.push(path.with_index(
                 "referencedContentItemIdentifier",
@@ -1689,36 +1742,48 @@ impl super::super::codec::Json for ImagingSelectionInstance {
             )?);
         }
         let mut field_segment_number = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_segment_number, raw_segment_number_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("segmentNumber", |path| {
+                super::super::codec::pair_arrays(
+                    raw_segment_number,
+                    raw_segment_number_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_segment_number.push(path.with_index("segmentNumber", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_region_of_interest = Vec::new();
-        for (index, (value, element)) in super::super::codec::pair_arrays(
-            raw_region_of_interest,
-            raw_region_of_interest_element,
-            path,
-        )?
-        .into_iter()
-        .enumerate()
+        for (index, (value, element)) in path
+            .with("regionOfInterest", |path| {
+                super::super::codec::pair_arrays(
+                    raw_region_of_interest,
+                    raw_region_of_interest_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_region_of_interest.push(path.with_index("regionOfInterest", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_wave_form_channel = Vec::new();
-        for (index, (value, element)) in super::super::codec::pair_arrays(
-            raw_wave_form_channel,
-            raw_wave_form_channel_element,
-            path,
-        )?
-        .into_iter()
-        .enumerate()
+        for (index, (value, element)) in path
+            .with("waveFormChannel", |path| {
+                super::super::codec::pair_arrays(
+                    raw_wave_form_channel,
+                    raw_wave_form_channel_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_wave_form_channel.push(path.with_index("waveFormChannel", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -1726,7 +1791,10 @@ impl super::super::codec::Json for ImagingSelectionInstance {
         }
         let mut field_image_region2_d = Vec::new();
         if let Some(raw) = raw_image_region2_d {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("imageRegion2D", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1995,7 +2063,10 @@ impl super::super::codec::Json for ImagingSelectionInstanceImageRegion2D {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2009,7 +2080,10 @@ impl super::super::codec::Json for ImagingSelectionInstanceImageRegion2D {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2033,10 +2107,12 @@ impl super::super::codec::Json for ImagingSelectionInstanceImageRegion2D {
             )
         })?;
         let mut field_coordinate = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_coordinate, raw_coordinate_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("coordinate", |path| {
+                super::super::codec::pair_arrays(raw_coordinate, raw_coordinate_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_coordinate.push(path.with_index("coordinate", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -2229,7 +2305,10 @@ impl super::super::codec::Json for ImagingSelectionPerformer {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2243,7 +2322,10 @@ impl super::super::codec::Json for ImagingSelectionPerformer {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

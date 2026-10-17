@@ -79,7 +79,7 @@ fn render_scalar_builder(
             writeln!(out, "        if let Some(raw) = raw_{slot} {{")?;
             writeln!(
                 out,
-                "            for (index, value) in {C}::expect_array(raw, path)?.iter().enumerate() {{"
+                "            for (index, value) in path.with({key:?}, |path| {C}::expect_array(raw, path))?.iter().enumerate() {{"
             )?;
             writeln!(
                 out,
@@ -147,7 +147,7 @@ fn render_primitive_builder(out: &mut String, field: &Field) -> fmt::Result {
             writeln!(out, "        let mut {name} = Vec::new();")?;
             writeln!(
                 out,
-                "        for (index, (value, element)) in {C}::pair_arrays(raw_{slot}, raw_{slot}_element, path)?.into_iter().enumerate() {{"
+                "        for (index, (value, element)) in path.with({key:?}, |path| {C}::pair_arrays(raw_{slot}, raw_{slot}_element, path))?.into_iter().enumerate() {{"
             )?;
             writeln!(
                 out,
@@ -182,7 +182,7 @@ fn render_complex_builder(out: &mut String, field: &Field) -> fmt::Result {
             writeln!(out, "        if let Some(raw) = raw_{slot} {{")?;
             writeln!(
                 out,
-                "            for (index, value) in {C}::expect_array(raw, path)?.iter().enumerate() {{"
+                "            for (index, value) in path.with({key:?}, |path| {C}::expect_array(raw, path))?.iter().enumerate() {{"
             )?;
             writeln!(
                 out,

@@ -225,7 +225,10 @@ impl super::super::codec::Json for HumanName {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -256,30 +259,36 @@ impl super::super::codec::Json for HumanName {
             })?),
         };
         let mut field_given = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_given, raw_given_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("given", |path| {
+                super::super::codec::pair_arrays(raw_given, raw_given_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_given.push(path.with_index("given", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_prefix = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_prefix, raw_prefix_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("prefix", |path| {
+                super::super::codec::pair_arrays(raw_prefix, raw_prefix_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_prefix.push(path.with_index("prefix", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_suffix = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_suffix, raw_suffix_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("suffix", |path| {
+                super::super::codec::pair_arrays(raw_suffix, raw_suffix_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_suffix.push(path.with_index("suffix", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)

@@ -733,7 +733,10 @@ impl super::super::codec::Json for SubscriptionTopic {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -747,7 +750,10 @@ impl super::super::codec::Json for SubscriptionTopic {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -761,7 +767,10 @@ impl super::super::codec::Json for SubscriptionTopic {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -782,7 +791,10 @@ impl super::super::codec::Json for SubscriptionTopic {
         })?;
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -807,10 +819,12 @@ impl super::super::codec::Json for SubscriptionTopic {
             })?),
         };
         let mut field_derived_from = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_derived_from, raw_derived_from_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("derivedFrom", |path| {
+                super::super::codec::pair_arrays(raw_derived_from, raw_derived_from_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_derived_from.push(path.with_index("derivedFrom", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -839,7 +853,10 @@ impl super::super::codec::Json for SubscriptionTopic {
         };
         let mut field_contact = Vec::new();
         if let Some(raw) = raw_contact {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contact", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -859,7 +876,10 @@ impl super::super::codec::Json for SubscriptionTopic {
         };
         let mut field_use_context = Vec::new();
         if let Some(raw) = raw_use_context {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("useContext", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -873,7 +893,10 @@ impl super::super::codec::Json for SubscriptionTopic {
         }
         let mut field_jurisdiction = Vec::new();
         if let Some(raw) = raw_jurisdiction {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("jurisdiction", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -924,7 +947,10 @@ impl super::super::codec::Json for SubscriptionTopic {
             .transpose()?;
         let mut field_resource_trigger = Vec::new();
         if let Some(raw) = raw_resource_trigger {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("resourceTrigger", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -938,7 +964,10 @@ impl super::super::codec::Json for SubscriptionTopic {
         }
         let mut field_event_trigger = Vec::new();
         if let Some(raw) = raw_event_trigger {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("eventTrigger", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -952,7 +981,10 @@ impl super::super::codec::Json for SubscriptionTopic {
         }
         let mut field_can_filter_by = Vec::new();
         if let Some(raw) = raw_can_filter_by {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("canFilterBy", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -966,7 +998,10 @@ impl super::super::codec::Json for SubscriptionTopic {
         }
         let mut field_notification_shape = Vec::new();
         if let Some(raw) = raw_notification_shape {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("notificationShape", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1407,7 +1442,10 @@ impl super::super::codec::Json for SubscriptionTopicCanFilterBy {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1421,7 +1459,10 @@ impl super::super::codec::Json for SubscriptionTopicCanFilterBy {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1463,10 +1504,12 @@ impl super::super::codec::Json for SubscriptionTopicCanFilterBy {
             })?),
         };
         let mut field_modifier = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_modifier, raw_modifier_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("modifier", |path| {
+                super::super::codec::pair_arrays(raw_modifier, raw_modifier_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_modifier.push(path.with_index("modifier", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -1707,7 +1750,10 @@ impl super::super::codec::Json for SubscriptionTopicEventTrigger {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1721,7 +1767,10 @@ impl super::super::codec::Json for SubscriptionTopicEventTrigger {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1993,7 +2042,10 @@ impl super::super::codec::Json for SubscriptionTopicNotificationShape {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2007,7 +2059,10 @@ impl super::super::codec::Json for SubscriptionTopicNotificationShape {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2031,20 +2086,24 @@ impl super::super::codec::Json for SubscriptionTopicNotificationShape {
             )
         })?;
         let mut field_include = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_include, raw_include_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("include", |path| {
+                super::super::codec::pair_arrays(raw_include, raw_include_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_include.push(path.with_index("include", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_rev_include = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_rev_include, raw_rev_include_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("revInclude", |path| {
+                super::super::codec::pair_arrays(raw_rev_include, raw_rev_include_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_rev_include.push(path.with_index("revInclude", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -2316,7 +2375,10 @@ impl super::super::codec::Json for SubscriptionTopicResourceTrigger {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2330,7 +2392,10 @@ impl super::super::codec::Json for SubscriptionTopicResourceTrigger {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2360,13 +2425,16 @@ impl super::super::codec::Json for SubscriptionTopicResourceTrigger {
             )
         })?;
         let mut field_supported_interaction = Vec::new();
-        for (index, (value, element)) in super::super::codec::pair_arrays(
-            raw_supported_interaction,
-            raw_supported_interaction_element,
-            path,
-        )?
-        .into_iter()
-        .enumerate()
+        for (index, (value, element)) in path
+            .with("supportedInteraction", |path| {
+                super::super::codec::pair_arrays(
+                    raw_supported_interaction,
+                    raw_supported_interaction_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_supported_interaction.push(path.with_index(
                 "supportedInteraction",
@@ -2681,7 +2749,10 @@ impl super::super::codec::Json for SubscriptionTopicResourceTriggerQueryCriteria
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2695,7 +2766,10 @@ impl super::super::codec::Json for SubscriptionTopicResourceTriggerQueryCriteria
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

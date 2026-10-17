@@ -143,7 +143,10 @@ impl super::super::codec::Json for Availability {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -170,7 +173,10 @@ impl super::super::codec::Json for Availability {
             .transpose()?;
         let mut field_available_time = Vec::new();
         if let Some(raw) = raw_available_time {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("availableTime", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -184,7 +190,10 @@ impl super::super::codec::Json for Availability {
         }
         let mut field_not_available_time = Vec::new();
         if let Some(raw) = raw_not_available_time {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("notAvailableTime", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -413,7 +422,10 @@ impl super::super::codec::Json for AvailabilityAvailableTime {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -426,10 +438,12 @@ impl super::super::codec::Json for AvailabilityAvailableTime {
             }
         }
         let mut field_days_of_week = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_days_of_week, raw_days_of_week_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("daysOfWeek", |path| {
+                super::super::codec::pair_arrays(raw_days_of_week, raw_days_of_week_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_days_of_week.push(path.with_index("daysOfWeek", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -625,7 +639,10 @@ impl super::super::codec::Json for AvailabilityNotAvailableTime {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

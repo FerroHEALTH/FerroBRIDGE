@@ -356,7 +356,10 @@ impl super::super::codec::Json for SubstancePolymer {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -370,7 +373,10 @@ impl super::super::codec::Json for SubstancePolymer {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -384,7 +390,10 @@ impl super::super::codec::Json for SubstancePolymer {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -428,7 +437,10 @@ impl super::super::codec::Json for SubstancePolymer {
             .transpose()?;
         let mut field_copolymer_connectivity = Vec::new();
         if let Some(raw) = raw_copolymer_connectivity {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("copolymerConnectivity", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -445,10 +457,12 @@ impl super::super::codec::Json for SubstancePolymer {
             }
         }
         let mut field_modification = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_modification, raw_modification_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("modification", |path| {
+                super::super::codec::pair_arrays(raw_modification, raw_modification_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_modification.push(path.with_index("modification", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -456,7 +470,10 @@ impl super::super::codec::Json for SubstancePolymer {
         }
         let mut field_monomer_set = Vec::new();
         if let Some(raw) = raw_monomer_set {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("monomerSet", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -470,7 +487,10 @@ impl super::super::codec::Json for SubstancePolymer {
         }
         let mut field_repeat = Vec::new();
         if let Some(raw) = raw_repeat {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("repeat", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -712,7 +732,10 @@ impl super::super::codec::Json for SubstancePolymerMonomerSet {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -726,7 +749,10 @@ impl super::super::codec::Json for SubstancePolymerMonomerSet {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -757,7 +783,10 @@ impl super::super::codec::Json for SubstancePolymerMonomerSet {
             .transpose()?;
         let mut field_starting_material = Vec::new();
         if let Some(raw) = raw_starting_material {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("startingMaterial", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -985,7 +1014,10 @@ impl super::super::codec::Json for SubstancePolymerMonomerSetStartingMaterial {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -999,7 +1031,10 @@ impl super::super::codec::Json for SubstancePolymerMonomerSetStartingMaterial {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1292,7 +1327,10 @@ impl super::super::codec::Json for SubstancePolymerRepeat {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1306,7 +1344,10 @@ impl super::super::codec::Json for SubstancePolymerRepeat {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1352,7 +1393,10 @@ impl super::super::codec::Json for SubstancePolymerRepeat {
             .transpose()?;
         let mut field_repeat_unit = Vec::new();
         if let Some(raw) = raw_repeat_unit {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("repeatUnit", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1610,7 +1654,10 @@ impl super::super::codec::Json for SubstancePolymerRepeatRepeatUnit {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1624,7 +1671,10 @@ impl super::super::codec::Json for SubstancePolymerRepeatRepeatUnit {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1674,7 +1724,10 @@ impl super::super::codec::Json for SubstancePolymerRepeatRepeatUnit {
             .transpose()?;
         let mut field_degree_of_polymerisation = Vec::new();
         if let Some(raw) = raw_degree_of_polymerisation {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("degreeOfPolymerisation", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1692,7 +1745,10 @@ impl super::super::codec::Json for SubstancePolymerRepeatRepeatUnit {
         }
         let mut field_structural_representation = Vec::new();
         if let Some(raw) = raw_structural_representation {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("structuralRepresentation", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1913,7 +1969,10 @@ impl super::super::codec::Json for SubstancePolymerRepeatRepeatUnitDegreeOfPolym
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1927,7 +1986,10 @@ impl super::super::codec::Json for SubstancePolymerRepeatRepeatUnitDegreeOfPolym
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2167,7 +2229,10 @@ impl super::super::codec::Json for SubstancePolymerRepeatRepeatUnitStructuralRep
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2181,7 +2246,10 @@ impl super::super::codec::Json for SubstancePolymerRepeatRepeatUnitStructuralRep
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

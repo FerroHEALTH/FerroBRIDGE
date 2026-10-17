@@ -555,7 +555,10 @@ impl super::super::codec::Json for Provenance {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -569,7 +572,10 @@ impl super::super::codec::Json for Provenance {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -583,7 +589,10 @@ impl super::super::codec::Json for Provenance {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -601,7 +610,10 @@ impl super::super::codec::Json for Provenance {
         }
         let mut field_target = Vec::new();
         if let Some(raw) = raw_target {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("target", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -636,10 +648,12 @@ impl super::super::codec::Json for Provenance {
             })?),
         };
         let mut field_policy = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_policy, raw_policy_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("policy", |path| {
+                super::super::codec::pair_arrays(raw_policy, raw_policy_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_policy.push(path.with_index("policy", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -660,7 +674,10 @@ impl super::super::codec::Json for Provenance {
             .transpose()?;
         let mut field_authorization = Vec::new();
         if let Some(raw) = raw_authorization {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("authorization", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -693,7 +710,10 @@ impl super::super::codec::Json for Provenance {
             .transpose()?;
         let mut field_based_on = Vec::new();
         if let Some(raw) = raw_based_on {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("basedOn", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -733,7 +753,8 @@ impl super::super::codec::Json for Provenance {
             .transpose()?;
         let mut field_agent = Vec::new();
         if let Some(raw) = raw_agent {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("agent", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -752,7 +773,10 @@ impl super::super::codec::Json for Provenance {
         }
         let mut field_entity = Vec::new();
         if let Some(raw) = raw_entity {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("entity", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -766,7 +790,10 @@ impl super::super::codec::Json for Provenance {
         }
         let mut field_signature = Vec::new();
         if let Some(raw) = raw_signature {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("signature", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1094,7 +1121,10 @@ impl super::super::codec::Json for ProvenanceAgent {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1108,7 +1138,10 @@ impl super::super::codec::Json for ProvenanceAgent {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1139,7 +1172,8 @@ impl super::super::codec::Json for ProvenanceAgent {
             .transpose()?;
         let mut field_role = Vec::new();
         if let Some(raw) = raw_role {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("role", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -1389,7 +1423,10 @@ impl super::super::codec::Json for ProvenanceEntity {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1403,7 +1440,10 @@ impl super::super::codec::Json for ProvenanceEntity {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1435,7 +1475,8 @@ impl super::super::codec::Json for ProvenanceEntity {
         })?;
         let mut field_agent = Vec::new();
         if let Some(raw) = raw_agent {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("agent", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {

@@ -415,7 +415,10 @@ impl super::super::codec::Json for BodyStructure {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -429,7 +432,10 @@ impl super::super::codec::Json for BodyStructure {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -443,7 +449,10 @@ impl super::super::codec::Json for BodyStructure {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -461,7 +470,10 @@ impl super::super::codec::Json for BodyStructure {
         }
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -494,7 +506,10 @@ impl super::super::codec::Json for BodyStructure {
             .transpose()?;
         let mut field_included_structure = Vec::new();
         if let Some(raw) = raw_included_structure {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("includedStructure", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -517,7 +532,10 @@ impl super::super::codec::Json for BodyStructure {
         }
         let mut field_excluded_structure = Vec::new();
         if let Some(raw) = raw_excluded_structure {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("excludedStructure", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -541,7 +559,8 @@ impl super::super::codec::Json for BodyStructure {
         };
         let mut field_image = Vec::new();
         if let Some(raw) = raw_image {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("image", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -867,7 +886,10 @@ impl super::super::codec::Json for BodyStructureIncludedStructure {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -881,7 +903,10 @@ impl super::super::codec::Json for BodyStructureIncludedStructure {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -923,7 +948,10 @@ impl super::super::codec::Json for BodyStructureIncludedStructure {
             .transpose()?;
         let mut field_body_landmark_orientation = Vec::new();
         if let Some(raw) = raw_body_landmark_orientation {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("bodyLandmarkOrientation", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -941,7 +969,10 @@ impl super::super::codec::Json for BodyStructureIncludedStructure {
         }
         let mut field_spatial_reference = Vec::new();
         if let Some(raw) = raw_spatial_reference {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("spatialReference", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -959,7 +990,10 @@ impl super::super::codec::Json for BodyStructureIncludedStructure {
         }
         let mut field_qualifier = Vec::new();
         if let Some(raw) = raw_qualifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("qualifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1230,7 +1264,10 @@ impl super::super::codec::Json for BodyStructureIncludedStructureBodyLandmarkOri
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1244,7 +1281,10 @@ impl super::super::codec::Json for BodyStructureIncludedStructureBodyLandmarkOri
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1262,7 +1302,10 @@ impl super::super::codec::Json for BodyStructureIncludedStructureBodyLandmarkOri
         }
         let mut field_landmark_description = Vec::new();
         if let Some(raw) = raw_landmark_description {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("landmarkDescription", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1280,7 +1323,10 @@ impl super::super::codec::Json for BodyStructureIncludedStructureBodyLandmarkOri
         }
         let mut field_clock_face_position = Vec::new();
         if let Some(raw) = raw_clock_face_position {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("clockFacePosition", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1298,7 +1344,10 @@ impl super::super::codec::Json for BodyStructureIncludedStructureBodyLandmarkOri
         }
         let mut field_distance_from_landmark = Vec::new();
         if let Some(raw) = raw_distance_from_landmark {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("distanceFromLandmark", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1316,7 +1365,10 @@ impl super::super::codec::Json for BodyStructureIncludedStructureBodyLandmarkOri
         }
         let mut field_surface_orientation = Vec::new();
         if let Some(raw) = raw_surface_orientation {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("surfaceOrientation", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1557,7 +1609,10 @@ impl super::super::codec::Json
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1571,7 +1626,10 @@ impl super::super::codec::Json
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1589,7 +1647,10 @@ impl super::super::codec::Json
         }
         let mut field_device = Vec::new();
         if let Some(raw) = raw_device {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("device", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1603,7 +1664,8 @@ impl super::super::codec::Json
         }
         let mut field_value = Vec::new();
         if let Some(raw) = raw_value {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("value", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
