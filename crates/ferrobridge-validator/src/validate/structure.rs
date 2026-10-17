@@ -108,6 +108,23 @@ impl Structure {
             .collect()
     }
 
+    /// Answers whether the snapshot defines an element whose id starts with
+    /// `stem`: the element, a slice of it, a child, or for a `choice` one of
+    /// its type forms (`Observation.valueQuantity`).
+    pub(crate) fn mentions(&self, stem: &str, choice: bool) -> bool {
+        self.by_id
+            .range(stem.to_owned()..)
+            .map(|(key, _)| key)
+            .take_while(|key| key.starts_with(stem))
+            .any(|key| {
+                key.strip_prefix(stem)
+                    .and_then(|rest| rest.chars().next())
+                    .is_none_or(|next| {
+                        matches!(next, '.' | ':' | '[') || (choice && next.is_ascii_uppercase())
+                    })
+            })
+    }
+
     /// Answers whether the snapshot defines an element below `id`.
     pub(crate) fn has_children(&self, id: &str) -> bool {
         let prefix = format!("{id}.");

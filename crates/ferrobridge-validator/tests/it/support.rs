@@ -120,7 +120,7 @@ pub(crate) fn set_with(definitions: &[serde_json::Value]) -> TestResult<(Synthet
 /// A `StructureDefinition` constraining `kind` with the snapshot `elements`.
 ///
 /// The snapshot is partial: the validator holds an instance to the elements a
-/// snapshot carries, and the element table supplies the base of the rest.
+/// snapshot carries, and the core definitions supply the rest.
 pub(crate) fn profile(id: &str, kind: &str, elements: &serde_json::Value) -> serde_json::Value {
     json!({
         "resourceType": "StructureDefinition",

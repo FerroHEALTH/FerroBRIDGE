@@ -52,6 +52,13 @@ crates on crates.io.
   file secret, and CI resolves the quickstart under every profile and
   dry-runs the console image build.
 
+### Fixed
+
+- The profile validator holds a child that a profile's snapshot leaves out
+  to the core definition of the type declaring it (#484), so the core
+  bindings, invariants and fixed values of that child apply. Before, a
+  partial snapshot left such a child with no element definition at all.
+
 ## [0.0.7] - 2026-10-17
 
 ### Changed
