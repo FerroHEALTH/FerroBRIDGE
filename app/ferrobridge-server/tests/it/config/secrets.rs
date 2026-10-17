@@ -204,7 +204,10 @@ fn no_inline_secret_reaches_the_debug_rendering_of_the_tree_or_the_settings()
             "synthetic-tx-token",
             "synthetic-db-password",
         ] {
-            assert!(!rendered.contains(secret), "{secret} leaked: {rendered}");
+            assert!(
+                !rendered.contains(secret),
+                "a secret reached the Debug rendering"
+            );
         }
     }
     Ok(())
@@ -221,7 +224,13 @@ fn no_inline_client_secret_reaches_the_debug_rendering_of_the_tree() -> Result<(
     let config = Config::from_sources(Some(text), &BTreeMap::new())?;
     let tree = format!("{config:?}");
     let settings = format!("{:?}", config.resolve()?);
-    assert!(!tree.contains("synthetic-client-secret"), "{tree}");
-    assert!(!settings.contains("synthetic-client-secret"), "{settings}");
+    assert!(
+        !tree.contains("synthetic-client-secret"),
+        "the client secret reached the Debug rendering of the tree"
+    );
+    assert!(
+        !settings.contains("synthetic-client-secret"),
+        "the client secret reached the Debug rendering of the settings"
+    );
     Ok(())
 }
