@@ -80,7 +80,7 @@ crates on crates.io.
   flat object with `file`, `line`, `column`, `severity`, `code`, `message`,
   `mapping` and `model_path`, and reading it back refuses an invalid code or
   mapping name as the constructors do. `DiagnosticCode::parse` reads a code
-  from its stable spelling. `fhirconnect` moves to 0.1.128 with it, since it
+  from its stable spelling. `fhirconnect` moves to 0.1.129 with it, since it
   pins `openehr-mapping-core` exactly.
 
 - `scripts/deploy-probe.sh` probes a running deployment at a base URL (#220)
