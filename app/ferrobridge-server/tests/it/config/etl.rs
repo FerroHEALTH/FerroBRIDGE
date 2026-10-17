@@ -4,7 +4,8 @@
 //! The `[cdm]` and `[etl]` configuration: the schema names, the person
 //! policy, and the two queries checked when the configuration loads.
 
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use ferrobridge_server::etl::aql::AqlError;
 use ferrobridge_server::etl::deletions::DeletionPolicy;
 use std::collections::BTreeMap;

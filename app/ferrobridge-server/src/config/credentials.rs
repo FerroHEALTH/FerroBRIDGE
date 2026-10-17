@@ -8,7 +8,7 @@ use secrecy::{ExposeSecret, SecretString};
 use std::path::Path;
 use std::time::Duration;
 
-use super::Error;
+use super::error::Error;
 use super::resolve::url_of;
 use super::section::Cdm;
 use super::section::Credentials;

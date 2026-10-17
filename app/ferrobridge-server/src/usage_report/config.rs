@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::config::Error;
+use crate::config::error::Error;
 use crate::config::section::UsageReport;
 
 /// The collector every report goes to unless the deployment names another

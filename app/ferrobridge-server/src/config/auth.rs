@@ -9,8 +9,8 @@ use std::time::Duration;
 
 use jsonwebtoken::Algorithm;
 
-use super::Error;
 use super::credentials::is_scope;
+use super::error::Error;
 use super::resolve::url_of;
 use super::section::Auth;
 use crate::auth::AuthSettings;

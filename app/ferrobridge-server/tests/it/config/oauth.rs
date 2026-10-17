@@ -6,7 +6,8 @@
 
 use ferrobridge_server::cdr::config::CdrCredentials;
 use ferrobridge_server::cdr::oauth::{ClientAuth, Endpoint, OAuthConfig};
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;

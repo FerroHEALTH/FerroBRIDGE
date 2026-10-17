@@ -4,7 +4,8 @@
 //! The `[usage_report]` section: on by default with no state directory, every
 //! key, the environment switch, and every refusal.
 
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use ferrobridge_server::usage_report::config::{Deployment, ENDPOINT};
 use std::collections::BTreeMap;
 use std::error::Error as StdError;

@@ -3,7 +3,8 @@
 
 //! The `[hl7v2]` section: off until present, every key, and every refusal.
 
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::time::Duration;

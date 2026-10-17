@@ -10,7 +10,8 @@
 //! container-backed cases run only when `FERROBRIDGE_E2E=1` admits the
 //! harness. No specification governs `cdm init`: our own design.
 
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use ferrobridge_testkit::containers::{self, Postgres};
 use ferrobridge_testkit::tls::{TlsError, TlsMaterial};
 use omop_cdm::connection::SslMode;

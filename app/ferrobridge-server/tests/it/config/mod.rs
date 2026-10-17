@@ -16,7 +16,8 @@ mod refusals;
 mod secrets;
 mod usage_report;
 
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 

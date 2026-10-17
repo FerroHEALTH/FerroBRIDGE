@@ -11,7 +11,6 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use super::CdmSettings;
-use super::Error;
 use super::FacadeSettings;
 use super::Hl7v2Settings;
 use super::MappingSettings;
@@ -20,6 +19,7 @@ use super::credentials::cdm_connection_key;
 use super::credentials::resolve_credentials;
 use super::credentials::resolve_oauth;
 use super::credentials::secret;
+use super::error::Error;
 use super::section::Auth;
 use super::section::Cdm;
 use super::section::Cdr;
