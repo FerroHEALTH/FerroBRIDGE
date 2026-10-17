@@ -845,9 +845,12 @@ expression is a load error: the reference CDR's connector let `where()` and
   one is refused at load. Rows are grouped by version uid, each entry of
   the context's archetype is answered once, and the total counts entries
   (#530, #658) with one AQL count where that count agrees with the answer
-  (#661). One resource type answers one
-  parameter set, and two declarations of one type over one template are
-  refused at load. A parameter outside the set is refused unless the client
+  (#661). An entry whose context splits it with `create: resource` answers
+  every resource the split creates beside its own, each once, a page and
+  the total count those resources, the count reads the rows, and an `_id`
+  naming a created resource answers it alone (#731). One resource type
+  answers one parameter set, and two declarations of one type over one
+  template are refused at load. A parameter outside the set is refused unless the client
   sends `Prefer: handling=lenient` (R4 search §3.1.1.3); an unsupported
   modifier is always refused (§3.1.1.4.4); `_count=0` answers the total
   alone, as R4 treats it as `_summary=count` (§3.1.1.5.3).
@@ -1110,7 +1113,8 @@ token. The bridge validates that token as the resource server it already is
 
 **The console links two workspace crates and no others.** The server half
 may depend on `openehr-mapping-core`, for the `Diagnostic` a check answers,
-and on `fhir-types` with the `r4` feature, for the `OperationOutcome` and the
+and on `fhir-types` with the `r4` and `terminology` features (the root set
+that emits them), for the `OperationOutcome` and the
 `CapabilityStatement` it renders. The browser half links neither and receives
 view data from server functions. A dependency-closure test fails on any
 other workspace member, so the console can never compile or run a mapping
@@ -1642,9 +1646,18 @@ draft upstream change.
   resource updates rather than duplicates (section 4.6). The acknowledged
   failure mode (a re-sent Bundle omitting one resource reads as a different
   mapping) is documented, not hidden. The store file records its schema
-  (#298): this build writes schema 2, reads 1 and 2 (a file without the row
+  (#298): this build writes schema 3, reads 1 to 3 (a file without the row
   is schema 1, written by 0.0.6 or earlier), and refuses any other by name,
-  so a later build that drops a schema refuses the older file. A source `id`
+  so a later build that drops a schema refuses the older file. Schema 3
+  (#225) adds the binding of a resource an outbound run creates: a further
+  `hierarchy.split` occurrence or a `reference` target is bound under the
+  id a SHA-256 over the parent's entry key, the creating mapping, the
+  occurrence positions and the split's `unique` values derives, recorded
+  with its parent, so the parent references it as `<Type>/<id>` and a read
+  of that id maps the parent's entry again and answers the created resource
+  (a contained resource has no independent identity, R4 references.html
+  §2.3.0.8). The binding is recorded the first time the facade answers the
+  parent, and the map wins from then on. A source `id`
   a store written before 0.0.4 bound to two compositions answers `409`, and
   the refusal names each composition's resource id, whose update revises it.
 
@@ -2235,7 +2248,7 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | Bulk load | binary `COPY` via `tokio-postgres`, `sqlx` for checked queries | throughput; the reference engine's per-row persist is its ceiling | ORM-style inserts |
 | Demographics | in order: the patient-to-EHR link through `EHR_STATUS.subject.external_ref`; `Patient` from EHR-side person templates through FHIRconnect; the FHIRconnect demographics endpoint as our own port over the identity store; `PARTY` objects over the ITS-REST Demographic API behind a feature labelled DEVELOPMENT; party-rooted mappings as our own extension; demographic AQL as Cadasto's experimental extension documents it, behind a feature labelled with that extension, backing demographic FHIR search (#465, #480) | the link and EHR-side templates rest on STABLE texts (RM Common IM §4.2.1.1, ITS-REST EHR); the Demographic API is `x-status: DEVELOPMENT` at 1.1.0 and on master and has no search; FHIRconnect `engine/demographics.adoc` defines no endpoint interface; AQL 1.1.0 defines no demographic semantics (QUERY §3.13.2), and the owner expects Cadasto's extension to become that specification (owner direction 2026-10-15) | demographics left outside |
 | Operator console shape | `app/ferrobridge-viewer`, a Leptos app rendered on the server and hydrated, with a backend-for-frontend, its own binary and image; halves chosen by target, never by feature; the operator's OIDC session on the console's server, which calls the bridge with the operator's token (section 4.10, #594) | the bridge authenticates every request by bearer token and holds no browser session (#400), so a console the bridge served would add a session and a static-asset surface; FerroFED's A55 is the family precedent; no specification governs the console: our own design | a client-side app served by the bridge; a console inside the server binary |
-| Console crate boundary | the server half links `openehr-mapping-core` and `fhir-types` (`r4`) and no other workspace crate, enforced by a dependency-closure test; the browser half links neither | `codegen.md` forbids a consumer shadowing a model the workspace defines (`Diagnostic`, `OperationOutcome`, `CapabilityStatement`); excluding the engine crates keeps every check, transform and save on the bridge | no workspace crate (shadow types for the three); the engine crates linked so the console compiles mappings itself |
+| Console crate boundary | the server half links `openehr-mapping-core` and `fhir-types` (`r4`, `terminology`) and no other workspace crate, enforced by a dependency-closure test; the browser half links neither | `codegen.md` forbids a consumer shadowing a model the workspace defines (`Diagnostic`, `OperationOutcome`, `CapabilityStatement`); excluding the engine crates keeps every check, transform and save on the bridge | no workspace crate (shadow types for the three); the engine crates linked so the console compiles mappings itself |
 | Operator API | `/operator` on the bridge's listener, off unless `[operator] enabled`, refused at load without `[auth]`, every route requiring `auth.operator_scope`; the log names actor and file, never content | SMART scopes cover FHIR resources only; the bridge has no admin listener and the writes touch mapping files, never clinical data; no specification governs it: our own design | a second admin listener; an unguarded API on a private network |
 | Mapping ownership and saving | provisioned directories read-only; console saves go to `[operator] mapping_dir`, written to a temporary file, synced and renamed; a save over a provisioned path is refused | one owner per file (FerroFED A88); the server runs with a read-only root file system; a rename is atomic within one file system, so a reader sees the old file or the new one | writing back into the provisioned tree; saving without a check |
 | Mapping reload | the whole set compiled, any error keeps the running set; a clean set swapped in one pointer swap that each request reads at entry; each replica reloads on its own call or restart | requests in flight finish on the set they started with; a half-loaded set is never served; shared revisions are v0.0.16 | per-file hot reload; a file watcher; reload on save across replicas |

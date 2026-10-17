@@ -6,6 +6,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use ferrobridge_term::outcome::Translation;
 use fhir_types::codec::{Json, Value};
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::tree::Occurrence;
@@ -44,10 +45,9 @@ impl Run<'_> {
                 calls = calls.saturating_add(1);
                 let answer = client
                     .translate(
-                        &group.source,
-                        &request.code,
-                        &group.target,
-                        Some(&request.url),
+                        &Translation::new(group.source.as_str(), request.code.as_str())
+                            .with_concept_map(request.url.as_str())
+                            .with_target_system(group.target.as_str()),
                     )
                     .await
                     .map_err(|source| MapError::Terminology {

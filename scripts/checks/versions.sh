@@ -28,6 +28,11 @@
 #                          cargo-auditable, cargo-cyclonedx and syft versions
 #                          the two release workflows install, against
 #                          docs/VERSIONS.md.
+#                          The operator console's build tools: cargo-leptos
+#                          and the wasm-bindgen CLI of the ci.yml viewer job,
+#                          the wasm-bindgen crate requirement, and the
+#                          Tailwind CSS and Binaryen releases of
+#                          scripts/release/viewer-{tools,site}.sh.
 #   6. docs toolchain      the mdBook, mdbook-toc and mdbook-mermaid defaults of
 #                          .github/actions/docs-toolchain/action.yml against
 #                          docs/VERSIONS.md.
@@ -369,6 +374,42 @@ if [ -f .github/workflows/release-build.yml ] || [ -f .github/workflows/release-
   [ "$agreed" -eq 3 ] && note "OK: all three release tool pins agree"
 else
   note "no release-build.yml or release-image.yml yet, skipped"
+fi
+
+echo "== operator console build tools (ci.yml, Cargo.toml, scripts/release/viewer-*.sh <-> docs/VERSIONS.md)"
+if [ -f app/ferrobridge-viewer/Cargo.toml ]; then
+  # The value of the first `NAME="..."` assignment in FILE.
+  shell_pin() {
+    sed -nE "s|^$1=\"([^\"]+)\".*|\1|p" "$2" | head -n1
+  }
+  # Compares FOUND, read from WHERE, with the docs/VERSIONS.md row ROW.
+  console_pin() {
+    local row="$1" found="$2" where="$3" want
+    want="$(pin_of "$row" docs/VERSIONS.md)"
+    if [ -z "$want" ]; then
+      bad "docs/VERSIONS.md has no '$row' row"
+    elif [ -z "$found" ]; then
+      bad "$where pins no $row version"
+    elif [ "$found" != "$want" ]; then
+      bad "$row: $where pins $found, docs/VERSIONS.md pins $want"
+    else
+      note "OK: $row $found ($where)"
+    fi
+  }
+  for tool in cargo-leptos wasm-bindgen; do
+    found="$(sed -nE "s|^[[:space:]]*tool:[[:space:]]*$tool@([^[:space:]]+).*|\1|p" \
+      .github/workflows/ci.yml | head -n1)"
+    console_pin "$tool" "$found" .github/workflows/ci.yml
+  done
+  console_pin wasm-bindgen "$(manifest_req wasm-bindgen)" "the root Cargo.toml"
+  console_pin "Tailwind CSS" "$(shell_pin tailwind_version scripts/release/viewer-tools.sh)" \
+    scripts/release/viewer-tools.sh
+  tailwind="$(shell_pin "export LEPTOS_TAILWIND_VERSION" scripts/release/viewer-site.sh)"
+  console_pin "Tailwind CSS" "${tailwind#v}" scripts/release/viewer-site.sh
+  console_pin Binaryen "$(shell_pin binaryen_version scripts/release/viewer-tools.sh)" \
+    scripts/release/viewer-tools.sh
+else
+  note "no app/ferrobridge-viewer yet, skipped"
 fi
 
 echo "== docs toolchain (.github/actions/docs-toolchain <-> docs/VERSIONS.md)"

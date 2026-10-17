@@ -26,6 +26,8 @@ use fhirconnect::model::semantic::StaticMappingCodes;
 use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
 use fhirconnect::resolve::program::binding::TemplateId;
+use fhirconnect::resolve::program::mapping::Mapping;
+use fhirconnect::resolve::program::mapping::Method;
 use fhirconnect::resolve::select::SelectError;
 use fhirconnect::resolve::select::select_by_profile_pinned;
 use openehr_mapping_core::diagnostic::Diagnostic;
@@ -179,6 +181,31 @@ impl Programs {
             .any(|entry| entry.program.resource().as_str() == resource_type)
     }
 
+    /// Returns the resource types a `reference` mapping of some program
+    /// creates and no program maps, in order.
+    ///
+    /// Going out of openEHR a `reference` mapping creates the resource it
+    /// names (`types-of-mappings/concept-type/Reference.adoc`), and the facade
+    /// serves it on its own, so these types are readable although no context
+    /// maps them (no specification governs this: our own design).
+    #[must_use]
+    pub fn created_types(&self) -> BTreeSet<String> {
+        let mut created = BTreeSet::new();
+        for entry in &self.loaded {
+            referenced(entry.program.mappings(), &mut created);
+        }
+        let mapped = self.resource_types();
+        created.retain(|resource_type| !mapped.contains(resource_type));
+        created
+    }
+
+    /// Whether `resource_type` is mapped by a program or created by one, so a
+    /// read of it can answer.
+    #[must_use]
+    pub fn readable(&self, resource_type: &str) -> bool {
+        self.supports(resource_type) || self.created_types().contains(resource_type)
+    }
+
     /// Returns the program the claimed profiles select, pinned by `template`.
     ///
     /// # Errors
@@ -231,6 +258,28 @@ impl Programs {
                 )
             })
             .collect()
+    }
+}
+
+/// Adds every resource type a `reference` mapping among `mappings` names to
+/// `created`, through slots, nested references and `followedBy`.
+fn referenced(mappings: &[Mapping], created: &mut BTreeSet<String>) {
+    for mapping in mappings {
+        match *mapping.method() {
+            Method::Reference {
+                ref resource,
+                ref mappings,
+            } => {
+                created.insert(String::from(resource.as_str()));
+                referenced(mappings, created);
+            }
+            Method::Slot { ref mappings, .. } => referenced(mappings, created),
+            Method::Value
+            | Method::Link { .. }
+            | Method::Programmed { .. }
+            | Method::Participation { .. } => {}
+        }
+        referenced(mapping.followed_by(), created);
     }
 }
 

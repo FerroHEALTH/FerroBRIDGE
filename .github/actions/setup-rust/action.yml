@@ -55,3 +55,7 @@ runs:
         cache: ${{ inputs.cache }}
         cache-shared-key: ${{ inputs.cache-shared-key }}
         cache-save-if: ${{ inputs.cache-save-if }}
+        # An empty value keeps v1 from exporting RUSTFLAGS=-D warnings to every
+        # later step, which would override per-target flags; clippy carries
+        # -D warnings on its own command line.
+        rustflags: ""

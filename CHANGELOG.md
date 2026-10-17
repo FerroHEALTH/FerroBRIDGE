@@ -25,6 +25,34 @@ crates on crates.io.
 
 ### Changed
 
+- A facade search lists every resource a `hierarchy.split` with
+  `create: resource` creates beside the entry's own resource, each once
+  (#731). A page holds at most `_count` resources and may end between two
+  occurrences of one entry, `Bundle.total` counts every resource (the count
+  reads the rows for such a context), and an `_id` naming a created resource
+  answers that resource alone instead of matching nothing.
+
+- `ferrobridge-term` translates by concept map with an optional target
+  system and an optional `reverse` (#721). This breaks the crate's public
+  API: `Client::translate` takes a `Translation` (`Translation::new(system,
+  code)` with `with_version`, `with_concept_map`, `with_target_system` and
+  `with_reverse`), and `Request::Translate` wraps one. Each of `version`,
+  `url`, `targetsystem` and `reverse` is sent only when it is set, as R4
+  `ConceptMap/$translate` declares each `0..1`, so a FHIRconnect
+  `conceptmap`, which names only the map, can be translated in both
+  directions.
+- A resource the facade's outbound mapping creates, a further
+  `hierarchy.split` occurrence with `create: resource` or the target of a
+  `reference` mapping, is no longer carried as a contained resource with a
+  `#id` reference (#225). It gets an identity-store binding of its own under
+  an id derived from its parent's entry, the creating mapping and the openEHR
+  occurrence, stable across re-runs and composition versions, and the parent
+  references it as `<Type>/<id>`. `GET /fhir/<Type>/<id>` and the vread answer
+  it, a `PUT` of it answers `405`, and a type only a `reference` creates is
+  declared with `read` and `vread` in the `CapabilityStatement`. The identity
+  store writes schema 3 and reads schemas 1 to 3; a file of schema 1 or 2
+  opens unchanged and is stamped 3, and a build before this one refuses a
+  schema 3 file by name.
 - The FHIRconnect operations lane reads its mapping directory through the
   walk the facade uses (#524), so a `.YML` or `.YAML` file is now read by both
   lanes; the operations lane read only the lower-case spellings before.
@@ -63,6 +91,19 @@ crates on crates.io.
   schema, vendored by `scripts/vendor/ferropulse-schemas.sh`, and
   `scripts/checks/usage-report-off.sh` (a new CI job) fails a test launcher
   that leaves the report on.
+- `fhirconnect` 0.1.128 translates the codes of a mapping that names a
+  `conceptmap` through `ConceptMap/$translate` (#219), over a new
+  `engine::terminology::Terminology` seam that `Seams::with_terminology`
+  sets. With no server configured the run refuses
+  (`EngineError::Terminology`), so a code is never passed through under a
+  system it was not translated into. Each distinct code is translated once,
+  with the resource's own system and code, before the composition is built;
+  only an `equivalent` or `equal` match counts, and the translated concept's
+  display wins over the source text. An untranslatable code at an optional
+  element writes nothing and is declared as `SkipReason::Untranslated`; at a
+  required element it refuses the unit (`EngineError::Untranslated`).
+  Breaking for a consumer that matches `SkipReason` exhaustively: add an arm
+  for `Untranslated`.
 - `ferrobridge mapping check` runs (#595). It loads the FHIRconnect tree of
   `[mappings] directory`, compiles every context against its template from
   `[mappings] templates` or the `[cdr]`, loads and validates the OMOCL files
@@ -71,6 +112,13 @@ crates on crates.io.
   exits 0 when no diagnostic is an error, 1 when one is, 69 when the check
   cannot run and 78 when the configuration names nothing to check. The
   checker is the library module `check`, which the operator API reuses.
+- `openehr-mapping-core` 0.1.113: `Diagnostic` has a serde form (#726), one
+  flat object with `file`, `line`, `column`, `severity`, `code`, `message`,
+  `mapping` and `model_path`, and reading it back refuses an invalid code or
+  mapping name as the constructors do. `DiagnosticCode::parse` reads a code
+  from its stable spelling. `fhirconnect` moves to 0.1.129 with it, since it
+  pins `openehr-mapping-core` exactly.
+
 - `scripts/deploy-probe.sh` probes a running deployment at a base URL (#220)
   and reports each lane (health, the facade under `/fhir`, the FHIRconnect
   operations) as `on`, `off`, `failing` or `uncovered`. An `uncovered` lane
@@ -78,6 +126,19 @@ crates on crates.io.
   lane in the wrong state, and the report names the findings each lane was
   not observed in. The Operate section of the book documents it under
   "Checking a deployment".
+- The operator console has its crate, `app/ferrobridge-viewer` (#599): the
+  `ferrobridge-viewer` binary, a Leptos app rendered on the server and
+  hydrated in the browser, with `serve`, `config check` and `healthcheck`.
+  It reads a TOML configuration with `FERROBRIDGE_VIEWER__<SECTION>__<KEY>`
+  overrides and `_file` secrets, answers every response with a per-response
+  nonce Content-Security-Policy, `nosniff`, `DENY` framing and
+  `no-referrer`, marks every document `no-store`, and compresses only its
+  site bundle. Its bridge client reads the bridge's R4 `CapabilityStatement`
+  and keeps the status and body of a refusal. A test holds its server half
+  to `openehr-mapping-core` and `fhir-types` of the workspace and its browser
+  half to none, and the CI `viewer` lane lints the WebAssembly half, builds
+  the site bundle with pinned tools and fails it above a 112 KiB
+  brotli-compressed budget. Sign-in and the pages follow in #600 and #601.
 - `fhir-types` 0.1.117 carries a search parameter registry per FHIR version
   behind `resources` (#522): `<version>::search_parameters::SEARCH_PARAMETERS`
   holds every `SearchParameter` of the core package, apart from its examples,
@@ -105,6 +166,10 @@ crates on crates.io.
   `readHistory: true` on every resource type.
 
 ### Fixed
+
+- The request log writes `<unmatched>` as the route of a request no route
+  matched (#746), instead of the raw path the client sent, so an identifier
+  in that path no longer reaches the log.
 
 - A percent-encoded `_count`, such as `_count=%32%30`, reads as its decoded
   value on every facade route (#523). The request guard read `_count` from

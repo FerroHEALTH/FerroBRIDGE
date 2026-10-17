@@ -31,12 +31,14 @@ pub mod place;
 pub mod reference;
 pub mod split;
 pub mod tail;
+pub mod translate;
 pub mod walk;
 
 use std::collections::BTreeMap;
 
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
+use fhir_types::r4::coding::Coding;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::composition::NodeValue;
 use openehr_mapping_core::composition::RmPosition;
@@ -234,8 +236,10 @@ enum Leaf {
 
 /// Runs `program` over a FHIR document, producing a composition.
 ///
-/// `seams` carries what the run calls out to: the `mappingCode` registry and
-/// the source a `reference` mapping fetches the referenced resource from.
+/// `seams` carries what the run calls out to: the `mappingCode` registry, the
+/// source a `reference` mapping fetches the referenced resource from, and the
+/// terminology server a `conceptmap` translates through, which every
+/// translation reaches before the composition is built.
 /// `context` carries the per-call values a `manual` path reads through
 /// `$context`; pass [`CallContext::new`] when the caller supplied none.
 ///
@@ -296,7 +300,8 @@ pub fn to_openehr<T: Table + ?Sized>(
 /// `seams` carries what the run calls out to: the `mappingCode` registry and
 /// the sink that assigns the id of every resource a `reference` mapping or a
 /// `hierarchy.split` creates. Those resources travel as
-/// [`Outcome::created`]. `context` carries the per-call values a `manual`
+/// [`Outcome::created`]. A `conceptmap` translates the code the composition
+/// holds through the seams' terminology server. `context` carries the per-call values a `manual`
 /// path reads through `$context`; pass [`CallContext::new`] when the caller
 /// supplied none.
 ///
@@ -375,6 +380,9 @@ struct Run<'a, T: Table + ?Sized> {
     /// The FHIR element a split out of FHIR fixes, as its repeating axes and
     /// its occurrence.
     fhir_pin: Option<(Vec<String>, Occurrence)>,
+    /// The concept each distinct code translated to, so the seam is asked
+    /// once per code in a run.
+    translations: BTreeMap<translate::TranslationKey, Option<Coding>>,
 }
 
 impl<'a, T: Table + ?Sized> Run<'a, T> {
@@ -413,6 +421,7 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             created: Vec::new(),
             pins: Vec::new(),
             fhir_pin: None,
+            translations: BTreeMap::new(),
         }
     }
 }

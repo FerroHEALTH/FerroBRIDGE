@@ -76,7 +76,7 @@ pub(crate) fn batch_entry(
 ) -> Result<BatchOutcome, Error> {
     match request {
         Request::Lookup { .. } => lookup(version, answer).map(BatchOutcome::Lookup),
-        Request::Translate { .. } => translate(version, answer).map(BatchOutcome::Translate),
+        Request::Translate(_) => translate(version, answer).map(BatchOutcome::Translate),
         Request::ValidateCode(_) => validate_code(version, answer).map(BatchOutcome::ValidateCode),
     }
 }

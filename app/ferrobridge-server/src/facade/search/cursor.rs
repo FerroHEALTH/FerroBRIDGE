@@ -26,8 +26,8 @@ pub struct Position {
     pub declaration: usize,
     /// The row offset inside that declaration's query.
     pub offset: i64,
-    /// How many entries of the composition at `offset` an earlier page
-    /// answered, in the order its rows first name them.
+    /// How many resources of the composition at `offset` an earlier page
+    /// answered, in the order its rows first name their entries.
     pub skip: usize,
 }
 

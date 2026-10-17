@@ -103,16 +103,13 @@ macro_rules! r4_contracts {
                     ..Default::default()
                 }
                 .into_parameters(),
-                Request::Translate {
-                    system,
-                    code,
-                    target_system,
-                    concept_map_url,
-                } => ConceptMapTranslateRequest {
-                    url: concept_map_url.as_deref().map(Into::into),
-                    system: Some(system.as_str().into()),
-                    code: Some(code.as_str().into()),
-                    targetsystem: Some(target_system.as_str().into()),
+                Request::Translate(translation) => ConceptMapTranslateRequest {
+                    url: translation.concept_map_url.as_deref().map(Into::into),
+                    system: Some(translation.system.as_str().into()),
+                    code: Some(translation.code.as_str().into()),
+                    version: translation.version.as_deref().map(Into::into),
+                    targetsystem: translation.target_system.as_deref().map(Into::into),
+                    reverse: translation.reverse.map(Into::into),
                     ..Default::default()
                 }
                 .into_parameters(),
@@ -187,10 +184,10 @@ macro_rules! stu3_contracts {
         /// its `version` is the code system's.
         const fn unsupported(request: &Request) -> Option<&'static str> {
             match request {
-                Request::Translate {
+                Request::Translate(crate::outcome::Translation {
                     concept_map_url: Some(_),
                     ..
-                } => Some("url"),
+                }) => Some("url"),
                 Request::ValidateCode(Validation {
                     value_set_version: Some(_),
                     ..
@@ -214,15 +211,12 @@ macro_rules! stu3_contracts {
                     ..Default::default()
                 }
                 .into_parameters(),
-                Request::Translate {
-                    system,
-                    code,
-                    target_system,
-                    concept_map_url: _,
-                } => ConceptMapTranslateRequest {
-                    system: Some(system.as_str().into()),
-                    code: Some(code.as_str().into()),
-                    targetsystem: Some(target_system.as_str().into()),
+                Request::Translate(translation) => ConceptMapTranslateRequest {
+                    system: Some(translation.system.as_str().into()),
+                    code: Some(translation.code.as_str().into()),
+                    version: translation.version.as_deref().map(Into::into),
+                    targetsystem: translation.target_system.as_deref().map(Into::into),
+                    reverse: translation.reverse.map(Into::into),
                     ..Default::default()
                 }
                 .into_parameters(),
@@ -577,7 +571,7 @@ per_release!(r4b, r4b, r4_contracts);
 fn path_of(request: &Request) -> &'static str {
     match request {
         Request::Lookup { .. } => crate::LOOKUP,
-        Request::Translate { .. } => crate::TRANSLATE,
+        Request::Translate(_) => crate::TRANSLATE,
         Request::ValidateCode(_) => crate::VALIDATE_CODE,
     }
 }

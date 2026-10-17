@@ -45,6 +45,47 @@ pub struct CompositionBinding {
     /// [`derive::DERIVATION`](crate::facade::identity::derive::DERIVATION) for
     /// this build, and `None` for a binding a build up to 0.0.6 wrote.
     pub derivation: Option<u32>,
+    /// The resource whose outbound run creates this one, when the binding is
+    /// of a created resource rather than of the entry itself.
+    ///
+    /// Every other field is the parent's, so the binding names the entry the
+    /// parent maps. A binding a build before schema 3 wrote carries no such
+    /// field and is an entry's own.
+    pub created: Option<CreatedBy>,
+}
+
+/// The resource whose outbound run creates a resource of its own.
+///
+/// A `hierarchy.split` occurrence or a `reference` mapping creates a resource
+/// beside the one a context maps; the created resource is served by mapping
+/// its parent's entry again and answering the created resource of its id (no
+/// specification governs this: our own design).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CreatedBy {
+    /// The resource type of the parent.
+    pub parent_type: String,
+    /// The logical id of the parent.
+    pub parent_id: String,
+    /// The dotted name of the mapping or the model that creates the resource.
+    pub mapping: String,
+}
+
+impl CreatedBy {
+    /// Returns the logical id of the parent.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError::Identifier`] naming the parent when the stored
+    /// value is no legal FHIR id.
+    pub fn parent(&self) -> Result<FhirResourceId, StoreError> {
+        held(
+            &format!("{}/{}", self.parent_type, self.parent_id),
+            "FHIR id",
+            &self.parent_id,
+            FhirResourceId::new,
+        )
+    }
 }
 
 impl CompositionBinding {

@@ -152,6 +152,17 @@ pub(crate) async fn update(
             )),
         )
     })?;
+    if let Some(ref created) = binding.created {
+        // NOTE: no specification governs this: our own design, a created
+        // resource is content of its parent's entry, so only the parent is revised.
+        return Err(reply::refusal(
+            StatusCode::METHOD_NOT_ALLOWED,
+            Issue::error(IssueType::NotSupported).diagnosing(format!(
+                "{resource_type}/{id} is created by the mapping of {}/{}; update that resource instead",
+                created.parent_type, created.parent_id
+            )),
+        ));
+    }
     let inbound = read::parse(body, resource_type)?;
     same_id(&inbound, id)?;
     compartment::admit_inbound(facade, access, Permission::Update, &inbound)?;
@@ -298,6 +309,7 @@ fn answer(
                     version: &written.version,
                     source: &source,
                     subject: subject.as_ref(),
+                    store: facade.store(),
                 },
             )?;
             render::log_outcome(&rendered);

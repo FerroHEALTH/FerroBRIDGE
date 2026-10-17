@@ -1,0 +1,12 @@
+/* SPDX-FileCopyrightText: Cadasto B.V. */
+/* SPDX-License-Identifier: BUSL-1.1 */
+/* The operator console's stylesheet: Tailwind 4, configured in CSS, built by
+   cargo-leptos with the official standalone CLI, so there is no JavaScript
+   config file and no Node in this build.
+   https://tailwindcss.com/docs/upgrade-guide */
+/* `source(none)` turns off automatic detection, which would walk up out of
+   this crate and scan the whole workspace. The views are the only place a
+   class name is written, and the path is relative to this file.
+   https://tailwindcss.com/docs/detecting-classes-in-source-files */
+@import "tailwindcss" source(none);
+@source "../src/**/*.rs";

@@ -34,6 +34,8 @@
 #   e2e_packages   those of them that are, space-separated
 #   test_matrix    the test shards as a matrix (JSON, one line)
 #   lint_matrix    the clippy and msrv shards as a matrix (JSON, one line)
+#   viewer         ferrobridge-viewer is affected (its wasm32 lint and its
+#                  site bundle)
 #
 # A path reaches a package in three ways. A path under a member's directory
 # reaches that member and every member whose Rust source names that
@@ -153,6 +155,11 @@ classify() {
     # testkit's own corpus test.
     docs/VERSIONS.md) echo "packages ferrobridge-testkit" ;;
     .github/workflows/ci.yml | .github/actions/setup-rust/*) echo ci ;;
+    # The operator console's build surface: its Leptos rule holds the bundle
+    # budget, and these scripts install its tools, build its site bundle and
+    # measure it; each reaches the console as its own files would.
+    .claude/rules/leptos-ui.md) echo "packages ferrobridge-viewer" ;;
+    scripts/release/viewer-*.sh | scripts/checks/viewer-*.sh) echo "packages ferrobridge-viewer" ;;
     scripts/checks/affected.sh | scripts/checks/fast.sh) echo ci ;;
     .github/*) echo inert ;;
     .claude/* | website/* | assets/* | docker/* | fuzz/* | scripts/gh/* | scripts/release/*) echo inert ;;
@@ -302,6 +309,8 @@ emit() {
   if [ -n "$e2e" ]; then flag=true; else flag=false; fi
   echo "e2e=$flag"
   echo "e2e_packages=$e2e"
+  if has "$packages" ferrobridge-viewer; then flag=true; else flag=false; fi
+  echo "viewer=$flag"
   echo "test_matrix=$(matrix "$graph" "$packages" "$TEST_SHARDS" test_weight)"
   echo "lint_matrix=$(matrix "$graph" "$packages" "$LINT_SHARDS" lint_weight)"
 }
@@ -517,6 +526,18 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+ferrobridge-testkit +openehr-mapping-core +omocl +omop-cdm +ferrobridge-server -fhir-types -fhir-codegen"
   check "the FerroPULSE vendor script reaches the server alone" "scripts/vendor/ferropulse-schemas.sh" false \
     "+ferrobridge-server -ferrobridge-testkit -fhir-codegen"
+  check "the console reaches itself and nothing it does not link" \
+    "app/ferrobridge-viewer/src/lib.rs" false \
+    "+ferrobridge-viewer -fhir-types -openehr-mapping-core -ferrobridge-server"
+  check "the console's rule reaches the console" ".claude/rules/leptos-ui.md" false \
+    "+ferrobridge-viewer -ferrobridge-server -fhir-types"
+  check "the console's build scripts reach the console" "scripts/release/viewer-site.sh" false \
+    "+ferrobridge-viewer -ferrobridge-server"
+  check "the console's bundle checks reach the console" "scripts/checks/viewer-bundle.sh" false \
+    "+ferrobridge-viewer -ferrobridge-server"
+  check "fhir-types reaches the console that links it" "crates/fhir-types/src/lib.rs" false \
+    "+ferrobridge-viewer"
+  check "another rule stays inert" ".claude/rules/testing.md" false ""
   check "the sqlx script reaches omop-cdm" "scripts/checks/sqlx-offline.sh" false \
     "+omop-cdm +omocl +ferrobridge-server"
   local every_corpus_package
