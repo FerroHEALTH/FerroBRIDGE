@@ -65,6 +65,33 @@ async fn a_count_above_the_cap_is_answered_with_the_cap() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
+async fn a_percent_encoded_count_reads_as_its_decoded_value() -> Result<(), Box<dyn StdError>> {
+    // Search parameters are application/x-www-form-urlencoded
+    // (<https://hl7.org/fhir/R4/http.html#search>), so `%32` is `2`: the
+    // request guard and the search read the one decoded value.
+    let harness = searching().await;
+    mount_rows(&harness.cdr, &[]).await;
+    let (status, body) = get(&harness, "Condition?_count=%32").await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(
+        Some("http://ferrobridge.invalid/fhir/Condition?_count=2"),
+        link(&body, "self"),
+        "{body}"
+    );
+    assert_eq!(
+        Some(3),
+        queries(&harness)
+            .await
+            .first()
+            .and_then(|query| query["fetch"].as_i64())
+    );
+    let (status, body) = get(&harness, "Condition?_count=m%61ny").await?;
+    assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");
+    assert_eq!(Some("invalid"), first_issue(&body)["code"].as_str());
+    Ok(())
+}
+
+#[tokio::test]
 async fn count_zero_answers_the_total_with_no_entries_and_no_next_link()
 -> Result<(), Box<dyn StdError>> {
     // R4 search.html §3.1.1.5.3: "if _count has the value 0, this shall be

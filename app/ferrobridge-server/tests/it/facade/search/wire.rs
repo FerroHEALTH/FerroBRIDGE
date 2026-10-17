@@ -253,6 +253,41 @@ async fn the_capability_statement_names_exactly_the_declared_parameters()
         Some("http://hl7.org/fhir/SearchParameter/Resource-id"),
         condition["searchParam"][0]["definition"].as_str()
     );
+    // R4 capabilitystatement-definitions.html#CapabilityStatement.rest.resource.searchParam.definition:
+    // "SHALL be populated if the search parameter refers to a SearchParameter".
+    let definitions: Vec<(&str, Option<&str>)> = condition["searchParam"]
+        .as_array()
+        .expect("the type names its search parameters")
+        .iter()
+        .filter_map(|entry| Some((entry["name"].as_str()?, entry["definition"].as_str())))
+        .collect();
+    assert_eq!(
+        vec![
+            (
+                "_id",
+                Some("http://hl7.org/fhir/SearchParameter/Resource-id")
+            ),
+            (
+                "code",
+                Some("http://hl7.org/fhir/SearchParameter/clinical-code")
+            ),
+            ("context-start", None),
+            ("diagnosis-name", None),
+            (
+                "onset-date",
+                Some("http://hl7.org/fhir/SearchParameter/Condition-onset-date")
+            ),
+            (
+                "patient",
+                Some("http://hl7.org/fhir/SearchParameter/clinical-patient")
+            ),
+            (
+                "subject",
+                Some("http://hl7.org/fhir/SearchParameter/Condition-subject")
+            ),
+        ],
+        definitions
+    );
     Ok(())
 }
 

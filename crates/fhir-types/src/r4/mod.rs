@@ -330,6 +330,8 @@ pub mod schema;
 #[cfg(feature = "resources")]
 pub mod search_parameter;
 #[cfg(feature = "resources")]
+pub mod search_parameters;
+#[cfg(feature = "resources")]
 pub mod service_request;
 #[cfg(feature = "terminology")]
 pub mod signature;

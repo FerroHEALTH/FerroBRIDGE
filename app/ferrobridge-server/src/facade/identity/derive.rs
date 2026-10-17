@@ -3,7 +3,9 @@
 
 //! Deriving the FHIR resource id of one composition entry.
 //!
-//! `docs/architecture.md` §9 pins the rule against three facts. FHIR R4
+//! No specification governs the rule: our own design, beside the hash the
+//! FHIRconnect engine chapter recommends (`engine/id-management.adoc`, §Deterministic IDs), held
+//! against three facts. FHIR R4
 //! `Resource.id` is `[A-Za-z0-9\-\.]{1,64}` and "once assigned, this value
 //! never changes" (<https://hl7.org/fhir/R4/resource.html>). An openEHR
 //! `OBJECT_VERSION_ID` is `object_id::creating_system_id::version_tree_id`,
@@ -36,6 +38,16 @@ const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
 /// characters and the last one carries four bits.
 pub const DIGEST_CHARACTERS: usize = 52;
 
+/// The identity derivation this build writes.
+///
+/// Derivation 2 keys an entry by an openEHR path the BASE Release 1.2.0 path
+/// grammar parses (Paths and Locators): `/content[<archetype>]` for the first
+/// item of the archetype and `/content[<n>]` for every further one. A binding
+/// that names no derivation was written by a build up to 0.0.6, whose entry
+/// paths may take the `/content[<archetype>, <n>]` form, and is read as it
+/// stands (no specification governs the derivation: our own design).
+pub const DERIVATION: u32 = 2;
+
 /// Which input produced a derived id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Derivation {
@@ -58,8 +70,10 @@ pub struct EntryKey {
     entry_path: String,
     /// Which document of a `hierarchy` split this entry belongs to.
     ///
-    /// The released id recommendation's key is not unique under a split, so
-    /// the occurrence is part of the input (`docs/architecture.md` §9).
+    /// The key of the id the FHIRconnect engine chapter recommends
+    /// (`engine/id-management.adoc`, §Deterministic IDs) is not unique under a split, so the
+    /// occurrence is part of the input (no specification governs this: our own
+    /// design).
     split: u32,
 }
 
@@ -122,8 +136,8 @@ pub fn derive(key: &EntryKey, uid: Option<&str>) -> (FhirResourceId, Derivation)
 /// and the split occurrence, which is the one part of an entry's identity that
 /// does not move across composition versions. Keying on it is what makes the
 /// map win once written: an entry that gains a `LOCATABLE.uid` in a later
-/// version still resolves to the id the first version recorded
-/// (`docs/architecture.md` §9).
+/// version still resolves to the id the first version recorded (no
+/// specification governs this: our own design).
 #[must_use]
 pub fn map_key(key: &EntryKey) -> ExternalResourceId {
     let digest = digest(key);

@@ -5,7 +5,7 @@
 //!
 //! The run reads the configured AQL page by page, maps each composition to
 //! its record graph, commits it whole, and rebuilds the derived tables at the
-//! end (`docs/architecture.md` §5.1, §5.4).
+//! end (no specification governs the run: our own design).
 //!
 //! The composition query selects each composition whole beside its
 //! `ehr_id` and `version_uid`, and optionally its `versioned_object_uid`;

@@ -212,7 +212,7 @@ default branch.
 | `openehr-query` | 0.0.87 (BUSL-1.1) | the AQL 1.1.0 parser and canonical printer. `openehr-term` (Apache-2.0 AND CC-BY-SA-3.0) and `openehr-lang` arrive transitively |
 | `openehr-am` | 0.0.87 (Apache-2.0) | the generated AM 2.4 model: the AOM2 `OPERATIONAL_TEMPLATE` and `ARCHETYPE_HRID` types an ADL 2 template decodes into (section 3); taken directly because the bridge names those types |
 | `openehr-adl` | not taken in the first cut (0.0.87, BUSL-1.1) | the ADL 2 text parser, flattener and OPT2 generator; the bridge fetches an ADL 2 template as AOM2 canonical JSON, so it never parses ADL source (section 3); taken later only if a CDR serves ADL 2 templates as text alone |
-| `fhir-types` | 0.1.115 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
+| `fhir-types` | 0.1.117 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
 | openFHIR, the FHIRconnect reference engine | 3.0.1 (2026-09-09), read for behaviour only | never an oracle; section 4.4 records the 3.0.0 behaviour changes and what the bridge takes |
 | Eos, the OMOCL reference engine | 0.0.62 (2024-03-20), last commit 2026-03-09 | never an oracle; dormant, so its behaviour is prior art with no expected movement |
 | FHIR terminology operations | R4, R4B tolerant | `CodeSystem/$lookup`, `ConceptMap/$translate`, `ValueSet/$validate-code`; a server may answer R4 or R4B; the reference server selects the version by path (section 6) |
@@ -1575,16 +1575,36 @@ draft upstream change.
   them, so a `PUT` resolves, a re-sent Bundle is recognised, and a re-sent
   resource updates rather than duplicates (section 4.6). The acknowledged
   failure mode (a re-sent Bundle omitting one resource reads as a different
-  mapping) is documented, not hidden.
+  mapping) is documented, not hidden. The store file records its schema
+  (#298): this build writes schema 2, reads 1 and 2 (a file without the row
+  is schema 1, written by 0.0.6 or earlier), and refuses any other by name,
+  so a later build that drops a schema refuses the older file. A source `id`
+  a store written before 0.0.4 bound to two compositions answers `409`, and
+  the refusal names each composition's resource id, whose update revises it.
 
   Each `content` item of the archetype a context's start model mapping names
-  is a resource of its own (#530). Its entry path is
-  `/content[<archetype>, <n>]`, `n` its 1-based place among the items of that
-  archetype (openEHR BASE Release 1.2.0, Paths and Locators), and the first
-  item keys the identity map by the unindexed `/content[<archetype>]`, the
-  path it has when it is the only one, so a composition that gains a second
-  entry does not rename the resource of its first. The binding records that
-  path; a read, a vread or an `_id` search finds the entry by its place and
+  is a resource of its own (#530). The first item keys the identity map by
+  the archetype predicate `/content[<archetype>]`, the path it has when it is
+  the only one, so a composition that gains a second entry does not rename
+  the resource of its first. Every further item keys it by the positional
+  predicate `/content[<n>]`, `n` its 1-based place in `content`, which openEHR
+  BASE Release 1.2.0, Paths and Locators, §Using Positional Parameters, writes
+  the same in openEHR and XPath (#242). Both are built with the `openehr-rm`
+  path types and parse back. This is identity derivation 2, and each binding
+  records the derivation that wrote its path. Builds up to 0.0.6 wrote
+  `/content[<archetype>, <n>]`, `n` the place among the items of the
+  archetype, which the BASE grammar reads as the name-based predicate
+  shortcut and refuses; a binding without a derivation may carry that form,
+  the facade still reads it, and an entry whose new key the map does not
+  hold is looked up under its old key first, so no recorded id moves. The
+  old form has two readings (#659): builds up to 0.0.5 bound only the first
+  item of the archetype, with `n` its place in `content`, and 0.0.6 bound
+  the `n`th item of the archetype. A stored path resolves when one reading
+  names an item or both name the same one; when they name two items the
+  binding cannot say which entry it meant, and a read, a search or a bind
+  that meets it answers `500` with an `exception` issue naming the path. The
+  binding records the path; a read, a vread or an `_id` search finds the
+  entry by its place and
   maps the composition with every other item of the archetype removed. A
   search query selects each node its `FROM` binds, and the facade answers the
   entries that hold every selected node; a row whose nodes lie in no entry,
@@ -1597,8 +1617,9 @@ draft upstream change.
   entry nested in a `SECTION`; such a template, a bound node or an `_id`
   reads the rows and counts each entry once, and `_total=estimate` always
   answers from a count query. The
-  place is positional, so removing an earlier entry in a later version moves
-  the identity of the ones after it, the same property the released
+  place is positional, so removing or inserting an earlier `content` item in a
+  later version moves the identity of the entries after it, the same property
+  the released
   recommendation's entry path has. No specification governs how a row names
   its entry: our own design.
 

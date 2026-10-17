@@ -31,6 +31,8 @@ pub mod r5;
 #[cfg(feature = "r6")]
 pub mod r6;
 pub mod schema;
+#[cfg(feature = "resources")]
+pub mod search;
 #[cfg(feature = "stu3")]
 pub mod stu3;
 pub mod xml;

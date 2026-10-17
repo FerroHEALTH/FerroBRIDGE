@@ -243,7 +243,7 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
             initial_backoff: Duration::from_millis(cdr.retry.initial_backoff_ms),
             max_backoff: Duration::from_millis(cdr.retry.max_backoff_ms),
         });
-    let scheme = resolve_credentials("cdr.credentials", &cdr.credentials.static_schemes())?;
+    let scheme = resolve_credentials("cdr.credentials", &cdr.credentials)?;
     match (scheme, cdr.credentials.oauth.as_ref()) {
         (Some(_), Some(_)) => {
             return Err(Error::OAuthScheme {
@@ -304,7 +304,7 @@ pub(super) fn resolve_terminology(
 /// Returns the CDM database `cdm` describes.
 pub(super) fn resolve_cdm(cdm: &Cdm) -> Result<CdmSettings, Error> {
     let url =
-        secret("cdm.url", cdm.url.as_deref(), cdm.url_file.as_deref())?.ok_or(Error::Missing {
+        secret("cdm.url", cdm.url.as_ref(), cdm.url_file.as_deref())?.ok_or(Error::Missing {
             key: String::from("cdm.url"),
         })?;
     let schema_of = |key: &str, name: &str| {

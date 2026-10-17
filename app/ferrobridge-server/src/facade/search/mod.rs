@@ -4,7 +4,7 @@
 //! FHIR search over AQL projections declared beside the context mappings.
 //!
 //! FHIRconnect "does not focus specifically on AQL and `FHIRsearch`", so the
-//! whole surface is FerroBRIDGE's own design (`docs/architecture.md` §4.6).
+//! whole surface is FerroBRIDGE's own design.
 //! A context answers search only when a [`declaration`] file names it; the
 //! declaration is checked and every query it can build is parsed with
 //! `openehr-query` when the server boots, so a declaration that does not
@@ -261,6 +261,13 @@ pub fn bind(
         .unwrap_or_default();
     let parameters =
         declaration::check_parameters(file, &written.parameters, &patient_names, loaded.index())?;
+    let resource_type = loaded.program().resource().as_str();
+    for (name, parameter) in &parameters {
+        declaration::check_standard(file, resource_type, name, parameter.kind())?;
+    }
+    for name in &patient_names {
+        declaration::check_standard(file, resource_type, name, ParameterType::Reference)?;
+    }
     let order = written.order.unwrap_or_else(|| {
         aql::DEFAULT_ORDER
             .iter()

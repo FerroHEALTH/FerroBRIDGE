@@ -464,14 +464,15 @@ async fn the_loader_writes_every_fixture_row() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn an_unreachable_database_is_a_typed_error() -> Result<(), Box<dyn Error>> {
-    let options: PgConnectOptions = "postgres://nobody:nothing@127.0.0.1:1/none".parse()?;
+    let closed = ferrobridge_testkit::net::closed_port()?;
+    let options: PgConnectOptions = format!("postgres://nobody:nothing@{closed}/none").parse()?;
     let refusal = CdmPool::connect(
         PgPoolOptions::new().acquire_timeout(Duration::from_secs(5)),
         options,
         SchemaName::new(SCHEMA)?,
     )
     .await
-    .expect_err("nothing listens on port 1");
+    .expect_err("nothing listens on a closed port");
     assert_eq!(SCHEMA, refusal.schema().as_str(), "the wrong schema named");
     assert!(
         refusal.source().is_some(),

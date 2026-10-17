@@ -26,6 +26,15 @@ a FHIR facade over the CDR on one side and a batch ETL into a CDM database on
 the other. The [build order](evaluate/build-order.md) page says what comes
 first.
 
+## What this book leaves to the family book
+
+FerroBRIDGE is one product of the FerroHEALTH family, and Cadasto B.V. is the
+manufacturer of every product. This book documents FerroBRIDGE alone. The
+manufacturer, the shared security policy and support period, the Cyber
+Resilience Act's manufacturer side, how the products fit together, and the
+licensing and trademark terms are written once, in the
+[FerroHEALTH book](https://ferrohealth.eu/docs/).
+
 ## How this book is organised
 
 The four parts follow what you came to do.

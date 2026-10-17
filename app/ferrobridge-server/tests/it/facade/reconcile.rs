@@ -31,6 +31,7 @@ use super::harness;
 use super::post_condition;
 use super::post_transaction;
 use super::raw;
+use super::stub::ASSIGNED_ENTRY_UID;
 use super::stub::Committed;
 use super::stub::ECHOED;
 use super::stub::Echo;
@@ -72,17 +73,7 @@ async fn a_contribution_answer_naming_no_versions_for_the_entries_is_a_typed_fai
 /// Returns the container the identity map bound the entry `location` names
 /// to.
 fn bound_container(harness: &Harness, location: Option<&str>) -> Result<String, Box<dyn StdError>> {
-    let location = location.ok_or("the entry answers a location")?;
-    let id = location
-        .strip_prefix(&format!("{BASE_URL}/Condition/"))
-        .and_then(|rest| rest.split('/').next())
-        .ok_or(format!("{location} is no Condition location"))?;
-    let internal = ferrobridge_server::facade::identity::FhirResourceId::new(id)?;
-    let binding = harness
-        .store
-        .binding_of("Condition", &internal)?
-        .ok_or("the entry's binding is recorded")?;
-    Ok(binding.versioned_object_uid)
+    Ok(bound(harness, location)?.1.versioned_object_uid)
 }
 
 #[tokio::test]
@@ -253,6 +244,76 @@ async fn a_contribution_that_cannot_be_read_back_is_a_typed_failure_and_its_retr
         "the retry commits nothing"
     );
     assert!(harness.store.consumed(&source)?.is_some());
+    Ok(())
+}
+
+/// Returns the id and the binding of the entry `location` names.
+fn bound(
+    harness: &Harness,
+    location: Option<&str>,
+) -> Result<
+    (
+        String,
+        ferrobridge_server::facade::identity::record::CompositionBinding,
+    ),
+    Box<dyn StdError>,
+> {
+    let location = location.ok_or("the entry answers a location")?;
+    let id = location
+        .strip_prefix(&format!("{BASE_URL}/Condition/"))
+        .and_then(|rest| rest.split('/').next())
+        .ok_or(format!("{location} is no Condition location"))?;
+    let internal = ferrobridge_server::facade::identity::FhirResourceId::new(id)?;
+    let binding = harness
+        .store
+        .binding_of("Condition", &internal)?
+        .ok_or("the entry's binding is recorded")?;
+    Ok((String::from(id), binding))
+}
+
+#[tokio::test]
+async fn a_retry_binds_the_identity_the_cdr_stored_as_a_first_delivery_does()
+-> Result<(), Box<dyn StdError>> {
+    // The stub CDR stores an entry uid the sender never sent, so the stored
+    // composition differs from a fresh build in an identity input; both the
+    // first delivery and the retry after a failed read-back bind the stored one.
+    let bundle = transaction_of(&[("urn:uuid:0000-good", condition())]);
+
+    let first = harness().await;
+    mount_ehr(&first.cdr).await;
+    mount_echo(&first.cdr, ECHOED, Echo::MinimalAssigningUids).await;
+    let (status, body) = post_transaction(&first, &bundle).await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let (first_id, first_binding) =
+        bound(&first, body["entry"][0]["response"]["location"].as_str())?;
+
+    let retried = harness().await;
+    mount_ehr(&retried.cdr).await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path(format!(
+            "/ehr/{EHR_ID}/contribution/{CONTRIBUTION}"
+        )))
+        .respond_with(ferrobridge_testkit::stubs::its_rest::not_found(
+            "the contribution is not readable yet",
+        ))
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(&retried.cdr)
+        .await;
+    mount_echo(&retried.cdr, ECHOED, Echo::MinimalAssigningUids).await;
+    let (status, body) = post_transaction(&retried, &bundle).await?;
+    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
+    let (status, body) = post_transaction(&retried, &bundle).await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let (retried_id, retried_binding) =
+        bound(&retried, body["entry"][0]["response"]["location"].as_str())?;
+
+    assert_eq!(
+        ASSIGNED_ENTRY_UID, first_id,
+        "the id is the stored entry uid"
+    );
+    assert_eq!(first_id, retried_id);
+    assert_eq!(first_binding, retried_binding);
     Ok(())
 }
 

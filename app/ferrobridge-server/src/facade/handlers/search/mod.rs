@@ -12,7 +12,7 @@
 //! the context's compiled program as a read maps it, as a resource of its
 //! own, and every CDR refusal reaches the wire through the status table: a
 //! search never answers an empty Bundle for a failed call
-//! (`docs/architecture.md` §9).
+//! (no specification governs this: our own design).
 
 mod total;
 
@@ -49,6 +49,8 @@ use crate::facade::handlers::write;
 use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::PersonId;
 use crate::facade::identity::record::CompositionBinding;
+use crate::facade::ingest::Refused;
+use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
@@ -84,7 +86,7 @@ pub(crate) async fn search_get(
     uri: &Uri,
 ) -> Result<Response, Refusal> {
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    let pairs = pairs_of(uri.query().unwrap_or_default().as_bytes());
+    let pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
     search(facade, access, resource_type, headers, &pairs).await
 }
 
@@ -99,16 +101,9 @@ pub(crate) async fn search_post(
 ) -> Result<Response, Refusal> {
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
     check_form(headers)?;
-    let mut pairs = pairs_of(uri.query().unwrap_or_default().as_bytes());
-    pairs.extend(pairs_of(body));
+    let mut pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+    pairs.extend(media::query_pairs(body));
     search(facade, access, resource_type, headers, &pairs).await
-}
-
-/// Returns the `name=value` pairs of a query string or a form body.
-fn pairs_of(bytes: &[u8]) -> Vec<(String, String)> {
-    url::form_urlencoded::parse(bytes)
-        .map(|(name, value)| (name.into_owned(), value.into_owned()))
-        .collect()
 }
 
 /// Checks that a `POST _search` body is a form.
@@ -522,13 +517,17 @@ fn matched(
     let mut entries = chosen.unwrap_or(every);
     let container = versioned_object_uid(&read.version);
     for bindings in &plan.ids {
-        entries.retain(|entry| {
-            bindings.iter().any(|binding| {
-                binding.versioned_object_uid == container.value()
-                    && engine::entry_named(program, &read.composition, &binding.entry_path)
-                        .is_some_and(|named| named.ordinal() == entry.ordinal())
-            })
-        });
+        let mut named = Vec::new();
+        for binding in bindings {
+            if binding.versioned_object_uid == container.value()
+                && let Some(entry) =
+                    engine::entry_named(program, &read.composition, &binding.entry_path)
+                        .map_err(|error| Refusal::from(Refused::from(error)))?
+            {
+                named.push(entry.ordinal());
+            }
+        }
+        entries.retain(|entry| named.contains(&entry.ordinal()));
     }
     Ok(entries)
 }

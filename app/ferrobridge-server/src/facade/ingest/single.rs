@@ -122,7 +122,7 @@ impl Ingest<'_> {
                 .store
                 .consumed_versions(&source)
                 .map_err(|error| store_refusal(&error))?;
-            let Some(known) = one_composition(&source, versions)? else {
+            let Some(known) = one_composition(&source, &versions)? else {
                 return Ok(Recognised::Unknown);
             };
             if source.version_id().is_some() {
@@ -175,7 +175,7 @@ impl Ingest<'_> {
             })?;
         let whole = canonical_of(&standing.composition, built)?;
         Ok(
-            engine::entry_named(program.program(), &whole, &binding.entry_path)
+            engine::entry_named(program.program(), &whole, &binding.entry_path)?
                 .map(|entry| (whole, entry)),
         )
     }
@@ -422,7 +422,7 @@ fn splice(
     revision: &Revision<'_>,
 ) -> Result<CanonicalComposition, Refused> {
     let standing = canonical_of(revision.standing, built)?;
-    let target = engine::entry_named(program.program(), &standing, revision.entry_path)
+    let target = engine::entry_named(program.program(), &standing, revision.entry_path)?
         .ok_or_else(|| {
             Refused::new(
                 StatusCode::NOT_FOUND,

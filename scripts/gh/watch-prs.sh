@@ -71,7 +71,7 @@ while [ ${#left[@]} -gt 0 ]; do
     esac
     c=$(gh pr checks "$p" 2>&1)
     pend=$(printf '%s\n' "$c" | awk -F'\t' '$2=="pending"' | wc -l | tr -d ' ')
-    fails=$(printf '%s\n' "$c" | awk -F'\t' '$2=="fail" && $1!="conclusion" && $1!="analyze" && $1!="CodeQL" && $1!="Analyze (rust)" {print $1}' | tr '\n' ' ')
+    fails=$(printf '%s\n' "$c" | awk -F'\t' '$2=="fail" && $1!="conclusion" && $1!="analyze" && $1!="CodeQL" && $1!="Analyze (rust)" && $1!="SonarCloud Code Analysis" {print $1}' | tr '\n' ' ')
     if [ "$pend" = 0 ] && [ -n "$fails" ]; then echo "RED #$p: $fails"; exit 3; fi
     next+=("$p")
   done

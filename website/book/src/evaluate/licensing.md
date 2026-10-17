@@ -3,34 +3,32 @@
 
 # Licensing
 
-FerroBRIDGE is source-available under the Business Source License 1.1. The
-authoritative text is
+FerroBRIDGE is source-available under the Business Source License 1.1, which
+is not an OSI-approved open-source licence. The authoritative text is
 [`LICENSE`](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/LICENSE),
-with the parameters in
+with a summary in
 [`NOTICE`](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/NOTICE). This
-page summarises it; where the two differ, the licence text wins.
+page states the terms; where it and the licence differ, the licence text wins.
 
-## What you may do without asking
+## Do you need a commercial licence?
 
-Read, build, modify, and redistribute the source, with no fee and no
-conversation. That covers every non-production use: development, testing,
-evaluation, and prototyping.
+The table is the boundary in the order people ask about it. The `Why` column
+names the part of `LICENSE` that decides each row.
 
-Production use is free for Non-Commercial Purposes, which the licence defines
-as personal use, academic or scientific research, teaching, and use by a
-non-profit organisation or public body that is not acting in the course of a
-business, does not deliver a service for payment, and is not seeking commercial
-advantage.
+| What you are doing | What you need | Why |
+|---|---|---|
+| Reading, building, modifying or redistributing the source | Free | Terms: "the right to copy, modify, create derivative works, redistribute". |
+| Development, testing, evaluation, prototyping | Free | Terms: the right to "make non-production use of the Licensed Work". |
+| Production use for Non-Commercial Purposes | Free | Additional Use Grant: personal use, academic or scientific research, teaching, and use by a non-profit organisation or public body that is not in the course of a business, does not deliver a service for payment, and is not for commercial advantage. |
+| A hospital, clinic or care provider running it for its patients | Commercial licence | Additional Use Grant: "the delivery of health care or any other service for payment, requires a commercial license". |
+| A vendor or integrator, or any company running it in production | Commercial licence | Additional Use Grant: production use in the course of a business is outside Non-Commercial Purposes, and "Any other production use" needs a commercial license. |
+| Offering it, or a work derived from it, to third parties as a hosted, managed or embedded service | Commercial licence | Additional Use Grant (a): a service "through which anyone other than you and your affiliates maps, converts, or exchanges health data", excluded whoever you are. |
+| Selling, sublicensing or otherwise distributing it for a fee | Commercial licence | Additional Use Grant (b): excluded whoever you are, on its own or as a component of another product. |
 
-## What needs a commercial licence
+The last two rows hold whatever else you are: they need a commercial licence
+even for an organisation the rows above would otherwise leave free.
 
-Any other production use. A hospital, clinic, or care provider running
-FerroBRIDGE between its systems needs one. So does a vendor, an integrator, or
-any company running it in production. Offering FerroBRIDGE, or a work derived
-from it, to third parties as a hosted, managed, or embedded service that maps
-or exchanges health data needs one in every case, and so does selling,
-sublicensing, or distributing it for a fee, on its own or inside another
-product.
+## Arranging a commercial licence
 
 A commercial licence is arranged with Cadasto B.V., the Licensor, which handles
 the business side of FerroBRIDGE: write to
@@ -42,8 +40,15 @@ named in
 ## The change date
 
 Each version becomes available under the Apache License 2.0 four years after
-that version is published. The licence calls that the Change License, and it is
-the one place Apache 2.0 appears as a licence of this project's own code.
+that version is published (`LICENSE`, Change Date and Change License).
+
+## The published crates
+
+Two published crates are under the Apache License 2.0 instead of the Business
+Source License, because they are generated models meant for any Rust project:
+`fhir-types` and `hl7v2-types`, each with its own `LICENSE`. Every other
+published crate is BUSL-1.1 on the terms above, which its `Cargo.toml`
+`license` field and its README state.
 
 ## There is no open-core tier
 
@@ -58,3 +63,7 @@ CONTRIBUTING.md § Licensing of contributions, recorded by a checkbox in the
 pull request.
 Vendored specifications and third-party material keep their upstream terms,
 recorded in a `PROVENANCE.md` beside each vendored tree.
+
+The licensing and trademark terms every FerroHEALTH product shares, the same
+table for each of them included, are on the family book's
+[licensing page](https://ferrohealth.eu/docs/licensing.html).

@@ -9,19 +9,25 @@ use ferrobridge_server::facade::identity::store::Store;
 use http::Request;
 use http::StatusCode;
 use std::error::Error as StdError;
+use std::sync::Arc;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
 
 use super::CONTAINER;
 use super::EHR_ID;
+use super::FIXTURES;
 use super::VERSION_ONE;
 use super::VERSION_TWO;
+use super::app_over;
 use super::call;
 use super::create_one;
+use super::facade_over;
 use super::first_issue;
 use super::harness;
+use super::settings;
 use super::stub::mount_read;
+use super::stub::mount_version_read;
 
 #[tokio::test]
 async fn the_same_composition_read_twice_yields_the_same_id() -> Result<(), Box<dyn StdError>> {
@@ -52,6 +58,7 @@ async fn a_read_names_the_subject_the_identity_map_binds_to_the_ehr()
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
+    mount_version_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
     let (status, body) = call(
         harness.app(),
         Request::get(format!("/fhir/Condition/{id}")).body(Body::empty())?,
@@ -97,6 +104,7 @@ async fn a_read_whose_ehr_has_no_recorded_person_is_refused_naming_the_element()
             entry_path: String::from("/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"),
             split: 0,
             context: String::from("ferrobridge_facade.context"),
+            derivation: Some(ferrobridge_server::facade::identity::derive::DERIVATION),
         },
     )?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -169,5 +177,57 @@ async fn a_composition_the_cdr_reports_deleted_is_four_hundred_and_ten()
     .await?;
     assert_eq!(StatusCode::GONE, status);
     assert_eq!(Some("deleted"), first_issue(&body)["code"].as_str());
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_stored_container_the_uid_grammar_refuses_answers_a_typed_500_naming_the_key()
+-> Result<(), Box<dyn StdError>> {
+    // A store an earlier build wrote may hold a version container the openEHR
+    // BASE HIER_OBJECT_ID grammar refuses; the read names the resource and the
+    // field, and asks the CDR for nothing.
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("identity.redb");
+    {
+        let bindings: redb::TableDefinition<'static, &str, &str> =
+            redb::TableDefinition::new("internal_composition");
+        let database = redb::Database::create(&path)?;
+        let write = database.begin_write()?;
+        {
+            let mut table = write.open_table(bindings)?;
+            let record = serde_json::json!({
+                "ehr_id": EHR_ID,
+                "versioned_object_uid": "not a uid",
+                "template_id": "ferrobridge.diagnose.v1",
+                "resource_type": "Condition",
+                "entry_path": "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]",
+                "split": 0,
+                "context": "ferrobridge_facade.context"
+            });
+            table.insert("Condition\u{1f}badcontainer", record.to_string().as_str())?;
+        }
+        write.commit()?;
+    }
+    let store = ferrobridge_server::facade::identity::redb_store::RedbStore::open(&path)?;
+    let (cdr, facade) = facade_over(FIXTURES, settings(), None, Arc::new(store)).await;
+    let (status, body) = call(
+        app_over(&facade),
+        Request::get("/fhir/Condition/badcontainer").body(Body::empty())?,
+    )
+    .await?;
+    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
+    let issue = first_issue(&body);
+    assert_eq!(Some("exception"), issue["code"].as_str(), "{body}");
+    let diagnostics = issue["diagnostics"].as_str().unwrap_or_default();
+    assert!(diagnostics.contains("Condition/badcontainer"), "{body}");
+    assert!(diagnostics.contains("versioned_object_uid"), "{body}");
+    let asked = cdr
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .iter()
+        .filter(|request| request.url.path().contains("/composition"))
+        .count();
+    assert_eq!(0, asked, "the CDR is asked for no composition");
     Ok(())
 }

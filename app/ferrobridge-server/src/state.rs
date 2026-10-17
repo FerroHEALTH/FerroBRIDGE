@@ -102,7 +102,7 @@ pub struct AppState {
     /// The FHIR facade, when its lane is on.
     ///
     /// A disabled facade is `None` and mounts no route, so a request answers
-    /// `404` rather than `403` (`docs/architecture.md` §4.6).
+    /// `404` rather than `403` (no specification governs this: our own design).
     facade: Option<Arc<crate::facade::Facade>>,
     /// The FHIRconnect operations lane, when a mapping set is configured.
     operations: Option<OperationsLane>,
@@ -149,6 +149,9 @@ impl AppState {
                     }
                 })?;
             indicators.push(Arc::new(indicators::Terminology::new(client)));
+        }
+        if let Some(cdm) = settings.cdm.as_ref() {
+            indicators.push(Arc::new(indicators::Cdm::new(&cdm.connection)));
         }
         let programs = crate::mappings::load_configured(settings, cdr.as_ref())
             .await

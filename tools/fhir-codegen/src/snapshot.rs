@@ -19,6 +19,9 @@ const FHIRPATH_SYSTEM_PREFIX: &str = "http://hl7.org/fhirpath/System.";
 const FHIR_TYPE_EXTENSION: &str =
     "http://hl7.org/fhir/StructureDefinition/structuredefinition-fhir-type";
 
+/// The path of the id every element inherits from `Element`.
+const ELEMENT_ID: &str = "Element.id";
+
 /// The extension carrying the lexical form of a primitive's value, from R4.
 const REGEX_EXTENSION: &str = "http://hl7.org/fhir/StructureDefinition/regex";
 
@@ -181,6 +184,13 @@ impl TypeRef {
             (Some(system), None) => (code.to_owned(), Some(system.to_owned())),
             (None, _) => (code.to_owned(), None),
         };
+        let code = if code == "id" && is_element_id(element) {
+            // NOTE: R4B element-definitions.html and R5 types-definitions.html type Element.id
+            // as string, against the `id` the 4.3.0 and 5.0.0 snapshots state (#672).
+            String::from("string")
+        } else {
+            code
+        };
         let json_type = if fhirpath_type.is_none() && is_attribute(element) {
             // NOTE: https://hl7.org/fhir/STU3/json.html: "Composites can have id attributes,
             // which are converted to JSON member values", so an attribute is a plain string.
@@ -256,6 +266,15 @@ impl TypeRef {
             }
         }
     }
+}
+
+/// Whether `element` is `Element.id` or an element inheriting it.
+fn is_element_id(element: &ElementDefinition) -> bool {
+    element.path == ELEMENT_ID
+        || element
+            .base
+            .as_ref()
+            .is_some_and(|base| base.path == ELEMENT_ID)
 }
 
 /// Whether `element` is an XML attribute other than a primitive's value.

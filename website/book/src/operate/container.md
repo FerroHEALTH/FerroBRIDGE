@@ -79,8 +79,68 @@ FERROBRIDGE_BIND_HOST=10.0.0.7 docker compose up
 
 The service runs with a read-only root filesystem, every Linux capability
 dropped, and `no-new-privileges:true`. There is no `tmpfs` beside it because
-the server writes nothing: no cache, no scratch file, no upload directory, and
-every secret is read once at boot.
+the quickstart's server writes nothing: no cache, no scratch file, no upload
+directory, and every secret is read once at boot. The one file the server
+writes is the FHIR facade's identity store, and the facade is off in the
+quickstart; [the identity store](#the-identity-store) says what to mount when
+you turn it on.
+
+## The identity store
+
+With `[facade] enabled = true`, the server keeps its identity map in one
+file, `[facade] identity_store` (`FERROBRIDGE__FACADE__IDENTITY_STORE`). The map
+records each subject's `ehr_id`, each FHIR resource id and the composition it
+came from, and the source identity of every resource the facade consumed. It
+holds no clinical content. The server opens the file at boot, creating it when
+it is absent, and refuses to start when it cannot. The default, `identity.redb`,
+is relative to the working directory, which is `/` in the image: root-owned and
+read-only, so set the key to a path on a volume.
+
+- **Where it lives:** a path on a writable volume mounted into the container,
+  such as `/var/lib/ferrobridge/identity.redb`. The image runs as user
+  `65532`, so the volume must be writable by that user (in Kubernetes,
+  `securityContext.fsGroup: 65532` on the pod).
+- **What volume it needs:** a persistent one. The file survives a restart
+  only if the volume does, so use a `PersistentVolumeClaim` (or a named volume
+  under Compose), never an `emptyDir` or a `tmpfs`. A lost file is a lost map:
+  the next create of a resource the CDR already holds writes a second
+  composition, and a client's FHIR ids stop resolving. Back the file up with
+  the CDR.
+- **Replicas:** one process per file. The store takes an exclusive lock on the
+  file when it opens it, so a second process pointed at the same file refuses
+  its start, and a network filesystem that does not honour the lock is not a
+  safe place for it. Two replicas with a file each would keep two maps that
+  disagree. Run the facade as a single replica (a `StatefulSet` of one with a
+  `ReadWriteOnce` claim), and use the `Recreate` strategy for a `Deployment`,
+  so the old pod releases the file before the new one opens it.
+- **Restarts:** the map is read from the file at boot, so a restarted process
+  answers with the ids it handed out before. The claims that order
+  overlapping deliveries live in the process, and a restart drops them with
+  the deliveries they held; a retry is then recognised from the identity map
+  ([Failure and identity behaviour](failure-and-identity.md)).
+
+A Kubernetes pod spec with a read-only root filesystem keeps the store on its
+claim:
+
+```yaml
+securityContext:
+  runAsNonRoot: true
+  fsGroup: 65532
+containers:
+  - name: ferrobridge
+    securityContext:
+      readOnlyRootFilesystem: true
+    env:
+      - name: FERROBRIDGE__FACADE__IDENTITY_STORE
+        value: /var/lib/ferrobridge/identity.redb
+    volumeMounts:
+      - name: identity
+        mountPath: /var/lib/ferrobridge
+volumes:
+  - name: identity
+    persistentVolumeClaim:
+      claimName: ferrobridge-identity
+```
 
 ## The environment variables
 
@@ -135,8 +195,10 @@ external. Two endpoints answer it:
   configured credentials: the CDR check lists the ADL 1.4 templates
   (`GET /definition/template/adl1.4`, filtered so the answer is empty), and a
   `401` or `403` from either upstream counts as down, because every real call
-  would be refused the same way. Take the instance out of the load balancer
-  when it does not answer `200`.
+  would be refused the same way. With a `[cdm]` section, a `cdm` check opens
+  one connection to the CDM database over the configured TLS and asks
+  `SELECT 1`; a refused connection or a failed query counts as down. Take the
+  instance out of the load balancer when it does not answer `200`.
 
 Readiness answers `503` when any indicator is down, with a JSON body naming the
 aggregate and every indicator by name:

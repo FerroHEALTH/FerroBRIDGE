@@ -3,11 +3,11 @@
 
 //! The identity layer: the typed identifiers, the derivation and the store.
 //!
-//! `docs/architecture.md` §9 fixes the shape. A FHIR resource id derives from
-//! the entry's `LOCATABLE.uid` when the entry carries one and otherwise from a
-//! digest over the version container, the entry path and the split occurrence;
-//! whichever input produced it, the store records it and the store wins from
-//! then on, because "once assigned, this value never changes"
+//! No specification governs the shape: our own design. A FHIR resource id
+//! derives from the entry's `LOCATABLE.uid` when the entry carries one and
+//! otherwise from a digest over the version container, the entry path and the
+//! split occurrence; whichever input produced it, the store records it and the
+//! store wins from then on, because "once assigned, this value never changes"
 //! (<https://hl7.org/fhir/R4/resource.html>).
 //!
 //! The identifiers the openEHR side owns are the ones the CDR module
@@ -157,7 +157,7 @@ impl ExternalResourceId {
     ///
     /// A derived id carries only base32 characters, so it is always a legal
     /// external identity; this is the total conversion the identity-map key
-    /// takes (`docs/architecture.md` §9).
+    /// takes.
     #[must_use]
     pub fn of_digest(digest: &FhirResourceId) -> Self {
         Self(digest.as_str().to_owned())

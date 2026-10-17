@@ -17,6 +17,15 @@ resources are the authority for what it emits (`.claude/rules/codegen.md`).
   types each references, per version, and marks every item with the `cfg` of
   the narrowest feature that selects it. A shape the consumer lacks is fixed
   here, never shadowed downstream.
+- `search` (#522) emits the search parameter registry per version behind
+  `resources`: every `SearchParameter` of the package apart from the
+  specification's examples (`package::Package` leaves out the ids `example`
+  and `example-*`), in canonical order, and the standard parameter each
+  concrete resource type answers by code, its own over a base type's. Two
+  definitions of one code on one base fail the emit, except the pairs
+  `search::TOLERATED_AMBIGUITIES` lists, which a test asserts are still in
+  their packages. The crate-level `search.rs` carries the shape and the
+  `SearchParamType` enum over the codes every version uses.
 - The `v2` root set (`src/v2/`, #253) reads the HL7 v2 definitions that
   `scripts/vendor/v2ig.sh` fetches into the ignored `vendor/hl7-v2ig/` and
   emits `crates/hl7v2-types`: `v2::corpus` (the manifest-less loader over the
