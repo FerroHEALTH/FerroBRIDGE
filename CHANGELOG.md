@@ -107,6 +107,20 @@ crates on crates.io.
   products fit together, and licensing and trademarks.
 ### Added
 
+- The console has its shell and visual system (#601): a role layer
+  (`surface`, `ink`, `muted`, `accent` and the status tints) derived from the
+  "Indigo & Iron" brand tokens, the light, dark and system themes drawn by
+  the server from a cookie and switched by a plain form post, the top bar
+  with the bridge's status and version as a word and a tint, the theme
+  switch and the operator menu, the navigation grouped Overview, Mappings,
+  Tools and Bridge with a drawer on a narrow screen, a skip link, an About
+  page naming Cadasto B.V., and the page for a path the console does not
+  serve. A test computes WCAG 2.2 contrast for every text and ground pair in
+  both themes (4.5:1 for text, 3:1 for a control edge and the focus ring),
+  and the scroll padding keeps a focused control clear of the top bar (SC
+  2.4.11). The WebAssembly budget rises to 244 KiB with the measurement in
+  `.claude/rules/leptos-ui.md`.
+
 - The operator API checks, saves and reloads mapping files (#597), with
   `[operator] mapping_dir` set: `POST /operator/mappings/check?path=` answers
   a draft's diagnostics over the running set; `PUT /operator/mappings/{path}`

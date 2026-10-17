@@ -268,9 +268,14 @@ The bar is **WCAG 2.2 Level AA** (<https://www.w3.org/TR/WCAG22/>), checked
 per slice. Every control is keyboard operable with a visible focus state;
 tables carry real `<th scope=…>` headers; no meaning rides on colour alone,
 so a status is a word as well as a tint; contrast meets AA in the light and
-the dark theme, held by a contrast test over the stylesheet's colour tokens
-once the visual system lands (#601); motion respects
-`prefers-reduced-motion`.
+the dark theme, held by `tests/it/contrast.rs` over the stylesheet's role
+tokens (4.5:1 for text, 3:1 for a control edge and the focus ring); motion
+respects `prefers-reduced-motion`. A view names a role of
+`style/tailwind.css` (`surface`, `ink`, `muted`, `accent`, the status
+tints), never a palette entry, and a new role joins the contrast test's
+pairs in the change that adds it. The top bar stays in view from `md` up,
+so the stylesheet's `scroll-padding-top` clears it for a focused control
+(SC 2.4.11).
 
 ## 11. Testing and gates
 
@@ -306,30 +311,38 @@ changes here and nowhere else.
 
 | Measure | Budget |
 |---|---|
-| WebAssembly, brotli-compressed | 196608 bytes |
+| WebAssembly, brotli-compressed | 249856 bytes |
 
 - **The gating number is the brotli-compressed WebAssembly.** The book's
   `deployment/binary_size` chapter has a site serve its WebAssembly
   compressed, every current browser accepts brotli, and the compressed size
   is the download. The raw and gzip sizes are reported beside it, ungated.
-- **The budget is 192 KiB**, 25% over the 157809 bytes the sign-in of #600
+- **The budget is 244 KiB**, 25% over the 200047 bytes the shell of #601
   measured (2026-10-17, cargo-leptos 0.3.11, wasm-bindgen 0.2.129,
-  Tailwind CSS 4.3.3, Rust 1.98.1). It was set at 112 KiB, 26% over the
-  90964 bytes of the scaffold of #599: the router, the meta tags and the
-  hydration of a two-route shell. #600 added 66845 bytes. 54766 of them are
-  the first server function read under `<Suspense>`, measured by building
-  the page without it (103043 bytes): the server function client, its JSON
-  codec and the typed refusal it decodes, which every later screen that
-  reads the bridge carries. The other 12079 are the session state the
-  server hands the page and its three landing pages. The
-  headroom is the quarter FerroFED's console started with, enough for
+  Tailwind CSS 4.3.3, Rust 1.98.1). Its history:
+  - 112 KiB, 26% over the 90964 bytes of the scaffold of #599: the router,
+    the meta tags and the hydration of a two-route shell.
+  - 192 KiB for the sign-in of #600, which measured 157809. 54766 of the
+    66845 bytes it added are the first server function read under
+    `<Suspense>`, measured by building the page without it (103043): the
+    server function client, its JSON codec and the typed refusal it
+    decodes, which every later screen that reads the bridge carries.
+  - 244 KiB for the shell of #601, which added 42238 bytes: the top bar and
+    its status read under a second `<Suspense>`, the router links of the
+    grouped navigation that mark the current page, the About route, and the
+    drawer's two browser behaviours (the focus moved into it, and closing it
+    on a followed link), which measured 4420 bytes of it. Its theme switch
+    adds nothing to the bundle: it is a plain form post the server answers
+    with a redirect to the same page in the new theme. An action that
+    switched in place measured 12411 bytes more, and was left out.
+
+  The headroom is the quarter FerroFED's console started with, enough for
   toolchain drift and small growth and too little for a slice to pass
-  unmeasured. The JavaScript glue measured 22763 bytes raw and 5715
-  brotli-compressed. A slice that needs more (the shell and the theme
-  switch of #601) raises the budget in this table in its own pull request,
-  with the measured size and the reason, after checking that what it adds
-  belongs in the browser at all (§1). Server-rendered HTML for read-only
-  output stays the preferred shape.
+  unmeasured. The JavaScript glue measured 24217 bytes raw and 6008
+  brotli-compressed. A slice that needs more raises the budget in this
+  table in its own pull request, with the measured size and the reason,
+  after checking that what it adds belongs in the browser at all (§1).
+  Server-rendered HTML for read-only output stays the preferred shape.
 - **The profile keeps the overflow checks.** The console's own browser code
   does little arithmetic; the checks guard the arithmetic of Leptos, serde
   and the standard library, where a wrapped length or index would draw a

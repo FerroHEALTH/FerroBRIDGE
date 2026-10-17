@@ -66,6 +66,21 @@ timeouts:
 Sessions are held in the console's memory, so a restart signs every
 operator out, and replicas behind a load balancer need sticky sessions.
 
+## The console's pages
+
+A signed-in operator reads a top bar with the bridge's status and version,
+the navigation grouped Overview, Mappings, Tools and Bridge (a drawer on a
+narrow screen), and an operator menu with the sign-out. The status is a
+word as well as a colour: `Bridge UP` with the version, `Bridge refused`
+with the status the bridge answered, or `Bridge DOWN` when the console
+cannot reach it. The About page names the console's version and its maker,
+Cadasto B.V.
+
+The theme switch offers light, dark and system, which follows the
+operating system. The choice is kept in a cookie and the server draws each
+page in it, so nothing is kept in the browser's storage. Both themes meet
+WCAG 2.2 AA contrast.
+
 ## Signing out
 
 The console's sign-out is a `POST` to `/logout`. It ends the session and,

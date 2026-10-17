@@ -46,6 +46,10 @@ pub const COOKIE: &str = "ferrobridge_viewer_session";
 /// the `__Host-` prefix when the cookie is `Secure`.
 pub const SIGN_IN_COOKIE: &str = "ferrobridge_viewer_sign_in";
 
+/// The name of the cookie that carries the operator's theme choice, under
+/// the `__Host-` prefix when the cookie is `Secure`.
+pub const THEME_COOKIE: &str = "ferrobridge_viewer_theme";
+
 /// The cookie name prefix that binds a cookie to the host that set it.
 ///
 /// It holds for a `Secure`, `Path=/` cookie with no `Domain`, so no sibling

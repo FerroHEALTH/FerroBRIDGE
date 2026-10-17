@@ -174,7 +174,7 @@ async fn the_signed_in_page_offers_sign_out_as_a_post_form() -> Result<(), Box<d
     let (_provider, _state, service, cookie) = signed_in(false).await?;
     let (_response, body) = send(&service, get_with("/", &cookie)?).await?;
     assert!(
-        body.contains(r#"<form method="post" action="/logout">"#),
+        body.contains(r#"<form method="post" action="/logout""#),
         "{body}"
     );
     Ok(())
