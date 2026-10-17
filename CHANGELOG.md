@@ -25,6 +25,10 @@ crates on crates.io.
 
 ### Added
 
+- The operate book says where the FHIR facade's identity store lives, which
+  volume it needs on a read-only root filesystem, and what happens across
+  replicas and restarts, with a Kubernetes pod spec (#419). The container
+  page no longer says the server writes nothing.
 - A facade read and vread answer `Last-Modified`, the commit time the CDR's
   revision history records for the version (#348). Each read makes one more
   CDR call, `GET /ehr/{ehr_id}/versioned_composition/{uid}/revision_history`.
