@@ -6,6 +6,7 @@
 //! FHIRPath on each occurrence, or listed as unevaluated with the reason.
 
 mod bundles;
+mod choices;
 mod core;
 mod eu;
 mod examples;

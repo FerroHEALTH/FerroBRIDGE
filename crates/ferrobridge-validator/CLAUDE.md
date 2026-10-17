@@ -113,8 +113,10 @@ way further up the walk counts as passing (a reference cycle); every
 one whose `contentType` is `text/css`; an invariant whose expression answers
 empty is listed, neither passed nor failed; an invariant on a choice element
 is checked against every type the base choice admits and evaluated on the
-occurrence named as one of it; a Bundle entry is its own `%rootResource`; an
-invariant the
+occurrence named as one of it, except that one the profile itself declares
+(its `constraint.source`) on a choice it narrows is checked against the
+types the profile keeps (elementdefinition.html §2.30.0.4.2); a Bundle entry
+is its own `%rootResource`; an invariant the
 snapshot repeats is evaluated once per location, key and declaring
 canonical; `resolve()` from the Bundle element reaches entries by an
 absolute reference; an element context naming a type admits that type and
