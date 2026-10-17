@@ -135,6 +135,18 @@ crates on crates.io.
 
 ### Added
 
+- The console edits mapping files (#608). A text area opens a file with
+  the digest the operator API's `ETag` names. Check sends the draft to
+  `POST /operator/mappings/check` and shows its diagnostics inline. Save
+  sends the draft's exact bytes to `PUT /operator/mappings/{path}` under
+  `If-Match` (or `If-None-Match: *` for a new file), with a one-line reason
+  in `Ferrobridge-Reason`, behind a confirmation the server checks again.
+  The result takes the focus: the reload's report after a save, the
+  diagnostics of a refused draft (nothing written, the running set
+  unchanged), or the `412` conflict when the file changed meanwhile.
+  Reload calls `POST /operator/reload`. A provisioned file opens for a check
+  alone, and no draft reaches a log line. The WebAssembly budget rises to
+  314 KiB with the measurement in `.claude/rules/leptos-ui.md`.
 - The console has a transform playground and a validation dry run (#605).
   The playground runs `$tofhir` (a canonical or FLAT composition, a
   template id and a `context.patient` reference) and `$toopenehr` (a

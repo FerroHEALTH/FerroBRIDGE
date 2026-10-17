@@ -181,6 +181,11 @@ made in a slice.
   is disabled until an `Effect` marks the page hydrated, and a plain post
   that still arrives is refused by the server function before it asks the
   bridge anything.
+- **A `<textarea>` takes its text through `prop:value` alone, never a text
+  child.** The server renders a textarea's child as written, `<` included,
+  measured in #608, so a file holding `</textarea>` would end the element.
+  The text reaches the browser in the serialized resource, JSON-escaped,
+  and the field fills once the page hydrates, which its form waits for.
 - Parse user input yourself. `type="number"` is not validation.
 - Give every input an explicit, stable `id` and `name`, and associate the
   label with `for`.
@@ -311,14 +316,14 @@ changes here and nowhere else.
 
 | Measure | Budget |
 |---|---|
-| WebAssembly, brotli-compressed | 249856 bytes |
+| WebAssembly, brotli-compressed | 321536 bytes |
 
 - **The gating number is the brotli-compressed WebAssembly.** The book's
   `deployment/binary_size` chapter has a site serve its WebAssembly
   compressed, every current browser accepts brotli, and the compressed size
   is the download. The raw and gzip sizes are reported beside it, ungated.
-- **The budget is 244 KiB**, 25% over the 200047 bytes the shell of #601
-  measured (2026-10-17, cargo-leptos 0.3.11, wasm-bindgen 0.2.129,
+- **The budget is 314 KiB**, 25% over the 257500 bytes the mapping editor
+  of #608 measured (2026-10-17, cargo-leptos 0.3.11, wasm-bindgen 0.2.129,
   Tailwind CSS 4.3.3, Rust 1.98.1). Its history:
   - 112 KiB, 26% over the 90964 bytes of the scaffold of #599: the router,
     the meta tags and the hydration of a two-route shell.
@@ -335,6 +340,14 @@ changes here and nowhere else.
     adds nothing to the bundle: it is a plain form post the server answers
     with a redirect to the same page in the new theme. An action that
     switched in place measured 12411 bytes more, and was left out.
+  - Within 244 KiB, the read-only screens drawn on the server cost the
+    browser little: the engine-state screens of #604 measured 198283, the
+    mapping files of #607 203059. The playground and the dry run of #605,
+    three `ServerAction`s over controlled forms, measured 234423.
+  - 314 KiB for the mapping editor of #608, which added 23077 bytes: three
+    more `ServerAction`s (check, save, reload), the confirmation checkbox,
+    the save's digest carried between saves, and the `Effect` that moves the
+    focus to the save's result. Every answer is still drawn on the server.
 
   The headroom is the quarter FerroFED's console started with, enough for
   toolchain drift and small growth and too little for a slice to pass
