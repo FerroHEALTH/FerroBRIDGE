@@ -68,6 +68,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         let (mounted, counts) = build_facade(settings, lane)
             .await
             .context("starting the FHIR facade")?;
+        let mounted = mounted.with_usage(Arc::clone(state.usage_window()));
         state = state.with_facade(Arc::new(mounted));
         set_counts(&mut lanes, "facade", counts);
     }
@@ -140,7 +141,10 @@ async fn start_hl7v2(
     let listening = hl7v2::Listening::default();
     let face = StartedFace {
         socket,
-        face: Arc::new(hl7v2::Face::new(facade, corpus, terminology, lane)),
+        face: Arc::new(
+            hl7v2::Face::new(facade, corpus, terminology, lane)
+                .with_usage(Arc::clone(state.usage_window())),
+        ),
         listener: hl7v2::Listener::of(lane, settings.server.shutdown_timeout),
         listening: listening.clone(),
     };

@@ -22,7 +22,10 @@ use http::{Request, StatusCode, header};
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer};
 
-use super::{FHIR_JSON, OPENEHR_JSON, app_with, bundle, call, composition_text, mapping_tree_with};
+use super::{
+    FHIR_JSON, OPENEHR_JSON, app_with, bundle, call, composition_text, mapping_tree_with,
+    server_settings, state_with,
+};
 
 /// The concept map the synthetic mapping names. `example.org` is reserved
 /// for examples (RFC 6761 §6.5).
@@ -265,5 +268,36 @@ async fn with_no_terminology_server_a_conceptmap_refuses_naming_the_missing_serv
         "the refusal names the missing server: {body}"
     );
     assert!(body.contains(CONCEPT_MAP), "{body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_run_the_engine_refuses_is_counted_as_a_mapping_failure() -> Result<(), Box<dyn StdError>>
+{
+    let root = mapping_tree_with(MODEL_FILE)?;
+    let state = state_with(&root, Translator::default())?;
+    let app = ferrobridge_server::router(std::sync::Arc::clone(&state), &server_settings());
+    let (status, _, body) = call(
+        app.clone(),
+        Request::post("/fhir/$toopenehr")
+            .header(header::CONTENT_TYPE, FHIR_JSON)
+            .body(Body::from(bundle()?))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+    assert_eq!(1, state.usage_window().take().mapping_failures);
+    let (status, _, body) = call(
+        app,
+        Request::post("/fhir/$toopenehr")
+            .header(header::CONTENT_TYPE, "text/plain")
+            .body(Body::from("not a FHIR body"))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::UNSUPPORTED_MEDIA_TYPE, status, "{body}");
+    assert_eq!(
+        0,
+        state.usage_window().take().mapping_failures,
+        "a request refused before a program ran is no mapping failure"
+    );
     Ok(())
 }

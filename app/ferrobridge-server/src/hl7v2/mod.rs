@@ -17,7 +17,8 @@
 //!
 //! No byte of a message reaches a log line. The span of a message names its
 //! MSH-10 and its type, and the events name the acknowledgment code and
-//! counts.
+//! counts. The usage report's window takes each message's latency and its
+//! acknowledgment code, nothing of its content.
 
 pub mod answer;
 
@@ -25,7 +26,7 @@ use std::collections::BTreeMap;
 use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use ferrobridge_hl7v2::ack::{self, Code, Header, Stamp};
 use ferrobridge_hl7v2::decode::Charset;
@@ -43,6 +44,7 @@ use crate::config::Hl7v2Settings;
 use crate::facade::Facade;
 use crate::facade::ingest::{Provenance, UnmappedEntries};
 use crate::hl7v2::answer::{Settled, Tally};
+use crate::usage_report::window::Window;
 
 /// Loads the guide's `ConceptMaps`, the supplements `ferrobridge-hl7v2`
 /// ships, and every supplement directory of the settings over them, in order.
@@ -80,6 +82,9 @@ pub struct Face {
     log_outcomes: bool,
     /// The sending facilities the face accepts; empty accepts any.
     senders: Vec<Sender>,
+    /// The usage report's window each message and acknowledgment is counted
+    /// in.
+    usage: Arc<Window>,
 }
 
 /// One sending facility the face accepts, matched against MSH-4.
@@ -153,7 +158,16 @@ impl Face {
             profiles: settings.profiles.clone(),
             log_outcomes: settings.log_outcomes,
             senders: settings.senders.clone(),
+            usage: Arc::default(),
         }
+    }
+
+    /// Returns the face counting its messages in `usage`, the window the
+    /// server's usage report takes.
+    #[must_use]
+    pub fn with_usage(mut self, usage: Arc<Window>) -> Self {
+        self.usage = usage;
+        self
     }
 
     /// Answers one message's bytes: the acknowledgment's bytes, or `None`
@@ -168,7 +182,8 @@ impl Face {
             control_id = header.as_ref().and_then(Header::control_id),
             message_type = header.as_ref().and_then(Header::type_code),
         );
-        async {
+        let started = Instant::now();
+        let answered = async {
             let stamped = Stamped::now();
             let stamp = stamped.stamp();
             match inbound::receive(message, self.charset, structure_for, stamp) {
@@ -178,7 +193,7 @@ impl Face {
                 }
                 Received::Answered { code, reply } => {
                     tracing::info!(ack = code.as_str(), "answered before mapping");
-                    Some(reply)
+                    Some((code, reply))
                 }
                 Received::Parsed(inbound) => {
                     if !admitted(&self.senders, inbound.parsed().message()) {
@@ -195,23 +210,27 @@ impl Face {
             }
         }
         .instrument(span)
-        .await
+        .await;
+        let code = answered.as_ref().map(|(code, _)| *code);
+        self.usage.record_message(started.elapsed(), code);
+        answered.map(|(_, reply)| reply)
     }
 
     /// Maps and ingests one parsed message and returns its acknowledgment.
-    async fn settle(&self, inbound: &Inbound, stamped: &Stamped) -> Option<Vec<u8>> {
+    async fn settle(&self, inbound: &Inbound, stamped: &Stamped) -> Option<(Code, Vec<u8>)> {
         let (settled, tally) = self.ingest(inbound, stamped).await;
         self.acknowledge(inbound, &settled, &tally, stamped)
     }
 
-    /// Returns the acknowledgment `settled` owes, logging its code and counts.
+    /// Returns the acknowledgment `settled` owes with its code, logging the
+    /// code and the counts.
     fn acknowledge(
         &self,
         inbound: &Inbound,
         settled: &Settled,
         tally: &Tally,
         stamped: &Stamped,
-    ) -> Option<Vec<u8>> {
+    ) -> Option<(Code, Vec<u8>)> {
         let (code, mut errors) = answer::acknowledgment(settled);
         for error in &mut errors {
             error.text = printable(&error.text);
@@ -229,7 +248,7 @@ impl Face {
             }
         }
         match inbound.answer(code, &errors, stamped.stamp()) {
-            Ok(reply) => Some(reply),
+            Ok(reply) => Some((code, reply)),
             Err(error) => {
                 tracing::warn!(error = %error, "the acknowledgment cannot be encoded");
                 None
@@ -302,7 +321,11 @@ impl Handler for Face {
 
     fn malformed(&self, kind: Malformed, partial: &[u8]) -> Option<Vec<u8>> {
         let stamped = Stamped::now();
-        ack::reject_frame(partial, &kind.to_string(), stamped.stamp())
+        let reply = ack::reject_frame(partial, &kind.to_string(), stamped.stamp());
+        if reply.is_some() {
+            self.usage.record_acknowledgment(Code::Reject);
+        }
+        reply
     }
 }
 

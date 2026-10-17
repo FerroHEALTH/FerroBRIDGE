@@ -48,6 +48,7 @@ use serde::Deserialize;
 use crate::state::AppState;
 use crate::state::OperationsLane;
 use crate::terminology::Direction;
+use crate::usage_report::window::Window;
 
 /// The FHIR JSON media type, the one both operations exchange.
 pub const FHIR_JSON: &str = "application/fhir+json";
@@ -107,7 +108,7 @@ async fn to_fhir(
     }
     match tofhir_answer(lane, &settings, &query, &body).await {
         Ok(response) => response,
-        Err(error) => refused(&error),
+        Err(error) => refused(state.usage_window(), &error),
     }
 }
 
@@ -128,7 +129,7 @@ async fn to_openehr(
     }
     match toopenehr_answer(lane, &settings, &query, &body).await {
         Ok(response) => response,
-        Err(error) => refused(&error),
+        Err(error) => refused(state.usage_window(), &error),
     }
 }
 
@@ -161,7 +162,7 @@ async fn to_fhir_direct(
             StatusCode::OK,
             &Resource::Bundle(Box::new(response.into_bundle())),
         ),
-        Err(error) => refused(&error),
+        Err(error) => refused(state.usage_window(), &error),
     }
 }
 
@@ -193,7 +194,7 @@ async fn to_openehr_direct(
             String::from(response.composition()),
         )
             .into_response(),
-        Err(error) => refused(&error),
+        Err(error) => refused(state.usage_window(), &error),
     }
 }
 
@@ -397,7 +398,13 @@ fn with_query(request: ToFhirRequest, query: &OperationQuery) -> ToFhirRequest {
 /// can correct is `400`, a mapping that cannot be performed over a
 /// well-formed request is `422`
 /// (<https://hl7.org/fhir/R4/http.html#4.4.1.2>).
-fn refused(error: &OperationError) -> Response {
+///
+/// A run the engine refused is counted in `usage` as a mapping failure; a
+/// request refused before a program ran is not.
+fn refused(usage: &Window, error: &OperationError) -> Response {
+    if matches!(error, OperationError::Mapping { .. }) {
+        usage.record_mapping_failure();
+    }
     let status = match *error {
         OperationError::Mapping { .. }
         | OperationError::Serialization { .. }

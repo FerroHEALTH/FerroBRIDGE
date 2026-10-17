@@ -25,6 +25,7 @@ use ferrobridge_server::facade::ingest::SkipReason;
 use ferrobridge_server::facade::ingest::UnmappedEntries;
 use ferrobridge_server::facade::outcome::IssueType;
 use ferrobridge_server::facade::programs;
+use ferrobridge_server::usage_report::window::Window;
 use fhirconnect::engine::origin::MessageControlId;
 use fhirconnect::engine::origin::MessageType;
 use fhirconnect::engine::origin::SourceItem;
@@ -563,5 +564,52 @@ async fn the_entries_of_one_message_bind_on_retry_from_the_contribution_read_bac
         .collect();
     assert_eq!(expected, bound);
     assert_eq!(1, contributions(&cdr).await, "the retry commits nothing");
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_entry_the_program_refuses_is_counted_as_a_mapping_failure()
+-> Result<(), Box<dyn StdError>> {
+    let (cdr, facade) = facade().await?;
+    let usage = Arc::new(Window::default());
+    let facade = facade.with_usage(Arc::clone(&usage));
+    let mut refused_by_the_engine = observation();
+    refused_by_the_engine["code"] = serde_json::json!({ "coding": [{ "system": "http://example.org/fhir/CodeSystem/synthetic" }] });
+    let refused = facade
+        .ingest(facade.client().clone())
+        .ingest_bundle(
+            &bundle(&refused_by_the_engine),
+            UnmappedEntries::SkipAndCount,
+            &message(),
+        )
+        .await
+        .err()
+        .ok_or("an entry the program refuses refuses the Bundle")?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, refused.status());
+    assert_eq!(
+        vec![IssueType::Processing],
+        refused
+            .issues()
+            .iter()
+            .map(ferrobridge_server::facade::outcome::Issue::code)
+            .collect::<Vec<_>>(),
+        "the engine refused the entry: {refused:?}"
+    );
+    assert_eq!(0, contributions(&cdr).await, "nothing is committed");
+    assert_eq!(1, usage.take().mapping_failures, "{refused:?}");
+    let committed = facade
+        .ingest(facade.client().clone())
+        .ingest_bundle(
+            &bundle(&observation()),
+            UnmappedEntries::SkipAndCount,
+            &message(),
+        )
+        .await;
+    assert!(committed.is_ok(), "{committed:?}");
+    assert_eq!(
+        0,
+        usage.take().mapping_failures,
+        "a mapped entry is no failure"
+    );
     Ok(())
 }

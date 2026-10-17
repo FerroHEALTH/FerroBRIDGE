@@ -270,7 +270,8 @@ pub struct Status {
     pub hl7v2_listener_ok: Option<bool>,
 }
 
-/// A group of HTTP requests, by the route template the request matched.
+/// A group of requests: an HTTP request by the route template it matched,
+/// and an HL7 v2 message by the listener it arrived on.
 ///
 /// The declaration order is the order of the serialized names, so the
 /// report's `groups` object is written in name order.
@@ -289,6 +290,9 @@ pub enum Group {
     FacadeValidate,
     /// A facade create or update: FHIR to openEHR.
     FacadeWrite,
+    /// A message the HL7 v2 face's MLLP listener answered or dropped, timed
+    /// from its frame to its acknowledgment; its `errors_5xx` stays 0.
+    Hl7v2Message,
     /// `$tofhir` and `tofhir`: openEHR to FHIR.
     OperationsToFhir,
     /// `$toopenehr` and `toopenehr`: FHIR to openEHR.
@@ -312,12 +316,20 @@ pub struct GroupStats {
     pub histogram: [u64; BUCKETS],
 }
 
-// TODO(#744): count the HL7 v2 face's messages and the mapping failures.
 /// The counters of the window.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub struct Counters {
     /// Responses with a 4xx status, over every counted group.
     pub responses_4xx: u64,
+    /// HL7 v2 acknowledgments with the code `AA`.
+    pub hl7v2_aa: u64,
+    /// HL7 v2 acknowledgments with the code `AE`.
+    pub hl7v2_ae: u64,
+    /// HL7 v2 acknowledgments with the code `AR`, a rejected frame included.
+    pub hl7v2_ar: u64,
+    /// Units a FHIRconnect program refused to map: a facade or HL7 v2 ingest
+    /// and an operation call.
+    pub mapping_failures: u64,
 }
 
 /// The window a daily report covers.
@@ -464,6 +476,7 @@ mod tests {
             Group::FacadeTransaction,
             Group::FacadeValidate,
             Group::FacadeWrite,
+            Group::Hl7v2Message,
             Group::OperationsToFhir,
             Group::OperationsToOpenehr,
             Group::Other,

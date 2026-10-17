@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 use axum::Router;
 use axum::body::Body;
 use axum::routing::{get, post};
+use ferrobridge_hl7v2::ack::Code;
 use ferrobridge_server::health::{Check, HealthIndicator, IndicatorState, Registry};
 use ferrobridge_server::startup::{Lane, MappingCounts};
 use ferrobridge_server::state::AppState;
@@ -238,11 +239,58 @@ async fn a_server_with_no_lane_reports_an_empty_status_and_an_empty_window() {
             "window_24h": {
                 "requests_bucket": "0",
                 "groups": {},
-                "counters": { "responses_4xx": 0 }
+                "counters": {
+                    "responses_4xx": 0,
+                    "hl7v2_aa": 0,
+                    "hl7v2_ae": 0,
+                    "hl7v2_ar": 0,
+                    "mapping_failures": 0
+                }
             }
         })
     );
     assert!(report.get("first_start").is_none(), "start only");
+}
+
+#[tokio::test]
+async fn the_daily_report_counts_hl7v2_messages_and_mapping_failures() {
+    let state = state();
+    let window = state.usage_window();
+    window.record_message(Duration::from_millis(40), Some(Code::Accept));
+    window.record_message(Duration::from_millis(60), Some(Code::Accept));
+    window.record_message(Duration::from_millis(3), Some(Code::Error));
+    window.record_message(Duration::from_millis(1), None);
+    window.record_acknowledgment(Code::Reject);
+    window.record_mapping_failure();
+    window.record_mapping_failure();
+    let dir = tempfile::tempdir().expect("tempdir");
+    let config = config(dir.path(), "https://report.ferropulse.eu/v1/report");
+    let reporter = reporter_over(&config, Arc::clone(&state));
+    let counts = state.usage_window().take();
+    let report =
+        stable(serde_json::to_value(reporter.daily_report(&counts).await).expect("serializes"));
+    let window = &report["metrics"]["window_24h"];
+    assert_eq!(window["requests_bucket"], json!("1-100"));
+    assert_eq!(
+        window["counters"],
+        json!({
+            "responses_4xx": 0,
+            "hl7v2_aa": 2,
+            "hl7v2_ae": 1,
+            "hl7v2_ar": 1,
+            "mapping_failures": 2
+        })
+    );
+    let groups = window["groups"].as_object().expect("an object");
+    assert_eq!(
+        groups.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["hl7v2_message"]
+    );
+    assert_eq!(
+        groups["hl7v2_message"]["histogram"],
+        json!([2, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0])
+    );
+    assert_eq!(groups["hl7v2_message"]["errors_5xx"], json!(0));
 }
 
 /// Sends `request` through `app` and returns its status.
@@ -303,7 +351,16 @@ async fn the_daily_report_counts_requests_by_route_group_and_never_by_path() {
     let report = stable(report);
     let window = &report["metrics"]["window_24h"];
     assert_eq!(window["requests_bucket"], json!("1-100"));
-    assert_eq!(window["counters"], json!({ "responses_4xx": 1 }));
+    assert_eq!(
+        window["counters"],
+        json!({
+            "responses_4xx": 1,
+            "hl7v2_aa": 0,
+            "hl7v2_ae": 0,
+            "hl7v2_ar": 0,
+            "mapping_failures": 0
+        })
+    );
     let groups = window["groups"].as_object().expect("an object");
     assert_eq!(
         groups.keys().map(String::as_str).collect::<Vec<_>>(),

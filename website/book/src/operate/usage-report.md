@@ -151,17 +151,21 @@ daily report:
         "histogram": [0, 40, 900, 1500, 300, 60, 5, 1, 0, 0, 0]
       }
     },
-    "counters": { "responses_4xx": 12 }
+    "counters": {
+      "responses_4xx": 12,
+      "hl7v2_aa": 0, "hl7v2_ae": 0, "hl7v2_ar": 0,
+      "mapping_failures": 3
+    }
   }
 }
 ```
 
-- **`requests_bucket`:** the number of counted HTTP requests in the window, as
-  a range: `0`, `1-100`, `100-1k`, `1k-10k`, `10k-100k` or `100k+`. Each range
-  includes its lower bound and excludes its upper one, so `1-100` means 1 to
-  99. The health probes (`/health/liveness`, `/health/readiness`,
-  `/health/info`) and the root document `/` are not counted. Messages on the
-  HL7 v2 listener are not HTTP requests and are not counted either.
+- **`requests_bucket`:** the number of counted HTTP requests and HL7 v2
+  messages in the window, as a range: `0`, `1-100`, `100-1k`, `1k-10k`,
+  `10k-100k` or `100k+`. Each range includes its lower bound and excludes its
+  upper one, so `1-100` means 1 to 99. The health probes
+  (`/health/liveness`, `/health/readiness`, `/health/info`) and the root
+  document `/` are not counted.
 - **`groups`:** one entry per group of requests that saw at least one in the
   window. A request is placed in a group by the route template it matched,
   never by the path or the parameters the client sent:
@@ -177,15 +181,30 @@ daily report:
   | `operations_to_fhir` | `POST /fhir/$tofhir`, `POST /fhir/tofhir` | openEHR to FHIR |
   | `operations_to_openehr` | `POST /fhir/$toopenehr`, `POST /fhir/toopenehr` | FHIR to openEHR |
   | `other` | every other route, and a request no route matched | |
+  | `hl7v2_message` | a message on the HL7 v2 listener, timed from its frame to its acknowledgment | HL7 v2 to openEHR |
 
 - **`p50_ms`, `p95_ms`, `p99_ms`:** the median, 95th and 99th percentile
   latency of the group in milliseconds, estimated from its histogram.
-- **`errors_5xx`:** the responses with a 5xx status.
+- **`errors_5xx`:** the responses with a 5xx status. An HL7 v2 message has
+  no HTTP status, so `hl7v2_message` always carries 0; its outcomes are the
+  acknowledgment counters.
 - **`histogram`:** 11 request counts, one per latency bucket. The bucket upper
   bounds in milliseconds are 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000,
   and no bound for the last.
-- **`counters`:** `responses_4xx`, the responses with a 4xx status over every
-  counted group.
+- **`counters`:**
+  - `responses_4xx`: the responses with a 4xx status over every counted
+    group.
+  - `hl7v2_aa`, `hl7v2_ae`, `hl7v2_ar`: the acknowledgments the HL7 v2 face
+    sent with each code (HL7 table 0008). `hl7v2_ar` also counts the `AR`
+    answered to a frame the listener could not read, which is no message
+    and is not timed in `hl7v2_message`.
+  - `mapping_failures`: each resource or composition a FHIRconnect program
+    refused to map, on a facade write or transaction, on the HL7 v2 face's
+    ingest and on a `$tofhir` or `$toopenehr` call. A refusal the engine
+    returns because a terminology server did not translate a `conceptmap`
+    code is counted too. A request refused before any program ran (a body
+    in the wrong media type, a resource no program maps, a CDR that refused
+    the commit) is not.
 
 ## What a report never contains
 

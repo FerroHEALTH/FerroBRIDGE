@@ -122,6 +122,16 @@ fn app(root: &tempfile::TempDir) -> Result<Router, Box<dyn StdError>> {
 /// Returns the application with the mapping set under `root` loaded,
 /// translating every `conceptmap` code through `translator`.
 fn app_with(root: &tempfile::TempDir, translator: Translator) -> Result<Router, Box<dyn StdError>> {
+    let state = state_with(root, translator)?;
+    Ok(ferrobridge_server::router(state, &server_settings()))
+}
+
+/// Returns the state serving the mapping set under `root`, translating every
+/// `conceptmap` code through `translator`.
+fn state_with(
+    root: &tempfile::TempDir,
+    translator: Translator,
+) -> Result<Arc<AppState>, Box<dyn StdError>> {
     let settings = MappingSettings {
         directory: root.path().join("mappings"),
         templates: root.path().join("templates"),
@@ -134,8 +144,9 @@ fn app_with(root: &tempfile::TempDir, translator: Translator) -> Result<Router, 
             Some(String::from("NL")),
         )
         .with_translator(translator);
-    let state = Arc::new(AppState::with_health(Registry::default()).serving_operations(lane));
-    Ok(ferrobridge_server::router(state, &server_settings()))
+    Ok(Arc::new(
+        AppState::with_health(Registry::default()).serving_operations(lane),
+    ))
 }
 
 /// Returns server settings whose body ceiling admits a composition.

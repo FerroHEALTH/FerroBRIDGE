@@ -45,6 +45,7 @@ use crate::facade::identity::claims::Claims;
 use crate::facade::identity::store::Store;
 use crate::facade::programs::Programs;
 use crate::terminology::Translator;
+use crate::usage_report::window::Window;
 
 /// The path every facade route sits under.
 ///
@@ -100,6 +101,8 @@ pub struct Facade {
     translator: Translator,
     /// What may be fetched to resolve a reference the request does not carry.
     references: references::Policy,
+    /// The usage report's window the ingest counts mapping failures in.
+    usage: Arc<Window>,
 }
 
 impl Facade {
@@ -121,7 +124,17 @@ impl Facade {
             limits: search::Limits::default(),
             translator: Translator::default(),
             references: references::Policy::default(),
+            usage: Arc::default(),
         }
+    }
+
+    /// Returns this facade counting every unit its programs refuse to map
+    /// on ingest, through any face, in `usage`, the window the server's usage
+    /// report takes.
+    #[must_use]
+    pub fn with_usage(mut self, usage: Arc<Window>) -> Self {
+        self.usage = usage;
+        self
     }
 
     /// Returns this facade translating every `conceptmap` code through
@@ -257,6 +270,7 @@ impl Facade {
             settings,
         )
         .with_translator(&self.translator)
+        .with_usage(&self.usage)
     }
 }
 
