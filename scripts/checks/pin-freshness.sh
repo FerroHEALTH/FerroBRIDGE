@@ -36,7 +36,10 @@ shellcheck	koalaman/shellcheck
 hadolint	hadolint/hadolint
 mdBook	rust-lang/mdBook
 mdbook-toc	badboy/mdbook-toc
-mdbook-mermaid	badboy/mdbook-mermaid"
+mdbook-mermaid	badboy/mdbook-mermaid
+cargo-leptos	leptos-rs/cargo-leptos
+Tailwind CSS	tailwindlabs/tailwindcss
+Binaryen	WebAssembly/binaryen"
 
 # The second cell of the matrix row whose first cell is $1, with the backticks
 # stripped and only the first token kept, the same shape versions.sh reads.
@@ -67,7 +70,10 @@ while IFS=$'\t' read -r label repo; do
     unreadable=1
     continue
   fi
-  latest="${tag#v}"
+  # A leading v is a version prefix only before a digit (v1.2.3, never
+  # Binaryen's version_133).
+  latest="$tag"
+  [[ $tag =~ ^v[0-9] ]] && latest="${tag#v}"
 
   if [ "$pinned" = "$latest" ]; then
     printf 'current    %s %s (%s)\n' "$label" "$pinned" "$repo"
