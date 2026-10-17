@@ -6,7 +6,7 @@
 //! A read resolves the logical id through the identity map to one composition
 //! and maps that composition back with the program the map recorded. An id the
 //! map does not know is `404`; a composition the CDR reports deleted is `410`
-//! (`docs/architecture.md` §4.6). A vread does the same for the composition
+//! (no specification governs this: our own design). A vread does the same for the composition
 //! version whose version tree id is the `[vid]` a write's `Location` named
 //! (<https://hl7.org/fhir/R4/http.html#vread>). Both answer `Last-Modified`
 //! from the commit time the CDR's revision history records for the version.

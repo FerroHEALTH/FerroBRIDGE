@@ -6,7 +6,7 @@
 //! The identity map is asked first, then the CDR by subject id and namespace
 //! (`ehr-codegen.openapi.yaml`, `ehr_get_by_subject`), and only then does the
 //! configured policy decide whether an EHR is created
-//! (`docs/architecture.md` §4.6). The `EHR_STATUS.subject` shape is a
+//! (no specification governs this: our own design). The `EHR_STATUS.subject` shape is a
 //! `PARTY_SELF` over a `PARTY_REF` whose `GENERIC_ID` scheme is the namespace,
 //! which is what makes the same lookup find it again (§12).
 

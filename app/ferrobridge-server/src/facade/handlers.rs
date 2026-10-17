@@ -7,7 +7,7 @@
 //! Each handler is the same shape. It checks the media types and the query
 //! parameters, resolves the program the request runs, calls the engine and the
 //! CDR, and answers either a FHIR resource or an `OperationOutcome`
-//! (`docs/architecture.md` §4.6). Every CDR answer reaches the wire through
+//! (no specification governs this: our own design). Every CDR answer reaches the wire through
 //! the one table of [`crate::facade::status`], so a status is never invented
 //! at a call site. Create, update and transaction write through
 //! [`crate::facade::ingest`], so the handlers keep only the HTTP half.
@@ -338,8 +338,8 @@ pub(crate) fn guard(headers: &HeaderMap, uri: &Uri, body: Body) -> Result<(), Re
 
 /// Checks that some loaded program maps `resource_type`.
 ///
-/// "A type with no loaded context is `not-supported`"
-/// (`docs/architecture.md` §4.6), and it is absent from the
+/// A type with no loaded context is `not-supported`
+/// (no specification governs this: our own design), and it is absent from the
 /// `CapabilityStatement`, so the wire answer is a `404` whose issue code says
 /// why.
 pub(crate) fn supported(facade: &Facade, resource_type: &str) -> Result<(), Refusal> {

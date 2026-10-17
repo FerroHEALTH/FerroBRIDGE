@@ -70,7 +70,7 @@ pub struct Mappings {
 ///
 /// The lane is off until `enabled` is set, and a disabled facade mounts no
 /// route, so a request answers `404` rather than `403`
-/// (`docs/architecture.md` §4.6).
+/// (no specification governs this: our own design).
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Facade {

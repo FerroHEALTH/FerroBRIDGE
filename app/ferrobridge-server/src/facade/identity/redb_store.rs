@@ -3,10 +3,13 @@
 
 //! The identity map on disk, over `redb`.
 //!
-//! Four `redb` tables, one per row of `docs/architecture.md` §9, and a fifth
-//! from a source to the contribution that committed it, and a sixth from each
-//! `Resource.identifier` of a committed resource to its logical id, and a
-//! seventh from each `ehr_id` back to the person it was recorded for. The file
+//! Seven `redb` tables hold the identity map: a patient identifier to its
+//! `ehr_id`, each `ehr_id` back to the person it was recorded for, an
+//! external resource id to the internal one, an internal id to its
+//! composition binding, a source to what consumed it, a source to the
+//! contribution that committed it, and each `Resource.identifier` of a
+//! committed resource to its logical id. An eighth holds the store's schema
+//! (no specification governs the store: our own design). The file
 //! holds identifiers, archetype paths and mapping names and nothing else: no
 //! clinical value ever reaches it, which
 //! `the_store_never_holds_clinical_content` asserts by reading the file back
@@ -84,7 +87,7 @@ pub const OLDEST_SCHEMA: u32 = 1;
 /// The identity map of one configured CDR, on disk.
 ///
 /// One store per configured CDR: a multi-tenant deployment runs one bridge per
-/// tenant (`docs/architecture.md` §9 §Tenancy).
+/// tenant (no specification governs this: our own design).
 #[derive(Debug)]
 pub struct RedbStore {
     /// The open database.

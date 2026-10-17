@@ -5,7 +5,7 @@
 //!
 //! FerroBRIDGE stores no clinical data of its own: every interaction here maps
 //! onto CDR operations through a compiled FHIRconnect program
-//! (`docs/architecture.md` §4.6). What the facade keeps is identity, in the
+//! (no specification governs this: our own design). What the facade keeps is identity, in the
 //! store of [`identity`], so a re-sent resource updates the composition it
 //! already produced and a read resolves a FHIR id back to one entry.
 //!

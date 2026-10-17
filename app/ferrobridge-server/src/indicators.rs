@@ -110,7 +110,7 @@ impl HealthIndicator for Cdm {
 ///
 /// The facade resolves every request through the identity store, so a store
 /// that cannot be read is a facade that cannot answer
-/// (`docs/architecture.md` §9).
+/// (no specification governs this: our own design).
 #[derive(Debug, Clone)]
 pub struct IdentityStore {
     /// The store the probe reads.

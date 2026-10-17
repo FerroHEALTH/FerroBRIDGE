@@ -6,7 +6,7 @@
 //! Every field below is an identifier, a path or a mapping name. No clinical
 //! value, no narrative and no subject attribute reaches this module, which is
 //! what `the_store_never_holds_clinical_content` asserts against the store
-//! file itself (`docs/architecture.md` §9).
+//! file itself (no specification governs the store: our own design).
 
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use serde::Deserialize;
@@ -22,8 +22,8 @@ use crate::facade::identity::store::StoreError;
 ///
 /// The FHIR side addresses a resource by its logical id; the openEHR side
 /// addresses the same content by an EHR, a version container and the path of
-/// one entry inside it, so this record is the whole translation
-/// (`docs/architecture.md` §9).
+/// one entry inside it, so this record is the whole translation (no
+/// specification governs it: our own design).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CompositionBinding {
@@ -138,8 +138,7 @@ where
 ///
 /// The read path writes a resource's subject from it when the mapping carries
 /// none, so the row holds the person key and nothing about the person
-/// (`docs/architecture.md` §9; no specification governs the reverse row: our
-/// own design).
+/// (no specification governs the reverse row: our own design).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EhrSubject {

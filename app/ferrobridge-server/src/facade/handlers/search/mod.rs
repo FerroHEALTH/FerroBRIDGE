@@ -12,7 +12,7 @@
 //! the context's compiled program as a read maps it, as a resource of its
 //! own, and every CDR refusal reaches the wire through the status table: a
 //! search never answers an empty Bundle for a failed call
-//! (`docs/architecture.md` §9).
+//! (no specification governs this: our own design).
 
 mod total;
 
