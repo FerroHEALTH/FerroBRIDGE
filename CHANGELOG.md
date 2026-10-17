@@ -36,9 +36,18 @@ crates on crates.io.
   standard R4 search parameter of its resource type another type, and the
   `CapabilityStatement` names the standard parameter's canonical as
   `searchParam.definition` for every declared standard code (#522).
+- A facade read and vread answer `Last-Modified`, the commit time the CDR's
+  revision history records for the version (#348). Each read makes one more
+  CDR call, `GET /ehr/{ehr_id}/versioned_composition/{uid}/revision_history`.
+  The `CapabilityStatement` declares `versioning: versioned-update` and
+  `readHistory: true` on every resource type.
 
 ### Fixed
 
+- A vread of an earlier version after the latest version was deleted answers
+  that version (#348). The facade names the version from the revision
+  history, where it took the creating system from the latest version and so
+  answered `410`.
 - A CDR call whose token the CDR refused, and whose renewal the token
   endpoint then refused, is no longer retried (#663). The client asked the
   refusing token endpoint again on every retry of a `GET`; it now ends the

@@ -53,6 +53,14 @@ pub const FHIR_VERSION: &str = "4.0.1";
 /// `GET [base]/metadata` are byte-identical.
 const PUBLISHED: &str = "2026-01-01T00:00:00Z";
 
+/// The versioning every listed type supports.
+///
+/// Every answer carries `meta.versionId` and an `ETag`, and an update checks
+/// `If-Match`, which R4 names `versioned-update`: "the server supports all the
+/// versioning features, including using e-tags for version integrity in the
+/// API" (<https://hl7.org/fhir/R4/capabilitystatement-definitions.html#CapabilityStatement.rest.resource.versioning>).
+const VERSIONING: &str = "versioned-update";
+
 /// The canonical `OperationDefinition` of `$validate`.
 const VALIDATE_DEFINITION: &str = "http://hl7.org/fhir/OperationDefinition/Resource-validate";
 
@@ -375,6 +383,8 @@ fn resource(name: &str, search: &Catalog) -> CapabilityStatementRestResource {
         search_param: surface
             .map(|surface| search_params(name, &surface))
             .unwrap_or_default(),
+        versioning: Some(VERSIONING.into()),
+        read_history: Some(true.into()),
         update_create: Some(false.into()),
         conditional_create: Some(true.into()),
         conditional_update: Some(false.into()),
