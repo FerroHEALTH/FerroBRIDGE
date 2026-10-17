@@ -425,7 +425,7 @@ impl<'e, 'a> Engine<'e, 'a> {
                 let items = self.eval(operand, frame)?;
                 let ty = self.resolve_type(type_specifier)?;
                 match convert::single(&items, "is")? {
-                    Some(item) => Ok(vec![Item::Boolean(self.is_type(item, &ty))]),
+                    Some(item) => Ok(vec![Item::Boolean(self.is_instance(item, &ty))]),
                     None => Ok(Vec::new()),
                 }
             }

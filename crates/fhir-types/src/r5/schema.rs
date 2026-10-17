@@ -8,7 +8,7 @@
 
 use super::super::schema::Schemas;
 #[cfg(feature = "terminology")]
-use super::super::schema::{FieldSchema, Kind, TypeSchema, ValueKind};
+use super::super::schema::{FieldSchema, Kind, PrimitiveSchema, TypeSchema, ValueKind};
 
 /// The version's schema.
 pub static SCHEMAS: Schemas = Schemas {
@@ -119863,5 +119863,112 @@ pub static SCHEMAS: Schemas = Schemas {
         "VerificationResult",
         #[cfg(feature = "resources")]
         "VisionPrescription",
+    ],
+    primitives: &[
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "base64Binary",
+            base: Some("PrimitiveType"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "boolean",
+            base: Some("PrimitiveType"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "canonical",
+            base: Some("uri"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "code",
+            base: Some("string"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "date",
+            base: Some("PrimitiveType"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "dateTime",
+            base: Some("PrimitiveType"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "decimal",
+            base: Some("PrimitiveType"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "id",
+            base: Some("string"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "instant",
+            base: Some("PrimitiveType"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "integer",
+            base: Some("PrimitiveType"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "integer64",
+            base: Some("PrimitiveType"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "markdown",
+            base: Some("string"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "oid",
+            base: Some("uri"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "positiveInt",
+            base: Some("integer"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "string",
+            base: Some("PrimitiveType"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "time",
+            base: Some("PrimitiveType"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "unsignedInt",
+            base: Some("integer"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "uri",
+            base: Some("PrimitiveType"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "url",
+            base: Some("uri"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "uuid",
+            base: Some("uri"),
+        },
+        #[cfg(feature = "terminology")]
+        PrimitiveSchema {
+            name: "xhtml",
+            base: Some("Element"),
+        },
     ],
 };
