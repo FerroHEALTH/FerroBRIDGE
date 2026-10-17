@@ -26,8 +26,9 @@
 //! directions, and a second enum beside it would only need converting.
 //!
 //! The engine makes no call of its own. What a run asks of its caller, the
-//! `mappingCode` functions, the resource a reference points at and the id of
-//! a resource the run creates, is the [`seam`] it is handed.
+//! `mappingCode` functions, the resource a reference points at, the id of a
+//! resource the run creates and the translation a `conceptmap` names, is the
+//! [`seam`] it is handed.
 
 pub mod cell;
 
@@ -50,5 +51,7 @@ pub mod recurrence;
 pub mod rm;
 
 pub mod seam;
+
+pub mod terminology;
 
 pub mod traverse;

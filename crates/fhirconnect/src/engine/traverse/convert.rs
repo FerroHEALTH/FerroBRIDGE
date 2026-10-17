@@ -30,6 +30,7 @@ use crate::engine::traverse::Written;
 use crate::engine::traverse::error::EngineError;
 use crate::engine::traverse::functions::MappingCodeError;
 use crate::engine::traverse::place::rm_positions;
+use crate::engine::traverse::translate::Output;
 
 impl<T: Table + ?Sized> Run<'_, T> {
     /// Returns the text a `manual` path writes.
@@ -141,6 +142,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     return Ok(());
                 };
                 let node = openehr.node();
+                let Some(view) = self.translated(mapping, view, Output::openehr(openehr, input))?
+                else {
+                    return Ok(());
+                };
                 if !openehr.tail().segments.is_empty() {
                     return self.convert_tail(mapping, target, openehr, &view, binding);
                 }
@@ -215,6 +220,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                             }));
                         }
                     },
+                };
+                let output = Output::fhir(target, &binding.fhir);
+                let Some(view) = self.translated(mapping, view, output)? else {
+                    return Ok(());
                 };
                 self.put_fhir_at(mapping, target, binding, &view)?;
                 self.record_withheld(mapping, binding, &withheld);

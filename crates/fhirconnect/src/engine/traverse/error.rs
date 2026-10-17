@@ -15,6 +15,7 @@ use crate::engine::fhir::FhirError;
 use crate::engine::lens::LensError;
 use crate::engine::rm::RmError;
 use crate::engine::seam::ReferenceError;
+use crate::engine::terminology::TerminologyError;
 use crate::resolve::program::hierarchy::Create;
 
 use crate::tree::error::ReadError;
@@ -265,6 +266,32 @@ pub enum EngineError {
         mapping: String,
         /// The expression that reached the reference.
         expression: String,
+    },
+    /// A code could not be translated through the concept map its mapping
+    /// names.
+    #[error("{mapping} could not translate its code through {conceptmap}")]
+    Terminology {
+        /// The mapping being run.
+        mapping: String,
+        /// The `ConceptMap.url` the mapping names.
+        conceptmap: String,
+        /// The refusal of the seam or of its answer.
+        #[source]
+        source: Box<TerminologyError>,
+    },
+    /// A code the concept map does not translate, at an element the output
+    /// requires.
+    ///
+    /// An untranslated code is never written under a system it was not
+    /// translated into, so a required element is left with nothing.
+    #[error("{mapping} found no translation through {conceptmap} for {element}, which is required")]
+    Untranslated {
+        /// The mapping being run.
+        mapping: String,
+        /// The `ConceptMap.url` the mapping names.
+        conceptmap: String,
+        /// The output element: an openEHR `aqlPath` or a FHIR element path.
+        element: String,
     },
     /// The composition did not build.
     #[error("the values the run produced do not build a composition")]

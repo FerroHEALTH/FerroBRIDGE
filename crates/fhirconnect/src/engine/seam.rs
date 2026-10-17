@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! What a run asks of its caller: the functions a `mappingCode` names, the
-//! resources a reference points at, and the identity of a resource the run
-//! creates.
+//! What a run asks of its caller.
+//!
+//! A run asks for the functions a `mappingCode` names, the resources a
+//! reference points at, the identity of a resource the run creates, and the
+//! terminology server a `conceptmap` translates through.
 //!
 //! The engine makes no call of its own. Going into openEHR, a `reference`
 //! mapping maps the referenced resource, which "should" be fetched when it is
@@ -21,6 +23,8 @@ use core::fmt;
 use fhir_types::codec::Value;
 use sha2::Digest;
 
+use crate::engine::terminology::NoTerminology;
+use crate::engine::terminology::Terminology;
 use crate::engine::traverse::functions::MappingFunctions;
 use crate::engine::traverse::functions::NoMappingFunctions;
 use crate::resolve::program::binding::ResourceType;
@@ -301,13 +305,15 @@ pub enum ReferenceError {
 
 /// Everything a run calls out to, in one place.
 ///
-/// [`Seams::default`] registers no function, resolves no reference and
-/// derives every created id with [`DerivedIdentity`].
+/// [`Seams::default`] registers no function, resolves no reference, derives
+/// every created id with [`DerivedIdentity`] and translates through
+/// [`NoTerminology`], so a `conceptmap` fails closed.
 #[derive(Debug, Clone, Copy)]
 pub struct Seams<'seam> {
     functions: &'seam dyn MappingFunctions,
     references: &'seam dyn ReferenceSource,
     identities: &'seam dyn IdentitySink,
+    terminology: &'seam dyn Terminology,
 }
 
 impl Default for Seams<'_> {
@@ -316,6 +322,7 @@ impl Default for Seams<'_> {
             functions: &NoMappingFunctions,
             references: &NoReferences,
             identities: &DerivedIdentity,
+            terminology: &NoTerminology,
         }
     }
 }
@@ -354,10 +361,24 @@ impl<'seam> Seams<'seam> {
         self.references
     }
 
+    /// Returns these seams with `terminology` as the server a `conceptmap`
+    /// translates through.
+    #[must_use]
+    pub fn with_terminology(mut self, terminology: &'seam dyn Terminology) -> Self {
+        self.terminology = terminology;
+        self
+    }
+
     /// Returns the identity sink.
     #[must_use]
     pub fn identities(&self) -> &'seam dyn IdentitySink {
         self.identities
+    }
+
+    /// Returns the terminology server.
+    #[must_use]
+    pub fn terminology(&self) -> &'seam dyn Terminology {
+        self.terminology
     }
 }
 

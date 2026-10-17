@@ -126,6 +126,15 @@ Bundle entries and the facade carries them as contained resources with `#id`
 references. The operations lane resolves a reference against the request
 Bundle only.
 
+The fourth seam is `engine::terminology::Terminology`, the server a
+`conceptmap` translates through, over the generated R4 `$translate`
+contract. The default `NoTerminology` refuses, so a `conceptmap` with no
+server fails closed. `engine::traverse::translate` asks once per distinct
+code during the walk, which runs before the composition is built; only an
+`equivalent` or `equal` match counts, an untranslated optional element is a
+`SkipReason::Untranslated` and a required one refuses. Never pass a source
+code through under the target when the translation fails.
+
 ## Reference-model attributes beside the template nodes
 
 `FEEDER_AUDIT`, `LINK` and `PARTICIPATION` are no Web Template node, so the
