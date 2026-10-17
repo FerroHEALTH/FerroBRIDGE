@@ -83,13 +83,26 @@ services:
       # `auto` renders pretty output on a terminal and JSON otherwise.
       FERROBRIDGE__TELEMETRY__FORMAT: ${FERROBRIDGE_LOG_FORMAT:-auto}
       FERROBRIDGE__TELEMETRY__FILTER: ${FERROBRIDGE_LOG_FILTER:-info}
+      # The installation report to FerroPULSE: on by default, and
+      # FERROBRIDGE__USAGE_REPORT__ENABLED=false in your shell or .env stops
+      # it. What it sends and when:
+      # https://ferrobridge.eu/docs/operate/usage-report.html
+      FERROBRIDGE__USAGE_REPORT__ENABLED: ${FERROBRIDGE__USAGE_REPORT__ENABLED:-true}
+      FERROBRIDGE__USAGE_REPORT__DEPLOYMENT: compose
+      # The instance id lives here, on the one writable volume.
+      FERROBRIDGE__USAGE_REPORT__STATE_DIR: /home/nonroot/state
     secrets:
       - cdm_url
       - cdr_bearer_token
-    # The server writes nothing: no cache, no scratch file, no upload
-    # directory, and every secret is read once at boot. So the root filesystem
-    # is read-only with no tmpfs beside it. Should a lane ever need a writable
-    # path, mount a tmpfs for that path alone rather than dropping this line.
+    # The image's home directory, owned by its runtime user (uid 65532), so a
+    # fresh named volume mounted there is writable by that user.
+    volumes:
+      - ferrobridge-state:/home/nonroot
+    # The server writes only the usage report's state to the volume above: no
+    # cache, no scratch file, no upload directory, and every secret is read
+    # once at boot. So the root filesystem is read-only with no tmpfs beside
+    # it. Should a lane ever need a writable path, mount a volume or a tmpfs
+    # for that path alone rather than dropping this line.
     read_only: true
     cap_drop:
       - ALL
@@ -207,3 +220,4 @@ secrets:
 
 volumes:
   cdm-data:
+  ferrobridge-state:

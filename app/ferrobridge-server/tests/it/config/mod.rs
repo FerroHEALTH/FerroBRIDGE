@@ -14,6 +14,7 @@ mod oauth;
 mod operator;
 mod refusals;
 mod secrets;
+mod usage_report;
 
 use ferrobridge_server::config::{Config, Error};
 use std::collections::BTreeMap;

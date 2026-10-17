@@ -579,6 +579,7 @@ docs/specs/dqd|OHDSI Data Quality Dashboard
 docs/specs/its-rest|openEHR ITS-REST OpenAPI
 docs/specs/fhirpath-tests|FHIRPath test suite (R4)
 crates/ferrobridge-fhirpath/vendor/ucum|UCUM essence
+app/ferrobridge-server/tests/fixtures/ferropulse|FerroPULSE report envelope v2
 tools/ferrobridge-testkit/fixtures/opt/kds|KDS Diagnose operational template (fixture)
 tools/ferrobridge-testkit/fixtures/opt/kds-person|KDS Person operational template (fixture)
 tools/fhir-codegen/vendor/hl7-v2ig|HL7 v2 definitions (v2ig source of truth, never committed)

@@ -668,3 +668,33 @@ impl<'de> Deserialize<'de> for NoGrant {
         ))
     }
 }
+
+/// The `FerroHEALTH` installation report to `FerroPULSE`.
+///
+/// On by default, and silent without a writable `state_dir`, because without
+/// a stable instance id each restart would count as a new installation. A CI
+/// environment keeps it off whatever `enabled` says. No specification
+/// governs this configuration: our own design.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct UsageReport {
+    /// Whether the server sends the report.
+    pub enabled: bool,
+    /// The collector endpoint: `https`, or `http` to a loopback host.
+    pub endpoint: String,
+    /// The writable directory the instance id is kept in.
+    pub state_dir: Option<PathBuf>,
+    /// How the server was deployed: `helm`, `compose`, `binary` or `unknown`.
+    pub deployment: crate::usage_report::config::Deployment,
+}
+
+impl Default for UsageReport {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            endpoint: String::from(crate::usage_report::config::ENDPOINT),
+            state_dir: None,
+            deployment: crate::usage_report::config::Deployment::Unknown,
+        }
+    }
+}

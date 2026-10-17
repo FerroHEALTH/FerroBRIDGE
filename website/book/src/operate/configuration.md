@@ -98,7 +98,9 @@ The first boot events describe the process:
 | `build` | `version`, `commit`, `built_at`, `rustc`, `openehr_crates`, `fhir_types` |
 | `lane` | `lane` (`facade`, `operations`, `etl` or `terminology`), `enabled`, `identifiable`, and where set `cdr_host`, `terminology_host`, `cdm_host`, `cdm_schema`, `bridge_schema`, `contexts`, `programs`, `templates` |
 
-`listening` is the last boot event. The `etl` lane reports what
+`listening` is the last boot event of the lanes, and the
+[usage report](usage-report.md)'s one line, `usage report ON` or
+`usage report OFF` with the reason, follows it. The `etl` lane reports what
 `ferrobridge etl run` would reach; `serve` never runs it.
 
 `GET /health/info` answers the same build facts and pins as JSON, so a scraper
@@ -578,6 +580,21 @@ the engine and the composition language and territory on the project performing
 the mapping, so set the last two: a template whose reference model requires
 them refuses to build a composition without them, and `$toopenehr` then answers
 an `OperationOutcome` naming the missing field.
+
+### `[usage_report]`
+
+The installation report `serve` sends to FerroPULSE. It is on by default and
+sends nothing until `state_dir` names a writable directory, and a CI
+environment (`GITHUB_ACTIONS` or `CI` set to `true` or `1`) keeps it off
+whatever `enabled` says. [The usage report](usage-report.md) lists every field
+it carries.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `true` | Whether `serve` sends the report; `FERROBRIDGE__USAGE_REPORT__ENABLED=false` switches it off |
+| `endpoint` | `https://report.ferropulse.eu/v1/report` | The collector; an `https` URL, or `http` to a loopback host, with no credentials. Any other value refuses the start |
+| `state_dir` | none | The writable directory the instance id is kept in, created when absent; without one the report is off |
+| `deployment` | `unknown` | How the server was deployed, as the report states it: `helm`, `compose`, `binary` or `unknown`. The compose file sets `compose`; any other value refuses the start |
 
 ## The secrets, in one place
 

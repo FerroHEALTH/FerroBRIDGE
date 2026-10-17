@@ -219,7 +219,9 @@ pub fn registry(
 /// once instead: liveness answers `200` and readiness `503` with a `startup`
 /// indicator while the start is tried again after each wait `backoff` sets,
 /// and the lanes join the same listener once they start. A `shutdown` during
-/// the wait ends the function without an error.
+/// the wait ends the function without an error. Once the lanes start, the
+/// usage report logs its boot line and, when it is on, runs in the background
+/// until serving ends ([`crate::usage_report::reporter::start`]).
 ///
 /// # Errors
 /// Returns the error of a start that fails for any reason other than a CDR
@@ -238,6 +240,7 @@ where
 {
     use anyhow::Context;
 
+    let began = std::time::Instant::now();
     let (stop, _) = tokio::sync::watch::channel(false);
     let stop = Arc::new(stop);
     let signal = {
@@ -272,6 +275,10 @@ where
         Err(error) => return Err(error),
     };
     let state = Arc::new(started.state.with_lanes(started.lanes));
+    let ci = crate::usage_report::config::ci_of(|name| std::env::var(name).ok());
+    let report =
+        crate::usage_report::reporter::start(&settings.usage_report, Arc::clone(&state), began, ci)
+            .await;
     let app = crate::router(Arc::clone(&state), &settings.server);
     match started.face {
         None => crate::serve_until(
@@ -285,6 +292,9 @@ where
         Some(face) => {
             crate::lanes::serve_with_face(listener, app, &settings.server, face, &stop).await?;
         }
+    }
+    if let Some(report) = report {
+        report.abort();
     }
     signal.abort();
     Ok(())

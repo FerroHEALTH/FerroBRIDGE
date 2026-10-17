@@ -131,6 +131,8 @@ pub struct AppState {
     hl7v2: Option<crate::hl7v2::Listening>,
     /// The resource server, when inbound authentication is on.
     auth: Option<Arc<crate::auth::Authority>>,
+    /// The requests the usage report counts, recorded by the request log.
+    usage: Arc<crate::usage_report::window::Window>,
     /// The operator API, when `[operator] enabled` mounts it.
     operator: Option<Arc<crate::operator::Operator>>,
 }
@@ -198,6 +200,7 @@ impl AppState {
             lanes: Vec::new(),
             hl7v2: None,
             auth: None,
+            usage: Arc::default(),
             operator: None,
         })
     }
@@ -214,6 +217,7 @@ impl AppState {
             lanes: Vec::new(),
             hl7v2: None,
             auth: None,
+            usage: Arc::default(),
             operator: None,
         }
     }
@@ -341,6 +345,19 @@ impl AppState {
     #[must_use]
     pub fn logged_query_parameters(&self) -> &[String] {
         &self.logged_query_parameters
+    }
+
+    /// Returns the lanes the boot summary reported.
+    #[must_use]
+    pub fn lanes(&self) -> &[crate::startup::Lane] {
+        &self.lanes
+    }
+
+    /// Returns the window the request log records the usage report's
+    /// request counts into.
+    #[must_use]
+    pub const fn usage_window(&self) -> &Arc<crate::usage_report::window::Window> {
+        &self.usage
     }
 }
 

@@ -23,6 +23,7 @@ required status check on `main`.
 | Comment style | `scripts/checks/comment-style.sh --all` | line comments only, `// TODO(#NNNN):` naming its issue, `// NOTE:` as a citation plus one sentence |
 | Version drift | `scripts/checks/versions.sh` | every file that repeats a pin agrees with `docs/VERSIONS.md`, and no first-party file claims a licence other than BUSL-1.1 |
 | Favicon sync | `scripts/checks/favicon-sync.sh` | the book theme favicons stay byte-identical to the brand mark they are copies of |
+| Usage report off in tests | `scripts/checks/usage-report-off.sh` | every launcher of the server in a script, a workflow or a Rust test sets `FERROBRIDGE__USAGE_REPORT__ENABLED=false`, so a CI runner never counts as an installation |
 | The book | `mdbook build website/book` | a page that does not build fails the pull request |
 
 Run the same commands locally before you push. A finding costs a local run
