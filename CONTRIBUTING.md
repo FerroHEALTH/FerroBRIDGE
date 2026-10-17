@@ -5,31 +5,27 @@
 
 FerroBRIDGE is a pure-Rust, standalone bridge between openEHR and two
 interoperability targets: HL7 FHIR, driven by the FHIRconnect specification,
-and the OMOP Common Data Model, driven by the OMOCL specification. It is in its
-**design phase**: there is no code, and the architecture is the output of the
-research program on
-[issue #1](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1), which
-produces `docs/architecture.md`. The working discipline is
-[`CLAUDE.md`](CLAUDE.md). Read it before making a change.
+and the OMOP Common Data Model, driven by the OMOCL specification. The design
+of record is `docs/architecture.md`, and the working discipline is
+[`CLAUDE.md`](CLAUDE.md). Read both before making a change.
 
-## What helps most right now
+This file carries what is particular to FerroBRIDGE: how to build and test it,
+its rules for a change, and the parts it publishes under another licence. The
+contribution terms every FerroHEALTH product shares are in the family book at
+<https://ferrohealth.eu/docs/licensing.html#contributions>.
 
-Evidence, not scaffolding. A specification citation that settles an open
-question, a measurement, or first-hand experience running FHIRconnect, OMOCL,
-or an openEHR CDR in production is worth more than a pull request that guesses
-at a layout. Do not open a pull request that scaffolds a Cargo workspace or a
-crate structure; that decision belongs to issue #1.
+## The two layers
 
-## The two layers, once code exists
-
-- **A generated model layer**, expected on the FHIR side, from vendored
-  machine-readable packages. Never hand-edit a file marked `// @generated`:
-  change the generator and regenerate
+- **The generated model layers**: `crates/fhir-types` from the vendored HL7
+  FHIR packages, `crates/hl7v2-types` from the HL7 v2 definitions, and the
+  OMOP CDM row types in `crates/omop-cdm`. Never hand-edit a file marked
+  `// @generated`: change the generator and regenerate
   (`.claude/rules/codegen.md`).
-- **The hand-written bridge engine**, which is the product: the mapping loader
-  and validator, the mapping interpreter, the openEHR ITS-REST client, and the
-  terminology client. Modern idiomatic Rust, with the specifications as the
-  authority (`.claude/rules/rust-style.md`).
+- **The hand-written bridge engine**, which is the product: the mapping
+  foundation, the FHIRconnect and OMOCL parsers and interpreters, the openEHR
+  ITS-REST and terminology clients, the FHIR facade and the ETL runner. Modern
+  idiomatic Rust, with the specifications as the authority
+  (`.claude/rules/rust-style.md`).
 
 **Mappings are specification-conformant YAML**, validated against the published
 schemas. A hand-coded converter per FHIR resource or per OMOP table is refused
@@ -37,35 +33,32 @@ in review.
 
 ## Build and test
 
-Today the gates are the shell and workflow set, and they run on every change:
+The local gate is `scripts/checks/fast.sh`. It runs rustfmt, clippy, nextest
+and the doctests on the packages your change reaches, the same selection the
+CI `detect` job computes, after fetching the build-time inputs those packages
+read:
+
+```
+scripts/checks/fast.sh             # the packages your change reaches
+scripts/checks/fast.sh --dry-run   # print the plan without running it
+scripts/checks/fast.sh --all       # every package
+```
+
+A change to a workflow or a shell script also needs the tier-1 linters CI
+runs, with the same flags:
 
 ```
 zizmor --min-severity=low .github/
 actionlint
-shellcheck --severity=style <tracked shell files>
-hadolint --config .hadolint.yaml <tracked Dockerfiles>
-scripts/checks/comment-style.sh --all
-scripts/checks/versions.sh
+shellcheck --severity=style <the shell files you touched>
 ```
 
-These are the six tier-1 guards `ci.yml` runs, in the same order and with the
-same flags, so a local pass means a CI pass. The `conclusion` job aggregates
-them and is the single required check on `main` (`docs/ci-cd.md`).
-
-Once the Cargo workspace exists, the local gates mirror CI exactly:
-
-```
-cargo fmt --all --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo nextest run --workspace --locked
-cargo test --doc --workspace --locked
-RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items
-cargo deny check
-```
-
-Run them scoped to a crate (`-p <crate>`) while iterating, and run the full
-`--workspace` gates before opening a pull request. Every cargo invocation uses
-`--locked`, and `Cargo.lock` is committed.
+Every cargo invocation uses `--locked`, and `Cargo.lock` is committed. The
+full list of checks, the conformance pass lists and the build-time fetches are
+on the book's
+[checks and gates](https://ferrobridge.eu/docs/contribute/checks-and-gates.html)
+page. The `conclusion` job of `ci.yml` aggregates every lane and is the single
+required check on `main` (`docs/ci-cd.md`).
 
 ## Specifications are the authority
 
@@ -114,13 +107,18 @@ full: understood, explained on request, tested, and honest. See
 
 ## Security
 
-Report vulnerabilities privately. See [`SECURITY.md`](SECURITY.md). Do not open
-a public issue for a security problem.
+Report vulnerabilities privately. See [`SECURITY.md`](SECURITY.md), and the
+family policy it links for how a report is handled. Do not open a public issue
+for a security problem.
 
 ## Licensing of contributions
 
 FerroBRIDGE's own code is licensed under the Business Source License 1.1
-([`LICENSE`](LICENSE)). By submitting a contribution you:
+([`LICENSE`](LICENSE)). These are the terms the family book states for every
+FerroHEALTH product
+([Contributions](https://ferrohealth.eu/docs/licensing.html#contributions)),
+with the part FerroBRIDGE publishes under another licence named in point 2.
+By submitting a contribution you:
 
 1. certify that you wrote it, or otherwise have the right to submit it under
    these terms;

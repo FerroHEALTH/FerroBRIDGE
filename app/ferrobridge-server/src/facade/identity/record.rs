@@ -8,12 +8,15 @@
 //! what `the_store_never_holds_clinical_content` asserts against the store
 //! file itself (`docs/architecture.md` §9).
 
+use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::cdr::ids::EhrId;
 use crate::facade::identity::ExternalResourceId;
 use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::IdError;
+use crate::facade::identity::store::StoreError;
 
 /// Where one FHIR resource lives in the CDR.
 ///
@@ -42,6 +45,92 @@ pub struct CompositionBinding {
     /// [`derive::DERIVATION`](crate::facade::identity::derive::DERIVATION) for
     /// this build, and `None` for a binding a build up to 0.0.6 wrote.
     pub derivation: Option<u32>,
+}
+
+impl CompositionBinding {
+    /// Returns the EHR the binding of the resource `internal` names.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError::Identifier`] naming `<resource_type>/<internal>`
+    /// when the stored value is no legal `ehr_id`.
+    pub fn ehr(&self, internal: &FhirResourceId) -> Result<EhrId, StoreError> {
+        held(
+            &self.resource_key(internal),
+            "ehr_id",
+            &self.ehr_id,
+            EhrId::new,
+        )
+    }
+
+    /// Returns the version container the binding of the resource `internal`
+    /// names.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError::Identifier`] naming `<resource_type>/<internal>`
+    /// when the stored value is outside the openEHR BASE `HIER_OBJECT_ID`
+    /// grammar.
+    pub fn container(&self, internal: &FhirResourceId) -> Result<HierObjectId, StoreError> {
+        held(
+            &self.resource_key(internal),
+            "versioned_object_uid",
+            &self.versioned_object_uid,
+            |text| HierObjectId::new(text),
+        )
+    }
+
+    /// Returns the resource the binding is held for, as the wire names it.
+    fn resource_key(&self, internal: &FhirResourceId) -> String {
+        format!("{}/{internal}", self.resource_type)
+    }
+}
+
+impl ConsumedSource {
+    /// Returns the EHR the consumed source was committed into.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError::Identifier`] naming the resource id the source
+    /// was consumed as when the stored value is no legal `ehr_id`.
+    pub fn ehr(&self) -> Result<EhrId, StoreError> {
+        held(&self.internal_id, "ehr_id", &self.ehr_id, EhrId::new)
+    }
+
+    /// Returns the version container the consumed source produced.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError::Identifier`] naming the resource id the source
+    /// was consumed as when the stored value is outside the openEHR BASE
+    /// `HIER_OBJECT_ID` grammar.
+    pub fn container(&self) -> Result<HierObjectId, StoreError> {
+        held(
+            &self.internal_id,
+            "versioned_object_uid",
+            &self.versioned_object_uid,
+            |text| HierObjectId::new(text),
+        )
+    }
+}
+
+/// Returns the identifier `value` reads as under `parse`, or a refusal naming
+/// the record `key` and the `kind` of identifier.
+fn held<T, E>(
+    key: &str,
+    kind: &'static str,
+    value: &str,
+    parse: impl FnOnce(&str) -> Result<T, E>,
+) -> Result<T, StoreError>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    parse(value).map_err(|source| StoreError::Identifier {
+        key: key.to_owned(),
+        kind,
+        value: value.to_owned(),
+        source: Box::new(source),
+    })
 }
 
 /// The person one EHR was first recorded for: the reverse row of the patient
@@ -516,5 +605,32 @@ mod tests {
             external_key("Condition", &external),
             external_key("Observation", &external)
         );
+    }
+
+    #[test]
+    fn a_stored_id_the_grammar_refuses_is_refused_naming_its_record() {
+        use super::ConsumedSource;
+        use crate::facade::identity::store::StoreError;
+        let consumed = ConsumedSource {
+            ehr_id: String::from("not/an/ehr"),
+            versioned_object_uid: String::from("not a uid"),
+            internal_id: String::from("abc"),
+            context: String::from("ferrobridge_diagnosis.context"),
+        };
+        for refused in [
+            consumed
+                .ehr()
+                .map(|_| ())
+                .expect_err("the ehr_id is refused"),
+            consumed
+                .container()
+                .map(|_| ())
+                .expect_err("the container is refused"),
+        ] {
+            assert!(
+                matches!(refused, StoreError::Identifier { ref key, .. } if key == "abc"),
+                "{refused}"
+            );
+        }
     }
 }

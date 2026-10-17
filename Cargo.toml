@@ -130,7 +130,8 @@ redb = "4.3.0"
 jiff = { version = "0.2.37", default-features = false, features = ["std"] }
 url = "2.5.8"
 http = "1.5.0"
-secrecy = "0.10.3"
+# The `serde` feature reads a configured secret straight into a `SecretString`.
+secrecy = { version = "0.10.3", features = ["serde"] }
 tracing = "0.1.44"
 # The server's console: the env filter, the JSON line format and the pretty one.
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["std", "fmt", "env-filter", "json", "ansi"] }
