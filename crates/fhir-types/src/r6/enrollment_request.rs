@@ -338,7 +338,7 @@ impl super::super::codec::Json for EnrollmentRequest {
             .map(|value| {
                 path.with("id", |path| {
                     let value = super::super::codec::expect_single(value, path)?;
-                    super::primitives::checked_string(
+                    super::primitives::checked_id(
                         super::super::codec::expect_string(value, path)?,
                         path,
                     )

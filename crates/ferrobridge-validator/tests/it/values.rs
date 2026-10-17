@@ -36,6 +36,23 @@ fn a_value_outside_the_lexical_form_of_its_type_is_refused() -> TestResult {
     Ok(())
 }
 
+/// R4 resource-definitions.html#Resource.id types the logical id as `id`, so
+/// a space or a 65th character breaks it (datatypes.html#id).
+#[test]
+fn a_resource_id_outside_the_id_form_is_refused() -> TestResult {
+    for id in ["a b", &"a".repeat(65)] {
+        let mut resource = patient();
+        resource["id"] = json!(id);
+        let report = against_patient(&resource)?;
+        assert_eq!(locations(&report, MessageId::LexicalForm), ["Patient.id"]);
+    }
+    let mut resource = patient();
+    resource["id"] = json!(format!("{}-.", "A1".repeat(31)));
+    let report = against_patient(&resource)?;
+    assert!(locations(&report, MessageId::LexicalForm).is_empty());
+    Ok(())
+}
+
 #[test]
 fn a_lexical_form_of_a_choice_type_is_read_from_its_definition() -> TestResult {
     let set = PackageSet::load([core()])?;

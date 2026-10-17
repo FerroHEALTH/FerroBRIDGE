@@ -136,38 +136,58 @@ fn stu3_publishes_no_uri_form() {
     );
 }
 
-/// The resource id keeps the form the element's own type names, per package.
+/// The logical id of a resource takes the `id` form in every version.
 ///
-/// The `structuredefinition-fhir-type` extension of a resource's `id` element
-/// names `id` in 4.3.0 and 5.0.0 and `string` in 4.0.1; 6.0.0-ballot5 names
-/// `string` on `CodeSystem.id` and `id` on `Bundle.id`; 3.0.2 types
-/// `CodeSystem.id` with the code `id` itself. The emitter reads the
-/// element, so each version refuses exactly what its own package describes.
+/// The published definitions type `Resource.id` as `id`
+/// (<https://hl7.org/fhir/R4/resource-definitions.html#Resource.id>), and R4
+/// resource.html §2.26.3.3 limits an id to 64 ASCII letters, numerals, `-` and
+/// `.`. The 4.0.1 package's `structuredefinition-fhir-type` extension names
+/// `string` on `Resource.id` and every copy, and 6.0.0-ballot5 names `string`
+/// on 123 of the copies its own `Resource.id` types `id`; the emitter follows
+/// the definitions (#482).
 #[test]
-fn a_resource_id_keeps_the_form_its_package_states() {
+fn a_resource_id_takes_the_id_form_in_every_version() {
     let body = r#""id":"not a valid id!","#;
     for error in [
+        decode::<fhir_types::stu3::code_system::CodeSystem>(&code_system(body), "CodeSystem")
+            .expect_err("3.0.2 types CodeSystem.id as id"),
+        decode::<fhir_types::r4::code_system::CodeSystem>(&code_system(body), "CodeSystem")
+            .expect_err("R4 types CodeSystem.id as id"),
         decode::<fhir_types::r4b::code_system::CodeSystem>(&code_system(body), "CodeSystem")
             .expect_err("4.3.0 types CodeSystem.id as id"),
         decode::<fhir_types::r5::code_system::CodeSystem>(&code_system(body), "CodeSystem")
             .expect_err("5.0.0 types CodeSystem.id as id"),
-        decode::<fhir_types::stu3::code_system::CodeSystem>(&code_system(body), "CodeSystem")
-            .expect_err("3.0.2 types CodeSystem.id as id"),
+        decode::<fhir_types::r6::code_system::CodeSystem>(&code_system(body), "CodeSystem")
+            .expect_err("R6 types CodeSystem.id as id"),
     ] {
         assert_eq!(error.kind, DecodeErrorKind::BadValue);
         assert_eq!(error.path, "CodeSystem.id");
     }
-    let r4 = decode::<fhir_types::r4::code_system::CodeSystem>(&code_system(body), "CodeSystem")
-        .expect("4.0.1 types CodeSystem.id as string");
-    assert_eq!(r4.id.as_deref(), Some("not a valid id!"));
-    let r6 = decode::<fhir_types::r6::code_system::CodeSystem>(&code_system(body), "CodeSystem")
-        .expect("6.0.0-ballot5 types CodeSystem.id as string");
-    assert_eq!(r6.id.as_deref(), Some("not a valid id!"));
     let bundle = r#"{"resourceType":"Bundle","id":"not a valid id!","type":"collection"}"#;
-    let error = decode::<fhir_types::r6::bundle::Bundle>(bundle, "Bundle")
-        .expect_err("6.0.0-ballot5 types Bundle.id as id");
+    for error in [
+        decode::<fhir_types::r4::bundle::Bundle>(bundle, "Bundle").expect_err("R4 Bundle.id"),
+        decode::<fhir_types::r6::bundle::Bundle>(bundle, "Bundle").expect_err("R6 Bundle.id"),
+    ] {
+        assert_eq!(error.kind, DecodeErrorKind::BadValue);
+        assert_eq!(error.path, "Bundle.id");
+    }
+}
+
+/// An id of 64 characters is inside the R4 `id` form and one of 65 is outside it
+/// (<https://hl7.org/fhir/R4/datatypes.html#id>, `[A-Za-z0-9\-\.]{1,64}`).
+#[test]
+fn an_r4_resource_id_is_held_to_sixty_four_characters() {
+    let longest = "a".repeat(64);
+    let body = format!(r#""id":"{longest}","#);
+    let decoded =
+        decode::<fhir_types::r4::code_system::CodeSystem>(&code_system(&body), "CodeSystem")
+            .expect("64 characters keep the id form");
+    assert_eq!(decoded.id.as_deref(), Some(longest.as_str()));
+    let body = format!(r#""id":"{longest}a","#);
+    let error =
+        decode::<fhir_types::r4::code_system::CodeSystem>(&code_system(&body), "CodeSystem")
+            .expect_err("65 characters break the id form");
     assert_eq!(error.kind, DecodeErrorKind::BadValue);
-    assert_eq!(error.path, "Bundle.id");
 }
 
 /// A `dateTime` carrying a time without an offset, as each package states it.
@@ -261,6 +281,8 @@ macro_rules! element_id_case {
 
 element_id_case!(r4b, r4b_element_id);
 element_id_case!(r5, r5_element_id);
+element_id_case!(r4, r4_element_id);
+element_id_case!(r6, r6_element_id);
 
 /// 4.0.1 already types `Element.id` and its copies as `string`, so both
 /// element ids decode as before.

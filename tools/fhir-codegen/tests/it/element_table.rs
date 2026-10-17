@@ -113,7 +113,43 @@ fn element_id_code(element: &Value, code: String) -> String {
     if element_id && code == "id" {
         String::from("string")
     } else {
+        resource_id_code(element, code)
+    }
+}
+
+/// The code `Resource.id` and every element inheriting it take: `id`, as the
+/// published definitions type the logical id in every version
+/// (<https://hl7.org/fhir/R4/resource-definitions.html#Resource.id>), where the
+/// 4.0.1 snapshot states `string` (#482).
+fn resource_id_code(element: &Value, code: String) -> String {
+    let resource_id = element.get("path").and_then(Value::as_str) == Some("Resource.id")
+        || element.pointer("/base/path").and_then(Value::as_str) == Some("Resource.id");
+    if resource_id && code == "string" {
+        String::from("id")
+    } else {
         code
+    }
+}
+
+#[test]
+#[expect(
+    clippy::panic,
+    reason = "the test fails by naming the path it could not resolve"
+)]
+fn the_logical_id_of_a_resource_is_an_id_in_every_version() {
+    for (module, schemas) in tables() {
+        for name in ["Resource", "Patient", "Bundle"] {
+            let path = format!("{name}.id");
+            let (_, field) = schemas
+                .element(&path)
+                .unwrap_or_else(|| panic!("{module} {path} resolves"));
+            assert_eq!(field.types, ["id"], "{module} {path}");
+            assert_eq!(
+                field.kind,
+                Kind::Primitive(ValueKind::Text),
+                "{module} {path}"
+            );
+        }
     }
 }
 
