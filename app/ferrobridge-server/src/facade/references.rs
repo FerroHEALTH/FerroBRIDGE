@@ -261,51 +261,62 @@ enum Target {
 /// because no other is read. A reference that is not resolved is recorded in
 /// [`Resolved::skipped`] and logged, and the engine proceeds without it.
 pub async fn resolve(facade: &Facade, client: &CdrClient, document: &Value) -> Resolved {
-    resolve_from(facade, client, document, Resolved::default()).await
+    resolve_from(facade, client, document, &BTreeSet::new()).await
 }
 
-/// Resolves every reference a posted Bundle holds, as [`resolve`] does, with
-/// the Bundle's own entries looked up first.
+/// Resolves every reference a posted Bundle holds that none of its own
+/// entries answers, as [`resolve`] does.
 ///
 /// An entry answers a reference that names its `fullUrl`, or its `<Type>/<id>`
 /// when it carries an id (<https://hl7.org/fhir/R4/bundle.html#references>),
 /// because the references chapter fetches a resource only when it is "not
 /// contained in the Bundle" (`engine/references.adoc`). Such a reference is
-/// never read from this server or fetched.
+/// never read from this server or fetched: the caller looks the entries up
+/// first, through `BundleReferences` over [`entries_of`] with this result as
+/// the further source.
 pub async fn resolve_bundle(facade: &Facade, client: &CdrClient, bundle: &Value) -> Resolved {
-    let mut seeded = Resolved::default();
-    for entry in bundle
-        .get("entry")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-    {
-        let Some(resource) = entry.get("resource") else {
-            continue;
-        };
-        if let Some(full_url) = entry.get("fullUrl").and_then(Value::as_str) {
-            seeded.held.insert(String::from(full_url), resource.clone());
-        }
+    let mut answered = BTreeSet::new();
+    for (full_url, resource) in entries_of(bundle) {
+        answered.extend(full_url);
         if let (Some(kind), Some(id)) = (
             resource.get("resourceType").and_then(Value::as_str),
             resource.get("id").and_then(Value::as_str),
         ) {
-            seeded
-                .held
-                .entry(format!("{kind}/{id}"))
-                .or_insert_with(|| resource.clone());
+            answered.insert(format!("{kind}/{id}"));
         }
     }
-    resolve_from(facade, client, bundle, seeded).await
+    resolve_from(facade, client, bundle, &answered).await
 }
 
-/// Resolves the references `document` holds onto `resolved`, passing over
-/// every literal `resolved` already holds.
+/// Returns each entry of `bundle` that carries a resource, with its
+/// `fullUrl` when it has one, in Bundle order.
+#[must_use]
+pub fn entries_of(bundle: &Value) -> Vec<(Option<String>, Value)> {
+    bundle
+        .get("entry")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|entry| {
+            let resource = entry.get("resource")?;
+            let full_url = entry
+                .get("fullUrl")
+                .and_then(Value::as_str)
+                .map(String::from);
+            Some((full_url, resource.clone()))
+        })
+        .collect()
+}
+
+/// Resolves the references `document` holds, passing over every literal in
+/// `answered`.
 async fn resolve_from(
     facade: &Facade,
     client: &CdrClient,
     document: &Value,
-    mut resolved: Resolved,
+    answered: &BTreeSet<String>,
 ) -> Resolved {
+    let mut resolved = Resolved::default();
     let policy = facade.references();
     let wanted = facade.programs().referenced_types();
     if wanted.is_empty() {
@@ -317,7 +328,7 @@ async fn resolve_from(
         let mut next = Vec::new();
         for literal in frontier {
             if literal.starts_with('#')
-                || resolved.held.contains_key(&literal)
+                || answered.contains(&literal)
                 || !tried.insert(literal.clone())
             {
                 continue;

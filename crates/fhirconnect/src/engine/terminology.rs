@@ -28,7 +28,7 @@ use fhir_types::r4::primitives::String as FhirString;
 use fhir_types::r4::primitives::Uri;
 
 /// The terminology server a run translates codes through.
-pub trait Terminology: fmt::Debug {
+pub trait Terminology: fmt::Debug + Send + Sync {
     /// Answers `ConceptMap/$translate` for `request`.
     ///
     /// # Errors
