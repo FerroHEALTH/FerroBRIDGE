@@ -46,6 +46,13 @@ crates on crates.io.
   products fit together, and licensing and trademarks.
 ### Added
 
+- `scripts/deploy-probe.sh` probes a running deployment at a base URL (#220)
+  and reports each lane (health, the facade under `/fhir`, the FHIRconnect
+  operations) as `on`, `off`, `failing` or `uncovered`. An `uncovered` lane
+  fails the run with its own exit status, `--expect <lane>=<on|off>` fails a
+  lane in the wrong state, and the report names the findings each lane was
+  not observed in. The Operate section of the book documents it under
+  "Checking a deployment".
 - `fhir-types` 0.1.117 carries a search parameter registry per FHIR version
   behind `resources` (#522): `<version>::search_parameters::SEARCH_PARAMETERS`
   holds every `SearchParameter` of the core package, apart from its examples,
