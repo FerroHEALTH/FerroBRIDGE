@@ -11,6 +11,7 @@ mod facade;
 mod file;
 mod hl7v2;
 mod oauth;
+mod operator;
 mod refusals;
 mod secrets;
 

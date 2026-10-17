@@ -43,6 +43,7 @@ use section::Facade;
 use section::Hl7v2;
 use section::Mappings;
 use section::Operations;
+use section::Operator;
 use section::Server;
 use section::Telemetry;
 use section::Terminology;
@@ -82,6 +83,8 @@ pub struct Config {
     pub operations: Operations,
     /// The HL7 v2 face, off until its section turns it on.
     pub hl7v2: Hl7v2,
+    /// The operator API, off until its section turns it on.
+    pub operator: Operator,
 }
 
 /// A configuration the server refuses to start on.
@@ -564,6 +567,7 @@ impl Config {
                 composition_language: self.operations.composition_language.clone(),
                 composition_territory: self.operations.composition_territory.clone(),
             },
+            operator: resolve::resolve_operator(&self.operator, &self.auth)?,
         })
     }
 }
@@ -641,6 +645,8 @@ pub struct Settings {
     pub hl7v2: Option<Hl7v2Settings>,
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
+    /// Whether the operator API is mounted.
+    pub operator: bool,
 }
 
 /// The OMOP CDM database, resolved.

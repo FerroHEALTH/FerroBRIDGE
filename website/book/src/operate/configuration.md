@@ -458,7 +458,7 @@ a caller sends and what each refusal looks like.
 | `jwks_refresh_interval_ms` | `60000` | The shortest time between two reads of the key set that a token naming an unknown `kid` triggers |
 | `timeout_ms` | `10000` | How long one call to the authorization server may take |
 | `scopeless_subjects` | `[]` | The `sub` values whose token gets system-wide access when it names no SMART clinical scope, such as a backend service whose authorization server issues no scope; any other scopeless token is refused with `403` |
-| `operator_scope` | `ferrobridge.operator` | The scope that guards the operator API; SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own |
+| `operator_scope` | `ferrobridge.operator` | The scope that guards the [operator API](operator-api.md) and admits `$validate`, `$tofhir` and `$toopenehr`, which commit nothing; SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own |
 | `capabilities` | `[]` | SMART capabilities the discovery document lists beside the four the facade enforces (`permission-v1`, `permission-v2`, `permission-patient`, `permission-user`), such as `launch-standalone` or `client-confidential-asymmetric`, which describe the authorization server |
 
 At start-up the server reads the issuer's metadata, at
@@ -515,6 +515,18 @@ URL, a resource type listed twice, and a sender that names neither a
 namespace id alone nor a universal id with its type are each a boot error
 naming the key.
 
+### `[operator]`
+
+The operator API under `/operator`, which an operator console reads the
+engine state and the mapping files through. It is off until `enabled` is
+true, and it needs `[auth]`: an `[operator]` section turned on while
+`[auth]` is off refuses the start. The [operator API](operator-api.md) page
+has the routes and the scope.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether the operator routes are mounted, each requiring a token that carries `auth.operator_scope` |
+
 ### `[operations]`
 
 The `$tofhir` and `$toopenehr` lane. Both operations are pure transformations
@@ -552,7 +564,7 @@ a file never shows up in `docker inspect` or a process listing.
 ## What a bad configuration does
 
 The server refuses to start and prints one line on stderr naming the key, then
-exits 78, `EX_CONFIG`. Six things are refused:
+exits 78, `EX_CONFIG`. Seven things are refused:
 
 - an unknown key or an unknown section;
 - a value of the wrong type, or one that is not a socket address, a URL, or a
@@ -569,6 +581,7 @@ exits 78, `EX_CONFIG`. Six things are refused:
   `PGSSLROOTCERT`, `PGSSLCERT` or `PGSSLKEY` in the environment;
 - a secret set both inline and through its `_file` sibling;
 - a section that is present and names no value for a key it needs.
+- `[operator] enabled` while `[auth]` is off.
 
 ## An example
 

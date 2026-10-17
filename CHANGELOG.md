@@ -87,6 +87,23 @@ crates on crates.io.
   required element it refuses the unit (`EngineError::Untranslated`).
   Breaking for a consumer that matches `SkipReason` exhaustively: add an arm
   for `Untranslated`.
+- The read-only operator API (#596), behind `[operator] enabled` (off by
+  default, refused at boot without `[auth]`): `GET /operator/state` answers
+  the compiled programs with their files, templates and search declarations,
+  the OMOCL validation result and every diagnostic of the running load;
+  `GET /operator/mappings` lists every mapping file with its language, kind,
+  SHA-256, owner and diagnostics; `GET /operator/mappings/{path}` serves a
+  file verbatim with its SHA-256 as the `ETag`, confined to its directory.
+  Every route answers `401` without a token and `403` without
+  `auth.operator_scope`, and logs one audit line naming the caller and the
+  route, never content. The book's Operate section has a page for it.
+  Every diagnostic it and `ferrobridge mapping check --format json` answer
+  is the serde form of `openehr-mapping-core`'s `Diagnostic` (#726), so
+  `model_path` is now an array of steps.
+- `$validate` admits a token that carries the operator scope beside its `c`
+  or `u` permission, and `$tofhir` and `$toopenehr` admit it as they admit
+  any valid token, so an operator console dry-runs a mapping without a
+  clinical write scope (#598).
 - `ferrobridge mapping check` runs (#595). It loads the FHIRconnect tree of
   `[mappings] directory`, compiles every context against its template from
   `[mappings] templates` or the `[cdr]`, loads and validates the OMOCL files

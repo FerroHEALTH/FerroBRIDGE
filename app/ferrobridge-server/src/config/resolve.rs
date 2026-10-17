@@ -20,6 +20,7 @@ use super::credentials::cdm_connection_key;
 use super::credentials::resolve_credentials;
 use super::credentials::resolve_oauth;
 use super::credentials::secret;
+use super::section::Auth;
 use super::section::Cdm;
 use super::section::Cdr;
 use super::section::Etl;
@@ -27,6 +28,7 @@ use super::section::Facade;
 use super::section::Hl7v2;
 use super::section::Hl7v2Sender;
 use super::section::Mappings;
+use super::section::Operator;
 use super::section::Terminology;
 
 /// Returns the mapping-set paths `mappings` names, when it names both.
@@ -476,4 +478,16 @@ pub(super) fn url_of(key: &str, value: &str) -> Result<url::Url, Error> {
         key: key.to_owned(),
         source,
     })
+}
+
+/// Returns whether the operator API is mounted, refusing it without `[auth]`
+/// so the API is never served to an unauthenticated caller.
+pub(super) fn resolve_operator(operator: &Operator, auth: &Auth) -> Result<bool, Error> {
+    if operator.enabled && !auth.enabled {
+        return Err(Error::Needs {
+            key: String::from("operator.enabled"),
+            needs: String::from("auth.enabled"),
+        });
+    }
+    Ok(operator.enabled)
 }
