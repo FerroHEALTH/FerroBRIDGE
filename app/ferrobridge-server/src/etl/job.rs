@@ -67,7 +67,8 @@ pub fn missing_section(settings: &Settings) -> Option<&'static str> {
 /// The OMOCL set is read before any upstream is called, so a mapping that
 /// does not load refuses the start. The concept resolver and the writer open
 /// their own connections to the `[cdm]` database, over the TLS the
-/// configuration settled; the two clients never share a pool. The run carries a fresh UUID as its identifier.
+/// configuration settled; the two clients never share a pool. The run carries
+/// a fresh UUID as its identifier.
 ///
 /// # Errors
 ///
