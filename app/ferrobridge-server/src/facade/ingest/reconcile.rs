@@ -5,7 +5,6 @@
 //! bound or answered from what the CDR holds, committing nothing.
 
 use http::StatusCode;
-use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
 use openehr_base::v1_3::base_types::identification::object_ref::ObjectRef;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
@@ -439,8 +438,9 @@ impl Ingest<'_> {
     /// Returns the composition a consumed source produced, at the version it
     /// stands at now.
     pub(super) async fn standing(&self, known: &ConsumedSource) -> Result<Standing, Refused> {
-        let ehr_id = EhrId::new(&known.ehr_id).map_err(|error| stored_identifier(&error))?;
-        let container = HierObjectId::new(&known.versioned_object_uid)
+        let ehr_id = known.ehr().map_err(|error| stored_identifier(&error))?;
+        let container = known
+            .container()
             .map_err(|error| stored_identifier(&error))?;
         let id = FhirResourceId::new(&known.internal_id).map_err(|error| {
             Refused::new(

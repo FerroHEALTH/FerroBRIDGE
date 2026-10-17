@@ -8,7 +8,6 @@ use std::collections::BTreeSet;
 
 use fhir_types::codec::Value;
 use http::StatusCode;
-use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_base::v1_3::base_types::identification::uid_based_id::UidBasedId;
 use openehr_its::rest::generated::common::UpdateVersion;
@@ -405,7 +404,8 @@ impl Ingest<'_> {
                         .at(entry.full_url.clone()),
                 ));
             }
-            let container = HierObjectId::new(&known.versioned_object_uid)
+            let container = known
+                .container()
                 .map_err(|error| stored_identifier(&error))?;
             let (latest, _composition) = self
                 .read(ehr_id, &UidBasedId::HierObjectId(container))

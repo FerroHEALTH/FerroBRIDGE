@@ -50,6 +50,7 @@ use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::PersonId;
 use crate::facade::identity::record::CompositionBinding;
 use crate::facade::ingest::Refused;
+use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
@@ -85,7 +86,7 @@ pub(crate) async fn search_get(
     uri: &Uri,
 ) -> Result<Response, Refusal> {
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    let pairs = pairs_of(uri.query().unwrap_or_default().as_bytes());
+    let pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
     search(facade, access, resource_type, headers, &pairs).await
 }
 
@@ -100,16 +101,9 @@ pub(crate) async fn search_post(
 ) -> Result<Response, Refusal> {
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
     check_form(headers)?;
-    let mut pairs = pairs_of(uri.query().unwrap_or_default().as_bytes());
-    pairs.extend(pairs_of(body));
+    let mut pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+    pairs.extend(media::query_pairs(body));
     search(facade, access, resource_type, headers, &pairs).await
-}
-
-/// Returns the `name=value` pairs of a query string or a form body.
-fn pairs_of(bytes: &[u8]) -> Vec<(String, String)> {
-    url::form_urlencoded::parse(bytes)
-        .map(|(name, value)| (name.into_owned(), value.into_owned()))
-        .collect()
 }
 
 /// Checks that a `POST _search` body is a form.

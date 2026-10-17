@@ -4,11 +4,44 @@
 //! The file tree: one struct per TOML section, each refusing an unknown key
 //! and holding its defaults in its own `Default` impl.
 
+use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::telemetry::{DEFAULT_FILTER, Format};
+
+/// A secret written inline in the configuration: a [`SecretString`] from the
+/// parse, so its `Debug` rendering is redacted and its memory is zeroed when
+/// it is dropped.
+///
+/// It compares by value so a parsed tree can be compared with another. No
+/// specification governs this: our own design.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(transparent)]
+pub struct Secret(SecretString);
+
+impl Secret {
+    /// Returns the secret.
+    #[must_use]
+    pub const fn secret(&self) -> &SecretString {
+        &self.0
+    }
+}
+
+impl From<&str> for Secret {
+    fn from(value: &str) -> Self {
+        Self(SecretString::from(value))
+    }
+}
+
+impl PartialEq for Secret {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
+
+impl Eq for Secret {}
 
 /// The mapping set this deployment runs.
 ///
@@ -351,7 +384,7 @@ impl Default for Cdr {
 #[serde(default, deny_unknown_fields)]
 pub struct CdrCredentials {
     /// An RFC 6750 bearer token.
-    pub bearer_token: Option<String>,
+    pub bearer_token: Option<Secret>,
     /// A file holding the bearer token, read at boot.
     pub bearer_token_file: Option<PathBuf>,
     /// The user name of RFC 7617 basic authentication.
@@ -359,7 +392,7 @@ pub struct CdrCredentials {
     /// A file holding the user name, read at boot.
     pub user_file: Option<PathBuf>,
     /// The password of RFC 7617 basic authentication.
-    pub password: Option<String>,
+    pub password: Option<Secret>,
     /// A file holding the password, read at boot.
     pub password_file: Option<PathBuf>,
     /// The OAuth 2.0 client credentials grant (RFC 6749 §4.4) the bridge
@@ -398,7 +431,7 @@ pub struct OAuthClient {
     /// The client identifier (RFC 6749 §2.2).
     pub client_id: String,
     /// The client secret.
-    pub client_secret: Option<String>,
+    pub client_secret: Option<Secret>,
     /// A file holding the client secret, read at boot.
     pub client_secret_file: Option<PathBuf>,
     /// How the client authenticates: `client_secret_basic` or
@@ -465,7 +498,7 @@ impl Default for Terminology {
 #[serde(default, deny_unknown_fields)]
 pub struct Cdm {
     /// The PostgreSQL connection URL.
-    pub url: Option<String>,
+    pub url: Option<Secret>,
     /// A file holding the connection URL, read at boot.
     pub url_file: Option<PathBuf>,
     /// The PEM CA the database's certificate is checked against, for the
@@ -582,7 +615,7 @@ impl Default for Retry {
 #[serde(default, deny_unknown_fields)]
 pub struct Credentials {
     /// An RFC 6750 bearer token.
-    pub bearer_token: Option<String>,
+    pub bearer_token: Option<Secret>,
     /// A file holding the bearer token, read at boot.
     pub bearer_token_file: Option<PathBuf>,
     /// The user name of RFC 7617 basic authentication.
@@ -590,7 +623,7 @@ pub struct Credentials {
     /// A file holding the user name, read at boot.
     pub user_file: Option<PathBuf>,
     /// The password of RFC 7617 basic authentication.
-    pub password: Option<String>,
+    pub password: Option<Secret>,
     /// A file holding the password, read at boot.
     pub password_file: Option<PathBuf>,
 }
