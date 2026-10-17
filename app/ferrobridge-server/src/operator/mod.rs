@@ -85,15 +85,21 @@ async fn state(State(operator): State<Arc<Operator>>) -> Response {
 
 /// `GET /operator/mappings`: every mapping file with its digest and owner.
 async fn mappings(State(operator): State<Arc<Operator>>) -> Response {
-    match operator.snapshot.listing(&operator.roots) {
+    blocking(move || match operator.snapshot.listing(&operator.roots) {
         Ok(listing) => axum::Json(listing).into_response(),
         Err(error) => unreadable(&error),
-    }
+    })
+    .await
 }
 
 /// `GET /operator/mappings/{path}`: one file's verbatim bytes.
 async fn mapping(State(operator): State<Arc<Operator>>, Path(path): Path<String>) -> Response {
-    let located = match files::resolve(&operator.roots, &path) {
+    blocking(move || read_mapping(&operator, &path)).await
+}
+
+/// Resolves and reads the file `path` names, on a blocking thread.
+fn read_mapping(operator: &Operator, path: &str) -> Response {
+    let located = match files::resolve(&operator.roots, path) {
         Ok(located) => located,
         Err(files::PathError::Read { path, source }) => {
             return unreadable(&crate::walk::Error { path, source });
@@ -120,6 +126,24 @@ async fn mapping(State(operator): State<Arc<Operator>>, Path(path): Path<String>
             path: located.path().to_path_buf(),
             source: error,
         }),
+    }
+}
+
+/// Runs `work`, which reads the file system, off the async runtime.
+///
+/// A task that panics answers `500` through the same refusal as a read fault.
+async fn blocking(work: impl FnOnce() -> Response + Send + 'static) -> Response {
+    match tokio::task::spawn_blocking(work).await {
+        Ok(response) => response,
+        Err(error) => {
+            tracing::error!(%error, "an operator file read did not finish");
+            guard::refusal(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                None,
+                "unreadable",
+                "a mapping directory could not be read",
+            )
+        }
     }
 }
 
