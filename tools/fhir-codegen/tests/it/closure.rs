@@ -31,8 +31,8 @@ fn emitted_modules(module: &str) -> BTreeSet<String> {
         .filter_map(|entry| {
             let path = entry.expect("the entry reads").path();
             let stem = path.file_stem()?.to_str()?.to_owned();
-            (path.extension().is_some_and(|e| e == "rs") && stem != "mod" && stem != "schema")
-                .then_some(stem)
+            let emitter_owned = ["mod", "schema", "search_parameters"].contains(&stem.as_str());
+            (path.extension().is_some_and(|e| e == "rs") && !emitter_owned).then_some(stem)
         })
         .collect()
 }

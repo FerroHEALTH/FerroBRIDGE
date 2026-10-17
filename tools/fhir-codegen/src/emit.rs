@@ -11,7 +11,7 @@
 //! pinned `rustfmt`, and then either replaces the generated tree or, in check
 //! mode, compares it with the tree on disk and reports every difference.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -26,6 +26,7 @@ use crate::operations::{
 use crate::package::{LoadError, Package};
 use crate::render::{render_lib, render_module, render_version_mod};
 use crate::roots::{MissingRoot, RootScope, RootSet};
+use crate::search::Registry;
 
 /// One FHIR version to emit: its module name and its vendored package.
 #[derive(Debug, Clone)]
@@ -71,6 +72,9 @@ pub enum EmitError {
     /// An operation contract failed to lower.
     #[error(transparent)]
     Operation(#[from] OperationError),
+    /// A search parameter registry failed to lower.
+    #[error(transparent)]
+    Search(#[from] crate::search::SearchError),
     /// A file could not be read or written.
     #[error("cannot access {path}")]
     Io {
@@ -121,7 +125,11 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
         packages.push(Package::open(&version.package_dir)?);
     }
     let models = lower_models(&versions, &packages)?;
-    let files = render_files(&models)?;
+    let mut registries = Vec::with_capacity(models.len());
+    for (package, model) in packages.iter().zip(&models) {
+        registries.push(Registry::lower(package, model)?);
+    }
+    let files = render_files(&models, &registries)?;
 
     let scratch = tempfile::tempdir().map_err(|source| EmitError::Io {
         path: PathBuf::from("(temporary directory)"),
@@ -155,7 +163,10 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
 ///
 /// The shared files carry the crate banner over the two runtime templates; the
 /// rest are rendered per version module.
-fn render_files(models: &[VersionModule]) -> Result<BTreeMap<String, String>, EmitError> {
+fn render_files(
+    models: &[VersionModule],
+    registries: &[Registry],
+) -> Result<BTreeMap<String, String>, EmitError> {
     let crate_banner = crate::render::crate_banner(models);
     let mut files = BTreeMap::new();
     files.insert(String::from("lib.rs"), render_lib(models)?);
@@ -175,8 +186,17 @@ fn render_files(models: &[VersionModule]) -> Result<BTreeMap<String, String>, Em
         String::from("xml.rs"),
         format!("{crate_banner}{}", include_str!("templates/xml.rs")),
     );
-    for model in models {
+    let codes: BTreeSet<&str> = registries.iter().flat_map(Registry::type_codes).collect();
+    files.insert(
+        String::from("search.rs"),
+        crate::search::render_shared(&crate_banner, &codes)?,
+    );
+    for (model, registry) in models.iter().zip(registries) {
         render_version_files(model, &mut files)?;
+        files.insert(
+            format!("{}/search_parameters.rs", model.name),
+            crate::search::render(model, registry)?,
+        );
     }
     Ok(files)
 }

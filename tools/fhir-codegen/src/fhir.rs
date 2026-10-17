@@ -4,7 +4,7 @@
 //! The FHIR conformance resources as the vendored package spells them.
 //!
 //! Serde projections of `StructureDefinition`, `OperationDefinition`,
-//! `ValueSet`, and `CodeSystem`, keeping the fields the generator consumes.
+//! `ValueSet`, `CodeSystem`, and `SearchParameter`, keeping the fields the generator consumes.
 //! Field names follow the FHIR JSON representation
 //! (<https://hl7.org/fhir/R4B/json.html>); fields the generator never reads
 //! are left out rather than modelled and ignored.
@@ -427,4 +427,30 @@ pub struct CodeSystemConcept {
     /// Child concepts.
     #[serde(default)]
     pub concept: Vec<CodeSystemConcept>,
+}
+
+/// A FHIR `SearchParameter` (<https://hl7.org/fhir/R4/searchparameter.html>).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchParameter {
+    /// The logical id.
+    pub id: Option<String>,
+    /// The canonical URL identifying this parameter.
+    pub url: String,
+    /// The computer-friendly name.
+    pub name: String,
+    /// The code a search uses.
+    pub code: String,
+    /// The resource types the parameter applies to.
+    // NOTE: SearchParameter.base is 1..* (https://hl7.org/fhir/R4/searchparameter.html), yet
+    // the R4 and R4B core packages omit it on ten codesystem- and valueset-extensions ones.
+    #[serde(default)]
+    pub base: Vec<String>,
+    /// The `search-param-type` code.
+    #[serde(rename = "type")]
+    pub type_code: String,
+    /// The `FHIRPath` expression that extracts the values.
+    pub expression: Option<String>,
+    /// Whether the parameter is for testing, not for genuine usage.
+    pub experimental: Option<bool>,
 }

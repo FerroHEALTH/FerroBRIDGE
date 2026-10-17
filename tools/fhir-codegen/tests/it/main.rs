@@ -27,6 +27,7 @@ mod operations;
 mod package;
 mod precision;
 mod roots;
+mod search;
 mod serialize;
 mod snapshot;
 mod stu3;

@@ -261,6 +261,13 @@ pub fn bind(
         .unwrap_or_default();
     let parameters =
         declaration::check_parameters(file, &written.parameters, &patient_names, loaded.index())?;
+    let resource_type = loaded.program().resource().as_str();
+    for (name, parameter) in &parameters {
+        declaration::check_standard(file, resource_type, name, parameter.kind())?;
+    }
+    for name in &patient_names {
+        declaration::check_standard(file, resource_type, name, ParameterType::Reference)?;
+    }
     let order = written.order.unwrap_or_else(|| {
         aql::DEFAULT_ORDER
             .iter()

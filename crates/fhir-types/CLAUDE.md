@@ -26,6 +26,10 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
 - `schema::SCHEMAS` is the one element table per version: the XML codec and the
   path model read the same statics, so cardinality, the element path, the type
   codes and `contentReference` are never copied into a second table.
+- `search_parameters::SEARCH_PARAMETERS` is the one search parameter registry
+  per version, behind `resources`: a consumer checks a search parameter code,
+  type or canonical against it and never keeps its own copy of the
+  specification's parameters.
 - A string-valued primitive is held to its lexical form on decode: the emitter
   reads the `regex` extension of that version's `<primitive>.value` element,
   writes it anchored behind a `LazyLock` in the version's `primitives` module,
