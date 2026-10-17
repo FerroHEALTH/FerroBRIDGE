@@ -21,6 +21,8 @@ use fhir_types::r4::capability_statement::CapabilityStatement;
 
 use crate::config::settings::BridgeSettings;
 
+pub mod operations;
+
 /// The FHIR JSON media type (FHIR R4 REST API, `http.html`, content types
 /// and encodings).
 pub const FHIR_JSON: &str = "application/fhir+json";
@@ -101,6 +103,23 @@ pub enum BridgeError {
     /// A mapping file path that is not plain segments below a root.
     #[error("the mapping file path is not plain names below a root")]
     Path,
+    /// A resource type name that is not ASCII letters.
+    #[error("the resource type is not a FHIR resource type name")]
+    ResourceType,
+    /// A request body the console built has no JSON form.
+    #[error("the request could not be written as JSON")]
+    Encode {
+        /// What the encoder refused.
+        #[source]
+        source: Box<fhir_types::codec::EncodeError>,
+    },
+    /// A request body holds a number JSON cannot carry exactly.
+    #[error("the request holds a number JSON cannot carry")]
+    Number {
+        /// What the conversion refused.
+        #[source]
+        source: Box<fhir_types::codec::ValueConversionError>,
+    },
     /// The accepted answer's body does not decode as the resource asked for.
     #[error("the bridge's answer is not a {expected}")]
     Decode {
@@ -393,12 +412,42 @@ impl Bridge {
         token: &AccessToken,
         admitted: &[StatusCode],
     ) -> Result<(StatusCode, http::HeaderMap, Vec<u8>), BridgeError> {
+        self.exchange(self.client.get(url), accept, token, admitted)
+            .await
+    }
+
+    /// Sends `POST url` with `body` in `content_type`, for `accept`, as
+    /// [`Self::fetch`] does a `GET`.
+    async fn post(
+        &self,
+        url: Url,
+        (content_type, body): (&'static str, String),
+        accept: &'static str,
+        token: &AccessToken,
+        admitted: &[StatusCode],
+    ) -> Result<(StatusCode, http::HeaderMap, Vec<u8>), BridgeError> {
+        let request = self
+            .client
+            .post(url)
+            .header(http::header::CONTENT_TYPE, content_type)
+            .body(body);
+        self.exchange(request, accept, token, admitted).await
+    }
+
+    /// Sends `request` for `accept` with the operator's bearer token, and
+    /// reads the headers and body of an answer whose status is in
+    /// `admitted`; any other status is a refusal.
+    async fn exchange(
+        &self,
+        request: reqwest::RequestBuilder,
+        accept: &'static str,
+        token: &AccessToken,
+        admitted: &[StatusCode],
+    ) -> Result<(StatusCode, http::HeaderMap, Vec<u8>), BridgeError> {
         let mut bearer = HeaderValue::from_str(&format!("Bearer {}", token.0.expose_secret()))
             .map_err(|_invalid| BridgeError::Token)?;
         bearer.set_sensitive(true);
-        let response = self
-            .client
-            .get(url)
+        let response = request
             .header(ACCEPT, accept)
             .header(AUTHORIZATION, bearer)
             .send()

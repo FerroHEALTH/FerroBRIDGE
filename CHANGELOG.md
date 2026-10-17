@@ -119,6 +119,18 @@ crates on crates.io.
 
 ### Added
 
+- The console has a transform playground and a validation dry run (#605).
+  The playground runs `$tofhir` (a canonical or FLAT composition, a
+  template id and a `context.patient` reference) and `$toopenehr` (a
+  `Bundle`, a template id and the composition format) against the bridge's
+  running programs. The dry run runs `$validate` on a resource type the
+  `CapabilityStatement` declares it on. What the operator enters travels in
+  the request body alone, with autocomplete off. Every answer is `no-store`
+  and drawn on the server: the `Bundle`'s resources, the composition, and
+  the `OperationOutcome` issues ordered by severity, with the raw JSON
+  behind a disclosure. A refusal shows its status and diagnostics, and
+  nothing is stored or logged. A form waits for its page to hydrate, and a
+  plain post is refused before the bridge is asked.
 - The console shows the mapping files (#607): the list from `GET
   /operator/mappings` with each file's language, kind, owner, whether it is
   writable and its diagnostics count, and each file at `/files/{path}` from

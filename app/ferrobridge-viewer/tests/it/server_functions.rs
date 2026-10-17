@@ -19,7 +19,7 @@ use crate::support::{OPERATOR_TOKEN, ORIGIN, configuration, console, get_with, s
 
 /// Every server function the console registers, with the form body it
 /// takes.
-const SERVER_FUNCTIONS: [(&str, &str); 7] = [
+const SERVER_FUNCTIONS: [(&str, &str); 11] = [
     ("/api/bridge-status", ""),
     ("/api/capability", ""),
     ("/api/dashboard", ""),
@@ -27,6 +27,10 @@ const SERVER_FUNCTIONS: [(&str, &str); 7] = [
     ("/api/files", ""),
     ("/api/mappings", ""),
     ("/api/theme", "theme=dark"),
+    ("/api/tofhir", "composition=x&template_id=&patient="),
+    ("/api/toopenehr", "bundle=x&template_id=&format=canonical"),
+    ("/api/validate", "resource_type=Patient&resource=x"),
+    ("/api/validate-types", ""),
 ];
 
 /// A synthetic R4 `CapabilityStatement` of the bridge.
