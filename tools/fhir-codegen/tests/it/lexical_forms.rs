@@ -144,7 +144,7 @@ fn stu3_publishes_no_uri_form() {
 /// `.`. The 4.0.1 package's `structuredefinition-fhir-type` extension names
 /// `string` on `Resource.id` and every copy, and 6.0.0-ballot5 names `string`
 /// on 123 of the copies its own `Resource.id` types `id`; the emitter follows
-/// the definitions (#482).
+/// the definitions (#798).
 #[test]
 fn a_resource_id_takes_the_id_form_in_every_version() {
     let body = r#""id":"not a valid id!","#;

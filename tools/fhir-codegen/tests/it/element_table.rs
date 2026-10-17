@@ -120,7 +120,7 @@ fn element_id_code(element: &Value, code: String) -> String {
 /// The code `Resource.id` and every element inheriting it take: `id`, as the
 /// published definitions type the logical id in every version
 /// (<https://hl7.org/fhir/R4/resource-definitions.html#Resource.id>), where the
-/// 4.0.1 snapshot states `string` (#482).
+/// 4.0.1 snapshot states `string` (#798).
 fn resource_id_code(element: &Value, code: String) -> String {
     let resource_id = element.get("path").and_then(Value::as_str) == Some("Resource.id")
         || element.pointer("/base/path").and_then(Value::as_str) == Some("Resource.id");

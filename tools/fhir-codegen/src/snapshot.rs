@@ -193,7 +193,7 @@ impl TypeRef {
             String::from("string")
         } else if code == "string" && is_resource_id(element) {
             // NOTE: R4 resource-definitions.html#Resource.id types Resource.id as id, against
-            // the `string` the 4.0.1 package's fhir-type extension states (#482).
+            // the `string` the 4.0.1 package's fhir-type extension states (#798).
             String::from("id")
         } else {
             code
