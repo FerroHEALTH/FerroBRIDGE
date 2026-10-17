@@ -395,6 +395,39 @@ a resource would be named here. A subject reference to another entry of the
 Bundle is read through that entry: the person is the referenced resource's
 first `identifier`, the same pair a `subject.identifier` names.
 
+### References the request does not carry
+
+A `reference` mapping reads the resource a reference points at. FHIRconnect
+says that when the resource is not in the request, "the engine should attempt
+to GET it from the sending site. If not possible, the engine proceeds with the
+mapping", and that it should stop at a level or track what it resolved. The
+facade's policy beyond that is FerroBRIDGE's own design:
+
+- In a transaction Bundle, an entry answers a reference to it first: by its
+  `fullUrl`, or by `<Type>/<id>` when it carries an id. Such a reference is
+  never read from this server or fetched.
+- A relative reference (`Observation/abc`), or an absolute one under
+  `[facade] base_url`, names a resource this server committed. The facade
+  reads it through the identity map and the CDR, as a read of it answers.
+- An absolute reference to another server is fetched with
+  `Accept: application/fhir+json` only when its base is listed in
+  `[facade.references] fetch_bases`, and a redirect is not followed. The list
+  is empty by default, so by default the facade fetches nothing, and a client
+  cannot make the bridge call a URL it names.
+- References are followed to `max_depth` levels (default 2: the request's own,
+  then those of each resolved resource), and each literal is resolved once,
+  so a cycle ends.
+- A reference the facade does not resolve, because its base is not listed,
+  the server answered a status other than `200`, the fetch timed out, the body
+  is not the referenced resource, or this server holds no such resource, is a
+  declared skip: the write proceeds without it. The log line names the
+  reference, the base and the upstream status, never a body, and `$validate`
+  answers it as a `warning` issue naming the reference and the reason.
+
+Only a reference whose type some loaded `reference` mapping names is
+followed, because no other is read. The keys are on the Operate page under
+`[facade.references]`.
+
 ## `$validate` is a dry run of this server
 
 `POST /fhir/{type}/$validate` runs the whole inbound path up to the commit and

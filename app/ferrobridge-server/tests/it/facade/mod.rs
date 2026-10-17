@@ -18,6 +18,7 @@ mod examples;
 mod person;
 mod read;
 mod reconcile;
+mod references;
 mod replay;
 mod search;
 pub(crate) mod stub;

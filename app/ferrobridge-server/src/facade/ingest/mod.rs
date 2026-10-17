@@ -27,6 +27,8 @@ mod transaction;
 
 use fhir_types::codec::Value;
 use fhirconnect::engine::origin::SourceItem;
+use fhirconnect::engine::seam::NoReferences;
+use fhirconnect::engine::seam::ReferenceSource;
 use fhirconnect::engine::traverse::error::EngineError;
 use fhirconnect::resolve::program::binding::TemplateId;
 use http::StatusCode;
@@ -369,6 +371,9 @@ pub struct Ingest<'a> {
     settings: &'a Settings,
     /// The terminology server every `conceptmap` code translates through.
     translator: &'a Translator,
+    /// Where a `reference` mapping reads a resource the request does not
+    /// carry.
+    references: &'a (dyn ReferenceSource + Sync),
 }
 
 /// The translator of an ingest built with none: no server, so a
@@ -517,6 +522,7 @@ impl<'a> Ingest<'a> {
             client,
             settings,
             translator: &NO_TRANSLATOR,
+            references: &NoReferences,
         }
     }
 
@@ -525,6 +531,14 @@ impl<'a> Ingest<'a> {
     #[must_use]
     pub const fn with_translator(mut self, translator: &'a Translator) -> Self {
         self.translator = translator;
+        self
+    }
+
+    /// Returns this ingest with `references` as the source a `reference`
+    /// mapping reads a resource the request does not carry from.
+    #[must_use]
+    pub fn with_references(mut self, references: &'a (dyn ReferenceSource + Sync)) -> Self {
+        self.references = references;
         self
     }
 

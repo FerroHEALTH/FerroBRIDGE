@@ -5,6 +5,7 @@
 //! and the identity record of one committed composition.
 
 use fhir_types::codec::Value;
+use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::error::EngineError;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
@@ -184,7 +185,9 @@ impl Ingest<'_> {
                     &now,
                     self.settings,
                     provenance.source_for(inbound.document()),
-                    terminology,
+                    &Seams::default()
+                        .with_terminology(terminology)
+                        .with_references(self.references),
                 )
             })
             .await?;

@@ -185,6 +185,52 @@ pub(crate) async fn vread(
     ))
 }
 
+/// Returns the current resource `resource_type/id` names, as a read answers
+/// it, or `None` when the identity map binds no such resource.
+///
+/// A reference a request names reads its target this way, so the target is
+/// the resource a client would read (no specification governs this: our own
+/// design).
+///
+/// # Errors
+///
+/// Every refusal a read answers, carrying its status.
+pub(crate) async fn current(
+    facade: &Facade,
+    client: &CdrClient,
+    resource_type: &str,
+    id: &FhirResourceId,
+) -> Result<Option<fhir_types::codec::Object>, Refusal> {
+    let Some(binding) = binding(facade, resource_type, id)? else {
+        return Ok(None);
+    };
+    let program = program_of(facade, &binding)?;
+    let ehr_id = binding.ehr(id).map_err(|error| stored_identifier(&error))?;
+    let container = binding
+        .container(id)
+        .map_err(|error| stored_identifier(&error))?;
+    let (version, composition) =
+        fetch(facade, client, &ehr_id, &container, &binding.template_id).await?;
+    let composition = entry_view(program, &composition, &binding, id)?;
+    let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
+    let subject = render::subject_of(facade, &ehr_id)?;
+    let rendered = render_bound(
+        facade,
+        program,
+        &composition,
+        (resource_type, id, &binding),
+        render::Origin {
+            id,
+            version: &version,
+            source: &source,
+            subject: subject.as_ref(),
+            store: facade.store(),
+        },
+    )
+    .await?;
+    Ok(Some(rendered.body))
+}
+
 /// Renders the resource `bound` names in `composition`, narrowed to the entry
 /// its binding names: the entry's own resource, or the one its parent's
 /// outbound run creates.

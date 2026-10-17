@@ -126,3 +126,74 @@ fn a_search_page_size_no_page_can_hold_refuses_to_boot() -> Result<(), Box<dyn S
     }
     Ok(())
 }
+
+#[test]
+fn by_default_the_facade_fetches_no_absolute_reference() -> Result<(), Box<dyn StdError>> {
+    // engine/references.adoc: "If not possible, the engine proceeds with the
+    // mapping", so an empty allow-list is a deployment that fetches nothing.
+    let settings = Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve()?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    assert!(facade.references.fetch_bases().is_empty());
+    assert_eq!(
+        ferrobridge_server::facade::references::DEFAULT_MAX_DEPTH,
+        facade.references.max_depth()
+    );
+    Ok(())
+}
+
+#[test]
+fn the_reference_section_resolves_its_bases_and_its_depth() -> Result<(), Box<dyn StdError>> {
+    let text = format!(
+        "{ENABLED}\n[facade.references]\nfetch_bases = [\"https://sender.invalid/fhir\"]\nmax_depth = 1\ntimeout_ms = 2500\n"
+    );
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    let bases: Vec<&str> = facade
+        .references
+        .fetch_bases()
+        .iter()
+        .map(url::Url::as_str)
+        .collect();
+    assert_eq!(vec!["https://sender.invalid/fhir"], bases);
+    assert_eq!(1, facade.references.max_depth());
+    Ok(())
+}
+
+#[test]
+fn the_reference_bases_are_set_from_the_environment() -> Result<(), Box<dyn StdError>> {
+    let environment = BTreeMap::from([(
+        String::from("FERROBRIDGE__FACADE__REFERENCES__FETCH_BASES"),
+        String::from("[\"https://sender.invalid/fhir\"]"),
+    )]);
+    let settings = Config::from_sources(Some(ENABLED), &environment)?.resolve()?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    assert_eq!(1, facade.references.fetch_bases().len());
+    Ok(())
+}
+
+#[test]
+fn a_fetch_base_that_is_no_http_base_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    for value in [
+        "ftp://sender.invalid/fhir",
+        "https://sender.invalid/fhir?x=1",
+    ] {
+        let text = format!("{ENABLED}\n[facade.references]\nfetch_bases = [\"{value}\"]\n");
+        let error = Config::from_sources(Some(&text), &BTreeMap::new())?
+            .resolve()
+            .expect_err("only an http or https base is fetched from");
+        match &error {
+            Error::FetchBase { key, value: held } => {
+                assert_eq!("facade.references.fetch_bases", key);
+                assert_eq!(value, held);
+            }
+            other => return Err(format!("expected a fetch base error, got {other:?}").into()),
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn an_unknown_reference_key_refuses_to_boot() {
+    let text = format!("{ENABLED}\n[facade.references]\nfetch_everything = true\n");
+    assert!(Config::from_sources(Some(&text), &BTreeMap::new()).is_err());
+}

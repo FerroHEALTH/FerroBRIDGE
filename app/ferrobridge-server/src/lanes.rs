@@ -334,7 +334,12 @@ async fn build_facade(
         .context("building the terminology client the facade translates through")?;
     let built = facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone())
         .with_translator(Translator::new(terminology));
-    Ok((built.with_search(search, lane.search), counts))
+    Ok((
+        built
+            .with_search(search, lane.search)
+            .with_references(lane.references.clone()),
+        counts,
+    ))
 }
 
 /// Returns the client of the `[terminology]` server, `None` when none is

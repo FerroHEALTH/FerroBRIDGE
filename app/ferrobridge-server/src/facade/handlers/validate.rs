@@ -88,16 +88,21 @@ pub(crate) async fn validate(
     // every defaulted time of one run, and this one is discarded with the
     // composition it builds.
     let now = jiff::Timestamp::now().to_string();
+    let client = facade.client_for(headers);
+    let resolved = crate::facade::references::resolve(facade, &client, inbound.document()).await;
     let built = match facade
         .translator()
         .run(Direction::ToOpenehr, |terminology| {
-            engine::inbound(
+            engine::inbound_from(
                 program.program(),
                 program.index(),
                 inbound.document(),
                 &now,
                 facade.settings(),
-                terminology,
+                fhirconnect::engine::origin::SourceItem::of(inbound.document()),
+                &fhirconnect::engine::seam::Seams::default()
+                    .with_terminology(terminology)
+                    .with_references(&resolved),
             )
         })
         .await
@@ -135,10 +140,27 @@ pub(crate) async fn validate(
             .iter()
             .map(Issue::build)
             .chain(built.warnings().iter().map(of_warning))
+            .chain(resolved.skipped().iter().map(unresolved))
             .collect(),
         ..OperationOutcome::default()
     };
     Ok(reply::built(StatusCode::OK, &outcome, &[]))
+}
+
+/// Returns the warning issue of one reference the dry run did not resolve.
+///
+/// The engine proceeds without it, as `engine/references.adoc` allows ("If not
+/// possible, the engine proceeds with the mapping"), and the issue names why.
+fn unresolved(
+    skipped: &crate::facade::references::Unresolved,
+) -> fhir_types::r4::operation_outcome::OperationOutcomeIssue {
+    Issue::warning(IssueType::NotFound)
+        .diagnosing(format!(
+            "the reference {} was not resolved, and the mapping proceeds without it: {}",
+            skipped.reference(),
+            skipped.reason()
+        ))
+        .build()
 }
 
 /// Returns where the composition would be written, as the create path would
