@@ -355,7 +355,8 @@ release_tool_pins() {
 
 if [ -f .github/workflows/release-build.yml ] || [ -f .github/workflows/release-image.yml ]; then
   agreed=0
-  for tool in cargo-auditable cargo-cyclonedx syft cargo-fuzz; do
+  release_tools=(cargo-auditable cargo-cyclonedx syft cargo-fuzz)
+  for tool in "${release_tools[@]}"; do
     want="$(pin_of "$tool" docs/VERSIONS.md)"
     found="$(release_tool_pins "$tool")"
     if [ -z "$want" ]; then
@@ -371,7 +372,7 @@ if [ -f .github/workflows/release-build.yml ] || [ -f .github/workflows/release-
       note "OK: $tool $found"
     fi
   done
-  [ "$agreed" -eq 3 ] && note "OK: all three release tool pins agree"
+  [ "$agreed" -eq "${#release_tools[@]}" ] && note "OK: all ${#release_tools[@]} release tool pins agree"
 else
   note "no release-build.yml or release-image.yml yet, skipped"
 fi
