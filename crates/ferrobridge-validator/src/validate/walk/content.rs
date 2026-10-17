@@ -206,7 +206,7 @@ impl<'i> Walk<'_, '_, 'i> {
     ) -> Result<(), ValidateError> {
         let resolved = match value.as_object() {
             Some(object) => {
-                self.extension_cursor(object, placement, (location, &cursor.structure))?
+                self.extension_cursor((value, object), placement, (location, &cursor.structure))?
             }
             None => Cursor::new(self.validator.core("Extension")?, "Extension"),
         };

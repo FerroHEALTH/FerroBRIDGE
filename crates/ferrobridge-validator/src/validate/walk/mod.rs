@@ -95,6 +95,28 @@ pub(crate) struct Held<'a> {
     pub(crate) slices: &'a [String],
 }
 
+/// An element of the instance the walk is inside: what the contexts of an
+/// extension it holds are matched against
+/// (<https://hl7.org/fhir/R4/defining-extensions.html#context>, §2.5.1.2).
+#[derive(Debug, Clone)]
+pub(crate) struct Host<'i> {
+    /// The value, absent for a primitive written only as its `_` sibling.
+    pub(crate) value: Option<&'i Value>,
+    /// The `_` sibling of a primitive.
+    pub(crate) element: Option<&'i Value>,
+    /// The element path in the base specification, the type name of a
+    /// resource.
+    pub(crate) path: &'static str,
+    /// The element path a `contentReference` of the element names.
+    pub(crate) reference: Option<&'static str>,
+    /// The type code of the occurrence.
+    pub(crate) code: Option<&'static str>,
+    /// The snapshot the element is held to.
+    pub(crate) structure: Arc<Structure>,
+    /// The ids of the element and of the slices it is held to.
+    pub(crate) ids: Vec<String>,
+}
+
 /// What every walk of one validation shares, its forks included.
 #[derive(Debug, Default)]
 struct Shared {
@@ -111,6 +133,8 @@ pub(crate) struct Walk<'v, 'set, 'i> {
     out: Collector,
     /// The resources the walk is inside, the outermost first.
     scope: Vec<&'i Value>,
+    /// The elements the walk is inside, the outermost first.
+    hosts: Vec<Host<'i>>,
     /// The locations whose coding display was already checked.
     displayed: BTreeSet<String>,
     /// The invariants already evaluated, by location, key and source.
@@ -135,6 +159,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             validator,
             out: Collector::default(),
             scope: Vec::new(),
+            hosts: Vec::new(),
             displayed: BTreeSet::new(),
             invariants: BTreeSet::new(),
             depth,
@@ -150,6 +175,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             validator: self.validator,
             out: Collector::default(),
             scope: self.scope.clone(),
+            hosts: self.hosts.clone(),
             displayed: BTreeSet::new(),
             invariants: BTreeSet::new(),
             depth: self.depth,
@@ -241,6 +267,11 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         &self.scope
     }
 
+    /// Returns the elements the walk is inside, the outermost first.
+    pub(crate) fn hosts(&self) -> &[Host<'i>] {
+        &self.hosts
+    }
+
     /// Validates `resource`, against `profile` or its core definition.
     pub(crate) fn run(
         mut self,
@@ -311,6 +342,15 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             structure = self.validator.core(name)?;
         }
         self.scope.push(value);
+        self.hosts.push(Host {
+            value: Some(value),
+            element: None,
+            path: schema.name,
+            reference: None,
+            code: Some(schema.name),
+            structure: Arc::clone(&structure),
+            ids: vec![schema.name.to_owned()],
+        });
         let walked = self.object(
             value,
             object,
@@ -319,6 +359,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             &location,
             true,
         );
+        self.hosts.pop();
         self.scope.pop();
         walked?;
         if name == "Bundle" {
@@ -510,7 +551,20 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             element,
             slices: if content == held.id { &[] } else { held.slices },
         };
-        self.occurrence(schema, field, form, occurrence, cursor, target)
+        let mut ids = vec![held.id.to_owned()];
+        ids.extend(held.slices.iter().cloned());
+        self.hosts.push(Host {
+            value: occurrence.value,
+            element: occurrence.element,
+            path: field.path,
+            reference: field.content_reference,
+            code,
+            structure: Arc::clone(&structure),
+            ids,
+        });
+        let walked = self.occurrence(schema, field, form, occurrence, cursor, target);
+        self.hosts.pop();
+        walked
     }
 
     /// Applies one element definition's own constraints to an occurrence.
@@ -576,7 +630,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
 /// The FHIR type an occurrence is evaluated as: the type a resource in a
 /// resource-typed element names for itself, the element path of a backbone
 /// element, or the type `code`.
-fn occurrence_type(value: Option<&Value>, code: Option<&str>) -> Option<String> {
+pub(crate) fn occurrence_type(value: Option<&Value>, code: Option<&str>) -> Option<String> {
     let code = code?;
     let named = value
         .filter(|_| SCHEMAS.specializes(code, "Resource"))

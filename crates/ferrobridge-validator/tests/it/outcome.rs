@@ -205,16 +205,18 @@ fn the_target_profiles_of_a_reference_outside_the_resource_are_named_unevaluated
 }
 
 #[test]
-fn the_context_of_a_resolved_extension_is_named_unevaluated() -> TestResult {
+fn the_context_of_a_resolved_extension_is_evaluated_and_not_listed() -> TestResult {
     let mut resource = patient();
     resource["extension"] = json!([{"url": format!("{BASE}flag"), "valueBoolean": true}]);
     let report = against_patient(&resource)?;
-    let context = report
-        .unevaluated()
-        .iter()
-        .find(|entry| entry.constraint == Constraint::ExtensionContext)
-        .expect("the extension context is listed");
-    assert_eq!(context.structure, format!("{BASE}flag"));
-    assert_eq!(context.location, "Patient.extension[0]");
+    assert!(
+        report
+            .unevaluated()
+            .iter()
+            .all(|entry| entry.constraint != Constraint::ExtensionContext),
+        "{:#?}",
+        report.unevaluated()
+    );
+    assert!(report.is_valid(), "{:#?}", report.issues());
     Ok(())
 }
