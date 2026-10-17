@@ -20,7 +20,6 @@ use crate::validate::slicing::path::Step;
 use crate::validate::walk::Form;
 use crate::validate::walk::Occurrence;
 use crate::validate::walk::Walk;
-use crate::validate::walk::members::upper_first;
 
 /// One node a discriminator path selects: its value, the `_` sibling of a
 /// primitive, and its type.
@@ -163,19 +162,14 @@ fn children<'i>(node: &Node<'i>, name: &str) -> Vec<Node<'i>> {
         return Vec::new();
     };
     match field.kind {
-        Kind::Choice(variants) => variants
-            .iter()
-            .flat_map(|(suffix, kind)| {
-                let code = field
-                    .types
-                    .iter()
-                    .copied()
-                    .find(|code| upper_first(code) == *suffix);
+        Kind::Choice(_) => field
+            .choices()
+            .flat_map(|choice| {
                 members(
                     object,
-                    &format!("{}{suffix}", field.name),
-                    *kind,
-                    code,
+                    &format!("{}{}", field.name, choice.suffix),
+                    choice.kind,
+                    Some(choice.code),
                     field.many,
                 )
             })

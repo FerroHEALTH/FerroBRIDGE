@@ -38,6 +38,14 @@ crates on crates.io.
   capability dropped, `no-new-privileges`, and the OIDC client secret as a
   file secret, and CI resolves the quickstart under every profile and
   dry-runs the console image build.
+- `fhir-types` 0.1.118 resolves a JSON member name against the element
+  table (#483): `TypeSchema::member` answers the element an object key
+  names, the type code a choice form such as `valueQuantity` selects, and
+  whether the key is the `_` sibling of a primitive (R4 json.html §2.6.2),
+  and `FieldSchema::choices` lists a choice element's alternatives with
+  their type codes. The profile validator uses both and drops its own
+  copy of the choice matching. The change adds API and breaks none;
+  `fhirconnect` moves to 0.1.132 with the requirement.
 
 ## [0.0.7] - 2026-10-17
 
