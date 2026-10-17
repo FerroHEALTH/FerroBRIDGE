@@ -4,8 +4,9 @@
 # The release lane. One workflow owns the `v*` tag, and every ordering in it is
 # a `needs` edge:
 #
-#   plan ── github-release (draft) ── build-binaries ─┬─ finalize-release ── crates
-#                                     └─ build-image ─┘
+#   plan ── github-release (draft) ─┬─ build-binaries ─┬─────────────── finalize-release ── crates
+#                                   │                  └─ build-image ─┘
+#                                   └─ build-viewer ───────────────────┘
 #
 # The release is created as a DRAFT, the binaries, their SBOMs and their
 # Sigstore bundles are attached to it, and only once the expected asset set is
@@ -13,7 +14,7 @@
 # never visible, and a published release is immutable, so the draft is the only
 # window the uploads have.
 #
-# build-binaries and build-image are `uses:` calls AND NOTHING ELSE, which is
+# build-binaries, build-image and build-viewer are `uses:` calls AND NOTHING ELSE, which is
 # the deliberate shape rather than an accident of tidiness. SLSA v1.2 Build
 # Level 3 requires the signing material to be out of reach of the user-defined
 # build steps, and every step of one job shares one runner VM; a reusable
@@ -60,6 +61,7 @@ jobs:
       version: ${{ steps.tag.outputs.version }}
       is-prerelease: ${{ steps.tag.outputs.is_prerelease }}
       targets: ${{ steps.workspace.outputs.targets }}
+      viewer-targets: ${{ steps.workspace.outputs.viewer_targets }}
     steps:
       - id: tag
         name: Resolve and validate the release tag
@@ -210,6 +212,14 @@ jobs:
             {"runner":"ubuntu-24.04-arm","target":"aarch64-unknown-linux-musl"}
           ]}'
           echo "targets=$(printf '%s' "$targets" | tr -d '\n ')" >> "$GITHUB_OUTPUT"
+          # The operator console ships as an image on distroless static, so its
+          # binary is built for the two static targets alone, each named by the
+          # image platform it fills.
+          viewer_targets='{"include":[
+            {"runner":"ubuntu-24.04","target":"x86_64-unknown-linux-musl","arch":"amd64"},
+            {"runner":"ubuntu-24.04-arm","target":"aarch64-unknown-linux-musl","arch":"arm64"}
+          ]}'
+          echo "viewer_targets=$(printf '%s' "$viewer_targets" | tr -d '\n ')" >> "$GITHUB_OUTPUT"
 
       - name: Upload the release notes
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -324,11 +334,28 @@ jobs:
       tag: ${{ needs.plan.outputs.tag }}
       version: ${{ needs.plan.outputs.version }}
 
+  # ---- build-viewer: the operator console's binaries, bundle and image ------
+  # A call and nothing else, for the same Build L3 reason. It attaches the
+  # console's assets to the draft, so it waits for the draft to exist.
+  build-viewer:
+    name: viewer (binaries, site bundle, image)
+    needs: [plan, github-release]
+    permissions:
+      contents: write # attach the console's assets to the draft release
+      packages: write # push the image and its attestations to GHCR
+      id-token: write # Sigstore, for the provenance and SBOM attestations
+      attestations: write # store them against this repository
+    uses: ./.github/workflows/release-viewer.yml
+    with:
+      tag: ${{ needs.plan.outputs.tag }}
+      version: ${{ needs.plan.outputs.version }}
+      targets: ${{ needs.plan.outputs.viewer-targets }}
+
   # ---- finalize-release: verify the asset set, then PUBLISH -----------------
 
   finalize-release:
     name: github release (publish)
-    needs: [plan, github-release, build-binaries, build-image]
+    needs: [plan, github-release, build-binaries, build-image, build-viewer]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -339,6 +366,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.plan.outputs.tag }}
           TARGETS: ${{ needs.plan.outputs.targets }}
+          VIEWER_TARGETS: ${{ needs.plan.outputs.viewer-targets }}
         run: |
           set -euo pipefail
           assets="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
@@ -362,6 +390,24 @@ jobs:
                 || missing="$missing ferrobridge-${TAG}-${target}${suffix}"
             done
           done < <(printf '%s' "$TARGETS" | jq -r '.include[].target')
+          # Every suffix release-viewer.yml uploads: per console target, and
+          # once for the architecture-independent site bundle.
+          while IFS= read -r target; do
+            for suffix in \
+              ".tar.gz" \
+              ".tar.gz.sha256sum" \
+              ".tar.gz.sigstore.json" \
+              ".tar.gz.sbom.sigstore.json" \
+              ".tar.gz.intoto.jsonl" \
+              ".spdx.json"; do
+              printf '%s\n' "$assets" | grep -Fxq "ferrobridge-viewer-${TAG}-${target}${suffix}" \
+                || missing="$missing ferrobridge-viewer-${TAG}-${target}${suffix}"
+            done
+          done < <(printf '%s' "$VIEWER_TARGETS" | jq -r '.include[].target')
+          for suffix in ".tar.gz" ".tar.gz.sha256sum" ".tar.gz.sigstore.json" ".tar.gz.intoto.jsonl"; do
+            printf '%s\n' "$assets" | grep -Fxq "ferrobridge-viewer-${TAG}-site${suffix}" \
+              || missing="$missing ferrobridge-viewer-${TAG}-site${suffix}"
+          done
           printf '%s\n' "$assets" | grep -Fxq "compose.yaml" || missing="$missing compose.yaml"
           if [ -n "$missing" ]; then
             echo "::error::the draft is missing assets, so it will not be published:$missing" >&2

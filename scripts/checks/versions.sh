@@ -26,10 +26,11 @@
 #                          sqlx-offline service image against the PostgreSQL
 #                          row, and the
 #                          cargo-auditable, cargo-cyclonedx and syft versions
-#                          the two release workflows install, against
+#                          the three release workflows install, against
 #                          docs/VERSIONS.md.
 #                          The operator console's build tools: cargo-leptos
-#                          and the wasm-bindgen CLI of the ci.yml viewer job,
+#                          and the wasm-bindgen CLI of the ci.yml viewer job
+#                          and of release-viewer.yml,
 #                          the wasm-bindgen crate requirement, and the
 #                          Tailwind CSS and Binaryen releases of
 #                          scripts/release/viewer-{tools,site}.sh.
@@ -38,11 +39,12 @@
 #                          docs/VERSIONS.md.
 #   7. container images    the PinnedImage constants of the testkit container
 #                          harness against the docs/VERSIONS.md image rows.
-#   8. image and compose   the FROM of docker/Dockerfile against the base-image
+#   8. image and compose   the FROM of docker/Dockerfile and of
+#                          docker/viewer/Dockerfile against the base-image
 #                          row, the compose.yaml PostgreSQL image against the
-#                          PostgreSQL row, and the compose.yaml bridge tag
-#                          against the product version and the workspace
-#                          version.
+#                          PostgreSQL row, and the compose.yaml bridge and
+#                          console tags against the product version and the
+#                          workspace version.
 #   9. vendored corpora    every docs/specs/*/PROVENANCE.md, the vendored
 #                          fixtures, the HL7 v2 message sets under
 #                          crates/ferrobridge-hl7v2/vendor/ and the
@@ -347,7 +349,7 @@ echo "== release and fuzz tool pins (.github/workflows/{release-*,fuzz}.yml <-> 
 # tool named in both files has to carry the same pin in both.
 release_tool_pins() {
   local tool="$1" wf
-  for wf in .github/workflows/release-build.yml .github/workflows/release-image.yml .github/workflows/fuzz.yml; do
+  for wf in .github/workflows/release-build.yml .github/workflows/release-image.yml .github/workflows/release-viewer.yml .github/workflows/fuzz.yml; do
     [ -f "$wf" ] || continue
     sed -nE "s|^[[:space:]]*tool:[[:space:]]*${tool}@([^[:space:]]+).*|\1|p" "$wf"
   done | sort -u
@@ -397,10 +399,19 @@ if [ -f app/ferrobridge-viewer/Cargo.toml ]; then
       note "OK: $row $found ($where)"
     fi
   }
-  for tool in cargo-leptos wasm-bindgen; do
-    found="$(sed -nE "s|^[[:space:]]*tool:[[:space:]]*$tool@([^[:space:]]+).*|\1|p" \
-      .github/workflows/ci.yml | head -n1)"
-    console_pin "$tool" "$found" .github/workflows/ci.yml
+  for wf in .github/workflows/ci.yml .github/workflows/release-viewer.yml; do
+    if [ ! -f "$wf" ]; then
+      note "no $wf yet, skipped"
+      continue
+    fi
+    for tool in cargo-leptos wasm-bindgen; do
+      found="$(sed -nE "s|^[[:space:]]*tool:[[:space:]]*$tool@([^[:space:]]+).*|\1|p" "$wf" | sort -u)"
+      if [ "$(printf '%s\n' "$found" | grep -c . || true)" -gt 1 ]; then
+        bad "$tool: $wf installs more than one version ($(printf '%s' "$found" | tr '\n' ' '))"
+        continue
+      fi
+      console_pin "$tool" "$found" "$wf"
+    done
   done
   console_pin wasm-bindgen "$(manifest_req wasm-bindgen)" "the root Cargo.toml"
   console_pin "Tailwind CSS" "$(shell_pin tailwind_version scripts/release/viewer-tools.sh)" \
@@ -481,33 +492,38 @@ else
   note "no $harness yet, skipped"
 fi
 
-echo "== container recipe and quickstart (docker/Dockerfile, compose.yaml <-> docs/VERSIONS.md)"
-if [ -f docker/Dockerfile ] && [ -f docs/VERSIONS.md ]; then
-  base="$(sed -nE 's|^FROM[[:space:]]+([^[:space:]]+).*|\1|p' docker/Dockerfile | head -n1)"
+echo "== container recipes and quickstart (docker/Dockerfile, docker/viewer/Dockerfile, compose.yaml <-> docs/VERSIONS.md)"
+# The bridge image and the console image build on the one base the matrix
+# pins, so a bump moves both FROM lines or this fails.
+for recipe in docker/Dockerfile docker/viewer/Dockerfile; do
+  if [ ! -f "$recipe" ] || [ ! -f docs/VERSIONS.md ]; then
+    note "no $recipe yet, skipped"
+    continue
+  fi
+  base="$(sed -nE 's|^FROM[[:space:]]+([^[:space:]]+).*|\1|p' "$recipe" | head -n1)"
   want_base="$(pin_of "Container base image" docs/VERSIONS.md)"
   if [ -z "$base" ]; then
-    bad "docker/Dockerfile has no FROM"
+    bad "$recipe has no FROM"
   elif [ -z "$want_base" ]; then
     bad "docs/VERSIONS.md has no 'Container base image' row"
   elif [ "$base" != "$want_base" ]; then
-    bad "base image: docker/Dockerfile builds on $base, docs/VERSIONS.md pins $want_base"
+    bad "base image: $recipe builds on $base, docs/VERSIONS.md pins $want_base"
   else
-    note "OK: the base image is $base"
+    note "OK: $recipe builds on $base"
   fi
   # The digest belongs to the FROM alone; the base.name label names the tag it
   # came from, so a bump that moves one and not the other is caught here.
-  label_base="$(sed -nE 's|.*org\.opencontainers\.image\.base\.name="([^"]+)".*|\1|p' docker/Dockerfile | head -n1)"
+  label_base="$(sed -nE 's|.*org\.opencontainers\.image\.base\.name="([^"]+)".*|\1|p' "$recipe" | head -n1)"
   if [ -n "$label_base" ] && [ "${base%%@*}" != "$label_base" ]; then
-    bad "base image: the base.name label says $label_base, the FROM is ${base%%@*}"
+    bad "base image: the base.name label of $recipe says $label_base, the FROM is ${base%%@*}"
   fi
-else
-  note "no docker/Dockerfile yet, skipped"
-fi
+done
 
 if [ -f compose.yaml ] && [ -f docs/VERSIONS.md ]; then
-  # Every ferrobridge image reference in the quickstart carries the same tag
-  # default, so the set is collapsed and a second value is drift by itself.
-  tags="$(sed -nE 's|^[[:space:]]*image:[[:space:]]*ghcr\.io/ferrohealth/ferrobridge:\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]+)\}[[:space:]]*$|\1|p' compose.yaml | sort -u)"
+  # Every ferrobridge image reference in the quickstart, the console's
+  # included, carries the same tag default, so the set is collapsed and a
+  # second value is drift by itself.
+  tags="$(sed -nE 's|^[[:space:]]*image:[[:space:]]*ghcr\.io/ferrohealth/ferrobridge(-viewer)?:\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]+)\}[[:space:]]*$|\2|p' compose.yaml | sort -u)"
   count="$(printf '%s\n' "$tags" | grep -c . || true)"
   matrix_product="$(pin_of "Product version" docs/VERSIONS.md)"
   if [ "$count" -eq 0 ]; then

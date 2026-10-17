@@ -24,11 +24,13 @@ flowchart LR
   draft --> b2["binaries<br/>x86_64 musl"]
   draft --> b3["binaries<br/>aarch64 gnu"]
   draft --> b4["binaries<br/>aarch64 musl"]
+  draft --> viewer["viewer<br/>binaries, site bundle, image"]
   b2 --> image["image<br/>linux/amd64, linux/arm64"]
   b4 --> image
   b1 --> publish["finalize-release<br/>asset set, then publish"]
   b3 --> publish
   image --> publish
+  viewer --> publish
   publish --> crates["crates.io<br/>approval-gated"]
 ```
 
@@ -48,6 +50,10 @@ flowchart LR
 - **build-image** calls `release-image.yml` once the musl binaries exist, and
   builds `ghcr.io/ferrohealth/ferrobridge` for `linux/amd64` and `linux/arm64`
   from them.
+- **build-viewer** calls `release-viewer.yml` once the draft exists. It
+  builds the operator console's musl binaries and its site bundle, attaches
+  them to the draft, and builds `ghcr.io/ferrohealth/ferrobridge-viewer` for
+  `linux/amd64` and `linux/arm64` from them.
 - **finalize-release** checks that the draft carries every asset this version
   promises, then publishes. Publishing last means a half-assembled release is
   never visible. A pre-release publishes with `--latest=false`, so it never
@@ -79,9 +85,15 @@ nothing else reaches the builder, and `.gitignore` keeps the staged tree out of
 git. The same two commands reproduce the build on a laptop from a locally
 cross-compiled binary.
 
-## Why the two build jobs are reusable workflows
+`docker/viewer/Dockerfile`, the operator console's recipe, compiles nothing
+either. It copies `dist/viewer/${TARGETOS}_${TARGETARCH}/ferrobridge-viewer`
+and the site bundle at `dist/viewer/site/`, which `release-viewer.yml`
+stages from its own attested tarballs. The same `.dockerignore` applies.
 
-`build-binaries` and `build-image` carry a `uses:` line and nothing else. That
+## Why the build jobs are reusable workflows
+
+`build-binaries`, `build-image` and `build-viewer` carry a `uses:` line and
+nothing else. That
 shape is load-bearing.
 
 SLSA v1.2 Build Level 3 requires that the secret material authenticating the
@@ -174,6 +186,42 @@ platform manifest. The lane then verifies its own output the way a consumer
 would, so a broken attestation fails the release instead of the first
 deployment.
 
+## What release-viewer.yml produces
+
+The console ships as an image on distroless static, so its binary is built
+for the two musl targets alone, `x86_64-unknown-linux-musl` and
+`aarch64-unknown-linux-musl`, each on a runner of its own architecture. The
+`plan` job names them once, and both the viewer lane's matrix and the asset
+check read that list. The site bundle is the same for every architecture and
+is built once, by `scripts/release/viewer-site.sh` with the tools
+`scripts/release/viewer-tools.sh` installs at their pinned digests, so
+cargo-leptos downloads nothing in the attested job. No job restores a cache.
+
+Every name below is prefixed `ferrobridge-viewer-vX.Y.Z-`:
+
+| Asset | What it is |
+|---|---|
+| `<target>.tar.gz` | the stripped console binary with `LICENSE`, `NOTICE` and the console's `README.md` |
+| `<target>.tar.gz.sha256sum` | corruption detection, and not a signature |
+| `<target>.spdx.json` | the syft SBOM of the shipped binary, read from its `.dep-v0` section |
+| `<target>.tar.gz.sigstore.json` | the Sigstore bundle of the build provenance |
+| `<target>.tar.gz.sbom.sigstore.json` | the Sigstore bundle of the SBOM attestation |
+| `<target>.tar.gz.intoto.jsonl` | the provenance DSSE envelope |
+| `site.tar.gz` | the site bundle: the WebAssembly, its JavaScript glue and the stylesheet under `site/pkg/` |
+| `site.tar.gz.sha256sum` | corruption detection, and not a signature |
+| `site.tar.gz.sigstore.json` | the Sigstore bundle of the bundle's provenance |
+| `site.tar.gz.intoto.jsonl` | the provenance DSSE envelope |
+
+`finalize-release` checks the whole set beside the bridge's. The image job
+takes the tarballs from this run's artifacts, verifies each against
+`release-viewer.yml`'s own signer identity, stages them for
+`docker/viewer/Dockerfile`, and from there runs the steps `release-image.yml`
+runs: one buildx build for both platforms with no QEMU, the version and, for
+a release that is not a pre-release, the major.minor and `latest` tags, five
+attestations pushed as OCI referrers (provenance for the index, provenance
+plus an SPDX SBOM per platform manifest), and a verification of its own
+output as a consumer would run it.
+
 ## The pre-release rule
 
 A tag carrying a suffix after a hyphen (`v0.0.2-rc.1`) is a pre-release, and a
@@ -192,7 +240,8 @@ before a real cut.
 2. **The version moves in every file the pin matrix names:** the root
    `Cargo.toml` `[workspace.package]` `version`, `CITATION.cff`, the
    product-version row of `docs/VERSIONS.md`, and the
-   `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml`.
+   `ghcr.io/ferrohealth/ferrobridge` and `ghcr.io/ferrohealth/ferrobridge-viewer`
+   image tag defaults in `compose.yaml`.
    `scripts/checks/versions.sh` fails on any file left behind, and the `plan`
    job checks the first three against the tag and refuses the release when one
    of them is missing.
@@ -231,9 +280,11 @@ unsigned tag is refused at push time. `release.yml` takes it from there.
 2. **Verify one asset and the image as a stranger would**, with the commands in
    `SECURITY.md`. The image lane already ran them against its own output, so
    this confirms the published release rather than the run.
-3. **The GHCR package is public.** A package pushed for the first time is
+3. **The GHCR packages are public.** A package pushed for the first time is
    private, which hides the image from everyone and breaks a
-   `docker pull`. The owner sets it public once, in the package settings.
+   `docker pull`. The owner sets each one public once, in the package
+   settings: `ferrobridge`, and `ferrobridge-viewer` after the first release
+   that carries the console.
 4. **Post the board status update** with what shipped and what the next
    milestone targets (`.claude/rules/project-board.md`).
 5. **Close the milestone.** It is empty by step 1 of the cut, and a released

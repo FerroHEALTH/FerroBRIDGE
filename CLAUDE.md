@@ -221,10 +221,13 @@ the testkit tool crate. Beside it:
   dependency closure is complete.
 - `docker/Dockerfile`: the container recipe (#22), one stage on distroless
   static pinned by index digest, copying the binary the release lane stages
-  under `dist/<os>_<arch>/`; it compiles nothing.
+  under `dist/<os>_<arch>/`; it compiles nothing. `docker/viewer/Dockerfile`
+  is the operator console's recipe (#603) on the same base, copying the
+  console binary and site bundle staged under `dist/viewer/`.
 - `compose.yaml`: the quickstart that runs the published image with the
-  hardening set, file secrets, and the `cdm`, `cdm-init` and `vocab-load`
-  profiles over the pinned PostgreSQL.
+  hardening set, file secrets, the `cdm`, `cdm-init` and `vocab-load`
+  profiles over the pinned PostgreSQL, and the `viewer` profile that runs
+  the operator console beside the bridge.
 - `.claude/`: the working discipline. `rules/` (the path-scoped and standing
   rules), `hooks/`, `skills/`, `agents/`, `memory/`.
 - `scripts/gh/`: the tracker helpers (`rel.sh`, `project.sh`, `fields.sh`, `watch-prs.sh`,
@@ -247,17 +250,19 @@ the testkit tool crate. Beside it:
   CI lanes a pull request runs, and `fast.sh` is the default local gate over
   the same set (`docs/ci-cd.md`).
 - `.github/`: issue and pull-request templates, CODEOWNERS, Dependabot, and
-  ten workflows (CI, Docs, Scorecard, CodeQL, SonarQube Cloud, Release,
-  Release build, Release image, Publish crates, Pin freshness). `ci.yml` runs
+  twelve workflows (CI, Docs, Scorecard, CodeQL, SonarQube Cloud, Release,
+  Release build, Release image, Release viewer, Publish crates, Pin
+  freshness, Fuzz). `ci.yml` runs
   its workflow, shell, container and guard tier beside the Rust tier; its
   `conclusion` job is the single required check on `main` (`docs/ci-cd.md`).
   `release.yml` is dormant until a `v*` tag is pushed and cuts a release from
   the changelog section, and its `crates` leg publishes the library crates
-  through Trusted Publishing. `release-build.yml` and `release-image.yml` are
-  the two reusable workflows it calls, which is what puts the signing identity
-  out of reach of caller-defined steps (SLSA Build Level 3); they produce the
-  attested tarballs, the two SBOMs per target and the multi-platform GHCR image
-  (`docs/release.md`). `pin-freshness.yml` reads every pin no Dependabot
+  through Trusted Publishing. `release-build.yml`, `release-image.yml` and
+  `release-viewer.yml` are the three reusable workflows it calls, which is
+  what puts the signing identity out of reach of caller-defined steps (SLSA
+  Build Level 3); they produce the attested tarballs, the SBOMs per target,
+  and the multi-platform GHCR images of the bridge and of the operator
+  console (`docs/release.md`). `pin-freshness.yml` reads every pin no Dependabot
   ecosystem covers against its newest upstream release each week.
 - Root markdown: this file, `README.md`, and the community and governance set.
 
