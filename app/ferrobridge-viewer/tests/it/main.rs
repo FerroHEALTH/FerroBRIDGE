@@ -28,3 +28,4 @@ mod shell;
 mod sign_in;
 mod sign_out;
 mod support;
+mod tools;

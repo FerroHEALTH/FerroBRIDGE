@@ -61,7 +61,6 @@ pub struct Group {
 }
 
 /// The navigation, in the order it is drawn.
-// TODO(#605): the Tools group lists the transform playground and the validation dry run.
 pub const NAVIGATION: [Group; 4] = [
     Group {
         id: "nav-overview",
@@ -88,7 +87,16 @@ pub const NAVIGATION: [Group; 4] = [
     Group {
         id: "nav-tools",
         title: "Tools",
-        entries: &[],
+        entries: &[
+            Entry {
+                href: crate::tools::PLAYGROUND,
+                label: "Transform playground",
+            },
+            Entry {
+                href: crate::tools::VALIDATE,
+                label: "Validation dry run",
+            },
+        ],
     },
     Group {
         id: "nav-bridge",

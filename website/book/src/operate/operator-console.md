@@ -96,6 +96,21 @@ may write it, and how many diagnostics it has. Following one shows the file
 as the bridge serves it, byte for byte, with numbered lines, highlighted
 YAML, its SHA-256, and the diagnostics beside it, each linked to its line.
 
+Two tools run the bridge's operations as the operator, and keep nothing:
+
+- **Transform playground** (`/playground`): `$tofhir` turns a canonical or
+  FLAT composition into the `Bundle` the running programs map it to, with
+  an optional template id and `context.patient` reference. `$toopenehr`
+  turns a `Bundle` into a canonical or FLAT composition.
+- **Validation dry run** (`/validate`): `$validate` on a resource type the
+  `CapabilityStatement` declares it on, which commits nothing. The issues
+  appear errors first.
+
+What you enter goes to the bridge in the request body alone, never in an
+address or the browser's history, and the console logs none of it. The
+operations lane must be on for the playground; when it is off, the
+playground shows the bridge's `404`.
+
 The mapping counts, the overview and the files read the operator API, so they need
 `[operator] enabled = true` on the bridge and an operator token that
 carries the operator scope. Without either, those sections show the

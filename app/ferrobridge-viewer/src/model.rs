@@ -45,6 +45,27 @@ pub enum Refusal {
     },
 }
 
+impl std::fmt::Display for Refusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Bridge {
+                status,
+                diagnostics,
+            } => {
+                write!(f, "{status}: the bridge refused the request.")?;
+                for text in diagnostics {
+                    write!(f, " {text}")?;
+                }
+                Ok(())
+            }
+            Self::NotAuthenticated => {
+                f.write_str("401: the bridge did not accept your sign-in. Sign in again.")
+            }
+            Self::Invalid { reason } => f.write_str(reason),
+        }
+    }
+}
+
 /// A fault of the console: its session, its reach to the bridge, or a body
 /// it cannot read.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
@@ -61,6 +82,10 @@ pub enum ViewError {
     /// The bridge gave no answer at all.
     #[error("the bridge could not be reached")]
     Unreachable,
+    /// A plain form post, which a page sends before its bundle has loaded,
+    /// asked a tool for an answer no page would show.
+    #[error("the tool runs once its page has loaded; reload the page and run it again")]
+    PlainPost,
     /// The console could not serve the view.
     #[error("the console could not serve this view")]
     Unavailable,
@@ -184,7 +209,15 @@ pub mod server {
                     "the mapping file path is not plain names below a root, so it is not asked for",
                 ),
             }),
-            BridgeError::Route { .. } | BridgeError::Token => {
+            BridgeError::ResourceType => Ok(Refusal::Invalid {
+                reason: String::from(
+                    "the resource type is not a FHIR resource type name, so it is not asked for",
+                ),
+            }),
+            BridgeError::Route { .. }
+            | BridgeError::Token
+            | BridgeError::Encode { .. }
+            | BridgeError::Number { .. } => {
                 tracing::error!(error = %crate::command::chain(error), "a request to the bridge could not be sent");
                 Err(ViewError::Unavailable)
             }
