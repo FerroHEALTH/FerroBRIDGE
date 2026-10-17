@@ -432,6 +432,9 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         cursor: &Cursor,
         location: &str,
     ) -> Result<(), ValidateError> {
+        if let Some(base) = self.base_cursor(schema, field, cursor)? {
+            return self.field(object, schema, field, &base, location);
+        }
         let forms = forms(field, object);
         if forms.len() > 1 {
             self.out.issue(
@@ -511,6 +514,31 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             }
         }
         Ok(())
+    }
+
+    /// Returns the cursor `field` is walked with when the snapshot `cursor`
+    /// holds defines no element for it: the core definition of the type that
+    /// declares the field, at the parent's path.
+    fn base_cursor(
+        &self,
+        schema: &'static TypeSchema,
+        field: &'static FieldSchema,
+        cursor: &Cursor,
+    ) -> Result<Option<Cursor>, ValidateError> {
+        if cursor.structure.mentions(
+            &format!("{}.{}", cursor.prefix, field.name),
+            matches!(field.kind, Kind::Choice(_)),
+        ) {
+            return Ok(None);
+        }
+        let root = schema.path.split('.').next().unwrap_or(schema.path);
+        let core = self.validator.core(root)?;
+        if Arc::ptr_eq(&core, &cursor.structure) {
+            return Ok(None);
+        }
+        // NOTE: structuredefinition-definitions.html#StructureDefinition.snapshot: a snapshot is
+        // "standalone"; one that omits a child is completed by the core definition, our own design.
+        Ok(Some(Cursor::new(core, schema.path)))
     }
 
     /// Holds one occurrence to its member's element and to every slice it

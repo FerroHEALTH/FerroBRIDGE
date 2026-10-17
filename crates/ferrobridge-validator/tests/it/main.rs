@@ -23,6 +23,7 @@ mod extensions;
 mod invariants;
 mod outcome;
 mod packages;
+mod partial;
 mod resolve;
 mod scope;
 mod slicing;

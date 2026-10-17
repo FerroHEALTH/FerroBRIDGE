@@ -60,6 +60,13 @@ crates on crates.io.
   copy of the choice matching. The change adds API and breaks none;
   `fhirconnect` moves to 0.1.132 with the requirement.
 
+### Fixed
+
+- The profile validator holds a child that a profile's snapshot leaves out
+  to the core definition of the type declaring it (#484), so the core
+  bindings, invariants and fixed values of that child apply. Before, a
+  partial snapshot left such a child with no element definition at all.
+
 ## [0.0.7] - 2026-10-17
 
 ### Changed
