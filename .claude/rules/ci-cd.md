@@ -32,9 +32,9 @@ Ten workflows:
   the repository's security posture, published to the OpenSSF API and to code
   scanning.
 - `.github/workflows/codeql.yml`: CodeQL over the `actions` language, because
-  the workflows in this directory are code that holds tokens. The Rust
-  analysis is behind a detection job that looks for a root `Cargo.toml`, so it
-  is skipped cleanly until the workspace lands and then activates by itself.
+  the workflows in this directory are code that holds tokens, and over Rust,
+  which on a pull request runs only when the change touches Rust and leaves
+  out the generated trees (`docs/ci-cd.md`).
 - `.github/workflows/sonar.yml`: SonarQube Cloud, the multi-language sweep
   over shell, YAML, and JSON. Advisory, gating no merge
   (`ai-code-review.md`). The instrumented coverage run and the
