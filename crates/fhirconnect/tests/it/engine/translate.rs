@@ -6,9 +6,9 @@
 //! `ConceptMap/$translate`
 //! (<https://hl7.org/fhir/R4/conceptmap-operation-translate.html>).
 
-use core::cell::RefCell;
 use core::error::Error;
 use std::collections::BTreeMap;
+use std::sync::Mutex;
 
 use fhir_types::codec::Path;
 use fhir_types::codec::Value;
@@ -68,7 +68,7 @@ type Received = (Option<String>, Option<String>, Option<String>);
 #[derive(Debug, Default)]
 struct StubTerminology {
     answers: BTreeMap<(String, String, String), Vec<(String, Coding)>>,
-    received: RefCell<Vec<Received>>,
+    received: Mutex<Vec<Received>>,
 }
 
 impl StubTerminology {
@@ -90,7 +90,10 @@ impl StubTerminology {
 
     /// Returns the requests the stub received, in order.
     fn received(&self) -> Vec<Received> {
-        self.received.borrow().clone()
+        self.received
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 }
 
@@ -103,7 +106,8 @@ impl Terminology for StubTerminology {
         let system = request.system.as_ref().and_then(|uri| uri.value.clone());
         let code = request.code.as_ref().and_then(|code| code.value.clone());
         self.received
-            .borrow_mut()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push((url.clone(), system.clone(), code.clone()));
         let key = (
             url.unwrap_or_default(),

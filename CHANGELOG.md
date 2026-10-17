@@ -30,6 +30,15 @@ crates on crates.io.
   `mappings::compile` (#725): one read, one template resolution from the
   template directory or the CDR, one compile loop. The boot refusals are
   unchanged.
+- `fhirconnect` 0.1.131: the four seam traits, `ReferenceSource`,
+  `IdentitySink`, `Terminology` and `MappingFunctions`, require
+  `Send + Sync`, and a compile-time assertion keeps `Seams` `Send`, so an
+  async caller holds the seams of a run across an `.await` (#764). This
+  breaks the crate's public API: an implementation that holds a `Cell` or a
+  `RefCell` moves to a `Mutex` or an atomic. The facade's transaction path
+  now looks a reference up in the Bundle's own entries through
+  `BundleReferences` instead of copying them into its resolved set.
+
 - A facade search lists every resource a `hierarchy.split` with
   `create: resource` creates beside the entry's own resource, each once
   (#731). A page holds at most `_count` resources and may end between two

@@ -3,9 +3,9 @@
 
 //! The `reference` mappings, resolved going in and created going out.
 
-use core::cell::RefCell;
 use core::error::Error;
 use std::collections::BTreeMap;
+use std::sync::Mutex;
 
 use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
@@ -217,7 +217,7 @@ fn a_reference_out_of_openehr_creates_the_resource_the_sink_names() -> Result<()
     );
     let identities = MapIdentities {
         ids,
-        seen: RefCell::default(),
+        seen: Mutex::default(),
     };
     let outbound = to_fhir(
         &program,
@@ -252,7 +252,7 @@ fn a_reference_out_of_openehr_creates_the_resource_the_sink_names() -> Result<()
         Some("Synthetic evidence one"),
         "the created Observation carries what its mappings read"
     );
-    let seen = identities.seen.borrow();
+    let seen = identities.seen.lock().expect("the stub lock holds");
     assert_eq!(
         seen.iter()
             .map(IdentityRequest::resource_type)

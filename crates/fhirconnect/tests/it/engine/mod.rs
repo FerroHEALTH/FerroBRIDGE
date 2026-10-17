@@ -20,10 +20,10 @@ mod split;
 mod tail;
 mod translate;
 
-use core::cell::RefCell;
 use core::error::Error;
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
@@ -165,12 +165,15 @@ impl ReferenceSource for MapReferences {
 #[derive(Debug, Default)]
 struct MapIdentities {
     ids: BTreeMap<String, String>,
-    seen: RefCell<Vec<IdentityRequest>>,
+    seen: Mutex<Vec<IdentityRequest>>,
 }
 
 impl IdentitySink for MapIdentities {
     fn identify(&self, request: &IdentityRequest) -> Result<String, ReferenceError> {
-        self.seen.borrow_mut().push(request.clone());
+        self.seen
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(request.clone());
         self.ids
             .get(request.resource_type())
             .cloned()

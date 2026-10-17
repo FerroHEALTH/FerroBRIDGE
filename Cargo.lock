@@ -1581,7 +1581,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.130"
+version = "0.1.131"
 dependencies = [
  "ferrobridge-testkit",
  "fhir-types",
