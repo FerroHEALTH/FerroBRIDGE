@@ -96,14 +96,44 @@ lint_weight() {
   esac
 }
 
-# The packages scripts/checks/conformance.sh runs, read from its own loop so
-# the two lists cannot disagree.
+# The `corpus package` pairs of the corpus table in
+# scripts/checks/conformance.sh, read from the script so the two cannot
+# disagree.
+conformance_rows() {
+  local rows
+  rows="$(sed -n "s/^  '\([a-z0-9-]*\) \([a-z0-9-]*\) conformance_[a-z0-9_]*'\$/\1 \2/p" \
+    scripts/checks/conformance.sh)"
+  [ -n "$rows" ] || die "scripts/checks/conformance.sh has no corpus table to read"
+  printf '%s\n' "$rows"
+}
+
+# The packages scripts/checks/conformance.sh runs, each once, space-separated.
 conformance_packages() {
-  local line
-  line="$(grep -E '^for package in ' scripts/checks/conformance.sh)" ||
-    die "scripts/checks/conformance.sh has no 'for package in' loop to read"
-  line="${line#for package in }"
-  echo "${line%%;*}"
+  conformance_rows | awk '!seen[$2]++ { printf "%s%s", sep, $2; sep = " " } END { print "" }'
+}
+
+# The class of a path under conformance/ that belongs to corpus $1: the tests
+# of the package that measures it, or every conformance package when no
+# corpus has that name.
+corpus_class() {
+  local package
+  package="$(conformance_rows | awk -v corpus="$1" '$1 == corpus { print $2 }')"
+  if [ -n "$package" ]; then
+    echo "only $package"
+  else
+    echo "packages $(conformance_packages)"
+  fi
+}
+
+# The corpus a badge file under conformance/badges/ is rendered from; the
+# family and version badges count the HL7 v2 corpora, measured by one package.
+badge_corpus() {
+  local name="${1##*/}"
+  name="${name%.json}"
+  case "$name" in
+    hl7v2-family-* | hl7v2-version-*) echo hl7v2 ;;
+    *) echo "$name" ;;
+  esac
 }
 
 # How one changed path is classified: `inert` (no cargo result reads it),
@@ -137,7 +167,11 @@ classify() {
     scripts/checks/pin-freshness.sh | scripts/checks/versions.sh) echo inert ;;
     scripts/checks/todo-issues.sh) echo inert ;;
     # The pass lists, the badges and the README badge block are read by the
-    # conformance tests and scripts/checks/conformance.sh alone.
+    # conformance tests and scripts/checks/conformance.sh alone: a corpus's
+    # list and badge by the one package that measures it, the script and the
+    # README block by every conformance package.
+    conformance/badges/*) corpus_class "$(badge_corpus "$1")" ;;
+    conformance/*/*) corpus_class "$(cut -d/ -f2 <<<"$1")" ;;
     conformance/* | scripts/checks/conformance.sh | README.md) echo "packages $(conformance_packages)" ;;
     scripts/checks/sqlx-offline.sh) echo "packages omop-cdm" ;;
     crates/* | app/* | tools/*) echo member ;;
@@ -477,8 +511,23 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+ferrobridge-testkit +openehr-mapping-core +omocl +omop-cdm +ferrobridge-server -fhir-types -fhir-codegen"
   check "the sqlx script reaches omop-cdm" "scripts/checks/sqlx-offline.sh" false \
     "+omop-cdm +omocl +ferrobridge-server"
-  check "a pass list reaches the conformance packages" "conformance/omocl/pass-list.txt" false \
-    "$(for p in $(conformance_packages); do printf '+%s ' "$p"; done)-fhir-codegen"
+  local every_corpus_package
+  every_corpus_package="$(for p in $(conformance_packages); do printf '+%s ' "$p"; done)-fhir-codegen"
+  check "the conformance script reaches every conformance package" "scripts/checks/conformance.sh" false \
+    "$every_corpus_package"
+  check "the README badge block reaches every conformance package" "README.md" false "$every_corpus_package"
+  check "a corpus directory no corpus names reaches every conformance package" \
+    "conformance/new-corpus/pass-list.txt" false "$every_corpus_package"
+  check "a pass list reaches only the package that measures it" "conformance/omocl/pass-list.txt" false \
+    "+omocl -fhirconnect -ferrobridge-hl7v2 -ferrobridge-testkit -ferrobridge-server -ferrobridge-fhirpath"
+  check "the facade pass list reaches only the server" "conformance/fhir-r4-facade/PROVENANCE.md" false \
+    "+ferrobridge-server -fhirconnect -ferrobridge-testkit -ferrobridge-hl7v2"
+  check "a model corpus list reaches only the testkit" "conformance/fhir-r4b/pass-list.txt" false \
+    "+ferrobridge-testkit -fhirconnect -ferrobridge-server -omocl"
+  check "a corpus badge reaches only the package that measures it" "conformance/badges/roundtrip.json" false \
+    "+fhirconnect -ferrobridge-server -omocl -ferrobridge-testkit"
+  check "an HL7 v2 family badge reaches only the HL7 v2 package" "conformance/badges/hl7v2-family-adt.json" false \
+    "+ferrobridge-hl7v2 -ferrobridge-server -fhirconnect -ferrobridge-testkit"
   local all_members
   all_members="$(jq -r '[.members[].name] | join(" ")' <<<"$graph")"
   # Every member lands in exactly one shard of each full matrix.

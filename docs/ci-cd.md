@@ -80,7 +80,8 @@ A changed path reaches packages in one of these ways:
 | a file under a member's directory (`crates/*`, `app/*`, `tools/*`) | that member, every member whose Rust source names that directory in a string literal (`"tools/fhir-codegen/vendor"`, `"../../crates/omop-cdm"`), then their normal and build dependants transitively, then the dev-dependants of all of those |
 | the root `Cargo.toml` | a line that is a member's own `[workspace.dependencies]` entry reaches that member; any other line (a third-party requirement, a profile, a lint) reaches everything |
 | `Cargo.lock` | a moved entry without a `source` (a member's version) reaches that member; a moved third-party entry reaches everything |
-| `conformance/**`, `scripts/checks/conformance.sh`, `README.md` | the packages `conformance.sh` runs (read from its own loop) |
+| `conformance/<corpus>/**` and that corpus's badge under `conformance/badges/` | the tests of the one package that measures the corpus (read from the corpus table in `conformance.sh`); the HL7 v2 family and version badges count as the `hl7v2` corpus |
+| `scripts/checks/conformance.sh`, `README.md`, a `conformance/` path no corpus names | the packages `conformance.sh` runs |
 | `docs/VERSIONS.md` | `ferrobridge-testkit`, and through it every member testing with it (`matrix_pin`) |
 | `docs/architecture.md` | the testkit's own tests |
 | `scripts/checks/sqlx-offline.sh` | `omop-cdm` |
