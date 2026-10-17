@@ -85,7 +85,8 @@ pub(crate) async fn read(
             subject: subject.as_ref(),
             store: facade.store(),
         },
-    )?;
+    )
+    .await?;
     render::log_outcome(&rendered);
     Ok(reply::resource(
         StatusCode::OK,
@@ -174,7 +175,8 @@ pub(crate) async fn vread(
             subject: subject.as_ref(),
             store: facade.store(),
         },
-    )?;
+    )
+    .await?;
     render::log_outcome(&rendered);
     Ok(reply::resource(
         StatusCode::OK,
@@ -190,7 +192,7 @@ pub(crate) async fn vread(
 /// A created resource is answered by running the parent's mapping again with
 /// the parent as the origin and picking the created resource of the id asked
 /// for (no specification governs this: our own design).
-pub(crate) fn render_bound(
+pub(crate) async fn render_bound(
     facade: &Facade,
     program: &Loaded,
     composition: &CanonicalComposition,
@@ -199,7 +201,14 @@ pub(crate) fn render_bound(
 ) -> Result<render::Rendered, Refusal> {
     let (resource_type, internal, binding) = bound;
     let Some(ref created) = binding.created else {
-        return render::render(program.program(), program.index(), composition, origin);
+        return render::render(
+            program.program(),
+            program.index(),
+            composition,
+            origin,
+            facade.translator(),
+        )
+        .await;
     };
     let parent = created
         .parent()
@@ -227,7 +236,9 @@ pub(crate) fn render_bound(
             ..origin
         },
         (resource_type, internal),
+        facade.translator(),
     )
+    .await
 }
 
 /// Reads one request body as a resource of `resource_type`.

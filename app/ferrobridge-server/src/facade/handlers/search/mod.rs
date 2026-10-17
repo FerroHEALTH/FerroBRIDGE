@@ -401,7 +401,7 @@ async fn page(
                     if !held.insert((current.version.clone(), entry.ordinal())) {
                         continue;
                     }
-                    for unit in render_entry(facade, client, plan, &read, &entry)? {
+                    for unit in render_entry(facade, client, plan, &read, &entry).await? {
                         if skip > 0 {
                             skip = skip.saturating_sub(1);
                             current.answered = current.answered.saturating_add(1);
@@ -596,7 +596,7 @@ async fn rows_of(
 /// the identity map holds: the entry's own resource and every resource of
 /// the searched type its mapping creates ([`render::render_units`]), each
 /// kept when it carries an id every `_id` occurrence names.
-fn render_entry(
+async fn render_entry(
     facade: &Facade,
     client: &CdrClient,
     plan: &Plan<'_>,
@@ -630,7 +630,9 @@ fn render_entry(
             subject: subject.as_ref(),
             store: facade.store(),
         },
-    )?;
+        facade.translator(),
+    )
+    .await?;
     let mut matches = Vec::with_capacity(units.len());
     for (unit, rendered) in units {
         render::log_outcome(&rendered);

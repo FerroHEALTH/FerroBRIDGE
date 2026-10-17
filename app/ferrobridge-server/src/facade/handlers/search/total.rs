@@ -177,8 +177,11 @@ async fn count_entries(
             for entry in matched(plan, &read, row, position)? {
                 let fresh = counted.insert((read.version.value().to_owned(), entry.ordinal()));
                 if fresh && by_resource {
-                    resources = resources
-                        .saturating_add(render_entry(facade, client, plan, &read, &entry)?.len());
+                    resources = resources.saturating_add(
+                        render_entry(facade, client, plan, &read, &entry)
+                            .await?
+                            .len(),
+                    );
                 }
             }
         }

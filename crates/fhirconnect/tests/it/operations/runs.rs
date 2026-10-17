@@ -11,7 +11,7 @@ use fhir_types::codec::Path;
 use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
-use fhirconnect::engine::traverse::functions::NoMappingFunctions;
+use fhirconnect::engine::seam::Seams;
 use fhirconnect::operations::contract::CompositionPayload;
 use fhirconnect::operations::contract::Format;
 use fhirconnect::operations::contract::ToFhirRequest;
@@ -50,7 +50,7 @@ fn a_split_answers_every_created_resource_as_an_entry() -> Result<(), Box<dyn Er
     let inbound = run::to_openehr(
         &set,
         &SCHEMAS,
-        &NoMappingFunctions,
+        &Seams::default(),
         &settings(),
         &ToOpenehrRequest::new(bundle(vec![resource])?),
     )?;
@@ -62,7 +62,7 @@ fn a_split_answers_every_created_resource_as_an_entry() -> Result<(), Box<dyn Er
         );
     }
     let request = ToFhirRequest::new(CompositionPayload::parse(&built.to_string())?);
-    let answer = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let answer = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     let conditions: Vec<String> = answer
         .bundle()
         .entry
@@ -97,7 +97,7 @@ fn the_diagnosis_chain_maps_both_ways_through_the_operations() -> Result<(), Box
     let set = program_set(&[SUBJECT_CONTEXT])?;
     let committed = committed_composition()?;
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?);
-    let answer = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let answer = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     let carried = answer.bundle();
     assert_eq!(carried.r#type.value.as_deref(), Some("collection"));
     let mapped = carried
@@ -122,7 +122,7 @@ fn the_diagnosis_chain_maps_both_ways_through_the_operations() -> Result<(), Box
             .to_serde_json(&mut Path::root("Condition"))?,
     ])?)
     .with_template_id(TemplateId::new(TEMPLATE));
-    let second = run::to_openehr(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &back)?;
+    let second = run::to_openehr(&set, &SCHEMAS, &Seams::default(), &settings(), &back)?;
     let mut reread: serde_json::Value = serde_json::from_str(second.composition())?;
     // The FEEDER_AUDIT names the resource each pass read (RM 1.1.0
     // common.html §FEEDER_AUDIT), and the second pass reads the Condition
@@ -162,7 +162,7 @@ fn every_tofhir_bundle_carries_one_provenance_covering_every_entry() -> Result<(
     let set = program_set(&[SUBJECT_CONTEXT])?;
     let committed = committed_composition()?;
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?);
-    let answer = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let answer = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     let provenances: Vec<&fhir_types::r4::provenance::Provenance> = answer
         .bundle()
         .entry
@@ -226,7 +226,7 @@ fn the_call_context_overrides_the_provenance_agent() -> Result<(), Box<dyn Error
                 .with_who(reference("Practitioner/456"))
                 .with_on_behalf_of(reference("Organization/charite")),
         );
-    let answer = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let answer = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     let provenance = answer
         .bundle()
         .entry
@@ -261,7 +261,7 @@ fn the_context_patient_takes_precedence_over_the_mapped_subject() -> Result<(), 
     let committed = committed_composition()?;
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?)
         .with_context(CallContext::new().with_patient(reference("Patient/123")));
-    let answer = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let answer = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     let condition = answer
         .bundle()
         .entry
@@ -289,7 +289,7 @@ fn a_call_that_omits_the_context_patient_still_succeeds() -> Result<(), Box<dyn 
     let set = program_set(&[SUBJECT_CONTEXT])?;
     let committed = committed_composition()?;
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?);
-    let answer = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let answer = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     let condition = answer
         .bundle()
         .entry
@@ -320,7 +320,7 @@ fn a_context_member_the_caller_supplied_reaches_the_mapping() -> Result<(), Box<
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?)
         .with_template_id(TemplateId::new(TEMPLATE))
         .with_context(CallContext::new().with_who(reference("Practitioner/456")));
-    let answer = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let answer = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     let condition = answer
         .bundle()
         .entry
@@ -349,7 +349,7 @@ fn a_context_member_the_caller_did_not_supply_is_a_refusal() -> Result<(), Box<d
     let committed = committed_composition()?;
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?)
         .with_template_id(TemplateId::new(TEMPLATE));
-    let error = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)
+    let error = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)
         .err()
         .ok_or("the mapping names a member the call does not carry")?;
     let rendered = error.to_string();
@@ -388,7 +388,7 @@ fn a_bundle_referencing_two_subjects_is_refused_naming_them() -> Result<(), Box<
         );
     }
     let request = ToOpenehrRequest::new(bundle(vec![first, second])?);
-    let error = run::to_openehr(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)
+    let error = run::to_openehr(&set, &SCHEMAS, &Seams::default(), &settings(), &request)
         .err()
         .ok_or("a mixed-subject bundle cannot be one composition")?;
     let rendered = error.to_string();
@@ -411,7 +411,7 @@ fn a_failed_mapping_answers_an_outcome_and_nothing_else() -> Result<(), Box<dyn 
         object.remove("code");
     }
     let request = ToOpenehrRequest::new(bundle(vec![without_code])?);
-    let error = run::to_openehr(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)
+    let error = run::to_openehr(&set, &SCHEMAS, &Seams::default(), &settings(), &request)
         .err()
         .ok_or("the required child is not provided")?;
     assert!(matches!(error, OperationError::Mapping { .. }));
@@ -434,7 +434,7 @@ fn a_disagreeing_template_pin_is_refused() -> Result<(), Box<dyn Error>> {
     let committed = committed_composition()?;
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?)
         .with_template_id(TemplateId::new("another.template.v1"));
-    let error = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)
+    let error = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)
         .err()
         .ok_or("a pin that contradicts the payload is refused")?;
     assert!(matches!(error, OperationError::TemplateDisagreement { .. }));
@@ -448,7 +448,7 @@ fn an_agreeing_template_pin_is_accepted() -> Result<(), Box<dyn Error>> {
     let committed = committed_composition()?;
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?)
         .with_template_id(TemplateId::new(TEMPLATE));
-    let answer = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let answer = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     assert!(!answer.bundle().entry.is_empty());
     Ok(())
 }
@@ -460,7 +460,7 @@ fn a_flat_composition_maps_in_and_a_flat_composition_maps_out() -> Result<(), Bo
     let set = program_set(&[SUBJECT_CONTEXT])?;
     let request =
         ToOpenehrRequest::new(bundle(vec![condition(SUBJECT_PROFILE)?])?).with_format(Format::Flat);
-    let answer = run::to_openehr(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let answer = run::to_openehr(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     let flat: serde_json::Value = serde_json::from_str(answer.composition())?;
     let members = flat.as_object().ok_or("a flat document is an object")?;
     assert!(
@@ -473,7 +473,7 @@ fn a_flat_composition_maps_in_and_a_flat_composition_maps_out() -> Result<(), Bo
         matches!(*inbound.composition(), CompositionPayload::Flat(_)),
         "the flat answer reads back as the flat serialization"
     );
-    let error = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &inbound)
+    let error = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &inbound)
         .err()
         .ok_or("a flat payload carries no uid, so the Provenance has no target")?;
     assert!(matches!(error, OperationError::Unidentified { .. }));
@@ -491,7 +491,7 @@ fn a_composition_with_no_identity_is_refused() -> Result<(), Box<dyn Error>> {
         object.remove("uid");
     }
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?);
-    let error = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)
+    let error = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)
         .err()
         .ok_or("a composition with no uid gives the Provenance no target")?;
     assert!(matches!(error, OperationError::Unidentified { .. }));
@@ -506,7 +506,7 @@ fn the_mapped_resource_takes_the_composition_version_object_id() -> Result<(), B
     let set = program_set(&[SUBJECT_CONTEXT])?;
     let committed = committed_composition()?;
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?);
-    let answer = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let answer = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     let condition = answer
         .bundle()
         .entry
@@ -538,7 +538,7 @@ fn a_template_the_set_does_not_hold_is_refused() -> Result<(), Box<dyn Error>> {
         );
     }
     let request = ToFhirRequest::new(CompositionPayload::parse(&other.to_string())?);
-    let error = run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)
+    let error = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)
         .err()
         .ok_or("a template the set does not hold is refused")?;
     assert!(matches!(error, OperationError::UnknownTemplate { .. }));
@@ -552,7 +552,7 @@ fn a_bundle_claiming_no_known_profile_is_refused() -> Result<(), Box<dyn Error>>
     let request = ToOpenehrRequest::new(bundle(vec![condition(
         "http://example.org/fhir/StructureDefinition/unknown",
     )?])?);
-    let error = run::to_openehr(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)
+    let error = run::to_openehr(&set, &SCHEMAS, &Seams::default(), &settings(), &request)
         .err()
         .ok_or("no program claims that profile")?;
     assert!(matches!(error, OperationError::Select { .. }));
@@ -570,7 +570,7 @@ fn a_template_pin_narrows_two_contexts_over_one_profile() -> Result<(), Box<dyn 
     ])?;
     let request = ToOpenehrRequest::new(bundle(vec![condition(REQUIRED_PROFILE)?])?)
         .with_template_id(TemplateId::new(TEMPLATE));
-    let answer = run::to_openehr(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let answer = run::to_openehr(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     assert!(
         answer.composition().contains("Synthetic problem one"),
         "the pinned context mapped the problem name"
@@ -635,7 +635,7 @@ fn both_operations_answer_their_typed_losses_beside_the_outcome() -> Result<(), 
     }
     let request = ToOpenehrRequest::new(bundle(vec![resource])?);
     let inbound =
-        run::to_openehr_with_warnings(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+        run::to_openehr_with_warnings(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     let subject = inbound
         .warnings()
         .iter()
@@ -646,7 +646,7 @@ fn both_operations_answer_their_typed_losses_beside_the_outcome() -> Result<(), 
     assert_outcome_of(inbound.response().outcome(), inbound.warnings());
     assert_eq!(
         inbound.response(),
-        &run::to_openehr(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?,
+        &run::to_openehr(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?,
         "the typed losses change nothing of the answer"
     );
 
@@ -659,7 +659,7 @@ fn both_operations_answer_their_typed_losses_beside_the_outcome() -> Result<(), 
     }
     let request = ToFhirRequest::new(CompositionPayload::parse(&built.to_string())?);
     let outbound =
-        run::to_fhir_with_warnings(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+        run::to_fhir_with_warnings(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     let outcome =
         outbound
             .response()
@@ -675,7 +675,7 @@ fn both_operations_answer_their_typed_losses_beside_the_outcome() -> Result<(), 
     let (answer, warnings) = outbound.into_parts();
     assert_eq!(
         answer,
-        run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?,
+        run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?,
         "the typed losses change nothing of the answer"
     );
     assert_eq!(!warnings.is_empty(), reported);

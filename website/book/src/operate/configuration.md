@@ -230,8 +230,10 @@ As environment variables, the same section reads
 
 ### `[terminology]`
 
-The FHIR terminology lane. Absent, the bridge holds no terminology client, and
-the engines fail closed on anything that would need one.
+The FHIR terminology lane. The facade, the `$tofhir` and `$toopenehr`
+operations and the HL7 v2 face translate every `conceptmap` code through it.
+Absent, the bridge holds no terminology client, and the engines fail closed on
+anything that would need one: a `conceptmap` mapping refuses.
 
 | Key | Default | Meaning |
 |---|---|---|

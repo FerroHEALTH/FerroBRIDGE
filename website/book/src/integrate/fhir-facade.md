@@ -462,11 +462,20 @@ reference, and `$validate-code`. The `$lookup` case is the common one, because
 openEHR requires `DV_CODED_TEXT.value` while FHIR leaves `display` optional. A
 terminology failure is an error, never a coding with a missing display.
 
-The facade does not call the terminology server yet. The call site is the
-inbound engine seam, and it runs the calls before anything is built, so a
-terminology refusal will cost no CDR write. It arrives with the registry of
-mapping functions in
-[issue #95](https://github.com/FerroHEALTH/FerroBRIDGE/issues/95); until then
+A mapping that names a `conceptmap` is translated through `$translate` on
+every read, write, search and `$validate`, and on the HL7 v2 face. The map is
+read as authored from openEHR to FHIR: a composition going out as FHIR is
+translated forward with the map's `url`, and a resource coming in is
+translated with `reverse=true`. Every code is resolved before the composition
+or resource is built, so a terminology refusal costs no CDR write. Only an
+`equivalent` or `equal` match counts. An untranslated optional element is
+reported as a loss, and an untranslated required one refuses the resource.
+With no `[terminology]` section, a `conceptmap` mapping refuses with "no
+terminology server is configured to translate through".
+
+Display resolution through `$lookup` arrives with the registry of mapping
+functions in
+[issue #95](https://github.com/FerroHEALTH/FerroBRIDGE/issues/95). Until then
 a mapping that needs a display resolved refuses the unit rather than writing a
 coding without one.
 

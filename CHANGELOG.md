@@ -31,7 +31,14 @@ crates on crates.io.
   occurrences of one entry, `Bundle.total` counts every resource (the count
   reads the rows for such a context), and an `_id` naming a created resource
   answers that resource alone instead of matching nothing.
-
+- `fhirconnect` 0.1.130: the four `operations::run` entry points
+  (`to_fhir`, `to_fhir_with_warnings`, `to_openehr`,
+  `to_openehr_with_warnings`) take the caller's `&Seams` in place of a
+  `&dyn MappingFunctions` (#722), so a caller supplies the terminology server
+  beside the mapping functions. This breaks the crate's public API: a
+  consumer passes `&Seams::default().with_functions(functions)` where it
+  passed `functions`. `$toopenehr` resolves a reference outside the request
+  Bundle through the reference source the seams carry.
 - `ferrobridge-term` translates by concept map with an optional target
   system and an optional `reverse` (#721). This breaks the crate's public
   API: `Client::translate` takes a `Translation` (`Translation::new(system,
@@ -74,6 +81,15 @@ crates on crates.io.
   products fit together, and licensing and trademarks.
 ### Added
 
+- The server translates the codes of every `conceptmap` mapping through the
+  configured `[terminology]` server (#722), on the FHIR facade, the
+  `$tofhir` and `$toopenehr` operations and the HL7 v2 face. A composition
+  going into FHIR calls `ConceptMap/$translate` with the map `url` and the
+  source code, and FHIR going into openEHR adds `reverse=true`. Every code is
+  resolved before the run that builds the result, so a terminology fault
+  never leaves a half-built document. With no `[terminology]` section a
+  `conceptmap` refuses with "no terminology server is configured to
+  translate through".
 - `fhirconnect` 0.1.128 translates the codes of a mapping that names a
   `conceptmap` through `ConceptMap/$translate` (#219), over a new
   `engine::terminology::Terminology` seam that `Seams::with_terminology`

@@ -123,8 +123,10 @@ ids. A reference that resolves to nothing is a `Loss::Skipped` warning, never a
 silent nothing; a reference chain that reaches itself refuses. Created
 resources travel as `Outcome::created`: the operations lane answers them as
 Bundle entries and the facade binds each under an id of its own and serves it
-at `<Type>/<id>`. The operations lane resolves a reference against the request
-Bundle only.
+at `<Type>/<id>`. `operations::run` takes the caller's `Seams`, and `$toopenehr`
+resolves a reference against the request Bundle first and the seams'
+reference source after it; the server passes none, so it reads the Bundle
+only.
 
 The fourth seam is `engine::terminology::Terminology`, the server a
 `conceptmap` translates through, over the generated R4 `$translate`

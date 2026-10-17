@@ -30,7 +30,7 @@ use fhir_types::r4::parameters::ParametersParameter;
 use fhir_types::r4::parameters::ParametersParameterValue;
 use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
-use fhirconnect::engine::traverse::functions::NoMappingFunctions;
+use fhirconnect::engine::seam::Seams;
 use fhirconnect::operations::TO_FHIR;
 use fhirconnect::operations::TO_OPENEHR;
 use fhirconnect::operations::contract::CompositionPayload;
@@ -47,6 +47,7 @@ use serde::Deserialize;
 
 use crate::state::AppState;
 use crate::state::OperationsLane;
+use crate::terminology::Direction;
 
 /// The FHIR JSON media type, the one both operations exchange.
 pub const FHIR_JSON: &str = "application/fhir+json";
@@ -104,7 +105,7 @@ async fn to_fhir(
     if let Some(refusal) = fhir_media_type(&headers) {
         return refusal;
     }
-    match tofhir_answer(lane, &settings, &query, &body) {
+    match tofhir_answer(lane, &settings, &query, &body).await {
         Ok(response) => response,
         Err(error) => refused(&error),
     }
@@ -125,7 +126,7 @@ async fn to_openehr(
     if let Some(refusal) = fhir_media_type(&headers) {
         return refusal;
     }
-    match toopenehr_answer(lane, &settings, &query, &body) {
+    match toopenehr_answer(lane, &settings, &query, &body).await {
         Ok(response) => response,
         Err(error) => refused(&error),
     }
@@ -148,18 +149,13 @@ async fn to_fhir_direct(
     if let Some(refusal) = media_type(&headers, &[OPENEHR_JSON]) {
         return refusal;
     }
-    let answer = CompositionPayload::parse(&body)
+    let answer = match CompositionPayload::parse(&body)
         .map(ToFhirRequest::new)
         .map(|request| with_query(request, &query))
-        .and_then(|request| {
-            run::to_fhir(
-                lane.programs(),
-                &SCHEMAS,
-                &NoMappingFunctions,
-                &settings,
-                &request,
-            )
-        });
+    {
+        Ok(request) => run_to_fhir(lane, &settings, &request).await,
+        Err(error) => Err(error),
+    };
     match answer {
         Ok(response) => fhir_resource(
             StatusCode::OK,
@@ -186,15 +182,11 @@ async fn to_openehr_direct(
     if let Some(refusal) = media_type(&headers, &[FHIR_JSON, "application/json"]) {
         return refusal;
     }
-    match toopenehr_request(&body, &query).and_then(|request| {
-        run::to_openehr(
-            lane.programs(),
-            &SCHEMAS,
-            &NoMappingFunctions,
-            &settings,
-            &request,
-        )
-    }) {
+    let answer = match toopenehr_request(&body, &query) {
+        Ok(request) => run_to_openehr(lane, &settings, &request).await,
+        Err(error) => Err(error),
+    };
+    match answer {
         Ok(response) => (
             StatusCode::OK,
             [(CONTENT_TYPE, OPENEHR_JSON)],
@@ -205,8 +197,38 @@ async fn to_openehr_direct(
     }
 }
 
+/// Runs `$tofhir` over `request`, every `conceptmap` code translated
+/// through the lane's terminology server.
+async fn run_to_fhir(
+    lane: &OperationsLane,
+    settings: &run::Settings,
+    request: &ToFhirRequest,
+) -> Result<fhirconnect::operations::contract::ToFhirResponse, OperationError> {
+    lane.translator()
+        .run(Direction::ToFhir, |terminology| {
+            let seams = Seams::default().with_terminology(terminology);
+            run::to_fhir(lane.programs(), &SCHEMAS, &seams, settings, request)
+        })
+        .await
+}
+
+/// Runs `$toopenehr` over `request`, every `conceptmap` code translated
+/// through the lane's terminology server with `reverse` set.
+async fn run_to_openehr(
+    lane: &OperationsLane,
+    settings: &run::Settings,
+    request: &ToOpenehrRequest,
+) -> Result<fhirconnect::operations::contract::ToOpenehrResponse, OperationError> {
+    lane.translator()
+        .run(Direction::ToOpenehr, |terminology| {
+            let seams = Seams::default().with_terminology(terminology);
+            run::to_openehr(lane.programs(), &SCHEMAS, &seams, settings, request)
+        })
+        .await
+}
+
 /// Runs `$tofhir` over an enveloped request.
-fn tofhir_answer(
+async fn tofhir_answer(
     lane: &OperationsLane,
     settings: &run::Settings,
     query: &OperationQuery,
@@ -216,13 +238,7 @@ fn tofhir_answer(
         fhirconnect::operations::contract::parameters::parameters_from_json(TO_FHIR, body)?;
     merge_query(&mut parameters, query);
     let request = ToFhirRequest::from_parameters(&parameters)?;
-    let answer = run::to_fhir(
-        lane.programs(),
-        &SCHEMAS,
-        &NoMappingFunctions,
-        settings,
-        &request,
-    )?;
+    let answer = run_to_fhir(lane, settings, &request).await?;
     Ok(fhir_resource(
         StatusCode::OK,
         &Resource::Bundle(Box::new(answer.into_bundle())),
@@ -230,20 +246,14 @@ fn tofhir_answer(
 }
 
 /// Runs `$toopenehr` over an enveloped request.
-fn toopenehr_answer(
+async fn toopenehr_answer(
     lane: &OperationsLane,
     settings: &run::Settings,
     query: &OperationQuery,
     body: &str,
 ) -> Result<Response, OperationError> {
     let request = toopenehr_request(body, query)?;
-    let answer = run::to_openehr(
-        lane.programs(),
-        &SCHEMAS,
-        &NoMappingFunctions,
-        settings,
-        &request,
-    )?;
+    let answer = run_to_openehr(lane, settings, &request).await?;
     Ok(fhir_resource(
         StatusCode::OK,
         &Resource::Parameters(Box::new(answer.to_parameters())),
