@@ -30,7 +30,7 @@ use crate::engine::traverse::functions::NoMappingFunctions;
 use crate::resolve::program::binding::ResourceType;
 
 /// Where the resource a FHIR reference points at comes from.
-pub trait ReferenceSource: fmt::Debug {
+pub trait ReferenceSource: fmt::Debug + Send + Sync {
     /// Returns the resource `reference` points at, `None` when the source
     /// holds none.
     ///
@@ -108,7 +108,7 @@ fn relative(resource: &Value) -> Option<String> {
 }
 
 /// What assigns the id of a resource a run creates.
-pub trait IdentitySink: fmt::Debug {
+pub trait IdentitySink: fmt::Debug + Send + Sync {
     /// Returns the FHIR id the resource `request` describes takes.
     ///
     /// # Errors
@@ -308,6 +308,10 @@ pub enum ReferenceError {
 /// [`Seams::default`] registers no function, resolves no reference, derives
 /// every created id with [`DerivedIdentity`] and translates through
 /// [`NoTerminology`], so a `conceptmap` fails closed.
+///
+/// Every seam trait is `Send + Sync`, so the seams of one run are `Send` and
+/// an async caller can hold them across an `.await`
+/// (<https://doc.rust-lang.org/std/marker/trait.Sync.html>).
 #[derive(Debug, Clone, Copy)]
 pub struct Seams<'seam> {
     functions: &'seam dyn MappingFunctions,
@@ -315,6 +319,13 @@ pub struct Seams<'seam> {
     identities: &'seam dyn IdentitySink,
     terminology: &'seam dyn Terminology,
 }
+
+// NOTE: no specification governs this: our own design, the seams of a run cross
+// an `.await` in an async caller, so a seam trait that loses `Sync` fails here.
+const _: fn() = || {
+    const fn send<T: Send + Sync>() {}
+    send::<Seams<'static>>();
+};
 
 impl Default for Seams<'_> {
     fn default() -> Self {

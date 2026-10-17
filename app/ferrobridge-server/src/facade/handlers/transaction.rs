@@ -84,9 +84,13 @@ pub(crate) async fn transaction(
     let client = facade.client_for(headers);
     let resolved =
         crate::facade::references::resolve_bundle(facade, &client, bundle.document()).await;
+    let bundled = fhirconnect::engine::seam::BundleReferences::new(
+        crate::facade::references::entries_of(bundle.document()),
+        &resolved,
+    );
     let ingested = facade
         .ingest(client)
-        .with_references(&resolved)
+        .with_references(&bundled)
         .ingest_bundle(
             bundle.document(),
             UnmappedEntries::Refuse,

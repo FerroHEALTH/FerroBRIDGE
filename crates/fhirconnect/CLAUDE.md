@@ -119,7 +119,8 @@ The engine makes no call of its own. `engine::seam::Seams` carries the
 from, and the `IdentitySink` that names every resource a run creates;
 `Seams::default()` registers nothing, resolves nothing and derives ids by a
 digest over the `IdentityRequest`, so the same composition yields the same
-ids. A reference that resolves to nothing is a `Loss::Skipped` warning, never a
+ids. Every seam trait is `Send + Sync`, and a compile-time assertion keeps
+`Seams` `Send`, so an async caller holds the seams across an `.await`. A reference that resolves to nothing is a `Loss::Skipped` warning, never a
 silent nothing; a reference chain that reaches itself refuses. Created
 resources travel as `Outcome::created`: the operations lane answers them as
 Bundle entries and the facade binds each under an id of its own and serves it

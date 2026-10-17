@@ -3,9 +3,9 @@
 
 //! The `hierarchy.split` groups.
 
-use core::cell::RefCell;
 use core::error::Error;
 use std::collections::BTreeMap;
+use std::sync::Mutex;
 
 use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
@@ -140,7 +140,7 @@ fn a_split_out_of_openehr_creates_one_resource_per_cluster() -> Result<(), Box<d
     )?;
     let identities = MapIdentities {
         ids: BTreeMap::from([(String::from("Condition"), String::from("split-condition-2"))]),
-        seen: RefCell::default(),
+        seen: Mutex::default(),
     };
     let outbound = to_fhir(
         &program,
@@ -169,7 +169,7 @@ fn a_split_out_of_openehr_creates_one_resource_per_cluster() -> Result<(), Box<d
             "the content outside the split reaches every resource"
         );
     }
-    let seen = identities.seen.borrow();
+    let seen = identities.seen.lock().expect("the stub lock holds");
     let [ref request] = *seen.as_slice() else {
         return Err(Box::from("one identity was asked for"));
     };
@@ -249,7 +249,7 @@ fn a_split_groups_occurrences_by_their_unique_tuple() -> Result<(), Box<dyn Erro
     );
     let identities = MapIdentities {
         ids: BTreeMap::from([(String::from("Condition"), String::from("unique-condition"))]),
-        seen: RefCell::default(),
+        seen: Mutex::default(),
     };
     let outbound = to_fhir(
         &program,
@@ -260,7 +260,7 @@ fn a_split_groups_occurrences_by_their_unique_tuple() -> Result<(), Box<dyn Erro
         &CallContext::new(),
     )?;
     assert_eq!(outbound.created().len(), 1);
-    let seen = identities.seen.borrow();
+    let seen = identities.seen.lock().expect("the stub lock holds");
     assert_eq!(
         seen.first().map(IdentityRequest::unique),
         Some([String::from("Right knee")].as_slice()),
