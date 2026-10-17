@@ -96,15 +96,18 @@ reloads the running set. Without it, the three routes below answer `409`.
 
 - **One owner per file.** The files under `[mappings] directory` and
   `[mappings] omocl` are provisioned and never written. A console save goes
-  to `mapping_dir/fhirconnect/<path>`, and a save whose path names a
-  provisioned file answers `409`. Console files join the set beside the
-  provisioned ones, at every reload and at start-up, where a set that does not
-  compile refuses the start. A file with the path of a provisioned one is
-  ignored in favour of the provisioned file.
-- **FHIRconnect files only.** OMOCL files are read by `etl run` from
-  `[mappings] omocl`, so a save under `omocl/` answers `409`. A search
-  declaration (`*.search.yml`) and any file that is not `.yml` or `.yaml`
-  answer `400`.
+  to `mapping_dir/fhirconnect/<path>` or `mapping_dir/omocl/<path>`, and a
+  save whose path names a provisioned file answers `409`. Console files join
+  the set beside the provisioned ones, at every reload and at start-up, where
+  a set that does not compile refuses the start. A file with the path of a
+  provisioned one is ignored in favour of the provisioned file.
+- **OMOCL files reach `etl run`.** `serve` checks OMOCL files and does not
+  run them. `etl run` reads `mapping_dir/omocl/` beside `[mappings] omocl`
+  when its configuration turns the operator API on, with the same ownership
+  rule, so a file saved here maps the next run. Two files that define the
+  same mapping refuse the save, the reload and the run.
+- A search declaration (`*.search.yml`) and any file that is not `.yml` or
+  `.yaml` answer `400`.
 
 ### `POST /operator/mappings/check?path={path}`
 

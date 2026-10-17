@@ -27,7 +27,14 @@ use jsonwebtoken::Algorithm;
 use tower::ServiceExt as _;
 use wiremock::{Mock, MockServer, ResponseTemplate, matchers};
 
-use super::{FIXTURES, OPERATOR, bytes, digest};
+use super::{FIXTURES, OMOCL_FILE, OPERATOR, bytes, digest};
+
+/// The analyte file of the OMOCL corpus, provisioned beside the FHIRconnect
+/// tree.
+const PROVISIONED_OMOCL: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/specs/omocl/medical_data/cluster/Laboratory_test_analyte_v1.yml"
+);
 use crate::facade::auth::{Issuer, SigningKey, authority, bearing, ec_key, mint};
 
 /// A model mapping onto `Observation` over the testkit template.
@@ -124,6 +131,12 @@ impl Case {
         ] {
             std::fs::copy(Path::new(FIXTURES).join(name), provisioned.join(name))?;
         }
+        let omocl = tree.path().join("omocl");
+        std::fs::create_dir_all(&omocl)?;
+        std::fs::copy(
+            PROVISIONED_OMOCL,
+            omocl.join("Laboratory_test_analyte_v1.yml"),
+        )?;
         let cdr = MockServer::start().await;
         Mock::given(matchers::method("GET"))
             .and(matchers::path(
@@ -166,12 +179,15 @@ impl Case {
             fhirconnect: Some(provisioned.clone()),
             templates: None,
             cdr: Some(client),
-            omocl: false,
+            omocl: true,
             facade: Some(facade),
             operations: state.operations_handle().cloned(),
         };
         let operator = Operator::new(
-            vec![Root::new(Language::Fhirconnect, provisioned)],
+            vec![
+                Root::new(Language::Fhirconnect, provisioned),
+                Root::new(Language::Omocl, omocl),
+            ],
             Snapshot::new(Report::default(), BTreeMap::new()),
         )
         .with_saving(tree.path().join("console"), reloader);
@@ -206,13 +222,32 @@ impl Case {
         relative: &str,
         body: &str,
     ) -> Result<http::Response<Body>, Box<dyn StdError>> {
+        self.create_at(&format!("fhirconnect/{relative}"), body)
+            .await
+    }
+
+    /// Saves `body` at the wire path `wire` as a new file.
+    async fn create_at(
+        &self,
+        wire: &str,
+        body: &str,
+    ) -> Result<http::Response<Body>, Box<dyn StdError>> {
         self.send(
-            Request::put(format!("/operator/mappings/fhirconnect/{relative}"))
+            Request::put(format!("/operator/mappings/{wire}"))
                 .header(header::IF_NONE_MATCH, "*")
                 .header("ferrobridge-reason", REASON)
                 .body(Body::from(body.to_owned()))?,
         )
         .await
+    }
+
+    /// Returns the operator state document.
+    async fn state(&self) -> Result<serde_json::Value, Box<dyn StdError>> {
+        let response = self
+            .send(Request::get("/operator/state").body(Body::empty())?)
+            .await?;
+        assert_eq!(StatusCode::OK, response.status(), "the state route answers");
+        Ok(serde_json::from_slice(&bytes(response).await?)?)
     }
 
     /// Returns the resource types the `CapabilityStatement` names.
@@ -583,5 +618,93 @@ fn the_save_audit_line_names_the_caller_file_digests_and_reason_and_no_content()
             "the log carries mapping content `{marker}`: {text}"
         );
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_omocl_file_saves_under_the_console_tree_and_joins_the_set()
+-> Result<(), Box<dyn StdError>> {
+    let case = Case::new().await?;
+    let specimen = std::fs::read_to_string(OMOCL_FILE)?;
+    let response = case.create_at("omocl/Specimen_v1.yml", &specimen).await?;
+    assert_eq!(StatusCode::OK, response.status());
+    let report: serde_json::Value = serde_json::from_slice(&bytes(response).await?)?;
+    assert_eq!(serde_json::Value::Bool(true), report["clean"], "{report}");
+    assert_eq!(
+        specimen.as_bytes(),
+        std::fs::read(case.tree.path().join("console/omocl/Specimen_v1.yml"))?.as_slice()
+    );
+    let state = case.state().await?;
+    assert_eq!(
+        serde_json::json!([
+            "omocl/Laboratory_test_analyte_v1.yml",
+            "omocl/Specimen_v1.yml"
+        ]),
+        state["omocl"]["files"]
+    );
+    let response = case
+        .send(Request::get("/operator/mappings").body(Body::empty())?)
+        .await?;
+    let listing: serde_json::Value = serde_json::from_slice(&bytes(response).await?)?;
+    let saved = listing
+        .as_array()
+        .ok_or("a listing")?
+        .iter()
+        .find(|entry| entry["path"] == "omocl/Specimen_v1.yml")
+        .ok_or("the saved file is listed")?;
+    assert_eq!("console", saved["owner"]);
+    assert_eq!("mapping", saved["kind"]);
+    assert!(case.staging_left().is_empty(), "{:?}", case.staging_left());
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_omocl_draft_that_does_not_load_is_refused_and_writes_nothing()
+-> Result<(), Box<dyn StdError>> {
+    let case = Case::new().await?;
+    let response = case
+        .create_at("omocl/broken.yml", "grammar: [unclosed\n")
+        .await?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, response.status());
+    let report: serde_json::Value = serde_json::from_slice(&bytes(response).await?)?;
+    assert!(
+        report["diagnostics"]
+            .as_array()
+            .ok_or("a diagnostics array")?
+            .iter()
+            .any(|diagnostic| diagnostic["file"] == "omocl/broken.yml"),
+        "{report}"
+    );
+    assert!(!case.tree.path().join("console/omocl/broken.yml").exists());
+    assert!(case.staging_left().is_empty(), "{:?}", case.staging_left());
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_omocl_clash_with_a_provisioned_file_is_refused() -> Result<(), Box<dyn StdError>> {
+    let case = Case::new().await?;
+    let analyte = std::fs::read_to_string(PROVISIONED_OMOCL)?;
+    let response = case
+        .send(
+            Request::put("/operator/mappings/omocl/Laboratory_test_analyte_v1.yml")
+                .header(header::IF_MATCH, "*")
+                .header("ferrobridge-reason", REASON)
+                .body(Body::from(analyte.clone()))?,
+        )
+        .await?;
+    assert_eq!(
+        StatusCode::CONFLICT,
+        response.status(),
+        "a provisioned path is never written"
+    );
+    let response = case.create_at("omocl/analyte_copy.yml", &analyte).await?;
+    assert_eq!(
+        StatusCode::UNPROCESSABLE_ENTITY,
+        response.status(),
+        "a second file defining a provisioned mapping is refused"
+    );
+    let console = case.tree.path().join("console/omocl");
+    assert!(!console.join("Laboratory_test_analyte_v1.yml").exists());
+    assert!(!console.join("analyte_copy.yml").exists());
     Ok(())
 }

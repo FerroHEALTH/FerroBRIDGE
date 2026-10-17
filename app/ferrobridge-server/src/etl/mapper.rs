@@ -4,7 +4,7 @@
 //! The OMOCL mapper `etl run` maps every composition with.
 //!
 //! The OMOCL files are read and validated once, at boot, from `[mappings]
-//! omocl`, so a file that does not load refuses the start. OMOCL maps by
+//! omocl` and the console's `[operator] mapping_dir`, so a file that does not load refuses the start. OMOCL maps by
 //! archetype and names no template, so a program is compiled the first time a
 //! composition of a template arrives, against the template the runner read
 //! from the CDR, and kept for the rest of the run; a set that does not compile
@@ -40,6 +40,10 @@ use openehr_mapping_core::index::WebTemplateIndex;
 
 use crate::etl::Mapper;
 use crate::etl::SourceComposition;
+use crate::operator::files::Language;
+use crate::operator::files::Located;
+use crate::operator::files::Owner;
+use crate::operator::files::Root;
 
 /// Why the OMOCL mapping set could not be read.
 #[derive(Debug, thiserror::Error)]
@@ -95,6 +99,46 @@ pub fn read_set(directory: &Path) -> Result<MappingSet, MapperError> {
         });
     }
     omocl::model::load::load_set(files, &FirstPartyConverters)
+        .map_err(|diagnostics| MapperError::Mappings { diagnostics })
+}
+
+/// Reads and validates the OMOCL files of `roots` as one set, through the
+/// same load the operator reload checks them with.
+///
+/// Each wire path has one owner, the first root that holds a file at it, so
+/// a provisioned file wins over a console file at the same path. Two files
+/// at different paths that define the same mapping are a clash the load
+/// refuses.
+///
+/// # Errors
+///
+/// Returns [`MapperError::Read`] when a provisioned directory cannot be read,
+/// [`MapperError::Empty`] naming the first root when no root holds a file,
+/// and [`MapperError::Mappings`] with every diagnostic when a file does not
+/// load.
+pub fn read_roots(roots: &[Root]) -> Result<MappingSet, MapperError> {
+    let located: Vec<Located> = crate::operator::files::list(roots)
+        .map_err(|crate::walk::Error { path, source }| MapperError::Read { path, source })?
+        .into_iter()
+        .filter(|file| file.language() == Language::Omocl)
+        .collect();
+    if located.is_empty() {
+        return Err(MapperError::Empty {
+            path: roots
+                .first()
+                .map(|root| root.directory().to_path_buf())
+                .unwrap_or_default(),
+        });
+    }
+    tracing::info!(
+        files = located.len(),
+        console = located
+            .iter()
+            .filter(|file| file.owner() == Owner::Console)
+            .count(),
+        "the OMOCL mapping set is read"
+    );
+    omocl::model::load::load_set(located.iter().map(Located::path), &FirstPartyConverters)
         .map_err(|diagnostics| MapperError::Mappings { diagnostics })
 }
 

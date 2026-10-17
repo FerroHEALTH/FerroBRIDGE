@@ -73,7 +73,8 @@ pub struct Reloader {
     pub templates: Option<PathBuf>,
     /// The CDR the templates are fetched from otherwise.
     pub cdr: Option<crate::cdr::CdrClient>,
-    /// Whether OMOCL files are configured.
+    /// Whether `[mappings] omocl` is configured. The console's OMOCL files
+    /// are checked whenever there are any.
     pub omocl: bool,
     /// The facade, when it runs.
     pub facade: Option<Arc<Facade>>,
@@ -156,7 +157,7 @@ impl Reloader {
         let report = crate::check::check_files(
             self.fhirconnect.is_some().then_some(fhirconnect),
             templates,
-            self.omocl.then_some(omocl),
+            (self.omocl || !omocl.is_empty()).then_some(omocl),
         )
         .await
         .map_err(ReloadError::Check)?;

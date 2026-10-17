@@ -13,6 +13,7 @@ mod deletions;
 mod engine;
 mod person;
 mod run;
+mod sources;
 mod visit;
 
 use ferrobridge_server::cdr::CdrClient;
