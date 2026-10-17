@@ -100,6 +100,8 @@ pub struct Facade {
     /// The largest page one search answers; a larger `_count` is answered
     /// with this many.
     pub search_count_max: u32,
+    /// How a reference the request does not carry is resolved.
+    pub references: FacadeReferences,
 }
 
 impl Default for Facade {
@@ -115,6 +117,35 @@ impl Default for Facade {
             composition_territory: String::new(),
             search_count: crate::facade::search::Limits::default().default_count,
             search_count_max: crate::facade::search::Limits::default().max_count,
+            references: FacadeReferences::default(),
+        }
+    }
+}
+
+/// How the facade resolves a reference a request names and does not carry.
+///
+/// "The engine should attempt to GET it from the sending site. If not
+/// possible, the engine proceeds with the mapping" (`engine/references.adoc`).
+/// A relative reference is read from this server; an absolute one is fetched
+/// only from a base listed here, so by default nothing is fetched (no
+/// specification governs the policy: our own design).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeReferences {
+    /// The FHIR service bases an absolute reference may be fetched from.
+    pub fetch_bases: Vec<String>,
+    /// How many levels of references are followed.
+    pub max_depth: u32,
+    /// How long one fetch may take, connection included.
+    pub timeout_ms: u64,
+}
+
+impl Default for FacadeReferences {
+    fn default() -> Self {
+        Self {
+            fetch_bases: Vec::new(),
+            max_depth: crate::facade::references::DEFAULT_MAX_DEPTH,
+            timeout_ms: crate::facade::references::DEFAULT_TIMEOUT_MS,
         }
     }
 }
@@ -638,5 +669,35 @@ impl<'de> Deserialize<'de> for NoGrant {
         Err(serde::de::Error::custom(
             "this lane obtains no token with an OAuth grant, so it takes no `oauth` table",
         ))
+    }
+}
+
+/// The `FerroHEALTH` installation report to `FerroPULSE`.
+///
+/// On by default, and silent without a writable `state_dir`, because without
+/// a stable instance id each restart would count as a new installation. A CI
+/// environment keeps it off whatever `enabled` says. No specification
+/// governs this configuration: our own design.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct UsageReport {
+    /// Whether the server sends the report.
+    pub enabled: bool,
+    /// The collector endpoint: `https`, or `http` to a loopback host.
+    pub endpoint: String,
+    /// The writable directory the instance id is kept in.
+    pub state_dir: Option<PathBuf>,
+    /// How the server was deployed: `helm`, `compose`, `binary` or `unknown`.
+    pub deployment: crate::usage_report::config::Deployment,
+}
+
+impl Default for UsageReport {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            endpoint: String::from(crate::usage_report::config::ENDPOINT),
+            state_dir: None,
+            deployment: crate::usage_report::config::Deployment::Unknown,
+        }
     }
 }

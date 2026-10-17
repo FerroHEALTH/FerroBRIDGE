@@ -22,6 +22,7 @@
 - [The container image](operate/container.md)
 - [Checking a deployment](operate/deployment-probes.md)
 - [Failure and identity behaviour](operate/failure-and-identity.md)
+- [The usage report](operate/usage-report.md)
 - [Version lines and releases](operate/versions-and-releases.md)
 
 # Integrate

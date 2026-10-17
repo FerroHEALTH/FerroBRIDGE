@@ -89,6 +89,7 @@ fn serve_until_the_bind_fails(format: &str) -> String {
     let address = taken.local_addr().expect("the bound address");
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_ferrobridge"))
         .arg("serve")
+        .env("FERROBRIDGE__USAGE_REPORT__ENABLED", "false")
         .env_remove("FERROBRIDGE_CONFIG")
         .env_remove("RUST_LOG")
         .env("FERROBRIDGE_LOG_FORMAT", format)

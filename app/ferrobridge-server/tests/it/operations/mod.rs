@@ -12,6 +12,7 @@ mod answers;
 mod lane;
 mod refusals;
 mod round_trip;
+mod terminology;
 
 use axum::Router;
 use axum::body::Body;
@@ -20,6 +21,7 @@ use ferrobridge_server::health::Registry;
 use ferrobridge_server::mappings;
 use ferrobridge_server::state::AppState;
 use ferrobridge_server::state::OperationsLane;
+use ferrobridge_server::terminology::Translator;
 use http::{Request, Response, StatusCode, header};
 use std::error::Error as StdError;
 use std::sync::Arc;
@@ -89,6 +91,12 @@ mappings:
 
 /// Writes the synthetic mapping set into a temporary tree.
 fn mapping_tree() -> Result<tempfile::TempDir, Box<dyn StdError>> {
+    mapping_tree_with(MODEL_FILE)
+}
+
+/// Writes the synthetic context with `model` as its model mapping into a
+/// temporary tree.
+fn mapping_tree_with(model: &str) -> Result<tempfile::TempDir, Box<dyn StdError>> {
     let root = tempfile::tempdir()?;
     let mappings = root.path().join("mappings");
     let templates = root.path().join("templates");
@@ -98,7 +106,7 @@ fn mapping_tree() -> Result<tempfile::TempDir, Box<dyn StdError>> {
         mappings.join("ferrobridge_server_diagnose.context.yml"),
         CONTEXT_FILE,
     )?;
-    std::fs::write(mappings.join("ferrobridge_server_diagnose.yml"), MODEL_FILE)?;
+    std::fs::write(mappings.join("ferrobridge_server_diagnose.yml"), model)?;
     std::fs::write(
         templates.join("diagnose.opt"),
         ferrobridge_testkit::fixtures::DIAGNOSE_OPT,
@@ -108,16 +116,24 @@ fn mapping_tree() -> Result<tempfile::TempDir, Box<dyn StdError>> {
 
 /// Returns the application with the synthetic mapping set loaded.
 fn app(root: &tempfile::TempDir) -> Result<Router, Box<dyn StdError>> {
+    app_with(root, Translator::default())
+}
+
+/// Returns the application with the mapping set under `root` loaded,
+/// translating every `conceptmap` code through `translator`.
+fn app_with(root: &tempfile::TempDir, translator: Translator) -> Result<Router, Box<dyn StdError>> {
     let settings = MappingSettings {
         directory: root.path().join("mappings"),
         templates: root.path().join("templates"),
     };
     let programs = mappings::load(&settings)?;
-    let lane = OperationsLane::new(programs, "Device/ferrobridge-test").with_composition_defaults(
-        "FHIRconnect",
-        Some(String::from("en")),
-        Some(String::from("NL")),
-    );
+    let lane = OperationsLane::new(programs, "Device/ferrobridge-test")
+        .with_composition_defaults(
+            "FHIRconnect",
+            Some(String::from("en")),
+            Some(String::from("NL")),
+        )
+        .with_translator(translator);
     let state = Arc::new(AppState::with_health(Registry::default()).serving_operations(lane));
     Ok(ferrobridge_server::router(state, &server_settings()))
 }

@@ -60,6 +60,7 @@ use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
+use crate::facade::references;
 use crate::facade::reply;
 use crate::facade::request::Inbound;
 use crate::facade::status;
@@ -78,7 +79,9 @@ pub(crate) async fn create(
     let inbound = read::parse(body, resource_type)?;
     compartment::admit_inbound(facade, access, Permission::Create, &inbound)?;
     let program = &select_program(facade, &inbound, headers)?;
-    let ingest = facade.ingest(facade.client_for(headers));
+    let client = facade.client_for(headers);
+    let resolved = references::resolve(facade, &client, inbound.document()).await;
+    let ingest = facade.ingest(client).with_references(&resolved);
     let claim = ingest.claim_resource(&inbound)?;
 
     match ingest
@@ -93,7 +96,7 @@ pub(crate) async fn create(
                 resource_type,
                 &written.ehr_id,
             )?;
-            return answer(facade, program, &written, headers, StatusCode::OK);
+            return answer(facade, program, &written, headers, StatusCode::OK).await;
         }
         Recognised::Revised(known) => {
             let ehr_id = known.ehr().map_err(|error| store_identifier(&error))?;
@@ -126,7 +129,7 @@ pub(crate) async fn create(
         ingest::Delivery::Committed => StatusCode::CREATED,
         ingest::Delivery::Reconciled | ingest::Delivery::Replayed => StatusCode::OK,
     };
-    answer(facade, program, &written, headers, status)
+    answer(facade, program, &written, headers, status).await
 }
 
 /// `PUT [base]/{type}/{id}`.
@@ -167,7 +170,9 @@ pub(crate) async fn update(
     same_id(&inbound, id)?;
     compartment::admit_inbound(facade, access, Permission::Update, &inbound)?;
     let program = &select_program(facade, &inbound, headers)?;
-    let ingest = facade.ingest(facade.client_for(headers));
+    let client = facade.client_for(headers);
+    let resolved = references::resolve(facade, &client, inbound.document()).await;
+    let ingest = facade.ingest(client).with_references(&resolved);
     resend(
         facade,
         &ingest,
@@ -259,11 +264,11 @@ async fn resend(
             &Provenance::EachResource,
         )
         .await?;
-    answer(facade, program, &written, headers, StatusCode::OK)
+    answer(facade, program, &written, headers, StatusCode::OK).await
 }
 
 /// Answers one committed write, honouring `Prefer`.
-fn answer(
+async fn answer(
     facade: &Facade,
     program: &Loaded,
     written: &Written,
@@ -311,7 +316,9 @@ fn answer(
                     subject: subject.as_ref(),
                     store: facade.store(),
                 },
-            )?;
+                facade.translator(),
+            )
+            .await?;
             render::log_outcome(&rendered);
             Ok(reply::resource(status, &rendered.body, &response_headers))
         }

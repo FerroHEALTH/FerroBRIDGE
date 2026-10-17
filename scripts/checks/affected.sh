@@ -172,7 +172,7 @@ classify() {
     scripts/checks/crate-version-guard.sh | scripts/checks/favicon-sync.sh) echo inert ;;
     scripts/checks/file-length.sh | scripts/checks/file-length-allow.txt) echo inert ;;
     scripts/checks/pin-freshness.sh | scripts/checks/versions.sh) echo inert ;;
-    scripts/checks/todo-issues.sh) echo inert ;;
+    scripts/checks/todo-issues.sh | scripts/checks/usage-report-off.sh) echo inert ;;
     scripts/deploy-probe.sh) echo inert ;;
     # The pass lists, the badges and the README badge block are read by the
     # conformance tests and scripts/checks/conformance.sh alone: a corpus's
@@ -182,6 +182,8 @@ classify() {
     conformance/*/*) corpus_class "$(cut -d/ -f2 <<<"$1")" ;;
     conformance/* | scripts/checks/conformance.sh | README.md) echo "packages $(conformance_packages)" ;;
     scripts/checks/sqlx-offline.sh) echo "packages omop-cdm" ;;
+    # Writes only the vendored FerroPULSE schema the server's tests read.
+    scripts/vendor/ferropulse-schemas.sh) echo "packages ferrobridge-server" ;;
     crates/* | app/* | tools/*) echo member ;;
     *) echo global ;;
   esac
@@ -522,6 +524,8 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+fhir-types +ferrobridge-testkit +fhirconnect +ferrobridge-validator +ferrobridge-server +fhir-codegen -omop-cdm-codegen"
   check "the testkit reaches every member testing with it" "tools/ferrobridge-testkit/src/lib.rs" false \
     "+ferrobridge-testkit +openehr-mapping-core +omocl +omop-cdm +ferrobridge-server -fhir-types -fhir-codegen"
+  check "the FerroPULSE vendor script reaches the server alone" "scripts/vendor/ferropulse-schemas.sh" false \
+    "+ferrobridge-server -ferrobridge-testkit -fhir-codegen"
   check "the console reaches itself and nothing it does not link" \
     "app/ferrobridge-viewer/src/lib.rs" false \
     "+ferrobridge-viewer -fhir-types -openehr-mapping-core -ferrobridge-server"

@@ -87,7 +87,7 @@ pub(super) fn nothing_mapped(partition: &Partition) -> Refused {
 impl Ingest<'_> {
     /// Maps every entry, collecting the refusals rather than stopping at the
     /// first.
-    pub(super) fn map_entries(
+    pub(super) async fn map_entries(
         &self,
         entries: &[Value],
         unmapped: UnmappedEntries,
@@ -111,7 +111,10 @@ impl Ingest<'_> {
                 );
                 continue;
             };
-            match self.map_one(resource, &full_url, index, &locals, provenance) {
+            match self
+                .map_one(resource, &full_url, index, &locals, provenance)
+                .await
+            {
                 Ok(Mapping::Mapped(one, person)) => {
                     match partition.subject {
                         None => partition.subject = Some(person),
@@ -148,7 +151,7 @@ impl Ingest<'_> {
     /// `locals` holds every entry of the Bundle by its `fullUrl`, so a
     /// subject reference to another entry is read through that entry
     /// ([`local_subject`]).
-    fn map_one(
+    async fn map_one(
         &self,
         resource: &Value,
         full_url: &str,
@@ -207,11 +210,14 @@ impl Ingest<'_> {
                 .diagnosing(text)
                 .at(String::from(full_url))
         })?;
-        let (composition, instant) = self.run(program, &inbound, provenance).map_err(|error| {
-            Issue::error(IssueType::Processing)
-                .diagnosing(chain(&error))
-                .at(String::from(full_url))
-        })?;
+        let (composition, instant) =
+            self.run(program, &inbound, provenance)
+                .await
+                .map_err(|error| {
+                    Issue::error(IssueType::Processing)
+                        .diagnosing(chain(&error))
+                        .at(String::from(full_url))
+                })?;
         let text = serde_json::to_string(composition.value()).map_err(|error| {
             Issue::error(IssueType::Exception)
                 .diagnosing(format!(

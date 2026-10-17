@@ -23,7 +23,7 @@ use fhir_types::r4::primitives::Code;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
-use fhirconnect::engine::traverse::functions::NoMappingFunctions;
+use fhirconnect::engine::seam::Seams;
 use fhirconnect::operations::contract::ToOpenehrRequest;
 use fhirconnect::operations::programs::ProgramSet;
 use fhirconnect::operations::run;
@@ -197,7 +197,7 @@ fn reference(text: &str) -> Reference {
 fn committed_composition() -> Result<serde_json::Value, Box<dyn Error>> {
     let set = program_set(&[SUBJECT_CONTEXT])?;
     let request = ToOpenehrRequest::new(bundle(vec![condition(SUBJECT_PROFILE)?])?);
-    let answer = run::to_openehr(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request)?;
+    let answer = run::to_openehr(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
     let mut built: serde_json::Value = serde_json::from_str(answer.composition())?;
     if let Some(object) = built.as_object_mut() {
         object.insert(

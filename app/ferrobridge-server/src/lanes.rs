@@ -17,6 +17,7 @@ use tokio::net::TcpListener;
 use crate::config::{self, ServerSettings, Settings};
 use crate::serve_until;
 use crate::state::{self, AppState};
+use crate::terminology::Translator;
 use crate::{auth, cdr, check, facade, hl7v2, operator, startup};
 use std::collections::BTreeMap;
 
@@ -129,11 +130,7 @@ async fn start_hl7v2(
         )
     })?;
     let maps = corpus.maps().count();
-    let terminology = settings
-        .terminology
-        .as_ref()
-        .map(|config| ferrobridge_term::client::Client::new(config.clone()))
-        .transpose()
+    let terminology = terminology_client(settings)
         .context("building the terminology client the HL7 v2 face translates through")?;
     let socket = TcpListener::bind(lane.listen)
         .await
@@ -367,6 +364,26 @@ async fn build_facade(
     let search = facade::search::load(directory, &programs).context("reading the searches")?;
     let store = facade::identity::redb_store::RedbStore::open(&lane.identity_store)
         .with_context(|| format!("opening {}", lane.identity_store.display()))?;
-    let built = facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone());
-    Ok((built.with_search(search, lane.search), counts))
+    let terminology = terminology_client(settings)
+        .context("building the terminology client the facade translates through")?;
+    let built = facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone())
+        .with_translator(Translator::new(terminology));
+    Ok((
+        built
+            .with_search(search, lane.search)
+            .with_references(lane.references.clone()),
+        counts,
+    ))
+}
+
+/// Returns the client of the `[terminology]` server, `None` when none is
+/// configured.
+fn terminology_client(
+    settings: &Settings,
+) -> Result<Option<ferrobridge_term::client::Client>, ferrobridge_term::error::Error> {
+    settings
+        .terminology
+        .as_ref()
+        .map(|config| ferrobridge_term::client::Client::new(config.clone()))
+        .transpose()
 }

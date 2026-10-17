@@ -5,6 +5,7 @@
 //! and the identity record of one committed composition.
 
 use fhir_types::codec::Value;
+use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::error::EngineError;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
@@ -29,6 +30,7 @@ use crate::facade::outcome::chain;
 use crate::facade::programs::Loaded;
 use crate::facade::request::Inbound;
 use crate::facade::status;
+use crate::terminology::Direction;
 
 use super::Delivery;
 use super::Ingest;
@@ -147,20 +149,24 @@ pub(super) fn canonical_of(
 
 impl Ingest<'_> {
     /// Runs the engine over one inbound resource.
-    pub(super) fn build(
+    pub(super) async fn build(
         &self,
         program: &Loaded,
         inbound: &Inbound,
         provenance: &Provenance,
     ) -> Result<CanonicalComposition, Refused> {
         self.run(program, inbound, provenance)
+            .await
             .map(|(composition, _instant)| composition)
             .map_err(|error| engine_refusal(&error))
     }
 
     /// Runs the engine over one inbound resource, and returns the composition
     /// with the instant it defaulted every clock-derived time from.
-    pub(super) fn run(
+    ///
+    /// Every `conceptmap` code is translated with `reverse=true` before the
+    /// composition is built ([`crate::terminology::Translator::run`]).
+    pub(super) async fn run(
         &self,
         program: &Loaded,
         inbound: &Inbound,
@@ -169,14 +175,22 @@ impl Ingest<'_> {
         // NOTE: no specification governs this: our own design, one instant serves
         // every defaulted time of one ingest, so each resource reads the clock once.
         let now = jiff::Timestamp::now().to_string();
-        let built = engine::inbound_from(
-            program.program(),
-            program.index(),
-            inbound.document(),
-            &now,
-            self.settings,
-            provenance.source_for(inbound.document()),
-        )?;
+        let built = self
+            .translator
+            .run(Direction::ToOpenehr, |terminology| {
+                engine::inbound_from(
+                    program.program(),
+                    program.index(),
+                    inbound.document(),
+                    &now,
+                    self.settings,
+                    provenance.source_for(inbound.document()),
+                    &Seams::default()
+                        .with_terminology(terminology)
+                        .with_references(self.references),
+                )
+            })
+            .await?;
         Ok((built.into_value(), now))
     }
 

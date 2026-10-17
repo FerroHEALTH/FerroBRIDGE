@@ -100,7 +100,7 @@ impl Ingest<'_> {
             .map_err(|error| store_refusal(&error))?;
         let known = if let Some(known) = exact {
             if source.version_id().is_some() {
-                let built = self.build(program, inbound, provenance)?;
+                let built = self.build(program, inbound, provenance).await?;
                 let standing = self.standing(&known).await?;
                 let written = match self.standing_entry(program, inbound, &standing, &built)? {
                     Some((whole, entry)) => standing.replayed(entry.isolate(&whole)),
@@ -132,6 +132,7 @@ impl Ingest<'_> {
         };
         let (built, instant) = self
             .run(program, inbound, provenance)
+            .await
             .map_err(|error| engine_refusal(&error))?;
         let sent = strict_read(&built)?;
         let standing = self.standing(&known).await?;
@@ -241,7 +242,7 @@ impl Ingest<'_> {
         let ehr_id = ehr::resolve(&self.client, self.store, &subject, self.settings.ehr_policy)
             .await
             .map_err(|error| ehr_refusal(&error))?;
-        let composition = self.build(program, inbound, provenance)?;
+        let composition = self.build(program, inbound, provenance).await?;
         let rm = strict_read(&composition)?;
         let context = self.commit_context(commit::Change::Creation, &composition)?;
         let answered = self
@@ -326,7 +327,7 @@ impl Ingest<'_> {
             preceding,
             ..
         } = *revision;
-        let built = self.build(program, inbound, provenance)?;
+        let built = self.build(program, inbound, provenance).await?;
         let composition = splice(program, &built, revision)?;
         let rm = strict_read(&composition)?;
         let context = self.commit_context(commit::Change::Modification, &composition)?;

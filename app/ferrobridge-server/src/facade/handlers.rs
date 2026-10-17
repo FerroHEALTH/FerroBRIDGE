@@ -21,7 +21,7 @@
 mod batch;
 mod complete;
 mod conditional;
-mod read;
+pub(crate) mod read;
 mod render;
 mod search;
 mod transaction;
@@ -175,6 +175,7 @@ pub async fn validate_route(
     body: Bytes,
 ) -> Response {
     validate::validate(&facade, &access, &resource_type, &headers, &uri, &body)
+        .await
         .unwrap_or_else(Refusal::into_response)
 }
 

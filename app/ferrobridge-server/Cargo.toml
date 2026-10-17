@@ -95,6 +95,9 @@ aws-lc-rs.workspace = true
 ferrobridge-testkit.workspace = true
 # The OMOP round trip pins its rows as a reviewed snapshot.
 insta.workspace = true
+# The usage report cases validate every report against the vendored FerroPULSE
+# envelope schema.
+jsonschema.workspace = true
 # The CDR end-to-end lane builds the Web Template of the template it read.
 openehr-sdt.workspace = true
 # The shutdown cases drive a real socket, so they need a real HTTP client.

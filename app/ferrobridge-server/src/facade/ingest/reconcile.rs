@@ -188,6 +188,7 @@ impl Ingest<'_> {
         let (ehr_id, contribution) = committed_ids(&committed)?;
         let (built, instant) = self
             .run(program, inbound, provenance)
+            .await
             .map_err(|error| engine_refusal(&error))?;
         let rm = strict_read(&built)?;
         let mapped = [Mapped {

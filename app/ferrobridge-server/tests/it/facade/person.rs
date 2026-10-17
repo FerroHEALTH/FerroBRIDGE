@@ -90,6 +90,7 @@ fn person_composition(
         &document,
         "2026-09-15T09:00:00Z",
         &settings(),
+        &fhirconnect::engine::terminology::NoTerminology,
     )?;
     Ok(built.into_value().into_value())
 }

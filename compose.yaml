@@ -87,21 +87,32 @@ services:
       # `auto` renders pretty output on a terminal and JSON otherwise.
       FERROBRIDGE__TELEMETRY__FORMAT: ${FERROBRIDGE_LOG_FORMAT:-auto}
       FERROBRIDGE__TELEMETRY__FILTER: ${FERROBRIDGE_LOG_FILTER:-info}
+      # The installation report to FerroPULSE: on by default, and
+      # FERROBRIDGE__USAGE_REPORT__ENABLED=false in your shell or .env stops
+      # it. What it sends and when:
+      # https://ferrobridge.eu/docs/operate/usage-report.html
+      FERROBRIDGE__USAGE_REPORT__ENABLED: ${FERROBRIDGE__USAGE_REPORT__ENABLED:-true}
+      FERROBRIDGE__USAGE_REPORT__DEPLOYMENT: compose
+      # The instance id lives here, on the one writable volume.
+      FERROBRIDGE__USAGE_REPORT__STATE_DIR: /home/nonroot/state
     secrets:
       - cdm_url
       - cdr_bearer_token
-    # The server writes nothing outside the operator's mapping directory: no
-    # cache, no scratch file, no upload directory, and every secret is read
-    # once at boot. So the root filesystem is read-only, and the one writable
-    # path is the volume below. Should a lane ever need another, mount it for
-    # that path alone rather than dropping this line.
+    # The server writes two things, each to its own volume: the usage report's
+    # state under the image's home directory (owned by its runtime user, uid
+    # 65532, so a fresh named volume there is writable), and the console's
+    # saved mapping files. No cache, no scratch file, no upload directory, and
+    # every secret is read once at boot, so the root filesystem is read-only.
+    # Should a lane ever need another writable path, mount it for that path
+    # alone rather than dropping this line.
     read_only: true
-    # The console's saved mapping files, which survive a restart. The
-    # container runs as 65532:65532, so create the directory and hand it over
-    # before the first `docker compose up`:
+    # The saved mapping files survive a restart. The container runs as
+    # 65532:65532, so create the directory and hand it over before the first
+    # `docker compose up`:
     #
     #   mkdir -p operator-mappings && sudo chown 65532:65532 operator-mappings
     volumes:
+      - ferrobridge-state:/home/nonroot
       - type: bind
         source: ${FERROBRIDGE_OPERATOR_MAPPINGS:-./operator-mappings}
         target: /var/lib/ferrobridge/mappings
@@ -223,3 +234,4 @@ secrets:
 
 volumes:
   cdm-data:
+  ferrobridge-state:

@@ -83,6 +83,8 @@ pub struct Config {
     pub operations: Operations,
     /// The HL7 v2 face, off until its section turns it on.
     pub hl7v2: Hl7v2,
+    /// The installation report to `FerroPULSE`.
+    pub usage_report: section::UsageReport,
     /// The operator API, off until its section turns it on.
     pub operator: Operator,
 }
@@ -249,6 +251,14 @@ pub enum Error {
         /// The key that holds it.
         key: String,
     },
+    /// A reference fetch base is no http or https base.
+    #[error("{key} holds `{value}`, which is no http or https base without a query or a fragment")]
+    FetchBase {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: String,
+    },
     /// An upstream client refused the configuration it was handed.
     #[error("the {upstream} client refused its configuration")]
     Client {
@@ -392,6 +402,13 @@ pub enum Error {
     /// A size that would refuse every message.
     #[error("{key} is 0; a frame carries at least one byte")]
     FrameLimit {
+        /// The key that holds it.
+        key: String,
+    },
+    /// A collector endpoint that carries credentials or is plain `http` to a
+    /// host other than a loopback one.
+    #[error("{key} is not an https URL without credentials; only a loopback collector may be http")]
+    ReportEndpoint {
         /// The key that holds it.
         key: String,
     },
@@ -567,6 +584,7 @@ impl Config {
                 composition_language: self.operations.composition_language.clone(),
                 composition_territory: self.operations.composition_territory.clone(),
             },
+            usage_report: crate::usage_report::config::resolve(&self.usage_report)?,
             operator: resolve::resolve_operator(&self.operator, &self.auth)?,
         })
     }
@@ -581,6 +599,8 @@ pub struct FacadeSettings {
     pub identity_store: PathBuf,
     /// The page sizes a search answers with.
     pub search: crate::facade::search::Limits,
+    /// What may be fetched to resolve a reference the request does not carry.
+    pub references: crate::facade::references::Policy,
 }
 
 /// The HL7 v2 face, resolved.
@@ -645,6 +665,8 @@ pub struct Settings {
     pub hl7v2: Option<Hl7v2Settings>,
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
+    /// The installation report to `FerroPULSE`.
+    pub usage_report: crate::usage_report::config::UsageReportSettings,
     /// The operator API, when it is mounted.
     pub operator: Option<crate::operator::OperatorSettings>,
 }
