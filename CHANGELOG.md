@@ -97,6 +97,9 @@ crates on crates.io.
   Every route answers `401` without a token and `403` without
   `auth.operator_scope`, and logs one audit line naming the caller and the
   route, never content. The book's Operate section has a page for it.
+  Every diagnostic it and `ferrobridge mapping check --format json` answer
+  is the serde form of `openehr-mapping-core`'s `Diagnostic` (#726), so
+  `model_path` is now an array of steps.
 - `$validate` admits a token that carries the operator scope beside its `c`
   or `u` permission, and `$tofhir` and `$toopenehr` admit it as they admit
   any valid token, so an operator console dry-runs a mapping without a

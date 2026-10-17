@@ -252,20 +252,25 @@ impl fmt::Display for Report {
     }
 }
 
-/// Returns one diagnostic as a JSON object, its file named `file`.
+/// Returns one diagnostic in the serde form of [`Diagnostic`], its file named
+/// `file`, so a wire answer never names a host directory.
+///
+/// # Panics
+///
+/// Never in practice: the serde form of a [`Diagnostic`] is a flat object of
+/// strings, numbers and a string array, which `serde_json` always renders.
 #[must_use]
+#[expect(
+    clippy::expect_used,
+    reason = "the serde form of a Diagnostic is a flat object of strings, numbers and a string array, which serde_json always renders"
+)]
 pub fn diagnostic_json(diagnostic: &Diagnostic, file: &str) -> serde_json::Value {
-    let position = diagnostic.position();
-    serde_json::json!({
-        "file": file,
-        "line": position.map(openehr_mapping_core::position::Position::line),
-        "column": position.map(openehr_mapping_core::position::Position::column),
-        "severity": diagnostic.severity().to_string(),
-        "code": diagnostic.code().as_str(),
-        "message": diagnostic.message(),
-        "mapping": diagnostic.mapping_name().map(ToString::to_string),
-        "model_path": (!diagnostic.model_path().is_root()).then(|| diagnostic.model_path().to_string()),
-    })
+    let mut value =
+        serde_json::to_value(diagnostic).expect("a diagnostic should render as a JSON object");
+    if let Some(object) = value.as_object_mut() {
+        object.insert(String::from("file"), serde_json::Value::from(file));
+    }
+    value
 }
 
 /// Returns the inputs `settings` configures, the CDR `cdr` reaches serving
