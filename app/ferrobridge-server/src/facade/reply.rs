@@ -61,6 +61,18 @@ impl Header {
         }
     }
 
+    /// Returns the `Last-Modified` of a version, an HTTP-date.
+    ///
+    /// "Servers SHOULD return an `ETag` header … and a `Last-Modified` header"
+    /// (<https://hl7.org/fhir/R4/http.html#read>).
+    #[must_use]
+    pub fn last_modified(http_date: &str) -> Self {
+        Self {
+            name: header::LAST_MODIFIED,
+            value: http_date.to_owned(),
+        }
+    }
+
     /// Returns the `WWW-Authenticate` challenge an upstream sent.
     #[must_use]
     pub fn challenge(value: &str) -> Self {
