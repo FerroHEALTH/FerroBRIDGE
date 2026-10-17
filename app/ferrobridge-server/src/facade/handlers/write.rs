@@ -93,7 +93,7 @@ pub(crate) async fn create(
                 resource_type,
                 &written.ehr_id,
             )?;
-            return answer(facade, program, &written, headers, StatusCode::OK);
+            return answer(facade, program, &written, headers, StatusCode::OK).await;
         }
         Recognised::Revised(known) => {
             let ehr_id = known.ehr().map_err(|error| store_identifier(&error))?;
@@ -126,7 +126,7 @@ pub(crate) async fn create(
         ingest::Delivery::Committed => StatusCode::CREATED,
         ingest::Delivery::Reconciled | ingest::Delivery::Replayed => StatusCode::OK,
     };
-    answer(facade, program, &written, headers, status)
+    answer(facade, program, &written, headers, status).await
 }
 
 /// `PUT [base]/{type}/{id}`.
@@ -259,11 +259,11 @@ async fn resend(
             &Provenance::EachResource,
         )
         .await?;
-    answer(facade, program, &written, headers, StatusCode::OK)
+    answer(facade, program, &written, headers, StatusCode::OK).await
 }
 
 /// Answers one committed write, honouring `Prefer`.
-fn answer(
+async fn answer(
     facade: &Facade,
     program: &Loaded,
     written: &Written,
@@ -311,7 +311,9 @@ fn answer(
                     subject: subject.as_ref(),
                     store: facade.store(),
                 },
-            )?;
+                facade.translator(),
+            )
+            .await?;
             render::log_outcome(&rendered);
             Ok(reply::resource(status, &rendered.body, &response_headers))
         }

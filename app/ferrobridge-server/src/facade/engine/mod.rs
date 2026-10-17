@@ -19,6 +19,7 @@ use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::outcome::Outcome;
 use fhirconnect::engine::seam::IdentitySink;
 use fhirconnect::engine::seam::Seams;
+use fhirconnect::engine::terminology::Terminology;
 use fhirconnect::engine::traverse::Defaults;
 use fhirconnect::engine::traverse::error::EngineError;
 use fhirconnect::engine::traverse::to_fhir;
@@ -43,17 +44,21 @@ pub const COMPOSER: &str = "FerroBRIDGE";
 /// field the engine defaulted, because `FEEDER_AUDIT` "describes the origin of
 /// data that have been transformed into openEHR form and committed to the
 /// system" (<https://specifications.openehr.org/releases/RM/Release-1.1.0/common.html>).
+/// Every `conceptmap` code is translated through `terminology`, which
+/// [`crate::terminology::Translator::run`] supplies with the codes resolved.
 ///
 /// # Errors
 ///
-/// Returns [`EngineError`] for any element the program cannot map, and for a
-/// set of values the template does not admit as a composition.
+/// Returns [`EngineError`] for any element the program cannot map, for a
+/// code `terminology` does not translate, and for a set of values the
+/// template does not admit as a composition.
 pub fn inbound(
     program: &Program,
     index: &WebTemplateIndex,
     document: &Value,
     now: &str,
     settings: &crate::facade::Settings,
+    terminology: &dyn Terminology,
 ) -> Result<Outcome<CanonicalComposition>, EngineError> {
     inbound_from(
         program,
@@ -62,6 +67,7 @@ pub fn inbound(
         now,
         settings,
         SourceItem::of(document),
+        terminology,
     )
 }
 
@@ -74,8 +80,9 @@ pub fn inbound(
 ///
 /// # Errors
 ///
-/// Returns [`EngineError`] for any element the program cannot map, and for a
-/// set of values the template does not admit as a composition.
+/// Returns [`EngineError`] for any element the program cannot map, for a
+/// code `terminology` does not translate, and for a set of values the
+/// template does not admit as a composition.
 pub fn inbound_from(
     program: &Program,
     index: &WebTemplateIndex,
@@ -83,9 +90,10 @@ pub fn inbound_from(
     now: &str,
     settings: &crate::facade::Settings,
     source: Option<SourceItem>,
+    terminology: &dyn Terminology,
 ) -> Result<Outcome<CanonicalComposition>, EngineError> {
-    // TODO(#95): run the terminology calls the concept mappings need here,
-    // before any value is built, once the PROGRAMMED registry lands.
+    // TODO(#95): resolve the displays the concept mappings need here, before
+    // any value is built, once the PROGRAMMED registry lands.
     let mut origin = Origin::new(&settings.system_id);
     if let Some(source) = source {
         origin = origin.with_source(source);
@@ -100,33 +108,38 @@ pub fn inbound_from(
         &fhir_types::r4::schema::SCHEMAS,
         index,
         document,
-        &Seams::default(),
+        &Seams::default().with_terminology(terminology),
         &defaults,
         &CallContext::new(),
     )
 }
 
-/// Maps one composition into a FHIR document.
+/// Maps one composition into a FHIR document, translating every
+/// `conceptmap` code through `terminology`.
 ///
 /// Every resource the run creates beside the one it maps (a `hierarchy.split`
 /// occurrence or a `reference`) takes the id `identities` assigns.
 ///
 /// # Errors
 ///
-/// Returns [`EngineError`] for any element the program cannot map, and for a
-/// created resource `identities` gives no id.
+/// Returns [`EngineError`] for any element the program cannot map, for a
+/// created resource `identities` gives no id, and for a code `terminology`
+/// does not translate.
 pub fn outbound(
     program: &Program,
     index: &WebTemplateIndex,
     composition: &CanonicalComposition,
     identities: &dyn IdentitySink,
+    terminology: &dyn Terminology,
 ) -> Result<Outcome<Value>, EngineError> {
     to_fhir(
         program,
         &fhir_types::r4::schema::SCHEMAS,
         index,
         composition,
-        &Seams::default().with_identities(identities),
+        &Seams::default()
+            .with_identities(identities)
+            .with_terminology(terminology),
         &CallContext::new(),
     )
 }

@@ -134,6 +134,7 @@ impl Harness {
             &document,
             "2026-09-15T09:00:00Z",
             &settings(),
+            &fhirconnect::engine::terminology::NoTerminology,
         )
         .expect("the synthetic Condition maps");
         built.into_value().into_value()

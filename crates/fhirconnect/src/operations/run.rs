@@ -5,7 +5,7 @@
 //!
 //! Both operations are pure transformations that "change no server state", so
 //! everything a run needs arrives with the request: the compiled set, the
-//! element table, the mapping-function registry and the per-run [`Settings`].
+//! element table, the seams a run calls out to and the per-run [`Settings`].
 //! Neither reaches a CDR.
 //!
 //! FerroBRIDGE pins strictness where the draft leaves room: a refusal answers
@@ -29,11 +29,9 @@ use crate::engine::origin::Origin;
 use crate::engine::origin::SourceItem;
 use crate::engine::outcome::Warning;
 use crate::engine::seam::BundleReferences;
-use crate::engine::seam::NoReferences;
 use crate::engine::seam::Seams;
 use crate::engine::traverse;
 use crate::engine::traverse::Defaults;
-use crate::engine::traverse::functions::MappingFunctions;
 use crate::operations::contract::CompositionPayload;
 use crate::operations::contract::Format;
 use crate::operations::contract::ToFhirRequest;
@@ -169,12 +167,11 @@ impl<R> Transformed<R> {
 pub fn to_fhir<T: Table + ?Sized>(
     programs: &ProgramSet,
     table: &T,
-    functions: &dyn MappingFunctions,
+    seams: &Seams<'_>,
     settings: &Settings,
     request: &ToFhirRequest,
 ) -> Result<ToFhirResponse, OperationError> {
-    to_fhir_with_warnings(programs, table, functions, settings, request)
-        .map(Transformed::into_response)
+    to_fhir_with_warnings(programs, table, seams, settings, request).map(Transformed::into_response)
 }
 
 /// Runs `$tofhir` and answers the Bundle with the typed losses of the run.
@@ -185,7 +182,7 @@ pub fn to_fhir<T: Table + ?Sized>(
 pub fn to_fhir_with_warnings<T: Table + ?Sized>(
     programs: &ProgramSet,
     table: &T,
-    functions: &dyn MappingFunctions,
+    seams: &Seams<'_>,
     settings: &Settings,
     request: &ToFhirRequest,
 ) -> Result<Transformed<ToFhirResponse>, OperationError> {
@@ -199,11 +196,11 @@ pub fn to_fhir_with_warnings<T: Table + ?Sized>(
     let program = select_by_template(programs.programs(), &template)
         .map_err(|source| OperationError::Select { source })?;
     let context = request.context().cloned().unwrap_or_default();
-    let seams = Seams::default().with_functions(functions);
-    let outcome = traverse::to_fhir(program, table, index, &composition, &seams, &context)
-        .map_err(|source| OperationError::Mapping {
+    let outcome = traverse::to_fhir(program, table, index, &composition, seams, &context).map_err(
+        |source| OperationError::Mapping {
             source: Box::new(source),
-        })?;
+        },
+    )?;
     let resource_type = String::from(program.resource().as_str());
     let mut object = object_of(outcome.value())?;
     subject(table, &mut object, &resource_type, request.context())?;
@@ -269,11 +266,11 @@ pub fn to_fhir_with_warnings<T: Table + ?Sized>(
 pub fn to_openehr<T: Table + ?Sized>(
     programs: &ProgramSet,
     table: &T,
-    functions: &dyn MappingFunctions,
+    seams: &Seams<'_>,
     settings: &Settings,
     request: &ToOpenehrRequest,
 ) -> Result<ToOpenehrResponse, OperationError> {
-    to_openehr_with_warnings(programs, table, functions, settings, request)
+    to_openehr_with_warnings(programs, table, seams, settings, request)
         .map(Transformed::into_response)
 }
 
@@ -286,7 +283,7 @@ pub fn to_openehr<T: Table + ?Sized>(
 pub fn to_openehr_with_warnings<T: Table + ?Sized>(
     programs: &ProgramSet,
     table: &T,
-    functions: &dyn MappingFunctions,
+    seams: &Seams<'_>,
     settings: &Settings,
     request: &ToOpenehrRequest,
 ) -> Result<Transformed<ToOpenehrResponse>, OperationError> {
@@ -305,10 +302,8 @@ pub fn to_openehr_with_warnings<T: Table + ?Sized>(
         origin = origin.with_source(source);
     }
     let defaults = settings.defaults().clone().with_origin(origin);
-    let references = BundleReferences::new(bundle_entries(request.bundle())?, &NoReferences);
-    let seams = Seams::default()
-        .with_functions(functions)
-        .with_references(&references);
+    let references = BundleReferences::new(bundle_entries(request.bundle())?, seams.references());
+    let seams = seams.with_references(&references);
     let outcome = traverse::to_openehr(
         program,
         table,

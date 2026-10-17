@@ -292,7 +292,7 @@ impl Ingest<'_> {
             .get("entry")
             .and_then(Value::as_array)
             .unwrap_or_default();
-        let partition = self.map_entries(entries, unmapped, provenance);
+        let partition = self.map_entries(entries, unmapped, provenance).await;
         if !partition.failures.is_empty() {
             return Err(Refused::of(
                 StatusCode::UNPROCESSABLE_ENTITY,

@@ -67,6 +67,7 @@ fn two_sites(harness: &Harness) -> serde_json::Value {
         &document,
         "2026-09-15T09:00:00Z",
         &settings(),
+        &fhirconnect::engine::terminology::NoTerminology,
     )
     .expect("the Condition maps")
     .into_value()

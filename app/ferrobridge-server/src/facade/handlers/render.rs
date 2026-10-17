@@ -20,6 +20,7 @@ use fhir_types::codec::Value;
 use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::outcome::SkipReason;
 use fhirconnect::engine::outcome::Warning;
+use fhirconnect::engine::seam::DerivedIdentity;
 use fhirconnect::resolve::program::Program;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
@@ -39,6 +40,7 @@ use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::status;
+use crate::terminology::{Direction, Translator};
 
 /// What one rendered resource carries beside its body.
 #[derive(Debug, Clone)]
@@ -96,14 +98,16 @@ pub(crate) struct Origin<'a> {
 ///
 /// The engine's refusal, and the `500` of [`complete::refusal`] naming every
 /// required element neither the mapping nor the binding supplies.
-pub(crate) fn render(
+pub(crate) async fn render(
     program: &Program,
     index: &WebTemplateIndex,
     composition: &CanonicalComposition,
     origin: Origin<'_>,
+    translator: &Translator,
 ) -> Result<Rendered, Refusal> {
     let resource_type = program.resource().as_str();
-    let (value, _created, warnings) = produce(program, index, composition, &origin)?;
+    let (value, _created, warnings) =
+        produce(program, index, composition, &origin, translator).await?;
     let body = resource_object(value, resource_type)?;
     decorate(
         body,
@@ -126,15 +130,17 @@ pub(crate) fn render(
 ///
 /// A `404` when the run no longer creates that resource, the engine's
 /// refusal, and the `500` of [`complete::refusal`].
-pub(crate) fn render_created(
+pub(crate) async fn render_created(
     program: &Program,
     index: &WebTemplateIndex,
     composition: &CanonicalComposition,
     origin: Origin<'_>,
     target: (&str, &FhirResourceId),
+    translator: &Translator,
 ) -> Result<Rendered, Refusal> {
     let (resource_type, id) = target;
-    let (_value, created, warnings) = produce(program, index, composition, &origin)?;
+    let (_value, created, warnings) =
+        produce(program, index, composition, &origin, translator).await?;
     let found = created.into_iter().find(|resource| {
         resource.get("resourceType").and_then(Value::as_str) == Some(resource_type)
             && resource.get("id").and_then(Value::as_str) == Some(id.as_str())
@@ -165,14 +171,16 @@ pub(crate) fn render_created(
 ///
 /// The engine's refusal, the `500` of a created resource whose id is outside
 /// the R4 grammar, and the `500` of [`complete::refusal`].
-pub(crate) fn render_units(
+pub(crate) async fn render_units(
     program: &Program,
     index: &WebTemplateIndex,
     composition: &CanonicalComposition,
     origin: Origin<'_>,
+    translator: &Translator,
 ) -> Result<Vec<(FhirResourceId, Rendered)>, Refusal> {
     let resource_type = program.resource().as_str();
-    let (value, created, warnings) = produce(program, index, composition, &origin)?;
+    let (value, created, warnings) =
+        produce(program, index, composition, &origin, translator).await?;
     let body = resource_object(value, resource_type)?;
     let own = decorate(
         body,
@@ -207,14 +215,24 @@ pub(crate) fn render_units(
 
 /// Runs the outbound mapping, binding every resource it creates under the
 /// entry's own resource.
-fn produce(
+///
+/// The `conceptmap` codes are resolved by probe runs that bind nothing
+/// ([`DerivedIdentity`]), so only the one final run writes to the identity
+/// map.
+async fn produce(
     program: &Program,
     index: &WebTemplateIndex,
     composition: &CanonicalComposition,
     origin: &Origin<'_>,
+    translator: &Translator,
 ) -> Result<(Value, Vec<Value>, Vec<Warning>), Refusal> {
+    let resolved = translator
+        .resolve(Direction::ToFhir, |terminology| {
+            engine::outbound(program, index, composition, &DerivedIdentity, terminology)
+        })
+        .await;
     let identities = CreatedIdentities::new(origin.store, program.resource().as_str(), origin.id);
-    let produced = engine::outbound(program, index, composition, &identities)
+    let produced = engine::outbound(program, index, composition, &identities, &resolved)
         .map_err(|error| Refusal::from(crate::facade::ingest::engine_refusal(&error)))?;
     let warnings = produced.warnings().to_vec();
     let (value, created) = produced.into_parts();
