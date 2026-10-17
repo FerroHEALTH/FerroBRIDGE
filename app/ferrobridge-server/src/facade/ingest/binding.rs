@@ -231,7 +231,7 @@ impl Ingest<'_> {
         composition: &CanonicalComposition,
         path: &str,
     ) -> Result<Written, Refused> {
-        let entry = engine::entry_named(program.program(), composition, path)?.ok_or_else(|| {
+        let entry = engine::entry::entry_named(program.program(), composition, path)?.ok_or_else(|| {
             Refused::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Issue::error(IssueType::Exception).diagnosing(
@@ -329,7 +329,7 @@ impl Ingest<'_> {
         version: &ObjectVersionId,
         composition: &CanonicalComposition,
     ) -> Result<(FhirResourceId, CompositionBinding), Refused> {
-        let entry = engine::entry_of(program.program(), composition).ok_or_else(|| {
+        let entry = engine::entry::entry_of(program.program(), composition).ok_or_else(|| {
             Refused::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Issue::error(IssueType::Exception).diagnosing(
@@ -344,7 +344,7 @@ impl Ingest<'_> {
     /// and returns the resource id and the binding that stand.
     ///
     /// Each entry of the program's archetype is a resource of its own, keyed
-    /// by the composition and [`engine::Entry::identity_path`].
+    /// by the composition and [`engine::entry::Entry::identity_path`].
     pub(crate) fn bind_entry(
         &self,
         program: &Loaded,
@@ -352,7 +352,7 @@ impl Ingest<'_> {
         ehr_id: &EhrId,
         version: &ObjectVersionId,
         composition: &CanonicalComposition,
-        entry: &engine::Entry,
+        entry: &engine::entry::Entry,
     ) -> Result<(FhirResourceId, CompositionBinding), Refused> {
         // NOTE: no specification governs this: our own design, the facade serves the
         // first resource of a split and carries every further one as contained, so
@@ -376,7 +376,7 @@ impl Ingest<'_> {
                 .internal_of(resource_type, &derive::map_key(&earlier))
                 .map_err(|error| store_refusal(&error))?;
             if held.is_some()
-                && engine::entry_named(program.program(), composition, &legacy)?
+                && engine::entry::entry_named(program.program(), composition, &legacy)?
                     .is_some_and(|named| named == *entry)
             {
                 recorded = held;
