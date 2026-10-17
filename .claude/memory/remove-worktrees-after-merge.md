@@ -14,3 +14,5 @@ Remove a worktree under `.claude/worktrees/` and its local branches (`<branch>`,
 **Why:** the owner found leftover worktrees and asked (2026-10-15) that they "never hang there".
 
 **How to apply:** on each "PR merged" message: `git pull --ff-only`, `git worktree remove .claude/worktrees/<agent>`, `git branch -D <branch> worktree-<agent>`, `git fetch --prune`. If `worktree remove` leaves a non-empty folder, check it holds nothing unmerged, then move it out of the repo into the session scratchpad (the `block_dangerous` hook refuses `rm -rf` inside the repo). Keep a worktree only while its PR is open or its worker is running.
+
+**Where:** every checkout, the orchestrator's own included, goes under `.claude/worktrees/<name>` (`git worktree add .claude/worktrees/<name> -b <branch> origin/main`), never a sibling folder beside the project. The owner objected on 2026-10-17 to `FerroBRIDGE-memwip` next to the repo: "why is this not in our main project?"
