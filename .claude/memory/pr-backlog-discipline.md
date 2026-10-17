@@ -32,9 +32,9 @@ faster than a serial gate drains it.
   new work; when the list grows faster than it merges, slow the hand-out.
 - **Parallel PRs touch disjoint files.** A worker may open several PRs only
   when each stands alone on `main` and touches files no other open PR
-  changes; otherwise its next issue waits for the previous PR to merge. if two issues touch the same module
-  (the server startup in `lib.rs`, `CHANGELOG.md` aside), they go to the same
-  worker, in sequence.
+  changes; otherwise its next issue waits for the previous PR to merge. Two
+  issues that touch the same module (the server startup in `lib.rs`;
+  `CHANGELOG.md` aside) go to the same worker, in sequence.
 - **No stacked PRs.** Never branch a PR from another open PR's branch. Wait
   for the base to merge, then branch from `main`. If a stack exists anyway,
   only the bottom PR is queued; each upper PR is rebuilt from `main` with
