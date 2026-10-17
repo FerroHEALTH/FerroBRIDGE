@@ -38,7 +38,7 @@ the committed guards, so both are live code from day one and both need a gate.
 | `todo-issues` | `scripts/checks/todo-issues.sh` with the job token at `issues: read`: every `TODO(#N)` and every issue `Command::pending_issue` names is open |
 | `file-length` | `scripts/checks/file-length.sh`: a hand-written Rust file stays at most 1000 lines |
 | `contribution-licence` | `scripts/checks/contribution-licence.sh` on a pull request: the licensing checkbox of the body is ticked |
-| `tracker-helpers` | the `--self-test` of `scripts/gh/fields.sh`, `labels.sh` and `migrate-fields.sh`, each driven against a stub `gh` on `PATH` |
+| `tracker-helpers` | the `--self-test` of `scripts/gh/fields.sh`, `labels.sh` and `migrate-fields.sh`, each driven against a stub `gh` on `PATH`, and of `scripts/deploy-probe.sh` against a stub `curl` |
 
 `hadolint` runs against a real recipe since #22: `docker/Dockerfile`, the one
 tracked Dockerfile, whose digest-pinned `FROM` the `versions` job checks
