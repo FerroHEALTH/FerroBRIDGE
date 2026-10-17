@@ -105,6 +105,7 @@ fn a_log_format_outside_the_three_is_refused_naming_the_key() {
 fn a_log_format_outside_the_three_exits_seventy_eight() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_ferrobridge"))
         .arg("serve")
+        .env("FERROBRIDGE__USAGE_REPORT__ENABLED", "false")
         .env_remove("FERROBRIDGE_CONFIG")
         .env(FORMAT_ENV, "xml")
         .output()

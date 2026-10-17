@@ -275,6 +275,24 @@ jobs:
           persist-credentials: false
       - run: bash scripts/checks/favicon-sync.sh
 
+  # Every launcher of the server in a test lane switches the usage report
+  # off, so a throwaway runner never counts as an installation (#581). The
+  # self-test first proves the guard catches an unswitched launcher.
+  usage-report-off:
+    name: usage-report-off
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          set -euo pipefail
+          bash scripts/checks/usage-report-off.sh --self-test
+          bash scripts/checks/usage-report-off.sh
+
   # Every TODO(#N) and every issue a pending subcommand names must still be
   # open on the tracker (#614). The job token reads the issues and nothing
   # else.
@@ -1089,6 +1107,7 @@ jobs:
       - versions
       - profile-packages
       - favicon-sync
+      - usage-report-off
       - todo-issues
       - tracker-helpers
       - detect

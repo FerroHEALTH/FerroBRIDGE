@@ -96,7 +96,11 @@ the testkit tool crate. Beside it:
   Launch 2.x resource server behind `[auth]` (#400): the issuer's keys
   discovered and cached, every access token checked, SMART v2 scopes per
   interaction and the patient compartment, and one audit line per request;
-  every facade handler takes the caller's `Access`.
+  every facade handler takes the caller's `Access`. `src/usage_report/`
+  sends the installation report to FerroPULSE on its envelope v2 behind
+  `[usage_report]` (#581): one `start` and one `daily` report from `serve`,
+  the latency window the request log fills by route group, and the instance
+  id under `state_dir`, validated against the vendored schema in the tests.
 
 - `crates/fhir-types`: the generated FHIR model, Apache-2.0, emitted whole by
   the generator below and never hand-edited: one module per version, STU3,
@@ -210,7 +214,8 @@ the testkit tool crate. Beside it:
   which fails when a file disagrees with the `docs/VERSIONS.md` pin matrix or
   claims a licence other than `BUSL-1.1`; `crate-version-guard.sh`, the crate
   bump rule; `favicon-sync.sh`, the book theme favicon against the brand mark;
-  `todo-issues.sh`, which fails a `TODO(#N)` or a pending subcommand's issue
+  `usage-report-off.sh`, every launcher of the server in a test lane with the
+  usage report switched off; `todo-issues.sh`, which fails a `TODO(#N)` or a pending subcommand's issue
   that the tracker reports closed;
   `pin-freshness.sh`, every pin no ecosystem watches against its newest
   upstream release; and `conformance.sh`, the pass-list gate over the six

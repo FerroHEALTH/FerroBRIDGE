@@ -35,6 +35,7 @@ the committed guards, so both are live code from day one and both need a gate.
 | `versions` | `scripts/checks/versions.sh` |
 | `profile-packages` | `scripts/vendor/profile-packages.sh` over a cache keyed on `--cache-key` (the profile packages fetched at build time and never committed, each checked at its pinned count and digest), then `--self-test` and `--check`: every `PROVENANCE.md` against its pin, no unpinned tree, and every `dependencies` entry of every fetched `package.json` pinned too |
 | `favicon-sync` | `scripts/checks/favicon-sync.sh` |
+| `usage-report-off` | `scripts/checks/usage-report-off.sh --self-test`, then the guard itself: every launcher of the server in a script, a workflow or a Rust test switches the usage report off |
 | `todo-issues` | `scripts/checks/todo-issues.sh` with the job token at `issues: read`: every `TODO(#N)` and every issue `Command::pending_issue` names is open |
 | `file-length` | `scripts/checks/file-length.sh`: a hand-written Rust file stays at most 1000 lines |
 | `contribution-licence` | `scripts/checks/contribution-licence.sh` on a pull request: the licensing checkbox of the body is ticked |

@@ -46,6 +46,23 @@ crates on crates.io.
   products fit together, and licensing and trademarks.
 ### Added
 
+- `ferrobridge serve` sends the FerroHEALTH installation report to FerroPULSE
+  on its report envelope v2 (#581): one `start` report per process start and
+  one `daily` report a day to `https://report.ferropulse.eu/v1/report`,
+  carrying the version, the licence type, the deployment kind, coarse host
+  size, the enabled lanes, the mapping counts as ranges, the upstream health
+  and latency histograms per route group, and never clinical content, an
+  identifier other than the random instance id, a mapping name, a URL or a
+  request path. The new `[usage_report]` section (`enabled`, `endpoint`,
+  `state_dir`, `deployment`) configures it; it is on by default, sends
+  nothing without a writable `state_dir`, stays off in a CI environment,
+  and logs one boot line saying which. The compose file keeps the instance
+  id on a new `ferrobridge-state` volume. The book's new Operate page, The
+  usage report, lists every field and carries the privacy notice. Every
+  report the server builds is validated in the tests against FerroPULSE's
+  schema, vendored by `scripts/vendor/ferropulse-schemas.sh`, and
+  `scripts/checks/usage-report-off.sh` (a new CI job) fails a test launcher
+  that leaves the report on.
 - `ferrobridge mapping check` runs (#595). It loads the FHIRconnect tree of
   `[mappings] directory`, compiles every context against its template from
   `[mappings] templates` or the `[cdr]`, loads and validates the OMOCL files

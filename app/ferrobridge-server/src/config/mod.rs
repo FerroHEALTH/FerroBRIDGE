@@ -82,6 +82,8 @@ pub struct Config {
     pub operations: Operations,
     /// The HL7 v2 face, off until its section turns it on.
     pub hl7v2: Hl7v2,
+    /// The installation report to `FerroPULSE`.
+    pub usage_report: section::UsageReport,
 }
 
 /// A configuration the server refuses to start on.
@@ -392,6 +394,13 @@ pub enum Error {
         /// The key that holds it.
         key: String,
     },
+    /// A collector endpoint that carries credentials or is plain `http` to a
+    /// host other than a loopback one.
+    #[error("{key} is not an https URL without credentials; only a loopback collector may be http")]
+    ReportEndpoint {
+        /// The key that holds it.
+        key: String,
+    },
     /// The mapping set the operations lane runs did not load.
     #[error("the mapping set could not be loaded")]
     Mappings {
@@ -564,6 +573,7 @@ impl Config {
                 composition_language: self.operations.composition_language.clone(),
                 composition_territory: self.operations.composition_territory.clone(),
             },
+            usage_report: crate::usage_report::config::resolve(&self.usage_report)?,
         })
     }
 }
@@ -641,6 +651,8 @@ pub struct Settings {
     pub hl7v2: Option<Hl7v2Settings>,
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
+    /// The installation report to `FerroPULSE`.
+    pub usage_report: crate::usage_report::config::UsageReportSettings,
 }
 
 /// The OMOP CDM database, resolved.

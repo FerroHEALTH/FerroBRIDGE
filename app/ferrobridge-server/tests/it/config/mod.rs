@@ -13,6 +13,7 @@ mod hl7v2;
 mod oauth;
 mod refusals;
 mod secrets;
+mod usage_report;
 
 use ferrobridge_server::config::{Config, Error};
 use std::collections::BTreeMap;

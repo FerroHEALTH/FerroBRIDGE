@@ -1204,6 +1204,7 @@ dependencies = [
  "http",
  "insta",
  "jiff",
+ "jsonschema",
  "jsonwebtoken",
  "omocl",
  "omop-cdm",

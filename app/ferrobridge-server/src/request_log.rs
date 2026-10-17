@@ -7,8 +7,10 @@
 //! A body never reaches the log, and neither does the raw URL: the matched
 //! route is the path template, so an identifier in a path segment stays out.
 //! A query value is logged only when the deployment named its parameter in
-//! `[telemetry] logged_query_parameters`. No specification governs the log
-//! line: our own design, and the clinical-payload rule made mechanical.
+//! `[telemetry] logged_query_parameters`. The same method, matched route,
+//! status and latency are recorded into the usage report's window
+//! ([`crate::usage_report::window`]). No specification governs the log line:
+//! our own design, and the clinical-payload rule made mechanical.
 
 use axum::extract::{MatchedPath, Request, State};
 use axum::middleware::Next;
@@ -25,10 +27,13 @@ pub const MAX_VALUE_LENGTH: usize = 64;
 /// Logs `request` after it completes and returns its response untouched.
 pub async fn log(State(state): State<Arc<AppState>>, request: Request, next: Next) -> Response {
     let method = request.method().clone();
-    let route = request.extensions().get::<MatchedPath>().map_or_else(
-        || request.uri().path().to_owned(),
-        |matched| matched.as_str().to_owned(),
-    );
+    let matched = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|matched| matched.as_str().to_owned());
+    let route = matched
+        .clone()
+        .unwrap_or_else(|| request.uri().path().to_owned());
     let query = allowed_parameters(
         request.uri().query().unwrap_or_default(),
         state.logged_query_parameters(),
@@ -39,7 +44,11 @@ pub async fn log(State(state): State<Arc<AppState>>, request: Request, next: Nex
     let started = Instant::now();
     let response = next.run(request).await;
     let status = response.status();
-    let latency_ms = started.elapsed().as_secs_f64() * 1000.0;
+    let elapsed = started.elapsed();
+    state
+        .usage_window()
+        .record(&method, matched.as_deref(), status, elapsed);
+    let latency_ms = elapsed.as_secs_f64() * 1000.0;
     let (method, route, query, request_id) =
         (method.as_str(), route.as_str(), query.as_str(), id.as_str());
     let status_code = status.as_u16();

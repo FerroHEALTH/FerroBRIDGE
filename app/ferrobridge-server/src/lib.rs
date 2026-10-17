@@ -34,6 +34,7 @@ pub mod request_log;
 pub mod startup;
 pub mod state;
 pub mod telemetry;
+pub mod usage_report;
 pub mod walk;
 
 use std::future::Future;

@@ -38,3 +38,4 @@ mod search_e2e;
 mod shutdown;
 mod support;
 mod telemetry;
+mod usage_report;

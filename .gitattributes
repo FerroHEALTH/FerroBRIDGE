@@ -19,3 +19,4 @@ tools/ferrobridge-testkit/fixtures/opt/kds-person/** linguist-vendored -text
 crates/ferrobridge-hl7v2/vendor/** linguist-vendored -text
 crates/ferrobridge-fhirpath/vendor/** linguist-vendored -text
 tools/ferrobridge-testkit/vendor/** linguist-vendored -text
+app/ferrobridge-server/tests/fixtures/ferropulse/** linguist-vendored -text

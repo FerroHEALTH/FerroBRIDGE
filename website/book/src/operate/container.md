@@ -80,11 +80,14 @@ FERROBRIDGE_BIND_HOST=10.0.0.7 docker compose up
 
 The service runs with a read-only root filesystem, every Linux capability
 dropped, and `no-new-privileges:true`. There is no `tmpfs` beside it because
-the quickstart's server writes nothing: no cache, no scratch file, no upload
-directory, and every secret is read once at boot. The one file the server
-writes is the FHIR facade's identity store, and the facade is off in the
-quickstart; [the identity store](#the-identity-store) says what to mount when
-you turn it on.
+the quickstart's server writes almost nothing: no cache, no scratch file, no
+upload directory, and every secret is read once at boot. It keeps the
+[usage report](usage-report.md)'s instance id on the named volume
+`ferrobridge-state`, mounted at `/home/nonroot`, the image's home directory,
+which its runtime user owns. The other file the server writes is the FHIR
+facade's identity store, and the facade is off in the quickstart;
+[the identity store](#the-identity-store) says what to mount when you turn it
+on.
 
 ## The identity store
 
