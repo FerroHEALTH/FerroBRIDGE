@@ -82,6 +82,10 @@ pub const NAVIGATION: [Group; 4] = [
                 href: crate::engine::FILES,
                 label: "Files",
             },
+            Entry {
+                href: crate::editor::EDIT,
+                label: "New file",
+            },
         ],
     },
     Group {

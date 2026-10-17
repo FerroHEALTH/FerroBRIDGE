@@ -186,6 +186,16 @@ fn routes(session: SessionState, bridge: String) -> AnyView {
                 ssr=SsrMode::Async
             />
             <Route
+                path=path!("/edit")
+                view=guarded(session, crate::editor::EditPage)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/edit/*path")
+                view=guarded(session, crate::editor::EditPage)
+                ssr=SsrMode::Async
+            />
+            <Route
                 path=path!("/files")
                 view=guarded(session, crate::engine::FilesPage)
                 ssr=SsrMode::Async

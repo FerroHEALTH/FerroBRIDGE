@@ -21,6 +21,7 @@ use fhir_types::r4::capability_statement::CapabilityStatement;
 
 use crate::config::settings::BridgeSettings;
 
+pub mod editing;
 pub mod operations;
 
 /// The FHIR JSON media type (FHIR R4 REST API, `http.html`, content types
@@ -106,6 +107,10 @@ pub enum BridgeError {
     /// A resource type name that is not ASCII letters.
     #[error("the resource type is not a FHIR resource type name")]
     ResourceType,
+    /// A save's reason that is empty, too long, or not printable ASCII on
+    /// one line, which the bridge's reason header requires.
+    #[error("the reason is not one line of at most 200 printable ASCII characters")]
+    Reason,
     /// A request body the console built has no JSON form.
     #[error("the request could not be written as JSON")]
     Encode {

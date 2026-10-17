@@ -214,6 +214,11 @@ pub mod server {
                     "the resource type is not a FHIR resource type name, so it is not asked for",
                 ),
             }),
+            BridgeError::Reason => Ok(Refusal::Invalid {
+                reason: String::from(
+                    "The reason must be one line of at most 200 printable ASCII characters, so the save is not sent.",
+                ),
+            }),
             BridgeError::Route { .. }
             | BridgeError::Token
             | BridgeError::Encode { .. }

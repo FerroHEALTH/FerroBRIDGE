@@ -242,6 +242,9 @@ fn content(path: &str, file: &MappingFile) -> AnyView {
             <p class="text-muted">
                 "SHA-256 " <code>{digest}</code>
             </p>
+            <p>
+                <a href=format!("{}/{path}", crate::editor::EDIT)>"Open it in the editor"</a>
+            </p>
             <ol class="code-lines" aria-label="The file, one line per item">
                 {lines}
             </ol>
