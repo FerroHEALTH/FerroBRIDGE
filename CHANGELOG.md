@@ -25,6 +25,9 @@ crates on crates.io.
 
 ### Changed
 
+- The FHIRconnect operations lane reads its mapping directory through the
+  walk the facade uses (#524), so a `.YML` or `.YAML` file is now read by both
+  lanes; the operations lane read only the lower-case spellings before.
 - `SECURITY.md` and `CONTRIBUTING.md` keep what is particular to FerroBRIDGE
   and link the FerroHEALTH family book at <https://ferrohealth.eu/docs/> for
   the rest (#402). `SECURITY.md` keeps the supported versions, the reporting

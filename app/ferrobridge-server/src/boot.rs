@@ -247,7 +247,7 @@ where
             stop.send_replace(true);
         })
     };
-    let (started, listener) = match crate::start(settings).await {
+    let (started, listener) = match crate::lanes::start(settings).await {
         Ok(started) => {
             started.announce();
             let listener = bind().await?;
@@ -278,11 +278,13 @@ where
             listener,
             app,
             settings.server.shutdown_timeout,
-            crate::stopped(&stop),
+            crate::lanes::stopped(&stop),
         )
         .await
         .context("serving HTTP")?,
-        Some(face) => crate::serve_with_face(listener, app, &settings.server, face, &stop).await?,
+        Some(face) => {
+            crate::lanes::serve_with_face(listener, app, &settings.server, face, &stop).await?;
+        }
     }
     signal.abort();
     Ok(())
@@ -299,7 +301,7 @@ async fn wait_for_cdr(
     backoff: Backoff,
     first: anyhow::Error,
     stop: &tokio::sync::watch::Sender<bool>,
-) -> anyhow::Result<Option<(crate::Started, TcpListener)>> {
+) -> anyhow::Result<Option<(crate::lanes::Started, TcpListener)>> {
     use anyhow::Context;
 
     let shared = listener
@@ -326,11 +328,11 @@ async fn wait_for_cdr(
         probes,
         app,
         settings.server.shutdown_timeout,
-        crate::stopped(&done),
+        crate::lanes::stopped(&done),
     ));
     let started = tokio::select! {
-        started = retry(&status, backoff, first, || crate::start(settings)) => Some(started),
-        () = crate::stopped(stop) => None,
+        started = retry(&status, backoff, first, || crate::lanes::start(settings)) => Some(started),
+        () = crate::lanes::stopped(stop) => None,
     };
     done.send_replace(true);
     probing
