@@ -1543,6 +1543,7 @@ dependencies = [
  "leptos_axum",
  "leptos_meta",
  "leptos_router",
+ "openehr-mapping-core",
  "reqwest",
  "secrecy",
  "serde",

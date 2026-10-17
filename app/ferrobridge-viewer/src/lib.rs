@@ -27,6 +27,16 @@
 
 pub mod about;
 pub mod app;
+// The browser half of a server function, which the server macro writes, is a
+// network call that awaits nothing, and the lint names the macro alone.
+#[cfg_attr(
+    target_arch = "wasm32",
+    expect(
+        clippy::unused_async_trait_impl,
+        reason = "written by the server_fn #[server] macro for the browser half, whose call awaits nothing here (https://docs.rs/server_fn/0.8/server_fn/attr.server.html)"
+    )
+)]
+pub mod engine;
 pub mod model;
 pub mod shell;
 pub mod styles;

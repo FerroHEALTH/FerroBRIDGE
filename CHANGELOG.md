@@ -107,6 +107,19 @@ crates on crates.io.
   products fit together, and licensing and trademarks.
 ### Added
 
+- The console shows the engine state (#604). The dashboard has the
+  bridge's build facts, pins, lanes and listeners from `GET /health/info`,
+  its readiness indicators from `GET /health/readiness`, and the counts of
+  its running load from `GET /operator/state`. The capability screen shows
+  the R4 `CapabilityStatement` as cards for its resources with their
+  interactions, search parameters and operations, the system level and the
+  security, with the JSON behind a disclosure and the SMART discovery
+  document beside it. The mappings overview shows each context's program
+  with its template, profile, resource type, models, extensions and search
+  declaration, the templates with their source, the OMOCL files, and every
+  diagnostic, read into `openehr_mapping_core::diagnostic::Diagnostic`. Each
+  screen is drawn on the server. A refused or unreachable call draws its
+  status and diagnostics, or the fault, in its section.
 - The console has its shell and visual system (#601): a role layer
   (`surface`, `ink`, `muted`, `accent` and the status tints) derived from the
   "Indigo & Iron" brand tokens, the light, dark and system themes drawn by

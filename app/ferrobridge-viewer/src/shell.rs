@@ -61,7 +61,6 @@ pub struct Group {
 }
 
 /// The navigation, in the order it is drawn.
-// TODO(#604): the Mappings group lists the mappings overview and the Bridge group the capability page.
 // TODO(#605): the Tools group lists the transform playground and the validation dry run.
 pub const NAVIGATION: [Group; 4] = [
     Group {
@@ -75,7 +74,10 @@ pub const NAVIGATION: [Group; 4] = [
     Group {
         id: "nav-mappings",
         title: "Mappings",
-        entries: &[],
+        entries: &[Entry {
+            href: crate::engine::MAPPINGS,
+            label: "Overview",
+        }],
     },
     Group {
         id: "nav-tools",
@@ -85,10 +87,16 @@ pub const NAVIGATION: [Group; 4] = [
     Group {
         id: "nav-bridge",
         title: "Bridge",
-        entries: &[Entry {
-            href: ABOUT,
-            label: "About",
-        }],
+        entries: &[
+            Entry {
+                href: crate::engine::CAPABILITY,
+                label: "Capability",
+            },
+            Entry {
+                href: ABOUT,
+                label: "About",
+            },
+        ],
     },
 ];
 

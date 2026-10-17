@@ -8,13 +8,13 @@
 //! pages for a path the console does not serve and for a session store it
 //! cannot read.
 
-use leptos::either::{Either, EitherOf3};
+use leptos::either::Either;
 use leptos::prelude::*;
 use leptos_meta::{Stylesheet, Title, provide_meta_context};
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::{SsrMode, path};
 
-use crate::model::{BridgeView, Outcome, Refusal, SessionState, ViewError};
+use crate::model::SessionState;
 use crate::shell::Bar;
 use crate::styles;
 use crate::theme::Theme;
@@ -42,9 +42,6 @@ pub const ABOUT: &str = "/about";
 
 /// The word the page shows for an operator the provider gave no name.
 const OPERATOR: &str = "Operator";
-
-/// The bridge's status, read once for a signed-in page.
-type BridgeResource = Resource<Result<Outcome<BridgeView>, ViewError>>;
 
 /// The whole HTML document the server renders around [`App`], in the theme
 /// the request's cookie names, so the page arrives in it before any script
@@ -98,8 +95,7 @@ pub fn App() -> impl IntoView {
 fn layout(session: SessionState, operator: String, bar: Option<Bar>, bridge: String) -> AnyView {
     // NOTE: leptos_axum, `generate_route_list`: the server lists its routes by
     // rendering the app with no request, so every layout draws the same routes.
-    let status = bar.map(|bar| bar.bridge);
-    let routes = routes(session, status, bridge);
+    let routes = routes(session, bridge);
     match bar {
         Some(bar) => signed_in(operator, bar, routes).into_any(),
         None => visitor(routes).into_any(),
@@ -137,10 +133,23 @@ fn visitor(page: AnyView) -> impl IntoView {
     }
 }
 
-/// The routes, for a request whose session is `session`; `status` is the
-/// bridge's status a signed-in page reads, and `bridge` the bridge's base
-/// URL the About page shows a signed-in operator.
-fn routes(session: SessionState, status: Option<BridgeResource>, bridge: String) -> AnyView {
+/// The page `page` for a request whose session is `session`: the page for a
+/// signed-in operator, the sign-in for a visitor, and the fault page when the
+/// console cannot read its session store.
+fn guarded<V>(session: SessionState, page: fn() -> V) -> impl Fn() -> AnyView + Clone + Send + Sync
+where
+    V: IntoView + 'static,
+{
+    move || match session {
+        SessionState::SignedIn => page().into_any(),
+        SessionState::SignedOut => view! { <SignInPage /> }.into_any(),
+        SessionState::Unreadable => unreadable().into_any(),
+    }
+}
+
+/// The routes, for a request whose session is `session`; `bridge` is the
+/// bridge's base URL the About page shows a signed-in operator.
+fn routes(session: SessionState, bridge: String) -> AnyView {
     // NOTE: the Leptos book, `ssr/23_ssr_modes`: a page the bridge fills renders
     // `Async`, whole in one sweep, so no content waits on a script.
     view! {
@@ -153,13 +162,17 @@ fn routes(session: SessionState, status: Option<BridgeResource>, bridge: String)
         }>
             <Route
                 path=path!("/")
-                view=move || match (session, status) {
-                    (SessionState::SignedIn, Some(status)) => {
-                        EitherOf3::A(view! { <Dashboard status /> })
-                    }
-                    (SessionState::Unreadable, _) => EitherOf3::C(unreadable()),
-                    _ => EitherOf3::B(view! { <SignInPage /> }),
-                }
+                view=guarded(session, crate::engine::DashboardPage)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/capability")
+                view=guarded(session, crate::engine::CapabilityPage)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/mappings")
+                view=guarded(session, crate::engine::MappingsPage)
                 ssr=SsrMode::Async
             />
             <Route
@@ -194,76 +207,6 @@ fn SignInPage() -> impl IntoView {
         </div>
     }
 }
-
-/// The landing page of a signed-in operator: what the bridge says of
-/// itself.
-#[component]
-fn Dashboard(
-    /// The bridge's status, read once for the page.
-    status: BridgeResource,
-) -> impl IntoView {
-    let section = view! {
-        <section aria-labelledby="bridge-heading">
-            <h2 id="bridge-heading">"Bridge"</h2>
-            <Suspense fallback=|| {
-                view! { <p>"Asking the bridge."</p> }
-            }>{move || Suspend::new(async move { bridge_view(status.await) })}</Suspense>
-        </section>
-    }
-    .into_any();
-    view! {
-        <Title text=format!("Dashboard · {PRODUCT}") />
-        <h1>"Dashboard"</h1>
-        {section}
-    }
-}
-
-/// The bridge section for the answer `answered`: what the bridge says of
-/// itself, its refusal with its status, or the console's fault, never
-/// nothing.
-fn bridge_view(answered: Result<Outcome<BridgeView>, ViewError>) -> AnyView {
-    match answered {
-        Ok(Outcome::Shown(status)) => {
-            let unnamed = || String::from("not stated");
-            view! {
-                <dl>
-                    <dt>"Software"</dt>
-                    <dd>{status.software.unwrap_or_else(unnamed)}</dd>
-                    <dt>"Version"</dt>
-                    <dd>{status.version.unwrap_or_else(unnamed)}</dd>
-                    <dt>"FHIR version"</dt>
-                    <dd>{status.fhir_version.unwrap_or_else(unnamed)}</dd>
-                </dl>
-            }
-            .into_any()
-        }
-        Ok(Outcome::Refused(Refusal::NotAuthenticated)) => view! {
-            <p role="alert">
-                "401: the bridge did not accept your sign-in. "
-                <a href=SIGN_IN rel="external">
-                    "Sign in again"
-                </a>
-                "."
-            </p>
-        }
-        .into_any(),
-        Ok(Outcome::Refused(Refusal::Bridge {
-            status,
-            diagnostics,
-        })) => view! {
-            <p role="alert">{format!("{status}: the bridge refused the request.")}</p>
-            <ul>
-                {diagnostics.into_iter().map(|text| view! { <li>{text}</li> }).collect_view()}
-            </ul>
-        }
-        .into_any(),
-        Ok(Outcome::Refused(Refusal::Invalid { reason })) => {
-            view! { <p role="alert">{reason}</p> }.into_any()
-        }
-        Err(error) => view! { <p role="alert">{error.to_string()}</p> }.into_any(),
-    }
-}
-
 /// The page a visitor reads when the console cannot read its session store:
 /// it cannot tell whether they are signed in, so it offers neither the
 /// sign-in nor the operator's pages, and answers `500`.

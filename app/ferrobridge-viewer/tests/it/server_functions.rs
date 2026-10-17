@@ -19,8 +19,13 @@ use crate::support::{OPERATOR_TOKEN, ORIGIN, configuration, console, get_with, s
 
 /// Every server function the console registers, with the form body it
 /// takes.
-const SERVER_FUNCTIONS: [(&str, &str); 2] =
-    [("/api/bridge-status", ""), ("/api/theme", "theme=dark")];
+const SERVER_FUNCTIONS: [(&str, &str); 5] = [
+    ("/api/bridge-status", ""),
+    ("/api/capability", ""),
+    ("/api/dashboard", ""),
+    ("/api/mappings", ""),
+    ("/api/theme", "theme=dark"),
+];
 
 /// A synthetic R4 `CapabilityStatement` of the bridge.
 const STATEMENT: &str = r#"{
@@ -153,12 +158,8 @@ async fn a_bridge_refusal_is_an_answer_with_its_status() -> Result<(), Box<dyn E
         body.contains("403") && body.contains("synthetic refusal"),
         "{body}"
     );
-    let (_page, page) = send(&service, get_with("/", &cookie)?).await?;
-    assert!(
-        page.contains("403: the bridge refused the request."),
-        "{page}"
-    );
-    assert!(page.contains("synthetic refusal"), "{page}");
+    let (_page, page) = send(&service, get_with("/about", &cookie)?).await?;
+    assert!(page.contains("Bridge refused 403"), "the top bar: {page}");
     Ok(())
 }
 

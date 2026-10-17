@@ -76,6 +76,26 @@ with the status the bridge answered, or `Bridge DOWN` when the console
 cannot reach it. The About page names the console's version and its maker,
 Cadasto B.V.
 
+Three screens show the engine state:
+
+- **Dashboard** (`/`): the bridge's version, build facts and pins
+  (`GET /health/info`), its lanes and whether each listener is up, its
+  readiness indicators (`GET /health/readiness`), and the counts of the
+  contexts, models, templates and OMOCL files its running load compiled,
+  with its errors and warnings (`GET /operator/state`).
+- **Capability** (`/capability`): the `CapabilityStatement` the facade
+  serves, as cards per resource, and the SMART discovery document.
+- **Mappings overview** (`/mappings`): each context with its template,
+  profile, resource type, models, extensions and search declaration, the
+  templates and where each came from, the OMOCL files, and every
+  diagnostic.
+
+The mapping counts and the overview read the operator API, so they need
+`[operator] enabled = true` on the bridge and an operator token that
+carries the operator scope. Without either, those sections show the
+bridge's refusal, its status and its diagnostics, while the rest of the
+screen still draws.
+
 The theme switch offers light, dark and system, which follows the
 operating system. The choice is kept in a cookie and the server draws each
 page in it, so nothing is kept in the browser's storage. Both themes meet
