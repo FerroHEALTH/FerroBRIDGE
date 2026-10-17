@@ -11,16 +11,9 @@
 //! (<https://hl7.org/fhir/R4/conceptmap-operation-translate.html>).
 
 use std::error::Error as StdError;
-use std::sync::Arc;
 use std::time::Duration;
 
-use axum::Router;
 use axum::body::Body;
-use ferrobridge_server::config::MappingSettings;
-use ferrobridge_server::health::Registry;
-use ferrobridge_server::mappings;
-use ferrobridge_server::state::AppState;
-use ferrobridge_server::state::OperationsLane;
 use ferrobridge_server::terminology::Translator;
 use ferrobridge_term::client::Client;
 use ferrobridge_term::config::{Config, RetryPolicy, WireVersion};
@@ -29,7 +22,7 @@ use http::{Request, StatusCode, header};
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer};
 
-use super::{CONTEXT_FILE, FHIR_JSON, OPENEHR_JSON, bundle, call, composition_text};
+use super::{FHIR_JSON, OPENEHR_JSON, app_with, bundle, call, composition_text, mapping_tree_with};
 
 /// The concept map the synthetic mapping names. `example.org` is reserved
 /// for examples (RFC 6761 §6.5).
@@ -80,44 +73,6 @@ mappings:
           - path: "reference"
             value: "Patient/synthetic-subject-0001"
 "#;
-
-/// Writes the translating mapping set into a temporary tree.
-fn mapping_tree() -> Result<tempfile::TempDir, Box<dyn StdError>> {
-    let root = tempfile::tempdir()?;
-    let mappings = root.path().join("mappings");
-    let templates = root.path().join("templates");
-    std::fs::create_dir_all(&mappings)?;
-    std::fs::create_dir_all(&templates)?;
-    std::fs::write(
-        mappings.join("ferrobridge_server_diagnose.context.yml"),
-        CONTEXT_FILE,
-    )?;
-    std::fs::write(mappings.join("ferrobridge_server_diagnose.yml"), MODEL_FILE)?;
-    std::fs::write(
-        templates.join("diagnose.opt"),
-        ferrobridge_testkit::fixtures::DIAGNOSE_OPT,
-    )?;
-    Ok(root)
-}
-
-/// Returns the application over the translating mapping set, translating
-/// through `translator`.
-fn app(root: &tempfile::TempDir, translator: Translator) -> Result<Router, Box<dyn StdError>> {
-    let settings = MappingSettings {
-        directory: root.path().join("mappings"),
-        templates: root.path().join("templates"),
-    };
-    let programs = mappings::load(&settings)?;
-    let lane = OperationsLane::new(programs, "Device/ferrobridge-test")
-        .with_composition_defaults(
-            "FHIRconnect",
-            Some(String::from("en")),
-            Some(String::from("NL")),
-        )
-        .with_translator(translator);
-    let state = Arc::new(AppState::with_health(Registry::default()).serving_operations(lane));
-    Ok(ferrobridge_server::router(state, &super::server_settings()))
-}
 
 /// Returns a translator over the R4 terminology server `server` mocks.
 fn translator(server: &MockServer) -> Result<Translator, Box<dyn StdError>> {
@@ -194,10 +149,10 @@ async fn a_conceptmap_translates_both_ways_with_reverse_only_going_into_openehr(
 -> Result<(), Box<dyn StdError>> {
     let server = MockServer::start().await;
     mount_map(&server).await;
-    let root = mapping_tree()?;
+    let root = mapping_tree_with(MODEL_FILE)?;
 
     let (status, _, body) = call(
-        app(&root, translator(&server)?)?,
+        app_with(&root, translator(&server)?)?,
         Request::post("/fhir/$toopenehr")
             .header(header::CONTENT_TYPE, FHIR_JSON)
             .body(Body::from(bundle()?))?,
@@ -237,7 +192,7 @@ async fn a_conceptmap_translates_both_ways_with_reverse_only_going_into_openehr(
         );
     }
     let (status, _, body) = call(
-        app(&root, translator(&server)?)?,
+        app_with(&root, translator(&server)?)?,
         Request::post("/fhir/tofhir")
             .header(header::CONTENT_TYPE, OPENEHR_JSON)
             .body(Body::from(composition.to_string()))?,
@@ -279,9 +234,9 @@ async fn a_refused_translation_refuses_the_run_with_the_upstream_status()
         ))
         .mount(&server)
         .await;
-    let root = mapping_tree()?;
+    let root = mapping_tree_with(MODEL_FILE)?;
     let (status, _, body) = call(
-        app(&root, translator(&server)?)?,
+        app_with(&root, translator(&server)?)?,
         Request::post("/fhir/$toopenehr")
             .header(header::CONTENT_TYPE, FHIR_JSON)
             .body(Body::from(bundle()?))?,
@@ -296,9 +251,9 @@ async fn a_refused_translation_refuses_the_run_with_the_upstream_status()
 #[tokio::test]
 async fn with_no_terminology_server_a_conceptmap_refuses_naming_the_missing_server()
 -> Result<(), Box<dyn StdError>> {
-    let root = mapping_tree()?;
+    let root = mapping_tree_with(MODEL_FILE)?;
     let (status, _, body) = call(
-        app(&root, Translator::default())?,
+        app_with(&root, Translator::default())?,
         Request::post("/fhir/$toopenehr")
             .header(header::CONTENT_TYPE, FHIR_JSON)
             .body(Body::from(bundle()?))?,
