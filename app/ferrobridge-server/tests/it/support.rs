@@ -1,15 +1,21 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! Shared helpers: a capturing log writer, test settings and a test state.
+//! Shared helpers: a capturing log writer, test settings, a test state and a
+//! terminology translator.
 
 use ferrobridge_server::config::ServerSettings;
 use ferrobridge_server::health::Registry;
 use ferrobridge_server::state::AppState;
+use ferrobridge_server::terminology::Translator;
+use ferrobridge_term::client::Client;
+use ferrobridge_term::config::{Config, RetryPolicy, WireVersion};
+use std::error::Error as StdError;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tracing_subscriber::fmt::MakeWriter;
+use wiremock::MockServer;
 
 /// A `tracing` writer that keeps every line in memory.
 #[derive(Debug, Clone, Default)]
@@ -58,4 +64,16 @@ pub(crate) fn settings() -> ServerSettings {
 /// Returns a state with no indicator and no logged query parameter.
 pub(crate) fn state() -> Arc<AppState> {
     Arc::new(AppState::with_health(Registry::default()))
+}
+
+/// Returns a translator over the R4 terminology server `server` mocks.
+pub(crate) fn translator(server: &MockServer) -> Result<Translator, Box<dyn StdError>> {
+    let config = Config::new(format!("{}/r4", server.uri()).parse()?, WireVersion::R4)
+        .with_timeout(Duration::from_secs(5))
+        .with_retry(RetryPolicy {
+            max_attempts: 1,
+            initial_backoff: Duration::from_millis(1),
+            max_backoff: Duration::from_millis(1),
+        });
+    Ok(Translator::new(Some(Client::new(config)?)))
 }
