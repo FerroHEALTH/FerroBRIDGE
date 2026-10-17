@@ -52,3 +52,5 @@ pub const VALIDATE_CODE: &str = "ValueSet/$validate-code";
 /// The batch interaction, a `POST` of a `Bundle` to the service base
 /// (<https://hl7.org/fhir/R4/http.html#transaction>).
 pub const BATCH: &str = "batch";
+
+// Probe for the Sonar pull-request coverage path; reverted before merge.
