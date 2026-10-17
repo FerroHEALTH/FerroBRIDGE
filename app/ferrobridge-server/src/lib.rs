@@ -426,7 +426,7 @@ async fn info(State(state): State<Arc<AppState>>) -> Response {
 /// `GET /health/readiness`: the state of every registered indicator.
 pub(crate) async fn readiness(State(state): State<Arc<AppState>>) -> Response {
     let report = state.health().evaluate().await;
-    (report.status(), axum::Json(report)).into_response()
+    (health::status(&report), axum::Json(report)).into_response()
 }
 
 /// Serves `app` on an already-bound listener until the process receives

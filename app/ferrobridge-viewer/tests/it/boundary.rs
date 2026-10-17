@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The console's crate boundary, read from the graph Cargo resolves: the
-//! server half links `openehr-mapping-core` and `fhir-types` of the
+//! server half links `openehr-mapping-core`, `fhir-types` and
+//! `ferrobridge-operator-api` of the
 //! workspace's own crates and no other, and the browser half links none
 //! (docs/architecture.md section 4.10), so the console never compiles or
 //! runs a mapping itself.
@@ -22,7 +23,11 @@ use serde_json::{Value, json};
 const VIEWER: &str = "ferrobridge-viewer";
 
 /// The workspace crates the server half may link.
-const SERVER_ALLOWED: [&str; 2] = ["openehr-mapping-core", "fhir-types"];
+const SERVER_ALLOWED: [&str; 3] = [
+    "openehr-mapping-core",
+    "fhir-types",
+    "ferrobridge-operator-api",
+];
 
 /// The target the browser half compiles for.
 const BROWSER: &str = "wasm32-unknown-unknown";
@@ -152,7 +157,7 @@ fn inject(metadata: &mut Value, from: &str, to: &str, kind: &Value) {
 }
 
 #[test]
-fn the_server_half_links_only_the_two_allowed_workspace_crates() {
+fn the_server_half_links_only_the_three_allowed_workspace_crates() {
     let metadata = metadata(None);
     let (workspace, _) = closure(&metadata, VIEWER);
     assert_eq!(
@@ -161,8 +166,24 @@ fn the_server_half_links_only_the_two_allowed_workspace_crates() {
         "the console links a workspace crate the boundary does not allow"
     );
     assert!(
-        workspace.contains("fhir-types"),
-        "the walk reaches the console's own dependency: {workspace:?}"
+        workspace.contains("fhir-types") && workspace.contains("ferrobridge-operator-api"),
+        "the walk reaches the console's own dependencies: {workspace:?}"
+    );
+}
+
+#[test]
+fn an_injected_browser_dependency_on_the_operator_contract_is_refused() {
+    let mut metadata = metadata(Some(BROWSER));
+    inject(
+        &mut metadata,
+        VIEWER,
+        "ferrobridge-operator-api",
+        &Value::Null,
+    );
+    let (workspace, _) = closure(&metadata, VIEWER);
+    assert!(
+        workspace.contains("ferrobridge-operator-api"),
+        "the contract is the server half's alone: {workspace:?}"
     );
 }
 

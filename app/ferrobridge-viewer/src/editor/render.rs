@@ -10,14 +10,11 @@ use leptos::prelude::*;
 
 use crate::bridge::BridgeError;
 use crate::bridge::editing::Answered;
-use crate::engine::render::parts::{self, Shape};
+use crate::engine::render::parts;
 
 /// The verdict and the diagnostics of a report.
 fn report(heading: &'static str, verdict: &str, answered: &Answered) -> AnyView {
-    let diagnostics = match parts::diagnostics(&answered.report, "diagnostics") {
-        Ok(diagnostics) => parts::diagnostics_table(&diagnostics),
-        Err(shape) => return parts::unreadable(heading, &shape),
-    };
+    let diagnostics = parts::diagnostics_table(&answered.report.diagnostics);
     let tone = if answered.status == StatusCode::OK {
         "pill tone-ok"
     } else {
@@ -35,26 +32,18 @@ fn report(heading: &'static str, verdict: &str, answered: &Answered) -> AnyView 
     .into_any()
 }
 
-/// Whether the report says the set compiled.
-fn clean(answered: &Answered) -> Result<bool, Shape> {
-    parts::field(&answered.report, "clean")?
-        .as_bool()
-        .ok_or(Shape { path: "clean" })
-}
-
 /// A draft check's answer.
 #[must_use]
 pub fn checked(answer: &Result<Answered, BridgeError>) -> String {
     let section = match answer {
-        Ok(answered) => match clean(answered) {
-            Ok(true) => report("Check", "The set compiles with this draft.", answered),
-            Ok(false) => report(
-                "Check",
-                "The set does not compile with this draft; a save would be refused.",
-                answered,
-            ),
-            Err(shape) => parts::unreadable("Check", &shape),
-        },
+        Ok(answered) if answered.report.clean => {
+            report("Check", "The set compiles with this draft.", answered)
+        }
+        Ok(answered) => report(
+            "Check",
+            "The set does not compile with this draft; a save would be refused.",
+            answered,
+        ),
         Err(error) => parts::failed("Check", error),
     };
     section.to_html()

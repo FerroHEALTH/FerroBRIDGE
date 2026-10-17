@@ -68,6 +68,8 @@ socket2 = "0.6.5"
 fhir-types = { path = "crates/fhir-types", version = "0.1.118", default-features = false }
 hl7v2-types = { path = "crates/hl7v2-types", version = "0.0.0" }
 openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "0.1.113" }
+# The health and operator documents the server writes and the console reads.
+ferrobridge-operator-api = { path = "crates/ferrobridge-operator-api", version = "0.0.0" }
 # The OMOP CDM layer, taken metadata-only by default: a consumer that writes
 # to a CDM database turns on its `database` feature.
 omop-cdm = { path = "crates/omop-cdm", version = "0.0.0", default-features = false }

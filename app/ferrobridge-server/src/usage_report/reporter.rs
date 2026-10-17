@@ -19,7 +19,6 @@ use std::time::{Duration, Instant};
 use http::StatusCode;
 use tokio::task::JoinHandle;
 
-use crate::health::State;
 use crate::state::AppState;
 use crate::usage_report::config::{Deployment, UsageReportSettings};
 use crate::usage_report::payload::{
@@ -28,6 +27,7 @@ use crate::usage_report::payload::{
 };
 use crate::usage_report::state::{Instance, StateDir, StateError};
 use crate::usage_report::window::Counts;
+use ferrobridge_operator_api::health::State;
 
 /// The book page that carries the full notice.
 pub const NOTICE_URL: &str = "https://ferrobridge.eu/docs/operate/usage-report.html";

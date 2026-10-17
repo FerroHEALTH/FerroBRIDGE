@@ -45,7 +45,8 @@ wasm-bindgen.workspace = true
 console_error_panic_hook.workspace = true
 
 # The server half. Of the workspace's own crates it may link
-# openehr-mapping-core and fhir-types (r4) and no other, and the browser half
+# openehr-mapping-core, fhir-types (r4) and ferrobridge-operator-api and no
+# other, and the browser half
 # links none (docs/architecture.md section 4.10); tests/it/boundary.rs walks
 # the resolved graph and fails on any other.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -63,6 +64,9 @@ base64.workspace = true
 clap.workspace = true
 # The `__Host-` session cookies (RFC 6265bis).
 cookie.workspace = true
+# The bridge's health and operator documents, the contract the bridge
+# serializes with (docs/architecture.md section 4.10).
+ferrobridge-operator-api.workspace = true
 # The R4 CapabilityStatement the bridge client reads from `/fhir/metadata`,
 # in the terminology root set of the generated model.
 fhir-types = { workspace = true, features = ["r4", "terminology"] }

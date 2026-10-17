@@ -16,6 +16,8 @@ use http::{HeaderValue, StatusCode};
 use secrecy::{ExposeSecret as _, SecretString};
 use url::Url;
 
+use ferrobridge_operator_api::health::{Info, Readiness};
+use ferrobridge_operator_api::operator::{EngineState, Listed};
 use fhir_types::codec::{Json as _, Path, Value};
 use fhir_types::r4::capability_statement::CapabilityStatement;
 
@@ -98,9 +100,16 @@ pub enum BridgeError {
     /// The accepted answer's body is JSON but no object.
     #[error("the bridge's answer is not a JSON object")]
     NotAnObject,
-    /// The accepted answer's body is JSON but no array.
-    #[error("the bridge's answer is not a JSON array")]
-    NotAnArray,
+    /// The accepted answer's body is no health or operator document of the
+    /// kind asked for (`ferrobridge_operator_api`).
+    #[error("the bridge's answer is not its {expected}")]
+    Document {
+        /// The document asked for.
+        expected: &'static str,
+        /// What reading it failed with.
+        #[source]
+        source: serde_json::Error,
+    },
     /// A mapping file path that is not plain segments below a root.
     #[error("the mapping file path is not plain names below a root")]
     Path,
@@ -231,9 +240,16 @@ impl Bridge {
         &self,
         token: &AccessToken,
     ) -> Result<(CapabilityStatement, serde_json::Value), BridgeError> {
-        let (_status, raw) = self
-            .json("fhir/metadata", FHIR_JSON, token, &[StatusCode::OK])
+        let (_status, _headers, body) = self
+            .fetch(
+                self.url("fhir/metadata")?,
+                FHIR_JSON,
+                token,
+                &[StatusCode::OK],
+            )
             .await?;
+        let raw: serde_json::Value =
+            serde_json::from_slice(&body).map_err(|source| BridgeError::Payload { source })?;
         let Value::Object(object) = Value::from_serde_json(raw.clone()) else {
             return Err(BridgeError::NotAnObject);
         };
@@ -250,12 +266,14 @@ impl Bridge {
     /// `GET {base}health/info`.
     ///
     /// # Errors
-    /// Returns [`BridgeError::Refused`] for any status but `200`, and the
-    /// transport and body errors of [`Self::capability_statement`].
-    pub async fn health_info(&self, token: &AccessToken) -> Result<serde_json::Value, BridgeError> {
-        self.json("health/info", JSON, token, &[StatusCode::OK])
+    /// Returns [`BridgeError::Refused`] for any status but `200`,
+    /// [`BridgeError::Document`] for a body that is no
+    /// `ferrobridge_operator_api` document of its kind, and the transport and
+    /// size errors of [`Self::capability_statement`].
+    pub async fn health_info(&self, token: &AccessToken) -> Result<Info, BridgeError> {
+        self.document("health/info", "health info", token, &[StatusCode::OK])
             .await
-            .map(|(_status, body)| body)
+            .map(|(_status, info)| info)
     }
 
     /// Reads the bridge's readiness from `GET {base}health/readiness`, with
@@ -263,15 +281,15 @@ impl Bridge {
     /// while one is down, each with the report naming every indicator.
     ///
     /// # Errors
-    /// Returns [`BridgeError::Refused`] for any other status, and the
-    /// transport and body errors of [`Self::capability_statement`].
+    /// Returns [`BridgeError::Refused`] for any other status, and the body
+    /// errors of [`Self::health_info`].
     pub async fn readiness(
         &self,
         token: &AccessToken,
-    ) -> Result<(StatusCode, serde_json::Value), BridgeError> {
-        self.json(
+    ) -> Result<(StatusCode, Readiness), BridgeError> {
+        self.document(
             "health/readiness",
-            JSON,
+            "readiness report",
             token,
             &[StatusCode::OK, StatusCode::SERVICE_UNAVAILABLE],
         )
@@ -284,14 +302,11 @@ impl Bridge {
     /// # Errors
     /// Returns [`BridgeError::Refused`] for any status but `200` (a `404`
     /// where the operator API is off, a `403` without the operator scope),
-    /// and the transport and body errors of [`Self::capability_statement`].
-    pub async fn operator_state(
-        &self,
-        token: &AccessToken,
-    ) -> Result<serde_json::Value, BridgeError> {
-        self.json("operator/state", JSON, token, &[StatusCode::OK])
+    /// and the body errors of [`Self::health_info`].
+    pub async fn operator_state(&self, token: &AccessToken) -> Result<EngineState, BridgeError> {
+        self.document("operator/state", "engine state", token, &[StatusCode::OK])
             .await
-            .map(|(_status, body)| body)
+            .map(|(_status, state)| state)
     }
 
     /// Reads the bridge's SMART discovery document, `GET
@@ -306,69 +321,53 @@ impl Bridge {
         &self,
         token: &AccessToken,
     ) -> Result<serde_json::Value, BridgeError> {
-        self.json(
-            "fhir/.well-known/smart-configuration",
-            JSON,
+        let (_status, value) = self
+            .document::<serde_json::Value>(
+                "fhir/.well-known/smart-configuration",
+                "SMART discovery document",
+                token,
+                &[StatusCode::OK],
+            )
+            .await?;
+        if value.is_object() {
+            Ok(value)
+        } else {
+            Err(BridgeError::NotAnObject)
+        }
+    }
+
+    /// Sends `GET {base}{route}` for JSON as the operator whose access token
+    /// is `token`, and reads the document the bridge answers with a status in
+    /// `admitted` into `T`; any other status is a refusal.
+    async fn document<T: serde::de::DeserializeOwned>(
+        &self,
+        route: &'static str,
+        expected: &'static str,
+        token: &AccessToken,
+        admitted: &[StatusCode],
+    ) -> Result<(StatusCode, T), BridgeError> {
+        let (status, _headers, body) = self.fetch(self.url(route)?, JSON, token, admitted).await?;
+        let document = serde_json::from_slice(&body)
+            .map_err(|source| BridgeError::Document { expected, source })?;
+        Ok((status, document))
+    }
+
+    /// Lists every mapping file through the operator API, `GET
+    /// {base}operator/mappings`, with each file's digest, owner and
+    /// diagnostics.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Refused`] for any status but `200`, and the
+    /// body errors of [`Self::health_info`].
+    pub async fn mapping_files(&self, token: &AccessToken) -> Result<Vec<Listed>, BridgeError> {
+        self.document(
+            "operator/mappings",
+            "mapping listing",
             token,
             &[StatusCode::OK],
         )
         .await
-        .map(|(_status, body)| body)
-    }
-
-    /// Sends `GET {base}{route}` for `accept` as the operator whose access
-    /// token is `token`, and reads the JSON object the bridge answers with a
-    /// status in `admitted`; any other status is a refusal.
-    async fn json(
-        &self,
-        route: &'static str,
-        accept: &'static str,
-        token: &AccessToken,
-        admitted: &[StatusCode],
-    ) -> Result<(StatusCode, serde_json::Value), BridgeError> {
-        let (status, value) = self.any_json(route, accept, token, admitted).await?;
-        if !value.is_object() {
-            return Err(BridgeError::NotAnObject);
-        }
-        Ok((status, value))
-    }
-
-    /// Sends `GET {base}{route}` as [`Self::json`] does and reads whatever
-    /// JSON value the bridge answers.
-    async fn any_json(
-        &self,
-        route: &'static str,
-        accept: &'static str,
-        token: &AccessToken,
-        admitted: &[StatusCode],
-    ) -> Result<(StatusCode, serde_json::Value), BridgeError> {
-        let (status, _headers, body) = self
-            .fetch(self.url(route)?, accept, token, admitted)
-            .await?;
-        let value: serde_json::Value =
-            serde_json::from_slice(&body).map_err(|source| BridgeError::Payload { source })?;
-        Ok((status, value))
-    }
-
-    /// Lists every mapping file through the operator API, `GET
-    /// {base}operator/mappings`: a JSON array of the files with their
-    /// digest, owner and diagnostics.
-    ///
-    /// # Errors
-    /// Returns [`BridgeError::Refused`] for any status but `200`,
-    /// [`BridgeError::NotAnArray`] for a body that is no array, and the
-    /// transport and body errors of [`Self::capability_statement`].
-    pub async fn mapping_files(
-        &self,
-        token: &AccessToken,
-    ) -> Result<serde_json::Value, BridgeError> {
-        let (_status, value) = self
-            .any_json("operator/mappings", JSON, token, &[StatusCode::OK])
-            .await?;
-        if !value.is_array() {
-            return Err(BridgeError::NotAnArray);
-        }
-        Ok(value)
+        .map(|(_status, listing)| listing)
     }
 
     /// Reads one mapping file's verbatim bytes through the operator API,

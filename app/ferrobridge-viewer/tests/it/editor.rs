@@ -30,12 +30,12 @@ const DRAFT: &str =
 
 /// The report of a set that compiled.
 fn clean() -> serde_json::Value {
-    json!({"clean": true, "counts": {"contexts": 1}, "diagnostics": []})
+    json!({"clean": true, "counts": {"fhirconnect_files": 1, "contexts": 1, "programs": 1, "templates": 1, "omocl_files": 0}, "diagnostics": []})
 }
 
 /// The report of a set the draft broke.
 fn broken() -> serde_json::Value {
-    json!({"clean": false, "counts": {"contexts": 1}, "diagnostics": [{
+    json!({"clean": false, "counts": {"fhirconnect_files": 1, "contexts": 1, "programs": 1, "templates": 1, "omocl_files": 0}, "diagnostics": [{
         "file": PATH, "line": 4, "column": 9, "severity": "error",
         "code": "invalid-mapping-name", "message": "the synthetic name is refused",
         "mapping": null, "model_path": ["metadata", "name"]

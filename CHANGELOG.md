@@ -71,6 +71,14 @@ crates on crates.io.
 
 ### Changed
 
+- The bridge's health and operator documents have one definition (#777):
+  the new library crate `ferrobridge-operator-api` holds them as serde
+  types, the server writes `/health/info`, `/health/readiness`, the engine
+  state, the file listing and every load report through them, and the
+  operator console reads them back into the same types, so a renamed field
+  fails the build of both. The wire JSON is unchanged. The console's server
+  half now links three workspace crates, and `tests/it/boundary.rs` holds it
+  to them.
 - A facade search translates a `conceptmap` code once per request (#763):
   the page and its `Bundle.total` share the answers of one terminology
   session, so a code repeated across their entries costs one
