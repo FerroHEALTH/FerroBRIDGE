@@ -519,6 +519,11 @@ impl super::super::codec::Json for MedicinalProductPharmaceutical {
                 )?);
             }
         }
+        if field_route_of_administration.is_empty() && !path.is_lenient() {
+            return path.with("routeOfAdministration", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             meta: field_meta,

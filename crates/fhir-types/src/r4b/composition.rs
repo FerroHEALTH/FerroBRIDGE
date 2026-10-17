@@ -675,6 +675,11 @@ impl super::super::codec::Json for Composition {
                 })?);
             }
         }
+        if field_author.is_empty() && !path.is_lenient() {
+            return path.with("author", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_title = path.with("title", |path| {
             super::super::codec::Primitive::from_json_parts(raw_title, raw_title_element, path)
         })?;

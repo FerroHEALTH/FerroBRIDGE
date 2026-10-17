@@ -707,6 +707,11 @@ impl super::super::codec::Json for AuditEvent {
                 })?);
             }
         }
+        if field_agent.is_empty() && !path.is_lenient() {
+            return path.with("agent", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_source = path.with("source", |path| {
             let value = raw_source
                 .ok_or_else(|| path.error(super::super::codec::DecodeErrorKind::MissingProperty))?;

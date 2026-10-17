@@ -610,6 +610,11 @@ impl super::super::codec::Json for Endpoint {
                 })?);
             }
         }
+        if field_payload_type.is_empty() && !path.is_lenient() {
+            return path.with("payloadType", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_payload_mime_type = Vec::new();
         for (index, (value, element)) in super::super::codec::pair_arrays(
             raw_payload_mime_type,

@@ -1504,6 +1504,11 @@ impl super::super::codec::Json for StructureDefinitionDifferential {
                 })?);
             }
         }
+        if field_element.is_empty() && !path.is_lenient() {
+            return path.with("element", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,
@@ -2016,6 +2021,11 @@ impl super::super::codec::Json for StructureDefinitionSnapshot {
                     )
                 })?);
             }
+        }
+        if field_element.is_empty() && !path.is_lenient() {
+            return path.with("element", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,

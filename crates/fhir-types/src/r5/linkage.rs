@@ -400,6 +400,11 @@ impl super::super::codec::Json for Linkage {
                 })?);
             }
         }
+        if field_item.is_empty() && !path.is_lenient() {
+            return path.with("item", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             meta: field_meta,

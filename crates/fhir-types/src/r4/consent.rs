@@ -602,6 +602,11 @@ impl super::super::codec::Json for Consent {
                 })?);
             }
         }
+        if field_category.is_empty() && !path.is_lenient() {
+            return path.with("category", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_patient = raw_patient
             .map(|value| {
                 path.with("patient", |path| {

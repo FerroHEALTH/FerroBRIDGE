@@ -1323,6 +1323,11 @@ impl super::super::codec::Json for ResearchElementDefinition {
                 })?);
             }
         }
+        if field_characteristic.is_empty() && !path.is_lenient() {
+            return path.with("characteristic", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             meta: field_meta,

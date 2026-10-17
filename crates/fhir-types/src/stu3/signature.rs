@@ -244,6 +244,11 @@ impl super::super::codec::Json for Signature {
                 })?);
             }
         }
+        if field_type.is_empty() && !path.is_lenient() {
+            return path.with("type", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_when = path.with("when", |path| {
             super::super::codec::Primitive::from_json_parts(raw_when, raw_when_element, path)
         })?;

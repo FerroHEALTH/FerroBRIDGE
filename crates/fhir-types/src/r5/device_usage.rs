@@ -1169,6 +1169,11 @@ impl super::super::codec::Json for DeviceUsageAdherence {
                 })?);
             }
         }
+        if field_reason.is_empty() && !path.is_lenient() {
+            return path.with("reason", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,

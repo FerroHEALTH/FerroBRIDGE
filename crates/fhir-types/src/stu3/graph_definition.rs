@@ -1167,6 +1167,11 @@ impl super::super::codec::Json for GraphDefinitionLink {
                 })?);
             }
         }
+        if field_target.is_empty() && !path.is_lenient() {
+            return path.with("target", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,

@@ -913,6 +913,11 @@ impl super::super::codec::Json for Appointment {
                 })?);
             }
         }
+        if field_participant.is_empty() && !path.is_lenient() {
+            return path.with("participant", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_requested_period = Vec::new();
         if let Some(raw) = raw_requested_period {
             for (index, value) in super::super::codec::expect_array(raw, path)?

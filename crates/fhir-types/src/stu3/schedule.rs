@@ -519,6 +519,11 @@ impl super::super::codec::Json for Schedule {
                 })?);
             }
         }
+        if field_actor.is_empty() && !path.is_lenient() {
+            return path.with("actor", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_planning_horizon = raw_planning_horizon
             .map(|value| {
                 path.with("planningHorizon", |path| {

@@ -1122,6 +1122,11 @@ impl super::super::codec::Json for InsuranceProductCoverage {
                 })?);
             }
         }
+        if field_benefit.is_empty() && !path.is_lenient() {
+            return path.with("benefit", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,

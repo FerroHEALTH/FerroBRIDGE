@@ -654,6 +654,11 @@ impl super::super::codec::Json for DocumentManifest {
                 })?);
             }
         }
+        if field_content.is_empty() && !path.is_lenient() {
+            return path.with("content", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_related = Vec::new();
         if let Some(raw) = raw_related {
             for (index, value) in super::super::codec::expect_array(raw, path)?

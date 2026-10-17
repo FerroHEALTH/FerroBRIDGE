@@ -743,6 +743,11 @@ impl super::super::codec::Json for Coverage {
                 })?);
             }
         }
+        if field_payor.is_empty() && !path.is_lenient() {
+            return path.with("payor", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_class = Vec::new();
         if let Some(raw) = raw_class {
             for (index, value) in super::super::codec::expect_array(raw, path)?

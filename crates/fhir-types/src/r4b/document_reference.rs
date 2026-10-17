@@ -778,6 +778,11 @@ impl super::super::codec::Json for DocumentReference {
                 })?);
             }
         }
+        if field_content.is_empty() && !path.is_lenient() {
+            return path.with("content", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_context = raw_context
             .map(|value| {
                 path.with("context", |path| {

@@ -573,6 +573,11 @@ impl super::super::codec::Json for MedicinalProductPackaged {
                 })?);
             }
         }
+        if field_package_item.is_empty() && !path.is_lenient() {
+            return path.with("packageItem", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             meta: field_meta,

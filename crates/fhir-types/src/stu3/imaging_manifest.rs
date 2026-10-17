@@ -481,6 +481,11 @@ impl super::super::codec::Json for ImagingManifest {
                 })?);
             }
         }
+        if field_study.is_empty() && !path.is_lenient() {
+            return path.with("study", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             meta: field_meta,
@@ -832,6 +837,11 @@ impl super::super::codec::Json for ImagingManifestStudy {
                 })?);
             }
         }
+        if field_series.is_empty() && !path.is_lenient() {
+            return path.with("series", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,
@@ -1111,6 +1121,11 @@ impl super::super::codec::Json for ImagingManifestStudySeries {
                     )
                 })?);
             }
+        }
+        if field_instance.is_empty() && !path.is_lenient() {
+            return path.with("instance", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,

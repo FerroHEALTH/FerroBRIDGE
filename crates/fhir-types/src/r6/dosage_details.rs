@@ -498,6 +498,11 @@ impl super::super::codec::Json for DosageDetailsStep {
                 })?);
             }
         }
+        if field_component.is_empty() && !path.is_lenient() {
+            return path.with("component", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_safety = raw_safety
             .map(|value| {
                 path.with("safety", |path| {

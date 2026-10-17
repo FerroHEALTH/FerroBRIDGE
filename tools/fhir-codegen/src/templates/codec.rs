@@ -485,6 +485,27 @@ impl fmt::Display for DecodeError {
 
 impl std::error::Error for DecodeError {}
 
+/// A text outside the lexical form of a FHIR primitive, the form the
+/// package's `regex` extension on `<primitive>.value` states
+/// (<https://hl7.org/fhir/R4/datatypes.html#primitive>).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LexicalError {
+    /// The primitive's type code, for example `id`.
+    pub type_code: &'static str,
+}
+
+impl fmt::Display for LexicalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "the text is outside the lexical form of {}",
+            self.type_code
+        )
+    }
+}
+
+impl std::error::Error for LexicalError {}
+
 /// The element path being decoded, for error reports.
 #[derive(Debug, Default, Clone)]
 pub struct Path {
@@ -503,7 +524,9 @@ impl Path {
     }
 
     /// A path starting at `root` that reads a required primitive stating no
-    /// value as the value-less element it would be with only an extension.
+    /// value as the value-less element it would be with only an extension,
+    /// and a required repeating element with fewer items than its minimum as
+    /// the items it carries.
     ///
     /// Cardinality is an aspect of validating a resource, which a server
     /// performs at its discretion, and an implementation "should be

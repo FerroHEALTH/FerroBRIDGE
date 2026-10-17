@@ -550,6 +550,11 @@ impl super::super::codec::Json for ClinicalUseDefinition {
                 })?);
             }
         }
+        if field_subject.is_empty() && !path.is_lenient() {
+            return path.with("subject", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_status = raw_status
             .map(|value| {
                 path.with("status", |path| {

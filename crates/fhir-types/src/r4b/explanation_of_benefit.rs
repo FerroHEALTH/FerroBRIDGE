@@ -1411,6 +1411,11 @@ impl super::super::codec::Json for ExplanationOfBenefit {
                 })?);
             }
         }
+        if field_insurance.is_empty() && !path.is_lenient() {
+            return path.with("insurance", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_accident = raw_accident
             .map(|value| {
                 path.with("accident", |path| {

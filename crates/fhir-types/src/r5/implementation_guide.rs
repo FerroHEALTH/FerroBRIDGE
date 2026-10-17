@@ -980,6 +980,11 @@ impl super::super::codec::Json for ImplementationGuide {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
+        if field_fhir_version.is_empty() && !path.is_lenient() {
+            return path.with("fhirVersion", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_depends_on = Vec::new();
         if let Some(raw) = raw_depends_on {
             for (index, value) in super::super::codec::expect_array(raw, path)?
@@ -3964,6 +3969,11 @@ impl super::super::codec::Json for ImplementationGuideManifest {
                     )
                 })?);
             }
+        }
+        if field_resource.is_empty() && !path.is_lenient() {
+            return path.with("resource", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         let mut field_page = Vec::new();
         if let Some(raw) = raw_page {

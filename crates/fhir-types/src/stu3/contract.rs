@@ -2778,6 +2778,11 @@ impl super::super::codec::Json for ContractSigner {
                 })?);
             }
         }
+        if field_signature.is_empty() && !path.is_lenient() {
+            return path.with("signature", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,

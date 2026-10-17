@@ -2635,6 +2635,11 @@ impl super::super::codec::Json for CodeSystemFilter {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
+        if field_operator.is_empty() && !path.is_lenient() {
+            return path.with("operator", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_value = path.with("value", |path| {
             super::super::codec::Primitive::from_json_parts(raw_value, raw_value_element, path)
         })?;

@@ -972,6 +972,11 @@ impl super::super::codec::Json for SearchParameter {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
+        if field_base.is_empty() && !path.is_lenient() {
+            return path.with("base", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_type = path.with("type", |path| {
             super::super::codec::Primitive::from_json_parts(raw_type, raw_type_element, path)
         })?;

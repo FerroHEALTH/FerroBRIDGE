@@ -1080,6 +1080,11 @@ impl super::super::codec::Json for DocumentReference {
                 })?);
             }
         }
+        if field_content.is_empty() && !path.is_lenient() {
+            return path.with("content", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             meta: field_meta,

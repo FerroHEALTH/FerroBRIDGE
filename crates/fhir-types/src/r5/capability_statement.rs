@@ -1163,6 +1163,11 @@ impl super::super::codec::Json for CapabilityStatement {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
+        if field_format.is_empty() && !path.is_lenient() {
+            return path.with("format", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_patch_format = Vec::new();
         for (index, (value, element)) in
             super::super::codec::pair_arrays(raw_patch_format, raw_patch_format_element, path)?

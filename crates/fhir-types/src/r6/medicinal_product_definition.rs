@@ -1233,6 +1233,11 @@ impl super::super::codec::Json for MedicinalProductDefinition {
                 })?);
             }
         }
+        if field_name.is_empty() && !path.is_lenient() {
+            return path.with("name", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_cross_reference = Vec::new();
         if let Some(raw) = raw_cross_reference {
             for (index, value) in super::super::codec::expect_array(raw, path)?

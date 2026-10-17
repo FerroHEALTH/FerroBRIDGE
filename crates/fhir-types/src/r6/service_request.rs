@@ -1919,6 +1919,11 @@ impl super::super::codec::Json for ServiceRequestOrderDetail {
                 })?);
             }
         }
+        if field_parameter.is_empty() && !path.is_lenient() {
+            return path.with("parameter", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,

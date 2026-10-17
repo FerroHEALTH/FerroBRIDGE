@@ -834,6 +834,11 @@ impl super::super::codec::Json for StructureMap {
                 })?);
             }
         }
+        if field_group.is_empty() && !path.is_lenient() {
+            return path.with("group", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             meta: field_meta,
@@ -1284,6 +1289,11 @@ impl super::super::codec::Json for StructureMapGroup {
                 })?);
             }
         }
+        if field_input.is_empty() && !path.is_lenient() {
+            return path.with("input", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_rule = Vec::new();
         if let Some(raw) = raw_rule {
             for (index, value) in super::super::codec::expect_array(raw, path)?
@@ -1297,6 +1307,11 @@ impl super::super::codec::Json for StructureMapGroup {
                     )
                 })?);
             }
+        }
+        if field_rule.is_empty() && !path.is_lenient() {
+            return path.with("rule", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,
@@ -1900,6 +1915,11 @@ impl super::super::codec::Json for StructureMapGroupRule {
                 })?);
             }
         }
+        if field_source.is_empty() && !path.is_lenient() {
+            return path.with("source", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_target = Vec::new();
         if let Some(raw) = raw_target {
             for (index, value) in super::super::codec::expect_array(raw, path)?
@@ -2191,6 +2211,11 @@ impl super::super::codec::Json for StructureMapGroupRuleDependent {
             field_variable.push(path.with_index("variable", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
+        }
+        if field_variable.is_empty() && !path.is_lenient() {
+            return path.with("variable", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,

@@ -523,6 +523,11 @@ impl super::super::codec::Json for VisionPrescription {
                 )?);
             }
         }
+        if field_lens_specification.is_empty() && !path.is_lenient() {
+            return path.with("lensSpecification", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             meta: field_meta,

@@ -346,6 +346,11 @@ impl super::super::codec::Json for OperationOutcome {
                 })?);
             }
         }
+        if field_issue.is_empty() && !path.is_lenient() {
+            return path.with("issue", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             meta: field_meta,

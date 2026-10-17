@@ -686,6 +686,11 @@ impl super::super::codec::Json for NamingSystem {
                 })?);
             }
         }
+        if field_unique_id.is_empty() && !path.is_lenient() {
+            return path.with("uniqueId", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_replaced_by = raw_replaced_by
             .map(|value| {
                 path.with("replacedBy", |path| {

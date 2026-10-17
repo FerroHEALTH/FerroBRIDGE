@@ -2143,6 +2143,11 @@ impl super::super::codec::Json for ConceptMapGroup {
                 })?);
             }
         }
+        if field_element.is_empty() && !path.is_lenient() {
+            return path.with("element", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_unmapped = raw_unmapped
             .map(|value| {
                 path.with("unmapped", |path| {

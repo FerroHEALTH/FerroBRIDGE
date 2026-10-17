@@ -658,6 +658,11 @@ impl super::super::codec::Json for Composition {
                 })?);
             }
         }
+        if field_author.is_empty() && !path.is_lenient() {
+            return path.with("author", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_title = path.with("title", |path| {
             super::super::codec::Primitive::from_json_parts(raw_title, raw_title_element, path)
         })?;
@@ -1058,6 +1063,11 @@ impl super::super::codec::Json for CompositionAttester {
             field_mode.push(path.with_index("mode", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
+        }
+        if field_mode.is_empty() && !path.is_lenient() {
+            return path.with("mode", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         let field_time = match (raw_time, raw_time_element) {
             (None, None) => None,

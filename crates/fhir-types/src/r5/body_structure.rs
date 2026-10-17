@@ -510,6 +510,11 @@ impl super::super::codec::Json for BodyStructure {
                 )?);
             }
         }
+        if field_included_structure.is_empty() && !path.is_lenient() {
+            return path.with("includedStructure", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_excluded_structure = Vec::new();
         if let Some(raw) = raw_excluded_structure {
             for (index, value) in super::super::codec::expect_array(raw, path)?

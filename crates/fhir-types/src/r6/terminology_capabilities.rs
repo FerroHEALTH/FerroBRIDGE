@@ -2474,6 +2474,11 @@ impl super::super::codec::Json for TerminologyCapabilitiesCodeSystemVersionFilte
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
+        if field_op.is_empty() && !path.is_lenient() {
+            return path.with("op", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,

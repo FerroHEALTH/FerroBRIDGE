@@ -879,6 +879,11 @@ impl super::super::codec::Json for NutritionIntake {
                 })?);
             }
         }
+        if field_consumed_item.is_empty() && !path.is_lenient() {
+            return path.with("consumedItem", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_ingredient_label = Vec::new();
         if let Some(raw) = raw_ingredient_label {
             for (index, value) in super::super::codec::expect_array(raw, path)?

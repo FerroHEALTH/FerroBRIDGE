@@ -1737,6 +1737,11 @@ impl super::super::codec::Json for ValueSetCompose {
                 })?);
             }
         }
+        if field_include.is_empty() && !path.is_lenient() {
+            return path.with("include", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_exclude = Vec::new();
         if let Some(raw) = raw_exclude {
             for (index, value) in super::super::codec::expect_array(raw, path)?

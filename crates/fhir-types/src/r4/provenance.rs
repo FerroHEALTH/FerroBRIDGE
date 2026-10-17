@@ -525,6 +525,11 @@ impl super::super::codec::Json for Provenance {
                 })?);
             }
         }
+        if field_target.is_empty() && !path.is_lenient() {
+            return path.with("target", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_occurred = match raw_occurred.suffix {
             None => None,
             Some(suffix) => Some(path.with("occurred", |path| {
@@ -606,6 +611,11 @@ impl super::super::codec::Json for Provenance {
                     )
                 })?);
             }
+        }
+        if field_agent.is_empty() && !path.is_lenient() {
+            return path.with("agent", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         let mut field_entity = Vec::new();
         if let Some(raw) = raw_entity {

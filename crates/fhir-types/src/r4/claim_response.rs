@@ -1971,6 +1971,11 @@ impl super::super::codec::Json for ClaimResponseAddItem {
                 })?);
             }
         }
+        if field_adjudication.is_empty() && !path.is_lenient() {
+            return path.with("adjudication", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_detail = Vec::new();
         if let Some(raw) = raw_detail {
             for (index, value) in super::super::codec::expect_array(raw, path)?
@@ -2546,6 +2551,11 @@ impl super::super::codec::Json for ClaimResponseAddItemDetail {
                 })?);
             }
         }
+        if field_adjudication.is_empty() && !path.is_lenient() {
+            return path.with("adjudication", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_sub_detail = Vec::new();
         if let Some(raw) = raw_sub_detail {
             for (index, value) in super::super::codec::expect_array(raw, path)?
@@ -3021,6 +3031,11 @@ impl super::super::codec::Json for ClaimResponseAddItemDetailSubDetail {
                     )
                 })?);
             }
+        }
+        if field_adjudication.is_empty() && !path.is_lenient() {
+            return path.with("adjudication", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,
@@ -4198,6 +4213,11 @@ impl super::super::codec::Json for ClaimResponseItem {
                 })?);
             }
         }
+        if field_adjudication.is_empty() && !path.is_lenient() {
+            return path.with("adjudication", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_detail = Vec::new();
         if let Some(raw) = raw_detail {
             for (index, value) in super::super::codec::expect_array(raw, path)?
@@ -4825,6 +4845,11 @@ impl super::super::codec::Json for ClaimResponseItemDetail {
                     )
                 })?);
             }
+        }
+        if field_adjudication.is_empty() && !path.is_lenient() {
+            return path.with("adjudication", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         let mut field_sub_detail = Vec::new();
         if let Some(raw) = raw_sub_detail {

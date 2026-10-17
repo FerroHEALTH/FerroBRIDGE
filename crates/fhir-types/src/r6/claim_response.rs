@@ -2904,6 +2904,11 @@ impl super::super::codec::Json for ClaimResponseAddItemBodySite {
                 })?);
             }
         }
+        if field_site.is_empty() && !path.is_lenient() {
+            return path.with("site", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_sub_site = Vec::new();
         if let Some(raw) = raw_sub_site {
             for (index, value) in super::super::codec::expect_array(raw, path)?

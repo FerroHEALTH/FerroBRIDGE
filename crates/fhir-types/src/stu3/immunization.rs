@@ -2142,6 +2142,11 @@ impl super::super::codec::Json for ImmunizationVaccinationProtocol {
                 })?);
             }
         }
+        if field_target_disease.is_empty() && !path.is_lenient() {
+            return path.with("targetDisease", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_dose_status = path.with("doseStatus", |path| {
             let value = raw_dose_status
                 .ok_or_else(|| path.error(super::super::codec::DecodeErrorKind::MissingProperty))?;

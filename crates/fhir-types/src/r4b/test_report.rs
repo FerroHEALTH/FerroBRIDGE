@@ -1169,6 +1169,11 @@ impl super::super::codec::Json for TestReportSetup {
                 })?);
             }
         }
+        if field_action.is_empty() && !path.is_lenient() {
+            return path.with("action", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,
@@ -2158,6 +2163,11 @@ impl super::super::codec::Json for TestReportTeardown {
                 })?);
             }
         }
+        if field_action.is_empty() && !path.is_lenient() {
+            return path.with("action", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,
@@ -2629,6 +2639,11 @@ impl super::super::codec::Json for TestReportTest {
                     )
                 })?);
             }
+        }
+        if field_action.is_empty() && !path.is_lenient() {
+            return path.with("action", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,

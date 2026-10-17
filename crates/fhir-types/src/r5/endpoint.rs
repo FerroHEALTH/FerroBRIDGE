@@ -578,6 +578,11 @@ impl super::super::codec::Json for Endpoint {
                 })?);
             }
         }
+        if field_connection_type.is_empty() && !path.is_lenient() {
+            return path.with("connectionType", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_name = match (raw_name, raw_name_element) {
             (None, None) => None,
             (value, element) => Some(path.with("name", |path| {

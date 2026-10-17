@@ -1993,6 +1993,11 @@ impl super::super::codec::Json for TestScriptMetadata {
                 })?);
             }
         }
+        if field_capability.is_empty() && !path.is_lenient() {
+            return path.with("capability", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,
@@ -3554,6 +3559,11 @@ impl super::super::codec::Json for TestScriptRuleset {
                 })?);
             }
         }
+        if field_rule.is_empty() && !path.is_lenient() {
+            return path.with("rule", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,
@@ -4228,6 +4238,11 @@ impl super::super::codec::Json for TestScriptSetup {
                     )
                 })?);
             }
+        }
+        if field_action.is_empty() && !path.is_lenient() {
+            return path.with("action", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,
@@ -7745,6 +7760,11 @@ impl super::super::codec::Json for TestScriptTeardown {
                 })?);
             }
         }
+        if field_action.is_empty() && !path.is_lenient() {
+            return path.with("action", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,
@@ -8204,6 +8224,11 @@ impl super::super::codec::Json for TestScriptTest {
                     )
                 })?);
             }
+        }
+        if field_action.is_empty() && !path.is_lenient() {
+            return path.with("action", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,

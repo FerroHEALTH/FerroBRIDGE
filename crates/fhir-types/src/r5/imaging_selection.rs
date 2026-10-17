@@ -1577,6 +1577,11 @@ impl super::super::codec::Json for ImagingSelectionInstanceImageRegion2D {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
+        if field_coordinate.is_empty() && !path.is_lenient() {
+            return path.with("coordinate", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,
@@ -1820,6 +1825,11 @@ impl super::super::codec::Json for ImagingSelectionInstanceImageRegion3D {
             field_coordinate.push(path.with_index("coordinate", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
+        }
+        if field_coordinate.is_empty() && !path.is_lenient() {
+            return path.with("coordinate", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,

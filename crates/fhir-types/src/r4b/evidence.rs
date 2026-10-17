@@ -1026,6 +1026,11 @@ impl super::super::codec::Json for Evidence {
                 )?);
             }
         }
+        if field_variable_definition.is_empty() && !path.is_lenient() {
+            return path.with("variableDefinition", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_synthesis_type = raw_synthesis_type
             .map(|value| {
                 path.with("synthesisType", |path| {

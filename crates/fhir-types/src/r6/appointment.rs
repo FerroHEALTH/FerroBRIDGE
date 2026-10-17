@@ -1299,6 +1299,11 @@ impl super::super::codec::Json for Appointment {
                 })?);
             }
         }
+        if field_participant.is_empty() && !path.is_lenient() {
+            return path.with("participant", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_recurrence_id = match (raw_recurrence_id, raw_recurrence_id_element) {
             (None, None) => None,
             (value, element) => Some(path.with("recurrenceId", |path| {
@@ -2929,6 +2934,11 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplateWeeklyTemplate {
             field_days_of_week.push(path.with_index("daysOfWeek", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
+        }
+        if field_days_of_week.is_empty() && !path.is_lenient() {
+            return path.with("daysOfWeek", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         let field_week_interval = match (raw_week_interval, raw_week_interval_element) {
             (None, None) => None,

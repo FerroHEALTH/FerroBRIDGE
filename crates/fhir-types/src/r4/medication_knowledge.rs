@@ -1740,6 +1740,11 @@ impl super::super::codec::Json for MedicationKnowledgeAdministrationGuidelinesDo
                 })?);
             }
         }
+        if field_dosage.is_empty() && !path.is_lenient() {
+            return path.with("dosage", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             extension: field_extension,
@@ -5713,6 +5718,11 @@ impl super::super::codec::Json for MedicationKnowledgeRelatedMedicationKnowledge
                     )
                 })?);
             }
+        }
+        if field_reference.is_empty() && !path.is_lenient() {
+            return path.with("reference", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,

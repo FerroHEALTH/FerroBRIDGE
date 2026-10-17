@@ -1429,6 +1429,11 @@ impl super::super::codec::Json for AllergyIntoleranceReaction {
                 })?);
             }
         }
+        if field_manifestation.is_empty() && !path.is_lenient() {
+            return path.with("manifestation", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_description = match (raw_description, raw_description_element) {
             (None, None) => None,
             (value, element) => Some(path.with("description", |path| {

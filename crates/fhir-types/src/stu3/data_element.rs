@@ -790,6 +790,11 @@ impl super::super::codec::Json for DataElement {
                 })?);
             }
         }
+        if field_element.is_empty() && !path.is_lenient() {
+            return path.with("element", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         Ok(Self {
             id: field_id,
             meta: field_meta,

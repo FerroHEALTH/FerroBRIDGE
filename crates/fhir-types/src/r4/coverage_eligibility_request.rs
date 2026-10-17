@@ -604,6 +604,11 @@ impl super::super::codec::Json for CoverageEligibilityRequest {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
+        if field_purpose.is_empty() && !path.is_lenient() {
+            return path.with("purpose", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let field_patient = path.with("patient", |path| {
             let value = raw_patient
                 .ok_or_else(|| path.error(super::super::codec::DecodeErrorKind::MissingProperty))?;
