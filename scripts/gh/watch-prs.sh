@@ -9,6 +9,8 @@
 # - DIRTY in CHANGELOG.md or only in version lines: merges origin/main
 #   (both changelog sides, the branch's higher versions, a fresh Cargo.lock,
 #   the crate bump guard passing), pushes, and keeps watching.
+# - Open and not queued: arms auto-merge again, since a push to the branch
+#   (an update or a resolved merge) drops the arming.
 # - DIRTY elsewhere, or a red required check with nothing pending: stops
 #   (exit 2 or 3) so the session fixes it. Advisory analyzers never stop it.
 set -u
@@ -63,6 +65,9 @@ while [ ${#left[@]} -gt 0 ]; do
     ms=${s#* }
     if [ "$st" = MERGED ]; then echo "MERGED #$p"; continue; fi
     if [ "$st" = CLOSED ]; then echo "CLOSED #$p"; continue; fi
+    # A push drops the auto-merge arming; re-arming a queued PR is refused
+    # harmlessly, so this runs on every pass.
+    gh pr merge "$p" --auto >/dev/null 2>&1 || true
     case $ms in
       BEHIND) gh pr update-branch "$p" >/dev/null 2>&1 && echo "updated #$p" ;;
       DIRTY)
