@@ -117,9 +117,8 @@ async fn a_refused_client_credentials_grant_answers_502_naming_the_oauth_error()
 #[tokio::test]
 async fn an_unreachable_token_endpoint_answers_502() -> Result<(), Box<dyn StdError>> {
     let cdr = MockServer::start().await;
-    // A port bound and released at once has no listener, so the connect fails.
-    let closed = std::net::TcpListener::bind("127.0.0.1:0")?.local_addr()?;
-    let app = app_over(&cdr, &format!("http://{closed}")).await?;
+    let closed = ferrobridge_testkit::net::closed_http_url()?;
+    let app = app_over(&cdr, &closed).await?;
 
     let (status, body) = call(app, post_condition(&condition())).await?;
     assert_eq!(StatusCode::BAD_GATEWAY, status);
