@@ -94,22 +94,7 @@ impl Translator {
             return run(&NoTerminology);
         };
         let mut answers: BTreeMap<Translation, Answer> = BTreeMap::new();
-        loop {
-            let missing = {
-                let prepared = Prepared {
-                    direction,
-                    answers: &answers,
-                    missing: Mutex::new(BTreeSet::new()),
-                };
-                let result = run(&prepared);
-                let missing = prepared.missing();
-                if missing.is_empty() {
-                    return result;
-                }
-                missing
-            };
-            resolve(client, missing, &mut answers).await;
-        }
+        settle(client, direction, &mut answers, &mut run).await
     }
 
     /// Resolves every code `probe` translates, for a final run over the
@@ -125,27 +110,39 @@ impl Translator {
     ) -> Resolved {
         let mut answers: BTreeMap<Translation, Answer> = BTreeMap::new();
         if let Some(client) = self.client.as_ref() {
-            loop {
-                let missing = {
-                    let prepared = Prepared {
-                        direction,
-                        answers: &answers,
-                        missing: Mutex::new(BTreeSet::new()),
-                    };
-                    let _probed: Result<R, E> = probe(&prepared);
-                    prepared.missing()
-                };
-                if missing.is_empty() {
-                    break;
-                }
-                resolve(client, missing, &mut answers).await;
-            }
+            let _probed: Result<R, E> = settle(client, direction, &mut answers, &mut probe).await;
         }
         Resolved {
             direction,
             configured: self.client.is_some(),
             answers,
         }
+    }
+}
+
+/// Repeats `run` over the codes resolved so far, resolving the ones each
+/// run meets, and returns the result of the first run that meets none.
+async fn settle<R, E>(
+    client: &Client,
+    direction: Direction,
+    answers: &mut BTreeMap<Translation, Answer>,
+    run: &mut impl FnMut(&dyn Terminology) -> Result<R, E>,
+) -> Result<R, E> {
+    loop {
+        let missing = {
+            let prepared = Prepared {
+                direction,
+                answers,
+                missing: Mutex::new(BTreeSet::new()),
+            };
+            let result = run(&prepared);
+            let missing = prepared.missing();
+            if missing.is_empty() {
+                return result;
+            }
+            missing
+        };
+        resolve(client, missing, answers).await;
     }
 }
 
