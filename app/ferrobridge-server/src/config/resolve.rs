@@ -480,14 +480,19 @@ pub(super) fn url_of(key: &str, value: &str) -> Result<url::Url, Error> {
     })
 }
 
-/// Returns whether the operator API is mounted, refusing it without `[auth]`
-/// so the API is never served to an unauthenticated caller.
-pub(super) fn resolve_operator(operator: &Operator, auth: &Auth) -> Result<bool, Error> {
+/// Returns the operator API settings, refusing the API without `[auth]` so it
+/// is never served to an unauthenticated caller.
+pub(super) fn resolve_operator(
+    operator: &Operator,
+    auth: &Auth,
+) -> Result<Option<crate::operator::OperatorSettings>, Error> {
     if operator.enabled && !auth.enabled {
         return Err(Error::Needs {
             key: String::from("operator.enabled"),
             needs: String::from("auth.enabled"),
         });
     }
-    Ok(operator.enabled)
+    Ok(operator.enabled.then(|| crate::operator::OperatorSettings {
+        mapping_dir: operator.mapping_dir.clone(),
+    }))
 }

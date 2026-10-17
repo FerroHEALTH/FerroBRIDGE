@@ -9,14 +9,21 @@
 //! [`guard::guard`]. `GET /operator/state` answers what the running load
 //! compiled, `GET /operator/mappings` every mapping file with its digest and
 //! owner, and `GET /operator/mappings/{path}` one file's verbatim bytes with
-//! its digest as the `ETag`. No specification governs the operator surface:
-//! our own design.
+//! its digest as the `ETag`. With `[operator] mapping_dir`, `POST
+//! /operator/mappings/check` checks a draft over the running set, `PUT
+//! /operator/mappings/{path}` saves one and reloads, and `POST
+//! /operator/reload` reloads the files on disk ([`save`], [`reload`]). No
+//! specification governs the operator surface: our own design.
 
 pub mod files;
 pub mod guard;
+pub mod reload;
+pub mod save;
 pub mod snapshot;
 
+use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use axum::Router;
 use axum::extract::Path;
@@ -24,6 +31,7 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::routing::get;
+use axum::routing::post;
 use http::StatusCode;
 use http::header;
 
@@ -34,33 +42,119 @@ use crate::operator::snapshot::Snapshot;
 /// The media type a mapping file is served with.
 const YAML: &str = "application/yaml";
 
-/// What the operator routes read.
+/// The operator API, resolved from `[operator]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OperatorSettings {
+    /// The writable directory console saves go to, when one is configured.
+    pub mapping_dir: Option<PathBuf>,
+}
+
+/// What the operator routes read and write.
 #[derive(Debug)]
 pub struct Operator {
-    /// The configured mapping directories.
+    /// The provisioned mapping directories, then the console's.
     roots: Vec<Root>,
-    /// The running load, as the boot check saw it.
-    snapshot: Snapshot,
+    /// The running load, swapped whole on a reload.
+    snapshot: RwLock<Arc<Snapshot>>,
+    /// What a reload compiles against, when saving is configured.
+    reloader: Option<reload::Reloader>,
+    /// The writable directory console saves go to.
+    mapping_dir: Option<PathBuf>,
+    /// Held for the whole of a check, a save or a reload, so they never
+    /// interleave.
+    saving: tokio::sync::Mutex<()>,
 }
 
 impl Operator {
-    /// Returns the operator surface over `roots` and the running load
-    /// `snapshot` describes.
+    /// Returns the read-only operator surface over `roots` and the running
+    /// load `snapshot` describes.
     #[must_use]
-    pub const fn new(roots: Vec<Root>, snapshot: Snapshot) -> Self {
-        Self { roots, snapshot }
+    pub fn new(roots: Vec<Root>, snapshot: Snapshot) -> Self {
+        Self {
+            roots,
+            snapshot: RwLock::new(Arc::new(snapshot)),
+            reloader: None,
+            mapping_dir: None,
+            saving: tokio::sync::Mutex::new(()),
+        }
     }
 
-    /// Returns the configured mapping directories.
+    /// Returns this surface saving into `mapping_dir` and reloading through
+    /// `reloader`.
+    ///
+    /// The console's FHIRconnect files live under `mapping_dir/fhirconnect`
+    /// and join the set beside the provisioned ones.
+    #[must_use]
+    pub fn with_saving(mut self, mapping_dir: PathBuf, reloader: reload::Reloader) -> Self {
+        self.roots.push(Root::console(
+            files::Language::Fhirconnect,
+            mapping_dir.join("fhirconnect"),
+        ));
+        self.mapping_dir = Some(mapping_dir);
+        self.reloader = Some(reloader);
+        self
+    }
+
+    /// Returns the mapping directories, provisioned first.
     #[must_use]
     pub fn roots(&self) -> &[Root] {
         &self.roots
     }
 
-    /// Returns the running load.
+    /// Returns the provisioned mapping directories alone.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
+    pub fn provisioned_roots(&self) -> Vec<Root> {
+        self.roots
+            .iter()
+            .filter(|root| root.owner() == files::Owner::Provisioned)
+            .cloned()
+            .collect()
+    }
+
+    /// Returns the running load, taken once per request.
+    #[must_use]
+    pub fn snapshot(&self) -> Arc<Snapshot> {
+        // NOTE: no specification governs this: our own design; the lock only
+        // guards an `Arc` swap, so a poisoned lock still holds a whole set.
+        Arc::clone(
+            &self
+                .snapshot
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        )
+    }
+
+    /// Replaces the running load every later request reads.
+    pub fn replace(&self, snapshot: Snapshot) {
+        *self
+            .snapshot
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Arc::new(snapshot);
+    }
+
+    /// Returns `report` as a check answers it, each file by its wire path and
+    /// `draft` by the path it stands for.
+    #[must_use]
+    pub fn report_json(
+        &self,
+        report: &crate::check::Report,
+        draft: Option<&reload::Draft>,
+    ) -> serde_json::Value {
+        let diagnostics: Vec<serde_json::Value> = report
+            .diagnostics()
+            .iter()
+            .map(|diagnostic| {
+                crate::check::diagnostic_json(
+                    diagnostic,
+                    &reload::shown(&self.roots, draft, diagnostic.file()),
+                )
+            })
+            .collect();
+        serde_json::json!({
+            "clean": report.is_clean(),
+            "counts": report.counts(),
+            "diagnostics": diagnostics,
+        })
     }
 }
 
@@ -70,7 +164,9 @@ pub fn routes(operator: Arc<Operator>, authority: Arc<Authority>) -> Router {
     Router::new()
         .route("/operator/state", get(state))
         .route("/operator/mappings", get(mappings))
-        .route("/operator/mappings/{*path}", get(mapping))
+        .route("/operator/mappings/check", post(save::check))
+        .route("/operator/mappings/{*path}", get(mapping).put(save::save))
+        .route("/operator/reload", post(save::reload))
         .with_state(operator)
         .route_layer(axum::middleware::from_fn_with_state(
             authority,
@@ -80,12 +176,12 @@ pub fn routes(operator: Arc<Operator>, authority: Arc<Authority>) -> Router {
 
 /// `GET /operator/state`: the running load.
 async fn state(State(operator): State<Arc<Operator>>) -> Response {
-    axum::Json(operator.snapshot.document(&operator.roots)).into_response()
+    axum::Json(operator.snapshot().document(&operator.roots)).into_response()
 }
 
 /// `GET /operator/mappings`: every mapping file with its digest and owner.
 async fn mappings(State(operator): State<Arc<Operator>>) -> Response {
-    blocking(move || match operator.snapshot.listing(&operator.roots) {
+    blocking(move || match operator.snapshot().listing(&operator.roots) {
         Ok(listing) => axum::Json(listing).into_response(),
         Err(error) => unreadable(&error),
     })

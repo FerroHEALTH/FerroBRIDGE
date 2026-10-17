@@ -645,8 +645,8 @@ pub struct Settings {
     pub hl7v2: Option<Hl7v2Settings>,
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
-    /// Whether the operator API is mounted.
-    pub operator: bool,
+    /// The operator API, when it is mounted.
+    pub operator: Option<crate::operator::OperatorSettings>,
 }
 
 /// The OMOP CDM database, resolved.

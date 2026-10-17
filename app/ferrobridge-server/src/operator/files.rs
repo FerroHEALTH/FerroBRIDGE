@@ -43,6 +43,8 @@ impl Language {
 pub enum Owner {
     /// The deployment provisioned it; the operator API never writes it.
     Provisioned,
+    /// The console saved it under `[operator] mapping_dir`.
+    Console,
 }
 
 /// One configured directory and the root name a wire path reaches it by.
@@ -52,16 +54,37 @@ pub struct Root {
     language: Language,
     /// The directory.
     directory: PathBuf,
+    /// Who owns its files.
+    owner: Owner,
 }
 
 impl Root {
-    /// Returns the root over `directory` holding files of `language`.
+    /// Returns the provisioned root over `directory` holding files of
+    /// `language`.
     #[must_use]
     pub const fn new(language: Language, directory: PathBuf) -> Self {
         Self {
             language,
             directory,
+            owner: Owner::Provisioned,
         }
+    }
+
+    /// Returns the console root over `directory`, the writable tree console
+    /// saves of `language` go to.
+    #[must_use]
+    pub const fn console(language: Language, directory: PathBuf) -> Self {
+        Self {
+            language,
+            directory,
+            owner: Owner::Console,
+        }
+    }
+
+    /// Returns who owns its files.
+    #[must_use]
+    pub const fn owner(&self) -> Owner {
+        self.owner
     }
 
     /// Returns the language of its files.
@@ -106,6 +129,8 @@ pub enum PathError {
 pub struct Located {
     /// The language of its root.
     language: Language,
+    /// Who owns it.
+    owner: Owner,
     /// Its path on the wire, `<root>/<relative path>` with `/` separators.
     wire: String,
     /// Its path on disk.
@@ -117,6 +142,12 @@ impl Located {
     #[must_use]
     pub const fn language(&self) -> Language {
         self.language
+    }
+
+    /// Returns who owns it.
+    #[must_use]
+    pub const fn owner(&self) -> Owner {
+        self.owner
     }
 
     /// Returns its path on the wire.
@@ -137,7 +168,8 @@ impl Located {
 const EXTENSIONS: [&str; 2] = ["yml", "yaml"];
 
 /// Returns whether `path` carries a mapping file extension.
-fn is_mapping(path: &Path) -> bool {
+#[must_use]
+pub fn is_mapping(path: &Path) -> bool {
     path.extension()
         .and_then(std::ffi::OsStr::to_str)
         .map(str::to_ascii_lowercase)
@@ -151,16 +183,26 @@ fn is_mapping(path: &Path) -> bool {
 ///
 /// Returns the walk's [`crate::walk::Error`] when a directory cannot be read.
 pub fn list(roots: &[Root]) -> Result<Vec<Located>, crate::walk::Error> {
-    let mut found = Vec::new();
+    let mut found: Vec<Located> = Vec::new();
     for root in roots {
+        if root.owner == Owner::Console && !root.directory.exists() {
+            continue;
+        }
         for path in crate::walk::files(&root.directory, is_mapping)? {
-            if let Some(wire) = wire_path(root, &path) {
-                found.push(Located {
-                    language: root.language,
-                    wire,
-                    path,
-                });
+            let Some(wire) = wire_path(root, &path) else {
+                continue;
+            };
+            // NOTE: no specification governs this: our own design; one owner
+            // per file, and the provisioned root, listed first, wins a clash.
+            if found.iter().any(|located| located.wire == wire) {
+                continue;
             }
+            found.push(Located {
+                language: root.language,
+                owner: root.owner,
+                wire,
+                path,
+            });
         }
     }
     Ok(found)
@@ -198,12 +240,44 @@ pub fn wire_path_in(roots: &[Root], path: &Path) -> Option<String> {
 /// outside its root once every symlink is followed, and [`PathError::Read`]
 /// when the file system refuses a read for another reason.
 pub fn resolve(roots: &[Root], wire: &str) -> Result<Located, PathError> {
+    let (first, relative) = relative(wire)?;
+    let mut matched = false;
+    for root in roots.iter().filter(|root| root.language.root() == first) {
+        matched = true;
+        let path = root.directory.join(&relative);
+        if !is_mapping(&path) {
+            return Err(PathError::Absent);
+        }
+        match confined(&root.directory, &path) {
+            Ok(()) => {
+                return Ok(Located {
+                    language: root.language,
+                    owner: root.owner,
+                    wire: wire.to_owned(),
+                    path,
+                });
+            }
+            Err(PathError::Absent) => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Err(if matched {
+        PathError::Absent
+    } else {
+        PathError::UnknownRoot
+    })
+}
+
+/// Returns the root name `wire` opens with and the relative path after it,
+/// refusing every segment that is not a plain name.
+///
+/// # Errors
+///
+/// Returns [`PathError::UnknownRoot`] when `wire` names nothing below a root
+/// and [`PathError::Step`] for an empty, `.`, `..` or `..`-prefixed segment.
+pub fn relative(wire: &str) -> Result<(&str, PathBuf), PathError> {
     let (first, rest) = wire.split_once('/').ok_or(PathError::UnknownRoot)?;
-    let root = roots
-        .iter()
-        .find(|root| root.language.root() == first)
-        .ok_or(PathError::UnknownRoot)?;
-    let mut path = root.directory.clone();
+    let mut path = PathBuf::new();
     for segment in rest.split('/') {
         // NOTE: no specification governs this: our own design; `..`-prefixed
         // names are the ConfigMap writer's own entries, which the walk skips.
@@ -216,19 +290,18 @@ pub fn resolve(roots: &[Root], wire: &str) -> Result<Located, PathError> {
             _ => return Err(PathError::Step),
         }
     }
-    if !is_mapping(&path) {
-        return Err(PathError::Absent);
-    }
-    let inside = canonical(&root.directory)?;
-    let target = canonical(&path)?;
+    Ok((first, path))
+}
+
+/// Checks that `path` is a file inside `directory` once every symlink is
+/// followed.
+fn confined(directory: &Path, path: &Path) -> Result<(), PathError> {
+    let inside = canonical(directory)?;
+    let target = canonical(path)?;
     if !target.starts_with(&inside) || !target.is_file() {
         return Err(PathError::Absent);
     }
-    Ok(Located {
-        language: root.language,
-        wire: wire.to_owned(),
-        path,
-    })
+    Ok(())
 }
 
 /// Returns `path` with every symlink followed.

@@ -193,21 +193,35 @@ pub async fn load_configured(
 /// context does not compile against its template.
 pub fn load(settings: &MappingSettings) -> Result<ProgramSet, Error> {
     let files = mapping_files(&settings.directory)?;
-    let set = read(&settings.directory, &files)?;
-    let templates = compile::directory_templates(&settings.templates)?;
-    if !templates.diagnostics.is_empty() {
+    load_files(&settings.directory, &files, &settings.templates)
+}
+
+/// Loads the mapping files `files`, named after `directory` in a refusal,
+/// compiled against every `.opt` file under `templates`.
+///
+/// # Errors
+///
+/// Returns what [`load`] returns, apart from an empty mapping tree.
+pub fn load_files(
+    directory: &Path,
+    files: &[PathBuf],
+    templates: &Path,
+) -> Result<ProgramSet, Error> {
+    let set = read(directory, files)?;
+    let resolved = compile::directory_templates(templates)?;
+    if !resolved.diagnostics.is_empty() {
         return Err(Error::Mappings {
-            path: settings.templates.clone(),
-            report: compile::render(&templates.diagnostics),
+            path: templates.to_path_buf(),
+            report: compile::render(&resolved.diagnostics),
         });
     }
-    if templates.indexes.is_empty() {
+    if resolved.indexes.is_empty() {
         return Err(Error::Empty {
-            path: settings.templates.clone(),
+            path: templates.to_path_buf(),
             what: "operational template",
         });
     }
-    program_set(&set, templates.indexes, &templates.refusals)
+    program_set(&set, resolved.indexes, &resolved.refusals)
 }
 
 /// Loads the mapping set under `directory`, compiled against the templates
@@ -231,7 +245,21 @@ pub async fn load_from_cdr(
     client: &crate::cdr::CdrClient,
 ) -> Result<ProgramSet, Error> {
     let files = mapping_files(directory)?;
-    let set = read(directory, &files)?;
+    load_files_from_cdr(directory, &files, client).await
+}
+
+/// Loads the mapping files `files`, named after `directory` in a refusal,
+/// compiled against the templates the CDR `client` reaches serves.
+///
+/// # Errors
+///
+/// Returns what [`load_from_cdr`] returns, apart from an empty mapping tree.
+pub async fn load_files_from_cdr(
+    directory: &Path,
+    files: &[PathBuf],
+    client: &crate::cdr::CdrClient,
+) -> Result<ProgramSet, Error> {
+    let set = read(directory, files)?;
     let templates = compile::cdr_templates(&set, client).await?;
     if let Some(refusal) = templates.refusals.into_iter().next() {
         return Err(refused(refusal, ""));

@@ -122,7 +122,7 @@ pub struct AppState {
     /// `404` rather than `403` (no specification governs this: our own design).
     facade: Option<Arc<crate::facade::Facade>>,
     /// The FHIRconnect operations lane, when a mapping set is configured.
-    operations: Option<OperationsLane>,
+    operations: Option<Arc<OperationsLane>>,
     /// The lanes the boot summary reported, for `GET /health/info`.
     lanes: Vec<crate::startup::Lane>,
     /// Whether the HL7 v2 listener accepts, when the face runs.
@@ -178,12 +178,14 @@ impl AppState {
                 source: Box::new(source),
             })?;
         let operations = programs.map(|programs| {
-            OperationsLane::new(programs, settings.operations.device_reference.as_str())
-                .with_composition_defaults(
-                    settings.operations.composer.as_str(),
-                    settings.operations.composition_language.clone(),
-                    settings.operations.composition_territory.clone(),
-                )
+            Arc::new(
+                OperationsLane::new(programs, settings.operations.device_reference.as_str())
+                    .with_composition_defaults(
+                        settings.operations.composer.as_str(),
+                        settings.operations.composition_language.clone(),
+                        settings.operations.composition_territory.clone(),
+                    ),
+            )
         });
         Ok(Self {
             health: Registry::new(indicators),
@@ -316,13 +318,20 @@ impl AppState {
     /// Returns this state with `lane` serving the FHIRconnect operations.
     #[must_use]
     pub fn serving_operations(mut self, lane: OperationsLane) -> Self {
-        self.operations = Some(lane);
+        self.operations = Some(Arc::new(lane));
         self
     }
 
     /// Returns the FHIRconnect operations lane, when one is configured.
     #[must_use]
-    pub const fn operations(&self) -> Option<&OperationsLane> {
+    pub fn operations(&self) -> Option<&OperationsLane> {
+        self.operations.as_deref()
+    }
+
+    /// Returns a shared handle on the operations lane, for the reload that
+    /// swaps its programs.
+    #[must_use]
+    pub const fn operations_handle(&self) -> Option<&Arc<OperationsLane>> {
         self.operations.as_ref()
     }
 
