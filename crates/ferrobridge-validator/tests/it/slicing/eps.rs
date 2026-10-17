@@ -133,9 +133,9 @@ fn an_eps_bundle_without_its_patient_entry_is_refused() -> TestResult {
     Ok(())
 }
 
-#[test]
-fn an_eps_bundle_matches_its_entries_by_type_and_profile() -> TestResult {
-    let Some(set) = eu_set()? else { return Ok(()) };
+/// A complete EPS document Bundle: the Composition, its subject Patient and
+/// its author Practitioner.
+fn eps_bundle() -> serde_json::Value {
     let sections =
         ["11450-4", "48765-2", "10160-0", "47519-4", "46264-8"].map(|code| section(code, &[]));
     // documents.html §3.3.1: the subject and the author the Composition
@@ -143,7 +143,7 @@ fn an_eps_bundle_matches_its_entries_by_type_and_profile() -> TestResult {
     let mut composition = composition(&sections);
     composition["subject"] = json!({"reference": "urn:uuid:00000000-0000-0000-0000-000000000004"});
     composition["author"] = json!([{"reference": "urn:uuid:00000000-0000-0000-0000-000000000005"}]);
-    let resource = json!({
+    json!({
         "resourceType": "Bundle",
         "identifier": {"system": "urn:ietf:rfc:3986", "value": "urn:uuid:00000000-0000-0000-0000-000000000002"},
         "type": "document",
@@ -156,8 +156,40 @@ fn an_eps_bundle_matches_its_entries_by_type_and_profile() -> TestResult {
             {"fullUrl": "urn:uuid:00000000-0000-0000-0000-000000000005", "resource": {
                 "resourceType": "Practitioner", "name": [{"family": "Smith", "given": ["Eve"]}]}}
         ]
-    });
+    })
+}
+
+#[test]
+fn an_eps_bundle_matches_its_entries_by_type_and_profile() -> TestResult {
+    let Some(set) = eu_set()? else { return Ok(()) };
+    let resource = eps_bundle();
     let report = validate(&set, &resource, Some(BUNDLE))?;
     assert!(report.is_valid(), "{:#?}", report.issues());
+    Ok(())
+}
+
+#[test]
+fn an_eps_bundle_whose_patient_fails_its_profile_names_why() -> TestResult {
+    let Some(set) = eu_set()? else { return Ok(()) };
+    let mut resource = eps_bundle();
+    resource["entry"][1]["resource"]
+        .as_object_mut()
+        .map(|patient| patient.remove("birthDate"));
+    let report = validate(&set, &resource, Some(BUNDLE))?;
+    let found = minimums(&report);
+    assert!(
+        found.iter().any(|message| message == "Bundle.entry:patient occurs 0 times, below its minimum of 1"),
+        "{found:#?}"
+    );
+    let named: Vec<&str> = report
+        .with_message(MessageId::SliceRejection)
+        .map(|issue| issue.message.as_str())
+        .collect();
+    assert!(
+        named.iter().any(
+            |message| message.contains("Bundle.entry:patient") && message.contains("birthDate")
+        ),
+        "{named:#?}"
+    );
     Ok(())
 }

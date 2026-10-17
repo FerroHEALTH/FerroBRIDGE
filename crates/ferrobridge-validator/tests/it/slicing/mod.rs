@@ -11,6 +11,7 @@ mod eps;
 mod extensions;
 mod paths;
 mod profiles;
+mod rejections;
 mod rules;
 
 use ferrobridge_validator::report::Constraint;

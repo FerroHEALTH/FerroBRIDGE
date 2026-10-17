@@ -221,6 +221,9 @@ pub enum MessageId {
     OpenAtEnd,
     /// An item that matches more than one slice (profiling.html §5.1.0.11).
     OverlappingSlices,
+    /// A failure of the item closest to a slice that holds too few items,
+    /// which kept the item out of the slice.
+    SliceRejection,
     /// A reference a discriminator resolves names no resource where it
     /// points.
     UnresolvedReference,
@@ -301,6 +304,7 @@ impl MessageId {
             Self::SliceOrder => "slice-order",
             Self::OpenAtEnd => "open-at-end",
             Self::OverlappingSlices => "overlapping-slices",
+            Self::SliceRejection => "slice-rejection",
             Self::UnresolvedReference => "unresolved-reference",
             Self::TypeProfileMismatch => "type-profile-mismatch",
             Self::ResourceTypeNotAllowed => "resource-type-not-allowed",

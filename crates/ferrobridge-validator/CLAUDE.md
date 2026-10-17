@@ -115,7 +115,7 @@ canonical; `resolve()` from the Bundle element reaches entries by an
 absolute reference; an element context naming a type admits that type and
 its specializations, and `Element` admits a resource too; a `url#id` context
 on an element held to no definition deriving from `url`, or on an item in no
-slice of the entry it names a slice of, is undecided; a child a snapshot omits is held to the core definition of the type that declares it. Change one only with a citation.
+slice of the entry it names a slice of, is undecided; a child a snapshot omits is held to the core definition of the type that declares it; a slice that falls short of its minimum after a validation kept an item out of it (a `profile` discriminator, or no discriminator) names that validation's errors for the rejected item with the fewest, as `slice-rejection` information. Change one only with a citation.
 
 ## Tests
 
