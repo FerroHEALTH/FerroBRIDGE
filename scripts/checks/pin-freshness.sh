@@ -15,8 +15,9 @@
 # upstream project's GitHub releases, which is the tag the container image and
 # the installer both carry. A corpus pinned by commit on a repository with no
 # releases is read against the newest commit of the branch it follows, and a
-# FHIR examples package against the registry's `latest` version. Needs an
-# authenticated `gh`, curl and jq.
+# FHIR package (a core package, THO, the v2-to-FHIR guide, an examples package
+# or a root of the profile set) against the registry's `latest` version. Needs
+# an authenticated `gh`, curl and jq.
 #
 # Exit 0 when every pin is current, 1 when at least one is behind (each such
 # line starts with STALE), 2 when a release could not be read, so a network
@@ -79,9 +80,18 @@ done <<< "$WATCHED"
 
 # One "matrix label<TAB>upstream repository<TAB>branch" record per line: a
 # corpus pinned by commit on a repository that publishes no releases, read
-# against the newest commit of the branch the pin follows.
-# TODO(#268): the other commit-pinned corpora and the FHIR core packages.
+# against the newest commit of the branch the pin follows. The REST API
+# chapter is pinned at the head of an upstream pull request and is read
+# against the default branch it merges into. The two KDS fixture rows pin one
+# file each, and the UCUM row a release tag, so neither is read here.
 readonly WATCHED_COMMITS="\
+FHIRconnect REST API chapter (draft, unmerged)	SevKohler/FHIRconnect-spec	main
+FHIRconnect specification source	SevKohler/FHIRconnect-spec	main
+FHIRconnect mapping library (corpus, never an oracle)	SevKohler/FHIRconnect-mapping-lib	main
+OMOCL corpus	SevKohler/OMOCL	main
+HL7 v2 definitions (v2ig source of truth, never committed)	HL7/v2ig	main
+FHIRPath test suite (R4)	FHIR/fhir-test-cases	master
+HL7 v2+ licence page	HL7/v2plus	master
 HL7 v2 samples: Microsoft FHIR-Converter	microsoft/FHIR-Converter	main
 HL7 v2 samples: CDC ReportStream data tests	CDCgov/prime-reportstream	main
 HL7 v2 samples: HL7 v2-to-FHIR benchmark messages	HL7/v2-to-fhir	master
@@ -127,10 +137,22 @@ while IFS=$'\t' read -r label repo branch; do
   fi
 done <<< "$WATCHED_COMMITS"
 
-# One "package<TAB>registry metadata URL" record per line: a FHIR package
+# One "matrix label<TAB>registry metadata URL" record per line: a FHIR package
 # pinned by version, read against the `latest` dist-tag the FHIR package
 # registry publishes for it (the npm registry shape both registries speak).
+# Of the profile set only the two roots with a `latest` tag are read: every
+# other row is pinned at the version a dependent names, and the third root,
+# hl7.fhir.eu.eps, has one ballot version and no `latest` tag.
 readonly WATCHED_PACKAGES="\
+hl7.fhir.r3.core	https://packages.fhir.org/hl7.fhir.r3.core
+hl7.fhir.r4.core	https://packages.fhir.org/hl7.fhir.r4.core
+hl7.fhir.r4b.core	https://packages.fhir.org/hl7.fhir.r4b.core
+hl7.fhir.r5.core	https://packages.fhir.org/hl7.fhir.r5.core
+hl7.fhir.r6.core	https://packages2.fhir.org/packages/hl7.fhir.r6.core
+hl7.terminology (THO)	https://packages.fhir.org/hl7.terminology
+hl7.fhir.uv.v2mappings (the v2-to-FHIR IG)	https://packages.fhir.org/hl7.fhir.uv.v2mappings
+hl7.fhir.eu.base	https://packages.fhir.org/hl7.fhir.eu.base
+hl7.fhir.uv.ips	https://packages.fhir.org/hl7.fhir.uv.ips
 hl7.fhir.r3.examples	https://packages.fhir.org/hl7.fhir.r3.examples
 hl7.fhir.r4.examples	https://packages.fhir.org/hl7.fhir.r4.examples
 hl7.fhir.r4b.examples	https://packages.fhir.org/hl7.fhir.r4b.examples
