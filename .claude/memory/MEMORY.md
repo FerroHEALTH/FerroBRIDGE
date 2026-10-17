@@ -58,7 +58,7 @@
 - [End-to-end gate](e2e-gate.md): container tests run only with
   `FERROBRIDGE_E2E=1` through the testkit harness; images pinned by digest and
   checked by the versions guard; 2026-09-12
-- [Merge queue with signed commits](merge-queue-signed.md): main requires signed, up-to-date branches; rebase locally, merge one at a time, never gh pr update-branch --rebase
+- [Merge queue and signed commits](merge-queue-signed.md) — main merges through the merge queue since 2026-10-17; arm with gh pr merge --auto, never update-branch --rebase
 - [Release tag is mine](release-tag-is-mine.md): the session pushes every release and pre-release tag; never hand the tag to the owner
 - [Upstream reports carry no milestone](upstream-reports-no-milestone.md): an upstream-report issue is never in a milestone; the in-repo decision it forces is a separate, milestoned issue
 - [Upstream reports stay here](upstream-reports-stay-here.md): the issue is the record; nothing is filed on external trackers and no owner-action issue for filing is created
@@ -76,3 +76,4 @@
 - [Remove worktrees after merge](remove-worktrees-after-merge.md) — remove each agent worktree and its branches as soon as its PR merges; owner 2026-10-15
 - [PR merge watch](pr-merge-watch.md) — watch every PR until merged with scripts/gh/watch-prs.sh; fix red checks, conflicts and BEHIND at once; owner 2026-10-15
 - [Worker wait loops](worker-wait-loops.md) — worker briefs forbid self-matching pgrep waits; find and kill stuck shells by working directory; owner 2026-10-16
+- [PR backlog discipline](pr-backlog-discipline.md) — several open PRs are fine if each merges cleanly; no stacked PRs, overlapping work in sequence, every open PR tracked to its merge; owner 2026-10-17

@@ -470,7 +470,7 @@ the state on 2026-09-05.
 
 | Setting | State |
 |---|---|
-| `main` ruleset: requires a pull request, signed commits, and the `conclusion` status check with the strict up-to-date policy; deletions and non-fast-forward pushes blocked | done |
+| `main` ruleset: requires a pull request, signed commits, and the `conclusion` status check, and merges through the merge queue (squash, up to 5 entries per build, enabled 2026-10-17 in place of the strict up-to-date policy); deletions and non-fast-forward pushes blocked | done |
 | Code scanning in advanced setup, with the CodeQL default setup off so `codeql.yml` is the analysis path | done |
 | Secret scanning with push protection, Dependabot alerts, and Dependabot security updates | done |
 | Artifact attestations, which the release lane's provenance and SBOM bundles are stored against | done |
