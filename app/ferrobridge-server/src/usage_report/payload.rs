@@ -312,6 +312,7 @@ pub struct GroupStats {
     pub histogram: [u64; BUCKETS],
 }
 
+// TODO(#744): count the HL7 v2 face's messages and the mapping failures.
 /// The counters of the window.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub struct Counters {
