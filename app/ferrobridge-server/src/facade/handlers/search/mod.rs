@@ -49,6 +49,7 @@ use crate::facade::handlers::write;
 use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::PersonId;
 use crate::facade::identity::record::CompositionBinding;
+use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
@@ -522,13 +523,17 @@ fn matched(
     let mut entries = chosen.unwrap_or(every);
     let container = versioned_object_uid(&read.version);
     for bindings in &plan.ids {
-        entries.retain(|entry| {
-            bindings.iter().any(|binding| {
-                binding.versioned_object_uid == container.value()
-                    && engine::entry_named(program, &read.composition, &binding.entry_path)
-                        .is_some_and(|named| named.ordinal() == entry.ordinal())
-            })
-        });
+        let mut named = Vec::new();
+        for binding in bindings {
+            if binding.versioned_object_uid == container.value()
+                && let Some(entry) =
+                    engine::entry_named(program, &read.composition, &binding.entry_path)
+                        .map_err(|error| Refusal::from(Refused::from(error)))?
+            {
+                named.push(entry.ordinal());
+            }
+        }
+        entries.retain(|entry| named.contains(&entry.ordinal()));
     }
     Ok(entries)
 }

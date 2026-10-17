@@ -9,7 +9,13 @@
 //! diagnosis with its own id. The stub CDR evaluates no AQL, so each row
 //! names the node that matched as the real CDR would.
 
+use ferrobridge_server::facade::identity::FhirResourceId;
+use ferrobridge_server::facade::identity::derive;
+use ferrobridge_server::facade::identity::derive::EntryKey;
+use ferrobridge_server::facade::identity::record::CompositionBinding;
+use ferrobridge_server::facade::identity::store::Store;
 use http::StatusCode;
+use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use std::collections::BTreeSet;
 use std::error::Error as StdError;
 use wiremock::Mock;
@@ -371,5 +377,179 @@ async fn an_accurate_total_is_one_count_query_for_one_and_two_entry_compositions
             "the page is the only row read: {sent:?}"
         );
     }
+    Ok(())
+}
+
+/// Records `id` for the entry of the composition `path` names, as a build
+/// that wrote no derivation did.
+fn record_earlier(
+    harness: &super::super::Harness,
+    path: &str,
+    id: &FhirResourceId,
+) -> Result<(), Box<dyn StdError>> {
+    let key = EntryKey::new(HierObjectId::new(super::super::CONTAINER)?, path, 0);
+    harness
+        .store
+        .record_internal("Condition", &derive::map_key(&key), id)?;
+    harness.store.record_binding(
+        "Condition",
+        id,
+        &CompositionBinding {
+            ehr_id: String::from(super::super::EHR_ID),
+            versioned_object_uid: String::from(super::super::CONTAINER),
+            template_id: String::from("ferrobridge.diagnose.v1"),
+            resource_type: String::from("Condition"),
+            entry_path: String::from(path),
+            split: 0,
+            context: String::from("ferrobridge_facade.context"),
+            derivation: None,
+        },
+    )?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_id_an_earlier_build_recorded_under_the_comma_path_keeps_answering_its_entry()
+-> Result<(), Box<dyn StdError>> {
+    // A build up to 0.0.6 keyed the second diagnosis by
+    // `/content[<archetype>, 2]`, a path the BASE grammar refuses; the map
+    // wins once written, so that id still names the second diagnosis.
+    let harness = searching().await;
+    let (composition, _first, second) = two_diagnoses(&harness);
+    let legacy = FhirResourceId::new("legacysecond")?;
+    record_earlier(&harness, &format!("/content[{DIAGNOSIS}, 2]"), &legacy)?;
+    mount_rows(
+        &harness.cdr,
+        &[node_row(VERSION_ONE, &composition, &second)],
+    )
+    .await;
+    let (status, body) = get(&harness, "Condition?code=SYN-002").await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let entry = matches(&body).first().copied().ok_or("one match")?;
+    assert_eq!(Some("SYN-002"), code_of(entry), "{body}");
+    assert_eq!(Some("legacysecond"), id_of(entry), "{body}");
+
+    mount_read(&harness.cdr, VERSION_ONE, &composition).await;
+    let (status, read) = get(&harness, "Condition/legacysecond").await?;
+    assert_eq!(StatusCode::OK, status, "{read}");
+    assert_eq!(
+        Some("SYN-002"),
+        read["code"]["coding"][0]["code"].as_str(),
+        "{read}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_later_entry_is_bound_by_the_positional_path_of_its_place_in_content()
+-> Result<(), Box<dyn StdError>> {
+    // openEHR BASE Release 1.2.0, Paths and Locators, §Using Positional
+    // Parameters: the second diagnosis is the second `content` item.
+    let harness = searching().await;
+    let (composition, _first, second) = two_diagnoses(&harness);
+    mount_rows(
+        &harness.cdr,
+        &[node_row(VERSION_ONE, &composition, &second)],
+    )
+    .await;
+    let (status, body) = get(&harness, "Condition?code=SYN-002").await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let entry = matches(&body).first().copied().ok_or("one match")?;
+    let id = FhirResourceId::new(id_of(entry).ok_or("the match has an id")?)?;
+    let binding = harness
+        .store
+        .binding_of("Condition", &id)?
+        .ok_or("the entry is bound")?;
+    assert_eq!("/content[2]", binding.entry_path);
+    assert_eq!(Some(derive::DERIVATION), binding.derivation);
+    Ok(())
+}
+
+/// The archetype of the `content` items [`with_foreign`] puts before the
+/// diagnoses, which the fixture context does not map.
+const FOREIGN: &str = "openEHR-EHR-EVALUATION.adverse_reaction_risk.v1";
+
+/// Returns `composition` with `count` items of [`FOREIGN`] before its
+/// content, each a copy of its first diagnosis under that archetype.
+fn with_foreign(composition: &serde_json::Value, count: usize) -> serde_json::Value {
+    let mut foreign = diagnosis(composition);
+    foreign["archetype_node_id"] = serde_json::json!(FOREIGN);
+    let mut changed = composition.clone();
+    let content = changed["content"]
+        .as_array_mut()
+        .expect("the composition has content");
+    for _ in 0..count {
+        content.insert(0, foreign.clone());
+    }
+    changed
+}
+
+#[tokio::test]
+async fn a_comma_path_a_build_up_to_0_0_5_recorded_reads_as_the_first_entry_at_its_place()
+-> Result<(), Box<dyn StdError>> {
+    // Builds up to 0.0.5 bound the first diagnosis by its place in content:
+    // the third item here, and the composition holds no third diagnosis.
+    let harness = searching().await;
+    let (composition, _, _) = two_diagnoses(&harness);
+    let composition = with_foreign(&composition, 2);
+    let early = FhirResourceId::new("earlyfirst")?;
+    record_earlier(&harness, &format!("/content[{DIAGNOSIS}, 3]"), &early)?;
+    mount_read(&harness.cdr, VERSION_ONE, &composition).await;
+    let (status, read) = get(&harness, "Condition/earlyfirst").await?;
+    assert_eq!(StatusCode::OK, status, "{read}");
+    assert_eq!(
+        Some("SYN-001"),
+        read["code"]["coding"][0]["code"].as_str(),
+        "{read}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_comma_path_whose_two_readings_name_two_entries_is_reported()
+-> Result<(), Box<dyn StdError>> {
+    // `/content[<archetype>, 2]` is the first diagnosis as builds up to 0.0.5
+    // wrote it and the second as 0.0.6 wrote it; the read reports the binding.
+    let harness = searching().await;
+    let (composition, _, _) = two_diagnoses(&harness);
+    let composition = with_foreign(&composition, 1);
+    let path = format!("/content[{DIAGNOSIS}, 2]");
+    record_earlier(&harness, &path, &FhirResourceId::new("splitread")?)?;
+    mount_read(&harness.cdr, VERSION_ONE, &composition).await;
+    let (status, body) = get(&harness, "Condition/splitread").await?;
+    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
+    let issue = &body["issue"][0];
+    assert_eq!(Some("exception"), issue["code"].as_str(), "{body}");
+    let diagnostics = issue["diagnostics"].as_str().unwrap_or_default();
+    assert!(diagnostics.contains(&path), "{body}");
+    assert!(!body.to_string().contains("SYN-00"), "{body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_search_meeting_a_comma_key_with_two_readings_is_reported()
+-> Result<(), Box<dyn StdError>> {
+    // The second diagnosis's 0.0.6 key is the first diagnosis's key as builds
+    // up to 0.0.5 wrote it, so binding it would move an id between entries.
+    let harness = searching().await;
+    let (composition, _, second) = two_diagnoses(&harness);
+    let composition = with_foreign(&composition, 1);
+    record_earlier(
+        &harness,
+        &format!("/content[{DIAGNOSIS}, 2]"),
+        &FhirResourceId::new("splitsearch")?,
+    )?;
+    mount_rows(
+        &harness.cdr,
+        &[node_row(VERSION_ONE, &composition, &second)],
+    )
+    .await;
+    let (status, body) = get(&harness, "Condition?code=SYN-002").await?;
+    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
+    assert_eq!(
+        Some("exception"),
+        body["issue"][0]["code"].as_str(),
+        "{body}"
+    );
     Ok(())
 }
