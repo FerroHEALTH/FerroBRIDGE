@@ -199,3 +199,84 @@ fn a_time_without_an_offset_follows_each_package() {
         Some("2001-06-15T12:00:00")
     );
 }
+
+/// Two element ids outside the `id` form: an element id naming a slice, as a
+/// `StructureDefinition` snapshot carries one, and a 65-character value.
+const ELEMENT_IDS: [&str; 2] = [
+    "Patient.extension:birthPlace",
+    "an-element-id-of-sixty-five-characters-which-the-id-form-refuses0",
+];
+
+/// `Element.id` and every element inheriting it take the `string` form.
+///
+/// <https://hl7.org/fhir/R4B/element-definitions.html#Element.id> and
+/// <https://hl7.org/fhir/R5/types-definitions.html#Element.id> type
+/// `Element.id` as `string` ("This may be any string value that does not
+/// contain spaces"), while the 4.3.0 and 5.0.0 snapshots state `id` on the
+/// copies `ElementDefinition.id` and `Extension.id` inherit; the emitter
+/// follows the definitions (#672). A resource id keeps its own form.
+macro_rules! element_id_case {
+    ($version:ident, $name:ident) => {
+        mod $name {
+            use fhir_types::codec::DecodeErrorKind;
+            use fhir_types::$version::code_system::CodeSystem;
+            use fhir_types::$version::element_definition::ElementDefinition;
+            use fhir_types::$version::extension::Extension;
+
+            use super::{ELEMENT_IDS, code_system, decode};
+
+            #[test]
+            fn an_element_definition_id_takes_the_string_form() {
+                for id in ELEMENT_IDS {
+                    let text = format!(r#"{{"id":"{id}","path":"Patient.extension"}}"#);
+                    let decoded = decode::<ElementDefinition>(&text, "ElementDefinition")
+                        .expect("ElementDefinition.id inherits the string Element.id");
+                    assert_eq!(decoded.id.as_deref(), Some(id));
+                }
+            }
+
+            #[test]
+            fn an_extension_id_takes_the_string_form() {
+                for id in ELEMENT_IDS {
+                    let text = format!(r#"{{"id":"{id}","url":"http://example.org/e"}}"#);
+                    let decoded = decode::<Extension>(&text, "Extension")
+                        .expect("Extension.id inherits the string Element.id");
+                    assert_eq!(decoded.id.as_deref(), Some(id));
+                }
+            }
+
+            #[test]
+            fn a_resource_id_still_takes_the_id_form() {
+                for id in ELEMENT_IDS {
+                    let body = format!(r#""id":"{id}","#);
+                    let error = decode::<CodeSystem>(&code_system(&body), "CodeSystem")
+                        .expect_err("CodeSystem.id derives from Resource.id, typed id");
+                    assert_eq!(error.kind, DecodeErrorKind::BadValue);
+                    assert_eq!(error.path, "CodeSystem.id");
+                }
+            }
+        }
+    };
+}
+
+element_id_case!(r4b, r4b_element_id);
+element_id_case!(r5, r5_element_id);
+
+/// 4.0.1 already types `Element.id` and its copies as `string`, so both
+/// element ids decode as before.
+#[test]
+fn r4_element_ids_keep_the_string_form() {
+    for id in ELEMENT_IDS {
+        let text = format!(r#"{{"id":"{id}","path":"Patient.extension"}}"#);
+        let decoded = decode::<fhir_types::r4::element_definition::ElementDefinition>(
+            &text,
+            "ElementDefinition",
+        )
+        .expect("4.0.1 types ElementDefinition.id as string");
+        assert_eq!(decoded.id.as_deref(), Some(id));
+        let text = format!(r#"{{"id":"{id}","url":"http://example.org/e"}}"#);
+        let decoded = decode::<fhir_types::r4::extension::Extension>(&text, "Extension")
+            .expect("4.0.1 types Extension.id as string");
+        assert_eq!(decoded.id.as_deref(), Some(id));
+    }
+}

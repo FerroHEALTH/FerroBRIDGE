@@ -3,8 +3,9 @@
 
 //! The identity map: the seam, and the in-memory implementation tests use.
 //!
-//! Four tables, as `docs/architecture.md` §9 names them: a patient identifier
-//! to an `ehr_id`, an external resource id to the internal one, an internal
+//! No specification governs the identity map: our own design. Four tables
+//! relate a patient identifier to an `ehr_id`, an external resource id to the
+//! internal one, an internal
 //! resource id to the composition it lives in, and a source resource `id` with
 //! its `meta.versionId` to the mapping that consumed them. A fifth table keys
 //! the same source to the CONTRIBUTION that committed it, written before the
@@ -53,6 +54,20 @@ pub enum StoreError {
         /// What the storage layer reported.
         #[source]
         source: Box<redb::DatabaseError>,
+    },
+    /// The store file carries a schema this build does not read.
+    #[error(
+        "the identity store at {path} carries schema {found}, and this build reads schemas {oldest} to {newest}"
+    )]
+    Schema {
+        /// The path that was opened.
+        path: String,
+        /// The schema the file records.
+        found: String,
+        /// The oldest schema this build reads.
+        oldest: u32,
+        /// The schema this build writes.
+        newest: u32,
     },
     /// A transaction could not be started or committed.
     #[error("an identity store transaction did not complete")]
@@ -491,9 +506,10 @@ mod tests {
             versioned_object_uid: String::from(uid),
             template_id: String::from("ferrobridge.diagnose.v1"),
             resource_type: String::from("Condition"),
-            entry_path: String::from("/content[0]"),
+            entry_path: String::from("/content[1]"),
             split: 0,
             context: String::from("ferrobridge_diagnosis.context"),
+            derivation: Some(crate::facade::identity::derive::DERIVATION),
         }
     }
 

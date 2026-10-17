@@ -4,7 +4,7 @@
 //! The one table from a CDR outcome to a facade answer.
 //!
 //! No specification governs the mapping: it is FerroBRIDGE's own design with
-//! both sides cited per row (`docs/architecture.md` §4.6). ITS-REST 1.1.0
+//! both sides cited per row. ITS-REST 1.1.0
 //! fixes what the CDR may answer (`ehr-codegen.openapi.yaml`, the status list
 //! of each operation) and FHIR R4 fixes what a FHIR server may answer
 //! (<https://hl7.org/fhir/R4/http.html>). Every row below is one [`Row`]
@@ -264,7 +264,7 @@ impl Answer {
 /// The openEHR error body travels verbatim: the `message` and every
 /// `validationErrors` entry the CDR sent, and the raw body when the CDR sent
 /// something that is not an error body. It never reaches the wire as its own
-/// document (`docs/architecture.md` §4.6).
+/// document (no specification governs this: our own design).
 #[must_use]
 pub fn diagnostics(status: StatusCode, body: &ErrorBody) -> String {
     let mut text = format!("the openEHR service answered {status}");

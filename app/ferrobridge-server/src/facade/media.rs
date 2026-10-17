@@ -155,7 +155,19 @@ impl CountError {
     }
 }
 
-/// Returns the `_count` a query string names, when it names one.
+/// Returns the decoded `name=value` pairs of a query string or a form body.
+///
+/// Search parameters travel `application/x-www-form-urlencoded`, in the URL
+/// or in a `POST _search` body (<https://hl7.org/fhir/R4/http.html#search>),
+/// so every reader of a parameter reads it from these pairs.
+#[must_use]
+pub fn query_pairs(bytes: &[u8]) -> Vec<(String, String)> {
+    url::form_urlencoded::parse(bytes)
+        .map(|(name, value)| (name.into_owned(), value.into_owned()))
+        .collect()
+}
+
+/// Returns the page size one decoded `_count` value names.
 ///
 /// "`_count` … is an instruction to the server regarding how many resources
 /// should be returned in a single page"
@@ -164,23 +176,29 @@ impl CountError {
 ///
 /// # Errors
 ///
+/// Returns [`CountError`] when `text` is not a non-negative whole number.
+pub fn page_size(text: &str) -> Result<u32, CountError> {
+    text.parse::<u32>().map_err(|_parse| CountError {
+        found: text.to_owned(),
+    })
+}
+
+/// Returns the `_count` a query string names, when it names one.
+///
+/// The query is decoded first, so a percent-encoded `_count` reads as the
+/// search reads it, through [`page_size`].
+///
+/// # Errors
+///
 /// Returns [`CountError`] when `_count` is present and is not a non-negative
 /// whole number.
 pub fn count(query: Option<&str>) -> Result<Option<u32>, CountError> {
-    let Some(query) = query else {
-        return Ok(None);
-    };
-    for pair in query.split('&') {
-        let mut halves = pair.splitn(2, '=');
-        if halves.next() != Some("_count") {
-            continue;
-        }
-        let raw = halves.next().unwrap_or_default();
-        return raw.parse::<u32>().map(Some).map_err(|_parse| CountError {
-            found: raw.to_owned(),
-        });
-    }
-    Ok(None)
+    let pairs = query_pairs(query.unwrap_or_default().as_bytes());
+    pairs
+        .iter()
+        .find(|(name, _)| name == "_count")
+        .map(|(_, value)| page_size(value))
+        .transpose()
 }
 
 #[cfg(test)]
@@ -277,5 +295,13 @@ mod tests {
             count(Some("_count=")).is_err(),
             "an empty page size is refused"
         );
+    }
+
+    #[test]
+    fn a_percent_encoded_count_reads_decoded() {
+        assert_eq!(Ok(Some(20)), count(Some("_count=%32%30")));
+        assert_eq!(Ok(Some(5)), count(Some("_c%6Funt=5")));
+        let refused: CountError = count(Some("_count=m%61ny")).expect_err("a word is no page size");
+        assert_eq!("many", refused.found());
     }
 }

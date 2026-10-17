@@ -10,6 +10,13 @@
 #   scripts/checks/conformance.sh            # run and compare; warn on drift
 #   scripts/checks/conformance.sh --update   # run and rewrite lists, badges, README block
 #   scripts/checks/conformance.sh --check    # run and fail on any drift (CI)
+#   scripts/checks/conformance.sh --update fhir-r4b   # one corpus: its test, list, badge
+#
+# A corpus name after the mode (or alone, to compare) runs that corpus's test
+# only and compares or rewrites only its list and badge. The README block is
+# still compared or rewritten. The family and version badges count both HL7 v2
+# corpora, so naming either one also runs the other's test, without rewriting
+# its list, and renders those badges; any other corpus keeps them as they are.
 #
 # The tests write target/conformance/<corpus>.json through the testkit's
 # conformance module, and rewrite the pass lists themselves when
@@ -37,6 +44,69 @@
 # usage error, a missing result or a failed fetch.
 set -euo pipefail
 
+# Each corpus, the package whose test measures it, and that test's name, one
+# quoted row per line; scripts/checks/affected.sh reads the rows in this shape.
+readonly CORPUS_TESTS=(
+  'fhirconnect-mapping-lib fhirconnect conformance_the_fhirconnect_corpus_holds_its_pass_list'
+  'omocl omocl conformance_the_omocl_corpus_holds_its_pass_list'
+  'roundtrip fhirconnect conformance_the_round_trip_chains_hold_their_pass_list'
+  'draft-rest-api fhirconnect conformance_the_draft_operation_definitions_hold_their_pass_list'
+  'hl7v2 ferrobridge-hl7v2 conformance_the_vendored_hl7v2_corpora_hold_their_pass_list'
+  'hl7v2-smoke ferrobridge-hl7v2 conformance_the_fetched_hl7v2_corpora_hold_their_pass_list'
+  'fhir-stu3 ferrobridge-testkit conformance_the_fhir_stu3_examples_hold_their_pass_list'
+  'fhir-r4 ferrobridge-testkit conformance_the_fhir_r4_examples_hold_their_pass_list'
+  'fhir-r4b ferrobridge-testkit conformance_the_fhir_r4b_examples_hold_their_pass_list'
+  'fhir-r5 ferrobridge-testkit conformance_the_fhir_r5_examples_hold_their_pass_list'
+  'fhir-r6 ferrobridge-testkit conformance_the_fhir_r6_examples_hold_their_pass_list'
+  'fhir-r4-facade ferrobridge-server conformance_the_fhir_r4_examples_hold_their_facade_pass_list'
+  'fhirpath-r4 ferrobridge-fhirpath conformance_fhirpath_r4'
+)
+corpora=()
+packages=()
+for row in "${CORPUS_TESTS[@]}"; do
+  corpora+=("${row%% *}")
+  package="${row#* }"
+  package="${package%% *}"
+  [[ " ${packages[*]-} " = *" $package "* ]] || packages+=("$package")
+done
+readonly CORPORA=("${corpora[@]}")
+# The packages of the table, each once, in the order it first names them.
+readonly PACKAGES=("${packages[@]}")
+
+# The package and the test name of corpus $1, or status 1 for no such corpus.
+test_of() {
+  local row
+  for row in "${CORPUS_TESTS[@]}"; do
+    if [[ "${row%% *}" = "$1" ]]; then
+      echo "${row#* }"
+      return 0
+    fi
+  done
+  return 1
+}
+
+usage() {
+  echo "usage: $0 [--update|--check] [corpus]" >&2
+  echo "corpora: ${CORPORA[*]}" >&2
+  exit 2
+}
+
+mode=compare
+only=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --update) mode=update ;;
+    --check) mode=check ;;
+    -*) usage ;;
+    *)
+      [[ -z "$only" ]] || usage
+      test_of "$1" >/dev/null || { echo "conformance: no corpus is named $1" >&2; usage; }
+      only="$1"
+      ;;
+  esac
+  shift
+done
+
 # A missing cargo would otherwise read as every corpus test failing.
 if ! command -v cargo >/dev/null 2>&1; then
   echo "conformance: cargo not found on PATH" >&2
@@ -44,8 +114,6 @@ if ! command -v cargo >/dev/null 2>&1; then
 fi
 cd "$(dirname "$0")/../.."
 
-readonly CORPORA=(fhirconnect-mapping-lib omocl roundtrip draft-rest-api hl7v2 hl7v2-smoke
-  fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6 fhir-r4-facade fhirpath-r4)
 readonly OUT=target/conformance
 readonly BADGES=conformance/badges
 # The shields.io endpoint prefix every conformance badge file is read through.
@@ -60,17 +128,6 @@ readonly BUILD_BADGES=(
   '[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)'
   '[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/FerroHEALTH/FerroBRIDGE?sort=semver)](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest)'
 )
-
-mode=compare
-case "${1:-}" in
-  "") ;;
-  --update) mode=update ;;
-  --check) mode=check ;;
-  *)
-    echo "usage: $0 [--update|--check]" >&2
-    exit 2
-    ;;
-esac
 
 # The badge label of a corpus.
 label_of() {
@@ -144,35 +201,63 @@ if [[ "$mode" = update ]]; then
   export FERROBRIDGE_CONFORMANCE_UPDATE=1
 fi
 # The hl7v2-smoke corpus reads the HL7 v2 sets fetched at build time; the
-# script keeps a tree already at its pinned digest without a download.
-if ! scripts/vendor/hl7v2-samples.sh --build-time; then
+# script keeps a tree already at its pinned digest without a download. A run
+# of one corpus fetches only what that corpus reads.
+if [[ -z "$only" || "$only" = hl7v2* ]] && ! scripts/vendor/hl7v2-samples.sh --build-time; then
   echo "conformance: the build-time HL7 v2 sets could not be fetched" >&2
   exit 2
 fi
 
 # The FHIR corpora read the examples packages fetched at build time, kept the
 # same way at their pinned count and digest.
-if ! scripts/vendor/fhir-packages.sh --build-time; then
+if [[ -z "$only" || "$only" = fhir-* ]] && ! scripts/vendor/fhir-packages.sh --build-time; then
   echo "conformance: the FHIR examples packages could not be fetched" >&2
   exit 2
 fi
 
 # The R4 profile validator's package set (#435), fetched at build time and
 # kept the same way, so the validator corpus finds it on disk.
-if ! scripts/vendor/profile-packages.sh; then
+if [[ -z "$only" ]] && ! scripts/vendor/profile-packages.sh; then
   echo "conformance: the profile packages could not be fetched" >&2
   exit 2
 fi
-# One package per invocation, as the CI test lane runs them.
-for package in fhirconnect omocl ferrobridge-hl7v2 ferrobridge-testkit ferrobridge-server ferrobridge-fhirpath; do
-  if ! cargo nextest run --locked -p "$package" --no-tests=fail --no-fail-fast \
-    -E 'test(/conformance_/)'; then
-    echo "conformance: a $package corpus test failed; a case its list records no longer passes"
+# Runs the conformance tests of package $1 that filter $2 selects.
+measure() {
+  if ! cargo nextest run --locked -p "$1" --no-tests=fail --no-fail-fast -E "$2"; then
+    echo "conformance: a $1 corpus test failed; a case its list records no longer passes"
     failed=1
   fi
-done
+}
 
-for corpus in "${CORPORA[@]}"; do
+# Runs the one test that measures corpus $1.
+measure_corpus() {
+  local package test
+  read -r package test < <(test_of "$1")
+  measure "$package" "test(/(^|::)${test}\$/)"
+}
+
+# One package per invocation, as the CI test lane runs them.
+for package in "${PACKAGES[@]}"; do
+  [[ -z "$only" ]] || break
+  measure "$package" 'test(/conformance_/)'
+done
+selected=("${CORPORA[@]}")
+if [[ -n "$only" ]]; then
+  selected=("$only")
+  measure_corpus "$only"
+  # The other HL7 v2 corpus is measured for the family and version badges,
+  # with its own list left as it is.
+  case "$only" in
+    hl7v2) sibling=hl7v2-smoke ;;
+    hl7v2-smoke) sibling=hl7v2 ;;
+    *) sibling="" ;;
+  esac
+  if [[ -n "$sibling" ]]; then
+    FERROBRIDGE_CONFORMANCE_UPDATE=0 measure_corpus "$sibling"
+  fi
+fi
+
+for corpus in "${selected[@]}"; do
   result="$OUT/$corpus.json"
   list="conformance/$corpus/pass-list.txt"
   if [[ ! -f "$result" ]]; then
@@ -206,47 +291,70 @@ for corpus in "${CORPORA[@]}"; do
   emit_badge "$corpus" "$(badge_of "$corpus")" "$list"
 done
 
-# Every case of both HL7 v2 corpora, and the passing and total count of the
-# cases whose field $1 is $2.
-hl7v2_cases="$(jq -c -s '[.[].cases[]]' "$OUT/hl7v2.json" "$OUT/hl7v2-smoke.json")"
-fraction_of() {
-  jq -r --arg field "$1" --arg value "$2" \
-    '[.[] | select(.[$field] == $value)] | "\([.[] | select(.passed)] | length) \(length)"' \
-    <<<"$hl7v2_cases"
+families=()
+versions=()
+
+# The family and version badges already on disk, in the order a measured run
+# sorts them, for a run of one corpus other than the HL7 v2 two.
+badges_on_disk() {
+  local name
+  while IFS= read -r name; do
+    families+=("$name")
+  done < <(cd "$BADGES" && find . -name 'hl7v2-family-*.json' | sed 's#^\./##; s#\.json$##' | LC_ALL=C sort)
+  while IFS= read -r name; do
+    versions+=("hl7v2-version-$name")
+  done < <(cd "$BADGES" && find . -name 'hl7v2-version-*.json' |
+    sed 's#^\./hl7v2-version-##; s#\.json$##' | sort -t. -k1,1n -k2,2n -k3,3n)
 }
 
-families=()
-while IFS= read -r family; do
-  [[ -n "$family" ]] || continue
-  read -r passed total < <(fraction_of family "$family")
-  name="hl7v2-family-$(tr '[:upper:]' '[:lower:]' <<<"$family")"
-  families+=("$name")
-  emit_badge "$name" "$(fraction_badge "$family" "$passed" "$total")" "the HL7 v2 results"
-done < <(jq -r '[.[] | .family | select(. != null and test("^[A-Z0-9]+$"))] | unique | .[]' \
-  <<<"$hl7v2_cases" | LC_ALL=C sort)
-versions=()
-while IFS= read -r version; do
-  [[ -n "$version" ]] || continue
-  read -r passed total < <(fraction_of version "$version")
-  name="hl7v2-version-$version"
-  versions+=("$name")
-  emit_badge "$name" "$(fraction_badge "v$version" "$passed" "$total")" "the HL7 v2 results"
-done < <(jq -r '[.[] | .version | select(. != null and test("^[0-9]+(\\.[0-9]+)+$"))]
-  | unique | sort_by(split(".") | map(tonumber)) | .[]' <<<"$hl7v2_cases")
+# The family and version badges of both measured HL7 v2 corpora, emitted, and
+# a badge no case counts any more removed under --update.
+badges_measured() {
+  local hl7v2_cases family version name passed total derived stale
+  # Every case of both HL7 v2 corpora, and the passing and total count of the
+  # cases whose field $1 is $2.
+  hl7v2_cases="$(jq -c -s '[.[].cases[]]' "$OUT/hl7v2.json" "$OUT/hl7v2-smoke.json")"
+  fraction_of() {
+    jq -r --arg field "$1" --arg value "$2" \
+      '[.[] | select(.[$field] == $value)] | "\([.[] | select(.passed)] | length) \(length)"' \
+      <<<"$hl7v2_cases"
+  }
+  while IFS= read -r family; do
+    [[ -n "$family" ]] || continue
+    read -r passed total < <(fraction_of family "$family")
+    name="hl7v2-family-$(tr '[:upper:]' '[:lower:]' <<<"$family")"
+    families+=("$name")
+    emit_badge "$name" "$(fraction_badge "$family" "$passed" "$total")" "the HL7 v2 results"
+  done < <(jq -r '[.[] | .family | select(. != null and test("^[A-Z0-9]+$"))] | unique | .[]' \
+    <<<"$hl7v2_cases" | LC_ALL=C sort)
+  while IFS= read -r version; do
+    [[ -n "$version" ]] || continue
+    read -r passed total < <(fraction_of version "$version")
+    name="hl7v2-version-$version"
+    versions+=("$name")
+    emit_badge "$name" "$(fraction_badge "v$version" "$passed" "$total")" "the HL7 v2 results"
+  done < <(jq -r '[.[] | .version | select(. != null and test("^[0-9]+(\\.[0-9]+)+$"))]
+    | unique | sort_by(split(".") | map(tonumber)) | .[]' <<<"$hl7v2_cases")
 
-# A family or version badge no case counts any more goes with --update.
-derived=" ${families[*]-} ${versions[*]-} "
-for stale in "$BADGES"/hl7v2-family-*.json "$BADGES"/hl7v2-version-*.json; do
-  [[ -f "$stale" ]] || continue
-  if [[ "$derived" != *" $(basename "$stale" .json) "* ]]; then
-    if [[ "$mode" = update ]]; then
-      rm "$stale"
-    else
-      echo "conformance: $stale counts no case any more; run $0 --update"
-      if [[ "$mode" = check ]]; then failed=1; fi
+  derived=" ${families[*]-} ${versions[*]-} "
+  for stale in "$BADGES"/hl7v2-family-*.json "$BADGES"/hl7v2-version-*.json; do
+    [[ -f "$stale" ]] || continue
+    if [[ "$derived" != *" $(basename "$stale" .json) "* ]]; then
+      if [[ "$mode" = update ]]; then
+        rm "$stale"
+      else
+        echo "conformance: $stale counts no case any more; run $0 --update"
+        if [[ "$mode" = check ]]; then failed=1; fi
+      fi
     fi
-  fi
-done
+  done
+}
+
+if [[ -f "$OUT/hl7v2.json" && -f "$OUT/hl7v2-smoke.json" ]]; then
+  badges_measured
+else
+  badges_on_disk
+fi
 
 # The markdown of one badge: its alt text, its badge file, the list it links to.
 badge_link() {

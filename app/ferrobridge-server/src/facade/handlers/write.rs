@@ -96,13 +96,21 @@ pub(crate) async fn create(
             return answer(facade, program, &written, headers, StatusCode::OK);
         }
         Recognised::Revised(known) => {
-            let ehr_id = EhrId::new(&known.ehr_id).map_err(|error| store_identifier(&error))?;
+            let ehr_id = known.ehr().map_err(|error| store_identifier(&error))?;
             compartment::admit_ehr(facade, access, Permission::Create, resource_type, &ehr_id)?;
             // NOTE: SMART App Launch 2.x scopes-and-launch-context maps `u` to update, and a
             // create that revises a known resource is an update in effect (our own design).
             compartment::admit_ehr(facade, access, Permission::Update, resource_type, &ehr_id)?;
-            let binding = binding_of(facade, resource_type, &known)?;
-            return resend(facade, &ingest, program, &inbound, &binding, headers).await;
+            let (internal, binding) = binding_of(facade, resource_type, &known)?;
+            return resend(
+                facade,
+                &ingest,
+                program,
+                &inbound,
+                (&internal, &binding),
+                headers,
+            )
+            .await;
         }
         Recognised::Unknown => {}
     }
@@ -149,7 +157,15 @@ pub(crate) async fn update(
     compartment::admit_inbound(facade, access, Permission::Update, &inbound)?;
     let program = select_program(facade, &inbound, headers)?;
     let ingest = facade.ingest(facade.client_for(headers));
-    resend(facade, &ingest, program, &inbound, &binding, headers).await
+    resend(
+        facade,
+        &ingest,
+        program,
+        &inbound,
+        (&internal, &binding),
+        headers,
+    )
+    .await
 }
 
 /// Checks that the resource an update carries names the id its URL names.
@@ -180,14 +196,15 @@ fn same_id(inbound: &Inbound, id: &str) -> Result<(), Refusal> {
     ))
 }
 
-/// Returns the binding of the resource a consumed source produced.
+/// Returns the resource id and the binding of the resource a consumed source
+/// produced.
 fn binding_of(
     facade: &Facade,
     resource_type: &str,
     known: &ConsumedSource,
-) -> Result<CompositionBinding, Refusal> {
+) -> Result<(FhirResourceId, CompositionBinding), Refusal> {
     let id = FhirResourceId::new(&known.internal_id).map_err(|error| store_identifier(&error))?;
-    read::binding(facade, resource_type, &id)?.ok_or_else(|| {
+    let binding = read::binding(facade, resource_type, &id)?.ok_or_else(|| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
             Issue::error(IssueType::Exception).diagnosing(format!(
@@ -195,20 +212,26 @@ fn binding_of(
                 id.as_str()
             )),
         )
-    })
+    })?;
+    Ok((id, binding))
 }
 
-/// Runs the update path of a resource the identity map already placed.
+/// Runs the update path of the resource `bound` names and the identity map
+/// already placed.
 async fn resend(
     facade: &Facade,
     ingest: &Ingest<'_>,
     program: &Loaded,
     inbound: &Inbound,
-    binding: &CompositionBinding,
+    bound: (&FhirResourceId, &CompositionBinding),
     headers: &HeaderMap,
 ) -> Result<axum::response::Response, Refusal> {
-    let ehr_id = EhrId::new(&binding.ehr_id).map_err(|error| store_identifier(&error))?;
-    let container = HierObjectId::new(&binding.versioned_object_uid)
+    let (internal, binding) = bound;
+    let ehr_id = binding
+        .ehr(internal)
+        .map_err(|error| store_identifier(&error))?;
+    let container = binding
+        .container(internal)
         .map_err(|error| store_identifier(&error))?;
     let (preceding, standing) = precondition(ingest.client(), headers, &ehr_id, &container).await?;
     let written = ingest

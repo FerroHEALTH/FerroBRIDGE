@@ -17,7 +17,8 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use crate::fhir::{
-    CodeSystem, Derivation, OperationDefinition, ResourceHeader, StructureDefinition, ValueSet,
+    CodeSystem, Derivation, OperationDefinition, ResourceHeader, SearchParameter,
+    StructureDefinition, ValueSet,
 };
 
 /// A failure while reading a package.
@@ -98,6 +99,7 @@ pub struct Package {
     operation_definitions: BTreeMap<String, OperationDefinition>,
     value_sets: BTreeMap<String, ValueSet>,
     code_systems: BTreeMap<String, CodeSystem>,
+    search_parameters: BTreeMap<String, SearchParameter>,
     sources: BTreeMap<String, PathBuf>,
 }
 
@@ -125,6 +127,7 @@ impl Package {
             operation_definitions: BTreeMap::new(),
             value_sets: BTreeMap::new(),
             code_systems: BTreeMap::new(),
+            search_parameters: BTreeMap::new(),
             sources: BTreeMap::new(),
         };
         for path in resource_files(&content)? {
@@ -184,6 +187,20 @@ impl Package {
                     path,
                 )
             }
+            "SearchParameter" => {
+                let resource: SearchParameter = parse_json(path, &text)?;
+                if is_example(&resource) {
+                    return Ok(());
+                }
+                insert_unique(
+                    &mut self.search_parameters,
+                    &mut self.sources,
+                    "SearchParameter",
+                    resource.url.clone(),
+                    resource,
+                    path,
+                )
+            }
             _ => Ok(()),
         }
     }
@@ -224,6 +241,13 @@ impl Package {
         &self.code_systems
     }
 
+    /// Every `SearchParameter` apart from the specification's examples, keyed
+    /// by canonical URL.
+    #[must_use]
+    pub fn search_parameters(&self) -> &BTreeMap<String, SearchParameter> {
+        &self.search_parameters
+    }
+
     /// The file a resource was loaded from, by resource type and canonical URL.
     #[must_use]
     pub fn source_of(&self, resource_type: &str, url: &str) -> Option<&Path> {
@@ -243,6 +267,22 @@ impl Package {
             definition.name == name && definition.derivation != Some(Derivation::Constraint)
         })
     }
+}
+
+/// Whether `parameter` is one of the specification's example search
+/// parameters, which the core packages ship beside the definitions.
+///
+/// Their ids are `example` and `example-*`, they define codes the standard
+/// parameters already define (`_id` on `Resource`, `subject` on
+/// `Condition`), and in `hl7.fhir.r3.core` 3.0.2 two of them share one
+/// canonical.
+fn is_example(parameter: &SearchParameter) -> bool {
+    // NOTE: https://hl7.org/fhir/R4/searchparameter-examples.html lists them as examples;
+    // no specification marks an example inside a package: our own design.
+    parameter
+        .id
+        .as_deref()
+        .is_some_and(|id| id == "example" || id.starts_with("example-"))
 }
 
 /// The JSON resource files of a package content directory, in sorted order.

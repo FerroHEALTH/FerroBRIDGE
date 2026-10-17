@@ -21,6 +21,8 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 
+use fhir_types::r4::search_parameters::SEARCH_PARAMETERS;
+use fhir_types::search::SearchParameter;
 use openehr_mapping_core::index::WebTemplateIndex;
 use serde::Deserialize;
 
@@ -315,6 +317,24 @@ pub enum DeclarationError {
         /// The type it was given.
         kind: String,
     },
+    /// A parameter that takes the code of a standard parameter of its
+    /// resource type with another type.
+    #[error(
+        "the search declaration {} gives `{name}` the type `{kind}`, and the standard parameter {definition} of that code is a {standard}",
+        file.display()
+    )]
+    Standard {
+        /// The file.
+        file: PathBuf,
+        /// The parameter.
+        name: String,
+        /// The type it was given.
+        kind: &'static str,
+        /// The type the standard parameter states.
+        standard: &'static str,
+        /// The canonical of the standard parameter.
+        definition: &'static str,
+    },
     /// A parameter's keys do not fit its type.
     #[error("the search declaration {} declares `{name}` as a {kind}: {reason}", file.display())]
     Shape {
@@ -469,6 +489,46 @@ pub fn check_name(file: &Path, name: &str) -> Result<(), DeclarationError> {
     })
 }
 
+/// Returns the standard R4 search parameter `name` of `resource_type`, its own
+/// or one a type it specializes defines, when R4 defines one.
+#[must_use]
+pub fn standard(resource_type: &str, name: &str) -> Option<&'static SearchParameter> {
+    SEARCH_PARAMETERS.of(resource_type, name)
+}
+
+/// Checks a declared parameter against the standard R4 parameter of its code,
+/// when R4 defines one for `resource_type`.
+///
+/// "Parameter names cannot overlap with standard parameter names, and
+/// standard parameters cannot be redefined", and the type a statement names
+/// "SHALL be the same as the type in the search parameter definition"
+/// (<https://hl7.org/fhir/R4/capabilitystatement-definitions.html#CapabilityStatement.rest.resource.searchParam.name>),
+/// so a declaration that takes a standard code takes its type too.
+///
+/// # Errors
+///
+/// Returns [`DeclarationError::Standard`] when the standard parameter of that
+/// code has another type.
+pub fn check_standard(
+    file: &Path,
+    resource_type: &str,
+    name: &str,
+    kind: ParameterType,
+) -> Result<(), DeclarationError> {
+    match standard(resource_type, name) {
+        Some(parameter) if parameter.r#type.code() != kind.as_str() => {
+            Err(DeclarationError::Standard {
+                file: file.to_path_buf(),
+                name: name.to_owned(),
+                kind: kind.as_str(),
+                standard: parameter.r#type.code(),
+                definition: parameter.url,
+            })
+        }
+        _ => Ok(()),
+    }
+}
+
 /// Checks one parameter's keys against its type and its path against the
 /// template.
 fn check_parameter(
@@ -518,7 +578,10 @@ fn check_parameter(
 
 #[cfg(test)]
 mod tests {
-    use super::{Coded, DeclarationError, ParameterType, check_parameters, is_declaration, parse};
+    use super::{
+        Coded, DeclarationError, ParameterType, check_parameters, check_standard, is_declaration,
+        parse,
+    };
     use openehr_mapping_core::index::WebTemplateIndex;
     use openehr_mapping_core::template::TemplateSource;
     use std::path::Path;
@@ -682,5 +745,45 @@ mod tests {
         )
         .expect_err("the patient section takes the name");
         assert!(matches!(error, DeclarationError::Name { .. }), "{error:?}");
+    }
+
+    #[test]
+    fn a_standard_code_declared_with_another_type_is_refused_naming_the_standard() {
+        // R4 capabilitystatement-definitions.html: "standard parameters cannot
+        // be redefined"; Condition answers `code` as the token clinical-code.
+        let error = check_standard(Path::new(FILE), "Condition", "code", ParameterType::String)
+            .expect_err("code is a token on Condition");
+        let DeclarationError::Standard {
+            standard,
+            definition,
+            ..
+        } = error
+        else {
+            panic!("a Standard refusal: {error:?}");
+        };
+        assert_eq!("token", standard);
+        assert_eq!(
+            "http://hl7.org/fhir/SearchParameter/clinical-code",
+            definition
+        );
+        assert!(
+            check_standard(Path::new(FILE), "Condition", "patient", ParameterType::Date).is_err(),
+            "patient is a reference on Condition"
+        );
+    }
+
+    #[test]
+    fn a_standard_code_with_its_own_type_and_an_implementation_code_pass() {
+        for (name, kind) in [
+            ("code", ParameterType::Token),
+            ("onset-date", ParameterType::Date),
+            ("subject", ParameterType::Reference),
+            ("diagnosis-name", ParameterType::String),
+        ] {
+            assert!(
+                check_standard(Path::new(FILE), "Condition", name, kind).is_ok(),
+                "{name}"
+            );
+        }
     }
 }

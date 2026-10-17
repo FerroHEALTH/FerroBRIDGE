@@ -23,8 +23,62 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Changed
+
+- The README, the book's Licensing page and the landing page answer "do you
+  need a commercial licence?" at a glance (#111): a table of what you are
+  doing, what you need and the part of `LICENSE` that decides it, the same
+  shape as the FerroHEALTH family table, with the change date and the
+  commercial-licence contact beside it. The README's top navigation links the
+  table, and the `ferrobridge-fhirpath` and `ferrobridge-validator` READMEs
+  state the terms like the other BUSL-1.1 crates.
+- `SECURITY.md` and `CONTRIBUTING.md` keep what is particular to FerroBRIDGE
+  and link the FerroHEALTH family book at <https://ferrohealth.eu/docs/> for
+  the rest (#402). `SECURITY.md` keeps the supported versions, the reporting
+  route, the response times, the scope and release verification, and links
+  the family policy for disclosure, advisories and the support period.
+  `CONTRIBUTING.md` describes the current build and test gate,
+  `scripts/checks/fast.sh`. The README and the book's introduction link the
+  family book for the manufacturer, the Cyber Resilience Act, how the
+  products fit together, and licensing and trademarks.
+### Added
+
+- `fhir-types` 0.1.117 carries a search parameter registry per FHIR version
+  behind `resources` (#522): `<version>::search_parameters::SEARCH_PARAMETERS`
+  holds every `SearchParameter` of the core package, apart from its examples,
+  with canonical, code, base types, type and expression, and
+  `SearchParameters::of(type, code)` answers the standard parameter a resource
+  type answers, its own or a base type's. `fhirconnect` moves to 0.1.127 with
+  it.
+- The facade refuses at boot a search declaration that gives the code of a
+  standard R4 search parameter of its resource type another type, and the
+  `CapabilityStatement` names the standard parameter's canonical as
+  `searchParam.definition` for every declared standard code (#522).
+- `/health/readiness` carries a `cdm` indicator when a `[cdm]` section is
+  configured (#615). It opens one connection to the CDM database over the
+  configured TLS and asks `SELECT 1`, and reports down with the reason on a
+  refused connection or a failed query, so an unreachable CDM shows before the
+  next `etl run` fails. Without `[cdm]`, readiness is unchanged.
+- The operate book says where the FHIR facade's identity store lives, which
+  volume it needs on a read-only root filesystem, and what happens across
+  replicas and restarts, with a Kubernetes pod spec (#419). The container
+  page no longer says the server writes nothing.
+- A facade read and vread answer `Last-Modified`, the commit time the CDR's
+  revision history records for the version (#348). Each read makes one more
+  CDR call, `GET /ehr/{ehr_id}/versioned_composition/{uid}/revision_history`.
+  The `CapabilityStatement` declares `versioning: versioned-update` and
+  `readHistory: true` on every resource type.
+
 ### Fixed
 
+- A percent-encoded `_count`, such as `_count=%32%30`, reads as its decoded
+  value on every facade route (#523). The request guard read `_count` from
+  the raw query and refused it with a `400`, while the search read the
+  decoded value; both now read the one decoded value.
+- A vread of an earlier version after the latest version was deleted answers
+  that version (#348). The facade names the version from the revision
+  history, where it took the creating system from the latest version and so
+  answered `410`.
 - A CDR call whose token the CDR refused, and whose renewal the token
   endpoint then refused, is no longer retried (#663). The client asked the
   refusing token endpoint again on every retry of a `GET`; it now ends the
@@ -37,6 +91,57 @@ crates on crates.io.
   seconds, so a Kubernetes pod that starts before its CDR stays up instead of
   crash-looping. A documented refusal, such as a `404` for a template the CDR
   does not hold, still stops the start.
+- The facade keys a second or later entry of a composition by the openEHR
+  positional path `/content[<n>]`, `n` its 1-based place in `content`, and
+  the first by `/content[<archetype>]`, both built with the `openehr-rm` path
+  types (#242). Earlier builds wrote `/content[<archetype>, <n>]`, which the
+  openEHR BASE path grammar reads as a name predicate and refuses. Each new
+  binding records identity derivation 2. An id an earlier build recorded
+  under the old form keeps naming its entry: the facade looks the old key up
+  when the new one is unbound and still reads a stored binding of the old
+  form, so no resource a client holds is renamed. A resource first bound by
+  this build gets an id derived from the new path.
+- A binding a build up to 0.0.5 recorded for a composition holding several
+  entries of one archetype named its entry by its place in `content`, and
+  0.0.6 read the same `/content[<archetype>, <n>]` text as the `n`th entry
+  of the archetype, so such a resource could answer another entry (#659).
+  The facade now reads both meanings: the path resolves when one names an
+  entry or both name the same one, and when they name two entries, the read,
+  search or bind that meets it answers `500` with an `exception` issue naming
+  the path, and no id moves to another entry.
+- A transaction entry, and a retry that binds a contribution an earlier
+  delivery committed, now derive the entry's identity from the composition
+  the CDR stored at its version (#284). Before, they derived it from the
+  composition the current run built. Nothing the derivation reads differed
+  between the two, so no id changes. A CDR that stores an entry
+  `LOCATABLE.uid` the sender did not send now gives that entry the same id on
+  the transaction path as on the single create.
+- The `409` a create meets when an identity store written before 0.0.4 binds
+  its `id` to two compositions now names the repair (#298): its `conflict`
+  issue lists the resource id of each composition, and an update
+  (`PUT [base]/[type]/[id]`) of the one the sender means revises it.
+- A stored version container that the openEHR BASE `HIER_OBJECT_ID` grammar
+  refuses, or a stored `ehr_id` carrying a character that would change the
+  request path, now answers a `500` whose `exception` issue names the
+  resource the record belongs to, the field and the value (#280). Before, the issue named
+  neither the resource nor the field. The Operate page on failure and
+  identity states the rule.
+
+### Changed
+
+- The identity store records its schema (#298). This build writes schema 2
+  and reads schemas 1 and 2; a file with no schema row, which 0.0.6 or
+  earlier wrote, reads as schema 1 and is stamped on open. A file in another
+  schema stops the start with an error naming the file, the schema found and
+  the schemas this build reads, and the file is left unchanged.
+
+### Security
+
+- An inline secret in the configuration file (`bearer_token`, `password`,
+  `client_secret`, the `[cdm] url`) is a `SecretString` from the moment the
+  file is parsed, so a `Debug` rendering of the configuration tree redacts it
+  and its memory is zeroed when it is dropped (#309). A `_file` sibling's
+  text is wrapped the same way as soon as it is read.
 
 ## [0.0.6] - 2026-10-17
 
@@ -445,6 +550,13 @@ crates on crates.io.
 
 ### Fixed
 
+- `fhir-types` 0.1.116 holds an element id to the `string` form in R4B and
+  R5 (#378). The published definitions type `Element.id` as `string` in every
+  version, while the 4.3.0 and 5.0.0 core packages state `id` on the copies
+  `ElementDefinition.id`, `Extension.id` and the other datatypes inherit, so
+  an element id such as `Patient.extension:birthPlace` or one longer than 64
+  characters was refused. A resource id keeps the form its package states.
+  The R4B and R5 examples corpora pass 544 and 191 more instances.
 - A create with no `meta.versionId` of a source the facade already holds as
   one entry of a multi-entry composition is recognised as a replay when its
   mapping is that entry as it stands, and commits nothing (#667). The replay

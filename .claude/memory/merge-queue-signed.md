@@ -1,6 +1,6 @@
 ---
 name: merge-queue-signed
-description: The main ruleset requires signed commits and an up-to-date branch, so pull requests merge one at a time after a LOCAL signed rebase; gh pr update-branch --rebase strips the signature and blocks the merge
+description: main merges through GitHub's merge queue (since 2026-10-17) with signed commits required; the strict up-to-date rule is gone, and gh pr update-branch --rebase still strips the signature
 metadata:
   type: feedback
 ---
@@ -9,22 +9,24 @@ metadata:
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 On 2026-09-13 five green pull requests with auto-merge armed sat unmerged
-for hours. Two rules on `main` explain it: `required_status_checks` with the
-strict up-to-date policy, so every merge makes the other branches stale and
-auto-merge waits, and `required_signatures`, so a branch rewritten by
-`gh pr update-branch --rebase` (a server-side rebase, which drops the
-author's signature) is refused with "the base branch policy prohibits the
-merge" even when every check is green.
+for hours: the `main` ruleset required an up-to-date branch, so every merge
+made the others stale, and required signed commits, so a branch rewritten by
+`gh pr update-branch --rebase` (a server-side rebase that drops the author's
+signature) was refused even with every check green. On 2026-10-17, with 21
+open pull requests draining one per CI cycle, the owner approved the merge
+queue: the ruleset now carries a `merge_queue` rule (squash, up to 5 entries
+built and merged together, gated on `conclusion`) and the strict up-to-date
+policy is off. `required_signatures` stays; the queue's merge commits are
+GitHub's own.
 
-**Why:** GitHub's auto-merge never updates a stale branch, and it cannot sign
-a rebase with the author's key.
+**Why:** the queue tests queued pull requests together on top of `main`, so a
+branch never has to be brought up to date by hand, and several land per CI
+run.
 
-**How to apply:** drain open pull requests as a serial queue. For each one:
-rebase LOCALLY onto `origin/HEAD` (commits are signed by `commit.gpgsign`),
-push with `--force-with-lease`, let the `conclusion` check go green, and let
-auto-merge fire before touching the next. Dependabot branches get the
-`@dependabot rebase` comment (GitHub signs those). Never use
-`gh pr update-branch --rebase`; the merge-commit form is signed by GitHub
-but adds a merge commit to a squash-merged branch, so the local rebase is
-the default. Never `--admin` without the owner asking. Opening a new pull
-request while the queue drains makes every queued branch stale again.
+**How to apply:** arm a pull request with `gh pr merge <n> --auto` (the
+queue sets the method; passing `--squash` is refused). A conflicting branch
+is still fixed by a LOCAL merge or rebase (commits signed by
+`commit.gpgsign`) and pushed, never by `gh pr update-branch --rebase`.
+Dependabot branches get the `@dependabot rebase` comment. Never `--admin`
+without the owner asking. The queue does not prevent overlapping changes;
+[[pr-backlog-discipline]] does.

@@ -4,11 +4,44 @@
 //! The file tree: one struct per TOML section, each refusing an unknown key
 //! and holding its defaults in its own `Default` impl.
 
+use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::telemetry::{DEFAULT_FILTER, Format};
+
+/// A secret written inline in the configuration: a [`SecretString`] from the
+/// parse, so its `Debug` rendering is redacted and its memory is zeroed when
+/// it is dropped.
+///
+/// It compares by value so a parsed tree can be compared with another. No
+/// specification governs this: our own design.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(transparent)]
+pub struct Secret(SecretString);
+
+impl Secret {
+    /// Returns the secret.
+    #[must_use]
+    pub const fn secret(&self) -> &SecretString {
+        &self.0
+    }
+}
+
+impl From<&str> for Secret {
+    fn from(value: &str) -> Self {
+        Self(SecretString::from(value))
+    }
+}
+
+impl PartialEq for Secret {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
+
+impl Eq for Secret {}
 
 /// The mapping set this deployment runs.
 ///
@@ -37,7 +70,7 @@ pub struct Mappings {
 ///
 /// The lane is off until `enabled` is set, and a disabled facade mounts no
 /// route, so a request answers `404` rather than `403`
-/// (`docs/architecture.md` §4.6).
+/// (no specification governs this: our own design).
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Facade {
@@ -328,7 +361,7 @@ pub struct Cdr {
     /// The retry budget for idempotent calls.
     pub retry: Retry,
     /// The credentials the CDR expects.
-    pub credentials: CdrCredentials,
+    pub credentials: Credentials<OAuthClient>,
 }
 
 impl Default for Cdr {
@@ -337,48 +370,7 @@ impl Default for Cdr {
             base_url: String::new(),
             timeout_ms: 30_000,
             retry: Retry::default(),
-            credentials: CdrCredentials::default(),
-        }
-    }
-}
-
-/// The credentials the CDR expects: the static schemes every upstream
-/// takes, or a token the bridge obtains for itself.
-///
-/// Every secret is reachable inline or through its `_file` sibling; setting
-/// both is a boot error, and so is a static scheme beside `oauth`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct CdrCredentials {
-    /// An RFC 6750 bearer token.
-    pub bearer_token: Option<String>,
-    /// A file holding the bearer token, read at boot.
-    pub bearer_token_file: Option<PathBuf>,
-    /// The user name of RFC 7617 basic authentication.
-    pub user: Option<String>,
-    /// A file holding the user name, read at boot.
-    pub user_file: Option<PathBuf>,
-    /// The password of RFC 7617 basic authentication.
-    pub password: Option<String>,
-    /// A file holding the password, read at boot.
-    pub password_file: Option<PathBuf>,
-    /// The OAuth 2.0 client credentials grant (RFC 6749 §4.4) the bridge
-    /// obtains its CDR token with.
-    pub oauth: Option<OAuthClient>,
-}
-
-impl CdrCredentials {
-    /// Returns the static schemes of this section, the ones every upstream
-    /// takes.
-    #[must_use]
-    pub fn static_schemes(&self) -> Credentials {
-        Credentials {
-            bearer_token: self.bearer_token.clone(),
-            bearer_token_file: self.bearer_token_file.clone(),
-            user: self.user.clone(),
-            user_file: self.user_file.clone(),
-            password: self.password.clone(),
-            password_file: self.password_file.clone(),
+            credentials: Credentials::default(),
         }
     }
 }
@@ -398,7 +390,7 @@ pub struct OAuthClient {
     /// The client identifier (RFC 6749 §2.2).
     pub client_id: String,
     /// The client secret.
-    pub client_secret: Option<String>,
+    pub client_secret: Option<Secret>,
     /// A file holding the client secret, read at boot.
     pub client_secret_file: Option<PathBuf>,
     /// How the client authenticates: `client_secret_basic` or
@@ -445,7 +437,7 @@ pub struct Terminology {
     /// The retry budget.
     pub retry: Retry,
     /// The credentials the server expects.
-    pub credentials: Credentials,
+    pub credentials: Credentials<NoGrant>,
 }
 
 impl Default for Terminology {
@@ -465,7 +457,7 @@ impl Default for Terminology {
 #[serde(default, deny_unknown_fields)]
 pub struct Cdm {
     /// The PostgreSQL connection URL.
-    pub url: Option<String>,
+    pub url: Option<Secret>,
     /// A file holding the connection URL, read at boot.
     pub url_file: Option<PathBuf>,
     /// The PEM CA the database's certificate is checked against, for the
@@ -574,15 +566,20 @@ impl Default for Retry {
     }
 }
 
-/// The credentials one upstream expects.
+/// The credentials one upstream expects: the static schemes every upstream
+/// takes, and the token grant `Grant` names for the lanes that take one.
 ///
 /// Every secret is reachable inline or through its `_file` sibling; setting
-/// both is a boot error.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+/// both is a boot error, and so is a static scheme beside `oauth`. The CDR
+/// takes an [`OAuthClient`]; the terminology lane takes [`NoGrant`], so an
+/// `oauth` table under it is refused when the file is read. One shape serves
+/// both because `deny_unknown_fields` cannot be combined with
+/// `#[serde(flatten)]` (<https://serde.rs/field-attrs.html#flatten>).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct Credentials {
+pub struct Credentials<Grant> {
     /// An RFC 6750 bearer token.
-    pub bearer_token: Option<String>,
+    pub bearer_token: Option<Secret>,
     /// A file holding the bearer token, read at boot.
     pub bearer_token_file: Option<PathBuf>,
     /// The user name of RFC 7617 basic authentication.
@@ -590,7 +587,40 @@ pub struct Credentials {
     /// A file holding the user name, read at boot.
     pub user_file: Option<PathBuf>,
     /// The password of RFC 7617 basic authentication.
-    pub password: Option<String>,
+    pub password: Option<Secret>,
     /// A file holding the password, read at boot.
     pub password_file: Option<PathBuf>,
+    /// The OAuth 2.0 client credentials grant (RFC 6749 §4.4) the bridge
+    /// obtains its token with, for a lane that takes one.
+    pub oauth: Option<Grant>,
+}
+
+impl<Grant> Default for Credentials<Grant> {
+    fn default() -> Self {
+        Self {
+            bearer_token: None,
+            bearer_token_file: None,
+            user: None,
+            user_file: None,
+            password: None,
+            password_file: None,
+            oauth: None,
+        }
+    }
+}
+
+/// The grant of a lane that obtains no token for itself: no value exists,
+/// and an `oauth` table is refused when the file is read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoGrant {}
+
+impl<'de> Deserialize<'de> for NoGrant {
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Err(serde::de::Error::custom(
+            "this lane obtains no token with an OAuth grant, so it takes no `oauth` table",
+        ))
+    }
 }

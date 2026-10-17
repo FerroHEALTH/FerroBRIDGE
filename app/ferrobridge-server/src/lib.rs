@@ -414,7 +414,7 @@ fn operation_counts(lane: &state::OperationsLane) -> startup::MappingCounts {
 ///
 /// The mapping set is read and compiled once, at boot, against the templates
 /// the CDR holds, so a mapping that does not compile refuses the start rather
-/// than the first request that touches it (`docs/architecture.md` §4.3). The
+/// than the first request that touches it (no specification governs this: our own design). The
 /// identity store is opened here too, so a path that cannot be written is a
 /// boot error.
 async fn build_facade(

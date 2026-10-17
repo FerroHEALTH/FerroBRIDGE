@@ -278,6 +278,8 @@ pub mod schema;
 #[cfg(feature = "resources")]
 pub mod search_parameter;
 #[cfg(feature = "resources")]
+pub mod search_parameters;
+#[cfg(feature = "resources")]
 pub mod sequence;
 #[cfg(feature = "resources")]
 pub mod service_definition;

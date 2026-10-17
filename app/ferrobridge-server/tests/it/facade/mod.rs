@@ -100,9 +100,7 @@ struct Harness {
 impl Harness {
     /// Returns the application under test.
     fn app(&self) -> Router {
-        let state =
-            AppState::with_health(Registry::default()).with_facade(Arc::clone(&self.facade));
-        ferrobridge_server::router(Arc::new(state), &server_settings())
+        app_over(&self.facade)
     }
 
     /// Returns the application under test with the FHIRconnect operations
@@ -233,6 +231,19 @@ async fn harness_built(
     facade_settings: Settings,
     search: Option<ferrobridge_server::facade::search::Limits>,
 ) -> Harness {
+    let store = Arc::new(MemoryStore::new());
+    let (cdr, facade) = facade_over(fixtures, facade_settings, search, handle(&store)).await;
+    Harness { cdr, store, facade }
+}
+
+/// Returns the stub CDR and a facade over it whose identity map is `store`,
+/// running the mapping set under `fixtures` as [`harness_built`] does.
+async fn facade_over(
+    fixtures: &str,
+    facade_settings: Settings,
+    search: Option<ferrobridge_server::facade::search::Limits>,
+    store: Arc<dyn Store>,
+) -> (MockServer, Arc<Facade>) {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(
@@ -250,8 +261,7 @@ async fn harness_built(
         .await
         .expect("the template fetch answers");
     let compiled = programs::compile_set(&set, &templates).expect("the mapping set compiles");
-    let store = Arc::new(MemoryStore::new());
-    let mut built = Facade::new(compiled, handle(&store), client(&cdr), facade_settings);
+    let mut built = Facade::new(compiled, store, client(&cdr), facade_settings);
     if let Some(limits) = search {
         let catalog = ferrobridge_server::facade::search::load(
             std::path::Path::new(fixtures),
@@ -260,8 +270,13 @@ async fn harness_built(
         .expect("the search declarations load");
         built = built.with_search(catalog, limits);
     }
-    let facade = Arc::new(built);
-    Harness { cdr, store, facade }
+    (cdr, Arc::new(built))
+}
+
+/// Returns the application under test over `facade`.
+fn app_over(facade: &Arc<Facade>) -> Router {
+    let state = AppState::with_health(Registry::default()).with_facade(Arc::clone(facade));
+    ferrobridge_server::router(Arc::new(state), &server_settings())
 }
 
 /// Returns the canonical JSON of an EHR whose `ehr_id` is [`EHR_ID`].

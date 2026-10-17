@@ -242,7 +242,8 @@ the engines fail closed on anything that would need one.
 ### `[cdm]`
 
 The OMOP CDM database lane. This section reaches identifiable data, and the
-server says so once at start-up.
+server says so once at start-up. Under `serve`, readiness carries a `cdm`
+indicator that reports whether the database answers.
 
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
@@ -432,7 +433,9 @@ The identity store holds identifiers: a subject to its `ehr_id`, a resource id
 to the composition it came from, and the source identity of every resource the
 facade consumed. No clinical content is written into it. Back it up with the
 CDR, because a lost map means the next create writes a second composition for a
-resource the CDR already holds.
+resource the CDR already holds. In a container with a read-only root
+filesystem, put the file on a persistent volume and run one process per file
+([the identity store](container.md#the-identity-store)).
 
 ### `[auth]`
 

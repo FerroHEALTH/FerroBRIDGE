@@ -41,6 +41,25 @@ The terminology ecosystem overlay (the HL7 terminology ecosystem IG requirements
 is applied at generation to R4, R4B and R5 and marked per parameter; the STU3
 contracts carry exactly the parameters 3.0.2 declares.
 
+## The search parameter registry
+
+With `resources` on, each version module carries
+`search_parameters::SEARCH_PARAMETERS`, over the types in the crate-level
+`fhir_types::search` module: every `SearchParameter` the core package defines
+(its examples left out) with its canonical, code, base types, type and
+expression, and the standard parameter each resource type answers by code,
+its own or one a base type defines.
+
+```rust
+use fhir_types::r4::search_parameters::SEARCH_PARAMETERS;
+
+let code = SEARCH_PARAMETERS.of("Condition", "code").expect("a standard code");
+assert_eq!(code.url, "http://hl7.org/fhir/SearchParameter/clinical-code");
+assert_eq!(code.r#type.code(), "token");
+let id = SEARCH_PARAMETERS.of("Condition", "_id").expect("defined on Resource");
+assert_eq!(id.url, "http://hl7.org/fhir/SearchParameter/Resource-id");
+```
+
 ## The element table
 
 Each version module carries `schema::SCHEMAS`, the elements of every type it

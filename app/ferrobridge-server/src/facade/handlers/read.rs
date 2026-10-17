@@ -6,9 +6,10 @@
 //! A read resolves the logical id through the identity map to one composition
 //! and maps that composition back with the program the map recorded. An id the
 //! map does not know is `404`; a composition the CDR reports deleted is `410`
-//! (`docs/architecture.md` §4.6). A vread does the same for the composition
+//! (no specification governs this: our own design). A vread does the same for the composition
 //! version whose version tree id is the `[vid]` a write's `Location` named
-//! (<https://hl7.org/fhir/R4/http.html#vread>).
+//! (<https://hl7.org/fhir/R4/http.html#vread>). Both answer `Last-Modified`
+//! from the commit time the CDR's revision history records for the version.
 
 use http::HeaderMap;
 use http::StatusCode;
@@ -18,7 +19,11 @@ use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVer
 use openehr_base::v1_3::base_types::identification::uid_based_id::UidBasedId;
 use openehr_base::v1_3::base_types::identification::version_tree_id::VersionTreeId;
 use openehr_its::rest::generated::ehr::client::CompositionGetOutcome;
+use openehr_its::rest::generated::ehr::client::VersionedCompositionRevisionHistoryOutcome;
 use openehr_mapping_core::composition::CanonicalComposition;
+use openehr_rm::v1_2::common::generic::audit_details::AuditDetails;
+use openehr_rm::v1_2::common::generic::revision_history::RevisionHistory;
+use openehr_rm::v1_2::common::generic::revision_history_item::RevisionHistoryItem;
 use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::cdr::CdrClient;
@@ -32,6 +37,7 @@ use crate::facade::handlers::render;
 use crate::facade::handlers::write;
 use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::record::CompositionBinding;
+use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
@@ -54,11 +60,16 @@ pub(crate) async fn read(
     let binding =
         binding(facade, resource_type, &internal)?.ok_or_else(|| unknown(resource_type, id))?;
     let program = program_of(facade, &binding)?;
-    let ehr_id = EhrId::new(&binding.ehr_id).map_err(|error| stored_identifier(&error))?;
-    let container = HierObjectId::new(&binding.versioned_object_uid)
+    let ehr_id = binding
+        .ehr(&internal)
+        .map_err(|error| stored_identifier(&error))?;
+    let container = binding
+        .container(&internal)
         .map_err(|error| stored_identifier(&error))?;
     let (version, composition) =
         fetch(facade, client, &ehr_id, &container, &binding.template_id).await?;
+    let history = history(client, &ehr_id, &container).await?;
+    let modified = last_modified(revision_of(&history, &version)?)?;
     let composition = entry_view(program, &composition, &binding, &internal)?;
     let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
     let subject = render::subject_of(facade, &ehr_id)?;
@@ -77,18 +88,19 @@ pub(crate) async fn read(
     Ok(reply::resource(
         StatusCode::OK,
         &rendered.body,
-        &[reply::Header::entity_tag(version.version_tree_id().value())],
+        &answer_headers(&version, modified),
     ))
 }
 
 /// `GET [base]/{type}/{id}/_history/{vid}`.
 ///
 /// The `[vid]` is the version tree id every write answers in its `Location`
-/// and `ETag`, so the version it names joins the version container the map
-/// binds, the creating system of the latest version, and `[vid]` (no
-/// specification governs the inversion: our own design). A `[vid]` that is no
-/// version tree id, or that the CDR does not hold, is `404`; a version the CDR
-/// reports deleted is `410`.
+/// and `ETag`, so the version it names is the one of that version tree id in
+/// the revision history of the container the map binds (no specification
+/// governs the inversion: our own design). A `[vid]` that is no version tree
+/// id, or that the history does not list, is `404`; a version the CDR reports
+/// deleted is `410`, and an earlier version stays readable after the latest
+/// was deleted.
 pub(crate) async fn vread(
     facade: &Facade,
     client: &CdrClient,
@@ -112,40 +124,38 @@ pub(crate) async fn vread(
             )),
         )
     })?;
-    let ehr_id = EhrId::new(&binding.ehr_id).map_err(|error| stored_identifier(&error))?;
-    let container = HierObjectId::new(&binding.versioned_object_uid)
+    let ehr_id = binding
+        .ehr(&internal)
         .map_err(|error| stored_identifier(&error))?;
-    let (newest, newest_body) = latest(client, &ehr_id, &container).await?;
-    let (version, body) = if newest.version_tree_id().value() == tree.value() {
-        (newest, newest_body)
-    } else {
-        let wanted = ObjectVersionId::new(format!(
-            "{}::{}::{}",
-            container.value(),
-            newest.creating_system_id_str(),
-            tree.value()
-        ))
+    let container = binding
+        .container(&internal)
         .map_err(|error| stored_identifier(&error))?;
-        let (named, body) = answered_version(
-            client,
-            &ehr_id,
-            &UidBasedId::ObjectVersionId(wanted.clone()),
-        )
-        .await?;
-        if let Some(named) = named
-            && named != wanted
-        {
-            return Err(reply::refusal(
-                StatusCode::BAD_GATEWAY,
-                Issue::error(IssueType::Exception).diagnosing(format!(
-                    "the CDR answered version {} where {} was asked for",
-                    named.value(),
-                    wanted.value()
-                )),
-            ));
-        }
-        (wanted, body)
-    };
+    let history = history(client, &ehr_id, &container).await?;
+    let revision = history
+        .items
+        .iter()
+        .find(|item| item.version_id.version_tree_id().value() == tree.value())
+        .ok_or_else(|| unknown_version(resource_type, id, vid))?;
+    let version = revision.version_id.clone();
+    let modified = last_modified(revision)?;
+    let (named, body) = answered_version(
+        client,
+        &ehr_id,
+        &UidBasedId::ObjectVersionId(version.clone()),
+    )
+    .await?;
+    if let Some(named) = named
+        && named != version
+    {
+        return Err(reply::refusal(
+            StatusCode::BAD_GATEWAY,
+            Issue::error(IssueType::Exception).diagnosing(format!(
+                "the CDR answered version {} where {} was asked for",
+                named.value(),
+                version.value()
+            )),
+        ));
+    }
     let composition = canonical(facade, &body, &binding.template_id)?;
     let composition = entry_view(program, &composition, &binding, &internal)?;
     let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
@@ -165,7 +175,7 @@ pub(crate) async fn vread(
     Ok(reply::resource(
         StatusCode::OK,
         &rendered.body,
-        &[reply::Header::entity_tag(version.version_tree_id().value())],
+        &answer_headers(&version, modified),
     ))
 }
 
@@ -439,6 +449,7 @@ pub(crate) fn entry_view(
     id: &FhirResourceId,
 ) -> Result<CanonicalComposition, Refusal> {
     let entry = engine::entry_named(program.program(), composition, &binding.entry_path)
+        .map_err(|error| Refusal::from(Refused::from(error)))?
         .ok_or_else(|| {
             reply::refusal(
                 StatusCode::NOT_FOUND,
@@ -452,6 +463,110 @@ pub(crate) fn entry_view(
     Ok(entry.isolate(composition))
 }
 
+/// Reads the revision history of the composition container `container`.
+///
+/// A `404` is the CDR not holding the container
+/// (`ehr-codegen.openapi.yaml`, `versioned_composition_revision_history`).
+async fn history(
+    client: &CdrClient,
+    ehr_id: &EhrId,
+    container: &HierObjectId,
+) -> Result<RevisionHistory, Refusal> {
+    let answered = client
+        .revision_history(ehr_id, container)
+        .await
+        .map_err(|error| write::refuse(&status::of_client_error(&error)))?;
+    match answered.outcome {
+        VersionedCompositionRevisionHistoryOutcome::Ok { body, .. } => Ok(body),
+        VersionedCompositionRevisionHistoryOutcome::NotFound { body } => {
+            Err(write::refuse(&status::Answer::new(
+                status::NOT_FOUND,
+                status::diagnostics(StatusCode::NOT_FOUND, &body),
+            )))
+        }
+    }
+}
+
+/// Returns the history item of `version`, which the CDR has just answered and
+/// so must list.
+fn revision_of<'a>(
+    history: &'a RevisionHistory,
+    version: &ObjectVersionId,
+) -> Result<&'a RevisionHistoryItem, Refusal> {
+    history
+        .items
+        .iter()
+        .find(|item| item.version_id == *version)
+        .ok_or_else(|| {
+            reply::refusal(
+                StatusCode::BAD_GATEWAY,
+                Issue::error(IssueType::Exception).diagnosing(format!(
+                    "the CDR answered version {}, which its revision history does not list",
+                    version.value()
+                )),
+            )
+        })
+}
+
+/// Returns the `Last-Modified` value of one version: its commit time as an
+/// HTTP-date (<https://hl7.org/fhir/R4/http.html#read>).
+///
+/// The commit audit is the first audit of the item (openEHR RM Common IM,
+/// `REVISION_HISTORY_ITEM.audits`). A commit time with no UTC offset names no
+/// instant, so the answer carries no `Last-Modified`; one that is no ISO 8601
+/// date-time at all is a CDR defect and answers `502`.
+fn last_modified(revision: &RevisionHistoryItem) -> Result<Option<String>, Refusal> {
+    let committed = match revision.audits.first() {
+        Some(AuditDetails::AuditDetails(audit)) => &audit.time_committed.value,
+        Some(AuditDetails::Attestation(attestation)) => &attestation.time_committed.value,
+        None => return Ok(None),
+    };
+    if let Ok(instant) = committed.parse::<jiff::Timestamp>() {
+        return jiff::fmt::rfc2822::DateTimePrinter::new()
+            .timestamp_to_rfc9110_string(&instant)
+            .map(Some)
+            .map_err(|error| bad_commit_time(revision, committed, &error));
+    }
+    // NOTE: a parse failure IS the answer here: ISO 8601 lets a date-time omit
+    // its offset (openEHR RM Data Types IM, `DV_DATE_TIME`), and a local time
+    // names no instant an HTTP-date can carry.
+    committed
+        .parse::<jiff::civil::DateTime>()
+        .map(|_local| None)
+        .map_err(|error| bad_commit_time(revision, committed, &error))
+}
+
+/// Returns the `502` a commit time that is no ISO 8601 date-time answers.
+fn bad_commit_time(
+    revision: &RevisionHistoryItem,
+    committed: &str,
+    error: &jiff::Error,
+) -> Refusal {
+    reply::refusal(
+        StatusCode::BAD_GATEWAY,
+        Issue::error(IssueType::Exception).diagnosing(format!(
+            "the CDR records version {} as committed at `{committed}`, which is no date-time: {error}",
+            revision.version_id.value()
+        )),
+    )
+}
+
+/// Returns the headers a read or vread answers: the `ETag` of `version`, and
+/// `Last-Modified` when the commit time names an instant.
+fn answer_headers(version: &ObjectVersionId, modified: Option<String>) -> Vec<reply::Header> {
+    let mut headers = vec![reply::Header::entity_tag(version.version_tree_id().value())];
+    headers.extend(modified.map(|value| reply::Header::last_modified(&value)));
+    headers
+}
+
+/// Returns the `404` a `[vid]` the revision history does not list answers.
+fn unknown_version(resource_type: &str, id: &str, vid: &str) -> Refusal {
+    reply::refusal(
+        StatusCode::NOT_FOUND,
+        Issue::error(IssueType::NotFound)
+            .diagnosing(format!("{resource_type}/{id} has no version {vid}")),
+    )
+}
 /// Returns the `404` an id the map does not know answers.
 fn unknown(resource_type: &str, id: &str) -> Refusal {
     reply::refusal(

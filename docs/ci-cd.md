@@ -80,7 +80,8 @@ A changed path reaches packages in one of these ways:
 | a file under a member's directory (`crates/*`, `app/*`, `tools/*`) | that member, every member whose Rust source names that directory in a string literal (`"tools/fhir-codegen/vendor"`, `"../../crates/omop-cdm"`), then their normal and build dependants transitively, then the dev-dependants of all of those |
 | the root `Cargo.toml` | a line that is a member's own `[workspace.dependencies]` entry reaches that member; any other line (a third-party requirement, a profile, a lint) reaches everything |
 | `Cargo.lock` | a moved entry without a `source` (a member's version) reaches that member; a moved third-party entry reaches everything |
-| `conformance/**`, `scripts/checks/conformance.sh`, `README.md` | the packages `conformance.sh` runs (read from its own loop) |
+| `conformance/<corpus>/**` and that corpus's badge under `conformance/badges/` | the tests of the one package that measures the corpus (read from the corpus table in `conformance.sh`); the HL7 v2 family and version badges count as the `hl7v2` corpus |
+| `scripts/checks/conformance.sh`, `README.md`, a `conformance/` path no corpus names | the packages `conformance.sh` runs |
 | `docs/VERSIONS.md` | `ferrobridge-testkit`, and through it every member testing with it (`matrix_pin`) |
 | `docs/architecture.md` | the testkit's own tests |
 | `scripts/checks/sqlx-offline.sh` | `omop-cdm` |
@@ -195,7 +196,8 @@ rest under `--check`: a passing case the list does not record, a corpus whose
 size moved from the list's `total` line, a badge under `conformance/badges/`
 that disagrees with its list, and a README conformance badge that names no
 committed badge file. `scripts/checks/conformance.sh --update` rewrites the
-lists and the badges from one run. The script runs one package per `cargo
+lists and the badges from one run, and `--update <corpus>` or `--check
+<corpus>` runs and rewrites or checks one corpus alone. The script runs one package per `cargo
 nextest` invocation, for the same memory reason the `test` job uses
 `cargo hack`, and it needs `jq`, which the hosted runner carries.
 
@@ -417,6 +419,45 @@ which is what a consumer builds; the all-features union (five versions, every
 resource, one crate) is no consumer's surface and is not linted in CI. No
 specification governs this: our own design.
 
+## The advisory analyzers beside this one
+
+`sonar.yml` (SonarQube Cloud) and `codeql.yml` (CodeQL) gate no merge
+(`.claude/rules/ai-code-review.md`), so neither is a `conclusion` input. Both
+narrow their work on a pull request and keep the full run on `main`, for the
+same reason the Rust lanes do: a pull-request analysis that is cancelled at
+its limit reports nothing, and both held runners the gating lanes need.
+
+**SonarQube Cloud.** The `analyze` job runs `affected.sh` the way `detect`
+does: `--base HEAD^1 --head HEAD` on a pull request, `--all` on a push to
+`main`. It instruments the reached packages one at a time with
+`cargo llvm-cov nextest`, leaving out `fhir-types` and `hl7v2-types`, whose
+sources the scan excludes, and fetches only the build-time corpora those
+packages read (the same rule `fast.sh` applies). A pull request that reaches
+no package skips the toolchain, the corpora and the coverage step, and the
+scan runs without `lcov.info`, which the scanner reports as a warning. The
+coverage of a pull request is therefore partial. That is acceptable for an
+advisory analyzer: a pull-request analysis applies only the quality gate's
+conditions on new code, and every file the change touches belongs to a
+reached package, so its new lines carry coverage. SonarQube Cloud's
+documentation describes no import of the target branch's coverage for
+unchanged files, and none is attempted.
+
+`sonar-project.properties` excludes every generated tree, the same rule it
+already applied to `crates/omop-cdm/src/generated`. Before that, the
+copy-paste detector spent 625 of the scan's 968 seconds on the 4711
+generated files of `fhir-types` and `hl7v2-types` (run 39007151631).
+A newer push to a pull request cancels its running analysis.
+
+**CodeQL.** The Rust analysis runs on a pull request only when the change
+touches a `.rs` file, a `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` or
+`codeql.yml`, and then over the hand-written tree: a `paths-ignore` list
+leaves out the three generated trees, which held the job at 24 to 32
+minutes. A push to `main` and the Monday schedule analyze the whole tree,
+generated code included. The actions analysis is unchanged.
+
+The measured durations before and after are on #703. No specification
+governs this: our own design.
+
 ## The release lane beside this one
 
 `release.yml` is dormant until a `v*` tag is pushed, and it calls two reusable
@@ -475,7 +516,7 @@ the state on 2026-09-05.
 
 | Setting | State |
 |---|---|
-| `main` ruleset: requires a pull request, signed commits, and the `conclusion` status check with the strict up-to-date policy; deletions and non-fast-forward pushes blocked | done |
+| `main` ruleset: requires a pull request, signed commits, and the `conclusion` status check, and merges through the merge queue (squash, up to 5 entries per build, enabled 2026-10-17 in place of the strict up-to-date policy); deletions and non-fast-forward pushes blocked | done |
 | Code scanning in advanced setup, with the CodeQL default setup off so `codeql.yml` is the analysis path | done |
 | Secret scanning with push protection, Dependabot alerts, and Dependabot security updates | done |
 | Artifact attestations, which the release lane's provenance and SBOM bundles are stored against | done |
@@ -506,6 +547,10 @@ instead, which keeps the ruleset stable as the pipeline grows.
   <https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository>
   and
   <https://github.com/licensee/licensee/blob/main/docs/what-we-look-at.md>
+- SonarQube Cloud pull request analysis:
+  <https://docs.sonarsource.com/sonarqube-cloud/improving/pull-request-analysis/>
+- CodeQL configuration, `paths-ignore`:
+  <https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning>
 - Scorecard checks:
   <https://github.com/ossf/scorecard/blob/main/docs/checks.md>
 - Required status checks and rulesets:

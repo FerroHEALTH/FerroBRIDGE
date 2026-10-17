@@ -53,7 +53,8 @@ The `CapabilityStatement` names exactly the resource types the loaded programs
 map, with `create`, `read`, `vread` and `update` per type, `transaction` and
 `batch` at system level, the `$validate` operation, `updateCreate: false`,
 `conditionalCreate` true, `conditionalUpdate` false (no `PUT [type]?[search]`
-is served; `If-Match` on an update is the version-aware update), and
+is served; `If-Match` on an update is the version-aware update),
+`versioning: versioned-update` and `readHistory: true` per type, and
 `fhirVersion: 4.0.1`. A type a search
 declaration answers also names `search-type` and, in `searchParam`, exactly
 `_id` and the parameters the declaration states; every other type names no
@@ -277,9 +278,16 @@ configured base URL and `ETag` carrying the version.
 
 That `Location` is `[base]/{type}/{id}/_history/{vid}`, and a `GET` of it is
 the R4 vread. The `{vid}` is the version tree id of the composition version
-the write committed, so the facade reads that exact version from the CDR and
-answers it with its `ETag`. A `{vid}` the CDR does not hold answers `404`, and
-a version the CDR reports deleted answers `410`.
+the write committed. The facade finds that version in the CDR's revision
+history of the composition, reads it, and answers it with its `ETag`. A
+`{vid}` the history does not list answers `404`, and a version the CDR reports
+deleted answers `410`. An earlier version stays readable after the latest one
+was deleted.
+
+A read and a vread also answer `Last-Modified`: the commit time the revision
+history records for the version, as an HTTP-date. That costs one more CDR
+call per read. A commit time with no UTC offset names no instant, so that
+answer carries no `Last-Modified`.
 
 An update needs `If-Match` when the map knows the id. Without one, the facade
 reads the CDR's current `ETag` and answers `412` with it on a mismatch rather
@@ -494,8 +502,14 @@ node the template does not hold, a path the template does not hold, a path
 that crosses a node which may occur more than once below the bound one (bind
 that node instead), a token over a value that is not coded, a path that is not
 one AQL path, a query that does not parse as AQL, two declarations of one
-resource type over one template, and two declarations of one type that state
-different parameters. `order` defaults to the commit time and then the version
+resource type over one template, two declarations of one type that state
+different parameters, and a parameter that takes the code of a standard R4
+search parameter of the resource type with another type (`code` on a
+`Condition` is a `token`; `patient` and `subject` are references). R4 says
+"standard parameters cannot be redefined". A parameter that takes a standard
+code names that parameter's canonical as `definition` in the
+`CapabilityStatement`, and a code R4 does not define for the type carries
+none. `order` defaults to the commit time and then the version
 uid; set it when your CDR orders better by something else, and end it with a
 key that is unique per composition.
 

@@ -89,7 +89,11 @@ scripts/checks/conformance.sh --update
 
 Commit the rewritten lists and badges with the change. Without a flag the
 script compares and reports without failing on new passes; `--check` is what
-CI runs. It needs `cargo-nextest` and `jq`. Never edit a list by hand, and
+CI runs. When your change moves one corpus, name it after the flag
+(`scripts/checks/conformance.sh --update fhir-r4b`): the script runs that
+corpus's test alone and rewrites only its list, its badge and the README
+block. Naming either HL7 v2 corpus also runs the other one, because the family
+and version badges count both. It needs `cargo-nextest` and `jq`. Never edit a list by hand, and
 never remove a case from one to make CI green.
 
 ### The badges and the README block

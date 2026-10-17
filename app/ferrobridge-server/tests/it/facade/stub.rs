@@ -41,7 +41,14 @@ pub(super) async fn mount_create(cdr: &MockServer, version: &str, body: &serde_j
         .await;
 }
 
-/// Mounts the composition read that answers `200` with `body`.
+/// The commit time every revision a stub history lists records.
+pub(super) const COMMITTED: &str = "2026-09-25T09:00:00Z";
+
+/// [`COMMITTED`] as the HTTP-date a `Last-Modified` carries.
+pub(super) const LAST_MODIFIED: &str = "Fri, 25 Sep 2026 09:00:00 GMT";
+
+/// Mounts the composition read that answers `200` with `body`, and the
+/// revision history that lists every version up to `version`.
 pub(super) async fn mount_read(cdr: &MockServer, version: &str, body: &serde_json::Value) {
     Mock::given(matchers::method("GET"))
         .and(matchers::path(format!(
@@ -55,6 +62,43 @@ pub(super) async fn mount_read(cdr: &MockServer, version: &str, body: &serde_jso
         )
         .mount(cdr)
         .await;
+    let listed = versions_up_to(version);
+    let listed: Vec<&str> = listed.iter().map(String::as_str).collect();
+    mount_history(cdr, &listed, COMMITTED).await;
+}
+
+/// Returns `version` and every version of its container before it, in order.
+fn versions_up_to(version: &str) -> Vec<String> {
+    version
+        .rsplit_once("::")
+        .and_then(|(head, tree)| Some((head, tree.parse::<u32>().ok()?)))
+        .map_or_else(
+            || vec![version.to_owned()],
+            |(head, last)| (1..=last).map(|n| format!("{head}::{n}")).collect(),
+        )
+}
+
+/// Mounts the revision history of [`CONTAINER`] listing `versions` in order,
+/// each committed at `committed`.
+pub(super) async fn mount_history(cdr: &MockServer, versions: &[&str], committed: &str) {
+    history_mock(versions, committed).mount(cdr).await;
+}
+
+/// Returns the revision history of [`CONTAINER`] listing `versions` in order,
+/// each committed at `committed`, unmounted.
+pub(super) fn history_mock(versions: &[&str], committed: &str) -> Mock {
+    let revisions: Vec<(&str, &str)> = versions.iter().map(|v| (*v, committed)).collect();
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path(format!(
+            "/ehr/{EHR_ID}/versioned_composition/{CONTAINER}/revision_history"
+        )))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("Content-Type", "application/json")
+                .set_body_string(ferrobridge_testkit::stubs::its_rest::revision_history_body(
+                    &revisions,
+                )),
+        )
 }
 
 /// Mounts the read of the composition version `version` names, answering
@@ -110,7 +154,15 @@ pub(crate) enum Echo {
     Reversed,
     /// The versions in order, each read back naming an item no entry sent.
     Foreign,
+    /// The empty `201` of [`Echo::Minimal`], each stored composition giving
+    /// its `content` items a `LOCATABLE.uid` the sender did not send, so the
+    /// stored composition differs from the built one in an identity input.
+    MinimalAssigningUids,
 }
+
+/// The `LOCATABLE.uid` [`Echo::MinimalAssigningUids`] gives the first
+/// `content` item of every composition it stores.
+pub(super) const ASSIGNED_ENTRY_UID: &str = "6f1c0a52-0000-4000-8000-000000000001";
 
 /// The compositions a stub CDR committed, by version and by container.
 #[derive(Debug, Default)]
@@ -189,6 +241,12 @@ impl TakeContribution {
                 stored["feeder_audit"]["originating_system_item_ids"][0]["id"] =
                     serde_json::json!("an-item-no-entry-sent");
             }
+            if self.echo == Echo::MinimalAssigningUids
+                && let Some(first) = stored["content"].get_mut(0)
+            {
+                first["uid"] =
+                    serde_json::json!({ "_type": "HIER_OBJECT_ID", "value": ASSIGNED_ENTRY_UID });
+            }
             committed.versions.push((version.clone(), stored));
             named.push(version);
         }
@@ -196,7 +254,7 @@ impl TakeContribution {
         if self.echo == Echo::Reversed {
             named.reverse();
         }
-        if self.echo == Echo::Minimal {
+        if matches!(self.echo, Echo::Minimal | Echo::MinimalAssigningUids) {
             return ferrobridge_testkit::stubs::its_rest::contribution_created_minimal(
                 CONTRIBUTION,
             );
@@ -315,7 +373,48 @@ pub(super) async fn mount_echo_tracked(
         })
         .mount(cdr)
         .await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path_regex(format!(
+            "^/ehr/{EHR_ID}/versioned_composition/[^/]+/revision_history$"
+        )))
+        .respond_with(ReadHistory {
+            committed: Arc::clone(&committed),
+        })
+        .mount(cdr)
+        .await;
     committed
+}
+
+/// The stub CDR half that answers the revision history of a committed
+/// container: every version committed into it, in commit order.
+struct ReadHistory {
+    /// What was committed.
+    committed: Arc<std::sync::Mutex<Committed>>,
+}
+
+impl wiremock::Respond for ReadHistory {
+    fn respond(&self, request: &wiremock::Request) -> ResponseTemplate {
+        let Ok(committed) = self.committed.lock() else {
+            return ResponseTemplate::new(500);
+        };
+        let container = request
+            .url
+            .path_segments()
+            .and_then(|segments| segments.rev().nth(1))
+            .unwrap_or_default();
+        let revisions: Vec<(&str, &str)> = committed
+            .versions
+            .iter()
+            .filter(|(version, _)| version.split("::").next() == Some(container))
+            .map(|(version, _)| (version.as_str(), COMMITTED))
+            .collect();
+        if revisions.is_empty() {
+            return ferrobridge_testkit::stubs::its_rest::not_found("no such container");
+        }
+        ferrobridge_testkit::stubs::its_rest::retrieved(
+            &ferrobridge_testkit::stubs::its_rest::revision_history_body(&revisions),
+        )
+    }
 }
 
 /// The containers the echo CDR hands out for a transaction.
