@@ -76,4 +76,4 @@
 - [Remove worktrees after merge](remove-worktrees-after-merge.md) — remove each agent worktree and its branches as soon as its PR merges; owner 2026-10-15
 - [PR merge watch](pr-merge-watch.md) — watch every PR until merged with scripts/gh/watch-prs.sh; fix red checks, conflicts and BEHIND at once; owner 2026-10-15
 - [Worker wait loops](worker-wait-loops.md) — worker briefs forbid self-matching pgrep waits; find and kill stuck shells by working directory; owner 2026-10-16
-- [PR backlog discipline](pr-backlog-discipline.md) — at most 6 open PRs before new work starts, one open PR per worker, no stacked PRs, track every open PR every turn; owner 2026-10-17
+- [PR backlog discipline](pr-backlog-discipline.md) — several open PRs are fine if each merges cleanly; no stacked PRs, overlapping work in sequence, every open PR tracked to its merge; owner 2026-10-17

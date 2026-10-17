@@ -87,9 +87,9 @@ Non-negotiables (violations are rejected at review):
 - No AI or Claude attribution anywhere. You do not commit unless the prompt
   says to, and then on a conventional-type branch with a descriptive subject.
 - Do NOT spawn your own subagents; do the work directly.
-- One open pull request at a time: never branch from another open PR's
-  branch, and when a brief lists several issues, start the next only after
-  the previous PR has merged (`.claude/memory/pr-backlog-discipline.md`).
+- Never branch from another open PR's branch, and never open a second PR
+  that touches files your open PR changes: that next issue waits for the
+  first PR to merge (`.claude/memory/pr-backlog-discipline.md`).
   Right after opening a PR, check `gh pr view <n> --json
   closingIssuesReferences` names exactly its issue.
 - Run a long command (a build, `nextest`, a codegen emit, the conformance

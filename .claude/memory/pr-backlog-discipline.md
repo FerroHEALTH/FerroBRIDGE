@@ -23,15 +23,16 @@ goes stale with each merge and every overlap costs a rebuild; a backlog grows
 faster than a serial gate drains it.
 
 **How to apply:**
-- **Count before starting work.** At the start of every turn that could start
-  or hand out work, run `gh pr list --state open` and read the number. With
-  more than 6 open PRs, start no new worker and hand out no new issue: drain
-  first (fix the red, resolve the conflicts, re-queue). Resume only at 3 or
-  fewer.
-- **One open PR per worker.** A worker brief names one issue, or a list
-  worked strictly one at a time where the next issue starts only after the
-  previous PR has MERGED, never "open each PR before starting the next".
-  Parallel workers touch disjoint files; if two issues touch the same module
+- **Several open PRs are fine; an untracked or stuck one is not** (owner,
+  2026-10-17: "you can of course have more than one open PR ... but you need
+  to make sure that they merge correctly"). At the start of every turn that
+  could start or hand out work, run `gh pr list --state open` and check that
+  each PR is either merging cleanly (queued or in CI under the watcher) or
+  being fixed now. When PRs sit conflicting or red, fix them before starting
+  new work; when the list grows faster than it merges, slow the hand-out.
+- **Parallel PRs touch disjoint files.** A worker may open several PRs only
+  when each stands alone on `main` and touches files no other open PR
+  changes; otherwise its next issue waits for the previous PR to merge. if two issues touch the same module
   (the server startup in `lib.rs`, `CHANGELOG.md` aside), they go to the same
   worker, in sequence.
 - **No stacked PRs.** Never branch a PR from another open PR's branch. Wait
