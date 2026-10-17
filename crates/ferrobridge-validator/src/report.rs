@@ -97,6 +97,12 @@ pub enum Constraint {
     /// The contexts an extension may be used in
     /// (`StructureDefinition.context`).
     ExtensionContext,
+    /// A rule about when an extension may be used
+    /// (`StructureDefinition.contextInvariant`).
+    ContextInvariant {
+        /// The FHIRPath expression.
+        expression: String,
+    },
 }
 
 /// Why a constraint was not evaluated.
@@ -196,8 +202,9 @@ pub enum Reason {
     /// `DomainResource`, which the validator holds no resource to beyond
     /// the core definitions.
     AbstractProfile,
-    /// The validator does not check where an extension is used.
-    ExtensionContext,
+    /// A context of the extension's definition the walk cannot decide, and
+    /// none it can decide admits the extension: each such context with why.
+    ExtensionContext(String),
 }
 
 impl fmt::Display for Reason {
@@ -291,7 +298,9 @@ impl fmt::Display for Reason {
             Self::AbstractProfile => {
                 f.write_str("a profile on Resource or DomainResource is not validated against")
             }
-            Self::ExtensionContext => f.write_str("extension contexts are not checked"),
+            Self::ExtensionContext(why) => {
+                write!(f, "the extension context is not decided ({why})")
+            }
         }
     }
 }
@@ -591,6 +600,9 @@ fn describe(unevaluated: &Unevaluated) -> String {
         }
         Constraint::ClaimedProfile { url } => format!("the claimed profile {url}"),
         Constraint::ExtensionContext => "the extension context".to_owned(),
+        Constraint::ContextInvariant { expression } => {
+            format!("the context invariant {expression}")
+        }
     };
     format!(
         "{what} on {} of {} was not evaluated: {}",

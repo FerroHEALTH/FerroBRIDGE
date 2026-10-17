@@ -31,7 +31,8 @@ generated model cannot carry what a check needs, that is a generator change
 - `validate`: the walk (`walk`: the object and member walk, `members` for
   the JSON shapes and cardinality, `content` per kind), the primitive rules
   (`primitive`), `fixed[x]` and `pattern[x]` (`matching`), extension
-  resolution (`extension`), the snapshot index with its slices
+  resolution (`extension`), the contexts and context invariants an
+  extension's definition declares (`context`), the snapshot index with its slices
   (`structure`), slicing (`slicing`: `path` holds a discriminator path to the
   FHIRPath subset through `ferrobridge-fhirpath`'s parser, `instance` and
   `definition` follow it through the item and the slice, `discriminate`
@@ -61,7 +62,9 @@ answered, and leaves a refused or failed one listed with
 
 ## Never a silent pass
 
-Every extension context the walk meets, every invariant whose expression
+Every extension context the walk cannot decide (and none it decides admits
+the extension), every context invariant that does not parse or evaluate,
+every invariant whose expression
 does not parse, check or evaluate (a seam the run cannot answer included),
 every target profile whose target it cannot reach or whose profile the set
 lacks, and every claimed profile the set lacks, is listed as `Unevaluated`
@@ -109,7 +112,10 @@ is checked against every type the base choice admits and evaluated on the
 occurrence named as one of it; a Bundle entry is its own `%rootResource`; an invariant the
 snapshot repeats is evaluated once per location, key and declaring
 canonical; `resolve()` from the Bundle element reaches entries by an
-absolute reference. Change one only with a citation.
+absolute reference; an element context naming a type admits that type and
+its specializations, and `Element` admits a resource too; a `url#id` context
+on an element held to no definition deriving from `url`, or on an item in no
+slice of the entry it names a slice of, is undecided. Change one only with a citation.
 
 ## Tests
 

@@ -130,7 +130,7 @@ fn upstream(source: &str, key: &str) -> Option<&'static str> {
 }
 
 /// The text of `error` followed by each of its causes.
-fn chain(error: &dyn Error) -> String {
+pub(super) fn chain(error: &dyn Error) -> String {
     let mut text = error.to_string();
     let mut cause = error.source();
     while let Some(inner) = cause {
@@ -143,7 +143,7 @@ fn chain(error: &dyn Error) -> String {
 
 impl Validator<'_> {
     /// Returns the expression `text`, parsed on first use.
-    fn expression(&self, text: &str) -> Compiled {
+    pub(super) fn expression(&self, text: &str) -> Compiled {
         let mut cache = self
             .expressions
             .lock()
@@ -288,20 +288,22 @@ impl<'i> Walk<'_, '_, 'i> {
             .map_err(|error| refuse(InvariantStage::Check, error))?;
         // NOTE: conformance-rules.html §2.1.0.6 asks for "true" and N1 §6.2 and §6.5 carry empty
         // as the unknown of three-valued logic, so an empty answer neither meets nor breaks it.
-        self.evaluate(&expression, structure, subject, choice)
+        self.evaluate(&expression, structure, subject, choice, None)
             .map_err(|error| refuse(InvariantStage::Evaluate, error))?
             .ok_or(Reason::InvariantEmpty)
     }
 
     /// Evaluates `expression` on `subject`, an occurrence of the choice
     /// element at `choice` when one is named, as a Boolean (N1 §4.5): `None`
-    /// for an empty result, or the error with its causes.
-    fn evaluate(
+    /// for an empty result, or the error with its causes. An `extension` is
+    /// `%extension`, the extension a context invariant is evaluated for.
+    pub(super) fn evaluate(
         &self,
         expression: &Expression,
         structure: &Structure,
         subject: &Subject<'_, 'i>,
         choice: Option<&str>,
+        extension: Option<&'i Value>,
     ) -> Result<Option<bool>, String> {
         let scope = self.scope();
         let resource = scope.last().copied();
@@ -323,10 +325,20 @@ impl<'i> Walk<'_, '_, 'i> {
         let references = References::new(self.validator(), scope);
         let terminology = Terminology::new(self.validator(), structure.origin());
         let conformance = Conformance::new(self.validator(), self.depth());
-        let environment = Environment::new(&R4)
+        let mut environment = Environment::new(&R4)
             .with_resolver(&references)
             .with_terminology(&terminology)
             .with_profiles(&conformance);
+        if let Some(extension) = extension {
+            // NOTE: structuredefinition-definitions.html#StructureDefinition.contextInvariant:
+            // "%extension refers to the extension itself".
+            let this = self.validator().expression("$this")?;
+            let focus = Focus::element(extension, "Extension", anchor).within(resource, root);
+            let items = this
+                .evaluate(&Environment::new(&R4), focus)
+                .map_err(|error| chain(&error))?;
+            environment = environment.with_variable("extension", items);
+        }
         expression
             .evaluate(&environment, focus)
             .and_then(|result| convert::boolean(&R4, &result, "an invariant"))

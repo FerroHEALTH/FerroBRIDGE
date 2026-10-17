@@ -17,6 +17,7 @@
 mod bindings;
 mod bundles;
 mod cardinality;
+mod contexts;
 mod eu;
 mod extensions;
 mod invariants;

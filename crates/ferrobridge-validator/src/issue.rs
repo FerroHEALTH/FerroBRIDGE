@@ -204,6 +204,12 @@ pub enum MessageId {
     /// An extension in `extension` defined as a modifier, or one in
     /// `modifierExtension` defined as none.
     ModifierMismatch,
+    /// An extension used on an element none of its definition's contexts
+    /// names (defining-extensions.html §2.5.1.2).
+    ExtensionContext,
+    /// An extension whose definition's context invariant the element holding
+    /// it breaks (`StructureDefinition.contextInvariant`).
+    ContextInvariant,
     /// An item of a closed slicing that matches no slice (profiling.html
     /// §5.1.0.10).
     UnmatchedSliceItem,
@@ -289,6 +295,8 @@ impl MessageId {
             Self::NotAnExtension => "not-an-extension",
             Self::RelativeExtensionUrl => "relative-extension-url",
             Self::ModifierMismatch => "modifier-mismatch",
+            Self::ExtensionContext => "extension-context",
+            Self::ContextInvariant => "context-invariant",
             Self::UnmatchedSliceItem => "unmatched-slice-item",
             Self::SliceOrder => "slice-order",
             Self::OpenAtEnd => "open-at-end",

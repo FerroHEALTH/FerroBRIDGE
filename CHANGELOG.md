@@ -25,6 +25,19 @@ crates on crates.io.
 
 ### Added
 
+- The profile validator holds every resolved extension to where its
+  definition admits it (#481): each `StructureDefinition.context` of the
+  types `element`, `extension` and `fhirpath`, read as R4
+  defining-extensions.html §2.5.1.2 and the `extension-context-type` code
+  system define them, and each `contextInvariant` evaluated on the element
+  holding the extension with `%extension` bound to it. A misplaced
+  extension is an `extension-context` error and a broken context invariant
+  a `context-invariant` error; a context the walk cannot decide, and a
+  context invariant that does not parse or evaluate, stay listed as
+  unevaluated with the reason. `Reason::ExtensionContext` now carries that
+  reason as a `String`, and `Constraint::ContextInvariant` is new: a
+  consumer matching the unit variant changes its pattern.
+
 - The operator console ships as its own image,
   `ghcr.io/ferrohealth/ferrobridge-viewer` (#603). `docker/viewer/Dockerfile`
   builds it on the bridge image's distroless base, runs as `65532:65532`,

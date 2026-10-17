@@ -5,12 +5,11 @@
 //! extension is then walked against (<https://hl7.org/fhir/R4/extensibility.html>).
 
 use fhir_types::codec::Object;
+use fhir_types::codec::Value;
 
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
-use crate::report::Constraint;
-use crate::report::Reason;
 use crate::set::ResolveError;
 use crate::validate::ValidateError;
 use crate::validate::structure::Structure;
@@ -28,14 +27,15 @@ pub(crate) enum Placement {
     Child,
 }
 
-impl Walk<'_, '_, '_> {
+impl<'i> Walk<'_, '_, 'i> {
     /// Returns the cursor an extension is walked with: the definition its
     /// `url` names, resolved as the definition `from` the walk holds the
     /// extension's parent to, or the core `Extension` when the url does not
-    /// resolve.
+    /// resolve; a resolved extension is held to the contexts its definition
+    /// declares.
     pub(crate) fn extension_cursor(
         &mut self,
-        object: &Object,
+        (value, object): (&'i Value, &Object),
         placement: Placement,
         (location, from): (&str, &Structure),
     ) -> Result<Cursor, ValidateError> {
@@ -132,16 +132,7 @@ impl Walk<'_, '_, '_> {
                 format!("the extension {url} belongs in {wanted}"),
             );
         }
-        if !structure.definition().context.is_empty() {
-            // TODO(#481): check the contexts StructureDefinition.context allows an extension in.
-            self.out().unevaluated(
-                structure.url(),
-                "Extension",
-                Constraint::ExtensionContext,
-                location,
-                Reason::ExtensionContext,
-            );
-        }
+        self.extension_context(&structure, value, location)?;
         Ok(Cursor::new(structure, "Extension"))
     }
 }

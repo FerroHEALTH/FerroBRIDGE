@@ -21,6 +21,7 @@
 //! [`crate::report::Report::resolve_bindings`] can send to a terminology
 //! server.
 
+mod context;
 mod document;
 mod extension;
 mod invariant;
