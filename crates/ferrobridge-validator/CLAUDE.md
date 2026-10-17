@@ -40,7 +40,8 @@ generated model cannot carry what a check needs, that is a generator change
   terminology (`terminology`: `index` holds a code system by code, `compose`
   decides membership in a value set three-valued, `binding` holds a value to
   an element's binding), the resolution seam with its contained-resource and
-  Bundle resolvers (`resolver`, bundle.html §2.36.4.1), the target profiles
+  Bundle resolvers (`resolver`, bundle.html §2.36.4.1, each Bundle
+  indexed once per validation), the target profiles
   and aggregation of a reference (`reference`), the versioning a reference
   takes (`versioning`), the document rules
   (`document`, documents.html §3.3.1), and the invariants (`invariant`: the

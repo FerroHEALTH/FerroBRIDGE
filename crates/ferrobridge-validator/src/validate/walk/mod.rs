@@ -32,6 +32,8 @@ use crate::validate::Validator;
 use crate::validate::invariant::Subject;
 use crate::validate::reference::Memo;
 use crate::validate::reference::address;
+use crate::validate::resolver::Indexes;
+use crate::validate::resolver::Resolution;
 use crate::validate::slicing::Item;
 use crate::validate::slicing::Site;
 use crate::validate::structure::Structure;
@@ -144,6 +146,8 @@ pub(crate) struct Walk<'v, 'set, 'i> {
     claims: bool,
     /// The state every walk of this validation shares.
     shared: Rc<RefCell<Shared>>,
+    /// The Bundles this validation meets, indexed for reference resolution.
+    indexes: Rc<Indexes<'i>>,
 }
 
 impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
@@ -164,6 +168,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             depth,
             claims: true,
             shared: Rc::default(),
+            indexes: Rc::default(),
         }
     }
 
@@ -180,6 +185,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             depth: self.depth,
             claims: self.claims,
             shared: Rc::clone(&self.shared),
+            indexes: Rc::clone(&self.indexes),
         }
     }
 
@@ -226,6 +232,32 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             .get(&from)
             .map(|to| to.iter().copied().collect())
             .unwrap_or_default()
+    }
+
+    /// Returns the Bundle indexes of this validation.
+    pub(crate) fn indexes(&self) -> &Indexes<'i> {
+        &self.indexes
+    }
+
+    /// Resolves `reference` from inside `scope`.
+    pub(crate) fn resolve_reference_in(
+        &self,
+        reference: &str,
+        scope: &[&'i Value],
+    ) -> Resolution<'i> {
+        self.validator
+            .resolver()
+            .resolve(reference, scope, &self.indexes)
+    }
+
+    /// Resolves `reference` from inside the resources the walk is inside.
+    pub(crate) fn resolve_reference(&self, reference: &str) -> Resolution<'i> {
+        self.resolve_reference_in(reference, &self.scope)
+    }
+
+    /// Returns the Bundle the resolver searches from where the walk is.
+    pub(crate) fn bundle(&self) -> Option<&'i Value> {
+        self.validator.resolver().bundle(&self.scope, &self.indexes)
     }
 
     /// Returns the validator.

@@ -66,7 +66,7 @@ impl<'i> Walk<'_, '_, 'i> {
         let Some(reference) = literal(value) else {
             return;
         };
-        match self.validator().resolver().resolve(reference, self.scope()) {
+        match self.resolve_reference(reference) {
             // NOTE: bundle.html §2.36.4.1: "If multiple matches are found, it is ambiguous
             // which is correct. Applications MAY return an error"; this validator does.
             Resolution::Ambiguous => self.out().issue(
@@ -149,8 +149,7 @@ impl<'i> Walk<'_, '_, 'i> {
             return Ok(());
         }
         let reference = literal(value);
-        let resolution =
-            reference.map(|reference| self.validator().resolver().resolve(reference, self.scope()));
+        let resolution = reference.map(|reference| self.resolve_reference(reference));
         let location = &occurrence.location;
         if !modes.is_empty() {
             let local = reference.is_some_and(|reference| reference.starts_with('#'));
@@ -197,7 +196,7 @@ impl<'i> Walk<'_, '_, 'i> {
                     None
                 } else if !allows("bundled") {
                     Some("it names a resource outside the resource that holds it")
-                } else if self.validator().resolver().bundle(self.scope()).is_some() {
+                } else if self.bundle().is_some() {
                     Some("it names no entry of the Bundle around it")
                 } else {
                     self.out().unevaluated(

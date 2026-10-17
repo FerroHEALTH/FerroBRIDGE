@@ -101,7 +101,7 @@ impl<'i> Walk<'_, '_, 'i> {
         let mut scope = self.scope().to_vec();
         scope.push(bundle);
         scope.push(resource);
-        self.validator().resolver().resolve(reference, &scope)
+        self.resolve_reference_in(reference, &scope)
     }
 
     /// The addresses of the Composition and of every entry it references,
