@@ -251,6 +251,10 @@ pub enum MessageId {
     /// A reference aggregated in a way the aggregation of its element does
     /// not allow (elementdefinition.html §2.30.0.4.4).
     AggregationMismatch,
+    /// A reference that names a version where its element's
+    /// `type.versioning` asks for none, or the reverse
+    /// (elementdefinition.html §2.30.0.4.4).
+    VersioningMismatch,
     /// A resource that does not conform to a profile it claims in
     /// `meta.profile`.
     ClaimedProfileMismatch,
@@ -315,6 +319,7 @@ impl MessageId {
             Self::AmbiguousReference => "ambiguous-reference",
             Self::TargetProfileMismatch => "target-profile-mismatch",
             Self::AggregationMismatch => "aggregation-mismatch",
+            Self::VersioningMismatch => "versioning-mismatch",
             Self::ClaimedProfileMismatch => "claimed-profile-mismatch",
             Self::DocumentReferenceMissing => "document-reference-missing",
             Self::DocumentEntryUnreferenced => "document-entry-unreferenced",

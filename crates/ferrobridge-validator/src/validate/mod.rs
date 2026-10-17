@@ -33,6 +33,7 @@ mod resolver;
 mod slicing;
 mod structure;
 mod terminology;
+mod versioning;
 mod walk;
 
 use std::collections::BTreeMap;

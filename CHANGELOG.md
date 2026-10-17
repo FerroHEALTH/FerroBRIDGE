@@ -45,6 +45,17 @@ crates on crates.io.
   `slice-rejection` information beside the cardinality error (an EPS
   Bundle whose Patient lacks `birthDate` now names `birthDate`).
 
+- The profile validator holds a `Reference` or a `canonical` to its
+  element's `type.versioning` (#514, R4 elementdefinition.html
+  §2.30.0.4.4): under `specific` a REST reference without `_history/[vid]`
+  or a canonical without `|[version]` is a `versioning-mismatch` error,
+  under `independent` one with a version is, and under any rule a
+  `Reference` without a literal `reference` is. A reference that names no
+  FHIR REST server counts as version specific (references.html,
+  `Reference.reference`), so `independent` lists it as unevaluated.
+  `Constraint::Versioning` and the reasons `NotRestfulReference` and
+  `VersioningRule` are new.
+
 - The operator console ships as its own image,
   `ghcr.io/ferrohealth/ferrobridge-viewer` (#603). `docker/viewer/Dockerfile`
   builds it on the bridge image's distroless base, runs as `65532:65532`,

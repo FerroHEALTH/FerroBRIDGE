@@ -105,11 +105,16 @@ impl<'i> Walk<'_, '_, 'i> {
     ) -> Result<(), ValidateError> {
         let mut profiles = Vec::new();
         let mut modes = Vec::new();
+        let mut versioning = None;
         for kind in element
             .r#type
             .iter()
             .filter(|kind| code.is_some() && kind.code.value.as_deref() == code)
         {
+            versioning = versioning.or(kind
+                .versioning
+                .as_ref()
+                .and_then(|rule| rule.value.as_deref()));
             let targets = kind
                 .target_profile
                 .iter()
@@ -133,6 +138,9 @@ impl<'i> Walk<'_, '_, 'i> {
                     );
                 }
             }
+        }
+        if let Some(rule) = versioning {
+            self.versioning(structure, id, rule, code, occurrence);
         }
         let Some(value) = occurrence.value.filter(|value| value.as_object().is_some()) else {
             return Ok(());
