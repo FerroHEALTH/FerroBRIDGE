@@ -36,6 +36,9 @@ pub const UNKNOWN_TEMPLATE: &str = "fb-unknown-template";
 /// The code of a context that names no template identifier.
 pub const NO_TEMPLATE_ID: &str = "fb-no-template-id";
 
+/// The code of a search declaration that does not bind to the set.
+pub const SEARCH_DECLARATION: &str = "fb-search-declaration";
+
 /// Where one template came from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemplateOrigin {
@@ -357,6 +360,13 @@ fn language(code: &str) -> DiagnosticCode {
     )
 }
 
+/// Returns the error diagnostic of a search declaration `file` that does not
+/// bind to the set, `message` saying why.
+#[must_use]
+pub fn search_declaration(file: &Path, message: String) -> Diagnostic {
+    Diagnostic::error(file, language(SEARCH_DECLARATION), message)
+}
+
 /// Renders the error diagnostics of `diagnostics` as one line.
 #[must_use]
 pub fn render(diagnostics: &[Diagnostic]) -> String {
@@ -379,11 +389,11 @@ pub fn render(diagnostics: &[Diagnostic]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{NO_TEMPLATE_ID, UNKNOWN_TEMPLATE, language};
+    use super::{NO_TEMPLATE_ID, SEARCH_DECLARATION, UNKNOWN_TEMPLATE, language};
 
     #[test]
     fn the_load_path_codes_are_in_the_code_alphabet() {
-        for code in [NO_TEMPLATE_ID, UNKNOWN_TEMPLATE] {
+        for code in [NO_TEMPLATE_ID, SEARCH_DECLARATION, UNKNOWN_TEMPLATE] {
             assert_eq!(code, language(code).as_str());
         }
     }

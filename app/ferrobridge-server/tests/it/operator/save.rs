@@ -28,6 +28,9 @@ use tower::ServiceExt as _;
 use wiremock::{Mock, MockServer, ResponseTemplate, matchers};
 
 use super::{FIXTURES, OMOCL_FILE, OPERATOR, bytes, digest};
+use crate::facade::auth::{Issuer, SigningKey, authority, bearing, ec_key, mint};
+
+mod search;
 
 /// The analyte file of the OMOCL corpus, provisioned beside the FHIRconnect
 /// tree.
@@ -35,7 +38,6 @@ const PROVISIONED_OMOCL: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../docs/specs/omocl/medical_data/cluster/Laboratory_test_analyte_v1.yml"
 );
-use crate::facade::auth::{Issuer, SigningKey, authority, bearing, ec_key, mint};
 
 /// A model mapping onto `Observation` over the testkit template.
 const MODEL: &str = r#"grammar: FHIRConnect/v1.0.0
@@ -108,7 +110,7 @@ struct Case {
     /// The provisioned tree and the console's, kept alive for the case.
     tree: tempfile::TempDir,
     /// The stub CDR, kept alive for the case.
-    _cdr: MockServer,
+    cdr: MockServer,
     /// The stub authorization server.
     issuer: Issuer,
     /// The signing key.
@@ -195,7 +197,7 @@ impl Case {
         let app = ferrobridge_server::router(Arc::new(state), &server_settings());
         Ok(Self {
             tree,
-            _cdr: cdr,
+            cdr,
             issuer,
             key,
             app,
@@ -504,7 +506,6 @@ async fn a_save_over_a_provisioned_path_is_refused() -> Result<(), Box<dyn StdEr
     assert!(!case.console("ferrobridge_facade.yml").exists());
     for path in [
         "/operator/mappings/fhirconnect/../escape.yml",
-        "/operator/mappings/fhirconnect/x.search.yml",
         "/operator/mappings/fhirconnect/notes.txt",
     ] {
         let response = case

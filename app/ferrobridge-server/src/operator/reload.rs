@@ -42,9 +42,6 @@ pub enum ReloadError {
     /// The facade's own load refused the set.
     #[error("the FHIR facade did not load the mapping set")]
     Facade(#[source] crate::facade::programs::LoadError),
-    /// The facade's search declarations do not bind to the new programs.
-    #[error("the search declarations do not load against the mapping set")]
-    Search(#[source] crate::facade::search::declaration::DeclarationError),
     /// The operations lane's own load refused the set.
     #[error("the FHIRconnect operations did not load the mapping set")]
     Operations(#[source] crate::mappings::Error),
@@ -63,11 +60,22 @@ pub struct Draft {
     pub path: PathBuf,
 }
 
+/// The files of one set, by the load that reads them.
+#[derive(Debug, Clone, Default)]
+pub struct Sources {
+    /// The FHIRconnect mapping files.
+    pub fhirconnect: Vec<PathBuf>,
+    /// The search declarations, provisioned and console.
+    pub declarations: Vec<PathBuf>,
+    /// The OMOCL files.
+    pub omocl: Vec<PathBuf>,
+}
+
 /// Everything a reload compiles against.
 #[derive(Debug, Clone, Default)]
 pub struct Reloader {
-    /// The provisioned FHIRconnect directory, which holds the search
-    /// declarations.
+    /// The provisioned FHIRconnect directory, named in an operations lane
+    /// refusal.
     pub fhirconnect: Option<PathBuf>,
     /// The template directory, when one is configured.
     pub templates: Option<PathBuf>,
@@ -102,53 +110,60 @@ impl Prepared {
 }
 
 impl Reloader {
-    /// Returns the FHIRconnect and OMOCL files of `roots`, with `draft`
-    /// standing in for the file at its wire path.
+    /// Returns the files of `roots` by the load that reads them, with
+    /// `draft` standing in for the file at its wire path.
     ///
     /// # Errors
     ///
     /// Returns [`ReloadError::Read`] when a directory cannot be listed.
-    pub fn sources(
-        roots: &[Root],
-        draft: Option<&Draft>,
-    ) -> Result<(Vec<PathBuf>, Vec<PathBuf>), ReloadError> {
-        let mut fhirconnect = Vec::new();
-        let mut omocl = Vec::new();
+    pub fn sources(roots: &[Root], draft: Option<&Draft>) -> Result<Sources, ReloadError> {
+        let mut sources = Sources::default();
+        let mut push = |language: Language, wire: &str, path: PathBuf| {
+            let list = match language {
+                Language::Omocl => &mut sources.omocl,
+                Language::Fhirconnect
+                    if crate::facade::search::declaration::is_declaration(Path::new(wire)) =>
+                {
+                    &mut sources.declarations
+                }
+                Language::Fhirconnect => &mut sources.fhirconnect,
+            };
+            list.push(path);
+        };
         for located in files::list(roots).map_err(ReloadError::Read)? {
             if draft.is_some_and(|draft| draft.wire == located.wire()) {
                 continue;
             }
-            match located.language() {
-                Language::Fhirconnect
-                    if !crate::facade::search::declaration::is_declaration(located.path()) =>
-                {
-                    fhirconnect.push(located.path().to_path_buf());
-                }
-                Language::Fhirconnect => {}
-                Language::Omocl => omocl.push(located.path().to_path_buf()),
-            }
+            push(
+                located.language(),
+                located.wire(),
+                located.path().to_path_buf(),
+            );
         }
         if let Some(draft) = draft {
-            match files::relative(&draft.wire) {
-                Ok(("omocl", _)) => omocl.push(draft.path.clone()),
-                _ => fhirconnect.push(draft.path.clone()),
-            }
+            let language = files::relative(&draft.wire)
+                .ok()
+                .and_then(|(root, _)| Language::of_root(root))
+                .unwrap_or(Language::Fhirconnect);
+            push(language, &draft.wire, draft.path.clone());
         }
-        Ok((fhirconnect, omocl))
+        Ok(sources)
     }
 
-    /// Checks and compiles `fhirconnect` and `omocl` for every lane.
+    /// Checks and compiles `sources` for every lane, each search declaration
+    /// against the context it names.
     ///
     /// # Errors
     ///
     /// Returns [`ReloadError::Rejected`] with the report when a diagnostic is
-    /// an error, and the other variants when a lane's own load refuses the set
-    /// or an upstream does not answer.
-    pub async fn prepare(
-        &self,
-        fhirconnect: &[PathBuf],
-        omocl: &[PathBuf],
-    ) -> Result<Prepared, ReloadError> {
+    /// an error or a search declaration does not bind, and the other variants
+    /// when a lane's own load refuses the set or an upstream does not answer.
+    pub async fn prepare(&self, sources: &Sources) -> Result<Prepared, ReloadError> {
+        let Sources {
+            fhirconnect,
+            declarations,
+            omocl,
+        } = sources;
         let templates = match (self.templates.as_deref(), self.cdr.as_ref()) {
             (Some(directory), _) => Some(Templates::Directory(directory)),
             (None, Some(client)) => Some(Templates::Cdr(client)),
@@ -178,12 +193,16 @@ impl Reloader {
                     crate::facade::programs::compile_set(set, &indexes)
                         .map_err(ReloadError::Facade)?
                 };
-                let catalog = match self.fhirconnect.as_deref() {
-                    Some(directory) => crate::facade::search::load(directory, &programs)
-                        .map_err(ReloadError::Search)?,
-                    None => Catalog::default(),
-                };
+                let catalog = bind(&report, declarations, &programs)?;
                 Some((programs, catalog))
+            }
+            (None, Some(_set)) if !declarations.is_empty() => {
+                let programs = crate::facade::programs::from_compiled(
+                    report.programs().to_vec(),
+                    report.indexes(),
+                );
+                bind(&report, declarations, &programs)?;
+                None
             }
             _ => None,
         };
@@ -228,6 +247,18 @@ impl Reloader {
         }
         prepared.snapshot
     }
+}
+
+/// Binds the search declarations `files` to `programs`, refusing a set with
+/// one that does not bind as `report` plus its diagnostic.
+fn bind(report: &Report, files: &[PathBuf], programs: &Programs) -> Result<Catalog, ReloadError> {
+    crate::facade::search::load_files(files, programs).map_err(|error| {
+        let diagnostic = crate::mappings::compile::search_declaration(
+            error.file(),
+            crate::facade::outcome::chain(&error),
+        );
+        ReloadError::Rejected(Box::new(report.clone().with_diagnostic(diagnostic)))
+    })
 }
 
 /// Returns the search declaration file of each context `catalog` declares

@@ -165,6 +165,13 @@ impl Report {
         &self.omocl_files
     }
 
+    /// Returns the report with `diagnostic` raised after every other.
+    #[must_use]
+    pub fn with_diagnostic(mut self, diagnostic: Diagnostic) -> Self {
+        self.diagnostics.push(diagnostic);
+        self
+    }
+
     /// Returns how many diagnostics carry `severity`.
     #[must_use]
     pub fn count(&self, severity: Severity) -> usize {

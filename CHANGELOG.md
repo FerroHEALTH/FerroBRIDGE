@@ -147,6 +147,13 @@ crates on crates.io.
   and the scroll padding keeps a focused control clear of the top bar (SC
   2.4.11). The WebAssembly budget rises to 244 KiB with the measurement in
   `.claude/rules/leptos-ui.md`.
+- The operator API saves search declarations (#766): `PUT
+  /operator/mappings/fhirconnect/{name}.search.yml` checks the declaration
+  against the context it names and writes it under
+  `mapping_dir/fhirconnect/`, where it was refused with `400` before. The
+  reload binds every declaration, provisioned and console, and swaps them in
+  with the facade's programs. A declaration that does not bind answers `422`
+  with an `fb-search-declaration` diagnostic and changes nothing.
 - The operator API saves OMOCL files (#757): `PUT /operator/mappings/omocl/{path}`
   checks the draft with the whole set and writes it under
   `mapping_dir/omocl/`, where it was refused with `409` before. `etl run`
