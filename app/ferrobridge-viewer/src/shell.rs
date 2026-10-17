@@ -74,10 +74,16 @@ pub const NAVIGATION: [Group; 4] = [
     Group {
         id: "nav-mappings",
         title: "Mappings",
-        entries: &[Entry {
-            href: crate::engine::MAPPINGS,
-            label: "Overview",
-        }],
+        entries: &[
+            Entry {
+                href: crate::engine::MAPPINGS,
+                label: "Overview",
+            },
+            Entry {
+                href: crate::engine::FILES,
+                label: "Files",
+            },
+        ],
     },
     Group {
         id: "nav-tools",

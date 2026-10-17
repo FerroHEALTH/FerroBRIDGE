@@ -17,7 +17,8 @@ server calls the bridge over HTTP and never compiles or runs a mapping
 itself. Built so far: the health route, the shell (a top bar with the
 bridge's status and version, the navigation, the light, dark and system
 themes, the About page), the engine-state screens (the dashboard, the
-capability screen and the mappings overview) under the browser security
+capability screen and the mappings overview), the mapping files shown
+verbatim with their diagnostics, under the browser security
 headers, operator
 sign-in with OpenID Connect, the configuration
 with its environment overrides and `_file` secrets, the typed bridge client

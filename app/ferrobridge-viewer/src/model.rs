@@ -172,12 +172,18 @@ pub mod server {
             BridgeError::TooLarge { .. }
             | BridgeError::Payload { .. }
             | BridgeError::NotAnObject
+            | BridgeError::NotAnArray
             | BridgeError::Decode { .. } => {
                 tracing::error!(error = %crate::command::chain(error), "the bridge answered a body this console cannot read");
                 Err(ViewError::Unreadable {
                     status: StatusCode::OK.as_u16(),
                 })
             }
+            BridgeError::Path => Ok(Refusal::Invalid {
+                reason: String::from(
+                    "the mapping file path is not plain names below a root, so it is not asked for",
+                ),
+            }),
             BridgeError::Route { .. } | BridgeError::Token => {
                 tracing::error!(error = %crate::command::chain(error), "a request to the bridge could not be sent");
                 Err(ViewError::Unavailable)

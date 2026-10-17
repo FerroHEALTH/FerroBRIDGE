@@ -90,7 +90,13 @@ Three screens show the engine state:
   templates and where each came from, the OMOCL files, and every
   diagnostic.
 
-The mapping counts and the overview read the operator API, so they need
+The **Files** page (`/files`) lists every mapping file the bridge reads,
+with its owner (provisioned, or saved by the console), whether the console
+may write it, and how many diagnostics it has. Following one shows the file
+as the bridge serves it, byte for byte, with numbered lines, highlighted
+YAML, its SHA-256, and the diagnostics beside it, each linked to its line.
+
+The mapping counts, the overview and the files read the operator API, so they need
 `[operator] enabled = true` on the bridge and an operator token that
 carries the operator scope. Without either, those sections show the
 bridge's refusal, its status and its diagnostics, while the rest of the

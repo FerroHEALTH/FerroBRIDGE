@@ -111,6 +111,16 @@ crates on crates.io.
   products fit together, and licensing and trademarks.
 ### Added
 
+- The console shows the mapping files (#607): the list from `GET
+  /operator/mappings` with each file's language, kind, owner, whether it is
+  writable and its diagnostics count, and each file at `/files/{path}` from
+  `GET /operator/mappings/{path}`, verbatim, one numbered line per line, its
+  YAML highlighted on the server and its SHA-256 from the `ETag`. Beside
+  each file are the running load's diagnostics about it, read into
+  `openehr_mapping_core::diagnostic::Diagnostic` and each linked to its
+  line. A file that is not UTF-8 is refused, never shown altered, and a path
+  that is not plain names below a root is refused before the bridge is
+  asked.
 - The console shows the engine state (#604). The dashboard has the
   bridge's build facts, pins, lanes and listeners from `GET /health/info`,
   its readiness indicators from `GET /health/readiness`, and the counts of

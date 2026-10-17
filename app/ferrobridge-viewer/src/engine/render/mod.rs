@@ -11,5 +11,7 @@
 
 pub mod capability;
 pub mod dashboard;
+pub mod files;
+pub mod highlight;
 pub mod mappings;
 pub mod parts;

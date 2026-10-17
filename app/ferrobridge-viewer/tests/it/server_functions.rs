@@ -19,10 +19,12 @@ use crate::support::{OPERATOR_TOKEN, ORIGIN, configuration, console, get_with, s
 
 /// Every server function the console registers, with the form body it
 /// takes.
-const SERVER_FUNCTIONS: [(&str, &str); 5] = [
+const SERVER_FUNCTIONS: [(&str, &str); 7] = [
     ("/api/bridge-status", ""),
     ("/api/capability", ""),
     ("/api/dashboard", ""),
+    ("/api/file", "path=fhirconnect%2Fa.yml"),
+    ("/api/files", ""),
     ("/api/mappings", ""),
     ("/api/theme", "theme=dark"),
 ];
