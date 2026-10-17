@@ -19,6 +19,12 @@ use std::time::Instant;
 use crate::request_id;
 use crate::state::AppState;
 
+/// The route a request no route matched is logged under.
+///
+/// Its raw path may carry an identifier, so no part of it is logged (no
+/// specification governs this: our own design).
+pub const UNMATCHED: &str = "<unmatched>";
+
 /// The longest a logged query value may be.
 pub const MAX_VALUE_LENGTH: usize = 64;
 
@@ -26,7 +32,7 @@ pub const MAX_VALUE_LENGTH: usize = 64;
 pub async fn log(State(state): State<Arc<AppState>>, request: Request, next: Next) -> Response {
     let method = request.method().clone();
     let route = request.extensions().get::<MatchedPath>().map_or_else(
-        || request.uri().path().to_owned(),
+        || UNMATCHED.to_owned(),
         |matched| matched.as_str().to_owned(),
     );
     let query = allowed_parameters(

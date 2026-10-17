@@ -622,3 +622,20 @@ fn a_refused_oversized_body_leaves_its_request_line() {
         "one line: {text}"
     );
 }
+
+#[test]
+fn an_unmatched_request_logs_no_part_of_its_path() {
+    let request = Request::get("/fhir/Patient/synthetic-id-7f3a9c/_history")
+        .body(Body::empty())
+        .expect("a request");
+    let (status, text) = logged(app(), request);
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(
+        text.contains(ferrobridge_server::request_log::UNMATCHED),
+        "the line names the unmatched marker: {text}"
+    );
+    assert!(
+        !text.contains("synthetic-id-7f3a9c") && !text.contains("/fhir/Patient"),
+        "no part of the raw path reaches the log: {text}"
+    );
+}
