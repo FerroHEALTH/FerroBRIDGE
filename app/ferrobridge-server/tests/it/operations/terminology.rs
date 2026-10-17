@@ -11,16 +11,15 @@
 //! (<https://hl7.org/fhir/R4/conceptmap-operation-translate.html>).
 
 use std::error::Error as StdError;
-use std::time::Duration;
 
 use axum::body::Body;
 use ferrobridge_server::terminology::Translator;
-use ferrobridge_term::client::Client;
-use ferrobridge_term::config::{Config, RetryPolicy, WireVersion};
 use ferrobridge_testkit::stubs::terminology;
 use http::{Request, StatusCode, header};
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer};
+
+use crate::support::translator;
 
 use super::{
     FHIR_JSON, OPENEHR_JSON, app_with, bundle, call, composition_text, mapping_tree_with,
@@ -76,18 +75,6 @@ mappings:
           - path: "reference"
             value: "Patient/synthetic-subject-0001"
 "#;
-
-/// Returns a translator over the R4 terminology server `server` mocks.
-fn translator(server: &MockServer) -> Result<Translator, Box<dyn StdError>> {
-    let config = Config::new(format!("{}/r4", server.uri()).parse()?, WireVersion::R4)
-        .with_timeout(Duration::from_secs(5))
-        .with_retry(RetryPolicy {
-            max_attempts: 1,
-            initial_backoff: Duration::from_millis(1),
-            max_backoff: Duration::from_millis(1),
-        });
-    Ok(Translator::new(Some(Client::new(config)?)))
-}
 
 /// Mounts the map in both directions: a `reverse` call answers the openEHR
 /// code, a forward call the FHIR code.

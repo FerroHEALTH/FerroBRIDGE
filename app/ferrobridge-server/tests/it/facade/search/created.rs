@@ -11,14 +11,12 @@ use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::search::Limits;
 use http::StatusCode;
 use std::error::Error as StdError;
-use std::time::Duration;
 
-use ferrobridge_server::terminology::Translator;
-use ferrobridge_term::client::Client;
-use ferrobridge_term::config::{Config, RetryPolicy, WireVersion};
 use ferrobridge_testkit::stubs::terminology;
 use wiremock::matchers;
 use wiremock::{Mock, MockServer};
+
+use crate::support::translator;
 
 use super::super::Harness;
 use super::super::VERSION_ONE;
@@ -206,18 +204,6 @@ fn translating_fixtures() -> Result<tempfile::TempDir, Box<dyn StdError>> {
         translated,
     )?;
     Ok(root)
-}
-
-/// Returns a translator over the R4 terminology server `server` mocks.
-fn translator(server: &MockServer) -> Result<Translator, Box<dyn StdError>> {
-    let config = Config::new(format!("{}/r4", server.uri()).parse()?, WireVersion::R4)
-        .with_timeout(Duration::from_secs(5))
-        .with_retry(RetryPolicy {
-            max_attempts: 1,
-            initial_backoff: Duration::from_millis(1),
-            max_backoff: Duration::from_millis(1),
-        });
-    Ok(Translator::new(Some(Client::new(config)?)))
 }
 
 #[tokio::test]
