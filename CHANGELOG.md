@@ -37,6 +37,10 @@ crates on crates.io.
 
 ### Fixed
 
+- A percent-encoded `_count`, such as `_count=%32%30`, reads as its decoded
+  value on every facade route (#523). The request guard read `_count` from
+  the raw query and refused it with a `400`, while the search read the
+  decoded value; both now read the one decoded value.
 - A vread of an earlier version after the latest version was deleted answers
   that version (#348). The facade names the version from the revision
   history, where it took the creating system from the latest version and so
