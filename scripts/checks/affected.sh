@@ -166,6 +166,7 @@ classify() {
     scripts/checks/file-length.sh | scripts/checks/file-length-allow.txt) echo inert ;;
     scripts/checks/pin-freshness.sh | scripts/checks/versions.sh) echo inert ;;
     scripts/checks/todo-issues.sh) echo inert ;;
+    scripts/deploy-probe.sh) echo inert ;;
     # The pass lists, the badges and the README badge block are read by the
     # conformance tests and scripts/checks/conformance.sh alone: a corpus's
     # list and badge by the one package that measures it, the script and the
@@ -483,6 +484,7 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+ferrobridge-testkit -fhirconnect -ferrobridge-server"
   check "a doc page is inert" "docs/ci-cd.md" false ""
   check "the changelog is inert" "CHANGELOG.md" false ""
+  check "the deployment probe is inert" "scripts/deploy-probe.sh" false ""
   check "another workflow is inert" ".github/workflows/docs.yml" false ""
   check "the book is inert" "website/book/src/index.md" false ""
   check "the toolchain reaches everything" "rust-toolchain.toml" false ALL
