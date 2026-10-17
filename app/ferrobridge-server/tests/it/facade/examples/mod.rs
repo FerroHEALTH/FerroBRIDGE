@@ -55,7 +55,9 @@ use super::client;
 use super::diagnostics_of;
 use super::handle;
 use super::server_settings;
+use super::stub::COMMITTED;
 use super::stub::mount_ehr;
+use super::stub::mount_history;
 
 /// A case whose create the profile it claims requires the facade to refuse.
 #[derive(Debug, Clone, Copy)]
@@ -289,6 +291,7 @@ async fn trip(
         .respond_with(Serve { kept })
         .mount(&cdr)
         .await;
+    mount_history(&cdr, &[VERSION_ONE], COMMITTED).await;
     let facade = Arc::new(Facade::new(
         Programs::new(compiled.loaded.clone()),
         handle(&Arc::new(MemoryStore::new())),
