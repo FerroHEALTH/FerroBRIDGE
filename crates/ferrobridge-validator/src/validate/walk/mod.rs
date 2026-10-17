@@ -358,7 +358,11 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             Some(profile) => profile,
             None => self.validator.core(name)?,
         };
-        if structure.type_name() != name {
+        // NOTE: StructureDefinition.type and baseDefinition (R4 structuredefinition.html): a
+        // profile on the abstract Resource or DomainResource constrains every type specializing it.
+        let inherited = matches!(structure.type_name(), "Resource" | "DomainResource")
+            && SCHEMAS.specializes(name, structure.type_name());
+        if structure.type_name() != name && !inherited {
             self.out.issue(
                 Severity::Error,
                 IssueType::Structure,
@@ -372,6 +376,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             );
             structure = self.validator.core(name)?;
         }
+        let root = structure.type_name().to_owned();
         self.scope.push(value);
         self.hosts.push(Host {
             value: Some(value),
@@ -380,13 +385,13 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             reference: None,
             code: Some(schema.name),
             structure: Arc::clone(&structure),
-            ids: vec![schema.name.to_owned()],
+            ids: vec![root.clone()],
         });
         let walked = self.object(
             value,
             object,
             schema,
-            &Cursor::new(Arc::clone(&structure), name),
+            &Cursor::new(Arc::clone(&structure), &root),
             &location,
             true,
         );

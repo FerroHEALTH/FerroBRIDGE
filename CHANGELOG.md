@@ -32,6 +32,14 @@ crates on crates.io.
   `EvalError::Unordered`, the error FHIRPath N1 §3.1 lets an implementation
   return for an order-dependent operation on a list whose order is
   undefined.
+
+- The profile validator checks a resource against a profile on the
+  abstract `Resource` or `DomainResource` (#620): a reference target, a
+  `meta.profile` claim or a `profile` discriminator walks the resource over
+  the profile's elements and its own core definition for the rest, so it
+  conforms or fails instead of being listed. `Reason::AbstractProfile` is
+  gone, as nothing is listed for it any more.
+
 - The profile validator holds every resolved extension to where its
   definition admits it (#481): each `StructureDefinition.context` of the
   types `element`, `extension` and `fhirpath`, read as R4

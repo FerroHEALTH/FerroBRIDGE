@@ -109,7 +109,9 @@ target profile is not refused while another is unknown; a target profile
 check under
 way further up the walk counts as passing (a reference cycle); every
 `meta.profile` claim is validated; the core `Resource` and
-`DomainResource` admit any target; the stylesheet `Binary` of a document is
+`DomainResource` admit any target, and a profile on either holds a resource
+that specializes its type to the profile's elements, the rest to the
+resource's core definition; the stylesheet `Binary` of a document is
 one whose `contentType` is `text/css`; an invariant whose expression answers
 empty is listed, neither passed nor failed; an invariant on a choice element
 is checked against every type the base choice admits and evaluated on the
