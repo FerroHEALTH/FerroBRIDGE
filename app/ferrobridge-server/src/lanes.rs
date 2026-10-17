@@ -65,7 +65,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
     }
     let mut lanes = startup::lanes(settings);
     if let Some(lane) = settings.facade.as_ref() {
-        let (mounted, counts) = build_facade(settings, lane)
+        let (mounted, counts) = build_facade(settings, lane, state.terminology().cloned())
             .await
             .context("starting the FHIR facade")?;
         let mounted = mounted.with_usage(Arc::clone(state.usage_window()));
@@ -131,8 +131,7 @@ async fn start_hl7v2(
         )
     })?;
     let maps = corpus.maps().count();
-    let terminology = terminology_client(settings)
-        .context("building the terminology client the HL7 v2 face translates through")?;
+    let terminology = state.terminology().cloned();
     let socket = TcpListener::bind(lane.listen)
         .await
         .with_context(|| format!("binding {}", lane.listen))?;
@@ -331,6 +330,7 @@ async fn build_operator(
 async fn build_facade(
     settings: &Settings,
     lane: &config::FacadeSettings,
+    terminology: Option<ferrobridge_term::client::Client>,
 ) -> anyhow::Result<(facade::Facade, startup::MappingCounts)> {
     use anyhow::Context;
 
@@ -368,8 +368,6 @@ async fn build_facade(
     let search = facade::search::load(directory, &programs).context("reading the searches")?;
     let store = facade::identity::redb_store::RedbStore::open(&lane.identity_store)
         .with_context(|| format!("opening {}", lane.identity_store.display()))?;
-    let terminology = terminology_client(settings)
-        .context("building the terminology client the facade translates through")?;
     let built = facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone())
         .with_translator(Translator::new(terminology));
     Ok((
@@ -378,16 +376,4 @@ async fn build_facade(
             .with_references(lane.references.clone()),
         counts,
     ))
-}
-
-/// Returns the client of the `[terminology]` server, `None` when none is
-/// configured.
-fn terminology_client(
-    settings: &Settings,
-) -> Result<Option<ferrobridge_term::client::Client>, ferrobridge_term::error::Error> {
-    settings
-        .terminology
-        .as_ref()
-        .map(|config| ferrobridge_term::client::Client::new(config.clone()))
-        .transpose()
 }

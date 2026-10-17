@@ -152,6 +152,9 @@ pub struct AppState {
     usage: Arc<crate::usage_report::window::Window>,
     /// The operator API, when `[operator] enabled` mounts it.
     operator: Option<Arc<crate::operator::Operator>>,
+    /// The one client of the `[terminology]` server, when one is configured,
+    /// shared by readiness and every lane that translates.
+    terminology: Option<ferrobridge_term::client::Client>,
 }
 
 impl AppState {
@@ -208,7 +211,7 @@ impl AppState {
                         settings.operations.composition_language.clone(),
                         settings.operations.composition_territory.clone(),
                     )
-                    .with_translator(Translator::new(terminology)),
+                    .with_translator(Translator::new(terminology.clone())),
             )
         });
         Ok(Self {
@@ -221,6 +224,7 @@ impl AppState {
             auth: None,
             usage: Arc::default(),
             operator: None,
+            terminology,
         })
     }
 
@@ -238,6 +242,7 @@ impl AppState {
             auth: None,
             usage: Arc::default(),
             operator: None,
+            terminology: None,
         }
     }
 
@@ -359,6 +364,13 @@ impl AppState {
     #[must_use]
     pub const fn operations_handle(&self) -> Option<&Arc<OperationsLane>> {
         self.operations.as_ref()
+    }
+
+    /// Returns the client of the `[terminology]` server, `None` when none is
+    /// configured.
+    #[must_use]
+    pub const fn terminology(&self) -> Option<&ferrobridge_term::client::Client> {
+        self.terminology.as_ref()
     }
 
     /// Returns the indicators readiness runs.
