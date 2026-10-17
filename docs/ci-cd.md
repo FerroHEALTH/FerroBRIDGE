@@ -389,7 +389,7 @@ to apply; this table is the reasoning behind each.
 | `MaintainedID` | clears with time. It scores 0 only because the repository is under 90 days old |
 | `CIIBestPracticesID` | registered on 2026-09-13 as bestpractices.dev project 14612; the check reads the registration and clears on the next run |
 | `FuzzingID` | `cargo fuzz` targets over the YAML mapping loader and the openEHR mapping-path parser run weekly from `fuzz.yml` (#155); Scorecard detects OSS-Fuzz and ClusterFuzzLite registrations, so the check scores only once the project registers there, a second step worth taking when the targets prove useful |
-| `SASTID` | already satisfied. CodeQL runs on every pull request and every push to `main`; the score lagged because its Rust job was gated off until the workspace landed |
+| `SASTID` | already satisfied. CodeQL runs on every push to `main` and on the weekly schedule, and on a pull request whenever the change touches Rust (its actions analysis on every pull request); the score lagged because its Rust job was gated off until the workspace landed |
 | `SecurityPolicyID` | fixed in #47, which gave `SECURITY.md` the link the check looks for |
 
 ## Configuration this workflow reads

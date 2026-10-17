@@ -10,9 +10,12 @@ way" quality gate). It exists as a second opinion beside the local gates and
 CodeQL, and it also reads the trees the Rust gates never see: shell, workflow
 YAML, and JSON.
 
-The lane runs the multi-language sweep and the Rust analysis (the analyzer
-runs Clippy itself over the workspace), and imports the lcov report the
-coverage step writes one workspace member at a time (`ci-cd.md`).
+The lane runs the multi-language sweep and the Rust analysis, and imports the
+lcov report the coverage step writes one workspace member at a time
+(`ci-cd.md`). The analyzer does not run Clippy and imports no Clippy report
+(SonarQube Cloud Rust documentation, `sonar.rust.clippyReport.reportPaths`):
+Clippy gates in `ci.yml` at `-D warnings`, so a second copy of its findings
+would add scan time and no new finding.
 
 It is a **second opinion**. It is not authority, and it gates no merge.
 
