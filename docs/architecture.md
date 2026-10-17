@@ -1449,7 +1449,10 @@ the translator answers each run from codes it resolved before the run: a run
 that meets an unresolved code is discarded, the codes it met go to
 `$translate` (one call, or one `batch` for several), and the run is
 repeated until it meets none. No blocking wait sits on the runtime (no
-specification governs this: our own design). FHIRconnect `manual.adoc`
+specification governs this: our own design). The answers live in a session
+of one request, keyed by the map, the system, the code, its version and the
+direction, so a search page and its total translate a shared code once; nothing
+outlives the request. FHIRconnect `manual.adoc`
 §ConceptMaps names no direction, so a map is read as authored from openEHR to
 FHIR: the FHIR-bound run calls `$translate` forward with the map `url` and
 the source `system`, `code` and `version`, and the openEHR-bound run adds

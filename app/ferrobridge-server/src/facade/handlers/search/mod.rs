@@ -70,6 +70,7 @@ use crate::facade::search::cursor::Position;
 use crate::facade::search::plan;
 use crate::facade::search::plan::Resolved;
 use crate::facade::status;
+use crate::terminology::Session;
 
 /// The media type of a `POST _search` body.
 ///
@@ -164,19 +165,8 @@ async fn search(
     if let Compartment::Patient(patient) = compartment {
         resolved.ehrs.push(compartment_ehrs(facade, &patient)?);
     }
-    let mut plans = Vec::with_capacity(declarations.len());
-    for declared in declarations {
-        let conditions = plan::conditions(declared, &criteria, &resolved)
-            .map_err(|error| reply::refusal(StatusCode::BAD_REQUEST, error.issue()))?;
-        plans.push(Plan {
-            declared,
-            program: program_of(facade, declared)?,
-            conditions,
-            order: plan::order(declared, &criteria),
-            ids: ids_of(&resolved, declared),
-            named: named_of(&criteria),
-        });
-    }
+    let session = facade.translator().session();
+    let plans = plans_of(facade, declarations, &criteria, &resolved, &session)?;
     let limits = facade.search_limits();
     let client = facade.client_for(headers);
     let page_size = criteria
@@ -255,6 +245,36 @@ struct Plan<'a> {
     conditions: Option<Conditions>,
     /// The `ORDER BY`.
     order: Vec<OrderKey>,
+    /// The terminology session of the request, which the page and the total
+    /// share, so a code repeated across their entries is translated once (no
+    /// specification governs this: our own design).
+    session: &'a Session<'a>,
+}
+
+/// Returns the plan of each declaration of the searched type, under
+/// `criteria`, translating through `session`.
+fn plans_of<'a>(
+    facade: &Facade,
+    declarations: &'a [Declared],
+    criteria: &Criteria,
+    resolved: &Resolved,
+    session: &'a Session<'a>,
+) -> Result<Vec<Plan<'a>>, Refusal> {
+    let mut plans = Vec::with_capacity(declarations.len());
+    for declared in declarations {
+        let conditions = plan::conditions(declared, criteria, resolved)
+            .map_err(|error| reply::refusal(StatusCode::BAD_REQUEST, error.issue()))?;
+        plans.push(Plan {
+            declared,
+            program: program_of(facade, declared)?,
+            conditions,
+            order: plan::order(declared, criteria),
+            ids: ids_of(resolved, declared),
+            named: named_of(criteria),
+            session,
+        });
+    }
+    Ok(plans)
 }
 
 /// Returns where the asked page starts.
@@ -633,7 +653,7 @@ async fn render_entry(
             store: facade.store(),
             usage: facade.usage(),
         },
-        facade.translator(),
+        plan.session,
     )
     .await?;
     let mut matches = Vec::with_capacity(units.len());

@@ -255,7 +255,7 @@ pub(crate) async fn render_bound(
             program.index(),
             composition,
             origin,
-            facade.translator(),
+            &facade.translator().session(),
         )
         .await;
     };
@@ -285,7 +285,7 @@ pub(crate) async fn render_bound(
             ..origin
         },
         (resource_type, internal),
-        facade.translator(),
+        &facade.translator().session(),
     )
     .await
 }

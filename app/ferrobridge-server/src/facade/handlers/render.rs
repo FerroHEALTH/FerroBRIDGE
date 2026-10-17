@@ -40,7 +40,7 @@ use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::status;
-use crate::terminology::{Direction, Translator};
+use crate::terminology::{Direction, Session};
 use crate::usage_report::window::Window;
 
 /// What one rendered resource carries beside its body.
@@ -106,11 +106,11 @@ pub(crate) async fn render(
     index: &WebTemplateIndex,
     composition: &CanonicalComposition,
     origin: Origin<'_>,
-    translator: &Translator,
+    session: &Session<'_>,
 ) -> Result<Rendered, Refusal> {
     let resource_type = program.resource().as_str();
     let (value, _created, warnings) =
-        produce(program, index, composition, &origin, translator).await?;
+        produce(program, index, composition, &origin, session).await?;
     let body = resource_object(value, resource_type)?;
     decorate(
         body,
@@ -139,11 +139,11 @@ pub(crate) async fn render_created(
     composition: &CanonicalComposition,
     origin: Origin<'_>,
     target: (&str, &FhirResourceId),
-    translator: &Translator,
+    session: &Session<'_>,
 ) -> Result<Rendered, Refusal> {
     let (resource_type, id) = target;
     let (_value, created, warnings) =
-        produce(program, index, composition, &origin, translator).await?;
+        produce(program, index, composition, &origin, session).await?;
     let found = created.into_iter().find(|resource| {
         resource.get("resourceType").and_then(Value::as_str) == Some(resource_type)
             && resource.get("id").and_then(Value::as_str) == Some(id.as_str())
@@ -179,11 +179,10 @@ pub(crate) async fn render_units(
     index: &WebTemplateIndex,
     composition: &CanonicalComposition,
     origin: Origin<'_>,
-    translator: &Translator,
+    session: &Session<'_>,
 ) -> Result<Vec<(FhirResourceId, Rendered)>, Refusal> {
     let resource_type = program.resource().as_str();
-    let (value, created, warnings) =
-        produce(program, index, composition, &origin, translator).await?;
+    let (value, created, warnings) = produce(program, index, composition, &origin, session).await?;
     let body = resource_object(value, resource_type)?;
     let own = decorate(
         body,
@@ -227,9 +226,9 @@ async fn produce(
     index: &WebTemplateIndex,
     composition: &CanonicalComposition,
     origin: &Origin<'_>,
-    translator: &Translator,
+    session: &Session<'_>,
 ) -> Result<(Value, Vec<Value>, Vec<Warning>), Refusal> {
-    let resolved = translator
+    let resolved = session
         .resolve(Direction::ToFhir, |terminology| {
             engine::outbound(program, index, composition, &DerivedIdentity, terminology)
         })

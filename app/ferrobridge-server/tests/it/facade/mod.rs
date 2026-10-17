@@ -42,6 +42,7 @@ use ferrobridge_server::facade::programs;
 use ferrobridge_server::health::Registry;
 use ferrobridge_server::state::AppState;
 use ferrobridge_server::state::OperationsLane;
+use ferrobridge_server::terminology::Translator;
 use fhirconnect::operations::programs::ProgramSet;
 use http::Request;
 use http::Response;
@@ -236,7 +237,34 @@ async fn harness_built(
     search: Option<ferrobridge_server::facade::search::Limits>,
 ) -> Harness {
     let store = Arc::new(MemoryStore::new());
-    let (cdr, facade) = facade_over(fixtures, facade_settings, search, handle(&store)).await;
+    let (cdr, facade) = facade_over(
+        fixtures,
+        facade_settings,
+        search,
+        handle(&store),
+        Translator::default(),
+    )
+    .await;
+    Harness { cdr, store, facade }
+}
+
+/// Returns a harness over the mapping set under `fixtures` that answers
+/// search with `limits` and translates every `conceptmap` code through
+/// `translator`.
+async fn harness_translating(
+    fixtures: &str,
+    limits: ferrobridge_server::facade::search::Limits,
+    translator: Translator,
+) -> Harness {
+    let store = Arc::new(MemoryStore::new());
+    let (cdr, facade) = facade_over(
+        fixtures,
+        settings(),
+        Some(limits),
+        handle(&store),
+        translator,
+    )
+    .await;
     Harness { cdr, store, facade }
 }
 
@@ -247,6 +275,7 @@ async fn facade_over(
     facade_settings: Settings,
     search: Option<ferrobridge_server::facade::search::Limits>,
     store: Arc<dyn Store>,
+    translator: Translator,
 ) -> (MockServer, Arc<Facade>) {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
@@ -265,7 +294,8 @@ async fn facade_over(
         .await
         .expect("the template fetch answers");
     let compiled = programs::compile_set(&set, &templates).expect("the mapping set compiles");
-    let mut built = Facade::new(compiled, store, client(&cdr), facade_settings);
+    let mut built =
+        Facade::new(compiled, store, client(&cdr), facade_settings).with_translator(translator);
     if let Some(limits) = search {
         let catalog = ferrobridge_server::facade::search::load(
             std::path::Path::new(fixtures),
