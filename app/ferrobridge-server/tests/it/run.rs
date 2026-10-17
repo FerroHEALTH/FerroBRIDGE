@@ -17,10 +17,8 @@ fn rendered(code: ExitCode) -> String {
 }
 
 /// The jobs that parse and do not run yet, with the issue each names.
-const PENDING: [(&[&str], &str); 2] = [
-    (&["vocab", "load", "/srv/athena", "--schema", "cdm"], "#233"),
-    (&["mapping", "check"], "#595"),
-];
+const PENDING: [(&[&str], &str); 1] =
+    [(&["vocab", "load", "/srv/athena", "--schema", "cdm"], "#233")];
 
 #[test]
 fn every_pending_job_exits_two() {

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The two batch jobs beside `serve`: `cdm init` and `etl run`.
+//! The batch jobs beside `serve`: `cdm init`, `etl run` and `mapping check`.
 //!
 //! Each builds its own runtime, does its one job and prints what it did for
 //! the operator. No specification governs the job output: our own design.
@@ -123,4 +123,61 @@ pub(crate) fn etl_run_command(
     println!("{report}");
     println!("{}", serde_json::to_string_pretty(&report)?);
     Ok(())
+}
+
+/// Why `mapping check` stopped before it printed a report.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum CheckFailure {
+    /// The configuration names nothing the check can run over.
+    #[error(transparent)]
+    Configuration(crate::check::Error),
+    /// The check could not run.
+    #[error(transparent)]
+    Run(anyhow::Error),
+}
+
+/// Checks the configured mapping set and prints the report in `format`.
+///
+/// Returns whether the set is clean. The report goes to stdout and nothing
+/// else does, so the JSON form reads as one document.
+#[expect(
+    clippy::print_stdout,
+    reason = "the check report is the job's output, written to stdout for the operator"
+)]
+pub(crate) fn mapping_check_command(
+    settings: &Settings,
+    format: crate::cli::ReportFormat,
+) -> Result<bool, CheckFailure> {
+    use anyhow::Context;
+
+    let needs_cdr = settings.mapping_directory.is_some() && settings.mappings.is_none();
+    let cdr = match settings.cdr.as_ref() {
+        Some(config) if needs_cdr => Some(
+            crate::cdr::CdrClient::new(config)
+                .context("building the CDR client the templates are fetched through")
+                .map_err(CheckFailure::Run)?,
+        ),
+        _ => None,
+    };
+    let inputs =
+        crate::check::inputs(settings, cdr.as_ref()).map_err(CheckFailure::Configuration)?;
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("building the runtime")
+        .map_err(CheckFailure::Run)?;
+    let report = runtime
+        .block_on(crate::check::check(inputs))
+        .context("checking the mapping set")
+        .map_err(CheckFailure::Run)?;
+    match format {
+        crate::cli::ReportFormat::Text => println!("{report}"),
+        crate::cli::ReportFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&report.to_json())
+                .context("rendering the report")
+                .map_err(CheckFailure::Run)?
+        ),
+    }
+    Ok(report.is_clean())
 }

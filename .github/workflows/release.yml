@@ -287,7 +287,6 @@ jobs:
         run: gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber compose.yaml
 
   # ---- build-binaries: the SLSA Build L3 lane, once per target --------------
-
   # A call and nothing else. See the graph comment at the top of this file:
   # the isolation is what makes the provenance unforgeable, and a job that
   # carries `uses:` cannot also carry `steps:`.
@@ -311,7 +310,6 @@ jobs:
       runner: ${{ matrix.runner }}
 
   # ---- build-image: the container from the attested musl binaries -----------
-
   # A call and nothing else, for the same Build L3 reason.
   build-image:
     name: image (linux/amd64, linux/arm64)
@@ -387,7 +385,6 @@ jobs:
           fi
 
   # ---- crates.io: the library crates, after the release is public -----------
-
   # The crates leg runs once the GitHub release is published, so a failed
   # upload never leaves a release half-cut. Authentication is Trusted
   # Publishing (OIDC), and the `crates-io` environment's required reviewer

@@ -50,6 +50,43 @@ Version agreement is part of loading. The mapping version, the grammar version,
 the archetype revision, the template `sem_ver`, and the profile version have to
 agree, and a mismatch is refused before any request is served.
 
+## Checking a set before you deploy it
+
+`ferrobridge mapping check` runs the same load without starting a lane, and
+reports every diagnostic instead of stopping at the first. It reads the
+`[mappings]` section of the configuration: the FHIRconnect tree in
+`directory`, compiled context by context against the templates in
+`templates` or, without that key, the templates the `[cdr]` serves, and the
+OMOCL files in `omocl`, which it loads and validates. OMOCL names no
+template, so its files compile when `etl run` first meets a composition, and
+the check does not compile them.
+
+```sh
+ferrobridge mapping check --config /etc/ferrobridge/ferrobridge.toml
+ferrobridge mapping check --format json
+```
+
+The text form prints one line per diagnostic,
+`file:line:column: severity[code]: message`, then a summary line with the
+files read, the contexts compiled and the error and warning counts. The JSON
+form prints one document with `clean`, `counts` and a `diagnostics` array
+whose objects carry `file`, `line`, `column`, `severity`, `code`, `message`,
+`mapping` and `model_path`. The report is the whole of stdout; the check
+writes no log line.
+
+| Exit code | Meaning |
+|---|---|
+| 0 | No diagnostic is an error. Warnings are printed and accepted, as `serve` accepts them. |
+| 1 | At least one diagnostic is an error. |
+| 69 | The check could not run: a directory cannot be read, or the CDR answered a template fetch with neither the template nor a `404`. |
+| 78 | The configuration names nothing to check, or a FHIRconnect tree with no template source. |
+
+Besides the codes of the two mapping languages, the check raises
+`template-build` for an operational template that does not build,
+`fb-unknown-template` for a context whose template neither the template
+directory nor the CDR provides, and `fb-no-template-id` for a context that
+names no template.
+
 ## Paths need a template
 
 Paths in both languages are RM and archetype paths, such as

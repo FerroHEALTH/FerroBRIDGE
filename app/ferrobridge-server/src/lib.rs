@@ -16,6 +16,7 @@ pub mod banner;
 pub mod boot;
 pub mod build_info;
 pub mod cdr;
+pub mod check;
 pub mod cli;
 pub mod config;
 pub mod etl;
@@ -70,6 +71,13 @@ pub const EXIT_UNAVAILABLE_JOB: u8 = 2;
 /// tells a bad configuration from a failure to serve.
 pub const EXIT_CONFIG: u8 = 78;
 
+/// The exit code of a `mapping check` that could not run: a directory it
+/// cannot read, or a CDR that does not serve a template.
+///
+/// `EX_UNAVAILABLE` from `sysexits`, so a pipeline tells a check that did
+/// not run from a set that failed it, which exits 1.
+pub const EXIT_CHECK_UNAVAILABLE: u8 = 69;
+
 /// Runs the binary with `args` and returns the process exit code.
 ///
 /// `args` is the whole argument vector, the program name included, so the
@@ -87,35 +95,9 @@ where
         Ok(cli) => cli,
         Err(error) => return ExitCode::from(clap_exit(&error)),
     };
-    let job = match (&cli.command, cli.command.pending_issue()) {
-        (cli::Command::Serve, None) => Job::Serve,
-        (
-            cli::Command::Cdm {
-                command: cli::Cdm::Init { with_constraints },
-            },
-            None,
-        ) => Job::CdmInit {
-            with_constraints: *with_constraints,
-        },
-        (
-            cli::Command::Etl {
-                command: cli::Etl::Run { resume, since },
-            },
-            None,
-        ) => Job::EtlRun(etl::RunOptions {
-            resume: *resume,
-            since: since.clone(),
-        }),
-        (command, issue) => {
-            let issue = issue.map_or_else(String::new, |issue| {
-                format!("; it lands with issue #{issue}")
-            });
-            eprintln!(
-                "ferrobridge: `{}` is not implemented yet{issue}",
-                command.spelling()
-            );
-            return ExitCode::from(EXIT_UNAVAILABLE_JOB);
-        }
+    let job = match Job::of(&cli.command) {
+        Ok(job) => job,
+        Err(code) => return code,
     };
     let settings = match Config::load(cli.config.as_deref()).and_then(|config| config.resolve()) {
         Ok(settings) => settings,
@@ -134,47 +116,120 @@ where
             format.colour(stdout_is_terminal),
         );
     }
-    if let Err(error) = telemetry::init(
-        settings.telemetry.format,
-        &settings.telemetry.filter,
-        stdout_is_terminal,
-    ) {
+    // NOTE: no specification governs this: our own design; `mapping check`
+    // installs no log subscriber, so its report is the whole of stdout.
+    let logs = !matches!(job, Job::MappingCheck { .. });
+    if logs
+        && let Err(error) = telemetry::init(
+            settings.telemetry.format,
+            &settings.telemetry.filter,
+            stdout_is_terminal,
+        )
+    {
         eprintln!("ferrobridge: cannot start: {}", chain(&error));
         return ExitCode::from(EXIT_CONFIG);
     }
-    match job {
-        Job::Serve => match serve_command(settings) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(error) => {
-                tracing::error!(error = format!("{error:#}"), "cannot serve");
-                ExitCode::FAILURE
+    job.run(settings)
+}
+
+impl Job {
+    /// Returns the job `command` names, or the exit code of one that parses
+    /// and does not run yet.
+    #[expect(
+        clippy::print_stderr,
+        reason = "a pending job is reported before any log subscriber exists"
+    )]
+    fn of(command: &cli::Command) -> Result<Self, ExitCode> {
+        Ok(match (command, command.pending_issue()) {
+            (cli::Command::Serve, None) => Self::Serve,
+            (
+                cli::Command::Cdm {
+                    command: cli::Cdm::Init { with_constraints },
+                },
+                None,
+            ) => Job::CdmInit {
+                with_constraints: *with_constraints,
+            },
+            (
+                cli::Command::Etl {
+                    command: cli::Etl::Run { resume, since },
+                },
+                None,
+            ) => Job::EtlRun(etl::RunOptions {
+                resume: *resume,
+                since: since.clone(),
+            }),
+            (
+                cli::Command::Mapping {
+                    command: cli::Mapping::Check { format },
+                },
+                None,
+            ) => Job::MappingCheck { format: *format },
+            (command, issue) => {
+                let issue = issue.map_or_else(String::new, |issue| {
+                    format!("; it lands with issue #{issue}")
+                });
+                eprintln!(
+                    "ferrobridge: `{}` is not implemented yet{issue}",
+                    command.spelling()
+                );
+                return Err(ExitCode::from(EXIT_UNAVAILABLE_JOB));
             }
-        },
-        Job::CdmInit { with_constraints } => {
-            let Some(cdm) = settings.cdm else {
-                eprintln!("ferrobridge: cannot start: `cdm init` needs a [cdm] section");
-                return ExitCode::from(EXIT_CONFIG);
-            };
-            match jobs::cdm_init_command(&cdm, with_constraints) {
+        })
+    }
+
+    /// Runs the job under `settings` and returns the process exit code.
+    #[expect(
+        clippy::print_stderr,
+        reason = "a missing section and a refused check are reported on stderr, outside the report on stdout"
+    )]
+    fn run(self, settings: Settings) -> ExitCode {
+        match self {
+            Job::Serve => match serve_command(settings) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
-                    tracing::error!(error = format!("{error:#}"), "cdm init failed");
+                    tracing::error!(error = format!("{error:#}"), "cannot serve");
                     ExitCode::FAILURE
                 }
-            }
-        }
-        Job::EtlRun(options) => {
-            if let Some(missing) = etl::job::missing_section(&settings) {
-                eprintln!("ferrobridge: cannot start: `etl run` needs {missing}");
-                return ExitCode::from(EXIT_CONFIG);
-            }
-            match jobs::etl_run_command(&settings, &options) {
-                Ok(()) => ExitCode::SUCCESS,
-                Err(error) => {
-                    tracing::error!(error = format!("{error:#}"), "etl run failed");
-                    ExitCode::FAILURE
+            },
+            Job::CdmInit { with_constraints } => {
+                let Some(cdm) = settings.cdm else {
+                    eprintln!("ferrobridge: cannot start: `cdm init` needs a [cdm] section");
+                    return ExitCode::from(EXIT_CONFIG);
+                };
+                match jobs::cdm_init_command(&cdm, with_constraints) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(error) => {
+                        tracing::error!(error = format!("{error:#}"), "cdm init failed");
+                        ExitCode::FAILURE
+                    }
                 }
             }
+            Job::EtlRun(options) => {
+                if let Some(missing) = etl::job::missing_section(&settings) {
+                    eprintln!("ferrobridge: cannot start: `etl run` needs {missing}");
+                    return ExitCode::from(EXIT_CONFIG);
+                }
+                match jobs::etl_run_command(&settings, &options) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(error) => {
+                        tracing::error!(error = format!("{error:#}"), "etl run failed");
+                        ExitCode::FAILURE
+                    }
+                }
+            }
+            Job::MappingCheck { format } => match jobs::mapping_check_command(&settings, format) {
+                Ok(true) => ExitCode::SUCCESS,
+                Ok(false) => ExitCode::FAILURE,
+                Err(jobs::CheckFailure::Configuration(error)) => {
+                    eprintln!("ferrobridge: cannot check: {}", chain(&error));
+                    ExitCode::from(EXIT_CONFIG)
+                }
+                Err(jobs::CheckFailure::Run(error)) => {
+                    eprintln!("ferrobridge: cannot check: {error:#}");
+                    ExitCode::from(EXIT_CHECK_UNAVAILABLE)
+                }
+            },
         }
     }
 }
@@ -190,6 +245,11 @@ enum Job {
     },
     /// `etl run`.
     EtlRun(etl::RunOptions),
+    /// `mapping check`.
+    MappingCheck {
+        /// How the report is written.
+        format: cli::ReportFormat,
+    },
 }
 
 /// Builds the runtime and serves until the process is asked to stop.

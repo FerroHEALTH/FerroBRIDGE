@@ -52,7 +52,6 @@ permissions: {}
 
 jobs:
   # ---- Tier 1: the checks that run on a repository with no code -------------
-
   # zizmor (https://docs.zizmor.sh/) is the static security analysis for GitHub
   # Actions, the machine check behind three properties this repository treats
   # as hard rules: every `uses:` pinned to a commit SHA (unpinned-uses), no
@@ -296,7 +295,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: bash scripts/checks/todo-issues.sh
 
-  # The tracker helpers that carry a self-test. Their real branches run only
+  # The tracker helpers and the deployment probe, each with a self-test. The
+  # probe self-test drives a stub curl. The helpers' real branches run only
   # against the live tracker: the fallback of fields.sh needs a token that
   # cannot read the organisation's issue types, and the migration and the
   # label run write to every issue. Each drives itself against a stub gh on
@@ -316,9 +316,9 @@ jobs:
           bash scripts/gh/fields.sh --self-test
           bash scripts/gh/labels.sh --self-test
           bash scripts/gh/migrate-fields.sh --self-test
+          bash scripts/deploy-probe.sh --self-test
 
   # ---- Tier 2: the Rust lanes, gated on the workspace existing --------------
-
   # The one job that decides whether the cargo tier runs at all, and which of
   # its lanes a change needs: it checks out, looks for a root Cargo.toml, and
   # reads the packages the change reaches (docs/ci-cd.md, "Lanes that run only
@@ -1050,7 +1050,6 @@ jobs:
           comment-summary-in-pr: on-failure
 
   # ---- The single required check -------------------------------------------
-
   # conclusion is the one status check the branch ruleset requires. It `needs`
   # every other job and runs on always(), so it reports even when every gated
   # Rust lane is skipped. It fails when a needed job failed or was cancelled
