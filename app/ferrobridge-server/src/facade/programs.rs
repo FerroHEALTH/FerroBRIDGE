@@ -22,8 +22,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use fhirconnect::model::load::MappingSet;
-use fhirconnect::model::semantic::StaticMappingCodes;
-use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
 use fhirconnect::resolve::program::binding::TemplateId;
 use fhirconnect::resolve::program::mapping::Mapping;
@@ -31,7 +29,11 @@ use fhirconnect::resolve::program::mapping::Method;
 use fhirconnect::resolve::select::SelectError;
 use fhirconnect::resolve::select::select_by_profile_pinned;
 use openehr_mapping_core::diagnostic::Diagnostic;
+use openehr_mapping_core::diagnostic::Severity;
 use openehr_mapping_core::index::WebTemplateIndex;
+
+use crate::mappings::compile::Refusal;
+use crate::mappings::compile::TemplateCause;
 
 /// Why the mapping set did not load.
 #[derive(Debug, thiserror::Error)]
@@ -301,8 +303,7 @@ pub fn mapping_files(directory: &Path) -> Result<Vec<PathBuf>, LoadError> {
 /// [`LoadError::Mappings`] when a file is not valid FHIRconnect.
 pub fn read_set(directory: &Path) -> Result<MappingSet, LoadError> {
     let files = mapping_files(directory)?;
-    fhirconnect::model::load::load_set(files, &StaticMappingCodes::default())
-        .map_err(|diagnostics| mappings_error(&diagnostics))
+    crate::mappings::compile::read(&files).map_err(|diagnostics| mappings_error(&diagnostics))
 }
 
 /// Compiles every context of `set` against the templates in `indexes`.
@@ -320,44 +321,48 @@ pub fn compile_set(
     set: &MappingSet,
     indexes: &BTreeMap<String, Arc<WebTemplateIndex>>,
 ) -> Result<Programs, LoadError> {
-    let mut loaded = Vec::new();
-    for context in set.contexts() {
-        let name = context.header().name().value().clone();
-        let template = template_of(context)?;
-        let Some(index) = indexes.get(&template) else {
-            return Err(LoadError::MissingTemplate {
-                template,
-                context: name.to_string(),
-            });
-        };
-        let program = compile(
-            set,
-            &name,
-            index,
-            &fhir_types::r4::schema::SCHEMAS,
-            &StaticMappingCodes::default(),
-        )
-        .map_err(|diagnostics| mappings_error(&diagnostics))?;
-        crate::mappings::log_warnings(&program);
-        loaded.push(Loaded {
-            program,
-            index: Arc::clone(index),
+    let compiled = crate::mappings::compile::compile(set, indexes, &[]);
+    if let Some(refusal) = compiled.refusals.into_iter().next() {
+        return Err(match refusal {
+            Refusal::NoTemplateId { file, .. } => LoadError::NoTemplateId {
+                context: file.display().to_string(),
+            },
+            Refusal::Template {
+                context, template, ..
+            } => LoadError::MissingTemplate { template, context },
+            Refusal::Compile { .. } => mappings_error(
+                &compiled
+                    .diagnostics
+                    .iter()
+                    .filter(|diagnostic| diagnostic.severity() == Severity::Error)
+                    .cloned()
+                    .collect::<Vec<Diagnostic>>(),
+            ),
         });
     }
-    Ok(Programs::new(loaded))
+    Ok(from_compiled(compiled.programs, indexes))
 }
 
-/// Returns the template identifier one context names.
-fn template_of(context: &fhirconnect::model::ast::ContextMappingFile) -> Result<String, LoadError> {
-    context
-        .context()
-        .template
-        .id
-        .as_ref()
-        .map(|located| located.value().clone())
-        .ok_or_else(|| LoadError::NoTemplateId {
-            context: context.file().display().to_string(),
+/// Returns the registry of `programs`, each with the index of the template it
+/// compiled against.
+#[must_use]
+pub fn from_compiled(
+    programs: Vec<Arc<Program>>,
+    indexes: &BTreeMap<String, Arc<WebTemplateIndex>>,
+) -> Programs {
+    let loaded = programs
+        .into_iter()
+        .filter_map(|program| {
+            crate::mappings::log_warnings(&program);
+            // NOTE: no specification governs this: our own design; the load
+            // path compiled each program against an index of this map.
+            let index = indexes
+                .get(program.template().id().as_str())
+                .map(Arc::clone)?;
+            Some(Loaded { program, index })
         })
+        .collect();
+    Programs::new(loaded)
 }
 
 /// Returns the templates every context of `set` names, fetched from the CDR.
@@ -375,34 +380,58 @@ pub async fn fetch_templates(
     set: &MappingSet,
     client: &crate::cdr::CdrClient,
 ) -> Result<BTreeMap<String, Arc<WebTemplateIndex>>, LoadError> {
-    let mut wanted: BTreeMap<String, String> = BTreeMap::new();
-    for context in set.contexts() {
-        let name = context.header().name().value().as_str().to_owned();
-        wanted.entry(template_of(context)?).or_insert(name);
+    if let Some(context) = set
+        .contexts()
+        .find(|context| crate::mappings::compile::template_of(context).is_none())
+    {
+        return Err(LoadError::NoTemplateId {
+            context: context.file().display().to_string(),
+        });
     }
-    let mut indexes = BTreeMap::new();
-    for (template, context) in wanted {
-        match crate::mappings::template_index(client, &template).await {
-            Ok(index) => {
-                indexes.insert(template, Arc::new(index));
-            }
-            Err(crate::mappings::Error::TemplateNotHeld { status, .. }) => {
-                return Err(LoadError::UnknownTemplate {
-                    template,
-                    context,
-                    status,
-                });
-            }
-            Err(source) => {
-                return Err(LoadError::Fetch {
-                    template,
-                    context,
-                    source: Box::new(source),
-                });
-            }
+    let templates = match crate::mappings::compile::cdr_templates(set, client).await {
+        Ok(templates) => templates,
+        Err(source) => {
+            let template = match &source {
+                crate::mappings::Error::TemplateFetch { template, .. }
+                | crate::mappings::Error::TemplateRefused { template, .. } => template.clone(),
+                _ => String::new(),
+            };
+            let context = set
+                .contexts()
+                .find(|context| {
+                    crate::mappings::compile::template_of(context).as_deref()
+                        == Some(template.as_str())
+                })
+                .map(|context| context.header().name().value().as_str().to_owned())
+                .unwrap_or_default();
+            return Err(LoadError::Fetch {
+                template,
+                context,
+                source: Box::new(source),
+            });
         }
+    };
+    if let Some(Refusal::Template {
+        context,
+        template,
+        cause,
+    }) = templates.refusals.into_iter().next()
+    {
+        return Err(match cause {
+            TemplateCause::NotHeld(status) => LoadError::UnknownTemplate {
+                template,
+                context,
+                status,
+            },
+            TemplateCause::Unusable(source) => LoadError::Fetch {
+                template,
+                context,
+                source,
+            },
+            TemplateCause::NotProvided => LoadError::MissingTemplate { template, context },
+        });
     }
-    Ok(indexes)
+    Ok(templates.indexes)
 }
 
 /// Returns the refusal a diagnostic list describes.

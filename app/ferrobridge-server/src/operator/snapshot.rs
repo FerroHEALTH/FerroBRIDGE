@@ -17,7 +17,7 @@ use openehr_mapping_core::diagnostic::Severity;
 use serde::Serialize;
 
 use crate::check::Report;
-use crate::check::TemplateOrigin;
+use crate::mappings::compile::TemplateOrigin;
 use crate::operator::files;
 use crate::operator::files::Language;
 use crate::operator::files::Owner;
