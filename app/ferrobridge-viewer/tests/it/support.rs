@@ -156,7 +156,11 @@ impl Begun {
 /// Begins a sign-in at `service` with `GET /login`.
 pub(crate) async fn begin(service: &axum::Router) -> Result<Begun, Box<dyn Error>> {
     let (response, _body) = send(service, get("/login")?).await?;
-    assert_eq!(StatusCode::SEE_OTHER, response.status(), "the sign-in redirects");
+    assert_eq!(
+        StatusCode::SEE_OTHER,
+        response.status(),
+        "the sign-in redirects"
+    );
     let location = Url::parse(header(&response, "location"))?;
     let query = location.query_pairs().into_owned().collect();
     let cookie = header(&response, "set-cookie")
