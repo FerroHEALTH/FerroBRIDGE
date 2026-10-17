@@ -150,6 +150,61 @@ pub(crate) fn render_created(
     decorate(body, resource_type, id, &origin, None, warnings)
 }
 
+/// Returns every resource of the program's own type the outbound run over
+/// `composition` answers: the entry's own resource first, then each one the
+/// run creates beside it (a further `hierarchy.split` occurrence), in the
+/// order the run creates them, each decorated as [`render`] decorates the
+/// entry's own.
+///
+/// A search lists all of them, because each is a resource of the searched
+/// type this server serves (no specification governs how a created resource
+/// is reached from a row: our own design). The declared losses of the run
+/// travel with the entry's own resource alone.
+///
+/// # Errors
+///
+/// The engine's refusal, the `500` of a created resource whose id is outside
+/// the R4 grammar, and the `500` of [`complete::refusal`].
+pub(crate) fn render_units(
+    program: &Program,
+    index: &WebTemplateIndex,
+    composition: &CanonicalComposition,
+    origin: Origin<'_>,
+) -> Result<Vec<(FhirResourceId, Rendered)>, Refusal> {
+    let resource_type = program.resource().as_str();
+    let (value, created, warnings) = produce(program, index, composition, &origin)?;
+    let body = resource_object(value, resource_type)?;
+    let own = decorate(
+        body,
+        resource_type,
+        origin.id,
+        &origin,
+        Some(program.profile().url().as_str()),
+        warnings,
+    )?;
+    let mut units = vec![(origin.id.clone(), own)];
+    for resource in created {
+        if resource.get("resourceType").and_then(Value::as_str) != Some(resource_type) {
+            continue;
+        }
+        let Value::Object(body) = resource else {
+            continue;
+        };
+        let text = body.get("id").and_then(Value::as_str).unwrap_or_default();
+        let id = FhirResourceId::new(text).map_err(|error| {
+            reply::refusal(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Issue::error(IssueType::Exception).diagnosing(format!(
+                    "a {resource_type} the mapping created carries an id outside the R4 grammar: {error}"
+                )),
+            )
+        })?;
+        let rendered = decorate(body, resource_type, &id, &origin, None, Vec::new())?;
+        units.push((id, rendered));
+    }
+    Ok(units)
+}
+
 /// Runs the outbound mapping, binding every resource it creates under the
 /// entry's own resource.
 fn produce(
