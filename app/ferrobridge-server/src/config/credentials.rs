@@ -13,6 +13,7 @@ use super::resolve::url_of;
 use super::section::Cdm;
 use super::section::Credentials;
 use super::section::OAuthClient;
+use super::section::Secret;
 use crate::cdr::oauth::Endpoint;
 use crate::cdr::oauth::OAuthConfig;
 
@@ -50,7 +51,7 @@ pub(super) fn resolve_oauth(section: &str, oauth: &OAuthClient) -> Result<OAuthC
     let secret_key = format!("{section}.client_secret");
     let client_secret = secret(
         &secret_key,
-        oauth.client_secret.as_deref(),
+        oauth.client_secret.as_ref(),
         oauth.client_secret_file.as_deref(),
     )?
     .ok_or(Error::Missing { key: secret_key })?;
@@ -113,17 +114,18 @@ pub(super) fn resolve_credentials(
 ) -> Result<Option<Scheme>, Error> {
     let token = secret(
         &format!("{section}.bearer_token"),
-        credentials.bearer_token.as_deref(),
+        credentials.bearer_token.as_ref(),
         credentials.bearer_token_file.as_deref(),
     )?;
     let password = secret(
         &format!("{section}.password"),
-        credentials.password.as_deref(),
+        credentials.password.as_ref(),
         credentials.password_file.as_deref(),
     )?;
+    let user_name = credentials.user.as_deref().map(Secret::from);
     let user = secret(
         &format!("{section}.user"),
-        credentials.user.as_deref(),
+        user_name.as_ref(),
         credentials.user_file.as_deref(),
     )?
     .map(|user| user.expose_secret().to_owned());
@@ -172,23 +174,28 @@ pub(super) fn cdm_connection_key(
 }
 
 /// Returns the secret `key` names, inline or from its `_file` sibling.
+///
+/// The file's text is a [`SecretString`] from the read, and the trimmed copy
+/// is taken from it, so neither form outlives the call unzeroed.
 pub(super) fn secret(
     key: &str,
-    inline: Option<&str>,
+    inline: Option<&Secret>,
     file: Option<&Path>,
 ) -> Result<Option<SecretString>, Error> {
     match (inline, file) {
         (Some(_), Some(_)) => Err(Error::Conflict {
             key: key.to_owned(),
         }),
-        (Some(value), None) => Ok(Some(SecretString::from(value))),
+        (Some(value), None) => Ok(Some(value.secret().clone())),
         (None, Some(path)) => {
-            let text = std::fs::read_to_string(path).map_err(|source| Error::Secret {
-                key: format!("{key}_file"),
-                path: path.to_path_buf(),
-                source,
-            })?;
-            Ok(Some(SecretString::from(text.trim())))
+            let text = SecretString::from(std::fs::read_to_string(path).map_err(|source| {
+                Error::Secret {
+                    key: format!("{key}_file"),
+                    path: path.to_path_buf(),
+                    source,
+                }
+            })?);
+            Ok(Some(SecretString::from(text.expose_secret().trim())))
         }
         (None, None) => Ok(None),
     }

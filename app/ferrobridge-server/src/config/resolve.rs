@@ -304,7 +304,7 @@ pub(super) fn resolve_terminology(
 /// Returns the CDM database `cdm` describes.
 pub(super) fn resolve_cdm(cdm: &Cdm) -> Result<CdmSettings, Error> {
     let url =
-        secret("cdm.url", cdm.url.as_deref(), cdm.url_file.as_deref())?.ok_or(Error::Missing {
+        secret("cdm.url", cdm.url.as_ref(), cdm.url_file.as_deref())?.ok_or(Error::Missing {
             key: String::from("cdm.url"),
         })?;
     let schema_of = |key: &str, name: &str| {
