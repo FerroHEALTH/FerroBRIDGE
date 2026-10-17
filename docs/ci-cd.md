@@ -85,8 +85,9 @@ A changed path reaches packages in one of these ways:
 | `docs/VERSIONS.md` | `ferrobridge-testkit`, and through it every member testing with it (`matrix_pin`) |
 | `docs/architecture.md` | the testkit's own tests |
 | `scripts/checks/sqlx-offline.sh` | `omop-cdm` |
+| `.claude/rules/leptos-ui.md`, `scripts/release/viewer-*.sh`, `scripts/checks/viewer-*.sh` | `ferrobridge-viewer` (the rule holds its bundle budget; the scripts build and measure its site bundle) |
 | `.github/workflows/ci.yml`, `.github/actions/setup-rust/**`, `scripts/checks/affected.sh`, `scripts/checks/fast.sh` | everything |
-| the rest of `.github/`, `.claude/`, `website/`, `assets/`, `docker/`, `fuzz/`, `scripts/gh/`, `scripts/release/`, `docs/ci-cd.md`, `docs/release.md`, the root community files, and the guard scripts tier 1 runs | nothing |
+| the rest of `.github/`, the rest of `.claude/`, `website/`, `assets/`, `docker/`, `fuzz/`, `scripts/gh/`, the rest of `scripts/release/`, `docs/ci-cd.md`, `docs/release.md`, the root community files, and the guard scripts tier 1 runs | nothing |
 | anything else (`docs/specs/**`, `scripts/vendor/**`, `rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, `deny.toml`, a new root file) | everything |
 
 The last row is the default, so a new input runs every lane until someone
@@ -100,6 +101,7 @@ maps it. Each lane then reads one output:
 | `codegen-drift`, `codegen-emit-tests` | `fhir-codegen` is reached (its sources, its vendored packages, `fhir-types` or `hl7v2-types`) |
 | `omop-cdm-codegen-drift` | `omop-cdm-codegen` is reached (its sources or `omop-cdm`) |
 | `sqlx-offline` | `omop-cdm` is reached |
+| `viewer (wasm32 and site bundle)` | `ferrobridge-viewer` is reached: its browser half linted for `wasm32-unknown-unknown`, its release site bundle built, held to the budget of `.claude/rules/leptos-ui.md` §12, and checked for build-host paths |
 | `conformance` | a package `conformance.sh` runs is reached |
 | `e2e (containers)` | one of `omop-cdm`, `ferrobridge-server`, `ferrobridge-term`, `ferrobridge-testkit` is reached; it runs those of them that are |
 | `rustfmt`, `cargo-deny`, `dependency-review` and every tier-1 job | always (`cargo-deny` because the advisory database moves without a change) |

@@ -60,7 +60,7 @@ names until a first publish, and `fhir-types`, `openehr-mapping-core` and
 `fhirconnect` on the published crate line), and
 the testkit tool crate. Beside it:
 
-- `app/ferrobridge-server`: the one binary, `ferrobridge` (#21). A thin
+- `app/ferrobridge-server`: the bridge's one binary, `ferrobridge` (#21). A thin
   `main.rs` over the library run path, the five subcommands, the TOML and
   environment configuration tree with `_file` secrets and `deny_unknown_fields`
   throughout, the `tracing` console, the request log that carries the matched
@@ -96,6 +96,16 @@ the testkit tool crate. Beside it:
   discovered and cached, every access token checked, SMART v2 scopes per
   interaction and the patient compartment, and one audit line per request;
   every facade handler takes the caller's `Access`.
+- `app/ferrobridge-viewer`: the operator console (#599, `docs/architecture.md`
+  §4.10), its own binary `ferrobridge-viewer`: a Leptos app rendered on the
+  server and hydrated, halves chosen by target, with `serve`, `config check`
+  and `healthcheck`, the TOML configuration with `FERROBRIDGE_VIEWER__`
+  overrides and `_file` secrets, the nonce CSP and the other browser security
+  headers, and the typed bridge client (`src/bridge.rs`). Its server half
+  links only `openehr-mapping-core` and `fhir-types` of the workspace and its
+  browser half none, held by `tests/it/boundary.rs`; the CI `viewer` lane
+  lints the wasm32 half and builds the site bundle against its budget
+  (`.claude/rules/leptos-ui.md`).
 
 - `crates/fhir-types`: the generated FHIR model, Apache-2.0, emitted whole by
   the generator below and never hand-edited: one module per version, STU3,
@@ -416,6 +426,8 @@ apply always. Read the relevant one before working in that area.
   the research that fixes the boundary.
 - `.claude/rules/vendored-inputs.md`: every external corpus is fetched by a
   committed `scripts/vendor/*.sh`, vendored verbatim, provenance-stamped.
+- `.claude/rules/leptos-ui.md`: the operator console's Leptos discipline,
+  scoped to `app/ferrobridge-viewer/**`.
 - `.claude/rules/ci-cd.md`, `ai-code-review.md`, `crates-publishing.md`: the
   workflow-security discipline, the advisory-analyzer policy (SonarQube Cloud,
   CodeQL), and the crates.io bump and publish rules.
