@@ -25,6 +25,10 @@ crates on crates.io.
 
 ### Changed
 
+- A facade search translates a `conceptmap` code once per request (#763):
+  the page and its `Bundle.total` share the answers of one terminology
+  session, so a code repeated across their entries costs one
+  `ConceptMap/$translate` call. Nothing is kept past the request.
 - The facade, the FHIRconnect operations lane, `mapping check` and the
   operator API load a FHIRconnect set through one path,
   `mappings::compile` (#725): one read, one template resolution from the

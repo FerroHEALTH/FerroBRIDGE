@@ -210,7 +210,14 @@ async fn a_stored_container_the_uid_grammar_refuses_answers_a_typed_500_naming_t
         write.commit()?;
     }
     let store = ferrobridge_server::facade::identity::redb_store::RedbStore::open(&path)?;
-    let (cdr, facade) = facade_over(FIXTURES, settings(), None, Arc::new(store)).await;
+    let (cdr, facade) = facade_over(
+        FIXTURES,
+        settings(),
+        None,
+        Arc::new(store),
+        ferrobridge_server::terminology::Translator::default(),
+    )
+    .await;
     let (status, body) = call(
         app_over(&facade),
         Request::get("/fhir/Condition/badcontainer").body(Body::empty())?,

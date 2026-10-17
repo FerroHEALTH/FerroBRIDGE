@@ -72,12 +72,55 @@ impl Translator {
         self.client.is_some()
     }
 
+    /// Returns a session that remembers every answer it receives, for the
+    /// runs of one request.
+    ///
+    /// A request that runs a mapping over several entries, such as a search
+    /// page and its total, opens one session, so a code repeated across them
+    /// is translated once. The session is dropped with the request.
+    #[must_use]
+    pub fn session(&self) -> Session<'_> {
+        Session {
+            client: self.client.as_ref(),
+            answers: Mutex::new(BTreeMap::new()),
+        }
+    }
+
+    /// Runs `run` with every code it translates resolved first, in a session
+    /// of its own ([`Session::run`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns the error `run` returns, as [`Session::run`] does.
+    pub async fn run<R, E>(
+        &self,
+        direction: Direction,
+        run: impl FnMut(&dyn Terminology) -> Result<R, E>,
+    ) -> Result<R, E> {
+        self.session().run(direction, run).await
+    }
+}
+
+/// The answers the runs of one request share.
+///
+/// Every answer is keyed by the whole question: the concept map, the system,
+/// the code, its version and the direction. Nothing outlives the session.
+#[derive(Debug)]
+pub struct Session<'t> {
+    /// The client of the `[terminology]` server, when one is configured.
+    client: Option<&'t Client>,
+    /// Every answer this session received.
+    answers: Mutex<BTreeMap<Translation, Answer>>,
+}
+
+impl Session<'_> {
     /// Runs `run` with every code it translates resolved first.
     ///
     /// `run` is called again after each round of `$translate` calls, so it
     /// must be a pure function of its input; only the result of the run that
-    /// met no unresolved code is returned. With no server `run` is called
-    /// once over [`NoTerminology`].
+    /// met no unresolved code is returned. A code this session already holds
+    /// is not asked again. With no server `run` is called once over
+    /// [`NoTerminology`].
     ///
     /// # Errors
     ///
@@ -90,83 +133,88 @@ impl Translator {
         direction: Direction,
         mut run: impl FnMut(&dyn Terminology) -> Result<R, E>,
     ) -> Result<R, E> {
-        let Some(client) = self.client.as_ref() else {
+        let Some(client) = self.client else {
             return run(&NoTerminology);
         };
-        let mut answers: BTreeMap<Translation, Answer> = BTreeMap::new();
-        settle(client, direction, &mut answers, &mut run).await
+        self.settle(client, direction, &mut run).await
     }
 
     /// Resolves every code `probe` translates, for a final run over the
     /// [`Resolved`] seam this returns.
     ///
-    /// This is [`Translator::run`] for a run with a side effect of its own,
-    /// such as binding the identity of a created resource: `probe` repeats
-    /// without it, and only the final run over [`Resolved`] has it.
+    /// This is [`Session::run`] for a run with a side effect of its own, such
+    /// as binding the identity of a created resource: `probe` repeats without
+    /// it, and only the final run over [`Resolved`] has it.
     pub async fn resolve<R, E>(
         &self,
         direction: Direction,
         mut probe: impl FnMut(&dyn Terminology) -> Result<R, E>,
-    ) -> Resolved {
-        let mut answers: BTreeMap<Translation, Answer> = BTreeMap::new();
-        if let Some(client) = self.client.as_ref() {
-            let _probed: Result<R, E> = settle(client, direction, &mut answers, &mut probe).await;
+    ) -> Resolved<'_> {
+        if let Some(client) = self.client {
+            let _probed: Result<R, E> = self.settle(client, direction, &mut probe).await;
         }
         Resolved {
+            session: self,
             direction,
-            configured: self.client.is_some(),
-            answers,
+        }
+    }
+
+    /// Repeats `run` over the codes resolved so far, resolving the ones each
+    /// run meets, and returns the result of the first run that meets none.
+    async fn settle<R, E>(
+        &self,
+        client: &Client,
+        direction: Direction,
+        run: &mut impl FnMut(&dyn Terminology) -> Result<R, E>,
+    ) -> Result<R, E> {
+        loop {
+            let missing = {
+                let answers = self.answers.lock().unwrap_or_else(PoisonError::into_inner);
+                let prepared = Prepared {
+                    direction,
+                    answers: &answers,
+                    missing: Mutex::new(BTreeSet::new()),
+                };
+                let result = run(&prepared);
+                let missing = prepared.missing();
+                if missing.is_empty() {
+                    return result;
+                }
+                missing
+            };
+            let fetched = fetch(client, missing).await;
+            self.answers
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .extend(fetched);
         }
     }
 }
 
-/// Repeats `run` over the codes resolved so far, resolving the ones each
-/// run meets, and returns the result of the first run that meets none.
-async fn settle<R, E>(
-    client: &Client,
-    direction: Direction,
-    answers: &mut BTreeMap<Translation, Answer>,
-    run: &mut impl FnMut(&dyn Terminology) -> Result<R, E>,
-) -> Result<R, E> {
-    loop {
-        let missing = {
-            let prepared = Prepared {
-                direction,
-                answers,
-                missing: Mutex::new(BTreeSet::new()),
-            };
-            let result = run(&prepared);
-            let missing = prepared.missing();
-            if missing.is_empty() {
-                return result;
-            }
-            missing
-        };
-        resolve(client, missing, answers).await;
-    }
-}
-
-/// The codes [`Translator::resolve`] resolved, as the seam of the final run.
+/// The codes [`Session::resolve`] resolved, as the seam of the final run.
 #[derive(Debug)]
-pub struct Resolved {
+pub struct Resolved<'s> {
+    /// The session holding the answers.
+    session: &'s Session<'s>,
     /// The direction of the run.
     direction: Direction,
-    /// Whether a terminology server is configured.
-    configured: bool,
-    /// Every code resolved.
-    answers: BTreeMap<Translation, Answer>,
 }
 
-impl Terminology for Resolved {
+impl Terminology for Resolved<'_> {
     fn translate(
         &self,
         request: &ConceptMapTranslateRequest,
     ) -> Result<ConceptMapTranslateResponse, TerminologyError> {
-        if !self.configured {
+        if self.session.client.is_none() {
             return Err(TerminologyError::NotConfigured);
         }
         let translation = translation(self.direction, request)?;
-        match self.answers.get(&translation) {
+        let answers = self
+            .session
+            .answers
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        match answers.get(&translation) {
             Some(Ok(response)) => Ok(response.clone()),
             Some(Err(error)) => Err(TerminologyError::Upstream {
                 source: Box::new(Arc::clone(error)),
@@ -310,15 +358,11 @@ fn unresolved() -> ConceptMapTranslateResponse {
     }
 }
 
-/// Resolves every code of `missing` and records the answers.
+/// Returns the answer to every code of `missing`.
 ///
 /// One code is one call; several are one `batch`, answered by position. A
 /// batch that failed as a whole is the answer of every code it carried.
-async fn resolve(
-    client: &Client,
-    missing: BTreeSet<Translation>,
-    answers: &mut BTreeMap<Translation, Answer>,
-) {
+async fn fetch(client: &Client, missing: BTreeSet<Translation>) -> Vec<(Translation, Answer)> {
     let missing: Vec<Translation> = missing.into_iter().collect();
     if let [one] = missing.as_slice() {
         let answer = client
@@ -326,26 +370,28 @@ async fn resolve(
             .await
             .map_err(shared)
             .and_then(|outcome| response(&outcome));
-        answers.insert(one.clone(), answer);
-        return;
+        return vec![(one.clone(), answer)];
     }
     let requests: Vec<Request> = missing.iter().cloned().map(Request::Translate).collect();
     match client.batch(&requests).await {
-        Ok(entries) => {
-            for (translation, entry) in missing.into_iter().zip(entries) {
+        Ok(entries) => missing
+            .into_iter()
+            .zip(entries)
+            .map(|(translation, entry)| {
                 let answer = match entry {
                     Ok(BatchOutcome::Translate(outcome)) => response(&outcome),
                     Ok(_) => Err(shared(UnexpectedAnswer)),
                     Err(error) => Err(shared(error)),
                 };
-                answers.insert(translation, answer);
-            }
-        }
+                (translation, answer)
+            })
+            .collect(),
         Err(error) => {
             let error = shared(error);
-            for translation in missing {
-                answers.insert(translation, Err(Arc::clone(&error)));
-            }
+            missing
+                .into_iter()
+                .map(|translation| (translation, Err(Arc::clone(&error))))
+                .collect()
         }
     }
 }
@@ -478,7 +524,8 @@ mod tests {
     async fn no_server_resolves_nothing_and_the_final_run_refuses() {
         let translator = Translator::default();
         let mut probes = 0;
-        let resolved = translator
+        let session = translator.session();
+        let resolved = session
             .resolve(Direction::ToFhir, |terminology| {
                 probes += 1;
                 terminology.translate(&request())

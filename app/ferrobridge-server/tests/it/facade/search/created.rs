@@ -11,11 +11,21 @@ use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::search::Limits;
 use http::StatusCode;
 use std::error::Error as StdError;
+use std::time::Duration;
+
+use ferrobridge_server::terminology::Translator;
+use ferrobridge_term::client::Client;
+use ferrobridge_term::config::{Config, RetryPolicy, WireVersion};
+use ferrobridge_testkit::stubs::terminology;
+use wiremock::matchers;
+use wiremock::{Mock, MockServer};
 
 use super::super::Harness;
 use super::super::VERSION_ONE;
 use super::super::harness_built;
+use super::super::harness_translating;
 use super::super::settings;
+use super::OTHER_CONTAINER;
 use super::SUBJECT;
 use super::get;
 use super::link;
@@ -158,5 +168,122 @@ async fn an_id_that_names_a_created_resource_answers_it_alone() -> Result<(), Bo
     let (status, body) = get(&harness, &format!("Condition?_id={parent}")).await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     assert_eq!(vec![parent.clone()], ids(&body));
+    Ok(())
+}
+
+/// The concept map the translating copy of the split model names on the
+/// problem name. `example.org` is reserved for examples (RFC 6761 §6.5).
+const CONCEPT_MAP: &str = "http://example.org/fhir/ConceptMap/ferrobridge-created-problems";
+
+/// Writes the split context, its search and its model into a temporary tree,
+/// the model's problem name translated through [`CONCEPT_MAP`].
+fn translating_fixtures() -> Result<tempfile::TempDir, Box<dyn StdError>> {
+    let root = tempfile::tempdir()?;
+    for name in [
+        "ferrobridge_created_split.context.yml",
+        "ferrobridge_created_split.search.yml",
+    ] {
+        std::fs::copy(
+            std::path::Path::new(CREATED).join(name),
+            root.path().join(name),
+        )?;
+    }
+    let model = std::fs::read_to_string(
+        std::path::Path::new(CREATED).join("ferrobridge_created_split.yml"),
+    )?;
+    let problem = "      openehr: \"$archetype/data[at0001]/items[at0002]\"\n      type: \"CODEABLECONCEPT\"\n";
+    assert!(
+        model.contains(problem),
+        "the split model maps the problem name"
+    );
+    let translated = model.replacen(
+        problem,
+        &format!("{problem}    conceptmap: \"{CONCEPT_MAP}\"\n"),
+        1,
+    );
+    std::fs::write(
+        root.path().join("ferrobridge_created_split.yml"),
+        translated,
+    )?;
+    Ok(root)
+}
+
+/// Returns a translator over the R4 terminology server `server` mocks.
+fn translator(server: &MockServer) -> Result<Translator, Box<dyn StdError>> {
+    let config = Config::new(format!("{}/r4", server.uri()).parse()?, WireVersion::R4)
+        .with_timeout(Duration::from_secs(5))
+        .with_retry(RetryPolicy {
+            max_attempts: 1,
+            initial_backoff: Duration::from_millis(1),
+            max_backoff: Duration::from_millis(1),
+        });
+    Ok(Translator::new(Some(Client::new(config)?)))
+}
+
+#[tokio::test]
+async fn a_code_shared_by_the_entries_of_a_page_and_its_total_is_translated_once()
+-> Result<(), Box<dyn StdError>> {
+    // NOTE: no specification governs this: our own design; one request
+    // translates a code its page and its total share through one session.
+    let composition = two_sites(&splitting(Limits::default()).await);
+    let terminology = MockServer::start().await;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path("/r4/ConceptMap/$translate"))
+        .respond_with(terminology::translate(
+            "equivalent",
+            "http://example.org/fhir/CodeSystem/synthetic-problems",
+            "SYN-001",
+            "Synthetic problem one",
+        ))
+        .mount(&terminology)
+        .await;
+    let fixtures = translating_fixtures()?;
+    let harness = harness_translating(
+        fixtures.path().to_str().ok_or("a UTF-8 temporary path")?,
+        Limits::default(),
+        translator(&terminology)?,
+    )
+    .await;
+    let person = PersonId::new("http://example.org/fhir", SUBJECT)?;
+    harness
+        .store
+        .record_ehr(&person, &EhrId::new(super::super::EHR_ID)?)?;
+    let second = format!("{OTHER_CONTAINER}::ferrobridge.test::1");
+    mount_rows(
+        &harness.cdr,
+        &[row(VERSION_ONE, &composition), row(&second, &composition)],
+    )
+    .await;
+
+    let (status, body) = get(
+        &harness,
+        &format!("Condition?patient={SUBJECT}&_count=1&_total=accurate"),
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(1, matches(&body).len(), "{body}");
+    assert_eq!(Some(4), body["total"].as_u64(), "{body}");
+    let calls = terminology
+        .received_requests()
+        .await
+        .ok_or("the terminology stub records requests")?
+        .len();
+    assert_eq!(
+        1, calls,
+        "the page and the total render three entries and translate their one code once"
+    );
+
+    let (status, body) = get(
+        &harness,
+        &format!("Condition?patient={SUBJECT}&_count=1&_total=accurate"),
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let calls = terminology
+        .received_requests()
+        .await
+        .ok_or("the terminology stub records requests")?
+        .len();
+    assert_eq!(2, calls, "nothing is kept past the request");
     Ok(())
 }

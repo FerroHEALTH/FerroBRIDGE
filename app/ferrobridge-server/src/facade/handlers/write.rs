@@ -317,7 +317,7 @@ async fn answer(
                     store: facade.store(),
                     usage: facade.usage(),
                 },
-                facade.translator(),
+                &facade.translator().session(),
             )
             .await?;
             render::log_outcome(&rendered);
