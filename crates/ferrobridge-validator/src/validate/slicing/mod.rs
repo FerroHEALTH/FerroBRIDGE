@@ -14,6 +14,7 @@ mod discriminate;
 mod instance;
 mod path;
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -21,6 +22,7 @@ use fhir_types::r4::element_definition::ElementDefinition;
 use fhir_types::schema::FieldSchema;
 use fhir_types::schema::TypeSchema;
 
+use crate::issue::Issue;
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
@@ -101,6 +103,9 @@ pub(crate) enum Verdict {
     Match,
     /// A discriminator does not match.
     NoMatch,
+    /// The item fails the validation that decides the slice, with the errors
+    /// it raised.
+    Rejected(Vec<Issue>),
     /// No discriminator fails, and these could not be evaluated.
     Unknown(Vec<Unknown>),
 }
@@ -134,6 +139,10 @@ struct Plan<'p> {
 /// The nodes one discriminator path selects from one item, or why it
 /// could not be followed.
 type Selected<'i> = Result<Vec<Node<'i>>, Reason>;
+
+/// The items a validation kept out of each slice: by the slice's index,
+/// each item's index with the errors it raised.
+type Rejections = BTreeMap<usize, Vec<(usize, Vec<Issue>)>>;
 
 impl<'i> Walk<'_, '_, 'i> {
     /// Evaluates the slicing `entry` declares over `items`, and returns for
@@ -213,11 +222,12 @@ impl<'i> Walk<'_, '_, 'i> {
         };
         let mut placements = Vec::with_capacity(members.len());
         let mut undecided: BTreeSet<usize> = BTreeSet::new();
+        let mut rejections = Rejections::new();
         for &member in members {
             let Some(item) = items.get(member) else {
                 continue;
             };
-            let (placement, unknown) = self.place(site, &plan, *item)?;
+            let (placement, unknown) = self.place(site, &plan, *item, (member, &mut rejections))?;
             undecided.extend(unknown);
             placements.push((member, placement));
         }
@@ -228,8 +238,10 @@ impl<'i> Walk<'_, '_, 'i> {
                 .filter(|(_, placement)| *placement == Placement::Slice(index))
                 .map(|(member, _)| *member)
                 .collect();
-            if !undecided.contains(&index) {
-                self.slice_cardinality(site, slice_id, slice, inside.len());
+            if !undecided.contains(&index)
+                && self.slice_cardinality(site, slice_id, slice, inside.len())
+            {
+                self.rejection(slice_id, items, rejections.get(&index));
             }
             for &member in &inside {
                 if let Some(chain) = chains.get_mut(member) {
@@ -251,6 +263,7 @@ impl<'i> Walk<'_, '_, 'i> {
         site: &Site<'_>,
         plan: &Plan<'_>,
         item: Item<'_, 'i>,
+        (member, rejections): (usize, &mut Rejections),
     ) -> Result<(Placement, Vec<usize>), ValidateError> {
         let location = &item.occurrence.location;
         let node = Node::item(site.field, item.form, item.occurrence);
@@ -278,6 +291,9 @@ impl<'i> Walk<'_, '_, 'i> {
             match verdict {
                 Verdict::Match => matched.push(index),
                 Verdict::NoMatch => {}
+                Verdict::Rejected(errors) => {
+                    rejections.entry(index).or_default().push((member, errors));
+                }
                 Verdict::Unknown(reasons) => {
                     for reason in reasons {
                         self.out().unevaluated(
@@ -380,21 +396,53 @@ impl<'i> Walk<'_, '_, 'i> {
         }
     }
 
+    /// Names, as information, the errors that kept out of the slice
+    /// `slice_id` the item of `rejected` that raised the fewest, the first
+    /// of them on a tie.
+    fn rejection(
+        &mut self,
+        slice_id: &str,
+        items: &[Item<'_, 'i>],
+        rejected: Option<&Vec<(usize, Vec<Issue>)>>,
+    ) {
+        let Some((member, errors)) = rejected
+            .into_iter()
+            .flatten()
+            .min_by_key(|(_, errors)| errors.len())
+        else {
+            return;
+        };
+        let at = items
+            .get(*member)
+            .map_or("", |item| item.occurrence.location.as_str());
+        for error in errors {
+            self.out().issue(
+                Severity::Information,
+                IssueType::Informational,
+                MessageId::SliceRejection,
+                &error.expression,
+                format!("the item at {at} is not in {slice_id}: {}", error.message),
+            );
+        }
+    }
+
     /// Checks how many items one slice holds against its own cardinality
-    /// (profiling.html §5.1.0.12).
+    /// (profiling.html §5.1.0.12), answering whether it holds fewer than its
+    /// minimum.
     fn slice_cardinality(
         &mut self,
         site: &Site<'_>,
         slice_id: &str,
         slice: &ElementDefinition,
         count: usize,
-    ) {
+    ) -> bool {
         let min = slice.min.as_ref().and_then(|min| min.value).unwrap_or(0);
         let max = match slice.max.as_ref().and_then(|max| max.value.as_deref()) {
             Some("*") | None => None,
             Some(max) => max.parse::<u32>().ok(),
         };
-        if usize::try_from(min).is_ok_and(|min| count < min) {
+        let short = usize::try_from(min).is_ok_and(|min| count < min);
+        if short {
             self.out().issue(
                 Severity::Error,
                 IssueType::Required,
@@ -414,6 +462,7 @@ impl<'i> Walk<'_, '_, 'i> {
                 format!("{slice_id} occurs {count} times, above its maximum of {max}"),
             );
         }
+        short
     }
 
     /// Answers whether `item` validates against the slice `slice_id`
@@ -440,10 +489,11 @@ impl<'i> Walk<'_, '_, 'i> {
             site.cursor,
             held,
         )?;
-        Ok(if fork.out().is_valid() {
+        let errors = fork.out().errors();
+        Ok(if errors.is_empty() {
             Verdict::Match
         } else {
-            Verdict::NoMatch
+            Verdict::Rejected(errors)
         })
     }
 
@@ -484,7 +534,7 @@ impl<'i> Walk<'_, '_, 'i> {
             };
             match self.discriminate(structure, slice_id, discriminator, nodes, location)? {
                 Verdict::Match => {}
-                Verdict::NoMatch => return Ok(Verdict::NoMatch),
+                found @ (Verdict::NoMatch | Verdict::Rejected(_)) => return Ok(found),
                 Verdict::Unknown(found) => unknown.extend(found),
             }
         }

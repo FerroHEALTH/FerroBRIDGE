@@ -38,6 +38,13 @@ crates on crates.io.
   reason as a `String`, and `Constraint::ContextInvariant` is new: a
   consumer matching the unit variant changes its pattern.
 
+- A profile slice that holds too few items names why the closest item
+  failed it (#490): when a `profile` discriminator, or slicing with no
+  discriminator, keeps an item out of a slice that then falls short of its
+  minimum, the errors of the rejected item with the fewest are reported as
+  `slice-rejection` information beside the cardinality error (an EPS
+  Bundle whose Patient lacks `birthDate` now names `birthDate`).
+
 - The operator console ships as its own image,
   `ghcr.io/ferrohealth/ferrobridge-viewer` (#603). `docker/viewer/Dockerfile`
   builds it on the bridge image's distroless base, runs as `65532:65532`,

@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use fhir_types::r4::element_definition::ElementDefinition;
 
+use crate::issue::Issue;
 use crate::report::Constraint;
 use crate::report::Reason;
 use crate::set::ResolveError;
@@ -249,6 +250,7 @@ impl<'i> Walk<'_, '_, 'i> {
         discriminator: &Discriminator,
     ) -> Result<Verdict, ValidateError> {
         let mut unknown = Vec::new();
+        let mut closest: Option<Vec<Issue>> = None;
         for node in nodes {
             let subject = match (node.kind, node.value) {
                 (NodeKind::Resource(_), Some(value)) => Subject::Resource { value },
@@ -267,7 +269,15 @@ impl<'i> Walk<'_, '_, 'i> {
             for profile in profiles {
                 match self.conformance(subject, (profile, from), location)? {
                     Conformance::Checked(found) if found.is_valid() => return Ok(Verdict::Match),
-                    Conformance::Checked(_) => {}
+                    Conformance::Checked(found) => {
+                        let errors = found.errors();
+                        if closest
+                            .as_ref()
+                            .is_none_or(|kept| errors.len() < kept.len())
+                        {
+                            closest = Some(errors);
+                        }
+                    }
                     Conformance::Unknown(reason) => unknown.push(Unknown {
                         constraint: Constraint::TypeProfile {
                             profiles: vec![profile.clone()],
@@ -277,10 +287,10 @@ impl<'i> Walk<'_, '_, 'i> {
                 }
             }
         }
-        Ok(if unknown.is_empty() {
-            Verdict::NoMatch
-        } else {
-            Verdict::Unknown(unknown)
+        Ok(match (unknown.is_empty(), closest) {
+            (false, _) => Verdict::Unknown(unknown),
+            (true, Some(errors)) => Verdict::Rejected(errors),
+            (true, None) => Verdict::NoMatch,
         })
     }
 }

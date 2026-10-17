@@ -472,6 +472,15 @@ impl Collector {
             .find(|issue| matches!(issue.severity, Severity::Fatal | Severity::Error))
     }
 
+    /// Returns the issues collected that are errors or fatal.
+    pub(crate) fn errors(&self) -> Vec<Issue> {
+        self.issues
+            .iter()
+            .filter(|issue| matches!(issue.severity, Severity::Fatal | Severity::Error))
+            .cloned()
+            .collect()
+    }
+
     /// Adds the issues, unevaluated constraints and pending checks `other`
     /// collected.
     pub(crate) fn absorb(&mut self, other: Self) {
