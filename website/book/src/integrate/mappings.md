@@ -71,7 +71,7 @@ The text form prints one line per diagnostic,
 files read, the contexts compiled and the error and warning counts. The JSON
 form prints one document with `clean`, `counts` and a `diagnostics` array
 whose objects carry `file`, `line`, `column`, `severity`, `code`, `message`,
-`mapping` and `model_path`. The report is the whole of stdout; the check
+`mapping` and `model_path` (the steps into the document model, as an array), the serde form of `openehr-mapping-core`'s `Diagnostic`. The report is the whole of stdout; the check
 writes no log line.
 
 | Exit code | Meaning |

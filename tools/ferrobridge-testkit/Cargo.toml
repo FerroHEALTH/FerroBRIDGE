@@ -23,6 +23,9 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["time"] }
 wiremock.workspace = true
 
+[target.'cfg(target_os = "linux")'.dependencies]
+socket2.workspace = true
+
 [dev-dependencies]
 # The FHIR examples corpora decode every resource of every version, so the
 # model is built with each version and the whole resource root set.

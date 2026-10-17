@@ -28,6 +28,7 @@ mod jobs;
 mod lanes;
 pub mod mappings;
 pub mod operations;
+pub mod operator;
 pub mod panic;
 pub mod request_id;
 pub mod request_log;
@@ -330,6 +331,12 @@ pub fn router(state: Arc<AppState>, server: &ServerSettings) -> Router {
         .merge(operations::router(Arc::clone(&state)));
     if let Some(authority) = state.auth() {
         routes = routes.merge(auth::smart::routes(authority));
+        if let Some(operator) = state.operator() {
+            routes = routes.merge(operator::routes(
+                Arc::clone(operator),
+                Arc::clone(authority),
+            ));
+        }
     }
     if let Some(mounted) = state.facade() {
         let shape = facade::capability::Shape {

@@ -263,6 +263,19 @@ pub struct Hl7v2Profile {
     pub profile: String,
 }
 
+/// The operator API: the engine state and the mapping files, read under the
+/// operator scope.
+///
+/// Off until `enabled` is set, and refused at boot while `[auth]` is off, so
+/// the API is never served to an unauthenticated caller. No specification
+/// governs the operator surface: our own design.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Operator {
+    /// Whether the operator routes are mounted under `/operator`.
+    pub enabled: bool,
+}
+
 /// The FHIRconnect operations lane.
 ///
 /// The two operations are pure transformations that reach no CDR on a

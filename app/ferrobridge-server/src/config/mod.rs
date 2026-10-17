@@ -43,6 +43,7 @@ use section::Facade;
 use section::Hl7v2;
 use section::Mappings;
 use section::Operations;
+use section::Operator;
 use section::Server;
 use section::Telemetry;
 use section::Terminology;
@@ -84,6 +85,8 @@ pub struct Config {
     pub hl7v2: Hl7v2,
     /// The installation report to `FerroPULSE`.
     pub usage_report: section::UsageReport,
+    /// The operator API, off until its section turns it on.
+    pub operator: Operator,
 }
 
 /// A configuration the server refuses to start on.
@@ -574,6 +577,7 @@ impl Config {
                 composition_territory: self.operations.composition_territory.clone(),
             },
             usage_report: crate::usage_report::config::resolve(&self.usage_report)?,
+            operator: resolve::resolve_operator(&self.operator, &self.auth)?,
         })
     }
 }
@@ -653,6 +657,8 @@ pub struct Settings {
     pub operations: OperationsSettings,
     /// The installation report to `FerroPULSE`.
     pub usage_report: crate::usage_report::config::UsageReportSettings,
+    /// Whether the operator API is mounted.
+    pub operator: bool,
 }
 
 /// The OMOP CDM database, resolved.

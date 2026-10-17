@@ -197,6 +197,69 @@ async fn validate_needs_c_or_u_on_the_type() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
+async fn validate_admits_a_token_that_carries_only_the_operator_scope()
+-> Result<(), Box<dyn StdError>> {
+    // No specification governs the operator scope: our own design, a dry run
+    // commits nothing, so the console's token needs no clinical write scope.
+    let case = Case::new().await;
+    let (status, _, body) = case
+        .send(validate_condition(), "ferrobridge.operator")
+        .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_forbidden(
+        &case
+            .send(post_condition(&condition()), "ferrobridge.operator")
+            .await?,
+    );
+    assert_forbidden(
+        &case
+            .send(get("/fhir/Condition/never-written"), "ferrobridge.operator")
+            .await?,
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_renamed_operator_scope_is_the_one_validate_admits() -> Result<(), Box<dyn StdError>> {
+    let case =
+        Case::with(|settings| settings.operator_scope = String::from("bridge:operator")).await;
+    let (status, _, body) = case.send(validate_condition(), "bridge:operator").await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_forbidden(
+        &case
+            .send(validate_condition(), "ferrobridge.operator")
+            .await?,
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_fhirconnect_operation_admits_a_token_with_only_the_operator_scope()
+-> Result<(), Box<dyn StdError>> {
+    let case = Case::new().await;
+    let state = AppState::with_health(Registry::default())
+        .serving_operations(OperationsLane::new(
+            ProgramSet::new(),
+            "Device/ferrobridge-test",
+        ))
+        .with_auth(Arc::clone(&case.authority));
+    let app = ferrobridge_server::router(Arc::new(state), &crate::facade::server_settings());
+    for path in ["/fhir/$toopenehr", "/fhir/$tofhir"] {
+        let request = Request::post(path)
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(condition().to_string()))?;
+        let response = raw(
+            app.clone(),
+            bearing(request, &case.token("ferrobridge.operator")),
+        )
+        .await?;
+        assert_ne!(StatusCode::UNAUTHORIZED, response.status(), "{path}");
+        assert_ne!(StatusCode::FORBIDDEN, response.status(), "{path}");
+    }
+    Ok(())
+}
+
+#[tokio::test]
 async fn the_wildcard_user_and_v1_scopes_grant_as_their_letters_say()
 -> Result<(), Box<dyn StdError>> {
     let case = Case::new().await;

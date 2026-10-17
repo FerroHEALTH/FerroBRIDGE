@@ -114,6 +114,8 @@ pub struct AppState {
     auth: Option<Arc<crate::auth::Authority>>,
     /// The requests the usage report counts, recorded by the request log.
     usage: Arc<crate::usage_report::window::Window>,
+    /// The operator API, when `[operator] enabled` mounts it.
+    operator: Option<Arc<crate::operator::Operator>>,
 }
 
 impl AppState {
@@ -177,6 +179,7 @@ impl AppState {
             hl7v2: None,
             auth: None,
             usage: Arc::default(),
+            operator: None,
         })
     }
 
@@ -193,6 +196,7 @@ impl AppState {
             hl7v2: None,
             auth: None,
             usage: Arc::default(),
+            operator: None,
         }
     }
 
@@ -226,6 +230,19 @@ impl AppState {
     pub fn with_auth(mut self, authority: Arc<crate::auth::Authority>) -> Self {
         self.auth = Some(authority);
         self
+    }
+
+    /// Returns this state with `operator` serving the operator API.
+    #[must_use]
+    pub fn with_operator(mut self, operator: Arc<crate::operator::Operator>) -> Self {
+        self.operator = Some(operator);
+        self
+    }
+
+    /// Returns the operator API, when it is mounted.
+    #[must_use]
+    pub const fn operator(&self) -> Option<&Arc<crate::operator::Operator>> {
+        self.operator.as_ref()
     }
 
     /// Returns the resource server, when inbound authentication is on.

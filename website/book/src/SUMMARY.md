@@ -18,6 +18,7 @@
 - [What FerroBRIDGE runs beside](operate/deployment-shape.md)
 - [Configuring the server](operate/configuration.md)
 - [The HL7 v2 face](operate/hl7v2-face.md)
+- [The operator API](operate/operator-api.md)
 - [The container image](operate/container.md)
 - [Checking a deployment](operate/deployment-probes.md)
 - [Failure and identity behaviour](operate/failure-and-identity.md)

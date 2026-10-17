@@ -76,8 +76,8 @@ pub struct AuthSettings {
     /// The subjects a token with no clinical scope is granted system-wide
     /// access for.
     pub scopeless_subjects: BTreeSet<String>,
-    /// The scope that will guard the operator API, which SMART scopes do not
-    /// cover.
+    /// The scope that guards the operator API, which SMART scopes do not cover,
+    /// and admits the operations that commit nothing.
     pub operator_scope: String,
     /// The SMART capabilities the discovery document adds to the ones the
     /// resource server enforces.
@@ -319,6 +319,8 @@ pub struct Caller {
     /// Whether the subject is granted system-wide access without a clinical
     /// scope.
     scopeless: bool,
+    /// Whether the token carries the operator scope.
+    operator: bool,
 }
 
 impl Caller {
@@ -340,7 +342,23 @@ impl Caller {
             scopes: Scopes::parse(scope),
             patient,
             scopeless,
+            operator: false,
         }
+    }
+
+    /// Returns this caller with `operator` as whether its token carries the
+    /// operator scope.
+    #[must_use]
+    pub const fn with_operator(mut self, operator: bool) -> Self {
+        self.operator = operator;
+        self
+    }
+
+    /// Whether the token carries the operator scope, which admits the operator
+    /// API and the operations that commit nothing.
+    #[must_use]
+    pub const fn is_operator(&self) -> bool {
+        self.operator
     }
 
     /// Returns the token's subject.
@@ -396,6 +414,16 @@ pub enum Access {
 }
 
 impl Access {
+    /// Whether the caller carries the operator scope; an open facade has no
+    /// caller and so no operator.
+    #[must_use]
+    pub fn is_operator(&self) -> bool {
+        match self {
+            Self::Open => false,
+            Self::Caller(caller) => caller.is_operator(),
+        }
+    }
+
     /// Returns which data `permission` on `resource_type` reaches.
     #[must_use]
     pub fn reach(&self, permission: Permission, resource_type: &str) -> Option<Compartment> {
