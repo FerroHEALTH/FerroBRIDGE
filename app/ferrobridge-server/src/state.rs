@@ -150,6 +150,9 @@ impl AppState {
                 })?;
             indicators.push(Arc::new(indicators::Terminology::new(client)));
         }
+        if let Some(cdm) = settings.cdm.as_ref() {
+            indicators.push(Arc::new(indicators::Cdm::new(&cdm.connection)));
+        }
         let programs = crate::mappings::load_configured(settings, cdr.as_ref())
             .await
             .map_err(|source| crate::config::Error::Mappings {

@@ -13,8 +13,6 @@ use http::StatusCode;
 
 use crate::health::{Check, HealthIndicator, IndicatorState};
 
-// TODO(#615): the CDM database indicator when `[cdm]` is configured.
-
 /// The openEHR CDR probe.
 #[derive(Debug, Clone)]
 pub struct Cdr {
@@ -62,6 +60,49 @@ impl HealthIndicator for Terminology {
 
     fn check(&self) -> Check<'_> {
         Box::pin(async move { classify(self.client.reachability().await.map_err(reason)) })
+    }
+}
+
+/// The OMOP CDM database probe.
+///
+/// `serve` runs no ETL, so it holds no CDM connection of its own; the probe
+/// keeps one lazy connection, opened on the first check over the TLS the
+/// `[cdm]` section settles, and asks `SELECT 1` on it. A refused connection
+/// and a failed query both count as down, so an operator sees an unreachable
+/// CDM before the next `etl run` fails.
+#[derive(Debug, Clone)]
+pub struct Cdm {
+    /// The lazy pool of one connection the probe asks through.
+    pool: sqlx::PgPool,
+}
+
+impl Cdm {
+    /// Returns a probe of the database `connection` reaches.
+    ///
+    /// Nothing is opened until the first check.
+    #[must_use]
+    pub fn new(connection: &omop_cdm::connection::CdmConnection) -> Self {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .min_connections(0)
+            .acquire_timeout(crate::health::CHECK_TIMEOUT)
+            .connect_lazy_with(connection.pool_options());
+        Self { pool }
+    }
+}
+
+impl HealthIndicator for Cdm {
+    fn name(&self) -> &'static str {
+        "cdm"
+    }
+
+    fn check(&self) -> Check<'_> {
+        Box::pin(async move {
+            match sqlx::query("SELECT 1").execute(&self.pool).await {
+                Ok(_answered) => IndicatorState::up(),
+                Err(error) => IndicatorState::down(reason(error)),
+            }
+        })
     }
 }
 
