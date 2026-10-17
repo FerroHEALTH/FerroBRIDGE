@@ -132,10 +132,6 @@ fn resource_id_code(element: &Value, code: String) -> String {
 }
 
 #[test]
-#[expect(
-    clippy::panic,
-    reason = "the test fails by naming the path it could not resolve"
-)]
 fn the_logical_id_of_a_resource_is_an_id_in_every_version() {
     for (module, schemas) in tables() {
         for name in ["Resource", "Patient", "Bundle"] {
