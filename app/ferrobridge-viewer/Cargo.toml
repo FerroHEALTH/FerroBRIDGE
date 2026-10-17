@@ -67,6 +67,8 @@ cookie.workspace = true
 # in the terminology root set of the generated model.
 fhir-types = { workspace = true, features = ["r4", "terminology"] }
 http.workspace = true
+# The `Diagnostic` the operator API answers, read in its serde form.
+openehr-mapping-core.workspace = true
 # The ID Token of a sign-in, verified against the provider's JWK Set
 # (OpenID Connect Core 1.0 §3.1.3.7).
 jsonwebtoken.workspace = true

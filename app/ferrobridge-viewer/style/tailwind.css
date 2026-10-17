@@ -303,6 +303,95 @@
     --tone-dot: var(--neutral-dot);
   }
 
+  /* A badge: a word on the tone's ground, with no dot. */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-control);
+    background: var(--tone-bg);
+    padding: 0 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: var(--tone-fg);
+    white-space: nowrap;
+  }
+
+  /* The sections of a screen the server drew, each a card. */
+  .sections {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .card {
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: var(--raised);
+    box-shadow: var(--shadow-card);
+    padding: 1rem 1.25rem;
+  }
+
+  .card > h2:first-child {
+    margin-block-start: 0;
+  }
+
+  .card table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .card :is(th, td) {
+    border-bottom: 1px solid var(--line);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .card thead th {
+    background: var(--head);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .card tbody tr:last-child > * {
+    border-bottom: 0;
+  }
+
+  /* A wide table scrolls in its own box, so the page never scrolls
+     sideways; the box takes the keyboard focus to scroll. */
+  .table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .disclosure > summary {
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .disclosure pre {
+    max-height: min(70vh, 40rem);
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: var(--inset);
+    padding: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+  }
+
   /* A status pill: a dot and a word on the tone's ground. */
   .pill {
     display: inline-flex;

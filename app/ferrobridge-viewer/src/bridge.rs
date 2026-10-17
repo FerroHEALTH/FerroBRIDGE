@@ -25,6 +25,9 @@ use crate::config::settings::BridgeSettings;
 /// and encodings).
 pub const FHIR_JSON: &str = "application/fhir+json";
 
+/// The JSON media type of the bridge's own documents (RFC 8259 §11).
+pub const JSON: &str = "application/json";
+
 /// The largest body the console reads from an answer the bridge accepted.
 pub const BODY_LIMIT: usize = 4 * 1024 * 1024;
 
@@ -172,22 +175,115 @@ impl Bridge {
         &self,
         token: &AccessToken,
     ) -> Result<CapabilityStatement, BridgeError> {
-        let object = self.fhir_object("fhir/metadata", token).await?;
-        CapabilityStatement::from_json(&object, &mut Path::root("CapabilityStatement")).map_err(
-            |source| BridgeError::Decode {
-                expected: "CapabilityStatement",
-                source: Box::new(source),
-            },
-        )
+        self.capability(token)
+            .await
+            .map(|(statement, _raw)| statement)
     }
 
-    /// Sends `GET {base}{route}` for FHIR JSON as the operator whose access
-    /// token is `token`, and reads the JSON object the bridge answers.
-    async fn fhir_object(
+    /// Reads the bridge's `CapabilityStatement` as
+    /// [`Self::capability_statement`] does, with the JSON it arrived in.
+    ///
+    /// # Errors
+    /// As [`Self::capability_statement`].
+    pub async fn capability(
+        &self,
+        token: &AccessToken,
+    ) -> Result<(CapabilityStatement, serde_json::Value), BridgeError> {
+        let (_status, raw) = self
+            .json("fhir/metadata", FHIR_JSON, token, &[StatusCode::OK])
+            .await?;
+        let Value::Object(object) = Value::from_serde_json(raw.clone()) else {
+            return Err(BridgeError::NotAnObject);
+        };
+        let statement =
+            CapabilityStatement::from_json(&object, &mut Path::root("CapabilityStatement"))
+                .map_err(|source| BridgeError::Decode {
+                    expected: "CapabilityStatement",
+                    source: Box::new(source),
+                })?;
+        Ok((statement, raw))
+    }
+
+    /// Reads the bridge's build facts, pins and lanes from
+    /// `GET {base}health/info`.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Refused`] for any status but `200`, and the
+    /// transport and body errors of [`Self::capability_statement`].
+    pub async fn health_info(&self, token: &AccessToken) -> Result<serde_json::Value, BridgeError> {
+        self.json("health/info", JSON, token, &[StatusCode::OK])
+            .await
+            .map(|(_status, body)| body)
+    }
+
+    /// Reads the bridge's readiness from `GET {base}health/readiness`, with
+    /// the status it answered: `200` while every indicator is up and `503`
+    /// while one is down, each with the report naming every indicator.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Refused`] for any other status, and the
+    /// transport and body errors of [`Self::capability_statement`].
+    pub async fn readiness(
+        &self,
+        token: &AccessToken,
+    ) -> Result<(StatusCode, serde_json::Value), BridgeError> {
+        self.json(
+            "health/readiness",
+            JSON,
+            token,
+            &[StatusCode::OK, StatusCode::SERVICE_UNAVAILABLE],
+        )
+        .await
+    }
+
+    /// Reads the running load from the operator API, `GET
+    /// {base}operator/state`.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Refused`] for any status but `200` (a `404`
+    /// where the operator API is off, a `403` without the operator scope),
+    /// and the transport and body errors of [`Self::capability_statement`].
+    pub async fn operator_state(
+        &self,
+        token: &AccessToken,
+    ) -> Result<serde_json::Value, BridgeError> {
+        self.json("operator/state", JSON, token, &[StatusCode::OK])
+            .await
+            .map(|(_status, body)| body)
+    }
+
+    /// Reads the bridge's SMART discovery document, `GET
+    /// {base}fhir/.well-known/smart-configuration` (SMART App Launch 2.2.0,
+    /// conformance).
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Refused`] for any status but `200` (a `404`
+    /// where the bridge checks no tokens), and the transport and body errors
+    /// of [`Self::capability_statement`].
+    pub async fn smart_configuration(
+        &self,
+        token: &AccessToken,
+    ) -> Result<serde_json::Value, BridgeError> {
+        self.json(
+            "fhir/.well-known/smart-configuration",
+            JSON,
+            token,
+            &[StatusCode::OK],
+        )
+        .await
+        .map(|(_status, body)| body)
+    }
+
+    /// Sends `GET {base}{route}` for `accept` as the operator whose access
+    /// token is `token`, and reads the JSON object the bridge answers with a
+    /// status in `admitted`; any other status is a refusal.
+    async fn json(
         &self,
         route: &'static str,
+        accept: &'static str,
         token: &AccessToken,
-    ) -> Result<fhir_types::codec::Object, BridgeError> {
+        admitted: &[StatusCode],
+    ) -> Result<(StatusCode, serde_json::Value), BridgeError> {
         let url = self.url(route)?;
         let mut bearer = HeaderValue::from_str(&format!("Bearer {}", token.0.expose_secret()))
             .map_err(|_invalid| BridgeError::Token)?;
@@ -195,13 +291,13 @@ impl Bridge {
         let response = self
             .client
             .get(url)
-            .header(ACCEPT, FHIR_JSON)
+            .header(ACCEPT, accept)
             .header(AUTHORIZATION, bearer)
             .send()
             .await
             .map_err(|source| BridgeError::Transport { source })?;
         let status = response.status();
-        if !status.is_success() {
+        if !admitted.contains(&status) {
             let body = read(response, REFUSAL_LIMIT, Overflow::Truncate).await?;
             return Err(BridgeError::Refused {
                 status,
@@ -211,10 +307,10 @@ impl Bridge {
         let body = read(response, BODY_LIMIT, Overflow::Refuse).await?;
         let value: serde_json::Value =
             serde_json::from_slice(&body).map_err(|source| BridgeError::Payload { source })?;
-        match Value::from_serde_json(value) {
-            Value::Object(object) => Ok(object),
-            _ => Err(BridgeError::NotAnObject),
+        if !value.is_object() {
+            return Err(BridgeError::NotAnObject);
         }
+        Ok((status, value))
     }
 
     /// The URL of `route` under the base.

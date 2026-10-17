@@ -17,6 +17,7 @@ mod boundary;
 mod bridge;
 mod config;
 mod contrast;
+mod engine;
 mod pages;
 mod refresh;
 mod run;
