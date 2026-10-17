@@ -6,6 +6,7 @@
 
 mod auth;
 mod environment;
+mod etl;
 mod facade;
 mod file;
 mod hl7v2;

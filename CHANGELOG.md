@@ -25,6 +25,9 @@ crates on crates.io.
 
 ### Changed
 
+- The FHIRconnect operations lane reads its mapping directory through the
+  walk the facade uses (#524), so a `.YML` or `.YAML` file is now read by both
+  lanes; the operations lane read only the lower-case spellings before.
 - The README, the book's Licensing page and the landing page answer "do you
   need a commercial licence?" at a glance (#111): a table of what you are
   doing, what you need and the part of `LICENSE` that decides it, the same
@@ -56,6 +59,13 @@ crates on crates.io.
   required element it refuses the unit (`EngineError::Untranslated`).
   Breaking for a consumer that matches `SkipReason` exhaustively: add an arm
   for `Untranslated`.
+- `scripts/deploy-probe.sh` probes a running deployment at a base URL (#220)
+  and reports each lane (health, the facade under `/fhir`, the FHIRconnect
+  operations) as `on`, `off`, `failing` or `uncovered`. An `uncovered` lane
+  fails the run with its own exit status, `--expect <lane>=<on|off>` fails a
+  lane in the wrong state, and the report names the findings each lane was
+  not observed in. The Operate section of the book documents it under
+  "Checking a deployment".
 - `fhir-types` 0.1.117 carries a search parameter registry per FHIR version
   behind `resources` (#522): `<version>::search_parameters::SEARCH_PARAMETERS`
   holds every `SearchParameter` of the core package, apart from its examples,

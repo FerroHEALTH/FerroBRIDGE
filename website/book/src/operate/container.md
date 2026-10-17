@@ -5,9 +5,10 @@
 
 FerroBRIDGE ships as one image carrying one binary. This page describes the
 image, the quickstart `compose.yaml` beside it, the variables the server reads,
-and the health probe you point your orchestrator at. No release has been cut
-yet, so no tag exists on the registry; the recipe and the quickstart are in the
-repository and the first release publishes the image they describe.
+and the health probe you point your orchestrator at. Each release
+publishes the image to `ghcr.io/ferrohealth/ferrobridge` under its version
+tag, with provenance and SBOM attestations, beside the release binaries on the
+GitHub release page.
 
 No specification governs packaging, the process model, or health probes: this
 page is FerroBRIDGE's own design.

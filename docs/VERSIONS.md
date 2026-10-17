@@ -176,6 +176,8 @@ v2-to-FHIR ConceptMaps for the HL7 v2 face (#251), and the script takes the
 `LICENSE` of its source repository beside it because that licence differs
 from the package's own. `scripts/checks/versions.sh` reads the `Version` line
 of every `PROVENANCE.md` below back against its row.
+`scripts/checks/pin-freshness.sh` reads each version against the registry's
+`latest`.
 
 | Item | Pin | Repeated in |
 |---|---|---|
@@ -366,7 +368,7 @@ macros read.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `zizmor` | 1.30.1 | `.github/workflows/ci.yml` |
+| `zizmor` | 1.31.1 | `.github/workflows/ci.yml` |
 | `actionlint` | 1.7.12 | `.github/workflows/ci.yml` |
 | `shellcheck` | 0.11.0 | `.github/workflows/ci.yml` |
 | `hadolint` | 2.15.1 | `.github/workflows/ci.yml` |

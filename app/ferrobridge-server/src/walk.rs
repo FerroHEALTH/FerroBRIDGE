@@ -91,6 +91,32 @@ pub fn files(directory: &Path, keep: impl Fn(&Path) -> bool) -> Result<Vec<PathB
     Ok(found)
 }
 
+/// The extensions a FHIRconnect mapping file carries, compared without case.
+///
+/// FHIRconnect writes YAML and states no extension, so both spellings are read
+/// and nothing else is (no specification governs this: our own design).
+const MAPPING_EXTENSIONS: [&str; 2] = ["yml", "yaml"];
+
+/// Returns every FHIRconnect mapping file under `directory`, sorted: the
+/// `.yml` and `.yaml` files, the search declarations beside them left out.
+///
+/// This is the one mapping-tree walk the operations lane and the facade
+/// share.
+///
+/// # Errors
+///
+/// Returns [`Error`] as [`files`] does.
+pub fn mapping_files(directory: &Path) -> Result<Vec<PathBuf>, Error> {
+    files(directory, |path| {
+        !crate::facade::search::declaration::is_declaration(path)
+            && path
+                .extension()
+                .and_then(std::ffi::OsStr::to_str)
+                .map(str::to_ascii_lowercase)
+                .is_some_and(|found| MAPPING_EXTENSIONS.contains(&found.as_str()))
+    })
+}
+
 /// Returns whether `path` carries one of the `wanted` extensions.
 #[must_use]
 pub fn has_extension(path: &Path, wanted: &[&str]) -> bool {

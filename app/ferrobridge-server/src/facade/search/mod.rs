@@ -290,7 +290,7 @@ pub fn bind(
         patient,
         order,
         parameters,
-        placement: engine::archetype_of(loaded.program())
+        placement: engine::entry::archetype_of(loaded.program())
             .and_then(|archetype| template::placement(loaded.index(), &archetype)),
     };
     check_paths(&declared)?;

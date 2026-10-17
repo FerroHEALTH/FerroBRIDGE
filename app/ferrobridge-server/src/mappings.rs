@@ -31,9 +31,6 @@ use crate::config::Settings;
 /// The extension an operational template file carries.
 const TEMPLATE_EXTENSION: &str = "opt";
 
-/// The extensions a mapping file carries.
-const MAPPING_EXTENSIONS: [&str; 2] = ["yml", "yaml"];
-
 /// Why a mapping set did not load.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -332,10 +329,8 @@ async fn fetch(client: &crate::cdr::CdrClient, template: &str) -> Result<Templat
 
 /// Reads and validates the mapping files under `directory`.
 fn read_mappings(directory: &Path) -> Result<MappingSet, Error> {
-    let mapping_files: Vec<PathBuf> = files(directory, &MAPPING_EXTENSIONS)?
-        .into_iter()
-        .filter(|path| !crate::facade::search::declaration::is_declaration(path))
-        .collect();
+    let mapping_files = crate::walk::mapping_files(directory)
+        .map_err(|crate::walk::Error { path, source }| Error::Read { path, source })?;
     if mapping_files.is_empty() {
         return Err(Error::Empty {
             path: directory.to_path_buf(),

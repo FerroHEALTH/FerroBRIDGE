@@ -448,7 +448,7 @@ pub(crate) fn entry_view(
     binding: &CompositionBinding,
     id: &FhirResourceId,
 ) -> Result<CanonicalComposition, Refusal> {
-    let entry = engine::entry_named(program.program(), composition, &binding.entry_path)
+    let entry = engine::entry::entry_named(program.program(), composition, &binding.entry_path)
         .map_err(|error| Refusal::from(Refused::from(error)))?
         .ok_or_else(|| {
             reply::refusal(

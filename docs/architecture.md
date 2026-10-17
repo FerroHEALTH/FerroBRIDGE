@@ -1091,6 +1091,72 @@ bindings proper stay with #440. Where R4 is silent (an item matching two
 slices, an item in no slice between ordered open slices) the behaviour is
 our own design, recorded at its site.
 
+### 4.10 The operator console and the operator API
+
+No specification governs the operator surface: our own design, on the model
+FerroFED records as its decisions A55, A88 and A93 (#594, #260). The console
+is for an operator who wants to see what the bridge runs and work with its
+mapping files without a shell on the host.
+
+**The console is its own binary and image.** `app/ferrobridge-viewer` is a
+Leptos application rendered on the server and hydrated in the browser, with a
+backend-for-frontend, shipped as `ghcr.io/ferrohealth/ferrobridge-viewer`.
+The server half and the browser half are chosen by compilation target, never
+by Cargo feature, so a workspace `--all-features` build never enables both.
+The operator's OpenID Connect session (authorization code with PKCE) lives on
+the console's server, which calls the bridge with the operator's own access
+token. The bridge validates that token as the resource server it already is
+(#400), serves no static asset and holds no browser session.
+
+**The console links two workspace crates and no others.** The server half
+may depend on `openehr-mapping-core`, for the `Diagnostic` a check answers,
+and on `fhir-types` with the `r4` feature, for the `OperationOutcome` and the
+`CapabilityStatement` it renders. The browser half links neither and receives
+view data from server functions. A dependency-closure test fails on any
+other workspace member, so the console can never compile or run a mapping
+itself: every check, transform and save goes through the bridge. Linking the
+two crates is what `codegen.md` asks of a consumer, which may not shadow a
+model the workspace already defines.
+
+**The operator API is off by default.** It is mounted under `/operator` on
+the bridge's listener when `[operator] enabled = true`, and enabling it
+without `[auth]` is a configuration error at load. Every route requires a
+token that carries `auth.operator_scope` (`ferrobridge.operator` by default).
+SMART scopes cover FHIR resources only, so that scope has nothing in SMART to
+overlap with. Reads and writes share the listener: the bridge has no admin
+listener, and the writes change mapping files, never clinical data. The
+request log names the actor and the file of a write, never its content.
+
+**A mapping file has one owner.** The files under the configured mapping
+directories are provisioned and read-only in the console. A console save goes
+to `[operator] mapping_dir`, a separate writable directory (a volume, since
+`compose.yaml` runs the server with a read-only root file system), and a save
+whose relative path names a provisioned file is refused. The save writes the
+verbatim bytes the editor sent to a temporary file in that directory, syncs
+it and renames it over the target, so a reader sees the old file or the new
+one and never a mix. Nothing writes back to a provisioned directory.
+
+**A reload checks the whole set, then swaps.** A save is checked first: the
+draft is compiled with every other file of the set, and a draft that would
+not compile is refused with its diagnostics and never written. A reload
+compiles the provisioned files and the console's files together. Any error
+leaves the running set in place and answers every diagnostic. A clean set
+replaces the running one in a single pointer swap: each request takes the
+set at entry and finishes on it, so a request in flight completes on the old
+set. An ETL run reads the set when it starts.
+
+**Each replica reloads on its own.** With `mapping_dir` on a shared volume, a
+file another replica saved is visible to this one at its next reload or
+restart. The console's reload acts on the replica behind its configured URL.
+Revisions shared across replicas, with history and rollback, are the console
+breadth of v0.0.16.
+
+**An operation that commits nothing admits the operator scope.** `$validate`
+is a dry run, and `$tofhir` and `$toopenehr` transform without writing, so
+each admits a token that carries the operator scope as well as the SMART
+scopes it admits today (#598). The transform playground and the validation
+dry run of the console use these operations as they are.
+
 ## 5. The OMOP side
 
 OMOP is a relational analytics schema, not an API: the deliverable is rows in
@@ -2020,14 +2086,15 @@ flowchart LR
     C --> E["v0.0.6<br/>STU3, FHIRPath,<br/>validator foundation,<br/>search, SMART"]
     D --> E
     E --> F["v0.0.7<br/>facade hardening"]
-    E --> G["v0.0.8<br/>profile validator<br/>finished"]
-    F --> H["v0.0.9<br/>openEHR demographics"]
-    E --> I["v0.0.10<br/>FHIRconnect breadth,<br/>HL7 v2 outcomes"]
-    C --> J["v0.0.11<br/>OMOP breadth,<br/>data quality"]
-    F --> K["v0.0.12<br/>security"]
-    G --> L["v0.0.13<br/>EU profile targets"]
-    J --> M["v0.0.14<br/>change-feed adapter"]
-    F --> N["v0.0.15<br/>operator viewer image"]
+    F --> N["v0.0.8<br/>operator console"]
+    E --> G["v0.0.9<br/>profile validator<br/>finished"]
+    F --> H["v0.0.10<br/>openEHR demographics"]
+    E --> I["v0.0.11<br/>FHIRconnect breadth,<br/>HL7 v2 outcomes"]
+    C --> J["v0.0.12<br/>OMOP breadth,<br/>data quality"]
+    F --> K["v0.0.13<br/>security"]
+    G --> L["v0.0.14<br/>EU profile targets"]
+    J --> M["v0.0.15<br/>change-feed adapter"]
+    N --> O["v0.0.16<br/>console breadth"]
 ```
 
 **v0.0.2, the foundation.** The workspace with every lint (#20); the vendor
@@ -2080,27 +2147,36 @@ error, the body ceiling and the timeout included, answers an
 `OperationOutcome`; the identity store's repair paths; references the request
 does not carry and resources the engine creates; the operator documentation.
 
-**v0.0.8, the profile validator finished.** Agreement with the HL7 FHIR
+**v0.0.8, the operator console.** The decisions of section 4.10 (#594); the
+operator API behind `[operator]` and the operator scope, with mapping files
+listed, read, checked, saved and reloaded; `$validate`, `$tofhir` and
+`$toopenehr` admitting the operator scope; `ferrobridge mapping check`
+checking a tree; and `app/ferrobridge-viewer` with OIDC sign-in, the shell
+and theme, engine state, the transform playground, the validation dry run,
+the mapping editor, browser journeys, its image, its release lane and a
+`viewer` profile in `compose.yaml`.
+
+**v0.0.9, the profile validator finished.** Agreement with the HL7 FHIR
 Validator on a shared corpus, the extension context and reference versioning
 checks, and the `fhir-types` gaps the validator found.
 
-**v0.0.9, openEHR demographics.** The patient-to-EHR link, demographic AQL as
+**v0.0.10, openEHR demographics.** The patient-to-EHR link, demographic AQL as
 Cadasto's experimental extension documents it, the FHIRconnect demographics
 endpoint, and Patient, Practitioner and Organization over the Demographic API.
 
-**v0.0.10, FHIRconnect breadth.** The full data-type matrix, the remaining
+**v0.0.11, FHIRconnect breadth.** The full data-type matrix, the remaining
 concept types and `mappingCode` functions, the published contexts compiling
 in-tree, and the open outcomes of the HL7 v2 face.
 
-**v0.0.11, OMOP breadth.** The remaining eight OMOCL targets and the full
+**v0.0.12, OMOP breadth.** The remaining eight OMOCL targets and the full
 key-to-column projection; the Athena vocabulary loader; domain validation, the
 run report and the Rust port of the Data Quality Dashboard checks; FHIR to OMOP
 with no CDR.
 
-**v0.0.12, security.** The caller's identity reaching the CDR, token
+**v0.0.13, security.** The caller's identity reaching the CDR, token
 introspection, and `private_key_jwt` client authentication.
 
-**v0.0.13, the EU profile targets.** HL7 Europe Base and Core, then the
+**v0.0.14, the EU profile targets.** HL7 Europe Base and Core, then the
 Laboratory Report (upgrading the library's EEHRxF context from 0.1.1 to
 2.0.0), then Medication Prescription and Dispense, each a context with
 extensions and a round trip asserting profile elements; the readiness matrix
@@ -2108,15 +2184,15 @@ per priority category published from generated metadata; the profile
 packages pinned in `docs/VERSIONS.md`. Patient Summary follows when its guide
 leaves ballot.
 
-**v0.0.14, the change feed.** The change-feed adapter of section 5.1 with the
+**v0.0.15, the change feed.** The change-feed adapter of section 5.1 with the
 reference CDR's outbox stream as its first source, driving the incremental
 OMOP load and the outbound FHIR lane, with a durable dead-letter store, a
 retraction message, and delivery at least once. Labelled as FerroBRIDGE's
 extension.
 
-**v0.0.15, the operator viewer image.** A separate image beside the server:
-engine state, a transform playground, and the mapping files viewed and
-edited.
+**v0.0.16, console breadth.** Mapping-set revisions shared across replicas,
+with history and rollback, export and import, example compositions for the
+playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 
 ## 15. Decision register
 
@@ -2158,6 +2234,12 @@ edited.
 | YAML parser | `serde-saphyr` 1.2.0 | anchors, aliases, merge keys, spans, maintained | `serde_yaml` (archived), `serde-yaml-ng`, `serde_yml` |
 | Bulk load | binary `COPY` via `tokio-postgres`, `sqlx` for checked queries | throughput; the reference engine's per-row persist is its ceiling | ORM-style inserts |
 | Demographics | in order: the patient-to-EHR link through `EHR_STATUS.subject.external_ref`; `Patient` from EHR-side person templates through FHIRconnect; the FHIRconnect demographics endpoint as our own port over the identity store; `PARTY` objects over the ITS-REST Demographic API behind a feature labelled DEVELOPMENT; party-rooted mappings as our own extension; demographic AQL as Cadasto's experimental extension documents it, behind a feature labelled with that extension, backing demographic FHIR search (#465, #480) | the link and EHR-side templates rest on STABLE texts (RM Common IM §4.2.1.1, ITS-REST EHR); the Demographic API is `x-status: DEVELOPMENT` at 1.1.0 and on master and has no search; FHIRconnect `engine/demographics.adoc` defines no endpoint interface; AQL 1.1.0 defines no demographic semantics (QUERY §3.13.2), and the owner expects Cadasto's extension to become that specification (owner direction 2026-10-15) | demographics left outside |
+| Operator console shape | `app/ferrobridge-viewer`, a Leptos app rendered on the server and hydrated, with a backend-for-frontend, its own binary and image; halves chosen by target, never by feature; the operator's OIDC session on the console's server, which calls the bridge with the operator's token (section 4.10, #594) | the bridge authenticates every request by bearer token and holds no browser session (#400), so a console the bridge served would add a session and a static-asset surface; FerroFED's A55 is the family precedent; no specification governs the console: our own design | a client-side app served by the bridge; a console inside the server binary |
+| Console crate boundary | the server half links `openehr-mapping-core` and `fhir-types` (`r4`) and no other workspace crate, enforced by a dependency-closure test; the browser half links neither | `codegen.md` forbids a consumer shadowing a model the workspace defines (`Diagnostic`, `OperationOutcome`, `CapabilityStatement`); excluding the engine crates keeps every check, transform and save on the bridge | no workspace crate (shadow types for the three); the engine crates linked so the console compiles mappings itself |
+| Operator API | `/operator` on the bridge's listener, off unless `[operator] enabled`, refused at load without `[auth]`, every route requiring `auth.operator_scope`; the log names actor and file, never content | SMART scopes cover FHIR resources only; the bridge has no admin listener and the writes touch mapping files, never clinical data; no specification governs it: our own design | a second admin listener; an unguarded API on a private network |
+| Mapping ownership and saving | provisioned directories read-only; console saves go to `[operator] mapping_dir`, written to a temporary file, synced and renamed; a save over a provisioned path is refused | one owner per file (FerroFED A88); the server runs with a read-only root file system; a rename is atomic within one file system, so a reader sees the old file or the new one | writing back into the provisioned tree; saving without a check |
+| Mapping reload | the whole set compiled, any error keeps the running set; a clean set swapped in one pointer swap that each request reads at entry; each replica reloads on its own call or restart | requests in flight finish on the set they started with; a half-loaded set is never served; shared revisions are v0.0.16 | per-file hot reload; a file watcher; reload on save across replicas |
+| Scope of non-committing operations | `$validate`, `$tofhir` and `$toopenehr` admit the operator scope beside their SMART scopes (#598) | none of them writes to the CDR, so an operator testing a mapping needs no clinical write scope | a SMART write scope for the console's dry runs |
 
 ## 16. What is deliberately outside, and what is recorded as an upstream report
 

@@ -3,12 +3,9 @@
 
 # CI in two tiers.
 #
-#   1. The workflow, shell, container and guard tier runs NOW, on a repository
-#      with no code: zizmor over .github, actionlint over .github/workflows,
-#      shellcheck over the tracked shell programs, hadolint over any
-#      Dockerfile, the committed comment-style and versions guards, the
-#      fetch and check of the profile package set, and the
-#      self-tests of the tracker helpers under scripts/gh. These
+#   1. The workflow, shell, container and guard tier runs on every change and
+#      needs no Rust: the workflow and shell linters and the committed guards,
+#      each a job below; docs/ci-cd.md (The two tiers) is the list. These
 #      keep this very file honest, so none of them may depend on Rust existing.
 #   2. The Rust tier is gated behind a detection job that looks for a root
 #      Cargo.toml. Every cargo lane is skipped cleanly until the workspace
@@ -78,7 +75,7 @@ jobs:
           persist-credentials: false
       - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
-          tool: zizmor@1.30.1
+          tool: zizmor@1.31.1
       - name: Audit .github
         # GH_TOKEN enables the online audits. impostor-commit verifies that a
         # pinned commit really belongs to the repository named in front of it,

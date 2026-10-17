@@ -3,10 +3,9 @@
 
 # What FerroBRIDGE runs beside
 
-FerroBRIDGE is not released yet, so there is nothing to install today. What is
-decided is the shape of the deployment: which systems the bridge talks to, what
-it stores, and what you have to supply. Read this page to plan; the commands
-arrive with the first release.
+This page describes the shape of a deployment: which systems the bridge talks
+to, what it stores, and what you have to supply. Read it to plan, then install
+the image or a release binary as [The container](container.md) describes.
 
 <!-- toc -->
 

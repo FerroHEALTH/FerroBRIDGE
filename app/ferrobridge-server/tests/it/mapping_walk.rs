@@ -127,3 +127,26 @@ async fn a_configmap_volume_mapping_directory_boots_the_operations_lane()
     );
     Ok(())
 }
+
+#[test]
+fn the_mapping_walk_reads_yaml_in_either_case_and_leaves_the_search_declarations_out()
+-> Result<(), Box<dyn StdError>> {
+    let directory = tempfile::tempdir()?;
+    for name in [
+        "a.yml",
+        "b.YAML",
+        "c.context.yml",
+        "c.search.yml",
+        "notes.txt",
+        "d.opt",
+    ] {
+        std::fs::write(directory.path().join(name), "")?;
+    }
+
+    let found: Vec<String> = walk::mapping_files(directory.path())?
+        .iter()
+        .filter_map(|path| path.file_name()?.to_str().map(str::to_owned))
+        .collect();
+    assert_eq!(vec!["a.yml", "b.YAML", "c.context.yml"], found);
+    Ok(())
+}

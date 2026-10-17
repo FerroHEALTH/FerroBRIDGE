@@ -37,7 +37,7 @@ use crate::cdr::ids::EhrId;
 use crate::cdr::ids::versioned_object_uid;
 use crate::facade::Facade;
 use crate::facade::engine;
-use crate::facade::engine::Entry;
+use crate::facade::engine::entry::Entry;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::Refusal;
 use crate::facade::handlers::read;
@@ -491,7 +491,7 @@ fn matched(
     position: usize,
 ) -> Result<Vec<Entry>, Refusal> {
     let program = plan.program.program();
-    let every = engine::entries_of(program, &read.composition);
+    let every = engine::entry::entries_of(program, &read.composition);
     let nodes = plan.conditions.as_ref().map_or(0, Conditions::node_count);
     let mut chosen: Option<Vec<Entry>> = None;
     for node in 0..nodes {
@@ -521,7 +521,7 @@ fn matched(
         for binding in bindings {
             if binding.versioned_object_uid == container.value()
                 && let Some(entry) =
-                    engine::entry_named(program, &read.composition, &binding.entry_path)
+                    engine::entry::entry_named(program, &read.composition, &binding.entry_path)
                         .map_err(|error| Refusal::from(Refused::from(error)))?
             {
                 named.push(entry.ordinal());
