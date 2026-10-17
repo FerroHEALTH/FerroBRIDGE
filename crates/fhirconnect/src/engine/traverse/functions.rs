@@ -13,7 +13,7 @@ use crate::engine::rm::RmValue;
 /// The specification leaves the functions to the engine
 /// (`types-of-mappings/concept-type/concept-mappings.adoc`), so the registry
 /// is a seam rather than a fixed list, and it ships empty.
-pub trait MappingFunctions: fmt::Debug {
+pub trait MappingFunctions: fmt::Debug + Send + Sync {
     /// Runs the function `code` names over one openEHR value.
     ///
     /// # Errors

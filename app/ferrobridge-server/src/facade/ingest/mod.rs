@@ -373,7 +373,7 @@ pub struct Ingest<'a> {
     translator: &'a Translator,
     /// Where a `reference` mapping reads a resource the request does not
     /// carry.
-    references: &'a (dyn ReferenceSource + Sync),
+    references: &'a dyn ReferenceSource,
 }
 
 /// The translator of an ingest built with none: no server, so a
@@ -537,7 +537,7 @@ impl<'a> Ingest<'a> {
     /// Returns this ingest with `references` as the source a `reference`
     /// mapping reads a resource the request does not carry from.
     #[must_use]
-    pub fn with_references(mut self, references: &'a (dyn ReferenceSource + Sync)) -> Self {
+    pub fn with_references(mut self, references: &'a dyn ReferenceSource) -> Self {
         self.references = references;
         self
     }
