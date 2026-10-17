@@ -158,7 +158,7 @@ impl Ingest<'_> {
         inbound: &Inbound,
         standing: &Standing,
         built: &CanonicalComposition,
-    ) -> Result<Option<(CanonicalComposition, engine::Entry)>, Refused> {
+    ) -> Result<Option<(CanonicalComposition, engine::entry::Entry)>, Refused> {
         let binding = self
             .store
             .binding_of(inbound.resource_type(), &standing.id)
@@ -175,7 +175,7 @@ impl Ingest<'_> {
             })?;
         let whole = canonical_of(&standing.composition, built)?;
         Ok(
-            engine::entry_named(program.program(), &whole, &binding.entry_path)?
+            engine::entry::entry_named(program.program(), &whole, &binding.entry_path)?
                 .map(|entry| (whole, entry)),
         )
     }
@@ -422,7 +422,7 @@ fn splice(
     revision: &Revision<'_>,
 ) -> Result<CanonicalComposition, Refused> {
     let standing = canonical_of(revision.standing, built)?;
-    let target = engine::entry_named(program.program(), &standing, revision.entry_path)?
+    let target = engine::entry::entry_named(program.program(), &standing, revision.entry_path)?
         .ok_or_else(|| {
             Refused::new(
                 StatusCode::NOT_FOUND,
@@ -432,10 +432,10 @@ fn splice(
                 )),
             )
         })?;
-    if engine::entries_of(program.program(), &standing).len() <= 1 {
+    if engine::entry::entries_of(program.program(), &standing).len() <= 1 {
         return Ok(built.clone());
     }
-    let item = engine::entry_of(program.program(), built)
+    let item = engine::entry::entry_of(program.program(), built)
         .and_then(|entry| entry.item(built).cloned())
         .ok_or_else(|| {
             Refused::new(
@@ -473,15 +473,15 @@ fn splice(
 fn would_commit(
     program: &Loaded,
     whole: &CanonicalComposition,
-    entry: &engine::Entry,
+    entry: &engine::entry::Entry,
     built: &CanonicalComposition,
     sent: Composition,
 ) -> Result<Option<Composition>, Refused> {
-    if engine::entries_of(program.program(), whole).len() <= 1 {
+    if engine::entry::entries_of(program.program(), whole).len() <= 1 {
         return Ok(Some(sent));
     }
-    let Some(item) =
-        engine::entry_of(program.program(), built).and_then(|mapped| mapped.item(built).cloned())
+    let Some(item) = engine::entry::entry_of(program.program(), built)
+        .and_then(|mapped| mapped.item(built).cloned())
     else {
         return Ok(None);
     };
