@@ -199,8 +199,9 @@ daily report:
     answered to a frame the listener could not read, which is no message
     and is not timed in `hl7v2_message`.
   - `mapping_failures`: each resource or composition a FHIRconnect program
-    refused to map, on a facade write or transaction, on the HL7 v2 face's
-    ingest and on a `$tofhir` or `$toopenehr` call. A refusal the engine
+    refused to map, on a facade write or transaction, on a facade read,
+    version read or search (openEHR to FHIR), on the HL7 v2 face's ingest
+    and on a `$tofhir` or `$toopenehr` call. A refusal the engine
     returns because a terminology server did not translate a `conceptmap`
     code is counted too. A request refused before any program ran (a body
     in the wrong media type, a resource no program maps, a CDR that refused

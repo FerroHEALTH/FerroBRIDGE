@@ -631,6 +631,7 @@ async fn render_entry(
             source: &source,
             subject: subject.as_ref(),
             store: facade.store(),
+            usage: facade.usage(),
         },
         facade.translator(),
     )

@@ -123,7 +123,8 @@ pub struct Facade {
     translator: Translator,
     /// What may be fetched to resolve a reference the request does not carry.
     references: references::Policy,
-    /// The usage report's window the ingest counts mapping failures in.
+    /// The usage report's window the ingest and the renders count mapping
+    /// failures in.
     usage: Arc<Window>,
 }
 
@@ -152,9 +153,9 @@ impl Facade {
         }
     }
 
-    /// Returns this facade counting every unit its programs refuse to map
-    /// on ingest, through any face, in `usage`, the window the server's usage
-    /// report takes.
+    /// Returns this facade counting every unit its programs refuse to map,
+    /// on ingest through any face and on a read or search, in `usage`, the
+    /// window the server's usage report takes.
     #[must_use]
     pub fn with_usage(mut self, usage: Arc<Window>) -> Self {
         self.usage = usage;
@@ -171,6 +172,13 @@ impl Facade {
     pub fn with_translator(mut self, translator: Translator) -> Self {
         self.translator = translator;
         self
+    }
+
+    /// Returns the usage report's window the facade counts mapping failures
+    /// in.
+    #[must_use]
+    pub fn usage(&self) -> &Window {
+        &self.usage
     }
 
     /// Returns the terminology server the engine runs translate through.
