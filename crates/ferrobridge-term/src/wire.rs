@@ -107,6 +107,7 @@ macro_rules! r4_contracts {
                     url: translation.concept_map_url.as_deref().map(Into::into),
                     system: Some(translation.system.as_str().into()),
                     code: Some(translation.code.as_str().into()),
+                    version: translation.version.as_deref().map(Into::into),
                     targetsystem: translation.target_system.as_deref().map(Into::into),
                     reverse: translation.reverse.map(Into::into),
                     ..Default::default()
@@ -213,6 +214,7 @@ macro_rules! stu3_contracts {
                 Request::Translate(translation) => ConceptMapTranslateRequest {
                     system: Some(translation.system.as_str().into()),
                     code: Some(translation.code.as_str().into()),
+                    version: translation.version.as_deref().map(Into::into),
                     targetsystem: translation.target_system.as_deref().map(Into::into),
                     reverse: translation.reverse.map(Into::into),
                     ..Default::default()

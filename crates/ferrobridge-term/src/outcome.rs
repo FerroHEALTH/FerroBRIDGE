@@ -146,6 +146,9 @@ pub struct Translation {
     pub system: String,
     /// `code`, the code to translate.
     pub code: String,
+    /// `version`, the version of the system, if one was provided in the
+    /// source data.
+    pub version: Option<String>,
     /// `url`, the canonical URL of the concept map to use, when one is named.
     ///
     /// STU3 `$translate` has no `url` parameter, so an STU3 client refuses a
@@ -166,10 +169,18 @@ impl Translation {
         Self {
             system: system.into(),
             code: code.into(),
+            version: None,
             concept_map_url: None,
             target_system: None,
             reverse: None,
         }
+    }
+
+    /// Names the version of the code system, sent as `version`.
+    #[must_use]
+    pub fn with_version(mut self, version: impl Into<String>) -> Self {
+        self.version = Some(version.into());
+        self
     }
 
     /// Names the concept map, sent as `url`.

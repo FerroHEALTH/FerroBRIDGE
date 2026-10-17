@@ -274,6 +274,23 @@ async fn a_map_url_alone_sends_no_target_system_and_no_reverse() -> Result<(), B
             "targetsystem is 0..1 and was not given"
         );
         assert_eq!(None, parameter(&body, "reverse"), "reverse was not given");
+        assert_eq!(None, parameter(&body, "version"), "version was not given");
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_system_version_is_sent_when_given() -> Result<(), Box<dyn StdError>> {
+    for version in RELEASES {
+        let translation =
+            Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
+                .with_version("2026")
+                .with_concept_map(fixtures::TERM_CONCEPT_MAP_URL);
+        let body = sent(version, &translation).await?;
+        assert_eq!(
+            Some(("valueString".to_owned(), serde_json::Value::from("2026"))),
+            parameter(&body, "version")
+        );
     }
     Ok(())
 }
