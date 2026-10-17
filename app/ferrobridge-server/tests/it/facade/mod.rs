@@ -18,6 +18,7 @@ mod examples;
 mod person;
 mod read;
 mod reconcile;
+mod references;
 mod replay;
 mod search;
 pub(crate) mod stub;
@@ -134,6 +135,7 @@ impl Harness {
             &document,
             "2026-09-15T09:00:00Z",
             &settings(),
+            &fhirconnect::engine::terminology::NoTerminology,
         )
         .expect("the synthetic Condition maps");
         built.into_value().into_value()

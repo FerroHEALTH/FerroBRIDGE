@@ -16,7 +16,7 @@ use fhir_types::r4::primitives::Code;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
-use fhirconnect::engine::traverse::functions::NoMappingFunctions;
+use fhirconnect::engine::seam::Seams;
 use fhirconnect::operations::contract::Format;
 use fhirconnect::operations::contract::ToFhirRequest;
 use fhirconnect::operations::contract::ToOpenehrRequest;
@@ -293,7 +293,7 @@ fn tofhir_verdict() -> Result<Option<String>, Box<dyn Error>> {
     };
     let set = program_set(&[SUBJECT_CONTEXT])?;
     Ok(
-        match run::to_fhir(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request) {
+        match run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request) {
             Ok(answer) if answer.bundle().entry.is_empty() => {
                 Some(String::from("the answered Bundle is empty"))
             }
@@ -315,7 +315,7 @@ fn toopenehr_verdict() -> Result<Option<String>, Box<dyn Error>> {
     };
     let set = program_set(&[SUBJECT_CONTEXT])?;
     Ok(
-        match run::to_openehr(&set, &SCHEMAS, &NoMappingFunctions, &settings(), &request) {
+        match run::to_openehr(&set, &SCHEMAS, &Seams::default(), &settings(), &request) {
             Ok(answer) => undeclared_out(&declared, &answer.to_parameters()),
             Err(error) => Some(format!(
                 "the operation refuses the declared inputs: {error}"

@@ -11,6 +11,7 @@ use fhirconnect::operations::programs::ProgramSet;
 use crate::config::Settings;
 use crate::health::Registry;
 use crate::indicators;
+use crate::terminology::Translator;
 
 /// The product name the root document reports.
 pub const PRODUCT: &str = "FerroBRIDGE";
@@ -31,6 +32,7 @@ pub struct OperationsLane {
     composer: String,
     language: Option<String>,
     territory: Option<String>,
+    translator: Translator,
 }
 
 impl OperationsLane {
@@ -43,7 +45,24 @@ impl OperationsLane {
             composer: String::from(DEFAULT_COMPOSER),
             language: None,
             territory: None,
+            translator: Translator::default(),
         }
+    }
+
+    /// Returns this lane translating every `conceptmap` code through
+    /// `translator`.
+    ///
+    /// The default translates through no server, so a `conceptmap` refuses.
+    #[must_use]
+    pub fn with_translator(mut self, translator: Translator) -> Self {
+        self.translator = translator;
+        self
+    }
+
+    /// Returns the terminology server the runs translate through.
+    #[must_use]
+    pub const fn translator(&self) -> &Translator {
+        &self.translator
     }
 
     /// Returns this lane with the composition defaults an inbound run applies.
@@ -144,6 +163,7 @@ impl AppState {
             indicators.push(Arc::new(indicators::Cdr::new(client.clone())));
             cdr = Some(client);
         }
+        let mut terminology = None;
         if let Some(config) = settings.terminology.as_ref() {
             let client =
                 ferrobridge_term::client::Client::new(config.clone()).map_err(|source| {
@@ -152,7 +172,8 @@ impl AppState {
                         source: Box::new(source),
                     }
                 })?;
-            indicators.push(Arc::new(indicators::Terminology::new(client)));
+            indicators.push(Arc::new(indicators::Terminology::new(client.clone())));
+            terminology = Some(client);
         }
         if let Some(cdm) = settings.cdm.as_ref() {
             indicators.push(Arc::new(indicators::Cdm::new(&cdm.connection)));
@@ -169,6 +190,7 @@ impl AppState {
                     settings.operations.composition_language.clone(),
                     settings.operations.composition_territory.clone(),
                 )
+                .with_translator(Translator::new(terminology))
         });
         Ok(Self {
             health: Registry::new(indicators),

@@ -798,10 +798,19 @@ expression is a load error: the reference CDR's connector let `where()` and
   chapter, with one correction: the chapter keys on `meta.url`, which does not
   exist in R4; the element is `meta.profile`, a list, so matching is set
   membership, not equality. A resource two mappings both need is a LINKED
-  mapping. Unresolved references are fetched from the sending site with cycle
-  protection; a reference that cannot be fetched is a refusal, because the
-  chapter's "the engine proceeds with the mapping" contradicts its own
-  strictness chapter and the strict reading wins.
+  mapping. A reference a transaction entry makes to another entry resolves
+  to that entry by `fullUrl` or `<Type>/<id>` first (#753). A reference the
+  request does not carry is resolved as the references chapter recommends, and one that cannot be resolved is a
+  declared skip: "If not possible, the engine proceeds with the mapping"
+  (`engine/references.adoc`), which the engine records as a
+  `Loss::Skipped` warning, never a silent nothing (#224). A relative
+  reference, or one under the facade's own base, is read through the
+  identity map and the CDR; an absolute one is fetched only from a base on
+  the `[facade.references] fetch_bases` allow-list (empty by default, so by
+  default nothing is fetched and no client can make the bridge call a URL it
+  names), with redirects refused, a timeout, `max_depth` levels and each
+  literal resolved once, every fetch logged by type, id, base and upstream
+  status. No specification governs that policy: our own design.
 - **A read-side Bundle is well formed.** One entry per composition per
   resource type (two programs over one template do not double an entry), a
   unique `fullUrl` per entry, `entry.search.mode`, `Bundle.total` as the
@@ -1413,6 +1422,34 @@ never passed through under the target system, and an untranslatable optional
 code writes nothing rather than a wrong terminology assertion (two invariants
 the reference CDR's connector pinned by test, section 12).
 
+**The `conceptmap` seam, as built.** The FHIRconnect engine makes no call of
+its own: `fhirconnect::engine::terminology::Terminology` is the seam a
+`conceptmap` translates through, over the generated R4 `$translate`
+contract, and its default `NoTerminology` refuses every code. The engine asks
+once per distinct code during the walk, which precedes the composition
+build; only an `equivalent` or `equal` match counts, an untranslated optional
+element is a declared loss, and a required one refuses the unit. The server
+supplies the seam through `Seams::with_terminology` on the FHIR facade (every
+read, write, search and `$validate`), on the operations lane (`$tofhir` and
+`$toopenehr`, whose `fhirconnect::operations::run` entry points take the
+caller's `Seams`), and on the HL7 v2 face, which writes through the facade's
+ingest. The implementation is `ferrobridge_server::terminology::Translator`
+over `ferrobridge-term`. The seam is synchronous and the client async, so
+the translator answers each run from codes it resolved before the run: a run
+that meets an unresolved code is discarded, the codes it met go to
+`$translate` (one call, or one `batch` for several), and the run is
+repeated until it meets none. No blocking wait sits on the runtime (no
+specification governs this: our own design). FHIRconnect `manual.adoc`
+§ConceptMaps names no direction, so a map is read as authored from openEHR to
+FHIR: the FHIR-bound run calls `$translate` forward with the map `url` and
+the source `system`, `code` and `version`, and the openEHR-bound run adds
+`reverse=true`, "return all the codes that might be mapped to this code"
+(<https://hl7.org/fhir/R4/conceptmap-operation-translate.html>). With no
+`[terminology]` section the seam stays `NoTerminology`, and the refusal reads
+"no terminology server is configured to translate through" beside the
+mapping and the concept map. A code the server refused, or never answered,
+refuses the run with the client's typed error and its upstream status.
+
 **The reference server's wire, read 2026-09-12, shapes the client without
 being its oracle.** FerroTERM selects the FHIR version by path (`/r4`,
 `/r4b`, `/r5`, `/r6` served concurrently), so the configured base URL carries
@@ -1976,7 +2013,11 @@ that shape the design:
   `total` counting resources, the regression its issue #2579 pinned.
 - `translate` fails closed with no provider, calls `$translate` before the
   composition build with the resource's own system and code, and an
-  untranslatable optional code writes nothing (its issue #2458).
+  untranslatable optional code writes nothing (its issue #2458). Built: the
+  server's `Translator` resolves every code before the run that builds the
+  composition, a missing `[terminology]` refuses, and the operations-lane
+  tests pin both directions against a `wiremock` terminology server (section
+  6).
 - `$validate` answers `200` with `information` or the validator's rejection
   verbatim, mirrors the create path's operation-level statuses, and is proved
   to commit nothing by counting versions (its issue #342).
@@ -2017,7 +2058,8 @@ watermark advanced only after publish. From the mapping and ingest paths: a
 `equal`, and the translated concept's own display wins over the source text;
 every terminology call is made and ordered deterministically before any
 composition is built, so a terminology fault never leaves a half-built
-document; one instant per ingest serves every defaulted time; the built
+document (built in `fhirconnect::engine::terminology` and the server's
+`Translator`, section 6); one instant per ingest serves every defaulted time; the built
 composition is re-read through the strict RM reader before it is sent, so a
 bad document never reaches the CDR; an EHR is resolved by subject id and
 namespace and created on first sight only under a configured policy, with the

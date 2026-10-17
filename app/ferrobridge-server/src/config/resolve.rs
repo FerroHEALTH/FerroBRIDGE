@@ -84,6 +84,39 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
         },
         identity_store: facade.identity_store.clone(),
         search: search_limits(facade)?,
+        references: reference_policy(facade)?,
+    })
+}
+
+/// Returns the reference policy `facade` configures.
+///
+/// Every fetch base is an absolute http or https URL with no query and no
+/// fragment, because a reference is resolved by appending `<Type>/<id>` to
+/// it (<https://hl7.org/fhir/R4/references.html#literal>).
+fn reference_policy(facade: &Facade) -> Result<crate::facade::references::Policy, Error> {
+    const KEY: &str = "facade.references.fetch_bases";
+    let mut bases = Vec::with_capacity(facade.references.fetch_bases.len());
+    for value in &facade.references.fetch_bases {
+        let base = url_of(KEY, value)?;
+        if !matches!(base.scheme(), "http" | "https")
+            || base.query().is_some()
+            || base.fragment().is_some()
+        {
+            return Err(Error::FetchBase {
+                key: String::from(KEY),
+                value: value.clone(),
+            });
+        }
+        bases.push(base);
+    }
+    crate::facade::references::Policy::new(
+        bases,
+        facade.references.max_depth,
+        Duration::from_millis(facade.references.timeout_ms),
+    )
+    .map_err(|source| Error::Client {
+        upstream: "reference fetch",
+        source: Box::new(source),
     })
 }
 

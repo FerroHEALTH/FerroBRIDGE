@@ -232,8 +232,10 @@ As environment variables, the same section reads
 
 ### `[terminology]`
 
-The FHIR terminology lane. Absent, the bridge holds no terminology client, and
-the engines fail closed on anything that would need one.
+The FHIR terminology lane. The facade, the `$tofhir` and `$toopenehr`
+operations and the HL7 v2 face translate every `conceptmap` code through it.
+Absent, the bridge holds no terminology client, and the engines fail closed on
+anything that would need one: a `conceptmap` mapping refuses.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -438,6 +440,35 @@ CDR, because a lost map means the next create writes a second composition for a
 resource the CDR already holds. In a container with a read-only root
 filesystem, put the file on a persistent volume and run one process per file
 ([the identity store](container.md#the-identity-store)).
+
+### `[facade.references]`
+
+How the facade resolves a reference a request names and does not carry, for a
+`reference` mapping that reads the referenced resource. A relative reference
+(`Observation/abc`), or an absolute one under `[facade] base_url`, names a
+resource this server committed, and the facade reads it through the identity
+map and the CDR as a read answers it. An absolute reference to another server
+is fetched only from a base listed in `fetch_bases`, with redirects refused,
+so by default nothing is fetched. A reference that is not resolved, because
+its base is not listed, the server answered another status, the fetch timed
+out or this server holds no such resource, is a declared skip: the mapping
+proceeds without it and the log line names the reference, the base and the
+upstream status. FHIRconnect says only that the engine "should attempt to GET
+it from the sending site. If not possible, the engine proceeds with the
+mapping"; the allow-list, the depth and the timeout are FerroBRIDGE's own
+design.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `fetch_bases` | `[]` | The FHIR service bases an absolute reference may be fetched from, each an `http` or `https` URL with no query or fragment |
+| `max_depth` | `2` | How many levels of references are followed: the request's own, then those of each resolved resource; `0` resolves none |
+| `timeout_ms` | `10000` | How long one fetch from a listed base may take, connection included |
+
+Each key is settable as `FERROBRIDGE__FACADE__REFERENCES__<KEY>`, and
+`fetch_bases` takes a TOML array:
+`FERROBRIDGE__FACADE__REFERENCES__FETCH_BASES='["https://sender.example/fhir"]'`.
+A base that is no `http` or `https` URL, or that carries a query or a
+fragment, is a boot error naming `facade.references.fetch_bases`.
 
 ### `[auth]`
 

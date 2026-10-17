@@ -31,7 +31,26 @@ crates on crates.io.
   occurrences of one entry, `Bundle.total` counts every resource (the count
   reads the rows for such a context), and an `_id` naming a created resource
   answers that resource alone instead of matching nothing.
-
+- `fhirconnect` 0.1.130: the four `operations::run` entry points
+  (`to_fhir`, `to_fhir_with_warnings`, `to_openehr`,
+  `to_openehr_with_warnings`) take the caller's `&Seams` in place of a
+  `&dyn MappingFunctions` (#722), so a caller supplies the terminology server
+  beside the mapping functions. This breaks the crate's public API: a
+  consumer passes `&Seams::default().with_functions(functions)` where it
+  passed `functions`. `$toopenehr` resolves a reference outside the request
+  Bundle through the reference source the seams carry.
+- The facade resolves a reference a request names and does not carry, for a
+  `reference` mapping that reads it (#224). A relative reference, or one under
+  `[facade] base_url`, is read through the identity map and the CDR; an
+  absolute one is fetched only from a base listed in the new
+  `[facade.references] fetch_bases` (empty by default, so nothing is fetched
+  until you list a base), with redirects refused, `timeout_ms` (default
+  10000) per fetch and `max_depth` levels (default 2), each reference once. A
+  reference that is not resolved is a declared skip the write proceeds
+  without; the log names the reference, the base and the upstream status, and
+  `$validate` answers it as a `warning` issue. In a transaction Bundle an
+  entry answers a reference to its `fullUrl` or its `<Type>/<id>` first
+  (#753).
 - `ferrobridge-term` translates by concept map with an optional target
   system and an optional `reverse` (#721). This breaks the crate's public
   API: `Client::translate` takes a `Translation` (`Translation::new(system,
@@ -91,6 +110,15 @@ crates on crates.io.
   schema, vendored by `scripts/vendor/ferropulse-schemas.sh`, and
   `scripts/checks/usage-report-off.sh` (a new CI job) fails a test launcher
   that leaves the report on.
+- The server translates the codes of every `conceptmap` mapping through the
+  configured `[terminology]` server (#722), on the FHIR facade, the
+  `$tofhir` and `$toopenehr` operations and the HL7 v2 face. A composition
+  going into FHIR calls `ConceptMap/$translate` with the map `url` and the
+  source code, and FHIR going into openEHR adds `reverse=true`. Every code is
+  resolved before the run that builds the result, so a terminology fault
+  never leaves a half-built document. With no `[terminology]` section a
+  `conceptmap` refuses with "no terminology server is configured to
+  translate through".
 - `fhirconnect` 0.1.128 translates the codes of a mapping that names a
   `conceptmap` through `ConceptMap/$translate` (#219), over a new
   `engine::terminology::Terminology` seam that `Seams::with_terminology`

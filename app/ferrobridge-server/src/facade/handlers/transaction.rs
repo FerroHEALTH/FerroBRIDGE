@@ -81,8 +81,12 @@ pub(crate) async fn transaction(
         ));
     }
     admit_entries(facade, access, bundle.document())?;
+    let client = facade.client_for(headers);
+    let resolved =
+        crate::facade::references::resolve_bundle(facade, &client, bundle.document()).await;
     let ingested = facade
-        .ingest(facade.client_for(headers))
+        .ingest(client)
+        .with_references(&resolved)
         .ingest_bundle(
             bundle.document(),
             UnmappedEntries::Refuse,

@@ -28,6 +28,7 @@ pub mod ingest;
 pub mod media;
 pub mod outcome;
 pub mod programs;
+pub mod references;
 pub mod reply;
 pub mod request;
 pub mod search;
@@ -43,6 +44,7 @@ use crate::cdr::CdrClient;
 use crate::facade::identity::claims::Claims;
 use crate::facade::identity::store::Store;
 use crate::facade::programs::Programs;
+use crate::terminology::Translator;
 
 /// The path every facade route sits under.
 ///
@@ -94,6 +96,10 @@ pub struct Facade {
     search: search::Catalog,
     /// The page sizes a search answers with.
     limits: search::Limits,
+    /// The terminology server every `conceptmap` code translates through.
+    translator: Translator,
+    /// What may be fetched to resolve a reference the request does not carry.
+    references: references::Policy,
 }
 
 impl Facade {
@@ -113,7 +119,44 @@ impl Facade {
             settings,
             search: search::Catalog::default(),
             limits: search::Limits::default(),
+            translator: Translator::default(),
+            references: references::Policy::default(),
         }
+    }
+
+    /// Returns this facade translating every `conceptmap` code through
+    /// `translator`, on every read, write and `$validate` and on the HL7 v2
+    /// face that writes through it.
+    ///
+    /// A facade built without it translates through no server, so a
+    /// `conceptmap` refuses.
+    #[must_use]
+    pub fn with_translator(mut self, translator: Translator) -> Self {
+        self.translator = translator;
+        self
+    }
+
+    /// Returns the terminology server the engine runs translate through.
+    #[must_use]
+    pub const fn translator(&self) -> &Translator {
+        &self.translator
+    }
+
+    /// Returns this facade resolving a reference the request does not carry
+    /// under `policy`.
+    ///
+    /// A facade built without it reads a relative reference to a resource it
+    /// committed and fetches no absolute one.
+    #[must_use]
+    pub fn with_references(mut self, policy: references::Policy) -> Self {
+        self.references = policy;
+        self
+    }
+
+    /// Returns what may be fetched to resolve a reference.
+    #[must_use]
+    pub const fn references(&self) -> &references::Policy {
+        &self.references
     }
 
     /// Returns this facade answering search as `catalog` declares, with the
@@ -213,6 +256,7 @@ impl Facade {
             client,
             settings,
         )
+        .with_translator(&self.translator)
     }
 }
 

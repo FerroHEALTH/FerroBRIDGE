@@ -251,6 +251,14 @@ pub enum Error {
         /// The key that holds it.
         key: String,
     },
+    /// A reference fetch base is no http or https base.
+    #[error("{key} holds `{value}`, which is no http or https base without a query or a fragment")]
+    FetchBase {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: String,
+    },
     /// An upstream client refused the configuration it was handed.
     #[error("the {upstream} client refused its configuration")]
     Client {
@@ -591,6 +599,8 @@ pub struct FacadeSettings {
     pub identity_store: PathBuf,
     /// The page sizes a search answers with.
     pub search: crate::facade::search::Limits,
+    /// What may be fetched to resolve a reference the request does not carry.
+    pub references: crate::facade::references::Policy,
 }
 
 /// The HL7 v2 face, resolved.
