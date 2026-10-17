@@ -28,6 +28,13 @@ crates on crates.io.
 - The FHIRconnect operations lane reads its mapping directory through the
   walk the facade uses (#524), so a `.YML` or `.YAML` file is now read by both
   lanes; the operations lane read only the lower-case spellings before.
+- The README, the book's Licensing page and the landing page answer "do you
+  need a commercial licence?" at a glance (#111): a table of what you are
+  doing, what you need and the part of `LICENSE` that decides it, the same
+  shape as the FerroHEALTH family table, with the change date and the
+  commercial-licence contact beside it. The README's top navigation links the
+  table, and the `ferrobridge-fhirpath` and `ferrobridge-validator` READMEs
+  state the terms like the other BUSL-1.1 crates.
 - `SECURITY.md` and `CONTRIBUTING.md` keep what is particular to FerroBRIDGE
   and link the FerroHEALTH family book at <https://ferrohealth.eu/docs/> for
   the rest (#402). `SECURITY.md` keeps the supported versions, the reporting
@@ -39,6 +46,17 @@ crates on crates.io.
   products fit together, and licensing and trademarks.
 ### Added
 
+- `fhir-types` 0.1.117 carries a search parameter registry per FHIR version
+  behind `resources` (#522): `<version>::search_parameters::SEARCH_PARAMETERS`
+  holds every `SearchParameter` of the core package, apart from its examples,
+  with canonical, code, base types, type and expression, and
+  `SearchParameters::of(type, code)` answers the standard parameter a resource
+  type answers, its own or a base type's. `fhirconnect` moves to 0.1.127 with
+  it.
+- The facade refuses at boot a search declaration that gives the code of a
+  standard R4 search parameter of its resource type another type, and the
+  `CapabilityStatement` names the standard parameter's canonical as
+  `searchParam.definition` for every declared standard code (#522).
 - `/health/readiness` carries a `cdm` indicator when a `[cdm]` section is
   configured (#615). It opens one connection to the CDM database over the
   configured TLS and asks `SELECT 1`, and reports down with the reason on a

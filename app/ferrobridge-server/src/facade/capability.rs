@@ -37,6 +37,8 @@ use fhir_types::r4::extension::ExtensionValue;
 
 use crate::facade::programs::Programs;
 use crate::facade::search::Catalog;
+use crate::facade::search::declaration;
+use crate::facade::search::declaration::ParameterType;
 use crate::state;
 
 /// The FHIR release this facade speaks.
@@ -70,10 +72,6 @@ const RESOURCE_INTERACTIONS: [&str; 4] = ["create", "read", "vread", "update"];
 
 /// The type-level interaction a type with a search declaration adds.
 const SEARCH_INTERACTION: &str = "search-type";
-
-/// The canonical `SearchParameter` of `_id`, which every searchable type
-/// answers through the identity map.
-const ID_DEFINITION: &str = "http://hl7.org/fhir/SearchParameter/Resource-id";
 
 /// The canonical `OperationDefinition` of `$tofhir`.
 ///
@@ -345,29 +343,26 @@ fn system_operations(operations: Operations) -> Vec<CapabilityStatementRestResou
 /// Returns the `rest.resource.searchParam` entries of one searchable type:
 /// `_id`, then the declared parameters in name order.
 ///
-/// A declared parameter carries no `definition`: the declaration names it and
-/// states its type, and R4 lets a statement name "additional ones defined
-/// for/by the implementation"
+/// A parameter that takes the code of a standard R4 parameter of the type
+/// `name` carries that parameter's canonical as `definition`, which "SHALL be
+/// populated if the search parameter refers to a `SearchParameter`"; any other
+/// is one of the "additional ones defined for/by the implementation" and
+/// carries none
 /// (<https://hl7.org/fhir/R4/capabilitystatement-definitions.html#CapabilityStatement.rest.resource.searchParam>).
+/// The search loader refuses a declared standard code of another type.
 fn search_params(
-    surface: &std::collections::BTreeMap<String, crate::facade::search::declaration::ParameterType>,
+    name: &str,
+    surface: &std::collections::BTreeMap<String, ParameterType>,
 ) -> Vec<CapabilityStatementRestResourceSearchParam> {
-    std::iter::once(CapabilityStatementRestResourceSearchParam {
-        name: "_id".into(),
-        definition: Some(ID_DEFINITION.into()),
-        r#type: "token".into(),
-        ..CapabilityStatementRestResourceSearchParam::default()
-    })
-    .chain(
-        surface
-            .iter()
-            .map(|(name, kind)| CapabilityStatementRestResourceSearchParam {
-                name: name.as_str().into(),
-                r#type: kind.as_str().into(),
-                ..CapabilityStatementRestResourceSearchParam::default()
-            }),
-    )
-    .collect()
+    std::iter::once(("_id", ParameterType::Token))
+        .chain(surface.iter().map(|(code, kind)| (code.as_str(), *kind)))
+        .map(|(code, kind)| CapabilityStatementRestResourceSearchParam {
+            name: code.into(),
+            definition: declaration::standard(name, code).map(|standard| standard.url.into()),
+            r#type: kind.as_str().into(),
+            ..CapabilityStatementRestResourceSearchParam::default()
+        })
+        .collect()
 }
 
 /// Returns the `rest.resource` entry of one supported type.
@@ -386,7 +381,7 @@ fn resource(name: &str, search: &Catalog) -> CapabilityStatementRestResource {
             })
             .collect(),
         search_param: surface
-            .map(|surface| search_params(&surface))
+            .map(|surface| search_params(name, &surface))
             .unwrap_or_default(),
         versioning: Some(VERSIONING.into()),
         read_history: Some(true.into()),
