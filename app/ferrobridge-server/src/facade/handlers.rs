@@ -346,11 +346,30 @@ pub(crate) fn supported(facade: &Facade, resource_type: &str) -> Result<(), Refu
     if facade.programs().supports(resource_type) {
         return Ok(());
     }
-    Err(reply::refusal(
+    Err(not_supported(resource_type))
+}
+
+/// Checks that some loaded program maps or creates `resource_type`, as read
+/// and vread require.
+///
+/// A type only a `reference` mapping creates answers read and vread and no
+/// other interaction, and the `CapabilityStatement` declares it with those
+/// two (no specification governs this: our own design).
+pub(crate) fn readable(facade: &Facade, resource_type: &str) -> Result<(), Refusal> {
+    if facade.programs().readable(resource_type) {
+        return Ok(());
+    }
+    Err(not_supported(resource_type))
+}
+
+/// Returns the `404` with `not-supported` a type no loaded program maps
+/// answers.
+fn not_supported(resource_type: &str) -> Refusal {
+    reply::refusal(
         StatusCode::NOT_FOUND,
         Issue::error(IssueType::NotSupported).diagnosing(format!(
             "no loaded mapping answers for {resource_type}; GET {}/metadata names the types this server supports",
             crate::facade::BASE_PATH
         )),
-    ))
+    )
 }

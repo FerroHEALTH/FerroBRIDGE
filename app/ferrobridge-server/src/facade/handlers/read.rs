@@ -55,7 +55,7 @@ pub(crate) async fn read(
     uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    crate::facade::handlers::supported(facade, resource_type)?;
+    crate::facade::handlers::readable(facade, resource_type)?;
     let internal = internal_id(id)?;
     let binding =
         binding(facade, resource_type, &internal)?.ok_or_else(|| unknown(resource_type, id))?;
@@ -73,15 +73,17 @@ pub(crate) async fn read(
     let composition = entry_view(program, &composition, &binding, &internal)?;
     let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
     let subject = render::subject_of(facade, &ehr_id)?;
-    let rendered = render::render(
-        program.program(),
-        program.index(),
+    let rendered = render_bound(
+        facade,
+        program,
         &composition,
+        (resource_type, &internal, &binding),
         render::Origin {
             id: &internal,
             version: &version,
             source: &source,
             subject: subject.as_ref(),
+            store: facade.store(),
         },
     )?;
     render::log_outcome(&rendered);
@@ -110,7 +112,7 @@ pub(crate) async fn vread(
 ) -> Result<axum::response::Response, Refusal> {
     let (resource_type, id, vid) = target;
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    crate::facade::handlers::supported(facade, resource_type)?;
+    crate::facade::handlers::readable(facade, resource_type)?;
     let internal = internal_id(id)?;
     let binding =
         binding(facade, resource_type, &internal)?.ok_or_else(|| unknown(resource_type, id))?;
@@ -160,15 +162,17 @@ pub(crate) async fn vread(
     let composition = entry_view(program, &composition, &binding, &internal)?;
     let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
     let subject = render::subject_of(facade, &ehr_id)?;
-    let rendered = render::render(
-        program.program(),
-        program.index(),
+    let rendered = render_bound(
+        facade,
+        program,
         &composition,
+        (resource_type, &internal, &binding),
         render::Origin {
             id: &internal,
             version: &version,
             source: &source,
             subject: subject.as_ref(),
+            store: facade.store(),
         },
     )?;
     render::log_outcome(&rendered);
@@ -177,6 +181,53 @@ pub(crate) async fn vread(
         &rendered.body,
         &answer_headers(&version, modified),
     ))
+}
+
+/// Renders the resource `bound` names in `composition`, narrowed to the entry
+/// its binding names: the entry's own resource, or the one its parent's
+/// outbound run creates.
+///
+/// A created resource is answered by running the parent's mapping again with
+/// the parent as the origin and picking the created resource of the id asked
+/// for (no specification governs this: our own design).
+pub(crate) fn render_bound(
+    facade: &Facade,
+    program: &Loaded,
+    composition: &CanonicalComposition,
+    bound: (&str, &FhirResourceId, &CompositionBinding),
+    origin: render::Origin<'_>,
+) -> Result<render::Rendered, Refusal> {
+    let (resource_type, internal, binding) = bound;
+    let Some(ref created) = binding.created else {
+        return render::render(program.program(), program.index(), composition, origin);
+    };
+    let parent = created
+        .parent()
+        .map_err(|error| stored_identifier(&error))?;
+    if facade
+        .store()
+        .binding_of(&created.parent_type, &parent)
+        .map_err(|error| write::store_refusal(&error))?
+        .is_none()
+    {
+        return Err(reply::refusal(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Issue::error(IssueType::Exception).diagnosing(format!(
+                "the identity map binds {resource_type}/{internal} to {}/{parent}, which it does not bind",
+                created.parent_type
+            )),
+        ));
+    }
+    render::render_created(
+        program.program(),
+        program.index(),
+        composition,
+        render::Origin {
+            id: &parent,
+            ..origin
+        },
+        (resource_type, internal),
+    )
 }
 
 /// Reads one request body as a resource of `resource_type`.

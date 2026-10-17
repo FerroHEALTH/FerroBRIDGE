@@ -178,7 +178,7 @@ mod tests {
             assert!(
                 matches!(
                     refused,
-                    StoreError::Schema { found: ref held, oldest: 1, newest: 2, .. } if held == found
+                    StoreError::Schema { found: ref held, oldest: 1, newest: 3, .. } if held == found
                 ),
                 "{refused}"
             );
@@ -188,6 +188,73 @@ mod tests {
                 "a refused file is left as it was"
             );
         }
+    }
+
+    #[test]
+    fn a_schema_2_store_opens_is_stamped_3_and_its_bindings_are_entries_own() {
+        let directory = tempfile::tempdir().expect("a temporary directory");
+        let path = directory.path().join("identity.redb");
+        let internal = FhirResourceId::new("abc").expect("a legal FHIR id");
+        let key = crate::facade::identity::record::internal_key("Condition", &internal);
+        {
+            let database = redb::Database::create(&path).expect("the file");
+            let write = database.begin_write().expect("a write");
+            {
+                let mut meta = write.open_table(META).expect("the table");
+                meta.insert(SCHEMA_KEY, "2").expect("the row");
+                let mut bindings = write.open_table(BINDINGS).expect("the table");
+                bindings
+                    .insert(
+                        key.as_str(),
+                        r#"{"ehr_id":"bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11","versioned_object_uid":"uid-1","template_id":"ferrobridge.diagnose.v1","resource_type":"Condition","entry_path":"/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]","split":0,"context":"ferrobridge_diagnosis.context","derivation":2}"#,
+                    )
+                    .expect("the row");
+            }
+            write.commit().expect("the commit");
+        }
+        let store = RedbStore::open(&path).expect("the open");
+        let held = store
+            .binding_of("Condition", &internal)
+            .expect("the read")
+            .expect("the binding");
+        assert_eq!(None, held.created, "a schema 2 binding is the entry's own");
+        assert_eq!(Some(2), held.derivation);
+        drop(store);
+        assert_eq!(Some(String::from("3")), schema_of(&path));
+    }
+
+    #[test]
+    fn a_created_binding_reads_back_with_its_parent() {
+        let directory = tempfile::tempdir().expect("a temporary directory");
+        let path = directory.path().join("identity.redb");
+        let store = RedbStore::open(&path).expect("the open");
+        let internal = FhirResourceId::new("created-1").expect("a legal FHIR id");
+        let binding = crate::facade::identity::record::CompositionBinding {
+            ehr_id: String::from("bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11"),
+            versioned_object_uid: String::from("uid-1"),
+            template_id: String::from("ferrobridge.diagnose.v1"),
+            resource_type: String::from("Observation"),
+            entry_path: String::from("/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"),
+            split: 0,
+            context: String::from("ferrobridge_diagnosis.context"),
+            derivation: Some(2),
+            created: Some(crate::facade::identity::record::CreatedBy {
+                parent_type: String::from("Condition"),
+                parent_id: String::from("parent-1"),
+                mapping: String::from("evidence"),
+            }),
+        };
+        store
+            .record_binding("Observation", &internal, &binding)
+            .expect("the write");
+        drop(store);
+        let reopened = RedbStore::open(&path).expect("the reopen");
+        assert_eq!(
+            Some(binding),
+            reopened
+                .binding_of("Observation", &internal)
+                .expect("the read")
+        );
     }
 
     #[test]

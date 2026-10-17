@@ -58,7 +58,9 @@ is served; `If-Match` on an update is the version-aware update),
 `fhirVersion: 4.0.1`. A type a search
 declaration answers also names `search-type` and, in `searchParam`, exactly
 `_id` and the parameters the declaration states; every other type names no
-search parameter.
+search parameter. A type no program maps and a `reference` mapping of a
+loaded program creates is listed with `read` and `vread` alone (see
+[Resources the mapping creates](#resources-the-mapping-creates)).
 When the FHIRconnect operations lane is served under the same base,
 `rest.operation` also names `$tofhir` and `$toopenehr`; their direct forms are
 never declared ([The FHIRconnect operations](operations.md) says why).
@@ -227,12 +229,39 @@ a known `id` and a new `meta.versionId` commits that later version inside the
 Bundle's contribution. The Operate page on failure and identity states the
 full rule.
 
+### Resources the mapping creates
+
+Going out of openEHR, a `hierarchy.split` with `create: resource` creates one
+resource per further occurrence of its node, and a `reference` mapping
+creates the resource it names. R4 says a contained resource "does not have an
+independent existence apart from the resource that contains it", so the
+facade contains none of them. Each one gets a binding of its own the first
+time the facade answers the resource whose mapping creates it (its parent), on
+a read, a vread, a search or a write under `Prefer: return=representation`.
+Its id is a SHA-256 over the parent's entry key, the creating mapping, the
+openEHR occurrence positions and the split's `unique` values, rendered as 52
+lowercase base32 characters, so a re-run and a later composition version
+derive the same id, and the map wins once written. The parent references a
+created resource as `<Type>/<id>`. A split's further occurrence is a sibling
+of the parent, and the parent names no reference to it.
+
+`GET /fhir/{type}/{id}` and the vread answer a created resource: the facade
+maps the parent's entry again and returns the created resource of that id,
+with the parent's `meta.versionId` and `meta.source` and no `meta.profile`.
+A version that no longer creates it answers `404`. A `PUT` of a created
+resource answers `405 Method Not Allowed` with `not-supported`, because its
+content is the parent's entry: update the parent. Search does not list a
+created resource yet, and an `_id` that names one matches nothing (#731). No
+specification governs the identity of a created resource: it is
+FerroBRIDGE's own design.
+
 ## A read is a valid instance
 
 Every resource the facade answers, on a read, a vread or a write under
 `Prefer: return=representation`, is a valid R4 instance: each element the R4
 element table marks `min 1` is present, at the top of the resource and inside
-every element and contained resource it carries. A mapping often has no
+every element and contained resource it carries (a resource the mapping
+creates is answered on its own, never contained). A mapping often has no
 outbound row for the subject, because the ingest reads the subject to find the
 EHR and the composition does not hold it. When the rendered resource has no
 `subject` (or `patient`, on a type that names its subject so), the facade

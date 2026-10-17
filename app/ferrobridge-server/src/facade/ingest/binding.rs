@@ -354,9 +354,9 @@ impl Ingest<'_> {
         composition: &CanonicalComposition,
         entry: &engine::entry::Entry,
     ) -> Result<(FhirResourceId, CompositionBinding), Refused> {
-        // NOTE: no specification governs this: our own design, the facade serves the
-        // first resource of a split and carries every further one as contained, so
-        // the entry's identity is its first occurrence.
+        // NOTE: no specification governs this: our own design, every further resource
+        // of a split is bound as a created resource of its own when the entry is
+        // rendered, so the entry's identity is its first occurrence.
         let path = entry.identity_path();
         let key = EntryKey::new(versioned_object_uid(version), path.as_str(), 0);
         let map_key = derive::map_key(&key);
@@ -399,6 +399,7 @@ impl Ingest<'_> {
             split: key.split(),
             context: program.program().context().to_string(),
             derivation: Some(derive::DERIVATION),
+            created: None,
         };
         let stood = self
             .store

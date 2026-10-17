@@ -12,6 +12,7 @@ mod auth;
 pub(crate) mod batch;
 mod capability;
 mod conditional;
+mod created;
 mod credentials;
 mod examples;
 mod person;

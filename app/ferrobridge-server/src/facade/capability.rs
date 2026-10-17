@@ -8,9 +8,11 @@
 //! per resource type a program maps, with the interactions the facade
 //! implements and the `$validate` operation. A type a search declaration
 //! answers also names `search-type` and exactly its declared parameters with
-//! `_id`; every other type names no search parameter. A type with no program
-//! is absent here and answers `404` with `not-supported` on the
-//! wire (no specification governs this: our own design).
+//! `_id`; every other type names no search parameter. A type only a
+//! `reference` mapping creates names `read` and `vread` alone, because the
+//! facade answers it once the resource referencing it is answered. A type no
+//! program maps or creates is absent here and answers `404` with
+//! `not-supported` on the wire (no specification governs this: our own design).
 //!
 //! The statement declares `updateCreate: false`, because a `PUT` to an
 //! unknown id is a `404` rather than a create, `conditionalCreate` true,
@@ -69,6 +71,14 @@ const VALIDATE_DEFINITION: &str = "http://hl7.org/fhir/OperationDefinition/Resou
 /// The codes are of `http://hl7.org/fhir/ValueSet/type-restful-interaction`
 /// (<https://hl7.org/fhir/R4/capabilitystatement.html>).
 const RESOURCE_INTERACTIONS: [&str; 4] = ["create", "read", "vread", "update"];
+
+/// The type-level interactions a type only a `reference` mapping creates
+/// answers.
+const CREATED_INTERACTIONS: [&str; 2] = ["read", "vread"];
+
+/// The `rest.resource.documentation` of a type only a `reference` mapping
+/// creates.
+const CREATED_DOCUMENTATION: &str = "Created by a reference mapping of another resource type when that resource is answered; readable at [base]/<type>/<id> under the id the resource that references it names, and answered by mapping that resource's composition entry again.";
 
 /// The type-level interaction a type with a search declaration adds.
 const SEARCH_INTERACTION: &str = "search-type";
@@ -253,11 +263,7 @@ pub fn statement_of(
         ),
         rest: vec![CapabilityStatementRest {
             mode: "server".into(),
-            resource: programs
-                .resource_types()
-                .iter()
-                .map(|name| resource(name, search))
-                .collect(),
+            resource: resources(programs, search),
             // NOTE: `transaction` and `batch` are the system-level interactions of
             // `http://hl7.org/fhir/ValueSet/system-restful-interaction` this route answers.
             interaction: ["transaction", "batch"]
@@ -363,6 +369,47 @@ fn search_params(
             ..CapabilityStatementRestResourceSearchParam::default()
         })
         .collect()
+}
+
+/// Returns the `rest.resource` entries, in type order: every type a program
+/// maps, and every type only a `reference` mapping creates.
+fn resources(programs: &Programs, search: &Catalog) -> Vec<CapabilityStatementRestResource> {
+    let mut entries: std::collections::BTreeMap<String, CapabilityStatementRestResource> = programs
+        .resource_types()
+        .into_iter()
+        .map(|name| {
+            let entry = resource(&name, search);
+            (name, entry)
+        })
+        .collect();
+    for name in programs.created_types() {
+        let entry = created_resource(&name);
+        entries.insert(name, entry);
+    }
+    entries.into_values().collect()
+}
+
+/// Returns the `rest.resource` entry of a type only a `reference` mapping
+/// creates.
+///
+/// The facade answers such a resource on its own once the resource that
+/// references it is answered, so the type takes `read` and `vread` and no
+/// other interaction (no specification governs this: our own design).
+fn created_resource(name: &str) -> CapabilityStatementRestResource {
+    CapabilityStatementRestResource {
+        r#type: name.into(),
+        documentation: Some(CREATED_DOCUMENTATION.into()),
+        interaction: CREATED_INTERACTIONS
+            .iter()
+            .map(|code| CapabilityStatementRestResourceInteraction {
+                code: (*code).into(),
+                ..CapabilityStatementRestResourceInteraction::default()
+            })
+            .collect(),
+        versioning: Some(VERSIONING.into()),
+        read_history: Some(true.into()),
+        ..CapabilityStatementRestResource::default()
+    }
 }
 
 /// Returns the `rest.resource` entry of one supported type.
