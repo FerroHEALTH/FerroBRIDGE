@@ -29,6 +29,7 @@ pub mod render;
 pub mod render_codec;
 pub mod render_schema;
 pub mod roots;
+pub mod search;
 pub mod snapshot;
 pub mod terminology;
 pub mod v2;

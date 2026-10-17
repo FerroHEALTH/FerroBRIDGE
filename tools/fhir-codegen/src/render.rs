@@ -62,6 +62,8 @@ pub fn render_lib(models: &[VersionModule]) -> Result<String, fmt::Error> {
     writeln!(out, "pub mod codec;")?;
     writeln!(out, "pub mod operation;")?;
     writeln!(out, "pub mod schema;")?;
+    out.push_str(&RootScope::Resources.cfg());
+    writeln!(out, "pub mod search;")?;
     writeln!(out, "pub mod xml;")?;
     for model in models {
         writeln!(out, "#[cfg(feature = \"{}\")]", model.name)?;
@@ -91,6 +93,8 @@ pub fn render_version_mod(model: &VersionModule) -> Result<String, fmt::Error> {
     out.push_str(&RootScope::Terminology.cfg());
     writeln!(out, "pub mod operations;")?;
     writeln!(out, "pub mod schema;")?;
+    out.push_str(&RootScope::Resources.cfg());
+    writeln!(out, "pub mod search_parameters;")?;
     Ok(out)
 }
 

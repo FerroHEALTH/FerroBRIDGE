@@ -23,6 +23,20 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Added
+
+- `fhir-types` 0.1.117 carries a search parameter registry per FHIR version
+  behind `resources` (#522): `<version>::search_parameters::SEARCH_PARAMETERS`
+  holds every `SearchParameter` of the core package, apart from its examples,
+  with canonical, code, base types, type and expression, and
+  `SearchParameters::of(type, code)` answers the standard parameter a resource
+  type answers, its own or a base type's. `fhirconnect` moves to 0.1.127 with
+  it.
+- The facade refuses at boot a search declaration that gives the code of a
+  standard R4 search parameter of its resource type another type, and the
+  `CapabilityStatement` names the standard parameter's canonical as
+  `searchParam.definition` for every declared standard code (#522).
+
 ### Fixed
 
 - A CDR call whose token the CDR refused, and whose renewal the token
