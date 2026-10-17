@@ -38,10 +38,11 @@ and `ferrobridge-hl7v2`. Each carries the
 `crates/*/Cargo.toml`, and that number never adopts the product version or a
 specification version.
 
-The set is deliberately not lockstep. `fhir-types` carries a real 0.1.x line,
-because the crate moved here from the sibling terminology server and continues
-the version sequence it already had on crates.io. Every other member still
-sits at the 0.0.0 placeholder that holds its name on the registry until its
+The set is deliberately not lockstep. `fhir-types`, `openehr-mapping-core` and
+`fhirconnect` carry a real 0.1.x line: `fhir-types` continues the sequence it
+had on crates.io before it moved here from the sibling terminology server, and
+the other two joined it on their first publish. Every other member still sits
+at the 0.0.0 placeholder that holds its name on the registry until its
 first real release. A 0.0.0 on crates.io is a name reservation and nothing
 else: it compiles, it carries the licence and the metadata, and it is not the
 crate you want to depend on yet.
