@@ -526,6 +526,7 @@ has the routes and the scope.
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether the operator routes are mounted, each requiring a token that carries `auth.operator_scope` |
+| `mapping_dir` | none | The writable directory console saves go to (`<mapping_dir>/fhirconnect/`); unset, the API checks and saves nothing. Keep it on its own volume when the root file system is read-only |
 
 ### `[operations]`
 

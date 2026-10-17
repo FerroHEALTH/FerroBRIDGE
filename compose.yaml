@@ -80,17 +80,33 @@ services:
       FERROBRIDGE__TERMINOLOGY__BASE_URL:
       FERROBRIDGE__TERMINOLOGY__WIRE_VERSION:
       FERROBRIDGE__CDM__URL_FILE:
+      # The operator API (it needs [auth]) saves console mapping files under
+      # this path, the writable volume below; it saves nothing while it is off.
+      FERROBRIDGE__OPERATOR__ENABLED:
+      FERROBRIDGE__OPERATOR__MAPPING_DIR: /var/lib/ferrobridge/mappings
       # `auto` renders pretty output on a terminal and JSON otherwise.
       FERROBRIDGE__TELEMETRY__FORMAT: ${FERROBRIDGE_LOG_FORMAT:-auto}
       FERROBRIDGE__TELEMETRY__FILTER: ${FERROBRIDGE_LOG_FILTER:-info}
     secrets:
       - cdm_url
       - cdr_bearer_token
-    # The server writes nothing: no cache, no scratch file, no upload
-    # directory, and every secret is read once at boot. So the root filesystem
-    # is read-only with no tmpfs beside it. Should a lane ever need a writable
-    # path, mount a tmpfs for that path alone rather than dropping this line.
+    # The server writes nothing outside the operator's mapping directory: no
+    # cache, no scratch file, no upload directory, and every secret is read
+    # once at boot. So the root filesystem is read-only, and the one writable
+    # path is the volume below. Should a lane ever need another, mount it for
+    # that path alone rather than dropping this line.
     read_only: true
+    # The console's saved mapping files, which survive a restart. The
+    # container runs as 65532:65532, so create the directory and hand it over
+    # before the first `docker compose up`:
+    #
+    #   mkdir -p operator-mappings && sudo chown 65532:65532 operator-mappings
+    volumes:
+      - type: bind
+        source: ${FERROBRIDGE_OPERATOR_MAPPINGS:-./operator-mappings}
+        target: /var/lib/ferrobridge/mappings
+        bind:
+          create_host_path: true
     cap_drop:
       - ALL
     security_opt:
