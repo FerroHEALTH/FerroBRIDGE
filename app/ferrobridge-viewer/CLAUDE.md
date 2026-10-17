@@ -10,9 +10,11 @@ crate.
 - **One crate, two targets, no `ssr`/`hydrate` feature.** The host build is
   the server half, the `wasm32-unknown-unknown` build the browser half; a
   module for one half carries `#[cfg(target_arch …)]`.
-- **The boundary is a test.** The server half links `openehr-mapping-core`
-  and `fhir-types` (`r4`) of the workspace and nothing else; the browser half
-  links none. `tests/it/boundary.rs` walks the graph `cargo metadata`
+- **The boundary is a test.** The server half links `openehr-mapping-core`,
+  `fhir-types` (`r4`) and `ferrobridge-operator-api` of the workspace and
+  nothing else; the browser half links none. The bridge's health and
+  operator documents decode into the contract crate's types, never by field
+  name. `tests/it/boundary.rs` walks the graph `cargo metadata`
   resolves, and its injected-edge cases prove it refuses another crate. A
   new workspace dependency here is an architecture change, returned to the
   orchestrator.

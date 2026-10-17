@@ -137,26 +137,25 @@ impl Operator {
     /// Returns `report` as a check answers it, each file by its wire path and
     /// `draft` by the path it stands for.
     #[must_use]
-    pub fn report_json(
+    pub fn load_report(
         &self,
         report: &crate::check::Report,
         draft: Option<&reload::Draft>,
-    ) -> serde_json::Value {
-        let diagnostics: Vec<serde_json::Value> = report
-            .diagnostics()
-            .iter()
-            .map(|diagnostic| {
-                crate::check::diagnostic_json(
-                    diagnostic,
-                    &reload::shown(&self.roots, draft, diagnostic.file()),
-                )
-            })
-            .collect();
-        serde_json::json!({
-            "clean": report.is_clean(),
-            "counts": report.counts(),
-            "diagnostics": diagnostics,
-        })
+    ) -> ferrobridge_operator_api::operator::LoadReport {
+        ferrobridge_operator_api::operator::LoadReport {
+            clean: report.is_clean(),
+            counts: report.counts(),
+            diagnostics: report
+                .diagnostics()
+                .iter()
+                .map(|diagnostic| {
+                    crate::check::shown_diagnostic(
+                        diagnostic,
+                        &reload::shown(&self.roots, draft, diagnostic.file()),
+                    )
+                })
+                .collect(),
+        }
     }
 }
 

@@ -79,6 +79,7 @@ exceptions = [
   { allow = ["BUSL-1.1"], crate = "ferrobridge-hl7v2" },
   { allow = ["BUSL-1.1"], crate = "ferrobridge-fhirpath" },
   { allow = ["BUSL-1.1"], crate = "ferrobridge-validator" },
+  { allow = ["BUSL-1.1"], crate = "ferrobridge-operator-api" },
   { allow = ["BUSL-1.1"], crate = "ferrobridge-server" },
   { allow = ["BUSL-1.1"], crate = "ferrobridge-viewer" },
   { allow = ["BUSL-1.1"], crate = "ferrobridge-testkit" },

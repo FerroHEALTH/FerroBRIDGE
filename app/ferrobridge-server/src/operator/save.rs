@@ -88,10 +88,10 @@ pub async fn check(
     .await;
     match checked {
         Ok((Ok(prepared), draft)) => {
-            axum::Json(operator.report_json(prepared.report(), Some(&draft))).into_response()
+            axum::Json(operator.load_report(prepared.report(), Some(&draft))).into_response()
         }
         Ok((Err(ReloadError::Rejected(report)), draft)) => {
-            axum::Json(operator.report_json(&report, Some(&draft))).into_response()
+            axum::Json(operator.load_report(&report, Some(&draft))).into_response()
         }
         Ok((Err(error), _)) => unavailable(&error),
         Err(failure) => failure.into_response(),
@@ -137,20 +137,20 @@ pub async fn save(
     })
     .await;
     let (status, old_digest, response) = match saved {
-        Ok(Saved::Done { old, report_json }) => (
+        Ok(Saved::Done { old, report }) => (
             StatusCode::OK,
             old,
             (
                 StatusCode::OK,
                 [(header::ETAG, format!("\"{new_digest}\""))],
-                axum::Json(report_json),
+                axum::Json(report),
             )
                 .into_response(),
         ),
-        Ok(Saved::Rejected { old, report_json }) => (
+        Ok(Saved::Rejected { old, report }) => (
             StatusCode::UNPROCESSABLE_ENTITY,
             old,
-            (StatusCode::UNPROCESSABLE_ENTITY, axum::Json(report_json)).into_response(),
+            (StatusCode::UNPROCESSABLE_ENTITY, axum::Json(report)).into_response(),
         ),
         Ok(Saved::Unreloaded { old, error }) => {
             (StatusCode::SERVICE_UNAVAILABLE, old, unavailable(&error))
@@ -186,10 +186,10 @@ pub async fn reload(
     })
     .await;
     let response = match reloaded {
-        Ok(Ok(report_json)) => axum::Json(report_json).into_response(),
+        Ok(Ok(report)) => axum::Json(report).into_response(),
         Ok(Err(ReloadError::Rejected(report))) => (
             StatusCode::UNPROCESSABLE_ENTITY,
-            axum::Json(operator.report_json(&report, None)),
+            axum::Json(operator.load_report(&report, None)),
         )
             .into_response(),
         Ok(Err(error)) => unavailable(&error),
@@ -259,14 +259,14 @@ pub enum Saved {
         /// The digest the file had before, when it existed.
         old: Option<String>,
         /// The report of the reloaded set.
-        report_json: serde_json::Value,
+        report: Option<ferrobridge_operator_api::operator::LoadReport>,
     },
     /// The draft did not compile; nothing was written.
     Rejected {
         /// The digest the file has.
         old: Option<String>,
         /// The report naming every diagnostic.
-        report_json: serde_json::Value,
+        report: ferrobridge_operator_api::operator::LoadReport,
     },
     /// The file was written and the reload did not run to the end, so the
     /// running set is the old one.
@@ -360,15 +360,16 @@ impl Operator {
         tokio::runtime::Handle::current().block_on(reloader.prepare(&sources))
     }
 
-    /// Swaps `prepared` in and returns the report of the new set.
-    pub fn apply(&self, prepared: Prepared) -> serde_json::Value {
-        let snapshot = match self.reloader.as_ref() {
-            Some(reloader) => reloader.apply(prepared),
-            None => return serde_json::Value::Null,
-        };
-        let report_json = self.report_json(snapshot.report(), None);
+    /// Swaps `prepared` in and returns the report of the new set, or `None`
+    /// when this surface reloads nothing.
+    pub fn apply(
+        &self,
+        prepared: Prepared,
+    ) -> Option<ferrobridge_operator_api::operator::LoadReport> {
+        let snapshot = self.reloader.as_ref()?.apply(prepared);
+        let report = self.load_report(snapshot.report(), None);
         self.replace(snapshot);
-        report_json
+        Some(report)
     }
 
     /// Saves `body` at `target`, the console file `wire` names, when the
@@ -406,7 +407,7 @@ impl Operator {
                 remove_quietly(&staged);
                 return Ok(Saved::Rejected {
                     old,
-                    report_json: self.report_json(&report, Some(&draft)),
+                    report: self.load_report(&report, Some(&draft)),
                 });
             }
             Err(error) => {
@@ -422,7 +423,7 @@ impl Operator {
         match self.prepare(None) {
             Ok(prepared) => Ok(Saved::Done {
                 old,
-                report_json: self.apply(prepared),
+                report: self.apply(prepared),
             }),
             Err(error) => Ok(Saved::Unreloaded { old, error }),
         }

@@ -11,7 +11,8 @@
 
 use http::StatusCode;
 
-use crate::health::{Check, HealthIndicator, IndicatorState};
+use crate::health::{Check, HealthIndicator};
+use ferrobridge_operator_api::health::IndicatorState;
 
 /// The openEHR CDR probe.
 #[derive(Debug, Clone)]
@@ -216,7 +217,7 @@ fn classify(outcome: Result<StatusCode, String>) -> IndicatorState {
 #[cfg(test)]
 mod tests {
     use super::classify;
-    use crate::health::State;
+    use ferrobridge_operator_api::health::State;
     use http::StatusCode;
 
     #[test]

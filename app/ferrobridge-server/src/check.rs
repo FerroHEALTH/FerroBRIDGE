@@ -18,12 +18,12 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use ferrobridge_operator_api::operator::Counts;
 use fhirconnect::model::load::MappingSet;
 use fhirconnect::resolve::program::Program;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::Severity;
 use openehr_mapping_core::index::WebTemplateIndex;
-use serde::Serialize;
 
 use crate::config::Settings;
 use crate::mappings::compile;
@@ -86,21 +86,6 @@ pub struct Inputs<'a> {
     pub templates: Option<Templates<'a>>,
     /// The OMOCL directory, when one is checked.
     pub omocl: Option<&'a Path>,
-}
-
-/// How much one check read and compiled.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
-pub struct Counts {
-    /// The FHIRconnect files read.
-    pub fhirconnect_files: usize,
-    /// The FHIRconnect context files of a set that loaded.
-    pub contexts: usize,
-    /// The contexts that compiled into a program.
-    pub programs: usize,
-    /// The templates the contexts compiled against.
-    pub templates: usize,
-    /// The OMOCL files read.
-    pub omocl_files: usize,
 }
 
 /// Every diagnostic one check raised, in the order it raised them.
@@ -242,6 +227,24 @@ pub fn diagnostic_json(diagnostic: &Diagnostic, file: &str) -> serde_json::Value
         object.insert(String::from("file"), serde_json::Value::from(file));
     }
     value
+}
+
+/// Returns `diagnostic` with its file named `file`, the form an operator
+/// document carries, so a wire answer never names a host directory.
+///
+/// # Panics
+///
+/// Never in practice: the serde form [`diagnostic_json`] writes is the
+/// diagnostic's own, with only its file text replaced, and a file is any
+/// path, so it reads back.
+#[must_use]
+#[expect(
+    clippy::expect_used,
+    reason = "a Diagnostic's own serde form, with only its file text replaced, reads back: the file is any path and every other field came from a valid Diagnostic"
+)]
+pub fn shown_diagnostic(diagnostic: &Diagnostic, file: &str) -> Diagnostic {
+    serde_json::from_value(diagnostic_json(diagnostic, file))
+        .expect("a diagnostic's own serde form should read back with another file")
 }
 
 /// Returns the inputs `settings` configures, the CDR `cdr` reaches serving

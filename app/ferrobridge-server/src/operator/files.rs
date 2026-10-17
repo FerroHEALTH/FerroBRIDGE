@@ -14,11 +14,8 @@ use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
-use serde::Serialize;
-
 /// The language of the files under one root.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Language {
     /// FHIRconnect model, extension, context and search files.
     Fhirconnect,
@@ -54,13 +51,30 @@ impl Language {
 }
 
 /// Who owns a file, and so who may change it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Owner {
     /// The deployment provisioned it; the operator API never writes it.
     Provisioned,
     /// The console saved it under `[operator] mapping_dir`.
     Console,
+}
+
+impl From<Language> for ferrobridge_operator_api::operator::Language {
+    fn from(language: Language) -> Self {
+        match language {
+            Language::Fhirconnect => Self::Fhirconnect,
+            Language::Omocl => Self::Omocl,
+        }
+    }
+}
+
+impl From<Owner> for ferrobridge_operator_api::operator::Owner {
+    fn from(owner: Owner) -> Self {
+        match owner {
+            Owner::Provisioned => Self::Provisioned,
+            Owner::Console => Self::Console,
+        }
+    }
 }
 
 /// One configured directory and the root name a wire path reaches it by.

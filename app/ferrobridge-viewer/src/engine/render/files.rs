@@ -9,12 +9,13 @@
 //! running load raised about it beside it, each linked to its line. Bytes
 //! that are not UTF-8 are refused with a sentence, never shown altered.
 
+use ferrobridge_operator_api::operator::{Language, Listed, Owner};
 use leptos::prelude::*;
 use openehr_mapping_core::diagnostic::Diagnostic;
 
 use crate::bridge::{BridgeError, MappingFile};
 use crate::engine::render::highlight;
-use crate::engine::render::parts::{self, Shape};
+use crate::engine::render::parts;
 
 /// The path of the page that shows the file `path`.
 #[must_use]
@@ -30,62 +31,56 @@ pub fn line_id(number: u64) -> String {
 
 /// The file list for the answer `listing`.
 #[must_use]
-pub fn list(listing: &Result<serde_json::Value, BridgeError>) -> String {
+pub fn list(listing: &Result<Vec<Listed>, BridgeError>) -> String {
     let section = match listing {
-        Ok(listing) => {
-            rows(listing).unwrap_or_else(|shape| parts::unreadable("Mapping files", &shape))
-        }
+        Ok(listing) => rows(listing),
         Err(error) => parts::failed("Mapping files", error),
     };
     view! { <div class="sections">{section}</div> }.to_html()
 }
 
 /// The table of every listed file.
-fn rows(listing: &serde_json::Value) -> Result<AnyView, Shape> {
-    let entries = listing.as_array().ok_or(Shape { path: "files" })?;
-    if entries.is_empty() {
-        return Ok(view! {
+fn rows(listing: &[Listed]) -> AnyView {
+    if listing.is_empty() {
+        return view! {
             <section class="card">
                 <h2>"Mapping files"</h2>
                 <p>"The bridge serves no mapping file."</p>
             </section>
         }
-        .into_any());
+        .into_any();
     }
-    let rows = entries
+    let rows = listing
         .iter()
         .map(|entry| {
-            let path = parts::text(entry, "path")?.to_owned();
-            let language = parts::text(entry, "language")?.to_owned();
-            let kind = parts::optional_text(entry, "kind")?
-                .unwrap_or("not read")
-                .to_owned();
-            let owner = parts::text(entry, "owner")?.to_owned();
-            let read_only = parts::field(entry, "read_only")?
-                .as_bool()
-                .ok_or(Shape { path: "read_only" })?;
-            let diagnostics = parts::diagnostics(entry, "diagnostics")?;
-            let (count, tone) = counted(&diagnostics);
-            let link = href(&path);
-            Ok(view! {
+            let (count, tone) = counted(&entry.diagnostics);
+            let language = match entry.language {
+                Language::Fhirconnect => "fhirconnect",
+                Language::Omocl => "omocl",
+            };
+            let owner = match entry.owner {
+                Owner::Provisioned => "provisioned",
+                Owner::Console => "console",
+            };
+            view! {
                 <tr>
                     <th scope="row">
-                        <a href=link>
-                            <code>{path}</code>
+                        <a href=href(&entry.path)>
+                            <code>{entry.path.clone()}</code>
                         </a>
                     </th>
                     <td>{language}</td>
-                    <td>{kind}</td>
+                    <td>{entry.kind.clone().unwrap_or_else(|| String::from("not read"))}</td>
                     <td>{owner}</td>
-                    <td>{if read_only { "read-only" } else { "editable" }}</td>
+                    <td>{if entry.read_only { "read-only" } else { "editable" }}</td>
                     <td>
                         <span class=tone>{count}</span>
                     </td>
                 </tr>
-            })
+            }
         })
-        .collect::<Result<Vec<_>, Shape>>()?;
-    Ok(view! {
+        .collect_view();
+    view! {
         <section class="card">
             <h2>"Mapping files"</h2>
             <div class="table-scroll" tabindex="0">
@@ -105,7 +100,7 @@ fn rows(listing: &serde_json::Value) -> Result<AnyView, Shape> {
             </div>
         </section>
     }
-    .into_any())
+    .into_any()
 }
 
 /// The words and tone of a file's diagnostics count.
@@ -133,13 +128,19 @@ fn counted(diagnostics: &[Diagnostic]) -> (String, &'static str) {
 pub fn shown(
     path: &str,
     file: &Result<MappingFile, BridgeError>,
-    listing: &Result<serde_json::Value, BridgeError>,
+    listing: &Result<Vec<Listed>, BridgeError>,
 ) -> String {
     let diagnostics = match listing {
-        Ok(listing) => diagnostics_of(listing, path).map_or_else(
-            |shape| parts::unreadable("Diagnostics", &shape),
-            |diagnostics| diagnostics_section(&diagnostics),
-        ),
+        Ok(listing) => {
+            // NOTE: no specification governs this: our own design; a file the
+            // listing does not carry has no diagnostics of the running load.
+            let of_file = listing
+                .iter()
+                .find(|entry| entry.path == path)
+                .map(|entry| entry.diagnostics.as_slice())
+                .unwrap_or_default();
+            diagnostics_section(of_file)
+        }
         Err(error) => parts::failed("Diagnostics", error),
     };
     let content = match file {
@@ -147,17 +148,6 @@ pub fn shown(
         Err(error) => parts::failed("The file", error),
     };
     view! { <div class="sections">{content} {diagnostics}</div> }.to_html()
-}
-
-/// The diagnostics the listing carries for `path`.
-fn diagnostics_of(listing: &serde_json::Value, path: &str) -> Result<Vec<Diagnostic>, Shape> {
-    let entries = listing.as_array().ok_or(Shape { path: "files" })?;
-    for entry in entries {
-        if parts::text(entry, "path")? == path {
-            return parts::diagnostics(entry, "diagnostics");
-        }
-    }
-    Ok(Vec::new())
 }
 
 /// The diagnostics beside the file, each linked to its line.

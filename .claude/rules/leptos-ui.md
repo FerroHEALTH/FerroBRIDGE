@@ -39,8 +39,10 @@ made in a slice.
   reaches the bridge over HTTP, on the public surface any client uses,
   through `crate::bridge`, server to server. Of the workspace's own crates
   the server half links `openehr-mapping-core` (the `Diagnostic` a check
-  answers) and `fhir-types` with `r4` (the `OperationOutcome` and the
-  `CapabilityStatement` it renders) and nothing else; the browser half links
+  answers), `fhir-types` with `r4` (the `OperationOutcome` and the
+  `CapabilityStatement` it renders) and `ferrobridge-operator-api` (the
+  bridge's health and operator documents, which the bridge serializes with
+  the same types) and nothing else; the browser half links
   none and receives view data from server functions. `tests/it/boundary.rs`
   walks the resolved graph and fails on any other workspace crate, so the
   console never compiles, transforms or saves a mapping itself: every check,
@@ -208,7 +210,8 @@ made in a slice.
 
 - **One module owns every bridge call: `crate::bridge`.** It builds each
   request with the operator's token and reads the answer into the
-  workspace's typed bodies (`fhir-types`, `openehr-mapping-core`). Never a
+  workspace's typed bodies (`fhir-types`, `openehr-mapping-core`,
+  `ferrobridge-operator-api`), never reading a document by field name. Never a
   second client, a shadow type for a body the workspace already models, or a
   `reqwest` call from a server function body (`.claude/rules/codegen.md`,
   `.claude/rules/spec-adherence.md`).
