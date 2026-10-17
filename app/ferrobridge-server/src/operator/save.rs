@@ -118,9 +118,7 @@ pub async fn save(
         return bad_path();
     };
     let target = language.console_directory(&mapping_dir).join(&relative);
-    let declaration = language == files::Language::Fhirconnect
-        && crate::facade::search::declaration::is_declaration(&target);
-    if !files::is_mapping(&target) || declaration {
+    if !files::is_mapping(&target) {
         return bad_path();
     }
     let Some(reason) = reason(&headers) else {
@@ -358,8 +356,8 @@ impl Operator {
                 path: PathBuf::new(),
                 source: std::io::Error::other("the operator API has no reload configured"),
             }))?;
-        let (fhirconnect, omocl) = Reloader::sources(&self.roots, draft)?;
-        tokio::runtime::Handle::current().block_on(reloader.prepare(&fhirconnect, &omocl))
+        let sources = Reloader::sources(&self.roots, draft)?;
+        tokio::runtime::Handle::current().block_on(reloader.prepare(&sources))
     }
 
     /// Swaps `prepared` in and returns the report of the new set.

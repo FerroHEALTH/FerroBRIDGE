@@ -1168,6 +1168,15 @@ the provisioned file winning a path both directories hold, and two files that
 define one mapping are a clash the load refuses: a save is refused with its
 diagnostics, and a run stops before it calls an upstream.
 
+**A search declaration is checked and swapped with its context.** A
+`*.search.yml` file is part of the set like any FHIRconnect file: the console
+saves it under `mapping_dir/fhirconnect/`, and a reload binds every
+declaration, provisioned and console, to the programs it compiled (#766). A
+declaration that does not bind is an error diagnostic on its file, so a save
+is refused with it and the running set stays. The facade's programs and its
+search declarations swap in the same pointer swap, so a request never sees a
+declaration of one set over the programs of another.
+
 **Each replica reloads on its own.** With `mapping_dir` on a shared volume, a
 file another replica saved is visible to this one at its next reload or
 restart. The console's reload acts on the replica behind its configured URL.

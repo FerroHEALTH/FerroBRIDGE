@@ -85,7 +85,9 @@ Besides the codes of the two mapping languages, the check raises
 `template-build` for an operational template that does not build,
 `fb-unknown-template` for a context whose template neither the template
 directory nor the CDR provides, and `fb-no-template-id` for a context that
-names no template.
+names no template. An operator API check or save also raises
+`fb-search-declaration` for a search declaration that does not bind to the
+set.
 
 ## Paths need a template
 

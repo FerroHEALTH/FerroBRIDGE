@@ -356,6 +356,26 @@ pub enum DeclarationError {
     },
 }
 
+impl DeclarationError {
+    /// Returns the file the refusal names: the second file of a pair.
+    #[must_use]
+    pub fn file(&self) -> &Path {
+        match self {
+            Self::Read { file, .. }
+            | Self::Yaml { file, .. }
+            | Self::UnknownContext { file, .. }
+            | Self::Name { file, .. }
+            | Self::UnsupportedType { file, .. }
+            | Self::Standard { file, .. }
+            | Self::Shape { file, .. }
+            | Self::Template { file, .. }
+            | Self::Path { file, .. }
+            | Self::Query { file, .. } => file,
+            Self::Duplicate { second, .. } | Self::Inconsistent { second, .. } => second,
+        }
+    }
+}
+
 /// Reads one declaration file.
 ///
 /// # Errors

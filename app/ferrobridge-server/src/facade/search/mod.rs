@@ -215,10 +215,20 @@ pub fn load(directory: &Path, programs: &Programs) -> Result<Catalog, Declaratio
     let files = crate::walk::files(directory, declaration::is_declaration).map_err(
         |crate::walk::Error { path, source }| DeclarationError::Read { file: path, source },
     )?;
+    load_files(&files, programs)
+}
+
+/// Reads the declarations `files` names, in order, and binds each to its
+/// program.
+///
+/// # Errors
+///
+/// Returns what [`load`] returns, apart from a directory that cannot be read.
+pub fn load_files(files: &[PathBuf], programs: &Programs) -> Result<Catalog, DeclarationError> {
     let mut catalog = Catalog::default();
     for file in files {
-        let written = declaration::read(&file)?;
-        let declared = bind(&file, written, programs)?;
+        let written = declaration::read(file)?;
+        let declared = bind(file, written, programs)?;
         insert(&mut catalog, declared)?;
     }
     tracing::info!(

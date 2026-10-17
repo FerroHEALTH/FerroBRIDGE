@@ -106,8 +106,14 @@ reloads the running set. Without it, the three routes below answer `409`.
   when its configuration turns the operator API on, with the same ownership
   rule, so a file saved here maps the next run. Two files that define the
   same mapping refuse the save, the reload and the run.
-- A search declaration (`*.search.yml`) and any file that is not `.yml` or
-  `.yaml` answer `400`.
+- **Search declarations save beside their context.** A `*.search.yml` file
+  under `fhirconnect/` is checked against the context it names, with every
+  other declaration of the set, and swapped in with the facade's programs, so
+  the `CapabilityStatement` and search answer with it after the save. A
+  declaration that names no compiled context, or that the facade's search
+  checks refuse, answers `422` with an `fb-search-declaration` diagnostic and
+  changes nothing.
+- A file that is not `.yml` or `.yaml` answers `400`.
 
 ### `POST /operator/mappings/check?path={path}`
 
