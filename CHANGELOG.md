@@ -482,6 +482,13 @@ crates on crates.io.
 
 ### Fixed
 
+- `fhir-types` 0.1.116 holds an element id to the `string` form in R4B and
+  R5 (#378). The published definitions type `Element.id` as `string` in every
+  version, while the 4.3.0 and 5.0.0 core packages state `id` on the copies
+  `ElementDefinition.id`, `Extension.id` and the other datatypes inherit, so
+  an element id such as `Patient.extension:birthPlace` or one longer than 64
+  characters was refused. A resource id keeps the form its package states.
+  The R4B and R5 examples corpora pass 544 and 191 more instances.
 - A create with no `meta.versionId` of a source the facade already holds as
   one entry of a multi-entry composition is recognised as a replay when its
   mapping is that entry as it stands, and commits nothing (#667). The replay
