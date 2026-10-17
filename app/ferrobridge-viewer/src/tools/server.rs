@@ -26,7 +26,8 @@ const FORMATS: [&str; 2] = ["canonical", "flat"];
 /// A plain form post, which a page sends before its bundle has loaded,
 /// asks for HTML; the tools answer only the bundle's call, so it is refused
 /// before the bridge is asked anything.
-fn admitted() -> Result<(crate::server::ViewerState, crate::bridge::AccessToken), ViewError> {
+pub(crate) fn admitted()
+-> Result<(crate::server::ViewerState, crate::bridge::AccessToken), ViewError> {
     let signed_in = crate::session::request::signed_in()?;
     let plain = use_context::<http::request::Parts>().is_some_and(|parts| {
         parts

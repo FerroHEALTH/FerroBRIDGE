@@ -96,6 +96,25 @@ may write it, and how many diagnostics it has. Following one shows the file
 as the bridge serves it, byte for byte, with numbered lines, highlighted
 YAML, its SHA-256, and the diagnostics beside it, each linked to its line.
 
+The **editor** (`/edit/{path}`, or `/edit` for a new file) changes the
+console's own mapping files, which live under the bridge's
+`[operator] mapping_dir`:
+
+1. **Check** compiles the whole set with your draft in place of the file
+   and lists every diagnostic. Nothing is written.
+2. **Save** needs a one-line reason and a confirmation. The bridge compiles
+   the set with the draft again and writes the file only when it compiles,
+   then reloads, so a refused draft leaves the disk and the running set as
+   they were. The save carries the digest the file was opened at: when
+   someone changed the file in the meantime, the bridge refuses with `412`
+   and your draft stays in the editor.
+3. **Reload** compiles the files on disk and replaces the running set when
+   they compile.
+
+A provisioned file opens for a check only: the console never saves over
+one. The bridge's audit log names who saved which file, the two digests and
+the reason, never the content.
+
 Two tools run the bridge's operations as the operator, and keep nothing:
 
 - **Transform playground** (`/playground`): `$tofhir` turns a canonical or

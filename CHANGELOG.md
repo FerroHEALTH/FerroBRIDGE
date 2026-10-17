@@ -25,6 +25,19 @@ crates on crates.io.
 
 ### Added
 
+- The profile validator holds every resolved extension to where its
+  definition admits it (#481): each `StructureDefinition.context` of the
+  types `element`, `extension` and `fhirpath`, read as R4
+  defining-extensions.html §2.5.1.2 and the `extension-context-type` code
+  system define them, and each `contextInvariant` evaluated on the element
+  holding the extension with `%extension` bound to it. A misplaced
+  extension is an `extension-context` error and a broken context invariant
+  a `context-invariant` error; a context the walk cannot decide, and a
+  context invariant that does not parse or evaluate, stay listed as
+  unevaluated with the reason. `Reason::ExtensionContext` now carries that
+  reason as a `String`, and `Constraint::ContextInvariant` is new: a
+  consumer matching the unit variant changes its pattern.
+
 - The operator console ships as its own image,
   `ghcr.io/ferrohealth/ferrobridge-viewer` (#603). `docker/viewer/Dockerfile`
   builds it on the bridge image's distroless base, runs as `65532:65532`,
@@ -38,12 +51,20 @@ crates on crates.io.
   capability dropped, `no-new-privileges`, and the OIDC client secret as a
   file secret, and CI resolves the quickstart under every profile and
   dry-runs the console image build.
-- `fhir-types` 0.1.118 lists every primitive type with the type its
+- `fhir-types` 0.1.118 resolves a JSON member name against the element
+  table (#483): `TypeSchema::member` answers the element an object key
+  names, the type code a choice form such as `valueQuantity` selects, and
+  whether the key is the `_` sibling of a primitive (R4 json.html §2.6.2),
+  and `FieldSchema::choices` lists a choice element's alternatives with
+  their type codes. The profile validator uses both and drops its own
+  copy of the choice matching. The change adds API and breaks none;
+  `fhirconnect` moves to 0.1.132 with the requirement.
+- `fhir-types` 0.1.119 lists every primitive type with the type its
   `StructureDefinition.baseDefinition` names, in each version's
   `schema::SCHEMAS.primitives`, read by `Schemas::primitive_base_of`
   (`code` specializes `string`) (#635). The new `primitives` field breaks a
   consumer that builds a `Schemas` value by hand: it adds the field.
-  `fhirconnect` 0.1.132 follows the requirement.
+  `fhirconnect` 0.1.133 follows the requirement.
 
 ### Fixed
 
@@ -149,6 +170,18 @@ crates on crates.io.
 
 ### Added
 
+- The console edits mapping files (#608). A text area opens a file with
+  the digest the operator API's `ETag` names. Check sends the draft to
+  `POST /operator/mappings/check` and shows its diagnostics inline. Save
+  sends the draft's exact bytes to `PUT /operator/mappings/{path}` under
+  `If-Match` (or `If-None-Match: *` for a new file), with a one-line reason
+  in `Ferrobridge-Reason`, behind a confirmation the server checks again.
+  The result takes the focus: the reload's report after a save, the
+  diagnostics of a refused draft (nothing written, the running set
+  unchanged), or the `412` conflict when the file changed meanwhile.
+  Reload calls `POST /operator/reload`. A provisioned file opens for a check
+  alone, and no draft reaches a log line. The WebAssembly budget rises to
+  314 KiB with the measurement in `.claude/rules/leptos-ui.md`.
 - The console has a transform playground and a validation dry run (#605).
   The playground runs `$tofhir` (a canonical or FLAT composition, a
   template id and a `context.patient` reference) and `$toopenehr` (a
@@ -368,6 +401,10 @@ crates on crates.io.
 
 ### Fixed
 
+- The operator API checks and compiles the console's FHIRconnect files on
+  every save and reload when no `[mappings] directory` is provisioned
+  (#774). Before, those files were listed and never checked, so a broken
+  draft was written. In that deployment the templates come from the CDR.
 - The request log writes `<unmatched>` as the route of a request no route
   matched (#746), instead of the raw path the client sent, so an identifier
   in that path no longer reaches the log.

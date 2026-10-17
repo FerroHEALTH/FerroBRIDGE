@@ -10,7 +10,6 @@ use fhir_types::codec::Value;
 use fhir_types::r4::element_definition::ElementDefinition;
 use fhir_types::schema::FieldSchema;
 use fhir_types::schema::Kind;
-use fhir_types::schema::TypeSchema;
 
 use crate::issue::IssueType;
 use crate::issue::MessageId;
@@ -204,20 +203,14 @@ pub(super) fn forms(field: &'static FieldSchema, object: &Object) -> Vec<Form> {
             || (matches!(kind, Kind::Primitive(_)) && object.contains_key(&format!("_{key}")))
     };
     match field.kind {
-        Kind::Choice(variants) => variants
-            .iter()
-            .filter_map(|(suffix, kind)| {
-                let code = field
-                    .types
-                    .iter()
-                    .copied()
-                    .find(|code| upper_first(code) == *suffix)
-                    .unwrap_or(suffix);
-                let key = format!("{}{suffix}", field.name);
-                present(&key, *kind).then_some(Form {
+        Kind::Choice(_) => field
+            .choices()
+            .filter_map(|choice| {
+                let key = format!("{}{}", field.name, choice.suffix);
+                present(&key, choice.kind).then_some(Form {
                     key,
-                    kind: *kind,
-                    choice: Some(code),
+                    kind: choice.kind,
+                    choice: Some(choice.code),
                 })
             })
             .collect(),
@@ -233,22 +226,6 @@ pub(super) fn forms(field: &'static FieldSchema, object: &Object) -> Vec<Form> {
             }
         }
     }
-}
-
-/// Answers whether `key` names a member of `schema`: an element, a choice
-/// form, or the `_` sibling of a primitive one (json.html §2.6.2.3).
-pub(super) fn knows(schema: &TypeSchema, key: &str) -> bool {
-    let (name, sibling) = match key.strip_prefix('_') {
-        Some(name) => (name, true),
-        None => (key, false),
-    };
-    schema.fields.iter().any(|field| match field.kind {
-        Kind::Choice(variants) => variants.iter().any(|(suffix, kind)| {
-            name.strip_prefix(field.name) == Some(*suffix)
-                && (!sibling || matches!(kind, Kind::Primitive(_)))
-        }),
-        kind => field.name == name && (!sibling || matches!(kind, Kind::Primitive(_))),
-    })
 }
 
 /// `code` with its first letter in upper case, the suffix a choice form

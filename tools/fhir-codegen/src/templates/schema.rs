@@ -86,6 +86,83 @@ pub struct FieldSchema {
     pub is_modifier: bool,
 }
 
+/// One alternative of a choice element: the suffix its JSON member carries,
+/// the type code the definition lists for it, and how it travels.
+///
+/// The JSON member of the alternative is the choice's stem followed by the
+/// suffix, the type code with its first letter in upper case
+/// (`valueQuantity`, <https://hl7.org/fhir/R4/json.html#2.6.2>).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChoiceForm {
+    /// The suffix of the JSON member name, for example `Quantity`.
+    pub suffix: &'static str,
+    /// The type code the definition lists, for example `dateTime`.
+    pub code: &'static str,
+    /// How the alternative travels.
+    pub kind: Kind,
+}
+
+/// A JSON member name resolved against the elements of a type.
+///
+/// The JSON representation names an element by its name, a choice element by
+/// its stem and the suffix of one alternative, and the `id` and `extension` of
+/// a primitive element by its name behind a leading underscore
+/// (<https://hl7.org/fhir/R4/json.html#2.6.2>).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Member {
+    /// The element the member belongs to.
+    pub field: &'static FieldSchema,
+    /// How the member's value travels: the chosen alternative's kind for a
+    /// choice form, the element's own kind otherwise.
+    pub kind: Kind,
+    /// The type code of the chosen alternative, for a choice form.
+    pub choice: Option<&'static str>,
+    /// Whether the member is the `_` sibling carrying a primitive's `id` and
+    /// `extension`.
+    pub sibling: bool,
+}
+
+impl FieldSchema {
+    /// The alternatives of a choice element, in definition order; none for an
+    /// element of a single type.
+    pub fn choices(&self) -> impl Iterator<Item = ChoiceForm> + '_ {
+        let variants: &'static [(&'static str, Kind)] = match self.kind {
+            Kind::Choice(variants) => variants,
+            _ => &[],
+        };
+        variants.iter().filter_map(|(suffix, kind)| {
+            self.choice_type(suffix).map(|code| ChoiceForm {
+                suffix,
+                code,
+                kind: *kind,
+            })
+        })
+    }
+
+    /// The type code of the choice alternative whose JSON suffix is `suffix`,
+    /// `None` when the element lists no such type.
+    #[must_use]
+    pub fn choice_type(&self, suffix: &str) -> Option<&'static str> {
+        self.types
+            .iter()
+            .copied()
+            .find(|code| is_choice_suffix(code, suffix))
+    }
+}
+
+/// Whether `suffix` is `code` with its first letter in upper case, the suffix
+/// a choice form carries (<https://hl7.org/fhir/R4/json.html#2.6.2>).
+fn is_choice_suffix(code: &str, suffix: &str) -> bool {
+    let mut code_chars = code.chars();
+    let mut suffix_chars = suffix.chars();
+    match (code_chars.next(), suffix_chars.next()) {
+        (Some(first), Some(upper)) => {
+            first.to_ascii_uppercase() == upper && code_chars.as_str() == suffix_chars.as_str()
+        }
+        _ => false,
+    }
+}
+
 /// One type's elements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TypeSchema {
@@ -116,6 +193,45 @@ pub struct PrimitiveSchema {
     /// carries, and from R5 the abstract `PrimitiveType`, which it does not.
     /// `None` when the definition names none.
     pub base: Option<&'static str>,
+}
+
+impl TypeSchema {
+    /// The element a JSON member of this type's object names, with the
+    /// alternative a choice form selects.
+    ///
+    /// `key` is an element name, a choice element's stem followed by the
+    /// suffix of one alternative, or either of those behind a leading
+    /// underscore when the element or alternative is a primitive
+    /// (<https://hl7.org/fhir/R4/json.html#2.6.2>). A choice element's bare
+    /// stem names no member, and neither does a key the type does not define.
+    #[must_use]
+    pub fn member(&self, key: &str) -> Option<Member> {
+        let (name, sibling) = match key.strip_prefix('_') {
+            Some(name) => (name, true),
+            None => (key, false),
+        };
+        let member = self.fields.iter().find_map(|field| match field.kind {
+            Kind::Choice(_) => {
+                let suffix = name.strip_prefix(field.name)?;
+                field
+                    .choices()
+                    .find(|form| form.suffix == suffix)
+                    .map(|form| Member {
+                        field,
+                        kind: form.kind,
+                        choice: Some(form.code),
+                        sibling,
+                    })
+            }
+            kind => (field.name == name).then_some(Member {
+                field,
+                kind,
+                choice: None,
+                sibling,
+            }),
+        })?;
+        (!sibling || matches!(member.kind, Kind::Primitive(_))).then_some(member)
+    }
 }
 
 /// A version's schema: every type, sorted by name, the resource names and
@@ -253,14 +369,8 @@ fn field_named(schema: &'static TypeSchema, segment: &str) -> Option<(&'static F
     if let Some(field) = named {
         return Some((field, field.kind));
     }
-    schema.fields.iter().find_map(|field| {
-        let Kind::Choice(variants) = field.kind else {
-            return None;
-        };
-        let suffix = segment.strip_prefix(field.name)?;
-        variants
-            .iter()
-            .find(|(candidate, _)| *candidate == suffix)
-            .map(|(_, kind)| (field, *kind))
-    })
+    schema
+        .member(segment)
+        .filter(|member| !member.sibling)
+        .map(|member| (member.field, member.kind))
 }

@@ -25,9 +25,13 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
 - The operation contracts stay the terminology set.
 - `schema::SCHEMAS` is the one element table per version: the XML codec and the
   path model read the same statics, so cardinality, the element path, the type
-  codes and `contentReference` are never copied into a second table. Its
-  `primitives` list names each primitive's `baseDefinition`, so a consumer
-  walks `code` to `string` without a constant of its own.
+  codes and `contentReference` are never copied into a second table.
+  `TypeSchema::member` resolves a JSON member name (a choice form, a `_`
+  sibling) to its element and the type code it selects, and
+  `FieldSchema::choices` lists a choice's alternatives, so a consumer walking
+  JSON never re-derives the choice matching. Its `primitives` list names each
+  primitive's `baseDefinition`, so a consumer walks `code` to `string` without
+  a constant of its own.
 - `search_parameters::SEARCH_PARAMETERS` is the one search parameter registry
   per version, behind `resources`: a consumer checks a search parameter code,
   type or canonical against it and never keeps its own copy of the
