@@ -413,7 +413,7 @@ names the Tailwind release to cargo-leptos.
 | `cargo-leptos` | 0.3.11 | `.github/workflows/ci.yml` (the `viewer` job) |
 | `wasm-bindgen` | 0.2.129 | `.github/workflows/ci.yml` (the `viewer` job), the root `Cargo.toml` `[workspace.dependencies]` |
 | Tailwind CSS | 4.3.3 | `scripts/release/viewer-tools.sh`, `scripts/release/viewer-site.sh` |
-| Binaryen | version_123 | `scripts/release/viewer-tools.sh` |
+| Binaryen | version_133 | `scripts/release/viewer-tools.sh` |
 
 `scripts/checks/versions.sh` reads each of them back against these rows.
 

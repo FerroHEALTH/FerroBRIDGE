@@ -24,14 +24,14 @@ set -Eeuo pipefail
 tailwind_version="4.3.3"
 tailwind_linux_x64_sha256="dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a"
 tailwind_macos_arm64_sha256="cdf646702987a743464dff4d9c60fd4480d1c1e73dd819a9a67f1078815dce9d"
-binaryen_version="version_123"
-binaryen_x86_64_linux_sha256="e959f2170af4c20c552e9de3a0253704d6a9d2766e8fdb88e4d6ac4bae9388fe"
-binaryen_arm64_macos_sha256="74428be348c1a09863e7b642a1fa948cabf8ec9561052233d8288e941951725b"
+binaryen_version="version_133"
+binaryen_x86_64_linux_sha256="2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489"
+binaryen_arm64_macos_sha256="ad66da82ac13f163e424b1643f16c6dfcccc98b5966296b43e52d3cab04f84a8"
 # The files inside each Binaryen archive that --check digests: wasm-opt, and
 # on macOS the libbinaryen it loads, which holds the optimizer itself.
-wasm_opt_x86_64_linux_sha256="d66c6724c07334155720eb2def29c434dcaaf741ce859b4f7f389e22674f9c4a"
-wasm_opt_arm64_macos_sha256="4c674f02a820509828b9271665b50cd6d06b1e6696002818cdcc23314ab949e8"
-libbinaryen_arm64_macos_sha256="672e18b2ba553c7960d71ef3db7c732772be1661d31119401af0b4f48e5d5e14"
+wasm_opt_x86_64_linux_sha256="8f25e9fd5db0fc5f210003aaa432922feb2e52d309e430def2f929e34da9466b"
+wasm_opt_arm64_macos_sha256="81041e09f332df94db1c2009a64d8f3b85f0431a2c920ccd014d3ceebb343402"
+libbinaryen_arm64_macos_sha256="61055e190d84d5db6d1dec63456e0c24dad324ecfd4d2e23740dca217ed89e5a"
 
 die() {
   echo "viewer-tools: $*" >&2
