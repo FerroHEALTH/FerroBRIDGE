@@ -17,6 +17,7 @@ use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::origin::Origin;
 use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::outcome::Outcome;
+use fhirconnect::engine::seam::IdentitySink;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::Defaults;
 use fhirconnect::engine::traverse::error::EngineError;
@@ -107,20 +108,25 @@ pub fn inbound_from(
 
 /// Maps one composition into a FHIR document.
 ///
+/// Every resource the run creates beside the one it maps (a `hierarchy.split`
+/// occurrence or a `reference`) takes the id `identities` assigns.
+///
 /// # Errors
 ///
-/// Returns [`EngineError`] for any element the program cannot map.
+/// Returns [`EngineError`] for any element the program cannot map, and for a
+/// created resource `identities` gives no id.
 pub fn outbound(
     program: &Program,
     index: &WebTemplateIndex,
     composition: &CanonicalComposition,
+    identities: &dyn IdentitySink,
 ) -> Result<Outcome<Value>, EngineError> {
     to_fhir(
         program,
         &fhir_types::r4::schema::SCHEMAS,
         index,
         composition,
-        &Seams::default(),
+        &Seams::default().with_identities(identities),
         &CallContext::new(),
     )
 }

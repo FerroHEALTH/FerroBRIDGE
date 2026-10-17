@@ -403,6 +403,7 @@ fn record_earlier(
             split: 0,
             context: String::from("ferrobridge_facade.context"),
             derivation: None,
+            created: None,
         },
     )?;
     Ok(())

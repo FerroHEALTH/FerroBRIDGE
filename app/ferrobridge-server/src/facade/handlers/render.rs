@@ -9,8 +9,10 @@
 //! `meta.source` that points at the composition version the content came
 //! from, and the subject the identity map binds to the composition's EHR when
 //! the mapping wrote none (no specification governs the identity: our own
-//! design). The answer is then checked against the required elements of the
-//! element table, so no interaction answers an invalid instance.
+//! design). Every resource the run creates beside it is bound under an id of
+//! its own, and [`render_created`] answers one of them. The answer is then
+//! checked against the required elements of the element table, so no
+//! interaction answers an invalid instance.
 
 use crate::cdr::ids::EhrId;
 use fhir_types::codec::Object;
@@ -30,6 +32,8 @@ use crate::facade::engine;
 use crate::facade::handlers::Refusal;
 use crate::facade::handlers::complete;
 use crate::facade::identity::FhirResourceId;
+use crate::facade::identity::created::CreatedIdentities;
+use crate::facade::identity::store::Store;
 use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
@@ -65,7 +69,7 @@ pub(crate) fn subject_of(facade: &Facade, ehr_id: &EhrId) -> Result<Option<Value
 /// logical id the map holds, and the subject the map binds to its EHR.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Origin<'a> {
-    /// The logical id the identity map holds.
+    /// The logical id the identity map holds for the entry's own resource.
     pub(crate) id: &'a FhirResourceId,
     /// The composition version the content came from.
     pub(crate) version: &'a ObjectVersionId,
@@ -73,10 +77,20 @@ pub(crate) struct Origin<'a> {
     pub(crate) source: &'a Url,
     /// The subject reference [`subject_of`] answered, when the map knows one.
     pub(crate) subject: Option<&'a Value>,
+    /// The identity map every resource the run creates is bound in.
+    pub(crate) store: &'a dyn Store,
 }
 
 /// Returns the resource `composition` maps to, decorated with its identity
 /// and checked against the required elements R4 gives its type.
+///
+/// Every resource the run creates beside it is bound in the identity map
+/// under an id of its own and stays out of the body: the reference the
+/// mapping wrote names it as `<Type>/<id>`, which a read answers
+/// ([`render_created`]). A contained resource "does not have an independent
+/// existence apart from the resource that contains it"
+/// (<https://hl7.org/fhir/R4/references.html#contained>), so none is
+/// contained.
 ///
 /// # Errors
 ///
@@ -88,22 +102,84 @@ pub(crate) fn render(
     composition: &CanonicalComposition,
     origin: Origin<'_>,
 ) -> Result<Rendered, Refusal> {
-    let Origin {
-        id,
-        version,
-        source,
-        subject,
-    } = origin;
     let resource_type = program.resource().as_str();
-    let produced = engine::outbound(program, index, composition)
+    let (value, _created, warnings) = produce(program, index, composition, &origin)?;
+    let body = resource_object(value, resource_type)?;
+    decorate(
+        body,
+        resource_type,
+        origin.id,
+        &origin,
+        Some(program.profile().url().as_str()),
+        warnings,
+    )
+}
+
+/// Returns the resource of type `resource_type` and id `id` the outbound run
+/// over `composition` creates, decorated as [`render`] decorates the entry's
+/// own resource.
+///
+/// The created resource claims no profile, because the context maps the
+/// parent's (no specification governs this: our own design).
+///
+/// # Errors
+///
+/// A `404` when the run no longer creates that resource, the engine's
+/// refusal, and the `500` of [`complete::refusal`].
+pub(crate) fn render_created(
+    program: &Program,
+    index: &WebTemplateIndex,
+    composition: &CanonicalComposition,
+    origin: Origin<'_>,
+    target: (&str, &FhirResourceId),
+) -> Result<Rendered, Refusal> {
+    let (resource_type, id) = target;
+    let (_value, created, warnings) = produce(program, index, composition, &origin)?;
+    let found = created.into_iter().find(|resource| {
+        resource.get("resourceType").and_then(Value::as_str) == Some(resource_type)
+            && resource.get("id").and_then(Value::as_str) == Some(id.as_str())
+    });
+    let Some(Value::Object(body)) = found else {
+        return Err(reply::refusal(
+            StatusCode::NOT_FOUND,
+            Issue::error(IssueType::NotFound).diagnosing(format!(
+                "{resource_type}/{id} names a resource the composition version no longer creates"
+            )),
+        ));
+    };
+    decorate(body, resource_type, id, &origin, None, warnings)
+}
+
+/// Runs the outbound mapping, binding every resource it creates under the
+/// entry's own resource.
+fn produce(
+    program: &Program,
+    index: &WebTemplateIndex,
+    composition: &CanonicalComposition,
+    origin: &Origin<'_>,
+) -> Result<(Value, Vec<Value>, Vec<Warning>), Refusal> {
+    let identities = CreatedIdentities::new(origin.store, program.resource().as_str(), origin.id);
+    let produced = engine::outbound(program, index, composition, &identities)
         .map_err(|error| Refusal::from(crate::facade::ingest::engine_refusal(&error)))?;
     let warnings = produced.warnings().to_vec();
     let (value, created) = produced.into_parts();
-    let mut body = resource_object(value, resource_type)?;
-    contain(&mut body, created);
-    let filled: Vec<&'static str> = complete::fill_subject(&mut body, resource_type, subject)
-        .into_iter()
-        .collect();
+    Ok((value, created, warnings))
+}
+
+/// Writes the identity of one rendered resource onto `body` and checks it
+/// against the required elements R4 gives `resource_type`.
+fn decorate(
+    mut body: Object,
+    resource_type: &str,
+    id: &FhirResourceId,
+    origin: &Origin<'_>,
+    profile: Option<&str>,
+    warnings: Vec<Warning>,
+) -> Result<Rendered, Refusal> {
+    let filled: Vec<&'static str> =
+        complete::fill_subject(&mut body, resource_type, origin.subject)
+            .into_iter()
+            .collect();
     body.insert(String::from("id"), Value::String(String::from(id.as_str())));
     let mut meta = body
         .get("meta")
@@ -112,18 +188,21 @@ pub(crate) fn render(
         .unwrap_or_default();
     meta.insert(
         String::from("versionId"),
-        Value::String(String::from(version.version_tree_id().value())),
+        Value::String(String::from(origin.version.version_tree_id().value())),
     );
     // NOTE: `Meta.source` is "a uri that identifies the source system"
     // (<https://hl7.org/fhir/R4/resource.html#Meta>), so the openEHR version
     // uid travels as the ITS-REST URL of that exact version.
-    meta.insert(String::from("source"), Value::String(source.to_string()));
     meta.insert(
-        String::from("profile"),
-        Value::Array(vec![Value::String(String::from(
-            program.profile().url().as_str(),
-        ))]),
+        String::from("source"),
+        Value::String(origin.source.to_string()),
     );
+    if let Some(profile) = profile {
+        meta.insert(
+            String::from("profile"),
+            Value::Array(vec![Value::String(String::from(profile))]),
+        );
+    }
     body.insert(String::from("meta"), Value::Object(meta));
     let absent = complete::absent_required(&body, resource_type);
     if !absent.is_empty() {
@@ -161,71 +240,6 @@ fn resource_object(value: Value, resource_type: &str) -> Result<Object, Refusal>
         format!("the engine produced {kind} where a {resource_type} resource object belongs"),
     ))))
 }
-
-/// Carries the resources an outbound run created inside the one it mapped.
-///
-/// The facade serves one resource per composition entry, and a resource the
-/// run created beside it has no location of its own on this server, so it
-/// travels as a contained resource and every reference to it becomes the
-/// local `#<id>` form (<https://hl7.org/fhir/R4/references.html#contained>).
-/// No specification governs the choice: our own design.
-fn contain(body: &mut Object, created: Vec<Value>) {
-    if created.is_empty() {
-        return;
-    }
-    let mut local: Vec<(String, String)> = Vec::with_capacity(created.len());
-    for resource in &created {
-        if let (Some(kind), Some(id)) = (
-            resource.get("resourceType").and_then(Value::as_str),
-            resource.get("id").and_then(Value::as_str),
-        ) {
-            local.push((format!("{kind}/{id}"), format!("#{id}")));
-        }
-    }
-    let mut contained: Vec<Value> = body
-        .get("contained")
-        .and_then(Value::as_array)
-        .map(<[Value]>::to_vec)
-        .unwrap_or_default();
-    contained.extend(created);
-    for resource in &mut contained {
-        relocate(resource, &local);
-    }
-    let mut document = Value::Object(core::mem::take(body));
-    relocate(&mut document, &local);
-    if let Value::Object(mut object) = document {
-        object.insert(String::from("contained"), Value::Array(contained));
-        *body = object;
-    }
-}
-
-/// Rewrites every `reference` that names a contained resource to its local
-/// form.
-fn relocate(value: &mut Value, local: &[(String, String)]) {
-    match *value {
-        Value::Object(ref mut object) => {
-            for (key, member) in object.iter_mut() {
-                if key == "reference"
-                    && let Value::String(ref mut text) = *member
-                    && let Some((_, rewritten)) = local.iter().find(|(from, _)| from == text)
-                {
-                    *text = rewritten.clone();
-                    continue;
-                }
-                if key != "contained" {
-                    relocate(member, local);
-                }
-            }
-        }
-        Value::Array(ref mut items) => {
-            for item in items {
-                relocate(item, local);
-            }
-        }
-        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
-    }
-}
-
 /// Records what the facade filled on one rendered resource and the declared
 /// set of losses its outbound run took.
 ///
@@ -313,7 +327,7 @@ pub(crate) fn composition_url(
 
 #[cfg(test)]
 mod tests {
-    use super::{Rendered, composition_url, contain, log_outcome, resource_object};
+    use super::{Rendered, composition_url, log_outcome, resource_object};
     use crate::cdr::ids::EhrId;
     use fhir_types::codec::Value;
     use fhirconnect::engine::outcome::Location;
@@ -446,41 +460,6 @@ mod tests {
         let passed = resource_object(Value::Object(object.clone()), "Condition")
             .expect("an object is the resource");
         assert_eq!(object, passed);
-    }
-
-    #[test]
-    fn a_created_resource_is_contained_and_referenced_locally() {
-        // R4 references.html#contained: a contained resource is referenced
-        // as `#<id>` from the resource that contains it.
-        let Value::Object(mut body) = Value::from_serde_json(serde_json::json!({
-            "resourceType": "Condition",
-            "evidence": [{"detail": [{"reference": "Observation/created-1"}]}]
-        })) else {
-            panic!("the literal is an object");
-        };
-        let created = Value::from_serde_json(serde_json::json!({
-            "resourceType": "Observation",
-            "id": "created-1"
-        }));
-        contain(&mut body, vec![created.clone()]);
-        let document = Value::Object(body);
-        assert_eq!(
-            document
-                .get("contained")
-                .and_then(Value::as_array)
-                .map(<[Value]>::to_vec),
-            Some(vec![created])
-        );
-        assert_eq!(
-            document
-                .get("evidence")
-                .and_then(|evidence| evidence.as_array()?.first())
-                .and_then(|evidence| evidence.get("detail"))
-                .and_then(|detail| detail.as_array()?.first())
-                .and_then(|detail| detail.get("reference"))
-                .and_then(Value::as_str),
-            Some("#created-1")
-        );
     }
 
     #[test]

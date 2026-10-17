@@ -122,8 +122,8 @@ digest over the `IdentityRequest`, so the same composition yields the same
 ids. A reference that resolves to nothing is a `Loss::Skipped` warning, never a
 silent nothing; a reference chain that reaches itself refuses. Created
 resources travel as `Outcome::created`: the operations lane answers them as
-Bundle entries and the facade carries them as contained resources with `#id`
-references. The operations lane resolves a reference against the request
+Bundle entries and the facade binds each under an id of its own and serves it
+at `<Type>/<id>`. The operations lane resolves a reference against the request
 Bundle only.
 
 The fourth seam is `engine::terminology::Terminology`, the server a

@@ -223,6 +223,7 @@ mod tests {
             split: 0,
             context: String::from("ferrobridge_diagnosis.context"),
             derivation: Some(crate::facade::identity::derive::DERIVATION),
+            created: None,
         }
     }
 

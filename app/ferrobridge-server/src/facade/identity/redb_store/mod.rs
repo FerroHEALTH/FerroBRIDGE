@@ -66,10 +66,13 @@ const SCHEMA_KEY: &str = "schema";
 
 /// The schema this build writes.
 ///
-/// Schema 2 adds the identity derivation to each composition binding. A file
-/// with no schema row was written by a build up to 0.0.6 and reads as schema
-/// 1 (no specification governs the store: our own design).
-pub const SCHEMA: u32 = 2;
+/// Schema 2 adds the identity derivation to each composition binding, and
+/// schema 3 the binding of a resource an outbound run creates, which names its
+/// parent; a binding without one is an entry's own, so a file of schema 1 or 2
+/// reads unchanged. A file with no schema row was written by a build up to
+/// 0.0.6 and reads as schema 1 (no specification governs the store: our own
+/// design).
+pub const SCHEMA: u32 = 3;
 
 /// The oldest schema this build reads.
 pub const OLDEST_SCHEMA: u32 = 1;

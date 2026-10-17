@@ -34,6 +34,18 @@ crates on crates.io.
   `ConceptMap/$translate` declares each `0..1`, so a FHIRconnect
   `conceptmap`, which names only the map, can be translated in both
   directions.
+- A resource the facade's outbound mapping creates, a further
+  `hierarchy.split` occurrence with `create: resource` or the target of a
+  `reference` mapping, is no longer carried as a contained resource with a
+  `#id` reference (#225). It gets an identity-store binding of its own under
+  an id derived from its parent's entry, the creating mapping and the openEHR
+  occurrence, stable across re-runs and composition versions, and the parent
+  references it as `<Type>/<id>`. `GET /fhir/<Type>/<id>` and the vread answer
+  it, a `PUT` of it answers `405`, and a type only a `reference` creates is
+  declared with `read` and `vread` in the `CapabilityStatement`. The identity
+  store writes schema 3 and reads schemas 1 to 3; a file of schema 1 or 2
+  opens unchanged and is stamped 3, and a build before this one refuses a
+  schema 3 file by name.
 - The FHIRconnect operations lane reads its mapping directory through the
   walk the facade uses (#524), so a `.YML` or `.YAML` file is now read by both
   lanes; the operations lane read only the lower-case spellings before.

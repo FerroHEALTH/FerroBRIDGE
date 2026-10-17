@@ -1642,9 +1642,18 @@ draft upstream change.
   resource updates rather than duplicates (section 4.6). The acknowledged
   failure mode (a re-sent Bundle omitting one resource reads as a different
   mapping) is documented, not hidden. The store file records its schema
-  (#298): this build writes schema 2, reads 1 and 2 (a file without the row
+  (#298): this build writes schema 3, reads 1 to 3 (a file without the row
   is schema 1, written by 0.0.6 or earlier), and refuses any other by name,
-  so a later build that drops a schema refuses the older file. A source `id`
+  so a later build that drops a schema refuses the older file. Schema 3
+  (#225) adds the binding of a resource an outbound run creates: a further
+  `hierarchy.split` occurrence or a `reference` target is bound under the
+  id a SHA-256 over the parent's entry key, the creating mapping, the
+  occurrence positions and the split's `unique` values derives, recorded
+  with its parent, so the parent references it as `<Type>/<id>` and a read
+  of that id maps the parent's entry again and answers the created resource
+  (a contained resource has no independent identity, R4 references.html
+  §2.3.0.8). The binding is recorded the first time the facade answers the
+  parent, and the map wins from then on. A source `id`
   a store written before 0.0.4 bound to two compositions answers `409`, and
   the refusal names each composition's resource id, whose update revises it.
 

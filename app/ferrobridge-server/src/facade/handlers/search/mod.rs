@@ -338,7 +338,10 @@ fn resolve(facade: &Facade, resource_type: &str, criteria: &Criteria) -> Result<
             let Ok(internal) = FhirResourceId::new(id) else {
                 continue;
             };
-            if let Some(binding) = read::binding(facade, resource_type, &internal)? {
+            // TODO(#731): answer an `_id` that names a created resource with it.
+            if let Some(binding) = read::binding(facade, resource_type, &internal)?
+                && binding.created.is_none()
+            {
                 bindings.push(binding);
             }
         }
@@ -618,6 +621,7 @@ fn render_entry(
             version,
             source: &source,
             subject: subject.as_ref(),
+            store: facade.store(),
         },
     )?;
     render::log_outcome(&rendered);

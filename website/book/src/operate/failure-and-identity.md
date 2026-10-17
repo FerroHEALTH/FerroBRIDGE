@@ -56,13 +56,24 @@ a re-sent Bundle is recognised. It also records each `Resource.identifier` a
 committed resource carries against its resource id, which is what a
 conditional create's `identifier` search reads.
 
+A resource the mapping creates beside the one it maps, one per further
+occurrence of a `hierarchy.split` with `create: resource` or one per
+`reference` mapping going out of openEHR, gets a binding of its own the first
+time the facade answers its parent. Its id is a digest over the parent's
+entry, the mapping that creates it and the openEHR occurrence it is created
+for, so it stays the same across re-runs and composition versions. The parent
+references it as `<Type>/<id>`, and `GET [base]/<Type>/<id>` answers it on
+its own: the facade maps the parent's entry again and returns the created
+resource of that id. The binding holds identifiers only, never content.
+
 The id-map file records the schema it was written in. This build writes
-schema 2 and reads schemas 1 and 2; a file with no schema row was written by
-0.0.6 or earlier and reads as schema 1. Opening the store checks the schema
-and stamps the file with schema 2. A file in any other schema, for example
-one a later build wrote, stops the start with an error that names the file,
-the schema it found and the schemas this build reads, and the file is left
-unchanged.
+schema 3 and reads schemas 1 to 3; a file with no schema row was written by
+0.0.6 or earlier and reads as schema 1. Schema 3 adds the binding of a
+created resource, so a file of schema 1 or 2 reads unchanged. Opening the
+store checks the schema and stamps the file with schema 3. A file in any
+other schema, for example one a later build wrote, stops the start with an
+error that names the file, the schema it found and the schemas this build
+reads, and the file is left unchanged.
 
 Every openEHR identifier the id map holds is checked again when a request
 reads it: an `ehr_id` must not carry a character that would change the
