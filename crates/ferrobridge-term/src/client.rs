@@ -7,7 +7,8 @@
 use crate::config::{Config, Credentials};
 use crate::error::{Error, UpstreamError};
 use crate::outcome::{
-    BatchOutcome, Coded, LookupOutcome, Request, TranslateOutcome, ValidateOutcome, Validation,
+    BatchOutcome, Coded, LookupOutcome, Request, TranslateOutcome, Translation, ValidateOutcome,
+    Validation,
 };
 use backon::{ExponentialBuilder, Retryable};
 use http::header::{ACCEPT, CONTENT_TYPE, WWW_AUTHENTICATE};
@@ -158,8 +159,12 @@ impl Client {
         crate::decode::lookup(self.config.wire_version, &answer)
     }
 
-    /// Translates `code` from `system` into `target_system`.
+    /// Translates the code `translation` names, through the concept map,
+    /// into the target system and in the direction it names.
     ///
+    /// `url`, `targetsystem` and `reverse` are each sent only when the
+    /// translation sets them, as R4 declares each `0..1`
+    /// (<https://hl7.org/fhir/R4/conceptmap-operation-translate.html>).
     /// Every match the server returned is carried with its equivalence, so the
     /// caller decides which ones count;
     /// [`TranslateOutcome::accepted`] yields the `equivalent` and `equal` ones.
@@ -171,6 +176,7 @@ impl Client {
     ///
     /// ```rust,no_run
     /// use ferrobridge_term::client::Client;
+    /// use ferrobridge_term::outcome::Translation;
     ///
     /// # fn main() {
     /// # let terminology: Option<Client> = None;
@@ -178,9 +184,9 @@ impl Client {
     /// let Some(client) = terminology.as_ref() else {
     ///     return Err("no terminology server is configured".into());
     /// };
-    /// let source = "http://example.org/source";
-    /// let target = "http://example.org/target";
-    /// let outcome = client.translate(source, "alpha", target, None).await?;
+    /// let translation = Translation::new("http://example.org/source", "alpha")
+    ///     .with_concept_map("http://example.org/ConceptMap/source-to-target");
+    /// let outcome = client.translate(&translation).await?;
     /// let Some(translated) = outcome.accepted().next() else {
     ///     return Err("no equivalent translation".into());
     /// };
@@ -196,21 +202,11 @@ impl Client {
     /// example because it serves no such concept map, and [`Error`] otherwise
     /// when the call did not reach an answer or the answer could not be
     /// decoded. A refusal is never a missing translation. Returns
-    /// [`Error::UnsupportedParameter`] when `concept_map_url` is set on an
-    /// STU3 client, whose `$translate` has no `url`; nothing is sent.
-    pub async fn translate(
-        &self,
-        system: &str,
-        code: &str,
-        target_system: &str,
-        concept_map_url: Option<&str>,
-    ) -> Result<TranslateOutcome, Error> {
-        let request = Request::Translate {
-            system: system.to_owned(),
-            code: code.to_owned(),
-            target_system: target_system.to_owned(),
-            concept_map_url: concept_map_url.map(str::to_owned),
-        };
+    /// [`Error::UnsupportedParameter`] when the translation names a concept
+    /// map on an STU3 client, whose `$translate` has no `url`; nothing is
+    /// sent.
+    pub async fn translate(&self, translation: &Translation) -> Result<TranslateOutcome, Error> {
+        let request = Request::Translate(translation.clone());
         let answer = self.operation(&request).await?;
         crate::decode::translate(self.config.wire_version, &answer)
     }

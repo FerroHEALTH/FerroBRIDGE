@@ -16,7 +16,8 @@ use ferrobridge_term::concept::{Concept, Equivalence};
 use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::error::{BodyError, Error};
 use ferrobridge_term::outcome::{
-    BatchOutcome, Coded, LookupOutcome, Request, TranslateOutcome, ValidateOutcome, Validation,
+    BatchOutcome, Coded, LookupOutcome, Request, TranslateOutcome, Translation, ValidateOutcome,
+    Validation,
 };
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
@@ -243,10 +244,8 @@ async fn a_translation_reads_the_stu3_match_parts() -> Result<(), Box<dyn StdErr
 
     let outcome = client(&server, STU3)?
         .translate(
-            fixtures::TERM_SOURCE_SYSTEM,
-            fixtures::TERM_MEMBER_CODE,
-            fixtures::TERM_TARGET_SYSTEM,
-            None,
+            &Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
+                .with_target_system(fixtures::TERM_TARGET_SYSTEM),
         )
         .await?;
     let TranslateOutcome::Translated { matches, .. } = &outcome else {
@@ -286,10 +285,8 @@ async fn an_stu3_translation_with_no_match_is_no_match() -> Result<(), Box<dyn S
 
     let outcome = client(&server, STU3)?
         .translate(
-            fixtures::TERM_SOURCE_SYSTEM,
-            fixtures::TERM_NON_MEMBER_CODE,
-            fixtures::TERM_TARGET_SYSTEM,
-            None,
+            &Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_NON_MEMBER_CODE)
+                .with_target_system(fixtures::TERM_TARGET_SYSTEM),
         )
         .await?;
     assert!(
@@ -305,10 +302,9 @@ async fn a_concept_map_url_is_refused_in_stu3_and_nothing_is_sent() -> Result<()
     let server = MockServer::start().await;
     let error = client(&server, STU3)?
         .translate(
-            fixtures::TERM_SOURCE_SYSTEM,
-            fixtures::TERM_MEMBER_CODE,
-            fixtures::TERM_TARGET_SYSTEM,
-            Some(fixtures::TERM_CONCEPT_MAP_URL),
+            &Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
+                .with_target_system(fixtures::TERM_TARGET_SYSTEM)
+                .with_concept_map(fixtures::TERM_CONCEPT_MAP_URL),
         )
         .await
         .expect_err("STU3 $translate has no url parameter");
@@ -528,12 +524,10 @@ async fn an_stu3_batch_answers_each_entry_by_position() -> Result<(), Box<dyn St
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
         },
-        Request::Translate {
-            system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
-            code: fixtures::TERM_MEMBER_CODE.to_owned(),
-            target_system: fixtures::TERM_TARGET_SYSTEM.to_owned(),
-            concept_map_url: None,
-        },
+        Request::Translate(
+            Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
+                .with_target_system(fixtures::TERM_TARGET_SYSTEM),
+        ),
         Request::ValidateCode(validation(Coded::Code {
             system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
             code: fixtures::TERM_NON_MEMBER_CODE.to_owned(),
@@ -583,12 +577,11 @@ async fn an_stu3_batch_with_an_unsupported_parameter_sends_nothing() -> Result<(
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
         },
-        Request::Translate {
-            system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
-            code: fixtures::TERM_MEMBER_CODE.to_owned(),
-            target_system: fixtures::TERM_TARGET_SYSTEM.to_owned(),
-            concept_map_url: Some(fixtures::TERM_CONCEPT_MAP_URL.to_owned()),
-        },
+        Request::Translate(
+            Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
+                .with_target_system(fixtures::TERM_TARGET_SYSTEM)
+                .with_concept_map(fixtures::TERM_CONCEPT_MAP_URL),
+        ),
     ];
 
     let error = client(&server, STU3)?

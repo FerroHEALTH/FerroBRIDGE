@@ -25,6 +25,14 @@ crates on crates.io.
 
 ### Changed
 
+- `ferrobridge-term` translates by concept map with an optional target
+  system and an optional `reverse` (#721). This breaks the crate's public
+  API: `Client::translate` takes a `Translation` (`Translation::new(system,
+  code)` with `with_concept_map`, `with_target_system` and `with_reverse`),
+  and `Request::Translate` wraps one. Each of `url`, `targetsystem` and
+  `reverse` is sent only when it is set, as R4 `ConceptMap/$translate`
+  declares each `0..1`, so a FHIRconnect `conceptmap`, which names only the
+  map, can be translated in both directions.
 - The FHIRconnect operations lane reads its mapping directory through the
   walk the facade uses (#524), so a `.YML` or `.YAML` file is now read by both
   lanes; the operations lane read only the lower-case spellings before.

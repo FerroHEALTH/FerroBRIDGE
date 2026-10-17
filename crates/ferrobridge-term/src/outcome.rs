@@ -118,19 +118,7 @@ pub enum Request {
         version: Option<String>,
     },
     /// `ConceptMap/$translate`.
-    Translate {
-        /// The code system the code is in.
-        system: String,
-        /// The code to translate.
-        code: String,
-        /// The code system to translate into.
-        target_system: String,
-        /// The canonical URL of the concept map to use, when one is named.
-        ///
-        /// STU3 `$translate` has no `url` parameter, so an STU3 client
-        /// refuses a request that names one.
-        concept_map_url: Option<String>,
-    },
+    Translate(Translation),
     /// `ValueSet/$validate-code`.
     ValidateCode(Validation),
 }
@@ -141,9 +129,68 @@ impl Request {
     pub const fn operation(&self) -> &'static str {
         match self {
             Self::Lookup { .. } => crate::LOOKUP,
-            Self::Translate { .. } => crate::TRANSLATE,
+            Self::Translate(_) => crate::TRANSLATE,
             Self::ValidateCode(_) => crate::VALIDATE_CODE,
         }
+    }
+}
+
+/// One `ConceptMap/$translate` question: what `code` from `system` maps to.
+///
+/// R4 declares `url`, `targetsystem` and `reverse` each `0..1`
+/// (<https://hl7.org/fhir/R4/conceptmap-operation-translate.html>), so each
+/// is sent only when it is set here.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Translation {
+    /// `system`, the code system the code is in.
+    pub system: String,
+    /// `code`, the code to translate.
+    pub code: String,
+    /// `url`, the canonical URL of the concept map to use, when one is named.
+    ///
+    /// STU3 `$translate` has no `url` parameter, so an STU3 client refuses a
+    /// translation that names one.
+    pub concept_map_url: Option<String>,
+    /// `targetsystem`, the code system to translate into, when one is named.
+    pub target_system: Option<String>,
+    /// `reverse`: "if this is true, then the operation should return all the
+    /// codes that might be mapped to this code".
+    pub reverse: Option<bool>,
+}
+
+impl Translation {
+    /// Returns the translation of `code` from `system`, naming no concept
+    /// map, no target system and no direction yet.
+    #[must_use]
+    pub fn new(system: impl Into<String>, code: impl Into<String>) -> Self {
+        Self {
+            system: system.into(),
+            code: code.into(),
+            concept_map_url: None,
+            target_system: None,
+            reverse: None,
+        }
+    }
+
+    /// Names the concept map, sent as `url`.
+    #[must_use]
+    pub fn with_concept_map(mut self, url: impl Into<String>) -> Self {
+        self.concept_map_url = Some(url.into());
+        self
+    }
+
+    /// Names the code system to translate into, sent as `targetsystem`.
+    #[must_use]
+    pub fn with_target_system(mut self, system: impl Into<String>) -> Self {
+        self.target_system = Some(system.into());
+        self
+    }
+
+    /// Sets `reverse`, which asks for the codes that map to this one.
+    #[must_use]
+    pub const fn with_reverse(mut self, reverse: bool) -> Self {
+        self.reverse = Some(reverse);
+        self
     }
 }
 

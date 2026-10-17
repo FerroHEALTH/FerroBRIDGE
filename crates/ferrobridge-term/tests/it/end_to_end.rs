@@ -11,7 +11,9 @@
 use crate::support::release_path;
 use ferrobridge_term::client::Client;
 use ferrobridge_term::config::{Config, WireVersion};
-use ferrobridge_term::outcome::{LookupOutcome, Request, TranslateOutcome, ValidateOutcome};
+use ferrobridge_term::outcome::{
+    LookupOutcome, Request, TranslateOutcome, Translation, ValidateOutcome,
+};
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::fixtures;
 use std::error::Error;
@@ -108,10 +110,9 @@ async fn translate_a_mapped_code(
 ) -> Result<(), Box<dyn Error>> {
     let outcome = client
         .translate(
-            fixtures::TERM_SOURCE_SYSTEM,
-            fixtures::TERM_MEMBER_CODE,
-            fixtures::TERM_TARGET_SYSTEM,
-            Some(fixtures::TERM_CONCEPT_MAP_URL),
+            &Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
+                .with_concept_map(fixtures::TERM_CONCEPT_MAP_URL)
+                .with_target_system(fixtures::TERM_TARGET_SYSTEM),
         )
         .await?;
     let accepted: Vec<Option<String>> = outcome
@@ -136,10 +137,9 @@ async fn translate_a_mapped_code(
 async fn refuse_a_wider_match(client: &Client, version: WireVersion) -> Result<(), Box<dyn Error>> {
     let outcome = client
         .translate(
-            fixtures::TERM_SOURCE_SYSTEM,
-            fixtures::TERM_NON_MEMBER_CODE,
-            fixtures::TERM_TARGET_SYSTEM,
-            Some(fixtures::TERM_CONCEPT_MAP_URL),
+            &Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_NON_MEMBER_CODE)
+                .with_concept_map(fixtures::TERM_CONCEPT_MAP_URL)
+                .with_target_system(fixtures::TERM_TARGET_SYSTEM),
         )
         .await?;
     if let TranslateOutcome::Translated { matches, .. } = &outcome {
