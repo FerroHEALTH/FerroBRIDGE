@@ -243,7 +243,7 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
             initial_backoff: Duration::from_millis(cdr.retry.initial_backoff_ms),
             max_backoff: Duration::from_millis(cdr.retry.max_backoff_ms),
         });
-    let scheme = resolve_credentials("cdr.credentials", &cdr.credentials.static_schemes())?;
+    let scheme = resolve_credentials("cdr.credentials", &cdr.credentials)?;
     match (scheme, cdr.credentials.oauth.as_ref()) {
         (Some(_), Some(_)) => {
             return Err(Error::OAuthScheme {

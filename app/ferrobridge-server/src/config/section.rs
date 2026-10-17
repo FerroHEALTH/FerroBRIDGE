@@ -361,7 +361,7 @@ pub struct Cdr {
     /// The retry budget for idempotent calls.
     pub retry: Retry,
     /// The credentials the CDR expects.
-    pub credentials: CdrCredentials,
+    pub credentials: Credentials<OAuthClient>,
 }
 
 impl Default for Cdr {
@@ -370,48 +370,7 @@ impl Default for Cdr {
             base_url: String::new(),
             timeout_ms: 30_000,
             retry: Retry::default(),
-            credentials: CdrCredentials::default(),
-        }
-    }
-}
-
-/// The credentials the CDR expects: the static schemes every upstream
-/// takes, or a token the bridge obtains for itself.
-///
-/// Every secret is reachable inline or through its `_file` sibling; setting
-/// both is a boot error, and so is a static scheme beside `oauth`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct CdrCredentials {
-    /// An RFC 6750 bearer token.
-    pub bearer_token: Option<Secret>,
-    /// A file holding the bearer token, read at boot.
-    pub bearer_token_file: Option<PathBuf>,
-    /// The user name of RFC 7617 basic authentication.
-    pub user: Option<String>,
-    /// A file holding the user name, read at boot.
-    pub user_file: Option<PathBuf>,
-    /// The password of RFC 7617 basic authentication.
-    pub password: Option<Secret>,
-    /// A file holding the password, read at boot.
-    pub password_file: Option<PathBuf>,
-    /// The OAuth 2.0 client credentials grant (RFC 6749 §4.4) the bridge
-    /// obtains its CDR token with.
-    pub oauth: Option<OAuthClient>,
-}
-
-impl CdrCredentials {
-    /// Returns the static schemes of this section, the ones every upstream
-    /// takes.
-    #[must_use]
-    pub fn static_schemes(&self) -> Credentials {
-        Credentials {
-            bearer_token: self.bearer_token.clone(),
-            bearer_token_file: self.bearer_token_file.clone(),
-            user: self.user.clone(),
-            user_file: self.user_file.clone(),
-            password: self.password.clone(),
-            password_file: self.password_file.clone(),
+            credentials: Credentials::default(),
         }
     }
 }
@@ -478,7 +437,7 @@ pub struct Terminology {
     /// The retry budget.
     pub retry: Retry,
     /// The credentials the server expects.
-    pub credentials: Credentials,
+    pub credentials: Credentials<NoGrant>,
 }
 
 impl Default for Terminology {
@@ -607,13 +566,18 @@ impl Default for Retry {
     }
 }
 
-/// The credentials one upstream expects.
+/// The credentials one upstream expects: the static schemes every upstream
+/// takes, and the token grant `Grant` names for the lanes that take one.
 ///
 /// Every secret is reachable inline or through its `_file` sibling; setting
-/// both is a boot error.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+/// both is a boot error, and so is a static scheme beside `oauth`. The CDR
+/// takes an [`OAuthClient`]; the terminology lane takes [`NoGrant`], so an
+/// `oauth` table under it is refused when the file is read. One shape serves
+/// both because `deny_unknown_fields` cannot be combined with
+/// `#[serde(flatten)]` (<https://serde.rs/field-attrs.html#flatten>).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct Credentials {
+pub struct Credentials<Grant> {
     /// An RFC 6750 bearer token.
     pub bearer_token: Option<Secret>,
     /// A file holding the bearer token, read at boot.
@@ -626,4 +590,37 @@ pub struct Credentials {
     pub password: Option<Secret>,
     /// A file holding the password, read at boot.
     pub password_file: Option<PathBuf>,
+    /// The OAuth 2.0 client credentials grant (RFC 6749 §4.4) the bridge
+    /// obtains its token with, for a lane that takes one.
+    pub oauth: Option<Grant>,
+}
+
+impl<Grant> Default for Credentials<Grant> {
+    fn default() -> Self {
+        Self {
+            bearer_token: None,
+            bearer_token_file: None,
+            user: None,
+            user_file: None,
+            password: None,
+            password_file: None,
+            oauth: None,
+        }
+    }
+}
+
+/// The grant of a lane that obtains no token for itself: no value exists,
+/// and an `oauth` table is refused when the file is read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoGrant {}
+
+impl<'de> Deserialize<'de> for NoGrant {
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Err(serde::de::Error::custom(
+            "this lane obtains no token with an OAuth grant, so it takes no `oauth` table",
+        ))
+    }
 }
