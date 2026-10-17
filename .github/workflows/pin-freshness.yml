@@ -7,10 +7,11 @@
 # Dependabot bumps what its ecosystems read, which is `uses:` references and
 # the manifests. Between the two sits a set of pins nothing watches: the
 # actionlint and hadolint container images named inside a `run:` block, the
-# analyzer versions handed to taiki-e/install-action as an input, and the
-# documentation toolchain the mermaid assets are vendored from. This workflow
-# reads the newest upstream release of each and opens ONE issue when a pin is
-# behind.
+# analyzer versions handed to taiki-e/install-action as an input, the
+# documentation toolchain the mermaid assets are vendored from, every corpus a
+# vendor script fetches by commit, and every FHIR package pinned by version.
+# This workflow reads the newest upstream release, branch head or registry
+# `latest` of each and opens ONE issue when a pin is behind.
 #
 # It opens an issue rather than failing: a weekly red job trains a maintainer
 # to ignore red jobs (#41), and a newer lint release is not a broken build.

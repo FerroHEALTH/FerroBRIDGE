@@ -19,6 +19,7 @@
 - [Configuring the server](operate/configuration.md)
 - [The HL7 v2 face](operate/hl7v2-face.md)
 - [The container image](operate/container.md)
+- [Checking a deployment](operate/deployment-probes.md)
 - [Failure and identity behaviour](operate/failure-and-identity.md)
 - [Version lines and releases](operate/versions-and-releases.md)
 

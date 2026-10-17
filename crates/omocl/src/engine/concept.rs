@@ -119,7 +119,8 @@ pub const UNIT_VOCABULARY: &str = "UCUM";
 /// differently (`SNOMED-CT` against `SNOMED`), so the engine reads the id
 /// through this table, and an id it does not list is taken as the
 /// `vocabulary_id` itself. The defaults are `LOINC` to `LOINC` and
-/// `SNOMED-CT` to `SNOMED`; a deployment adds its own.
+/// `SNOMED-CT` to `SNOMED`; a deployment adds its own, which the FerroBRIDGE
+/// server reads from its `[etl.vocabulary_aliases]` configuration table.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VocabularyAliases(BTreeMap<String, String>);
 
