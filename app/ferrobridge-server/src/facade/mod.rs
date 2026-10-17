@@ -28,6 +28,7 @@ pub mod ingest;
 pub mod media;
 pub mod outcome;
 pub mod programs;
+pub mod references;
 pub mod reply;
 pub mod request;
 pub mod search;
@@ -97,6 +98,8 @@ pub struct Facade {
     limits: search::Limits,
     /// The terminology server every `conceptmap` code translates through.
     translator: Translator,
+    /// What may be fetched to resolve a reference the request does not carry.
+    references: references::Policy,
 }
 
 impl Facade {
@@ -117,6 +120,7 @@ impl Facade {
             search: search::Catalog::default(),
             limits: search::Limits::default(),
             translator: Translator::default(),
+            references: references::Policy::default(),
         }
     }
 
@@ -136,6 +140,23 @@ impl Facade {
     #[must_use]
     pub const fn translator(&self) -> &Translator {
         &self.translator
+    }
+
+    /// Returns this facade resolving a reference the request does not carry
+    /// under `policy`.
+    ///
+    /// A facade built without it reads a relative reference to a resource it
+    /// committed and fetches no absolute one.
+    #[must_use]
+    pub fn with_references(mut self, policy: references::Policy) -> Self {
+        self.references = policy;
+        self
+    }
+
+    /// Returns what may be fetched to resolve a reference.
+    #[must_use]
+    pub const fn references(&self) -> &references::Policy {
+        &self.references
     }
 
     /// Returns this facade answering search as `catalog` declares, with the

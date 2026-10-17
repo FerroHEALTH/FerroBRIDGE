@@ -67,7 +67,7 @@ pub fn inbound(
         now,
         settings,
         SourceItem::of(document),
-        terminology,
+        &Seams::default().with_terminology(terminology),
     )
 }
 
@@ -76,12 +76,15 @@ pub fn inbound(
 ///
 /// This is [`inbound`] with the originating item given by the caller, so a
 /// face that received something other than the resource itself, such as a
-/// message, names what it received. `None` records no source item.
+/// message, names what it received. `None` records no source item. Every
+/// `conceptmap` code translates through the terminology `seams` carries, and
+/// a `reference` mapping reads the resource it points at from its reference
+/// source, where one it holds no resource for is a declared skip.
 ///
 /// # Errors
 ///
 /// Returns [`EngineError`] for any element the program cannot map, for a
-/// code `terminology` does not translate, and for a set of values the
+/// code the terminology does not translate, and for a set of values the
 /// template does not admit as a composition.
 pub fn inbound_from(
     program: &Program,
@@ -90,7 +93,7 @@ pub fn inbound_from(
     now: &str,
     settings: &crate::facade::Settings,
     source: Option<SourceItem>,
-    terminology: &dyn Terminology,
+    seams: &Seams<'_>,
 ) -> Result<Outcome<CanonicalComposition>, EngineError> {
     // TODO(#95): resolve the displays the concept mappings need here, before
     // any value is built, once the PROGRAMMED registry lands.
@@ -108,7 +111,7 @@ pub fn inbound_from(
         &fhir_types::r4::schema::SCHEMAS,
         index,
         document,
-        &Seams::default().with_terminology(terminology),
+        seams,
         &defaults,
         &CallContext::new(),
     )

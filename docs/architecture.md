@@ -798,10 +798,19 @@ expression is a load error: the reference CDR's connector let `where()` and
   chapter, with one correction: the chapter keys on `meta.url`, which does not
   exist in R4; the element is `meta.profile`, a list, so matching is set
   membership, not equality. A resource two mappings both need is a LINKED
-  mapping. Unresolved references are fetched from the sending site with cycle
-  protection; a reference that cannot be fetched is a refusal, because the
-  chapter's "the engine proceeds with the mapping" contradicts its own
-  strictness chapter and the strict reading wins.
+  mapping. A reference a transaction entry makes to another entry resolves
+  to that entry by `fullUrl` or `<Type>/<id>` first (#753). A reference the
+  request does not carry is resolved as the references chapter recommends, and one that cannot be resolved is a
+  declared skip: "If not possible, the engine proceeds with the mapping"
+  (`engine/references.adoc`), which the engine records as a
+  `Loss::Skipped` warning, never a silent nothing (#224). A relative
+  reference, or one under the facade's own base, is read through the
+  identity map and the CDR; an absolute one is fetched only from a base on
+  the `[facade.references] fetch_bases` allow-list (empty by default, so by
+  default nothing is fetched and no client can make the bridge call a URL it
+  names), with redirects refused, a timeout, `max_depth` levels and each
+  literal resolved once, every fetch logged by type, id, base and upstream
+  status. No specification governs that policy: our own design.
 - **A read-side Bundle is well formed.** One entry per composition per
   resource type (two programs over one template do not double an entry), a
   unique `fullUrl` per entry, `entry.search.mode`, `Bundle.total` as the

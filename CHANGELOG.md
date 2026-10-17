@@ -39,6 +39,18 @@ crates on crates.io.
   consumer passes `&Seams::default().with_functions(functions)` where it
   passed `functions`. `$toopenehr` resolves a reference outside the request
   Bundle through the reference source the seams carry.
+- The facade resolves a reference a request names and does not carry, for a
+  `reference` mapping that reads it (#224). A relative reference, or one under
+  `[facade] base_url`, is read through the identity map and the CDR; an
+  absolute one is fetched only from a base listed in the new
+  `[facade.references] fetch_bases` (empty by default, so nothing is fetched
+  until you list a base), with redirects refused, `timeout_ms` (default
+  10000) per fetch and `max_depth` levels (default 2), each reference once. A
+  reference that is not resolved is a declared skip the write proceeds
+  without; the log names the reference, the base and the upstream status, and
+  `$validate` answers it as a `warning` issue. In a transaction Bundle an
+  entry answers a reference to its `fullUrl` or its `<Type>/<id>` first
+  (#753).
 - `ferrobridge-term` translates by concept map with an optional target
   system and an optional `reverse` (#721). This breaks the crate's public
   API: `Client::translate` takes a `Translation` (`Translation::new(system,

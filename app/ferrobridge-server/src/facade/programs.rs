@@ -190,13 +190,24 @@ impl Programs {
     /// maps them (no specification governs this: our own design).
     #[must_use]
     pub fn created_types(&self) -> BTreeSet<String> {
-        let mut created = BTreeSet::new();
-        for entry in &self.loaded {
-            referenced(entry.program.mappings(), &mut created);
-        }
+        let mut created = self.referenced_types();
         let mapped = self.resource_types();
         created.retain(|resource_type| !mapped.contains(resource_type));
         created
+    }
+
+    /// Returns every resource type a `reference` mapping of some program
+    /// names, in order, whether a program maps it or not.
+    ///
+    /// These are the types a `reference` mapping reads going into openEHR, so
+    /// they are the references worth resolving.
+    #[must_use]
+    pub fn referenced_types(&self) -> BTreeSet<String> {
+        let mut referenced_by = BTreeSet::new();
+        for entry in &self.loaded {
+            referenced(entry.program.mappings(), &mut referenced_by);
+        }
+        referenced_by
     }
 
     /// Whether `resource_type` is mapped by a program or created by one, so a

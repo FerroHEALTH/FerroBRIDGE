@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that writes an Observation's code as
+# the problem or diagnosis name of the synthetic ferrobridge.diagnose.v1
+# template, so a transaction can carry the Observation a Condition's evidence
+# references.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_bundle_observation
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+mappings:
+  - name: "observationCode"
+    with:
+      fhir: "$resource.code"
+      openehr: "$archetype/data[at0001]/items[at0002]"
+      type: "CODEABLECONCEPT"

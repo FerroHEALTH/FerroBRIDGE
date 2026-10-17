@@ -60,6 +60,7 @@ use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
+use crate::facade::references;
 use crate::facade::reply;
 use crate::facade::request::Inbound;
 use crate::facade::status;
@@ -78,7 +79,9 @@ pub(crate) async fn create(
     let inbound = read::parse(body, resource_type)?;
     compartment::admit_inbound(facade, access, Permission::Create, &inbound)?;
     let program = select_program(facade, &inbound, headers)?;
-    let ingest = facade.ingest(facade.client_for(headers));
+    let client = facade.client_for(headers);
+    let resolved = references::resolve(facade, &client, inbound.document()).await;
+    let ingest = facade.ingest(client).with_references(&resolved);
     let claim = ingest.claim_resource(&inbound)?;
 
     match ingest
@@ -167,7 +170,9 @@ pub(crate) async fn update(
     same_id(&inbound, id)?;
     compartment::admit_inbound(facade, access, Permission::Update, &inbound)?;
     let program = select_program(facade, &inbound, headers)?;
-    let ingest = facade.ingest(facade.client_for(headers));
+    let client = facade.client_for(headers);
+    let resolved = references::resolve(facade, &client, inbound.document()).await;
+    let ingest = facade.ingest(client).with_references(&resolved);
     resend(
         facade,
         &ingest,

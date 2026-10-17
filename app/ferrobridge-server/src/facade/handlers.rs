@@ -21,7 +21,7 @@
 mod batch;
 mod complete;
 mod conditional;
-mod read;
+pub(crate) mod read;
 mod render;
 mod search;
 mod transaction;
