@@ -13,7 +13,13 @@ authors.workspace = true
 publish = false
 
 [dependencies]
+# The test OpenID Provider: its per-run ES256 key pair, the ID Tokens it
+# signs, the JWK Set it publishes, and the times its claims carry.
+aws-lc-rs.workspace = true
+jiff.workspace = true
+jsonwebtoken.workspace = true
 reqwest.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
 # The scratch directory the throwaway TLS material is generated in.

@@ -11,7 +11,8 @@
 //! [`examples`] finds the HL7 examples packages fetched at build time;
 //! [`fixtures`] holds the synthetic documents the suites commit and map;
 //! [`laws`] compares the two ends of a round trip; [`net`] reserves a port
-//! no server answers on;
+//! no server answers on; [`oidc`] is the test OpenID Provider the operator
+//! console signs in at;
 //! [`stubs`] carries the upstream response shapes for `wiremock`;
 //! [`tls`] generates the throwaway certificates a TLS-only PostgreSQL starts
 //! with; and [`vocabulary`] holds the synthetic OHDSI vocabulary and its
@@ -27,6 +28,7 @@ pub mod examples;
 pub mod fixtures;
 pub mod laws;
 pub mod net;
+pub mod oidc;
 pub mod stubs;
 pub mod tls;
 pub mod vocabulary;

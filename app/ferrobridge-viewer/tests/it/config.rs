@@ -129,6 +129,94 @@ fn each_value_its_key_does_not_admit_is_refused_by_key() {
     }
 }
 
+/// An `[oidc]` section with every required key, the provider on loopback.
+const OIDC: &str = "[oidc]\nissuer = \"http://127.0.0.1:8081/realm\"\n\
+    authorization_endpoint = \"http://127.0.0.1:8081/auth\"\n\
+    token_endpoint = \"http://127.0.0.1:8081/token\"\n\
+    jwks_uri = \"http://127.0.0.1:8081/jwks\"\nclient_id = \"ferrobridge-viewer\"\n\
+    redirect_uri = \"https://console.example.org/auth/callback\"\n";
+
+#[test]
+fn a_complete_oidc_section_resolves_and_reads_its_secret_file() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let path = dir.path().join("client-secret");
+    std::fs::write(&path, "s3cret\n").expect("the secret file");
+    let text = format!("{OIDC}client_secret_file = {path:?}\n");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())
+        .expect("the tree reads")
+        .resolve()
+        .expect("the section resolves");
+    let oidc = settings.oidc.expect("sign-in is configured");
+    assert_eq!("http://127.0.0.1:8081/realm", oidc.issuer);
+    assert_eq!("https://console.example.org", oidc.origin());
+    assert_eq!(
+        Some("s3cret"),
+        oidc.client_secret
+            .as_ref()
+            .map(secrecy::ExposeSecret::expose_secret)
+    );
+    assert!(settings.session.secure_cookie);
+    let shown = format!("{oidc:?}");
+    assert!(!shown.contains("s3cret"), "{shown}");
+}
+
+#[test]
+fn each_oidc_or_session_value_its_key_does_not_admit_is_refused_by_key() {
+    for (text, key) in [
+        (
+            OIDC.replace(
+                "http://127.0.0.1:8081/token",
+                "http://idp.example.org/token",
+            ),
+            "oidc.token_endpoint",
+        ),
+        (OIDC.replace("ferrobridge-viewer", " "), "oidc.client_id"),
+        (
+            OIDC.replace("/auth/callback", "/auth/callback#x"),
+            "oidc.redirect_uri",
+        ),
+        (
+            format!("{OIDC}scopes = [\"profile\"]\n"),
+            "oidc.scopes (openid)",
+        ),
+        (
+            format!("{OIDC}scopes = [\"openid\", \"offline_access\"]\n"),
+            "oidc.scopes",
+        ),
+        (
+            format!("{OIDC}post_logout_redirect_uri = \"https://console.example.org/\"\n"),
+            "oidc.end_session_endpoint (for post_logout_redirect_uri)",
+        ),
+        (
+            format!("[session]\nsecure_cookie = false\n\n{OIDC}"),
+            "session.secure_cookie",
+        ),
+        (
+            String::from("[session]\nmax_sessions = 0\n"),
+            "session.max_sessions",
+        ),
+        (
+            String::from("[session]\nidle_timeout_s = 0\n"),
+            "session.idle_timeout_s",
+        ),
+    ] {
+        let error = Config::from_sources(Some(&text), &BTreeMap::new())
+            .expect("the tree reads")
+            .resolve()
+            .expect_err("the value is refused");
+        let named = match &error {
+            Error::Url { key, .. }
+            | Error::UrlShape { key, .. }
+            | Error::Zero { key }
+            | Error::Missing { key }
+            | Error::Scope { key, .. }
+            | Error::InsecureCookie { key } => key.as_str(),
+            other => panic!("a refusal by key, got {other:?}"),
+        };
+        assert_eq!(key, named, "{text}");
+    }
+}
+
 #[test]
 fn a_secret_is_read_from_its_file_trimmed() {
     let dir = tempfile::tempdir().expect("a temporary directory");

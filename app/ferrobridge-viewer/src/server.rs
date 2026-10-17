@@ -1,14 +1,17 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The console's HTTP service: the health route, the Leptos pages and the
-//! site bundle, under one set of browser security headers.
+//! The console's HTTP service: the health route, the sign-in routes, the
+//! Leptos pages, the server functions and the site bundle, under one set of
+//! browser security headers.
 //!
 //! Every response carries a Content-Security-Policy whose script source is a
 //! nonce minted for that response alone, `nosniff`, `DENY` framing and no
 //! referrer, and every document is `no-store`. Only the site bundle is
-//! compressed. No specification governs the console's HTTP surface: our own
-//! design.
+//! compressed. A request that is not a safe method is taken only from the
+//! console's own pages, and a session's access token is refreshed before
+//! the request it arrives with is served. No specification governs the
+//! console's HTTP surface: our own design.
 
 use std::sync::Arc;
 
@@ -31,7 +34,8 @@ use tower_http::compression::predicate::{And, Predicate as _, SizeAbove};
 use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::bridge::{Bridge, BridgeError};
-use crate::config::settings::Settings;
+use crate::config::settings::{OidcSettings, Settings};
+use crate::session::Sessions;
 
 /// The path of the console's own liveness route.
 pub const HEALTH: &str = "/health";
@@ -43,19 +47,31 @@ pub const OUTPUT_NAME: &str = "ferrobridge-viewer";
 #[derive(Debug, Clone)]
 pub struct ViewerState {
     settings: Arc<Settings>,
+    sessions: Sessions,
     bridge: Bridge,
+    provider: reqwest::Client,
 }
 
 impl ViewerState {
-    /// The state for `settings`.
+    /// The state for `settings`, with an empty session store.
     ///
     /// # Errors
-    /// Returns the [`BridgeError`] of a bridge client that cannot be built.
+    /// Returns the [`BridgeError`] of a bridge client, or of the client of
+    /// the OpenID Provider, that cannot be built.
     pub fn new(settings: Settings) -> Result<Self, BridgeError> {
         let bridge = Bridge::new(&settings.bridge)?;
+        // NOTE: RFC 6749 §3.2: the token endpoint answers the request itself, so
+        // the provider's client follows no redirect.
+        let provider = reqwest::Client::builder()
+            .timeout(settings.bridge.timeout)
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|source| BridgeError::Transport { source })?;
         Ok(Self {
+            sessions: Sessions::new(settings.session),
             settings: Arc::new(settings),
             bridge,
+            provider,
         })
     }
 
@@ -65,10 +81,23 @@ impl ViewerState {
         &self.settings
     }
 
+    /// The session store.
+    #[must_use]
+    pub fn sessions(&self) -> &Sessions {
+        &self.sessions
+    }
+
     /// The bridge client.
     #[must_use]
     pub fn bridge(&self) -> &Bridge {
         &self.bridge
+    }
+
+    /// The HTTP client of the OpenID Provider, which the sign-in exchanges
+    /// its code with and a session refreshes its access token with.
+    #[must_use]
+    pub fn provider(&self) -> &reqwest::Client {
+        &self.provider
     }
 }
 
@@ -87,6 +116,7 @@ pub fn leptos_options(settings: &Settings) -> LeptosOptions {
 /// Builds the console's whole HTTP service over `state`.
 pub fn router(state: ViewerState) -> axum::Router {
     let options = leptos_options(state.settings());
+    let form_action = form_action(state.settings());
     let routes = leptos_axum::generate_route_list(crate::app::App);
     let context = {
         let state = state.clone();
@@ -97,6 +127,12 @@ pub fn router(state: ViewerState) -> axum::Router {
     };
     let pages = axum::Router::new()
         .route(HEALTH, get(health))
+        .route(crate::oidc::LOGIN, get(crate::oidc::login))
+        .route(crate::oidc::CALLBACK, get(crate::oidc::callback))
+        .route(
+            crate::oidc::logout::LOGOUT,
+            axum::routing::post(crate::oidc::logout::logout),
+        )
         .leptos_routes_with_context(&options, routes, context.clone(), {
             let options = options.clone();
             move || crate::app::shell(options.clone())
@@ -105,8 +141,104 @@ pub fn router(state: ViewerState) -> axum::Router {
             context,
             crate::app::shell,
         ))
+        .layer(axum::middleware::from_fn(
+            crate::oidc::refresh::refresh_session,
+        ))
+        .layer(axum::middleware::from_fn(same_origin_only))
         .layer(Extension(state));
-    with_security_headers(pages.layer(bundle_compression())).with_state(options)
+    with_security_headers(pages.layer(bundle_compression()), form_action).with_state(options)
+}
+
+/// The fetch metadata header that names where a request comes from.
+const SEC_FETCH_SITE: &str = "sec-fetch-site";
+
+/// Refuses every request that is not a safe method, a server function call
+/// and a sign-out among them, unless it comes from the console's own pages
+/// ([`same_origin`]), before anything reads the session or asks the bridge.
+///
+/// The session cookie is `SameSite=Lax` as well, so a cross-site `POST`
+/// carries no session in the first place; this check holds without it.
+async fn same_origin_only(
+    Extension(state): Extension<ViewerState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if request.method().is_safe() {
+        return next.run(request).await;
+    }
+    let origin = state.settings().oidc.as_ref().map(OidcSettings::origin);
+    if same_origin(request.headers(), origin.as_deref()) {
+        return next.run(request).await;
+    }
+    tracing::warn!(
+        method = %request.method(),
+        "a request that did not come from the console's own pages was refused"
+    );
+    (
+        StatusCode::FORBIDDEN,
+        [(CACHE_CONTROL, "no-store")],
+        "the console takes this request only from its own pages",
+    )
+        .into_response()
+}
+
+/// Whether `headers` show a request sent from a page of the console at
+/// `origin`, its own `scheme://host:port`.
+///
+/// `Sec-Fetch-Site` decides when the browser sends it, and only
+/// `same-origin` passes. Without it `Origin` must be `origin`, and without
+/// that the origin of `Referer` must be. A request that shows none of them,
+/// or a console with no known origin, is refused, so an unsafe request is
+/// never taken on trust (the W3C Fetch Metadata Request Headers; RFC 6454
+/// §7).
+///
+/// The console answers with `Referrer-Policy: no-referrer`, under which a
+/// browser sends a plain form post with `Origin: null` and no `Referer` (the
+/// WHATWG Fetch standard, the request `Origin` header). The console's own
+/// forms, the sign-out among them, therefore pass by `Sec-Fetch-Site`
+/// alone, and a browser without fetch metadata is refused, which fails
+/// closed. The `Origin` and `Referer` fallbacks serve a server function the
+/// page calls with `fetch`.
+#[must_use]
+pub fn same_origin(headers: &http::HeaderMap, origin: Option<&str>) -> bool {
+    if let Some(site) = headers.get(SEC_FETCH_SITE) {
+        return site.as_bytes() == b"same-origin";
+    }
+    let Some(origin) = origin else {
+        return false;
+    };
+    if let Some(sent) = headers.get(http::header::ORIGIN) {
+        return sent.as_bytes() == origin.as_bytes();
+    }
+    // NOTE: RFC 9110 §10.1.3: a `Referer` that is no URL names no origin, which
+    // refuses the request as a missing one does.
+    headers
+        .get(http::header::REFERER)
+        .and_then(|referer| referer.to_str().ok())
+        .and_then(|referer| url::Url::parse(referer).ok())
+        .is_some_and(|referer| referer.origin().ascii_serialization() == origin)
+}
+
+/// The sources of the policy's `form-action`: the console itself, and the
+/// origin of the provider's end-session endpoint when one is configured.
+///
+/// A browser holds every redirect a form submission follows to
+/// `form-action` (Content Security Policy Level 3, `form-action`), and the
+/// sign-out form is answered with a redirect to that endpoint (OpenID
+/// Connect RP-Initiated Logout 1.0 §2), so without its origin the browser
+/// blocks the sign-out on its way to the provider.
+#[must_use]
+pub fn form_action(settings: &Settings) -> String {
+    let end_session = settings
+        .oidc
+        .as_ref()
+        .and_then(|oidc| oidc.end_session_endpoint.as_ref())
+        .map(url::Url::origin)
+        .filter(url::Origin::is_tuple);
+    match end_session {
+        Some(origin) => format!("'self' {}", origin.ascii_serialization()),
+        None => String::from("'self'"),
+    }
 }
 
 /// The body of the liveness route.
@@ -162,10 +294,19 @@ fn bundle_compression() -> CompressionLayer<And<SizeAbove, ResponsePredicate>> {
         .compress_when(SizeAbove::new(256).and(bundle))
 }
 
-/// Wraps `router` in the browser security headers every response carries.
-fn with_security_headers(router: axum::Router<LeptosOptions>) -> axum::Router<LeptosOptions> {
+/// Wraps `router` in the browser security headers every response carries,
+/// with `form_action` as the policy's `form-action` sources.
+fn with_security_headers(
+    router: axum::Router<LeptosOptions>,
+    form_action: String,
+) -> axum::Router<LeptosOptions> {
+    let form_action: Arc<str> = Arc::from(form_action);
     router
-        .layer(axum::middleware::from_fn(content_security_policy))
+        .layer(axum::middleware::from_fn(
+            move |request: Request, next: Next| {
+                content_security_policy(Arc::clone(&form_action), request, next)
+            },
+        ))
         .layer(axum::middleware::from_fn(cache_control))
         .layer(SetResponseHeaderLayer::overriding(
             X_CONTENT_TYPE_OPTIONS,
@@ -182,10 +323,14 @@ fn with_security_headers(router: axum::Router<LeptosOptions>) -> axum::Router<Le
 }
 
 /// Mints this response's script nonce, hands it to the renderer through the
-/// request, and answers with the policy that names it.
-async fn content_security_policy(mut request: Request, next: Next) -> Response {
+/// request, and answers with the policy that names it and `form_action`.
+async fn content_security_policy(
+    form_action: Arc<str>,
+    mut request: Request,
+    next: Next,
+) -> Response {
     let nonce = Nonce::new();
-    let policy = HeaderValue::from_str(&policy(&nonce));
+    let policy = HeaderValue::from_str(&policy(&nonce, &form_action));
     request.extensions_mut().insert(nonce);
     let mut response = next.run(request).await;
     match policy {
@@ -217,13 +362,14 @@ fn provide_request_nonce() {
     }
 }
 
-/// The Content-Security-Policy of one response, naming its script nonce.
+/// The Content-Security-Policy of one response, naming its script nonce and
+/// the `form-action` sources [`form_action`] returns.
 ///
 /// The WebAssembly bundle needs `'wasm-unsafe-eval'` to be compiled, which
 /// admits no JavaScript `eval` (Content Security Policy Level 3). Scripts run
 /// by nonce alone, and nothing admits `'unsafe-inline'`.
 #[must_use]
-pub fn policy(nonce: &Nonce) -> String {
+pub fn policy(nonce: &Nonce, form_action: &str) -> String {
     format!(
         "default-src 'self'; \
          script-src 'self' 'wasm-unsafe-eval' 'nonce-{nonce}'; \
@@ -232,7 +378,7 @@ pub fn policy(nonce: &Nonce) -> String {
          connect-src 'self'; \
          object-src 'none'; \
          base-uri 'self'; \
-         form-action 'self'; \
+         form-action {form_action}; \
          frame-ancestors 'none'"
     )
 }
@@ -275,7 +421,7 @@ mod tests {
     #[test]
     fn the_policy_allows_scripts_only_by_nonce_and_never_eval() {
         let nonce = Nonce::new();
-        let policy = policy(&nonce);
+        let policy = policy(&nonce, "'self'");
         let script = policy
             .split(';')
             .map(str::trim)

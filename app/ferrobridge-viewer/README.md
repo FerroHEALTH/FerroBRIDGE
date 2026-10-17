@@ -14,10 +14,26 @@ specification. This crate is never published to crates.io.
 
 The console is one more client of the bridge's public HTTP surface. Its
 server calls the bridge over HTTP and never compiles or runs a mapping
-itself. Built so far: the health route, a minimal page under the browser
-security headers, the configuration with its environment overrides and
-`_file` secrets, the typed bridge client, and the check that holds the crate
-to the two workspace crates it may link.
+itself. Built so far: the health route, the landing page under the browser
+security headers, operator sign-in with OpenID Connect, the configuration
+with its environment overrides and `_file` secrets, the typed bridge client
+that calls the bridge with the operator's own access token, and the check
+that holds the crate to the two workspace crates it may link.
+
+## Sign-in
+
+Operators sign in at an OpenID Provider with the authorization code grant
+and PKCE (`S256`). `GET /login` starts a sign-in, the provider sends the
+operator back to `/auth/callback`, and the console checks the ID Token
+against the provider's JWK Set, its issuer, its audience and the sign-in's
+`nonce` before it begins a session. The session lives on the console's
+server; the browser holds one opaque `HttpOnly`, `SameSite=Lax` cookie,
+under the `__Host-` prefix when it is `Secure`, and never a token. The
+console refreshes the access token before it expires, one refresh per
+session at a time, and keeps a rotated refresh token. `POST /logout` ends
+the session and, when the provider publishes one, sends the operator to its
+end-session endpoint with the ID Token hint. Every request other than
+`GET`, `HEAD` and `OPTIONS` is taken only from the console's own pages.
 
 ## The subcommands
 
@@ -40,7 +56,33 @@ site_root = "/site"
 [bridge]
 base_url = "https://bridge.example.org/"
 timeout_ms = 30000
+
+[session]
+secure_cookie = true
+sign_in_timeout_s = 300
+max_sign_ins = 1000
+idle_timeout_s = 1800
+absolute_timeout_s = 43200
+max_sessions = 10000
+
+[oidc]
+issuer = "https://idp.example.org/realms/ferrobridge"
+authorization_endpoint = "https://idp.example.org/realms/ferrobridge/protocol/openid-connect/auth"
+token_endpoint = "https://idp.example.org/realms/ferrobridge/protocol/openid-connect/token"
+jwks_uri = "https://idp.example.org/realms/ferrobridge/protocol/openid-connect/certs"
+client_id = "ferrobridge-viewer"
+client_secret_file = "/run/secrets/viewer-client-secret"
+redirect_uri = "https://console.example.org/auth/callback"
+scopes = ["openid", "profile"]
+offline_access = true
+end_session_endpoint = "https://idp.example.org/realms/ferrobridge/protocol/openid-connect/logout"
+post_logout_redirect_uri = "https://console.example.org/"
 ```
+
+Without `[oidc]` the console offers no sign-in. The provider's endpoints
+must be `https`, or `http` on loopback. `secure_cookie = false` is refused
+unless `redirect_uri` is `http` on loopback. `offline_access = true` asks
+the provider for a refresh token; list it there, never in `scopes`.
 
 Every key can be set from the environment as
 `FERROBRIDGE_VIEWER__<SECTION>__<KEY>`, for example

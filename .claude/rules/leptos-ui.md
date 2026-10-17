@@ -67,8 +67,11 @@ made in a slice.
   this UI calls it. **Every server function is a `POST`**: the server's
   same-origin check passes safe methods, and the session cookie travels on a
   cross-site top-level `GET`, so a `GetUrl` server function would run for
-  any site. The first server function lands with a test that holds every
-  registered function to it.
+  any site. `tests/it/server_functions.rs` holds every registered function
+  to both: its list must equal what `server_fn_paths()` registers, each
+  entry is a `POST`, and each refuses a caller without a live session or
+  from another origin before it asks the bridge anything. A new server
+  function joins that list in the change that adds it.
 
 ## 1. Crate and build discipline
 
@@ -303,24 +306,30 @@ changes here and nowhere else.
 
 | Measure | Budget |
 |---|---|
-| WebAssembly, brotli-compressed | 114688 bytes |
+| WebAssembly, brotli-compressed | 196608 bytes |
 
 - **The gating number is the brotli-compressed WebAssembly.** The book's
   `deployment/binary_size` chapter has a site serve its WebAssembly
   compressed, every current browser accepts brotli, and the compressed size
   is the download. The raw and gzip sizes are reported beside it, ungated.
-- **The budget is 112 KiB**, 26% over the 90964 bytes the scaffold of #599
+- **The budget is 192 KiB**, 25% over the 157809 bytes the sign-in of #600
   measured (2026-10-17, cargo-leptos 0.3.11, wasm-bindgen 0.2.129,
-  Tailwind CSS 4.3.3, Rust 1.98.1): the router, the meta tags and the
-  hydration of a two-route shell, which every later page carries. The
+  Tailwind CSS 4.3.3, Rust 1.98.1). It was set at 112 KiB, 26% over the
+  90964 bytes of the scaffold of #599: the router, the meta tags and the
+  hydration of a two-route shell. #600 added 66845 bytes. 54766 of them are
+  the first server function read under `<Suspense>`, measured by building
+  the page without it (103043 bytes): the server function client, its JSON
+  codec and the typed refusal it decodes, which every later screen that
+  reads the bridge carries. The other 12079 are the session state the
+  server hands the page and its three landing pages. The
   headroom is the quarter FerroFED's console started with, enough for
   toolchain drift and small growth and too little for a slice to pass
-  unmeasured. The JavaScript glue measured 19625 bytes raw and 5089
-  brotli-compressed. A slice that needs more (the sign-in of #600, the shell
-  and the theme switch of #601) raises the budget in this table in its own
-  pull request, with the measured size and the reason, after checking that
-  what it adds belongs in the browser at all (§1). Server-rendered HTML for
-  read-only output stays the preferred shape.
+  unmeasured. The JavaScript glue measured 22763 bytes raw and 5715
+  brotli-compressed. A slice that needs more (the shell and the theme
+  switch of #601) raises the budget in this table in its own pull request,
+  with the measured size and the reason, after checking that what it adds
+  belongs in the browser at all (§1). Server-rendered HTML for read-only
+  output stays the preferred shape.
 - **The profile keeps the overflow checks.** The console's own browser code
   does little arithmetic; the checks guard the arithmetic of Leptos, serde
   and the standard library, where a wrapped length or index would draw a

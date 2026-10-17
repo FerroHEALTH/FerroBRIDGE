@@ -123,6 +123,20 @@ crates on crates.io.
   audit line with the caller's `sub`, the file, the old and new SHA-256 and
   the reason, never content. `compose.yaml` mounts `./operator-mappings` as
   the one writable path beside the read-only root file system.
+- Operators sign in to the console with OpenID Connect (#600): the
+  authorization code grant with PKCE (`S256`) and a `nonce`, the ID Token
+  checked against the provider's JWK Set, issuer, audience, `azp` and
+  `nonce`, and a session held on the console's server in two bounded pools,
+  carried by one `__Host-` `HttpOnly` `SameSite=Lax` cookie. The console
+  refreshes the access token on its server, once per session at a time,
+  keeps a rotated refresh token, and ends the session when the provider
+  refuses a refresh. `POST /logout` ends the session and sends the operator
+  to the provider's end-session endpoint with the ID Token hint. Every
+  request other than a safe method is taken only from the console's own
+  pages, and the console calls the bridge with the operator's own access
+  token. `[session]` and `[oidc]` configure it, and the book's Operate
+  section documents it under "The operator console". The test OpenID
+  Provider is `ferrobridge_testkit::oidc`.
 - `ferrobridge serve` sends the FerroHEALTH installation report to FerroPULSE
   on its report envelope v2 (#581): one `start` report per process start and
   one `daily` report a day to `https://report.ferropulse.eu/v1/report`,
