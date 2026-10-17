@@ -23,7 +23,7 @@ async fn a_visitor_reads_the_sign_in_as_a_link_the_client_router_leaves_alone()
     let (response, body) = send(&service, get("/")?).await?;
     assert_eq!(StatusCode::OK, response.status());
     assert!(
-        body.contains(r#"<a href="/login" rel="external">Sign in</a>"#),
+        body.contains(r#"<a href="/login" rel="external""#) && body.contains(">Sign in</a>"),
         "{body}"
     );
     assert!(!body.contains("Sign out"), "{body}");

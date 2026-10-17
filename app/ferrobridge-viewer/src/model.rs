@@ -37,6 +37,12 @@ pub enum Refusal {
     /// The bridge did not accept the operator's access token (`401`), so the
     /// operator signs in again.
     NotAuthenticated,
+    /// The operator's input cannot be sent as it stands; the reason names
+    /// the field and never quotes what was entered.
+    Invalid {
+        /// What is wrong, by field.
+        reason: String,
+    },
 }
 
 /// A fault of the console: its session, its reach to the bridge, or a body

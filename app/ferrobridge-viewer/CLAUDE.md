@@ -33,6 +33,12 @@ crate.
 - **Every server function checks the session first**
   (`session::request::signed_in`) and is listed in
   `tests/it/server_functions.rs`, which fails on one it does not hold.
+- **A view paints with roles, never palette entries** (`styles`,
+  `style/tailwind.css`): the role layer derives from
+  `assets/brand/tokens.css`, both dark blocks stay identical, and
+  `tests/it/contrast.rs` holds every pair to WCAG 2.2 AA. The theme is the
+  server's, drawn from its cookie as `data-theme`; the browser keeps no
+  storage.
 - **The security headers are tested in-process** (`tests/it/server.rs`): a
   new route keeps the CSP nonce, `nosniff`, `DENY`, `no-referrer` and
   `no-store` on documents, and only `/pkg/` is compressed.

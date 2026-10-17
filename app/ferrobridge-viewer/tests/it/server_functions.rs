@@ -19,7 +19,8 @@ use crate::support::{OPERATOR_TOKEN, ORIGIN, configuration, console, get_with, s
 
 /// Every server function the console registers, with the form body it
 /// takes.
-const SERVER_FUNCTIONS: [(&str, &str); 1] = [("/api/bridge-status", "")];
+const SERVER_FUNCTIONS: [(&str, &str); 2] =
+    [("/api/bridge-status", ""), ("/api/theme", "theme=dark")];
 
 /// A synthetic R4 `CapabilityStatement` of the bridge.
 const STATEMENT: &str = r#"{
