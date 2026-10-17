@@ -61,6 +61,11 @@ const TEXT_PAIRS: &[(&str, &[&str])] = &[
     ("ok-fg", &["ok-bg"]),
     ("warn-fg", &["warn-bg"]),
     ("danger-fg", &["danger-bg"]),
+    ("tok-keyword", &["inset", "accent-tint"]),
+    ("tok-string", &["inset", "accent-tint"]),
+    ("tok-number", &["inset", "accent-tint"]),
+    ("tok-comment", &["inset", "accent-tint"]),
+    ("tok-key", &["inset", "accent-tint"]),
 ];
 
 /// Each control edge (a pressed segment's border, the focus ring) and the

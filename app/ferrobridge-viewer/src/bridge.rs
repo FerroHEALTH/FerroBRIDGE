@@ -28,6 +28,18 @@ pub const FHIR_JSON: &str = "application/fhir+json";
 /// The JSON media type of the bridge's own documents (RFC 8259 §11).
 pub const JSON: &str = "application/json";
 
+/// The YAML media type a mapping file is served with (RFC 9512).
+pub const YAML: &str = "application/yaml";
+
+/// One mapping file as the operator API serves it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MappingFile {
+    /// Its bytes, verbatim.
+    pub bytes: Vec<u8>,
+    /// The digest its `ETag` names, the quotes removed, when it sent one.
+    pub etag: Option<String>,
+}
+
 /// The largest body the console reads from an answer the bridge accepted.
 pub const BODY_LIMIT: usize = 4 * 1024 * 1024;
 
@@ -83,6 +95,12 @@ pub enum BridgeError {
     /// The accepted answer's body is JSON but no object.
     #[error("the bridge's answer is not a JSON object")]
     NotAnObject,
+    /// The accepted answer's body is JSON but no array.
+    #[error("the bridge's answer is not a JSON array")]
+    NotAnArray,
+    /// A mapping file path that is not plain segments below a root.
+    #[error("the mapping file path is not plain names below a root")]
+    Path,
     /// The accepted answer's body does not decode as the resource asked for.
     #[error("the bridge's answer is not a {expected}")]
     Decode {
@@ -284,7 +302,97 @@ impl Bridge {
         token: &AccessToken,
         admitted: &[StatusCode],
     ) -> Result<(StatusCode, serde_json::Value), BridgeError> {
-        let url = self.url(route)?;
+        let (status, value) = self.any_json(route, accept, token, admitted).await?;
+        if !value.is_object() {
+            return Err(BridgeError::NotAnObject);
+        }
+        Ok((status, value))
+    }
+
+    /// Sends `GET {base}{route}` as [`Self::json`] does and reads whatever
+    /// JSON value the bridge answers.
+    async fn any_json(
+        &self,
+        route: &'static str,
+        accept: &'static str,
+        token: &AccessToken,
+        admitted: &[StatusCode],
+    ) -> Result<(StatusCode, serde_json::Value), BridgeError> {
+        let (status, _headers, body) = self
+            .fetch(self.url(route)?, accept, token, admitted)
+            .await?;
+        let value: serde_json::Value =
+            serde_json::from_slice(&body).map_err(|source| BridgeError::Payload { source })?;
+        Ok((status, value))
+    }
+
+    /// Lists every mapping file through the operator API, `GET
+    /// {base}operator/mappings`: a JSON array of the files with their
+    /// digest, owner and diagnostics.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Refused`] for any status but `200`,
+    /// [`BridgeError::NotAnArray`] for a body that is no array, and the
+    /// transport and body errors of [`Self::capability_statement`].
+    pub async fn mapping_files(
+        &self,
+        token: &AccessToken,
+    ) -> Result<serde_json::Value, BridgeError> {
+        let (_status, value) = self
+            .any_json("operator/mappings", JSON, token, &[StatusCode::OK])
+            .await?;
+        if !value.is_array() {
+            return Err(BridgeError::NotAnArray);
+        }
+        Ok(value)
+    }
+
+    /// Reads one mapping file's verbatim bytes through the operator API,
+    /// `GET {base}operator/mappings/{path}`, with the digest its `ETag`
+    /// names.
+    ///
+    /// `path` is a wire path of plain segments (`fhirconnect/models/a.yml`);
+    /// each segment is percent-encoded onto the URL on its own.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Path`] for a path with an empty, `.` or `..`
+    /// segment, before anything is sent; [`BridgeError::Refused`] for any
+    /// status but `200`; and the transport and size errors of
+    /// [`Self::capability_statement`].
+    pub async fn mapping_file(
+        &self,
+        path: &str,
+        token: &AccessToken,
+    ) -> Result<MappingFile, BridgeError> {
+        if path
+            .split('/')
+            .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+        {
+            return Err(BridgeError::Path);
+        }
+        let mut url = self.url("operator/mappings/")?;
+        url.path_segments_mut()
+            .map_err(|()| BridgeError::Path)?
+            .pop_if_empty()
+            .extend(path.split('/'));
+        let (_status, headers, bytes) = self.fetch(url, YAML, token, &[StatusCode::OK]).await?;
+        let etag = headers
+            .get(http::header::ETAG)
+            .and_then(|value| value.to_str().ok())
+            .map(|value| value.trim_matches('"').to_owned());
+        Ok(MappingFile { bytes, etag })
+    }
+
+    /// Sends `GET url` for `accept` as the operator whose access token is
+    /// `token`, and reads the headers and body the bridge answers with a
+    /// status in `admitted`; any other status is a refusal.
+    async fn fetch(
+        &self,
+        url: Url,
+        accept: &'static str,
+        token: &AccessToken,
+        admitted: &[StatusCode],
+    ) -> Result<(StatusCode, http::HeaderMap, Vec<u8>), BridgeError> {
         let mut bearer = HeaderValue::from_str(&format!("Bearer {}", token.0.expose_secret()))
             .map_err(|_invalid| BridgeError::Token)?;
         bearer.set_sensitive(true);
@@ -304,13 +412,9 @@ impl Bridge {
                 body: String::from_utf8_lossy(&body).into_owned(),
             });
         }
+        let headers = response.headers().clone();
         let body = read(response, BODY_LIMIT, Overflow::Refuse).await?;
-        let value: serde_json::Value =
-            serde_json::from_slice(&body).map_err(|source| BridgeError::Payload { source })?;
-        if !value.is_object() {
-            return Err(BridgeError::NotAnObject);
-        }
-        Ok((status, value))
+        Ok((status, headers, body))
     }
 
     /// The URL of `route` under the base.

@@ -18,6 +18,7 @@ mod bridge;
 mod config;
 mod contrast;
 mod engine;
+mod files;
 mod pages;
 mod refresh;
 mod run;

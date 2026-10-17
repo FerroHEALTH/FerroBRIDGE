@@ -67,6 +67,13 @@
   --neutral-dot: #94a3b8;
   --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.06), 0 1px 3px 0 rgb(15 23 42 / 0.04);
   --scrim: rgb(2 6 23 / 0.4);
+  /* The highlighted YAML, each colour 4.5:1 on the code block's `inset`
+     ground (https://www.w3.org/TR/WCAG22/#contrast-minimum). */
+  --tok-keyword: #6d28d9;
+  --tok-string: #065f46;
+  --tok-number: #9a3412;
+  --tok-comment: #475569;
+  --tok-key: #1d4ed8;
 }
 
 /* The dark block, written twice: once for an operator who chose dark, and
@@ -100,6 +107,11 @@
   --neutral-dot: #94a3b8;
   --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.3);
   --scrim: rgb(2 6 23 / 0.7);
+  --tok-keyword: #c4b5fd;
+  --tok-string: #6ee7b7;
+  --tok-number: #fdba74;
+  --tok-comment: #94a3b8;
+  --tok-key: #93c5fd;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -132,6 +144,11 @@
     --neutral-dot: #94a3b8;
     --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.3);
     --scrim: rgb(2 6 23 / 0.7);
+    --tok-keyword: #c4b5fd;
+    --tok-string: #6ee7b7;
+    --tok-number: #fdba74;
+    --tok-comment: #94a3b8;
+    --tok-key: #93c5fd;
   }
 }
 
@@ -384,6 +401,61 @@
     font-size: 0.8125rem;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+
+  /* A mapping file: one numbered line per item on the `inset` ground. The
+     numbers are list markers, so a copy of the text carries none; the line
+     a diagnostic links to is marked by an edge as well as a tint. */
+  .code-lines {
+    margin: 0;
+    max-height: min(75vh, 48rem);
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: var(--inset);
+    padding: 0.5rem 0.75rem 0.5rem 3.5rem;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.375rem;
+    list-style: decimal;
+  }
+
+  .code-lines > li {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    tab-size: 2;
+  }
+
+  .code-lines > li::marker {
+    color: var(--muted);
+  }
+
+  .code-lines > li:target {
+    background: var(--accent-tint);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  .tok-keyword {
+    color: var(--tok-keyword);
+    font-weight: 600;
+  }
+
+  .tok-string {
+    color: var(--tok-string);
+  }
+
+  .tok-number {
+    color: var(--tok-number);
+  }
+
+  .tok-comment {
+    color: var(--tok-comment);
+    font-style: italic;
+  }
+
+  .tok-key {
+    color: var(--tok-key);
   }
 
   code {
