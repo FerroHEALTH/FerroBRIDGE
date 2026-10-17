@@ -166,6 +166,19 @@ chumsky = "0.13.0"
 # crates.io on 2026-10-15.
 flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
 tar = { version = "0.4.46", default-features = false }
+# The operator console, app/ferrobridge-viewer (#599; no specification
+# governs it: our own design): Leptos rendered on the server and hydrated in
+# the browser. The server half and the browser half take their features per
+# target in that crate, so a workspace --all-features build never enables
+# both. The wasm-bindgen CLI of the viewer build must equal the wasm-bindgen
+# crate version, and scripts/checks/versions.sh holds the two to
+# docs/VERSIONS.md. Verified against crates.io on 2026-10-17.
+leptos = "0.8.22"
+leptos_axum = "0.8.10"
+leptos_meta = "0.8.7"
+leptos_router = "0.8.17"
+wasm-bindgen = "0.2.129"
+console_error_panic_hook = "0.1.7"
 # Test-only.
 wiremock = "0.6.5"
 # The end-to-end lane's container harness and the PostgreSQL client the CDM
@@ -295,6 +308,18 @@ deref_by_slicing = "warn"
 panic = "unwind"
 overflow-checks = true
 debug = "line-tables-only"
+
+# The operator console's WebAssembly bundle (app/ferrobridge-viewer), built
+# by cargo-leptos: optimized for size, since the browser downloads it (the
+# Cargo reference, profiles; no specification governs this: our own design).
+# It keeps the inherited overflow checks and drops the line tables, which
+# wasm-bindgen strips from the bundle anyway.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+debug = false
 
 # The full-emit tests of fhir-codegen (`cargo nextest run --cargo-profile emit
 # -p fhir-codegen`): the emitter runs optimised, while the two generated crates

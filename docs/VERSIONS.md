@@ -396,6 +396,27 @@ release without a reviewed change (`docs/release.md`).
 workflows back against these rows, so a bump moves one row and the workflows
 follow it.
 
+## Operator console build tools
+
+The `viewer` job of `.github/workflows/ci.yml` builds the operator console's
+site bundle (`app/ferrobridge-viewer`, #599) with four tools. cargo-leptos
+and the wasm-bindgen CLI are fetched by the digest-pinned
+`taiki-e/install-action`; the wasm-bindgen CLI equals the `wasm-bindgen`
+crate requirement of the root `Cargo.toml`, because the CLI and the crate
+must agree on the bindings they write. The Tailwind CSS standalone CLI and
+Binaryen's `wasm-opt` are installed by `scripts/release/viewer-tools.sh`,
+each checked against its SHA-256, and `scripts/release/viewer-site.sh`
+names the Tailwind release to cargo-leptos.
+
+| Item | Pin | Repeated in |
+|---|---|---|
+| `cargo-leptos` | 0.3.11 | `.github/workflows/ci.yml` (the `viewer` job) |
+| `wasm-bindgen` | 0.2.129 | `.github/workflows/ci.yml` (the `viewer` job), the root `Cargo.toml` `[workspace.dependencies]` |
+| Tailwind CSS | 4.3.3 | `scripts/release/viewer-tools.sh`, `scripts/release/viewer-site.sh` |
+| Binaryen | version_123 | `scripts/release/viewer-tools.sh` |
+
+`scripts/checks/versions.sh` reads each of them back against these rows.
+
 ## GitHub Actions pins
 
 Every `uses:` in `.github/workflows/**` is pinned to a full commit SHA with a

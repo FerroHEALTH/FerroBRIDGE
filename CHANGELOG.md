@@ -61,6 +61,19 @@ crates on crates.io.
   lane in the wrong state, and the report names the findings each lane was
   not observed in. The Operate section of the book documents it under
   "Checking a deployment".
+- The operator console has its crate, `app/ferrobridge-viewer` (#599): the
+  `ferrobridge-viewer` binary, a Leptos app rendered on the server and
+  hydrated in the browser, with `serve`, `config check` and `healthcheck`.
+  It reads a TOML configuration with `FERROBRIDGE_VIEWER__<SECTION>__<KEY>`
+  overrides and `_file` secrets, answers every response with a per-response
+  nonce Content-Security-Policy, `nosniff`, `DENY` framing and
+  `no-referrer`, marks every document `no-store`, and compresses only its
+  site bundle. Its bridge client reads the bridge's R4 `CapabilityStatement`
+  and keeps the status and body of a refusal. A test holds its server half
+  to `openehr-mapping-core` and `fhir-types` of the workspace and its browser
+  half to none, and the CI `viewer` lane lints the WebAssembly half, builds
+  the site bundle with pinned tools and fails it above a 112 KiB
+  brotli-compressed budget. Sign-in and the pages follow in #600 and #601.
 - `fhir-types` 0.1.117 carries a search parameter registry per FHIR version
   behind `resources` (#522): `<version>::search_parameters::SEARCH_PARAMETERS`
   holds every `SearchParameter` of the core package, apart from its examples,
