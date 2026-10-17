@@ -66,8 +66,9 @@ the testkit tool crate. Beside it:
   throughout, the `tracing` console, the request log that carries the matched
   route and never a body, the health family over an indicator registry, the
   `tower-http` stack (request id, panic catch, timeout, body ceiling), and the
-  bounded drain on `SIGTERM`. `serve`, `cdm init` and `etl run` run;
-  `vocab load` and `mapping check` parse and name the issue that lands each.
+  bounded drain on `SIGTERM`. `serve`, `cdm init`, `etl run` and
+  `mapping check` run (the last over `check`, the checker the operator API
+  shares, #595); `vocab load` parses and names the issue that lands it.
   `src/cdr/` reaches the CDR through the generated ITS-REST 1.1.0 client of
   `openehr-its` (`rest-client`, #285, #293): the handle built from `[cdr]`
   with its `SecretString` credentials or, under `[cdr.credentials.oauth]`, the

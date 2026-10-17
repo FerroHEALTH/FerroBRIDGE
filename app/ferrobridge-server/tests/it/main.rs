@@ -29,6 +29,7 @@ mod http;
 mod ingest;
 mod kds;
 mod lane_templates;
+mod mapping_check;
 mod mapping_walk;
 mod omop;
 mod operations;

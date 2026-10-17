@@ -46,6 +46,14 @@ crates on crates.io.
   products fit together, and licensing and trademarks.
 ### Added
 
+- `ferrobridge mapping check` runs (#595). It loads the FHIRconnect tree of
+  `[mappings] directory`, compiles every context against its template from
+  `[mappings] templates` or the `[cdr]`, loads and validates the OMOCL files
+  of `[mappings] omocl`, and prints every diagnostic with its file, line,
+  column, severity, code and message, as text or with `--format json`. It
+  exits 0 when no diagnostic is an error, 1 when one is, 69 when the check
+  cannot run and 78 when the configuration names nothing to check. The
+  checker is the library module `check`, which the operator API reuses.
 - `fhir-types` 0.1.117 carries a search parameter registry per FHIR version
   behind `resources` (#522): `<version>::search_parameters::SEARCH_PARAMETERS`
   holds every `SearchParameter` of the core package, apart from its examples,
