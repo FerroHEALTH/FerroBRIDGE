@@ -91,6 +91,42 @@ pub mod its_rest {
         .to_string()
     }
 
+    /// Returns a canonical `REVISION_HISTORY` listing each `(version_uid,
+    /// time_committed)` of `revisions` in order, each with one synthetic
+    /// commit audit.
+    ///
+    /// The `200` of `versioned_composition_revision_history` carries a
+    /// `REVISION_HISTORY` (`ehr-codegen.openapi.yaml`, `200_REVISION_HISTORY`),
+    /// whose items each hold a `version_id` and at least one audit.
+    #[must_use]
+    pub fn revision_history_body(revisions: &[(&str, &str)]) -> String {
+        let items: Vec<serde_json::Value> = revisions
+            .iter()
+            .map(|(version, committed)| {
+                serde_json::json!({
+                    "_type": "REVISION_HISTORY_ITEM",
+                    "version_id": { "_type": "OBJECT_VERSION_ID", "value": version },
+                    "audits": [{
+                        "_type": "AUDIT_DETAILS",
+                        "system_id": "ferrobridge.test",
+                        "time_committed": { "_type": "DV_DATE_TIME", "value": committed },
+                        "change_type": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "creation",
+                            "defining_code": {
+                                "_type": "CODE_PHRASE",
+                                "terminology_id": { "_type": "TERMINOLOGY_ID", "value": "openehr" },
+                                "code_string": "249"
+                            }
+                        },
+                        "committer": { "_type": "PARTY_SELF" }
+                    }]
+                })
+            })
+            .collect();
+        serde_json::json!({ "_type": "REVISION_HISTORY", "items": items }).to_string()
+    }
+
     /// Returns the `422` of content that is well formed and fails semantic
     /// validation, with the `Error` body of the `OpenAPI` schema.
     ///

@@ -231,7 +231,7 @@ impl Ingest<'_> {
         composition: &CanonicalComposition,
         path: &str,
     ) -> Result<Written, Refused> {
-        let entry = engine::entry_named(program.program(), composition, path).ok_or_else(|| {
+        let entry = engine::entry_named(program.program(), composition, path)?.ok_or_else(|| {
             Refused::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Issue::error(IssueType::Exception).diagnosing(
@@ -281,23 +281,30 @@ impl Ingest<'_> {
         })
     }
 
-    /// Binds and consumes each mapped entry at the version `versions` names
-    /// for it, in entry order.
+    /// Binds and consumes each mapped entry at the version `stored` pairs with
+    /// it, in entry order.
+    ///
+    /// The identity is read from the composition the CDR stored at that
+    /// version, so a retry that maps the resource again binds what the first
+    /// delivery committed, never a fresh build that differs from it in its
+    /// clock-filled times (no specification governs the identity: our own
+    /// design).
     pub(super) fn place(
         &self,
         mapped: &[Mapped<'_>],
         sources: &[Option<SourceVersion>],
         ehr_id: &EhrId,
-        versions: Vec<ObjectVersionId>,
+        stored: Vec<(ObjectVersionId, Composition)>,
     ) -> Result<Vec<Placed>, Refused> {
-        let mut placed = Vec::with_capacity(versions.len());
-        for ((entry, version), source) in mapped.iter().zip(versions).zip(sources) {
+        let mut placed = Vec::with_capacity(stored.len());
+        for ((entry, (version, held)), source) in mapped.iter().zip(stored).zip(sources) {
+            let composition = canonical_of(&held, &entry.built)?;
             let (id, stood) = self.bind(
                 entry.program,
                 entry.inbound.resource_type(),
                 ehr_id,
                 &version,
-                &entry.built,
+                &composition,
             )?;
             self.index(&entry.inbound, &id)?;
             if let Some(source) = source {
@@ -357,14 +364,23 @@ impl Ingest<'_> {
             .store
             .internal_of(resource_type, &map_key)
             .map_err(|error| store_refusal(&error))?;
-        if recorded.is_none() && entry.path() != path {
-            // The map wins once written: an id recorded under the positional
-            // path of the entry still stands.
-            let positional = EntryKey::new(versioned_object_uid(version), entry.path(), 0);
-            recorded = self
+        if recorded.is_none()
+            && let Some(legacy) = entry.legacy_path()
+        {
+            // The map wins once written: an id an earlier build recorded under
+            // the legacy path of the entry still stands, when that path names
+            // this entry and no other.
+            let earlier = EntryKey::new(versioned_object_uid(version), legacy.as_str(), 0);
+            let held = self
                 .store
-                .internal_of(resource_type, &derive::map_key(&positional))
+                .internal_of(resource_type, &derive::map_key(&earlier))
                 .map_err(|error| store_refusal(&error))?;
+            if held.is_some()
+                && engine::entry_named(program.program(), composition, &legacy)?
+                    .is_some_and(|named| named == *entry)
+            {
+                recorded = held;
+            }
         }
         let id = if let Some(known) = recorded {
             known
@@ -382,6 +398,7 @@ impl Ingest<'_> {
             entry_path: path,
             split: key.split(),
             context: program.program().context().to_string(),
+            derivation: Some(derive::DERIVATION),
         };
         let stood = self
             .store

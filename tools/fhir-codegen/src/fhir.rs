@@ -90,6 +90,8 @@ pub struct ElementDefinition {
     pub id: Option<String>,
     /// The dotted path from the root type, for example `ValueSet.compose.include`.
     pub path: String,
+    /// The element of the base definition this one constrains or inherits.
+    pub base: Option<ElementBase>,
     /// A short description.
     pub short: Option<String>,
     /// The formal definition.
@@ -112,6 +114,15 @@ pub struct ElementDefinition {
     pub is_summary: Option<bool>,
     /// Whether the element modifies the meaning of its parent.
     pub is_modifier: Option<bool>,
+}
+
+/// `ElementDefinition.base`: the element of the base definition an element
+/// derives from (<https://hl7.org/fhir/R4B/elementdefinition-definitions.html#ElementDefinition.base>).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ElementBase {
+    /// The path of the base element, for example `Element.id`.
+    pub path: String,
 }
 
 /// One entry of `ElementDefinition.type`.

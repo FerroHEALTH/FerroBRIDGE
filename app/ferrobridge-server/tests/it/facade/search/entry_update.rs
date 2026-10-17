@@ -27,6 +27,8 @@ use super::super::call;
 use super::super::condition;
 use super::super::named;
 use super::super::raw;
+use super::super::stub::COMMITTED;
+use super::super::stub::history_mock;
 use super::super::stub::mount_read;
 use super::AQL;
 use super::DIAGNOSIS;
@@ -183,6 +185,10 @@ async fn mount_version_two_read(harness: &Harness, composition: &serde_json::Val
                 .insert_header("Content-Type", "application/json")
                 .set_body_string(composition.to_string()),
         )
+        .with_priority(1)
+        .mount(&harness.cdr)
+        .await;
+    history_mock(&[VERSION_ONE, VERSION_TWO], COMMITTED)
         .with_priority(1)
         .mount(&harness.cdr)
         .await;

@@ -23,6 +23,9 @@ use fhirconnect::engine::traverse::to_openehr;
 use fhirconnect::resolve::program::Program;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::index::WebTemplateIndex;
+use openehr_rm::v1_2::paths::PathSegment;
+use openehr_rm::v1_2::paths::Predicate;
+use openehr_rm::v1_2::paths::RmPath;
 
 /// The composer the facade records when no mapping sets one.
 ///
@@ -126,8 +129,6 @@ pub fn outbound(
 /// Where in a composition one entry a program maps sits.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
-    /// The archetype path of the entry, as an openEHR path writes it.
-    path: String,
     /// The `LOCATABLE.uid` the entry carries, when it carries one.
     uid: Option<String>,
     /// The archetype id the entry carries.
@@ -136,15 +137,11 @@ pub struct Entry {
     ordinal: usize,
     /// The index of the entry in the composition's `content`.
     index: usize,
+    /// Whether the composition holds more than one item of the archetype.
+    several: bool,
 }
 
 impl Entry {
-    /// Returns the archetype path of the entry.
-    #[must_use]
-    pub fn path(&self) -> &str {
-        &self.path
-    }
-
     /// Returns the `LOCATABLE.uid` the entry carries.
     #[must_use]
     pub fn uid(&self) -> Option<&str> {
@@ -160,17 +157,57 @@ impl Entry {
 
     /// Returns the path the identity map keys the entry by.
     ///
-    /// The first entry of an archetype keeps the unindexed path it has when
-    /// it is the only one, so a composition that gains a second entry does
-    /// not rename the resource of its first; every further entry keeps its
-    /// positional path (no specification governs this: our own design).
+    /// The first entry of an archetype keeps the archetype predicate
+    /// `/content[<archetype>]` it has when it is the only one, so a
+    /// composition that gains a second entry does not rename the resource of
+    /// its first (no specification governs this: our own design). Every
+    /// further entry takes the positional predicate `/content[<n>]`, `n` its
+    /// 1-based place in `content`, as openEHR BASE Release 1.2.0, Paths and
+    /// Locators, §Using Positional Parameters, defines it. The path is built
+    /// with the `openehr-rm` path types, so it parses back.
     #[must_use]
     pub fn identity_path(&self) -> String {
-        if self.ordinal <= 1 {
-            format!("/content[{}]", self.archetype)
+        let predicate = if self.ordinal <= 1 {
+            Predicate {
+                archetype_node_id: Some(self.archetype.clone()),
+                ..Predicate::default()
+            }
         } else {
-            self.path.clone()
+            Predicate {
+                position: Some(self.index.saturating_add(1)),
+                ..Predicate::default()
+            }
+        };
+        RmPath {
+            absolute: true,
+            segments: vec![PathSegment {
+                attribute: String::from(CONTENT),
+                predicate,
+                descendant: false,
+            }],
         }
+        .to_string()
+    }
+
+    /// Returns the path a build up to 0.0.6 keyed the entry by, when it
+    /// differs from [`Entry::identity_path`].
+    ///
+    /// Those builds wrote `/content[<archetype>, <n>]` for an entry of a
+    /// composition holding several: builds up to 0.0.5 for the first item
+    /// only, `n` its place in `content`, and 0.0.6 for every later item, `n`
+    /// its place among the items of the archetype. BASE Release 1.2.0, Paths
+    /// and Locators, reads that comma as the name-based predicate shortcut,
+    /// so the form is outside the path grammar; the identity map still holds
+    /// ids under it, and the map wins once written.
+    #[must_use]
+    pub fn legacy_path(&self) -> Option<String> {
+        let n = if self.ordinal <= 1 {
+            self.index.saturating_add(1)
+        } else {
+            self.ordinal
+        };
+        self.several
+            .then(|| format!("/content[{}, {n}]", self.archetype))
     }
 
     /// Returns `composition` with every other `content` item of this entry's
@@ -259,10 +296,7 @@ fn archetype_node_id(item: &serde_json::Value) -> Option<&str> {
 /// A context maps one profile onto one template through a start model mapping
 /// whose `metadata.archetype` names the entry
 /// (`types-of-mapping-files/context-mappings.adoc`), so the entry is the
-/// `content` item carrying that `archetype_node_id`. The path is the openEHR
-/// one (<https://specifications.openehr.org/releases/BASE/Release-1.2.0/architecture_overview.html>),
-/// positionally indexed when the composition holds several items of the
-/// archetype.
+/// `content` item carrying that `archetype_node_id`.
 ///
 /// A composition with no such item answers `None`: the program mapped no entry
 /// of its own archetype, which the caller reports rather than papering over.
@@ -280,31 +314,142 @@ pub fn entries_of(program: &Program, composition: &CanonicalComposition) -> Vec<
         .unwrap_or_default()
 }
 
-/// Returns the entry `path` names in `composition`, as
-/// [`Entry::identity_path`] or [`Entry::path`] wrote it.
+/// Why a stored entry path names no single entry of a composition.
 ///
-/// An entry is named by its place among the items of its archetype, and an
-/// unindexed path names the first (no specification governs the identity:
-/// our own design).
-#[must_use]
+/// Builds up to 0.0.5 recorded `/content[<archetype>, <n>]` for the first item
+/// of the archetype, `n` its 1-based place in `content`, and 0.0.6 recorded
+/// the same text for the `n`th item of the archetype. When both readings name
+/// an item and the items differ, the binding cannot say which entry it meant.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error(
+    "the entry path {path} a build up to 0.0.6 recorded names the item at place {place} of content \
+     as builds up to 0.0.5 wrote it and another item as 0.0.6 wrote it, so it names no single entry"
+)]
+pub struct AmbiguousEntry {
+    /// The stored path.
+    path: String,
+    /// The `n` the path carries.
+    place: usize,
+}
+
+impl AmbiguousEntry {
+    /// Returns the stored path that names two entries.
+    #[must_use]
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+}
+
+/// Returns the entry `path` names in `composition`, as
+/// [`Entry::identity_path`] or [`Entry::legacy_path`] wrote it.
+///
+/// `/content[<archetype>]` names the first item of the archetype and
+/// `/content[<n>]` the `content` item at 1-based place `n`, which must carry
+/// the archetype. The legacy `/content[<archetype>, <n>]` has two readings:
+/// the first item of the archetype when it sits at place `n` of `content`,
+/// as builds up to 0.0.5 wrote it, and the `n`th item of the archetype, as
+/// 0.0.6 wrote it. One reading that names an item, or two that name the same
+/// one, resolves (no specification governs the identity: our own design).
+///
+/// # Errors
+///
+/// Returns [`AmbiguousEntry`] when the two readings of a legacy path name two
+/// different items.
 pub fn entry_named(
     program: &Program,
     composition: &CanonicalComposition,
     path: &str,
-) -> Option<Entry> {
-    let archetype = archetype_of(program)?;
-    let ordinal = ordinal_of(path, &archetype)?;
-    entries_at(composition, &archetype)
-        .into_iter()
-        .find(|entry| entry.ordinal == ordinal)
+) -> Result<Option<Entry>, AmbiguousEntry> {
+    match archetype_of(program) {
+        Some(archetype) => named_in(composition, &archetype, path),
+        None => Ok(None),
+    }
 }
 
-/// Returns the 1-based place `path` names among the items of `archetype`.
-fn ordinal_of(path: &str, archetype: &str) -> Option<usize> {
-    let inner = path.strip_prefix("/content[")?.strip_suffix(']')?;
-    if inner == archetype {
-        return Some(1);
+/// Returns the entry of `archetype` that `path` names in `composition`, as
+/// [`entry_named`] reads it.
+fn named_in(
+    composition: &CanonicalComposition,
+    archetype: &str,
+    path: &str,
+) -> Result<Option<Entry>, AmbiguousEntry> {
+    let Some(place) = place_of(path, archetype) else {
+        return Ok(None);
+    };
+    let entries = entries_at(composition, archetype);
+    let at = |position: usize| {
+        entries
+            .iter()
+            .find(|entry| entry.index.checked_add(1) == Some(position))
+    };
+    let nth = |ordinal: usize| entries.iter().find(|entry| entry.ordinal == ordinal);
+    let found = match place {
+        Place::Ordinal(ordinal) => nth(ordinal),
+        Place::Position(position) => at(position),
+        Place::Legacy(n) => {
+            let early = entries
+                .first()
+                .filter(|first| first.index.checked_add(1) == Some(n));
+            match (early, nth(n)) {
+                (Some(early), Some(later)) if early != later => {
+                    return Err(AmbiguousEntry {
+                        path: path.to_owned(),
+                        place: n,
+                    });
+                }
+                (Some(one), _) | (None, Some(one)) => Some(one),
+                (None, None) => None,
+            }
+        }
+    };
+    Ok(found.cloned())
+}
+
+/// The `content` attribute every entry path starts with.
+const CONTENT: &str = "content";
+
+/// How an entry path names its entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Place {
+    /// The 1-based place among the items of the archetype.
+    Ordinal(usize),
+    /// The 1-based place in `content`.
+    Position(usize),
+    /// The `n` of the legacy `/content[<archetype>, <n>]`.
+    Legacy(usize),
+}
+
+/// Returns how `path` names an entry of `archetype`.
+fn place_of(path: &str, archetype: &str) -> Option<Place> {
+    let Ok(parsed) = path.parse::<RmPath>() else {
+        // NOTE: no specification governs this: our own design, a path the BASE
+        // grammar refuses is either the legacy comma form or names no entry.
+        return legacy_place(path, archetype).map(Place::Legacy);
+    };
+    let [segment] = parsed.segments.as_slice() else {
+        return None;
+    };
+    let predicate = &segment.predicate;
+    if !parsed.absolute
+        || segment.descendant
+        || segment.attribute != CONTENT
+        || predicate.name_value.is_some()
+        || predicate.uid.is_some()
+        || !predicate.comparisons.is_empty()
+    {
+        return None;
     }
+    match (predicate.archetype_node_id.as_deref(), predicate.position) {
+        (Some(named), None) if named == archetype => Some(Place::Ordinal(1)),
+        (None, Some(position)) => Some(Place::Position(position)),
+        _ => None,
+    }
+}
+
+/// Returns the `n` of a legacy `/content[<archetype>, <n>]` naming
+/// `archetype`.
+fn legacy_place(path: &str, archetype: &str) -> Option<usize> {
+    let inner = path.strip_prefix("/content[")?.strip_suffix(']')?;
     let (named, place) = inner.split_once(',')?;
     if named.trim() != archetype {
         return None;
@@ -335,13 +480,6 @@ fn entries_at(composition: &CanonicalComposition, archetype: &str) -> Vec<Entry>
         .into_iter()
         .zip(1_usize..)
         .map(|((index, item), ordinal)| Entry {
-            // NOTE: openEHR BASE Release 1.2.0 §Paths and Locators writes the
-            // positional predicate 1-based, here among the items of one archetype.
-            path: if several {
-                format!("/content[{archetype}, {ordinal}]")
-            } else {
-                format!("/content[{archetype}]")
-            },
             uid: item
                 .get("uid")
                 .and_then(|uid| uid.get("value"))
@@ -350,6 +488,7 @@ fn entries_at(composition: &CanonicalComposition, archetype: &str) -> Vec<Entry>
             archetype: archetype.to_owned(),
             ordinal,
             index,
+            several,
         })
         .collect()
 }
@@ -368,11 +507,16 @@ pub fn archetype_of(program: &Program) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use super::AmbiguousEntry;
     use super::Entry;
+    use super::Place;
     use super::entries_at;
-    use super::ordinal_of;
+    use super::named_in;
+    use super::place_of;
     use openehr_mapping_core::composition::CanonicalComposition;
     use openehr_mapping_core::template::Generation;
+    use openehr_rm::v1_2::paths::RmPath;
+    use openehr_rm::v1_2::paths::item_at_path;
 
     /// The archetype every case below looks for.
     const DIAGNOSIS: &str = "openEHR-EHR-EVALUATION.problem_diagnosis.v1";
@@ -395,18 +539,67 @@ mod tests {
     fn one_entry_of_an_archetype_has_an_unindexed_path() {
         let built = composition(&serde_json::json!([{ "archetype_node_id": DIAGNOSIS }]));
         let entry = entry_at(&built, DIAGNOSIS).expect("the entry is found");
-        assert_eq!(format!("/content[{DIAGNOSIS}]"), entry.path());
+        assert_eq!(format!("/content[{DIAGNOSIS}]"), entry.identity_path());
+        assert_eq!(None, entry.legacy_path());
         assert_eq!(None, entry.uid());
     }
 
     #[test]
-    fn several_entries_of_one_archetype_take_a_one_based_predicate() {
+    fn a_later_entry_takes_the_one_based_positional_predicate_of_its_place_in_content() {
         let built = composition(&serde_json::json!([
             { "archetype_node_id": DIAGNOSIS },
+            { "archetype_node_id": "openEHR-EHR-OBSERVATION.body_weight.v2" },
             { "archetype_node_id": DIAGNOSIS }
         ]));
-        let entry = entry_at(&built, DIAGNOSIS).expect("the entry is found");
-        assert_eq!(format!("/content[{DIAGNOSIS}, 1]"), entry.path());
+        let entries = entries_at(&built, DIAGNOSIS);
+        let identities: Vec<String> = entries.iter().map(Entry::identity_path).collect();
+        assert_eq!(
+            vec![
+                format!("/content[{DIAGNOSIS}]"),
+                String::from("/content[3]")
+            ],
+            identities
+        );
+        let legacy: Vec<Option<String>> = entries.iter().map(Entry::legacy_path).collect();
+        assert_eq!(
+            vec![
+                Some(format!("/content[{DIAGNOSIS}, 1]")),
+                Some(format!("/content[{DIAGNOSIS}, 2]"))
+            ],
+            legacy
+        );
+    }
+
+    #[test]
+    fn every_identity_path_parses_back_and_navigates_to_its_entry() {
+        // NOTE: openEHR BASE Release 1.2.0, Paths and Locators, §Using Positional
+        // Parameters: `[n]` selects the nth item of the container, 1-based.
+        let built = composition(&serde_json::json!([
+            { "archetype_node_id": "openEHR-EHR-OBSERVATION.body_weight.v2" },
+            { "archetype_node_id": DIAGNOSIS, "name": "one" },
+            { "archetype_node_id": DIAGNOSIS, "name": "two" }
+        ]));
+        for entry in entries_at(&built, DIAGNOSIS) {
+            let path = entry.identity_path();
+            let parsed = path.parse::<RmPath>().expect("the identity path parses");
+            assert_eq!(path, parsed.to_string(), "the path renders back unchanged");
+            assert_eq!(
+                entry.item(&built),
+                item_at_path(built.value(), &parsed),
+                "{path} navigates to its entry"
+            );
+        }
+    }
+
+    #[test]
+    fn the_legacy_comma_form_is_outside_the_path_grammar() {
+        // NOTE: openEHR BASE Release 1.2.0, Paths and Locators, §Name-based
+        // Predicate: the comma shortcut takes a quoted name, so `, 2` is refused.
+        assert!(
+            format!("/content[{DIAGNOSIS}, 2]")
+                .parse::<RmPath>()
+                .is_err()
+        );
     }
 
     #[test]
@@ -436,22 +629,25 @@ mod tests {
             { "archetype_node_id": DIAGNOSIS, "name": "two" }
         ]));
         let entries = entries_at(&built, DIAGNOSIS);
-        let paths: Vec<&str> = entries.iter().map(Entry::path).collect();
-        assert_eq!(
-            vec![
-                format!("/content[{DIAGNOSIS}, 1]"),
-                format!("/content[{DIAGNOSIS}, 2]")
-            ],
-            paths
-        );
+        let ordinals: Vec<usize> = entries.iter().map(Entry::ordinal).collect();
+        assert_eq!(vec![1, 2], ordinals);
         let identities: Vec<String> = entries.iter().map(Entry::identity_path).collect();
         assert_eq!(
             vec![
                 format!("/content[{DIAGNOSIS}]"),
-                format!("/content[{DIAGNOSIS}, 2]")
+                String::from("/content[3]")
             ],
             identities,
             "the first entry keeps the identity it had alone"
+        );
+        let legacy: Vec<Option<String>> = entries.iter().map(Entry::legacy_path).collect();
+        assert_eq!(
+            vec![
+                Some(format!("/content[{DIAGNOSIS}, 2]")),
+                Some(format!("/content[{DIAGNOSIS}, 2]"))
+            ],
+            legacy,
+            "the first entry's early key, its place in content, is the second entry's 0.0.6 key"
         );
     }
 
@@ -509,20 +705,93 @@ mod tests {
     }
 
     #[test]
-    fn a_recorded_path_names_its_place_among_the_items() {
+    fn a_recorded_path_names_its_entry_by_archetype_or_by_its_place_in_content() {
         assert_eq!(
-            Some(1),
-            ordinal_of(&format!("/content[{DIAGNOSIS}]"), DIAGNOSIS)
+            Some(Place::Ordinal(1)),
+            place_of(&format!("/content[{DIAGNOSIS}]"), DIAGNOSIS)
         );
+        assert_eq!(Some(Place::Position(3)), place_of("/content[3]", DIAGNOSIS));
+        assert_eq!(None, place_of("/content[other]", DIAGNOSIS));
+        assert_eq!(None, place_of("/content[0]", DIAGNOSIS));
+        assert_eq!(None, place_of("/context", DIAGNOSIS));
+        assert_eq!(None, place_of("/content[3]/items[1]", DIAGNOSIS));
         assert_eq!(
-            Some(2),
-            ordinal_of(&format!("/content[{DIAGNOSIS}, 2]"), DIAGNOSIS)
+            None,
+            place_of(&format!("/content[{DIAGNOSIS}, 'x']"), DIAGNOSIS)
+        );
+    }
+
+    #[test]
+    fn a_legacy_path_is_read_as_the_comma_form() {
+        assert_eq!(
+            Some(Place::Legacy(2)),
+            place_of(&format!("/content[{DIAGNOSIS}, 2]"), DIAGNOSIS)
         );
         assert_eq!(
             None,
-            ordinal_of(&format!("/content[{DIAGNOSIS}, 0]"), DIAGNOSIS)
+            place_of(&format!("/content[{DIAGNOSIS}, 0]"), DIAGNOSIS)
         );
-        assert_eq!(None, ordinal_of("/content[other, 2]", DIAGNOSIS));
-        assert_eq!(None, ordinal_of("/context", DIAGNOSIS));
+        assert_eq!(None, place_of("/content[other, 2]", DIAGNOSIS));
+    }
+
+    /// Returns the `name` of the entry `path` names in `built`.
+    fn named(built: &CanonicalComposition, path: &str) -> Result<Option<String>, AmbiguousEntry> {
+        Ok(named_in(built, DIAGNOSIS, path)?.and_then(|entry| {
+            entry
+                .item(built)
+                .and_then(|item| item["name"].as_str())
+                .map(str::to_owned)
+        }))
+    }
+
+    #[test]
+    fn a_legacy_path_an_early_build_wrote_names_the_first_entry_at_its_place_in_content() {
+        // Builds up to 0.0.5 bound the first diagnosis at content place 3.
+        let built = composition(&serde_json::json!([
+            { "archetype_node_id": "openEHR-EHR-OBSERVATION.body_weight.v2" },
+            { "archetype_node_id": "openEHR-EHR-OBSERVATION.body_weight.v2" },
+            { "archetype_node_id": DIAGNOSIS, "name": "one" },
+            { "archetype_node_id": DIAGNOSIS, "name": "two" }
+        ]));
+        assert_eq!(
+            Ok(Some(String::from("one"))),
+            named(&built, &format!("/content[{DIAGNOSIS}, 3]")),
+            "place 3 of content is the first diagnosis, and there is no third diagnosis"
+        );
+    }
+
+    #[test]
+    fn a_legacy_path_0_0_6_wrote_names_the_nth_entry_of_the_archetype() {
+        let built = composition(&serde_json::json!([
+            { "archetype_node_id": DIAGNOSIS, "name": "one" },
+            { "archetype_node_id": DIAGNOSIS, "name": "two" },
+            { "archetype_node_id": DIAGNOSIS, "name": "three" }
+        ]));
+        assert_eq!(
+            Ok(Some(String::from("three"))),
+            named(&built, &format!("/content[{DIAGNOSIS}, 3]")),
+            "the first diagnosis is not at place 3, so only the 0.0.6 reading names an entry"
+        );
+        assert_eq!(
+            Ok(Some(String::from("one"))),
+            named(&built, &format!("/content[{DIAGNOSIS}, 1]")),
+            "both readings of place 1 name the first diagnosis"
+        );
+        assert_eq!(
+            Ok(None),
+            named(&built, &format!("/content[{DIAGNOSIS}, 4]"))
+        );
+    }
+
+    #[test]
+    fn a_legacy_path_whose_two_readings_name_two_entries_is_reported() {
+        let built = composition(&serde_json::json!([
+            { "archetype_node_id": "openEHR-EHR-OBSERVATION.body_weight.v2" },
+            { "archetype_node_id": DIAGNOSIS, "name": "one" },
+            { "archetype_node_id": DIAGNOSIS, "name": "two" }
+        ]));
+        let path = format!("/content[{DIAGNOSIS}, 2]");
+        let refused = named(&built, &path).expect_err("two entries answer the path");
+        assert_eq!(path, refused.path());
     }
 }
