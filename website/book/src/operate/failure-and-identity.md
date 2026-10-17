@@ -64,6 +64,17 @@ one a later build wrote, stops the start with an error that names the file,
 the schema it found and the schemas this build reads, and the file is left
 unchanged.
 
+Every openEHR identifier the id map holds is checked again when a request
+reads it: an `ehr_id` must not carry a character that would change the
+request path, and a version container must match the openEHR BASE
+`HIER_OBJECT_ID` grammar. A stored value that fails its check answers
+`500 Internal Server Error` with an `exception` issue. The issue names the
+resource the record belongs to (`Condition/<id>`), or the resource id a
+consumed source was recorded as, together with the field and the value it
+holds. The CDR is not called, and nothing is written. Opening the store does
+not scan the records, so a malformed value surfaces on the first request that
+reads it.
+
 ## A re-sent transaction commits once
 
 Every entry the facade commits records the source it consumed. A resource is

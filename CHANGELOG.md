@@ -23,6 +23,17 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Changed
+
+- `SECURITY.md` and `CONTRIBUTING.md` keep what is particular to FerroBRIDGE
+  and link the FerroHEALTH family book at <https://ferrohealth.eu/docs/> for
+  the rest (#402). `SECURITY.md` keeps the supported versions, the reporting
+  route, the response times, the scope and release verification, and links
+  the family policy for disclosure, advisories and the support period.
+  `CONTRIBUTING.md` describes the current build and test gate,
+  `scripts/checks/fast.sh`. The README and the book's introduction link the
+  family book for the manufacturer, the Cyber Resilience Act, how the
+  products fit together, and licensing and trademarks.
 ### Added
 
 - `fhir-types` 0.1.117 carries a search parameter registry per FHIR version
@@ -36,6 +47,10 @@ crates on crates.io.
   standard R4 search parameter of its resource type another type, and the
   `CapabilityStatement` names the standard parameter's canonical as
   `searchParam.definition` for every declared standard code (#522).
+- The operate book says where the FHIR facade's identity store lives, which
+  volume it needs on a read-only root filesystem, and what happens across
+  replicas and restarts, with a Kubernetes pod spec (#419). The container
+  page no longer says the server writes nothing.
 - A facade read and vread answer `Last-Modified`, the commit time the CDR's
   revision history records for the version (#348). Each read makes one more
   CDR call, `GET /ehr/{ehr_id}/versioned_composition/{uid}/revision_history`.
@@ -44,6 +59,10 @@ crates on crates.io.
 
 ### Fixed
 
+- A percent-encoded `_count`, such as `_count=%32%30`, reads as its decoded
+  value on every facade route (#523). The request guard read `_count` from
+  the raw query and refused it with a `400`, while the search read the
+  decoded value; both now read the one decoded value.
 - A vread of an earlier version after the latest version was deleted answers
   that version (#348). The facade names the version from the revision
   history, where it took the creating system from the latest version and so
@@ -89,6 +108,12 @@ crates on crates.io.
   its `id` to two compositions now names the repair (#298): its `conflict`
   issue lists the resource id of each composition, and an update
   (`PUT [base]/[type]/[id]`) of the one the sender means revises it.
+- A stored version container that the openEHR BASE `HIER_OBJECT_ID` grammar
+  refuses, or a stored `ehr_id` carrying a character that would change the
+  request path, now answers a `500` whose `exception` issue names the
+  resource the record belongs to, the field and the value (#280). Before, the issue named
+  neither the resource nor the field. The Operate page on failure and
+  identity states the rule.
 
 ### Changed
 
@@ -97,6 +122,14 @@ crates on crates.io.
   earlier wrote, reads as schema 1 and is stamped on open. A file in another
   schema stops the start with an error naming the file, the schema found and
   the schemas this build reads, and the file is left unchanged.
+
+### Security
+
+- An inline secret in the configuration file (`bearer_token`, `password`,
+  `client_secret`, the `[cdm] url`) is a `SecretString` from the moment the
+  file is parsed, so a `Debug` rendering of the configuration tree redacts it
+  and its memory is zeroed when it is dropped (#309). A `_file` sibling's
+  text is wrapped the same way as soon as it is read.
 
 ## [0.0.6] - 2026-10-17
 

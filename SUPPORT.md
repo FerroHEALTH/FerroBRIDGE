@@ -62,8 +62,9 @@ privately through
 [GitHub private vulnerability reporting](https://github.com/FerroHEALTH/FerroBRIDGE/security/advisories/new).
 
 That document also carries what you can expect in return: an acknowledgement
-window, an assessment window, and coordinated disclosure with credit by
-default.
+window and an assessment window. Coordinated disclosure, credit and how a fix
+reaches you are in the family policy it links,
+<https://ferrohealth.eu/docs/security.html>.
 
 **A vulnerability in a dependency, or in a service you deployed alongside
 FerroBRIDGE, goes to that project**, not here, unless it has a

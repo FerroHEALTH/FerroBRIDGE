@@ -184,3 +184,53 @@ fn a_user_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn S
     }
     Ok(())
 }
+
+#[test]
+fn no_inline_secret_reaches_the_debug_rendering_of_the_tree_or_the_settings()
+-> Result<(), Box<dyn StdError>> {
+    let text = concat!(
+        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
+        "[cdr.credentials]\nuser = \"bridge\"\npassword = \"synthetic-cdr-password\"\n\n",
+        "[terminology]\nbase_url = \"http://tx.invalid/fhir\"\n\n",
+        "[terminology.credentials]\nbearer_token = \"synthetic-tx-token\"\n\n",
+        "[cdm]\nurl = \"postgres://bridge:synthetic-db-password@db.invalid/cdm?sslmode=disable\"\n",
+    );
+    let config = Config::from_sources(Some(text), &BTreeMap::new())?;
+    let tree = format!("{config:?}");
+    let settings = format!("{:?}", config.resolve()?);
+    for rendered in [&tree, &settings] {
+        for secret in [
+            "synthetic-cdr-password",
+            "synthetic-tx-token",
+            "synthetic-db-password",
+        ] {
+            assert!(
+                !rendered.contains(secret),
+                "a secret reached the Debug rendering"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn no_inline_client_secret_reaches_the_debug_rendering_of_the_tree() -> Result<(), Box<dyn StdError>>
+{
+    let text = concat!(
+        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
+        "[cdr.credentials.oauth]\ntoken_endpoint = \"https://idp.invalid/token\"\n",
+        "client_id = \"bridge\"\nclient_secret = \"synthetic-client-secret\"\n",
+    );
+    let config = Config::from_sources(Some(text), &BTreeMap::new())?;
+    let tree = format!("{config:?}");
+    let settings = format!("{:?}", config.resolve()?);
+    assert!(
+        !tree.contains("synthetic-client-secret"),
+        "the client secret reached the Debug rendering of the tree"
+    );
+    assert!(
+        !settings.contains("synthetic-client-secret"),
+        "the client secret reached the Debug rendering of the settings"
+    );
+    Ok(())
+}

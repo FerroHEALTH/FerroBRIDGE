@@ -60,8 +60,11 @@ pub(crate) async fn read(
     let binding =
         binding(facade, resource_type, &internal)?.ok_or_else(|| unknown(resource_type, id))?;
     let program = program_of(facade, &binding)?;
-    let ehr_id = EhrId::new(&binding.ehr_id).map_err(|error| stored_identifier(&error))?;
-    let container = HierObjectId::new(&binding.versioned_object_uid)
+    let ehr_id = binding
+        .ehr(&internal)
+        .map_err(|error| stored_identifier(&error))?;
+    let container = binding
+        .container(&internal)
         .map_err(|error| stored_identifier(&error))?;
     let (version, composition) =
         fetch(facade, client, &ehr_id, &container, &binding.template_id).await?;
@@ -121,8 +124,11 @@ pub(crate) async fn vread(
             )),
         )
     })?;
-    let ehr_id = EhrId::new(&binding.ehr_id).map_err(|error| stored_identifier(&error))?;
-    let container = HierObjectId::new(&binding.versioned_object_uid)
+    let ehr_id = binding
+        .ehr(&internal)
+        .map_err(|error| stored_identifier(&error))?;
+    let container = binding
+        .container(&internal)
         .map_err(|error| stored_identifier(&error))?;
     let history = history(client, &ehr_id, &container).await?;
     let revision = history

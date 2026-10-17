@@ -263,7 +263,8 @@ fn admit_existing(
     let Some(binding) = read::binding(facade, resource_type, &internal)? else {
         return Ok(());
     };
-    let ehr = crate::cdr::ids::EhrId::new(&binding.ehr_id)
+    let ehr = binding
+        .ehr(&internal)
         .map_err(|error| read::stored_identifier(&error))?;
     compartment::admit_ehr(facade, access, permission, resource_type, &ehr)
 }

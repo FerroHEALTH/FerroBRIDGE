@@ -17,6 +17,7 @@
 
 use http::HeaderMap;
 
+use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::search::Declared;
@@ -311,13 +312,13 @@ impl Reader<'_> {
         read(self);
     }
 
-    /// Reads `_count`.
+    /// Reads `_count` through the one reader the request guard uses.
     fn count(&mut self, text: &str) {
-        match text.parse::<u32>() {
+        match media::page_size(text) {
             Ok(count) => self.criteria.count = Some(count),
-            Err(_parse) => self.errors.push(CriteriaError::Invalid {
+            Err(error) => self.errors.push(CriteriaError::Invalid {
                 name: String::from("_count"),
-                reason: format!("`{text}` is no non-negative whole number"),
+                reason: format!("`{}` is no non-negative whole number", error.found()),
             }),
         }
     }
