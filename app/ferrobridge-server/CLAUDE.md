@@ -117,6 +117,11 @@ the real run path; a binary-only crate cannot be imported from `tests/`
   or `AR`: a status no content change clears is `AR`, every other refusal
   `AE`. A message byte never reaches a log; the spans carry MSH-10 and the
   message type.
+- **The mapping set is swapped, never mutated.** `Facade::mappings` and
+  `OperationsLane::programs` hand out an `Arc` of the current set; a handler
+  takes it once at entry and runs on it to the end, so an operator reload
+  (`src/operator/reload.rs`) never changes a request in flight. Never hold the
+  lock past the clone, and load a set only through `mappings::compile`.
 - **A new interaction is four changes in one edit**: the route, the
   `CapabilityStatement` it is declared in, the wire test, and the Integrate
   page. An interaction the statement does not declare answers `404`, and one it

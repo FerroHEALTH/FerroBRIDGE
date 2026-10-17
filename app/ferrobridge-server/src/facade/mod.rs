@@ -79,11 +79,35 @@ pub struct Settings {
     pub territory: String,
 }
 
+/// The programs and search declarations of one load, which a reload swaps
+/// whole (no specification governs this: our own design).
+#[derive(Debug)]
+pub struct Mappings {
+    /// The compiled programs.
+    programs: Arc<Programs>,
+    /// The search declarations, by resource type.
+    search: Arc<search::Catalog>,
+}
+
+impl Mappings {
+    /// Returns the compiled programs.
+    #[must_use]
+    pub fn programs(&self) -> &Programs {
+        &self.programs
+    }
+
+    /// Returns the search declarations.
+    #[must_use]
+    pub fn search(&self) -> &search::Catalog {
+        &self.search
+    }
+}
+
 /// Everything a facade handler reaches.
 #[derive(Debug)]
 pub struct Facade {
-    /// The compiled programs this deployment loaded.
-    programs: Programs,
+    /// The programs and search declarations, swapped whole on a reload.
+    mappings: std::sync::RwLock<Arc<Mappings>>,
     /// The identity map.
     store: Arc<dyn Store>,
     /// The source keys the in-flight deliveries into that map hold.
@@ -92,8 +116,6 @@ pub struct Facade {
     client: CdrClient,
     /// What the deployment configured.
     settings: Settings,
-    /// The search declarations, by resource type.
-    search: search::Catalog,
     /// The page sizes a search answers with.
     limits: search::Limits,
     /// The terminology server every `conceptmap` code translates through.
@@ -112,12 +134,14 @@ impl Facade {
         settings: Settings,
     ) -> Self {
         Self {
-            programs,
+            mappings: std::sync::RwLock::new(Arc::new(Mappings {
+                programs: Arc::new(programs),
+                search: Arc::new(search::Catalog::default()),
+            })),
             store,
             claims: Claims::new(),
             client,
             settings,
-            search: search::Catalog::default(),
             limits: search::Limits::default(),
             translator: Translator::default(),
             references: references::Policy::default(),
@@ -166,15 +190,46 @@ impl Facade {
     /// `CapabilityStatement` declares none.
     #[must_use]
     pub fn with_search(mut self, catalog: search::Catalog, limits: search::Limits) -> Self {
-        self.search = catalog;
+        let programs = Arc::clone(&self.mappings().programs);
+        self.mappings = std::sync::RwLock::new(Arc::new(Mappings {
+            programs,
+            search: Arc::new(catalog),
+        }));
         self.limits = limits;
         self
     }
 
-    /// Returns the search declarations.
+    /// Returns the programs and search declarations a request runs on, taken
+    /// once at its entry so a reload never changes them under it.
     #[must_use]
-    pub const fn search(&self) -> &search::Catalog {
-        &self.search
+    pub fn mappings(&self) -> Arc<Mappings> {
+        // NOTE: no specification governs this: our own design; the lock only
+        // guards an `Arc` swap, so a poisoned lock still holds a whole set.
+        Arc::clone(
+            &self
+                .mappings
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        )
+    }
+
+    /// Replaces the programs and search declarations every later request runs
+    /// on; a request in flight finishes on the set it took.
+    pub fn replace(&self, programs: Programs, catalog: search::Catalog) {
+        let next = Arc::new(Mappings {
+            programs: Arc::new(programs),
+            search: Arc::new(catalog),
+        });
+        *self
+            .mappings
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = next;
+    }
+
+    /// Returns the search declarations of the current set.
+    #[must_use]
+    pub fn search(&self) -> Arc<search::Catalog> {
+        Arc::clone(&self.mappings().search)
     }
 
     /// Returns the page sizes a search answers with.
@@ -183,10 +238,10 @@ impl Facade {
         self.limits
     }
 
-    /// Returns the compiled programs.
+    /// Returns the compiled programs of the current set.
     #[must_use]
-    pub const fn programs(&self) -> &Programs {
-        &self.programs
+    pub fn programs(&self) -> Arc<Programs> {
+        Arc::clone(&self.mappings().programs)
     }
 
     /// Returns the identity map.
@@ -250,7 +305,7 @@ impl Facade {
         settings: &'a Settings,
     ) -> ingest::Ingest<'a> {
         ingest::Ingest::new(
-            &self.programs,
+            self.programs(),
             self.store.as_ref(),
             &self.claims,
             client,

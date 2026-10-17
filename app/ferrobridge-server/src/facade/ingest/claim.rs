@@ -45,7 +45,7 @@ pub(super) fn claim_keys(
 /// Returns the refusal of a Bundle whose entries `contended` names another
 /// in-flight delivery as holding.
 pub(super) fn contended_entries(
-    mapped: &[Mapped<'_>],
+    mapped: &[Mapped],
     sources: &[Option<SourceVersion>],
     contended: &Contended,
 ) -> Refused {

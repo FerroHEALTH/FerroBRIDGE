@@ -19,30 +19,18 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use fhirconnect::model::load::MappingSet;
-use fhirconnect::model::semantic::StaticMappingCodes;
-use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
 use openehr_mapping_core::diagnostic::Diagnostic;
-use openehr_mapping_core::diagnostic::DiagnosticCode;
-use openehr_mapping_core::diagnostic::LanguageCode;
 use openehr_mapping_core::diagnostic::Severity;
 use openehr_mapping_core::index::WebTemplateIndex;
-use openehr_mapping_core::template::TemplateSource;
 use serde::Serialize;
 
 use crate::config::Settings;
-
-/// The extension an operational template file carries.
-const TEMPLATE_EXTENSION: &str = "opt";
+use crate::mappings::compile;
+use crate::mappings::compile::TemplateEntry;
 
 /// The extensions an OMOCL file carries.
 const OMOCL_EXTENSIONS: [&str; 2] = ["yml", "yaml"];
-
-/// The code of a context whose template no template source provides.
-const UNKNOWN_TEMPLATE: &str = "fb-unknown-template";
-
-/// The code of a context that names no template identifier.
-const NO_TEMPLATE_ID: &str = "fb-no-template-id";
 
 /// Why a check did not run.
 #[derive(Debug, thiserror::Error)]
@@ -130,38 +118,8 @@ pub struct Report {
     templates: Vec<TemplateEntry>,
     /// The OMOCL files read.
     omocl_files: Vec<PathBuf>,
-}
-
-/// Where one template came from.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TemplateOrigin {
-    /// An `.opt` file of the template directory.
-    File(PathBuf),
-    /// The CDR.
-    Cdr,
-}
-
-/// One template the contexts compiled against.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TemplateEntry {
-    /// The template identifier.
-    id: String,
-    /// Where it came from.
-    origin: TemplateOrigin,
-}
-
-impl TemplateEntry {
-    /// Returns the template identifier.
-    #[must_use]
-    pub fn id(&self) -> &str {
-        &self.id
-    }
-
-    /// Returns where it came from.
-    #[must_use]
-    pub const fn origin(&self) -> &TemplateOrigin {
-        &self.origin
-    }
+    /// The Web Template indices the contexts compiled against, by identifier.
+    indexes: BTreeMap<String, Arc<WebTemplateIndex>>,
 }
 
 impl Report {
@@ -193,6 +151,12 @@ impl Report {
     #[must_use]
     pub fn templates(&self) -> &[TemplateEntry] {
         &self.templates
+    }
+
+    /// Returns the Web Template indices the contexts compiled against.
+    #[must_use]
+    pub const fn indexes(&self) -> &BTreeMap<String, Arc<WebTemplateIndex>> {
+        &self.indexes
     }
 
     /// Returns the OMOCL files read.
@@ -324,28 +288,76 @@ pub fn inputs<'a>(
 /// [`Error::Template`] when the CDR answers a template fetch with neither the
 /// template nor a `404`.
 pub async fn check(inputs: Inputs<'_>) -> Result<Report, Error> {
+    let fhirconnect = match inputs.fhirconnect {
+        Some(directory) => Some(crate::walk::mapping_files(directory).map_err(read_error)?),
+        None => None,
+    };
+    let omocl = match inputs.omocl {
+        Some(directory) => Some(omocl_files(directory)?),
+        None => None,
+    };
+    check_files(fhirconnect.as_deref(), inputs.templates, omocl.as_deref()).await
+}
+
+/// Returns the OMOCL files under `directory`, sorted.
+///
+/// # Errors
+///
+/// Returns [`Error::Read`] when the directory cannot be read.
+pub fn omocl_files(directory: &Path) -> Result<Vec<PathBuf>, Error> {
+    crate::walk::files(directory, |path| {
+        crate::walk::has_extension(path, &OMOCL_EXTENSIONS)
+    })
+    .map_err(read_error)
+}
+
+/// Checks the FHIRconnect files `fhirconnect` and the OMOCL files `omocl`,
+/// each when given, and returns every diagnostic.
+///
+/// This is [`check`] over file lists, so a caller checks a set that is not a
+/// directory on disk, such as the running set with one file replaced by a
+/// draft.
+///
+/// # Errors
+///
+/// Returns what [`check`] returns.
+pub async fn check_files(
+    fhirconnect: Option<&[PathBuf]>,
+    templates: Option<Templates<'_>>,
+    omocl: Option<&[PathBuf]>,
+) -> Result<Report, Error> {
     let mut report = Report::default();
-    if let Some(directory) = inputs.fhirconnect {
-        let templates = inputs.templates.ok_or_else(|| Error::NoTemplateSource {
-            directory: directory.to_path_buf(),
+    if let Some(files) = fhirconnect {
+        let templates = templates.ok_or_else(|| Error::NoTemplateSource {
+            directory: files
+                .first()
+                .and_then(|file| file.parent())
+                .map(Path::to_path_buf)
+                .unwrap_or_default(),
         })?;
-        check_fhirconnect(directory, templates, &mut report).await?;
+        check_fhirconnect(files, templates, &mut report).await?;
     }
-    if let Some(directory) = inputs.omocl {
-        check_omocl(directory, &mut report)?;
+    if let Some(files) = omocl {
+        report.counts.omocl_files = files.len();
+        if let Err(mut diagnostics) =
+            omocl::model::load::load_set(files, &omocl::model::semantic::FirstPartyConverters)
+        {
+            report.diagnostics.append(&mut diagnostics);
+        }
+        report.omocl_files = files.to_vec();
     }
     Ok(report)
 }
 
-/// Loads, resolves and compiles the FHIRconnect tree under `directory`.
+/// Loads, resolves and compiles the FHIRconnect files `files` through the one
+/// load path.
 async fn check_fhirconnect(
-    directory: &Path,
+    files: &[PathBuf],
     templates: Templates<'_>,
     report: &mut Report,
 ) -> Result<(), Error> {
-    let files = crate::walk::mapping_files(directory).map_err(read_error)?;
     report.counts.fhirconnect_files = files.len();
-    let set = match fhirconnect::model::load::load_set(&files, &StaticMappingCodes::default()) {
+    let set = match compile::read(files) {
         Ok(set) => set,
         Err(mut diagnostics) => {
             report.diagnostics.append(&mut diagnostics);
@@ -353,215 +365,40 @@ async fn check_fhirconnect(
         }
     };
     report.counts.contexts = set.contexts().count();
-    let indexes = match templates {
-        Templates::Directory(templates) => directory_templates(templates, report)?,
-        Templates::Cdr(client) => cdr_templates(&set, client, report).await?,
+    let mut resolved = match templates {
+        Templates::Directory(directory) => {
+            compile::directory_templates(directory).map_err(|error| match error {
+                crate::mappings::Error::Read { path, source } => Error::Read { path, source },
+                other => Error::Template {
+                    template: String::new(),
+                    source: Box::new(other),
+                },
+            })?
+        }
+        Templates::Cdr(client) => compile::cdr_templates(&set, client)
+            .await
+            .map_err(|source| Error::Template {
+                template: match &source {
+                    crate::mappings::Error::TemplateFetch { template, .. }
+                    | crate::mappings::Error::TemplateRefused { template, .. } => template.clone(),
+                    _ => String::new(),
+                },
+                source: Box::new(source),
+            })?,
     };
-    report.counts.templates = indexes.len();
-    compile_contexts(&set, &indexes, report);
+    report.counts.templates = resolved.indexes.len();
+    report.diagnostics.append(&mut resolved.diagnostics);
+    let mut compiled = compile::compile(&set, &resolved.indexes, &resolved.refusals);
+    report.counts.programs = compiled.programs.len();
+    report.diagnostics.append(&mut compiled.diagnostics);
+    report.programs = compiled.programs;
+    report.templates = resolved.entries;
+    report.indexes = resolved.indexes;
     report.set = Some(set);
     Ok(())
-}
-
-/// Builds the index of every `.opt` file under `directory`, reporting each
-/// one that does not build.
-fn directory_templates(
-    directory: &Path,
-    report: &mut Report,
-) -> Result<BTreeMap<String, Arc<WebTemplateIndex>>, Error> {
-    let files = crate::walk::files(directory, |path| {
-        crate::walk::has_extension(path, &[TEMPLATE_EXTENSION])
-    })
-    .map_err(read_error)?;
-    let mut indexes = BTreeMap::new();
-    for path in files {
-        let xml = std::fs::read_to_string(&path).map_err(|source| Error::Read {
-            path: path.clone(),
-            source,
-        })?;
-        let built = TemplateSource::opt14(&xml).and_then(|source| WebTemplateIndex::build(&source));
-        match built {
-            Ok(index) => {
-                report.templates.push(TemplateEntry {
-                    id: index.template_id().to_owned(),
-                    origin: TemplateOrigin::File(path.clone()),
-                });
-                indexes.insert(index.template_id().to_owned(), Arc::new(index));
-            }
-            Err(error) => report.diagnostics.push(Diagnostic::error(
-                &path,
-                DiagnosticCode::TemplateBuild,
-                error.to_string(),
-            )),
-        }
-    }
-    Ok(indexes)
-}
-
-/// Fetches every template a context of `set` names from the CDR, once each,
-/// reporting a template the CDR does not hold against the first context, in
-/// name order, that names it.
-async fn cdr_templates(
-    set: &MappingSet,
-    client: &crate::cdr::CdrClient,
-    report: &mut Report,
-) -> Result<BTreeMap<String, Arc<WebTemplateIndex>>, Error> {
-    let mut wanted: BTreeMap<String, PathBuf> = BTreeMap::new();
-    for context in set.contexts() {
-        if let Some(template) = template_of(context) {
-            wanted
-                .entry(template)
-                .or_insert_with(|| context.file().to_path_buf());
-        }
-    }
-    let mut indexes = BTreeMap::new();
-    for (template, file) in wanted {
-        match crate::mappings::template_index(client, &template).await {
-            Ok(index) => {
-                report.templates.push(TemplateEntry {
-                    id: template.clone(),
-                    origin: TemplateOrigin::Cdr,
-                });
-                indexes.insert(template, Arc::new(index));
-            }
-            Err(crate::mappings::Error::TemplateNotHeld { status, .. }) => {
-                report.diagnostics.push(Diagnostic::error(
-                    &file,
-                    language(UNKNOWN_TEMPLATE),
-                    format!("the CDR holds no template `{template}`: it answered {status}"),
-                ));
-            }
-            Err(error @ crate::mappings::Error::TemplateName { .. }) => {
-                report.diagnostics.push(Diagnostic::error(
-                    &file,
-                    language(UNKNOWN_TEMPLATE),
-                    error.to_string(),
-                ));
-            }
-            Err(crate::mappings::Error::CdrTemplate { source, .. }) => {
-                report.diagnostics.push(Diagnostic::error(
-                    &file,
-                    DiagnosticCode::TemplateBuild,
-                    format!("the template `{template}` the CDR served did not load: {source}"),
-                ));
-            }
-            Err(source) => {
-                return Err(Error::Template {
-                    template,
-                    source: Box::new(source),
-                });
-            }
-        }
-    }
-    Ok(indexes)
-}
-
-/// Compiles every context of `set` against the template it names, reporting
-/// every refusal and every warning.
-fn compile_contexts(
-    set: &MappingSet,
-    indexes: &BTreeMap<String, Arc<WebTemplateIndex>>,
-    report: &mut Report,
-) {
-    for context in set.contexts() {
-        let file = context.file();
-        let name = context.header().name().value();
-        let Some(template) = template_of(context) else {
-            report.diagnostics.push(
-                Diagnostic::error(
-                    file,
-                    language(NO_TEMPLATE_ID),
-                    "the context names no template id",
-                )
-                .with_mapping_name(name.clone()),
-            );
-            continue;
-        };
-        let Some(index) = indexes.get(&template) else {
-            // NOTE: a template the CDR does not hold was reported once, at
-            // its fetch, so only a template directory leaves a gap here.
-            if !report.diagnostics.iter().any(|diagnostic| {
-                diagnostic.file() == file && diagnostic.code() == &language(UNKNOWN_TEMPLATE)
-            }) {
-                report.diagnostics.push(
-                    Diagnostic::error(
-                        file,
-                        language(UNKNOWN_TEMPLATE),
-                        format!("the context maps `{template}`, which no loaded template provides"),
-                    )
-                    .with_mapping_name(name.clone()),
-                );
-            }
-            continue;
-        };
-        match compile(
-            set,
-            name,
-            index,
-            &fhir_types::r4::schema::SCHEMAS,
-            &StaticMappingCodes::default(),
-        ) {
-            Ok(program) => {
-                report.counts.programs = report.counts.programs.saturating_add(1);
-                report
-                    .diagnostics
-                    .extend(program.warnings().iter().cloned());
-                report.programs.push(program);
-            }
-            Err(mut diagnostics) => report.diagnostics.append(&mut diagnostics),
-        }
-    }
-}
-
-/// Loads and validates the OMOCL files under `directory`.
-fn check_omocl(directory: &Path, report: &mut Report) -> Result<(), Error> {
-    let files = crate::walk::files(directory, |path| {
-        crate::walk::has_extension(path, &OMOCL_EXTENSIONS)
-    })
-    .map_err(read_error)?;
-    report.counts.omocl_files = files.len();
-    let loaded =
-        omocl::model::load::load_set(&files, &omocl::model::semantic::FirstPartyConverters);
-    report.omocl_files = files;
-    if let Err(mut diagnostics) = loaded {
-        report.diagnostics.append(&mut diagnostics);
-    }
-    Ok(())
-}
-/// Returns the template identifier one context names, if it names one.
-fn template_of(context: &fhirconnect::model::ast::ContextMappingFile) -> Option<String> {
-    context
-        .context()
-        .template
-        .id
-        .as_ref()
-        .map(|located| located.value().clone())
-}
-
-/// Returns the checker's own diagnostic code `code`.
-#[expect(
-    clippy::expect_used,
-    reason = "every caller passes one of this module's constants, each lowercase letters and hyphens"
-)]
-fn language(code: &str) -> DiagnosticCode {
-    DiagnosticCode::Language(
-        LanguageCode::new(code).expect("the checker's codes should be in the code alphabet"),
-    )
 }
 
 /// Returns the check error a refused walk describes.
 fn read_error(crate::walk::Error { path, source }: crate::walk::Error) -> Error {
     Error::Read { path, source }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{NO_TEMPLATE_ID, UNKNOWN_TEMPLATE, language};
-
-    #[test]
-    fn the_checker_codes_are_in_the_code_alphabet() {
-        for code in [NO_TEMPLATE_ID, UNKNOWN_TEMPLATE] {
-            assert_eq!(code, language(code).as_str());
-        }
-    }
 }

@@ -58,6 +58,7 @@ fn two_sites(harness: &Harness) -> serde_json::Value {
         .facade
         .programs()
         .by_context("ferrobridge_created_split.context")
+        .cloned()
         .expect("the split context compiled");
     let document: fhir_types::codec::Value =
         serde_json::from_value(resource).expect("the Condition reads as a document");

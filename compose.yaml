@@ -80,6 +80,10 @@ services:
       FERROBRIDGE__TERMINOLOGY__BASE_URL:
       FERROBRIDGE__TERMINOLOGY__WIRE_VERSION:
       FERROBRIDGE__CDM__URL_FILE:
+      # The operator API (it needs [auth]) saves console mapping files under
+      # this path, the writable volume below; it saves nothing while it is off.
+      FERROBRIDGE__OPERATOR__ENABLED:
+      FERROBRIDGE__OPERATOR__MAPPING_DIR: /var/lib/ferrobridge/mappings
       # `auto` renders pretty output on a terminal and JSON otherwise.
       FERROBRIDGE__TELEMETRY__FORMAT: ${FERROBRIDGE_LOG_FORMAT:-auto}
       FERROBRIDGE__TELEMETRY__FILTER: ${FERROBRIDGE_LOG_FILTER:-info}
@@ -94,16 +98,26 @@ services:
     secrets:
       - cdm_url
       - cdr_bearer_token
-    # The image's home directory, owned by its runtime user (uid 65532), so a
-    # fresh named volume mounted there is writable by that user.
+    # The server writes two things, each to its own volume: the usage report's
+    # state under the image's home directory (owned by its runtime user, uid
+    # 65532, so a fresh named volume there is writable), and the console's
+    # saved mapping files. No cache, no scratch file, no upload directory, and
+    # every secret is read once at boot, so the root filesystem is read-only.
+    # Should a lane ever need another writable path, mount it for that path
+    # alone rather than dropping this line.
+    read_only: true
+    # The saved mapping files survive a restart. The container runs as
+    # 65532:65532, so create the directory and hand it over before the first
+    # `docker compose up`:
+    #
+    #   mkdir -p operator-mappings && sudo chown 65532:65532 operator-mappings
     volumes:
       - ferrobridge-state:/home/nonroot
-    # The server writes only the usage report's state to the volume above: no
-    # cache, no scratch file, no upload directory, and every secret is read
-    # once at boot. So the root filesystem is read-only with no tmpfs beside
-    # it. Should a lane ever need a writable path, mount a volume or a tmpfs
-    # for that path alone rather than dropping this line.
-    read_only: true
+      - type: bind
+        source: ${FERROBRIDGE_OPERATOR_MAPPINGS:-./operator-mappings}
+        target: /var/lib/ferrobridge/mappings
+        bind:
+          create_host_path: true
     cap_drop:
       - ALL
     security_opt:

@@ -36,6 +36,7 @@ use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_rm::v1_2::composition::composition::Composition;
+use std::sync::Arc;
 
 use crate::cdr::CdrClient;
 use crate::cdr::ids::ContributionUid;
@@ -360,7 +361,7 @@ impl Ingested {
 #[derive(Debug)]
 pub struct Ingest<'a> {
     /// The compiled programs.
-    programs: &'a Programs,
+    programs: Arc<Programs>,
     /// The identity map.
     store: &'a dyn Store,
     /// The source keys the in-flight deliveries into that map hold.
@@ -382,7 +383,7 @@ static NO_TRANSLATOR: Translator = Translator::new(None);
 
 /// One Bundle entry that mapped, ready to commit.
 #[derive(Debug)]
-struct Mapped<'p> {
+struct Mapped {
     /// The `fullUrl` the Bundle gave the entry, for a refusal that names it.
     full_url: String,
     /// The entry's position in the Bundle.
@@ -390,7 +391,7 @@ struct Mapped<'p> {
     /// The resource the entry carries.
     inbound: Inbound,
     /// The program the entry ran.
-    program: &'p Loaded,
+    program: Loaded,
     /// The template of the composition the entry produced.
     template_id: String,
     /// The composition as the engine built it.
@@ -414,9 +415,9 @@ enum Scope {
 
 /// What mapping one Bundle entry produced.
 #[derive(Debug)]
-enum Mapping<'p> {
+enum Mapping {
     /// The entry mapped, for the subject it names.
-    Mapped(Box<Mapped<'p>>, PersonId),
+    Mapped(Box<Mapped>, PersonId),
     /// No program ran: the skip, and the issue that refuses the Bundle.
     Unmapped(Skipped, Issue),
 }
@@ -432,9 +433,9 @@ enum Pending {
 
 /// Every entry of a Bundle, mapped and partitioned.
 #[derive(Debug, Default)]
-struct Partition<'p> {
+struct Partition {
     /// The entries that mapped, in Bundle order.
-    mapped: Vec<Mapped<'p>>,
+    mapped: Vec<Mapped>,
     /// One slot per entry that mapped or was skipped, in Bundle order.
     pending: Vec<Pending>,
     /// The issues that refuse the Bundle.
@@ -509,7 +510,7 @@ impl<'a> Ingest<'a> {
     /// `store` shares, so two deliveries of one source cannot both commit.
     #[must_use]
     pub const fn new(
-        programs: &'a Programs,
+        programs: Arc<Programs>,
         store: &'a dyn Store,
         claims: &'a Claims,
         client: CdrClient,

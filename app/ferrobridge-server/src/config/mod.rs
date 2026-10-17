@@ -667,8 +667,8 @@ pub struct Settings {
     pub operations: OperationsSettings,
     /// The installation report to `FerroPULSE`.
     pub usage_report: crate::usage_report::config::UsageReportSettings,
-    /// Whether the operator API is mounted.
-    pub operator: bool,
+    /// The operator API, when it is mounted.
+    pub operator: Option<crate::operator::OperatorSettings>,
 }
 
 /// The OMOP CDM database, resolved.

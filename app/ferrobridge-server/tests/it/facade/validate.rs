@@ -192,6 +192,7 @@ async fn validate_carries_the_validators_message_verbatim_and_writes_nothing()
         .facade
         .programs()
         .by_context("ferrobridge_facade.context")
+        .cloned()
         .ok_or("the fixture context compiled")?;
     let document: fhir_types::codec::Value = serde_json::from_value(resource.clone())?;
     let refusal = ferrobridge_server::facade::engine::inbound(

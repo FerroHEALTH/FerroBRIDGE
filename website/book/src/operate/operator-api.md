@@ -23,6 +23,7 @@ audience = "https://bridge.example.org/fhir"
 
 [operator]
 enabled = true
+mapping_dir = "/var/lib/ferrobridge/mappings"
 ```
 
 ## The operator scope
@@ -76,8 +77,8 @@ answer never names a host directory.
 | `language` | `fhirconnect` or `omocl` |
 | `kind` | `model`, `extension`, `context` or `search` for FHIRconnect, `mapping` for OMOCL; `null` for a file the running load did not read |
 | `sha256` | The lowercase hexadecimal SHA-256 of the file's bytes |
-| `owner` | `provisioned`: the deployment owns the file |
-| `read_only` | `true` for a provisioned file |
+| `owner` | `provisioned` for a file under a configured mapping directory, `console` for one the console saved under `[operator] mapping_dir` |
+| `read_only` | `true` for a provisioned file, `false` for a console file |
 | `diagnostics` | The diagnostics the running load raised about the file |
 
 ## `GET /operator/mappings/{path}`
@@ -88,10 +89,80 @@ strong `ETag`. A path is plain names under a root: an empty, `.`, `..` or
 its root once every symlink is followed, a path under no root, and a file
 that is not `.yml` or `.yaml`.
 
+## Saving mapping files
+
+With `[operator] mapping_dir` set, the console checks drafts, saves them and
+reloads the running set. Without it, the three routes below answer `409`.
+
+- **One owner per file.** The files under `[mappings] directory` and
+  `[mappings] omocl` are provisioned and never written. A console save goes
+  to `mapping_dir/fhirconnect/<path>`, and a save whose path names a
+  provisioned file answers `409`. Console files join the set beside the
+  provisioned ones, at every reload and at start-up, where a set that does not
+  compile refuses the start. A file with the path of a provisioned one is
+  ignored in favour of the provisioned file.
+- **FHIRconnect files only.** OMOCL files are read by `etl run` from
+  `[mappings] omocl`, so a save under `omocl/` answers `409`. A search
+  declaration (`*.search.yml`) and any file that is not `.yml` or `.yaml`
+  answer `400`.
+
+### `POST /operator/mappings/check?path={path}`
+
+The body is a draft of the file at `path`, under `fhirconnect/` or
+`omocl/`. The bridge compiles it with every other file of the running set,
+for every lane, and answers `200` with `clean`, `counts` and `diagnostics`,
+the draft's diagnostics named by `path`. Nothing is written.
+
+### `PUT /operator/mappings/{path}`
+
+The body is the file's new bytes, saved verbatim. A save carries:
+
+| Header | Meaning |
+|---|---|
+| `If-Match` | The `ETag` the file has now, from the file route or a previous save; `*` matches any existing file |
+| `If-None-Match: *` | Instead of `If-Match`, for a file that does not exist yet |
+| `Ferrobridge-Reason` | Why the file changes: one line of at most 200 characters |
+
+| Answer | When |
+|---|---|
+| `200` | The set compiled with the draft; the file is written and the running set replaced. The body is the new set's report and the `ETag` the new SHA-256 |
+| `400` | No reason, or a path the console cannot write |
+| `409` | A provisioned file holds the path, or no `mapping_dir` is configured |
+| `412` | The file changed since the `ETag` given, or `If-None-Match: *` names an existing file |
+| `422` | The set does not compile with the draft; the body names every diagnostic. Neither the file nor the running set changes |
+| `428` | Neither `If-Match` nor `If-None-Match: *` |
+| `503` | The CDR did not serve a template, so the set could not be compiled |
+
+The draft is written to a hidden file beside its target and synced; only a
+draft that compiles is renamed over the target and the directory synced, so a
+reader sees the old file or the new one. The running set is then compiled
+from disk and swapped in one step: the facade's programs and search
+declarations, the FHIRconnect operations and the operator state, so the
+`CapabilityStatement` names the new set at once. A request in flight finishes
+on the set it started with. Checks, saves and reloads run one at a time.
+
+### `POST /operator/reload`
+
+Compiles the provisioned and console files on disk and swaps them in, with
+the answers of a save: `200` with the report, `422` with the diagnostics and
+the running set unchanged, `503` when an upstream did not answer.
+
+The quickstart `compose.yaml` runs the server with a read-only root file
+system and mounts `./operator-mappings` (or `FERROBRIDGE_OPERATOR_MAPPINGS`)
+at `/var/lib/ferrobridge/mappings`, the `mapping_dir` it sets. The container
+runs as `65532:65532`, so hand that directory to that user before turning
+the API on.
+
+Each replica reloads on its own. With `mapping_dir` on a shared volume, a
+file one replica saved reaches another at that replica's next reload or
+restart; the console reloads the replica behind its configured URL.
+
 ## What the log records
 
 Every operator request leaves one line on the `ferrobridge::audit` target
 with the token's `sub`, the method, the matched route (such as
 `/operator/mappings/{*path}`), the status, the duration and the request id,
-beside the ordinary request line. Neither line carries a path value, a token
-or any mapping content.
+beside the ordinary request line. A save adds one more line with
+`action` `save`, the `file` it wrote, `old_sha256` (`-` for a new file),
+`new_sha256`, the `reason` and the status; a reload adds `action` `reload`.
+No line carries a token or any mapping content.

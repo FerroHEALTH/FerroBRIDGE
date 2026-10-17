@@ -125,7 +125,7 @@ pub(super) fn same_content(sent: &Composition, instant: &str, stored: &Compositi
 /// governs the matching: our own design.
 pub(super) fn pair(
     contribution: &ContributionUid,
-    mapped: &[Mapped<'_>],
+    mapped: &[Mapped],
     stored: Vec<(ObjectVersionId, Composition)>,
     scope: Scope,
 ) -> Result<Vec<(ObjectVersionId, Composition)>, Refused> {

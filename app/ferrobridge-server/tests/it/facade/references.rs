@@ -193,9 +193,8 @@ fn observation(id: &str, text: &str) -> serde_json::Value {
 /// Returns the canonical composition `resource` maps to under the reference
 /// context, with no reference resolved beyond what it contains.
 fn composition_of(harness: &Harness, resource: &serde_json::Value) -> serde_json::Value {
-    let loaded = harness
-        .facade
-        .programs()
+    let programs = harness.facade.programs();
+    let loaded = programs
         .by_context(REFERENCE_CONTEXT)
         .expect("the reference context compiled");
     let document: fhir_types::codec::Value =

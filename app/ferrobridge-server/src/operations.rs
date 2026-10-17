@@ -204,10 +204,12 @@ async fn run_to_fhir(
     settings: &run::Settings,
     request: &ToFhirRequest,
 ) -> Result<fhirconnect::operations::contract::ToFhirResponse, OperationError> {
+    // One snapshot for every attempt, so a reload mid-request cannot mix sets.
+    let programs = lane.programs();
     lane.translator()
         .run(Direction::ToFhir, |terminology| {
             let seams = Seams::default().with_terminology(terminology);
-            run::to_fhir(lane.programs(), &SCHEMAS, &seams, settings, request)
+            run::to_fhir(&programs, &SCHEMAS, &seams, settings, request)
         })
         .await
 }
@@ -219,10 +221,12 @@ async fn run_to_openehr(
     settings: &run::Settings,
     request: &ToOpenehrRequest,
 ) -> Result<fhirconnect::operations::contract::ToOpenehrResponse, OperationError> {
+    // One snapshot for every attempt, so a reload mid-request cannot mix sets.
+    let programs = lane.programs();
     lane.translator()
         .run(Direction::ToOpenehr, |terminology| {
             let seams = Seams::default().with_terminology(terminology);
-            run::to_openehr(lane.programs(), &SCHEMAS, &seams, settings, request)
+            run::to_openehr(&programs, &SCHEMAS, &seams, settings, request)
         })
         .await
 }

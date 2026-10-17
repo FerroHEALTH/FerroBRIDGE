@@ -24,6 +24,8 @@ use tower::ServiceExt as _;
 
 use crate::facade::auth::{Issuer, SigningKey, authority, bearing, challenge, ec_key, mint};
 
+mod save;
+
 /// The clean mapping set the facade suite runs.
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures");
 
@@ -363,5 +365,24 @@ fn the_audit_line_names_the_caller_and_the_route_and_never_the_content()
         );
     }
     assert!(!text.contains("ferrobridge_facade.yml"), "{text}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn without_a_mapping_dir_the_api_checks_and_saves_nothing() -> Result<(), Box<dyn StdError>> {
+    let case = Case::new().await?;
+    let token = case.token(OPERATOR);
+    for request in [
+        Request::put("/operator/mappings/fhirconnect/new.yml")
+            .header(header::IF_NONE_MATCH, "*")
+            .header("ferrobridge-reason", "synthetic")
+            .body(Body::from("grammar: FHIRConnect/v1.0.0\n"))?,
+        Request::post("/operator/mappings/check?path=fhirconnect/new.yml")
+            .body(Body::from("grammar: FHIRConnect/v1.0.0\n"))?,
+    ] {
+        let response = case.app.clone().oneshot(bearing(request, &token)).await?;
+        assert_eq!(StatusCode::CONFLICT, response.status());
+    }
+    assert!(!case.tree.path().join("mappings/new.yml").exists());
     Ok(())
 }

@@ -57,7 +57,7 @@ fn local_subject(
 
 /// Returns the refusal of a Bundle no entry of which mapped, naming every
 /// entry that was skipped and why.
-pub(super) fn nothing_mapped(partition: &Partition<'_>) -> Refused {
+pub(super) fn nothing_mapped(partition: &Partition) -> Refused {
     let mut issues = vec![
         Issue::error(IssueType::Required)
             .diagnosing("the Bundle carries no entry this server maps"),
@@ -84,7 +84,7 @@ pub(super) fn nothing_mapped(partition: &Partition<'_>) -> Refused {
     Refused::of(StatusCode::UNPROCESSABLE_ENTITY, issues)
 }
 
-impl<'a> Ingest<'a> {
+impl Ingest<'_> {
     /// Maps every entry, collecting the refusals rather than stopping at the
     /// first.
     pub(super) async fn map_entries(
@@ -92,7 +92,7 @@ impl<'a> Ingest<'a> {
         entries: &[Value],
         unmapped: UnmappedEntries,
         provenance: &Provenance,
-    ) -> Partition<'a> {
+    ) -> Partition {
         let mut partition = Partition::default();
         let locals: BTreeMap<&str, &Value> = entries
             .iter()
@@ -158,7 +158,7 @@ impl<'a> Ingest<'a> {
         position: usize,
         locals: &BTreeMap<&str, &Value>,
         provenance: &Provenance,
-    ) -> Result<Mapping<'a>, Issue> {
+    ) -> Result<Mapping, Issue> {
         let inbound = Inbound::of(resource.clone(), "").map_err(|error| {
             Issue::error(IssueType::Structure)
                 .diagnosing(chain(&error))
@@ -238,7 +238,7 @@ impl<'a> Ingest<'a> {
                 position,
                 template_id: String::from(composition.template_id()),
                 inbound,
-                program,
+                program: program.clone(),
                 built: composition,
                 composition: Box::new(rm),
                 instant,

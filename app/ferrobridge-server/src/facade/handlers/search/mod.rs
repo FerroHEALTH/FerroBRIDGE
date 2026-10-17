@@ -142,7 +142,8 @@ async fn search(
     let compartment = access
         .reach(Permission::Search, resource_type)
         .ok_or_else(crate::auth::guard::forbidden)?;
-    let declarations = facade.search().of_type(resource_type);
+    let catalog = facade.search();
+    let declarations = catalog.of_type(resource_type);
     let Some(first) = declarations.first() else {
         return Err(reply::refusal(
             StatusCode::NOT_FOUND,
@@ -244,7 +245,7 @@ struct Plan<'a> {
     /// The declaration.
     declared: &'a Declared,
     /// The program of the declaration's context.
-    program: &'a Loaded,
+    program: Loaded,
     /// Each `_id` occurrence, the entries of this context its ids name.
     ids: Vec<Vec<CompositionBinding>>,
     /// Each `_id` occurrence, the logical ids it names, which every resource
@@ -557,10 +558,11 @@ fn ids_of(resolved: &Resolved, declared: &Declared) -> Vec<Vec<CompositionBindin
 }
 
 /// Returns the program of the context `declared` names.
-fn program_of<'a>(facade: &'a Facade, declared: &Declared) -> Result<&'a Loaded, Refusal> {
+fn program_of(facade: &Facade, declared: &Declared) -> Result<Loaded, Refusal> {
     facade
         .programs()
         .by_context(declared.context())
+        .cloned()
         .ok_or_else(|| {
             reply::refusal(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -608,7 +610,7 @@ async fn render_entry(
         version,
         composition,
     } = read;
-    let program = plan.program;
+    let program = &plan.program;
     let (id, _binding) = facade.ingest(client.clone()).bind_entry(
         program,
         plan.declared.resource_type(),

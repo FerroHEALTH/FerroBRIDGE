@@ -71,10 +71,15 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         state = state.with_facade(Arc::new(mounted));
         set_counts(&mut lanes, "facade", counts);
     }
-    if settings.operator {
-        let operator = build_operator(settings, state.facade().map(Arc::as_ref))
-            .await
-            .context("starting the operator API")?;
+    if let Some(operator) = settings.operator.as_ref() {
+        let operator = build_operator(
+            settings,
+            operator,
+            state.facade().cloned(),
+            state.operations_handle().cloned(),
+        )
+        .await
+        .context("starting the operator API")?;
         state = state.with_operator(Arc::new(operator));
     }
     if let Some(operations) = state.operations() {
@@ -204,7 +209,8 @@ fn set_counts(lanes: &mut [startup::Lane], name: &str, counts: startup::MappingC
 /// Returns what the operations lane compiled: one program per context, over
 /// the distinct templates the programs name.
 fn operation_counts(lane: &state::OperationsLane) -> startup::MappingCounts {
-    let programs = lane.programs().programs();
+    let set = lane.programs();
+    let programs = set.programs();
     let contexts: std::collections::BTreeSet<&str> = programs
         .iter()
         .map(|program| program.context().as_str())
@@ -228,7 +234,9 @@ fn operation_counts(lane: &state::OperationsLane) -> startup::MappingCounts {
 /// (no specification governs the operator surface: our own design).
 async fn build_operator(
     settings: &Settings,
-    facade: Option<&facade::Facade>,
+    operator_settings: &operator::OperatorSettings,
+    facade: Option<Arc<facade::Facade>>,
+    operations: Option<Arc<state::OperationsLane>>,
 ) -> anyhow::Result<operator::Operator> {
     use anyhow::Context;
 
@@ -239,13 +247,6 @@ async fn build_operator(
                 .context("building the CDR client the templates are fetched through")?,
         ),
         _ => None,
-    };
-    let report = match check::inputs(settings, cdr.as_ref()) {
-        Ok(inputs) => check::check(inputs)
-            .await
-            .context("checking the mapping set")?,
-        Err(check::Error::NothingConfigured) => check::Report::default(),
-        Err(error) => return Err(error).context("reading the mapping inputs"),
     };
     let mut roots = Vec::new();
     if let Some(directory) = settings.mapping_directory.as_ref() {
@@ -260,26 +261,59 @@ async fn build_operator(
             directory.clone(),
         ));
     }
-    let searches = facade.map_or_else(BTreeMap::new, |facade| {
-        let catalog = facade.search();
-        facade
-            .programs()
-            .resource_types()
-            .iter()
-            .flat_map(|resource_type| catalog.of_type(resource_type))
-            .map(|declared| (declared.context().to_owned(), declared.file().to_path_buf()))
-            .collect()
+    let searches = facade.as_ref().map_or_else(BTreeMap::new, |facade| {
+        let mappings = facade.mappings();
+        operator::reload::searches(mappings.programs(), mappings.search())
     });
+    let built = if let Some(mapping_dir) = operator_settings.mapping_dir.clone() {
+        let reloader = operator::reload::Reloader {
+            fhirconnect: settings.mapping_directory.clone(),
+            templates: settings
+                .mappings
+                .as_ref()
+                .map(|mappings| mappings.templates.clone()),
+            cdr,
+            omocl: settings.omocl_directory.is_some(),
+            facade,
+            operations,
+        };
+        let operator = Arc::new(
+            operator::Operator::new(
+                roots,
+                operator::snapshot::Snapshot::new(check::Report::default(), searches),
+            )
+            .with_saving(mapping_dir, reloader),
+        );
+        // NOTE: no specification governs this: our own design; the console's
+        // saved files join the running set at boot, or the start is refused.
+        let worker = Arc::clone(&operator);
+        tokio::task::spawn_blocking(move || {
+            worker.prepare(None).map(|prepared| worker.apply(prepared))
+        })
+        .await
+        .context("loading the console's mapping files")?
+        .context("loading the console's mapping files")?;
+        Arc::try_unwrap(operator).map_err(|_shared| {
+            anyhow::anyhow!("the operator API is still shared after its boot load")
+        })?
+    } else {
+        let report = match check::inputs(settings, cdr.as_ref()) {
+            Ok(inputs) => check::check(inputs)
+                .await
+                .context("checking the mapping set")?,
+            Err(check::Error::NothingConfigured) => check::Report::default(),
+            Err(error) => return Err(error).context("reading the mapping inputs"),
+        };
+        operator::Operator::new(roots, operator::snapshot::Snapshot::new(report, searches))
+    };
     tracing::info!(
         lane = "operator",
-        roots = roots.len(),
-        diagnostics = report.diagnostics().len(),
+        roots = built.roots().len(),
+        diagnostics = built.snapshot().report().diagnostics().len(),
+        saving = operator_settings.mapping_dir.is_some(),
         "the operator API is mounted under /operator"
     );
-    Ok(operator::Operator::new(
-        roots,
-        operator::snapshot::Snapshot::new(report, searches),
-    ))
+    Ok(built)
 }
 
 /// Builds the FHIR facade this deployment mounts and returns it with what its

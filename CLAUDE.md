@@ -101,11 +101,15 @@ the testkit tool crate. Beside it:
   `[usage_report]` (#581): one `start` and one `daily` report from `serve`,
   the latency window the request log fills by route group, and the instance
   id under `state_dir`, validated against the vendored schema in the tests.
-  `src/operator/` is the read-only operator API behind `[operator]` and
-  `[auth]` (#596): the guard that admits only a token carrying
-  `auth.operator_scope`, the mapping roots with every wire path confined to
-  its directory, and the running load as the `check` module reported it at
-  boot.
+  `src/operator/` is the
+  read-only operator API behind `[operator]` and `[auth]` (#596): the guard
+  that admits only a token carrying `auth.operator_scope`, the mapping roots
+  with every wire path confined to its directory, and the running load as
+  the `check` module reports it; with `[operator] mapping_dir` it checks a
+  draft, saves it beside the provisioned tree and reloads (#597), swapping the
+  facade's and the operations lane's programs, which every request reads once
+  at entry. `src/mappings/compile.rs` is the one FHIRconnect load path the
+  lanes, `mapping check` and the reload share (#725).
 - `app/ferrobridge-viewer`: the operator console (#599, `docs/architecture.md`
   §4.10), its own binary `ferrobridge-viewer`: a Leptos app rendered on the
   server and hydrated, halves chosen by target, with `serve`, `config check`

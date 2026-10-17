@@ -17,7 +17,7 @@ use openehr_mapping_core::diagnostic::Severity;
 use serde::Serialize;
 
 use crate::check::Report;
-use crate::check::TemplateOrigin;
+use crate::mappings::compile::TemplateOrigin;
 use crate::operator::files;
 use crate::operator::files::Language;
 use crate::operator::files::Owner;
@@ -181,8 +181,8 @@ impl Snapshot {
                 language: located.language(),
                 kind: self.kind(&located),
                 sha256: files::sha256(&bytes),
-                owner: Owner::Provisioned,
-                read_only: true,
+                owner: located.owner(),
+                read_only: located.owner() == Owner::Provisioned,
                 diagnostics,
             });
         }
@@ -218,7 +218,8 @@ impl Snapshot {
 
 /// Returns how a document names `path`: its wire path under `roots`, or its
 /// file name.
-fn shown(roots: &[Root], path: &Path) -> String {
+#[must_use]
+pub fn shown(roots: &[Root], path: &Path) -> String {
     files::wire_path_in(roots, path).unwrap_or_else(|| {
         path.file_name()
             .and_then(std::ffi::OsStr::to_str)

@@ -305,7 +305,7 @@ impl Ingest<'_> {
     /// design).
     pub(super) fn place(
         &self,
-        mapped: &[Mapped<'_>],
+        mapped: &[Mapped],
         sources: &[Option<SourceVersion>],
         ehr_id: &EhrId,
         stored: Vec<(ObjectVersionId, Composition)>,
@@ -314,7 +314,7 @@ impl Ingest<'_> {
         for ((entry, (version, held)), source) in mapped.iter().zip(stored).zip(sources) {
             let composition = canonical_of(&held, &entry.built)?;
             let (id, stood) = self.bind(
-                entry.program,
+                &entry.program,
                 entry.inbound.resource_type(),
                 ehr_id,
                 &version,

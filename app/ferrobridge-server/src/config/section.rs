@@ -305,6 +305,9 @@ pub struct Hl7v2Profile {
 pub struct Operator {
     /// Whether the operator routes are mounted under `/operator`.
     pub enabled: bool,
+    /// The writable directory console saves go to; unset, the API saves
+    /// nothing.
+    pub mapping_dir: Option<PathBuf>,
 }
 
 /// The FHIRconnect operations lane.

@@ -27,7 +27,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// the clock lives.
 #[derive(Debug)]
 pub struct OperationsLane {
-    programs: ProgramSet,
+    programs: std::sync::RwLock<Arc<ProgramSet>>,
     device: String,
     composer: String,
     language: Option<String>,
@@ -40,7 +40,7 @@ impl OperationsLane {
     #[must_use]
     pub fn new(programs: ProgramSet, device: impl Into<String>) -> Self {
         Self {
-            programs,
+            programs: std::sync::RwLock::new(Arc::new(programs)),
             device: device.into(),
             composer: String::from(DEFAULT_COMPOSER),
             language: None,
@@ -83,10 +83,27 @@ impl OperationsLane {
         self
     }
 
-    /// Returns the compiled programs one call selects from.
+    /// Returns the compiled programs one call selects from, taken once per
+    /// request so a reload never changes them under it.
     #[must_use]
-    pub const fn programs(&self) -> &ProgramSet {
-        &self.programs
+    pub fn programs(&self) -> Arc<ProgramSet> {
+        // NOTE: no specification governs this: our own design; the lock only
+        // guards an `Arc` swap, so a poisoned lock still holds a whole set.
+        Arc::clone(
+            &self
+                .programs
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        )
+    }
+
+    /// Replaces the programs every later call selects from; a call in flight
+    /// finishes on the set it took.
+    pub fn replace(&self, programs: ProgramSet) {
+        *self
+            .programs
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Arc::new(programs);
     }
 
     /// Returns the settings of one run, stamped with the current time.
@@ -124,7 +141,7 @@ pub struct AppState {
     /// `404` rather than `403` (no specification governs this: our own design).
     facade: Option<Arc<crate::facade::Facade>>,
     /// The FHIRconnect operations lane, when a mapping set is configured.
-    operations: Option<OperationsLane>,
+    operations: Option<Arc<OperationsLane>>,
     /// The lanes the boot summary reported, for `GET /health/info`.
     lanes: Vec<crate::startup::Lane>,
     /// Whether the HL7 v2 listener accepts, when the face runs.
@@ -184,13 +201,15 @@ impl AppState {
                 source: Box::new(source),
             })?;
         let operations = programs.map(|programs| {
-            OperationsLane::new(programs, settings.operations.device_reference.as_str())
-                .with_composition_defaults(
-                    settings.operations.composer.as_str(),
-                    settings.operations.composition_language.clone(),
-                    settings.operations.composition_territory.clone(),
-                )
-                .with_translator(Translator::new(terminology))
+            Arc::new(
+                OperationsLane::new(programs, settings.operations.device_reference.as_str())
+                    .with_composition_defaults(
+                        settings.operations.composer.as_str(),
+                        settings.operations.composition_language.clone(),
+                        settings.operations.composition_territory.clone(),
+                    )
+                    .with_translator(Translator::new(terminology)),
+            )
         });
         Ok(Self {
             health: Registry::new(indicators),
@@ -325,13 +344,20 @@ impl AppState {
     /// Returns this state with `lane` serving the FHIRconnect operations.
     #[must_use]
     pub fn serving_operations(mut self, lane: OperationsLane) -> Self {
-        self.operations = Some(lane);
+        self.operations = Some(Arc::new(lane));
         self
     }
 
     /// Returns the FHIRconnect operations lane, when one is configured.
     #[must_use]
-    pub const fn operations(&self) -> Option<&OperationsLane> {
+    pub fn operations(&self) -> Option<&OperationsLane> {
+        self.operations.as_deref()
+    }
+
+    /// Returns a shared handle on the operations lane, for the reload that
+    /// swaps its programs.
+    #[must_use]
+    pub const fn operations_handle(&self) -> Option<&Arc<OperationsLane>> {
         self.operations.as_ref()
     }
 

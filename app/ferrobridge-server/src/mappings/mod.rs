@@ -8,28 +8,25 @@
 //! rather than the request that first touches it. The templates come from
 //! `[mappings] templates` when it names a directory, and otherwise from the
 //! CDR, which serves each one at `GET /definition/template/adl1.4/{id}`
-//! (openEHR ITS-REST 1.1.0 §Definition). No specification governs where the
-//! files live: our own design.
+//! (openEHR ITS-REST 1.1.0 §Definition). [`compile`] is the one load path
+//! the operations lane, the facade, the checker and the operator reload
+//! share. No specification governs where the files live: our own design.
 
-use std::collections::BTreeSet;
+pub mod compile;
+
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use fhir_types::r4::schema::SCHEMAS;
-use fhirconnect::model::load::MappingSet;
-use fhirconnect::model::load::load_set;
-use fhirconnect::model::semantic::StaticMappingCodes;
 use fhirconnect::operations::programs::ProgramSet;
-use fhirconnect::resolve::compile::compile;
 use http::StatusCode;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::template::TemplateSource;
 
 use crate::config::MappingSettings;
 use crate::config::Settings;
-
-/// The extension an operational template file carries.
-const TEMPLATE_EXTENSION: &str = "opt";
+use crate::mappings::compile::Refusal;
+use crate::mappings::compile::TemplateCause;
 
 /// Why a mapping set did not load.
 #[derive(Debug, thiserror::Error)]
@@ -60,15 +57,6 @@ pub enum Error {
     NoTemplateSource {
         /// The mapping directory that was configured.
         directory: PathBuf,
-    },
-    /// An operational template did not build a Web Template.
-    #[error("the operational template {} did not load", path.display())]
-    Template {
-        /// The file that was refused.
-        path: PathBuf,
-        /// Why it was refused.
-        #[source]
-        source: Box<openehr_mapping_core::template::PathError>,
     },
     /// A template the CDR served did not build a Web Template.
     #[error("the template `{template}` the CDR served did not load")]
@@ -152,6 +140,12 @@ pub enum Error {
         #[source]
         source: fhirconnect::operations::programs::ProgramSetError,
     },
+    /// A template index was still shared when the lane took ownership of it.
+    #[error("the template `{template}` is still shared and cannot join the compiled set")]
+    SharedTemplate {
+        /// The template identifier.
+        template: String,
+    },
 }
 
 /// Loads the mapping set the operations lane of `settings` runs, if any.
@@ -198,35 +192,36 @@ pub async fn load_configured(
 /// template does not build, when the mapping files do not validate, and when a
 /// context does not compile against its template.
 pub fn load(settings: &MappingSettings) -> Result<ProgramSet, Error> {
-    let mut set = ProgramSet::new();
-    let mut indices: Vec<WebTemplateIndex> = Vec::new();
-    for path in files(&settings.templates, &[TEMPLATE_EXTENSION])? {
-        let xml = std::fs::read_to_string(&path).map_err(|source| Error::Read {
-            path: path.clone(),
-            source,
-        })?;
-        let source = TemplateSource::opt14(&xml).map_err(|error| Error::Template {
-            path: path.clone(),
-            source: Box::new(error),
-        })?;
-        let index = WebTemplateIndex::build(&source).map_err(|error| Error::Template {
-            path: path.clone(),
-            source: Box::new(error),
-        })?;
-        indices.push(index);
+    let files = mapping_files(&settings.directory)?;
+    load_files(&settings.directory, &files, &settings.templates)
+}
+
+/// Loads the mapping files `files`, named after `directory` in a refusal,
+/// compiled against every `.opt` file under `templates`.
+///
+/// # Errors
+///
+/// Returns what [`load`] returns, apart from an empty mapping tree.
+pub fn load_files(
+    directory: &Path,
+    files: &[PathBuf],
+    templates: &Path,
+) -> Result<ProgramSet, Error> {
+    let set = read(directory, files)?;
+    let resolved = compile::directory_templates(templates)?;
+    if !resolved.diagnostics.is_empty() {
+        return Err(Error::Mappings {
+            path: templates.to_path_buf(),
+            report: compile::render(&resolved.diagnostics),
+        });
     }
-    if indices.is_empty() {
+    if resolved.indexes.is_empty() {
         return Err(Error::Empty {
-            path: settings.templates.clone(),
+            path: templates.to_path_buf(),
             what: "operational template",
         });
     }
-    for index in indices {
-        set.insert_template(index);
-    }
-    let loaded = read_mappings(&settings.directory)?;
-    compile_all(&mut set, &loaded)?;
-    Ok(set)
+    program_set(&set, resolved.indexes, &resolved.refusals)
 }
 
 /// Loads the mapping set under `directory`, compiled against the templates
@@ -249,19 +244,103 @@ pub async fn load_from_cdr(
     directory: &Path,
     client: &crate::cdr::CdrClient,
 ) -> Result<ProgramSet, Error> {
-    let loaded = read_mappings(directory)?;
-    let mut wanted: BTreeSet<String> = BTreeSet::new();
-    for context in loaded.contexts() {
-        wanted.insert(template_of(context)?);
-    }
-    let mut set = ProgramSet::new();
-    for template in wanted {
-        set.insert_template(template_index(client, &template).await?);
-    }
-    compile_all(&mut set, &loaded)?;
-    Ok(set)
+    let files = mapping_files(directory)?;
+    load_files_from_cdr(directory, &files, client).await
 }
 
+/// Loads the mapping files `files`, named after `directory` in a refusal,
+/// compiled against the templates the CDR `client` reaches serves.
+///
+/// # Errors
+///
+/// Returns what [`load_from_cdr`] returns, apart from an empty mapping tree.
+pub async fn load_files_from_cdr(
+    directory: &Path,
+    files: &[PathBuf],
+    client: &crate::cdr::CdrClient,
+) -> Result<ProgramSet, Error> {
+    let set = read(directory, files)?;
+    let templates = compile::cdr_templates(&set, client).await?;
+    if let Some(refusal) = templates.refusals.into_iter().next() {
+        return Err(refused(refusal, ""));
+    }
+    program_set(&set, templates.indexes, &[])
+}
+
+/// Returns the FHIRconnect files under `directory`, refusing an empty tree.
+fn mapping_files(directory: &Path) -> Result<Vec<PathBuf>, Error> {
+    let files = crate::walk::mapping_files(directory)
+        .map_err(|crate::walk::Error { path, source }| Error::Read { path, source })?;
+    if files.is_empty() {
+        return Err(Error::Empty {
+            path: directory.to_path_buf(),
+            what: "mapping file",
+        });
+    }
+    Ok(files)
+}
+
+/// Reads and validates `files`, the mapping files under `directory`.
+fn read(
+    directory: &Path,
+    files: &[PathBuf],
+) -> Result<fhirconnect::model::load::MappingSet, Error> {
+    compile::read(files).map_err(|diagnostics| Error::Mappings {
+        path: directory.to_path_buf(),
+        report: compile::render(&diagnostics),
+    })
+}
+
+/// Compiles every context of `set` into the operations lane's program set.
+fn program_set(
+    set: &fhirconnect::model::load::MappingSet,
+    indexes: std::collections::BTreeMap<String, Arc<WebTemplateIndex>>,
+    resolved: &[Refusal],
+) -> Result<ProgramSet, Error> {
+    let compiled = compile::compile(set, &indexes, resolved);
+    let report = compile::render(&compiled.diagnostics);
+    if let Some(refusal) = compiled.refusals.into_iter().next() {
+        return Err(refused(refusal, &report));
+    }
+    let mut programs = ProgramSet::new();
+    for (template, index) in indexes {
+        // NOTE: no specification governs this: our own design; a program
+        // holds no index, so the load path's handle is the only one left.
+        let index = Arc::try_unwrap(index).map_err(|_shared| Error::SharedTemplate {
+            template: template.clone(),
+        })?;
+        programs.insert_template(index);
+    }
+    for program in compiled.programs {
+        log_warnings(&program);
+        let context = program.context().as_str().to_owned();
+        programs
+            .insert_program(program)
+            .map_err(|source| Error::Insert { context, source })?;
+    }
+    Ok(programs)
+}
+
+/// Returns the lane error the first refusal of a load describes, `report`
+/// carrying the compile diagnostics.
+fn refused(refusal: Refusal, report: &str) -> Error {
+    match refusal {
+        Refusal::NoTemplateId { context, .. } => Error::NoTemplateId { context },
+        Refusal::Compile { context } => Error::Compile {
+            context,
+            report: report.to_owned(),
+        },
+        Refusal::Template {
+            context,
+            template,
+            cause,
+        } => match cause {
+            TemplateCause::NotProvided => Error::UnknownTemplate { context, template },
+            TemplateCause::NotHeld(status) => Error::TemplateNotHeld { template, status },
+            TemplateCause::Unusable(error) => *error,
+        },
+    }
+}
 /// Fetches the template `template` names from the CDR and builds its Web
 /// Template index.
 ///
@@ -327,24 +406,6 @@ async fn fetch(client: &crate::cdr::CdrClient, template: &str) -> Result<Templat
     }
 }
 
-/// Reads and validates the mapping files under `directory`.
-fn read_mappings(directory: &Path) -> Result<MappingSet, Error> {
-    let mapping_files = crate::walk::mapping_files(directory)
-        .map_err(|crate::walk::Error { path, source }| Error::Read { path, source })?;
-    if mapping_files.is_empty() {
-        return Err(Error::Empty {
-            path: directory.to_path_buf(),
-            what: "mapping file",
-        });
-    }
-    load_set(&mapping_files, &StaticMappingCodes::default()).map_err(|diagnostics| {
-        Error::Mappings {
-            path: directory.to_path_buf(),
-            report: report(&diagnostics),
-        }
-    })
-}
-
 /// Logs every warning a compiled program carries, once, as it loads.
 ///
 /// A warning is a disagreement the compiler accepted, so the program runs and
@@ -362,73 +423,4 @@ pub fn log_warnings(program: &fhirconnect::resolve::program::Program) {
             "a mapping context compiled with a warning"
         );
     }
-}
-
-/// Compiles every context of `loaded` against the templates `set` holds.
-fn compile_all(set: &mut ProgramSet, loaded: &MappingSet) -> Result<(), Error> {
-    for context in loaded.contexts() {
-        let name = context.header().name().value().clone();
-        let template = template_of(context)?;
-        let index = set
-            .template(&fhirconnect::resolve::program::binding::TemplateId::new(
-                template.clone(),
-            ))
-            .ok_or_else(|| Error::UnknownTemplate {
-                context: name.as_str().to_owned(),
-                template: template.clone(),
-            })?;
-        let program = compile(
-            loaded,
-            &name,
-            index,
-            &SCHEMAS,
-            &StaticMappingCodes::default(),
-        )
-        .map_err(|diagnostics| Error::Compile {
-            context: name.as_str().to_owned(),
-            report: report(&diagnostics),
-        })?;
-        log_warnings(&program);
-        set.insert_program(program)
-            .map_err(|source| Error::Insert {
-                context: name.as_str().to_owned(),
-                source,
-            })?;
-    }
-    Ok(())
-}
-
-/// Returns the template identifier one context names.
-fn template_of(context: &fhirconnect::model::ast::ContextMappingFile) -> Result<String, Error> {
-    context
-        .context()
-        .template
-        .id
-        .as_ref()
-        .map(|located| located.value().clone())
-        .ok_or_else(|| Error::NoTemplateId {
-            context: context.header().name().value().as_str().to_owned(),
-        })
-}
-
-/// Returns every file under `directory` whose extension is one of `wanted`.
-fn files(directory: &Path, wanted: &[&str]) -> Result<Vec<PathBuf>, Error> {
-    crate::walk::files(directory, |path| crate::walk::has_extension(path, wanted))
-        .map_err(|crate::walk::Error { path, source }| Error::Read { path, source })
-}
-
-/// Renders a diagnostic list as one line.
-fn report(diagnostics: &[openehr_mapping_core::diagnostic::Diagnostic]) -> String {
-    diagnostics
-        .iter()
-        .map(|diagnostic| {
-            format!(
-                "{} {}: {}",
-                diagnostic.file().display(),
-                diagnostic.code(),
-                diagnostic.message()
-            )
-        })
-        .collect::<Vec<String>>()
-        .join("; ")
 }

@@ -195,7 +195,7 @@ impl Ingest<'_> {
             full_url: format!("{}/{}", source.resource_type(), source.id()),
             position: 0,
             inbound: inbound.clone(),
-            program,
+            program: program.clone(),
             template_id: String::from(built.template_id()),
             built,
             composition: Box::new(rm),
@@ -248,7 +248,7 @@ impl Ingest<'_> {
     /// verifies them.
     pub(super) async fn reconcile(
         &self,
-        partition: Partition<'_>,
+        partition: Partition,
         sources: &[Option<SourceVersion>],
         committed: &CommittedSource,
     ) -> Result<Ingested, Refused> {
@@ -274,7 +274,7 @@ impl Ingest<'_> {
     /// with each entry where its first delivery put it.
     pub(super) async fn replay(
         &self,
-        partition: Partition<'_>,
+        partition: Partition,
         known: &[Option<ConsumedSource>],
     ) -> Result<Ingested, Refused> {
         let mut ehr_id = None;
@@ -374,7 +374,7 @@ impl Ingest<'_> {
         ehr_id: &EhrId,
         contribution: &ContributionUid,
         returned: Returned<Contribution>,
-        mapped: &[Mapped<'_>],
+        mapped: &[Mapped],
         scope: Scope,
     ) -> Result<Vec<(ObjectVersionId, Composition)>, Refused> {
         let stored = match returned {

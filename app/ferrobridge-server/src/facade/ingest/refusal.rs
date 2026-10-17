@@ -41,7 +41,7 @@ pub(super) fn upstream_refusal(
 ///
 /// Nothing was committed, so the answer names every entry the Bundle mapped:
 /// a caller cannot tell from a partial list which entries still stand.
-pub(super) fn refuse_all(mapped: &[Mapped<'_>], row: &status::Row, detail: &str) -> Refused {
+pub(super) fn refuse_all(mapped: &[Mapped], row: &status::Row, detail: &str) -> Refused {
     let mut issues = vec![
         Issue::error(row.issue())
             .diagnosing(detail.to_owned())

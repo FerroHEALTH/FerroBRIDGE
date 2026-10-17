@@ -25,6 +25,11 @@ crates on crates.io.
 
 ### Changed
 
+- The facade, the FHIRconnect operations lane, `mapping check` and the
+  operator API load a FHIRconnect set through one path,
+  `mappings::compile` (#725): one read, one template resolution from the
+  template directory or the CDR, one compile loop. The boot refusals are
+  unchanged.
 - `fhirconnect` 0.1.131: the four seam traits, `ReferenceSource`,
   `IdentitySink`, `Terminology` and `MappingFunctions`, require
   `Send + Sync`, and a compile-time assertion keeps `Seams` `Send`, so an
@@ -102,6 +107,22 @@ crates on crates.io.
   products fit together, and licensing and trademarks.
 ### Added
 
+- The operator API checks, saves and reloads mapping files (#597), with
+  `[operator] mapping_dir` set: `POST /operator/mappings/check?path=` answers
+  a draft's diagnostics over the running set; `PUT /operator/mappings/{path}`
+  with `If-Match` (or `If-None-Match: *`) and a `Ferrobridge-Reason` header
+  saves a FHIRconnect file under `mapping_dir/fhirconnect/` when the whole
+  set compiles with it, written to a synced hidden file and renamed into
+  place, and answers `422` with every diagnostic, leaving disk and programs
+  unchanged, when it does not, `412` on a stale `ETag`, `428` without a
+  precondition and `409` over a provisioned file; `POST /operator/reload`
+  compiles the files on disk. A clean set replaces the facade's programs and
+  search declarations, the FHIRconnect operations and the operator state in
+  one swap each request reads at entry, so the `CapabilityStatement` follows
+  a save at once. Console files join the set at start-up. Each save leaves an
+  audit line with the caller's `sub`, the file, the old and new SHA-256 and
+  the reason, never content. `compose.yaml` mounts `./operator-mappings` as
+  the one writable path beside the read-only root file system.
 - `ferrobridge serve` sends the FerroHEALTH installation report to FerroPULSE
   on its report envelope v2 (#581): one `start` report per process start and
   one `daily` report a day to `https://report.ferropulse.eu/v1/report`,
