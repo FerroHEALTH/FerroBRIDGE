@@ -31,12 +31,6 @@ use fhirconnect::resolve::select::select_by_profile_pinned;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::index::WebTemplateIndex;
 
-/// The file extensions a mapping directory is read for.
-///
-/// FHIRconnect writes YAML and states no extension, so both spellings are
-/// read and nothing else is (no specification governs this: our own design).
-const MAPPING_EXTENSIONS: [&str; 2] = ["yml", "yaml"];
-
 /// Why the mapping set did not load.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -246,15 +240,8 @@ impl Programs {
 ///
 /// Returns [`LoadError::Directory`] when the directory cannot be listed.
 pub fn mapping_files(directory: &Path) -> Result<Vec<PathBuf>, LoadError> {
-    crate::walk::files(directory, |path| {
-        !crate::facade::search::declaration::is_declaration(path)
-            && path
-                .extension()
-                .and_then(std::ffi::OsStr::to_str)
-                .map(str::to_ascii_lowercase)
-                .is_some_and(|found| MAPPING_EXTENSIONS.contains(&found.as_str()))
-    })
-    .map_err(|crate::walk::Error { path, source }| LoadError::Directory { path, source })
+    crate::walk::mapping_files(directory)
+        .map_err(|crate::walk::Error { path, source }| LoadError::Directory { path, source })
 }
 
 /// Reads and validates the mapping set under `directory`.

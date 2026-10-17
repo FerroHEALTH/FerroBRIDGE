@@ -25,6 +25,9 @@ crates on crates.io.
 
 ### Changed
 
+- The FHIRconnect operations lane reads its mapping directory through the
+  walk the facade uses (#524), so a `.YML` or `.YAML` file is now read by both
+  lanes; the operations lane read only the lower-case spellings before.
 - The README, the book's Licensing page and the landing page answer "do you
   need a commercial licence?" at a glance (#111): a table of what you are
   doing, what you need and the part of `LICENSE` that decides it, the same
