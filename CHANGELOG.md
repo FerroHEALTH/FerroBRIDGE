@@ -25,6 +25,13 @@ crates on crates.io.
 
 ### Changed
 
+- The README, the book's Licensing page and the landing page answer "do you
+  need a commercial licence?" at a glance (#111): a table of what you are
+  doing, what you need and the part of `LICENSE` that decides it, the same
+  shape as the FerroHEALTH family table, with the change date and the
+  commercial-licence contact beside it. The README's top navigation links the
+  table, and the `ferrobridge-fhirpath` and `ferrobridge-validator` READMEs
+  state the terms like the other BUSL-1.1 crates.
 - `SECURITY.md` and `CONTRIBUTING.md` keep what is particular to FerroBRIDGE
   and link the FerroHEALTH family book at <https://ferrohealth.eu/docs/> for
   the rest (#402). `SECURITY.md` keeps the supported versions, the reporting

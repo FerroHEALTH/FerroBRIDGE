@@ -106,4 +106,6 @@ An `OperationOutcome` issue carries its id as a `details.coding` in the system
 
 ## Licence
 
-Business Source License 1.1; see `LICENSE`.
+Business Source License 1.1 (`LICENSE`): free for every non-production use and
+for non-commercial production use; a commercial licence for other production
+use; Apache License 2.0 four years after each version.
