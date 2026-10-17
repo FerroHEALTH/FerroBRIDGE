@@ -61,13 +61,23 @@ readonly CORPUS_TESTS=(
   'fhir-r4-facade ferrobridge-server conformance_the_fhir_r4_examples_hold_their_facade_pass_list'
   'fhirpath-r4 ferrobridge-fhirpath conformance_fhirpath_r4'
 )
+# Whether $1 equals one of the remaining arguments.
+contains() {
+  local needle=$1 item
+  shift
+  for item in "$@"; do
+    [[ $item == "$needle" ]] && return 0
+  done
+  return 1
+}
+
 corpora=()
 packages=()
 for row in "${CORPUS_TESTS[@]}"; do
   corpora+=("${row%% *}")
   package="${row#* }"
   package="${package%% *}"
-  [[ " ${packages[*]-} " = *" $package "* ]] || packages+=("$package")
+  contains "$package" ${packages[@]+"${packages[@]}"} || packages+=("$package")
 done
 readonly CORPORA=("${corpora[@]}")
 # The packages of the table, each once, in the order it first names them.
@@ -310,7 +320,7 @@ badges_on_disk() {
 # The family and version badges of both measured HL7 v2 corpora, emitted, and
 # a badge no case counts any more removed under --update.
 badges_measured() {
-  local hl7v2_cases family version name passed total derived stale
+  local hl7v2_cases family version name passed total stale
   # Every case of both HL7 v2 corpora, and the passing and total count of the
   # cases whose field $1 is $2.
   hl7v2_cases="$(jq -c -s '[.[].cases[]]' "$OUT/hl7v2.json" "$OUT/hl7v2-smoke.json")"
@@ -336,10 +346,10 @@ badges_measured() {
   done < <(jq -r '[.[] | .version | select(. != null and test("^[0-9]+(\\.[0-9]+)+$"))]
     | unique | sort_by(split(".") | map(tonumber)) | .[]' <<<"$hl7v2_cases")
 
-  derived=" ${families[*]-} ${versions[*]-} "
   for stale in "$BADGES"/hl7v2-family-*.json "$BADGES"/hl7v2-version-*.json; do
     [[ -f "$stale" ]] || continue
-    if [[ "$derived" != *" $(basename "$stale" .json) "* ]]; then
+    if ! contains "$(basename "$stale" .json)" ${families[@]+"${families[@]}"} \
+      ${versions[@]+"${versions[@]}"}; then
       if [[ "$mode" = update ]]; then
         rm "$stale"
       else
