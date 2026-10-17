@@ -35,6 +35,22 @@ impl Language {
             Self::Omocl => "omocl",
         }
     }
+
+    /// Returns the language whose files a wire path opening with `root`
+    /// names, or `None` for a root that names neither.
+    #[must_use]
+    pub fn of_root(root: &str) -> Option<Self> {
+        [Self::Fhirconnect, Self::Omocl]
+            .into_iter()
+            .find(|language| language.root() == root)
+    }
+
+    /// Returns the directory under `mapping_dir` the console saves files of
+    /// this language in.
+    #[must_use]
+    pub fn console_directory(self, mapping_dir: &Path) -> PathBuf {
+        mapping_dir.join(self.root())
+    }
 }
 
 /// Who owns a file, and so who may change it.

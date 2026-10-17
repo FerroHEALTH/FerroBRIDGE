@@ -1158,6 +1158,16 @@ replaces the running one in a single pointer swap: each request takes the
 set at entry and finishes on it, so a request in flight completes on the old
 set. An ETL run reads the set when it starts.
 
+**A console OMOCL file reaches `etl run` through the console directory.**
+The bridge runs no OMOCL lane, so a reload only checks OMOCL files; `etl
+run` is a separate process that reads `[mappings] omocl` once at start (#757).
+When the run's configuration turns the operator API on, it also reads
+`mapping_dir/omocl/`, through the file listing and the OMOCL load the reload
+uses, so the run and the reload see the same set. A path has one owner,
+the provisioned file winning a path both directories hold, and two files that
+define one mapping are a clash the load refuses: a save is refused with its
+diagnostics, and a run stops before it calls an upstream.
+
 **Each replica reloads on its own.** With `mapping_dir` on a shared volume, a
 file another replica saved is visible to this one at its next reload or
 restart. The console's reload acts on the replica behind its configured URL.

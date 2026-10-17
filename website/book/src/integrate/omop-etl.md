@@ -8,7 +8,10 @@ Data Model v5.4 database, driven by OMOCL mapping files. OMOP is a relational
 analytics schema rather than an API, so the deliverable is populated tables.
 The sink, the runner, the OMOCL engine and `ferrobridge cdm init` are built,
 and `ferrobridge etl run` maps each composition with the files in
-`[mappings] omocl`.
+`[mappings] omocl` and, when the operator API is on, the files the console
+saved under `[operator] mapping_dir/omocl/`. A provisioned file owns a path
+both directories hold, and two files that define the same mapping refuse the
+run.
 
 <!-- toc -->
 

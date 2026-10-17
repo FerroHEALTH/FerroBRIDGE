@@ -82,14 +82,16 @@ impl Operator {
     /// Returns this surface saving into `mapping_dir` and reloading through
     /// `reloader`.
     ///
-    /// The console's FHIRconnect files live under `mapping_dir/fhirconnect`
-    /// and join the set beside the provisioned ones.
+    /// The console's files live under `mapping_dir/fhirconnect` and
+    /// `mapping_dir/omocl` and join the set beside the provisioned ones.
     #[must_use]
     pub fn with_saving(mut self, mapping_dir: PathBuf, reloader: reload::Reloader) -> Self {
-        self.roots.push(Root::console(
-            files::Language::Fhirconnect,
-            mapping_dir.join("fhirconnect"),
-        ));
+        for language in [files::Language::Fhirconnect, files::Language::Omocl] {
+            self.roots.push(Root::console(
+                language,
+                language.console_directory(&mapping_dir),
+            ));
+        }
         self.mapping_dir = Some(mapping_dir);
         self.reloader = Some(reloader);
         self

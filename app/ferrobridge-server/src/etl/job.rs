@@ -1,18 +1,19 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The `etl run` job over a resolved configuration: the OMOCL set read from
-//! `[mappings] omocl`, the CDR client of `[cdr]`, the concept resolver and
-//! the writer over `[cdm]`, then one run.
+//! The `etl run` job over a resolved configuration.
 //!
-//! The binary calls [`run`] and prints the report; a test calls it with a
+//! The job reads the OMOCL set from `[mappings] omocl` and the console's
+//! `[operator] mapping_dir`, builds the CDR client of `[cdr]`, the concept
+//! resolver and the writer over `[cdm]`, then runs once. The binary calls [`run`] and prints the report; a test calls it with a
 //! configuration of its own, so both drive the same path. No specification
 //! governs the job: our own design.
 
 use crate::config::Settings;
-use crate::etl::mapper::{CdmVocabulary, MapperError, OmoclMapper, read_set};
+use crate::etl::mapper::{CdmVocabulary, MapperError, OmoclMapper, read_roots};
 use crate::etl::report::RunReport;
 use crate::etl::{RunError, RunOptions};
+use crate::operator::files::{Language, Root};
 use omop_cdm::database::{CdmPool, ConnectError};
 use omop_cdm::graph::key::EmptyIdentifier;
 use omop_cdm::vocabulary::ConceptResolver;
@@ -55,11 +56,37 @@ pub fn missing_section(settings: &Settings) -> Option<&'static str> {
         Some("a [cdm] section")
     } else if settings.cdr.is_none() {
         Some("a [cdr] section")
-    } else if settings.omocl_directory.is_none() {
+    } else if omocl_roots(settings).is_empty() {
         Some("[mappings] omocl")
     } else {
         None
     }
+}
+
+/// Returns the OMOCL directories `etl run` reads: `[mappings] omocl`, then
+/// the console's `omocl/` under `[operator] mapping_dir` when the operator
+/// API is on.
+///
+/// The provisioned directory comes first, so it owns a path both hold, as it
+/// does in the operator reload (no specification governs this: our own
+/// design).
+#[must_use]
+pub fn omocl_roots(settings: &Settings) -> Vec<Root> {
+    let provisioned = settings
+        .omocl_directory
+        .as_ref()
+        .map(|directory| Root::new(Language::Omocl, directory.clone()));
+    let console = settings
+        .operator
+        .as_ref()
+        .and_then(|operator| operator.mapping_dir.as_deref())
+        .map(|mapping_dir| {
+            Root::console(
+                Language::Omocl,
+                Language::Omocl.console_directory(mapping_dir),
+            )
+        });
+    provisioned.into_iter().chain(console).collect()
 }
 
 /// Runs the OMOP ETL once over `settings` and returns its report.
@@ -78,15 +105,16 @@ pub fn missing_section(settings: &Settings) -> Option<&'static str> {
 /// [`JobError::Run`] when the run stops.
 pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport, JobError> {
     let missing = || JobError::Missing(missing_section(settings).unwrap_or("its configuration"));
-    let (Some(etl), Some(cdm), Some(cdr), Some(directory)) = (
+    let roots = omocl_roots(settings);
+    let (Some(etl), Some(cdm), Some(cdr), false) = (
         settings.etl.as_ref(),
         settings.cdm.as_ref(),
         settings.cdr.as_ref(),
-        settings.omocl_directory.as_ref(),
+        roots.is_empty(),
     ) else {
         return Err(missing());
     };
-    let set = read_set(directory).map_err(JobError::Mappings)?;
+    let set = read_roots(&roots).map_err(JobError::Mappings)?;
     let client = crate::cdr::CdrClient::new(cdr).map_err(JobError::Client)?;
     let pool = CdmPool::connect(
         sqlx::postgres::PgPoolOptions::new().max_connections(2),

@@ -120,7 +120,13 @@ crates on crates.io.
   and the scroll padding keeps a focused control clear of the top bar (SC
   2.4.11). The WebAssembly budget rises to 244 KiB with the measurement in
   `.claude/rules/leptos-ui.md`.
-
+- The operator API saves OMOCL files (#757): `PUT /operator/mappings/omocl/{path}`
+  checks the draft with the whole set and writes it under
+  `mapping_dir/omocl/`, where it was refused with `409` before. `etl run`
+  reads that directory beside `[mappings] omocl` whenever the operator API is
+  on, through the same OMOCL load the reload checks with: a provisioned file
+  owns a path both directories hold, and two files that define one mapping
+  refuse the run.
 - The operator API checks, saves and reloads mapping files (#597), with
   `[operator] mapping_dir` set: `POST /operator/mappings/check?path=` answers
   a draft's diagnostics over the running set; `PUT /operator/mappings/{path}`

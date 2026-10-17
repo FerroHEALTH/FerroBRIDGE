@@ -65,7 +65,7 @@ pub async fn check(
         return unconfigured();
     };
     let relative = match files::relative(&query.path) {
-        Ok((root, relative)) if root == "fhirconnect" || root == "omocl" => relative,
+        Ok((root, relative)) if files::Language::of_root(root).is_some() => relative,
         Ok(_) | Err(_) => return bad_path(),
     };
     let staged = mapping_dir
@@ -111,21 +111,16 @@ pub async fn save(
     let Some(mapping_dir) = operator.mapping_dir.clone() else {
         return unconfigured();
     };
-    let relative = match files::relative(&wire) {
-        Ok(("fhirconnect", relative)) => relative,
-        Ok(("omocl", _)) => {
-            // TODO(#757): save an OMOCL file where `etl run` reads it.
-            return refusal(
-                StatusCode::CONFLICT,
-                None,
-                "not-savable",
-                "the console saves FHIRconnect files only; OMOCL files are provisioned",
-            );
-        }
-        Ok(_) | Err(_) => return bad_path(),
+    let Some((language, relative)) = files::relative(&wire)
+        .ok()
+        .and_then(|(root, relative)| Some((files::Language::of_root(root)?, relative)))
+    else {
+        return bad_path();
     };
-    let target = mapping_dir.join("fhirconnect").join(&relative);
-    if !files::is_mapping(&target) || crate::facade::search::declaration::is_declaration(&target) {
+    let target = language.console_directory(&mapping_dir).join(&relative);
+    let declaration = language == files::Language::Fhirconnect
+        && crate::facade::search::declaration::is_declaration(&target);
+    if !files::is_mapping(&target) || declaration {
         return bad_path();
     }
     let Some(reason) = reason(&headers) else {
