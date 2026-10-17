@@ -60,6 +60,9 @@ proptest = "1.11.0"
 # The digest behind the derived FHIR resource id (docs/architecture.md
 # section 9) and the testkit's own checksums.
 sha2 = "0.11.0"
+# The testkit's closed port: a socket bound without a listen, which std cannot
+# make (already in the lock through tokio).
+socket2 = "0.6.5"
 # Published from this workspace, so the requirement carries both a path and a
 # version: cargo resolves the path locally and the version on crates.io.
 fhir-types = { path = "crates/fhir-types", version = "0.1.117", default-features = false }
