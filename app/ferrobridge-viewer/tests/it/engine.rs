@@ -241,12 +241,20 @@ async fn an_answer_of_another_shape_is_named_never_drawn_empty() -> Result<(), B
     answer(&bridge, "/operator/state", 200, &foreign).await;
     let (service, cookie) = signed_in(&format!("{}/", bridge.uri())).await?;
     let html = drawn(&service, "/api/dashboard", &cookie).await?;
-    assert!(html.contains("carries no version"), "{html}");
+    let unreadable =
+        "<p role=\"alert\">the bridge answered 200 with a body this console cannot read</p>";
+    assert!(
+        html.contains(&format!("<h2>Bridge</h2>{unreadable}")),
+        "an info without its version: {html}"
+    );
     assert!(
         html.contains("carries no state"),
         "a 200 that says down: {html}"
     );
-    assert!(html.contains("carries no diagnostics"), "{html}");
+    assert!(
+        html.contains(&format!("<h2>Mappings</h2>{unreadable}")),
+        "a diagnostic without its position: {html}"
+    );
     Ok(())
 }
 

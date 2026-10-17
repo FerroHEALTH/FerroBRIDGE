@@ -36,6 +36,7 @@ readonly CRATES=(
   fhir-types
   hl7v2-types
   openehr-mapping-core
+  ferrobridge-operator-api
   fhirconnect
   omocl
   omop-cdm

@@ -55,7 +55,7 @@ v0.0.4 (OMOP). Nothing is scaffolded before its issues are filed.
 ## Repo map
 
 The Cargo workspace (#107) holds the root manifests with the full lint set,
-ten library crates (seven at 0.0.0, the version that holds their crates.io
+eleven library crates (eight at 0.0.0, the version that holds their crates.io
 names until a first publish, and `fhir-types`, `openehr-mapping-core` and
 `fhirconnect` on the published crate line), and
 the testkit tool crate. Beside it:
@@ -115,9 +115,9 @@ the testkit tool crate. Beside it:
   server and hydrated, halves chosen by target, with `serve`, `config check`
   and `healthcheck`, the TOML configuration with `FERROBRIDGE_VIEWER__`
   overrides and `_file` secrets, the nonce CSP and the other browser security
-  headers, and the typed bridge client (`src/bridge.rs`). Its server half
-  links only `openehr-mapping-core` and `fhir-types` of the workspace and its
-  browser half none, held by `tests/it/boundary.rs`; the CI `viewer` lane
+  headers, and the typed bridge client (`src/bridge/`). Its server half
+  links only `openehr-mapping-core`, `fhir-types` and
+  `ferrobridge-operator-api` of the workspace and its browser half none, held by `tests/it/boundary.rs`; the CI `viewer` lane
   lints the wasm32 half and builds the site bundle against its budget
   (`.claude/rules/leptos-ui.md`).
 
@@ -134,6 +134,9 @@ the testkit tool crate. Beside it:
   codes v2.9.1 withdrew, `ORM_O01`) from the build-time IGAMT export of
   HL7's v2 database (#303, #333), which the parser selects by MSH-12.
   Never hand-edited.
+- `crates/ferrobridge-operator-api`: the bridge's health and operator
+  documents as serde types (#777), which the server writes and the operator
+  console reads, so the two sides compile against one definition.
 - `crates/openehr-mapping-core`: the half of the mapping foundation both
   languages share (#74): the header they standardize between them, the YAML
   loader with anchors and source positions, the registry by mapping name and

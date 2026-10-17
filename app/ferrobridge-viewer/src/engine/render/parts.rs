@@ -41,20 +41,6 @@ pub fn text<'a>(value: &'a serde_json::Value, path: &'static str) -> Result<&'a 
     field(value, path)?.as_str().ok_or(Shape { path })
 }
 
-/// The array at `path` of `value`.
-///
-/// # Errors
-/// Returns [`Shape`] when it is missing or no array.
-pub fn array<'a>(
-    value: &'a serde_json::Value,
-    path: &'static str,
-) -> Result<&'a [serde_json::Value], Shape> {
-    field(value, path)?
-        .as_array()
-        .map(Vec::as_slice)
-        .ok_or(Shape { path })
-}
-
 /// The text at the optional `key` of `value`: `None` for a key that is
 /// absent or `null`.
 ///
@@ -69,21 +55,6 @@ pub fn optional_text<'a>(
         Some(serde_json::Value::String(text)) => Ok(Some(text)),
         Some(_) => Err(Shape { path: key }),
     }
-}
-
-/// The diagnostics at `path` of `value`, each read into the mapping
-/// foundation's own [`Diagnostic`] from its serde form.
-///
-/// # Errors
-/// Returns [`Shape`] when the array is missing or an entry is no diagnostic.
-pub fn diagnostics(
-    value: &serde_json::Value,
-    path: &'static str,
-) -> Result<Vec<Diagnostic>, Shape> {
-    array(value, path)?
-        .iter()
-        .map(|entry| serde_json::from_value(entry.clone()).map_err(|_refused| Shape { path }))
-        .collect()
 }
 
 /// The section a failed bridge call draws in place of its content: the
@@ -229,7 +200,7 @@ pub fn raw_json(summary: &'static str, json: &serde_json::Value) -> AnyView {
 
 #[cfg(test)]
 mod tests {
-    use super::{Shape, diagnostics, field, optional_text, text};
+    use super::{Shape, field, optional_text, text};
 
     #[test]
     fn a_field_is_read_by_path_and_a_missing_one_is_named() {
@@ -244,18 +215,5 @@ mod tests {
         assert_eq!(Err(Shape { path: "n" }), text(&value, "n"));
         assert_eq!(Ok(None), optional_text(&value, "absent"));
         assert_eq!(Err(Shape { path: "n" }), optional_text(&value, "n"));
-    }
-
-    #[test]
-    fn a_diagnostic_reads_into_the_foundations_type_and_a_foreign_one_is_refused() {
-        let value = serde_json::json!({"diagnostics": [{
-            "file": "fhirconnect/contexts/a.context.yml", "line": 3, "column": 5,
-            "severity": "error", "code": "missing-key", "message": "synthetic",
-            "mapping": null, "model_path": ["spec"]
-        }]});
-        let read = diagnostics(&value, "diagnostics").expect("a diagnostic");
-        assert_eq!(1, read.len());
-        let foreign = serde_json::json!({"diagnostics": [{"message": "no shape"}]});
-        assert!(diagnostics(&foreign, "diagnostics").is_err());
     }
 }

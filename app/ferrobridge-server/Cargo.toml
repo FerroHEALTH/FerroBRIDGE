@@ -35,6 +35,8 @@ fhir-types = { workspace = true, features = ["r4", "resources"] }
 # The mapping language the facade runs: the loader, the compiler and the
 # bidirectional engine (docs/architecture.md section 4.6).
 fhirconnect.workspace = true
+# The health and operator documents, shared with the operator console.
+ferrobridge-operator-api.workspace = true
 http.workspace = true
 # The one clock: the instant every composition default of one ingest is taken
 # from.

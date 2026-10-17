@@ -140,15 +140,8 @@ pub mod server {
         let read_only = listing
             .as_ref()
             .ok()
-            .and_then(serde_json::Value::as_array)
-            .and_then(|entries| {
-                entries.iter().find(|entry| {
-                    entry.get("path").and_then(serde_json::Value::as_str) == Some(path.as_str())
-                })
-            })
-            .and_then(|entry| entry.get("read_only"))
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false);
+            .and_then(|entries| entries.iter().find(|entry| entry.path == path))
+            .is_some_and(|entry| entry.read_only);
         match file {
             Ok(file) => {
                 let Ok(text) = String::from_utf8(file.bytes) else {

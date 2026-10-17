@@ -8,6 +8,7 @@
 //! no line here logs them. No specification governs the operator surface:
 //! our own design.
 
+use ferrobridge_operator_api::operator::LoadReport;
 use http::{HeaderValue, StatusCode};
 
 use crate::bridge::{AccessToken, Bridge, BridgeError, JSON, YAML};
@@ -33,8 +34,9 @@ pub enum Precondition {
 pub struct Answered {
     /// `200` for a set that compiled, `422` for one that did not.
     pub status: StatusCode,
-    /// The report: `clean`, `counts` and `diagnostics`.
-    pub report: serde_json::Value,
+    /// The report of the set: whether it compiled, its counts and every
+    /// diagnostic.
+    pub report: LoadReport,
     /// The digest the new file's `ETag` names, after a save.
     pub etag: Option<String>,
 }
@@ -172,13 +174,11 @@ fn plain(path: &str) -> Result<(), BridgeError> {
     }
 }
 
-/// The report object `body` holds.
-fn report(body: &[u8]) -> Result<serde_json::Value, BridgeError> {
-    let value: serde_json::Value =
-        serde_json::from_slice(body).map_err(|source| BridgeError::Payload { source })?;
-    if value.is_object() {
-        Ok(value)
-    } else {
-        Err(BridgeError::NotAnObject)
-    }
+/// The report `body` holds, read into its `ferrobridge_operator_api`
+/// document.
+fn report(body: &[u8]) -> Result<LoadReport, BridgeError> {
+    serde_json::from_slice(body).map_err(|source| BridgeError::Document {
+        expected: "load report",
+        source,
+    })
 }

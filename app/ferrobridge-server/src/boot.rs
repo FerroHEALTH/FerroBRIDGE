@@ -25,7 +25,8 @@ use tokio::net::TcpListener;
 
 use crate::config::Settings;
 
-use crate::health::{Check, HealthIndicator, IndicatorState};
+use crate::health::{Check, HealthIndicator};
+use ferrobridge_operator_api::health::IndicatorState;
 
 /// How long the start waits between two attempts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -197,7 +197,7 @@ pub mod server {
             BridgeError::TooLarge { .. }
             | BridgeError::Payload { .. }
             | BridgeError::NotAnObject
-            | BridgeError::NotAnArray
+            | BridgeError::Document { .. }
             | BridgeError::Decode { .. } => {
                 tracing::error!(error = %crate::command::chain(error), "the bridge answered a body this console cannot read");
                 Err(ViewError::Unreadable {

@@ -6,15 +6,18 @@
 //!
 //! A path in a document is a wire path (`fhirconnect/...`, `omocl/...`) when
 //! the file is under a mapping root, and the file name alone otherwise, so a
-//! document never names a host directory. No specification governs the
-//! operator surface: our own design.
+//! document never names a host directory. The documents are the
+//! `ferrobridge_operator_api::operator` types the operator console reads. No
+//! specification governs the operator surface: our own design.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 
+use ferrobridge_operator_api::operator::{
+    EngineState, Extension, Listed, Model, Omocl, Program, Template,
+};
 use openehr_mapping_core::diagnostic::Severity;
-use serde::Serialize;
 
 use crate::check::Report;
 use crate::mappings::compile::TemplateOrigin;
@@ -33,27 +36,6 @@ pub struct Snapshot {
     searches: BTreeMap<String, PathBuf>,
 }
 
-/// One mapping file as `GET /operator/mappings` lists it.
-#[derive(Debug, Clone, Serialize)]
-pub struct Listed {
-    /// The wire path.
-    pub path: String,
-    /// The language of its root.
-    pub language: Language,
-    /// The mapping type its header declares, `search` for a search
-    /// declaration and `mapping` for an OMOCL file; absent for a file the
-    /// running load did not read.
-    pub kind: Option<&'static str>,
-    /// The lowercase hexadecimal SHA-256 of its bytes.
-    pub sha256: String,
-    /// Who owns it.
-    pub owner: Owner,
-    /// Whether the operator API refuses to write it.
-    pub read_only: bool,
-    /// The diagnostics the running load raised about it.
-    pub diagnostics: Vec<serde_json::Value>,
-}
-
 impl Snapshot {
     /// Returns the snapshot of `report`, with `searches` naming each
     /// context's search declaration.
@@ -70,64 +52,60 @@ impl Snapshot {
 
     /// Returns the `GET /operator/state` document over `roots`.
     #[must_use]
-    pub fn document(&self, roots: &[Root]) -> serde_json::Value {
+    pub fn document(&self, roots: &[Root]) -> EngineState {
         let shown = |path: &Path| shown(roots, path);
         let set = self.report.fhirconnect_set();
         let file_of = |name: &openehr_mapping_core::header::metadata::MappingName| {
             set.and_then(|set| set.file_of(name)).map(&shown)
         };
-        let contexts: Vec<serde_json::Value> = self
+        let contexts = self
             .report
             .programs()
             .iter()
-            .map(|program| {
-                let models: Vec<serde_json::Value> = program
+            .map(|program| Program {
+                context: program.context().as_str().to_owned(),
+                file: file_of(program.context()),
+                template: program.template().id().as_str().to_owned(),
+                profile: program.profile().url().as_str().to_owned(),
+                profile_version: program.profile().version().to_string(),
+                resource_type: program.resource().as_str().to_owned(),
+                models: program
                     .models()
                     .iter()
-                    .map(|model| {
-                        let extensions: Vec<serde_json::Value> = model
+                    .map(|model| Model {
+                        name: model.name().as_str().to_owned(),
+                        file: file_of(model.name()),
+                        extensions: model
                             .extensions()
                             .iter()
-                            .map(|name| {
-                                serde_json::json!({ "name": name.as_str(), "file": file_of(name) })
+                            .map(|name| Extension {
+                                name: name.as_str().to_owned(),
+                                file: file_of(name),
                             })
-                            .collect();
-                        serde_json::json!({
-                            "name": model.name().as_str(),
-                            "file": file_of(model.name()),
-                            "extensions": extensions,
-                        })
+                            .collect(),
                     })
-                    .collect();
-                serde_json::json!({
-                    "context": program.context().as_str(),
-                    "file": file_of(program.context()),
-                    "template": program.template().id().as_str(),
-                    "profile": program.profile().url().as_str(),
-                    "profile_version": program.profile().version().to_string(),
-                    "resource_type": program.resource().as_str(),
-                    "models": models,
-                    "search": self.searches.get(program.context().as_str()).map(|path| shown(path)),
-                })
+                    .collect(),
+                search: self
+                    .searches
+                    .get(program.context().as_str())
+                    .map(|path| shown(path)),
             })
             .collect();
-        let templates: Vec<serde_json::Value> = self
+        let templates = self
             .report
             .templates()
             .iter()
             .map(|template| match template.origin() {
-                TemplateOrigin::File(path) => serde_json::json!({
-                    "id": template.id(),
-                    "source": "directory",
-                    "file": shown(path),
-                }),
-                TemplateOrigin::Cdr => serde_json::json!({
-                    "id": template.id(),
-                    "source": "cdr",
-                }),
+                TemplateOrigin::File(path) => Template::Directory {
+                    id: template.id().to_owned(),
+                    file: shown(path),
+                },
+                TemplateOrigin::Cdr => Template::Cdr {
+                    id: template.id().to_owned(),
+                },
             })
             .collect();
-        let omocl_files: Vec<String> = self
+        let omocl_files = self
             .report
             .omocl_files()
             .iter()
@@ -141,18 +119,23 @@ impl Snapshot {
                     .iter()
                     .any(|file| file == diagnostic.file())
         });
-        serde_json::json!({
-            "contexts": contexts,
-            "templates": templates,
-            "omocl": { "files": omocl_files, "valid": omocl_valid },
-            "counts": self.report.counts(),
-            "diagnostics": self
+        EngineState {
+            contexts,
+            templates,
+            omocl: Omocl {
+                files: omocl_files,
+                valid: omocl_valid,
+            },
+            counts: self.report.counts(),
+            diagnostics: self
                 .report
                 .diagnostics()
                 .iter()
-                .map(|diagnostic| crate::check::diagnostic_json(diagnostic, &shown(diagnostic.file())))
-                .collect::<Vec<serde_json::Value>>(),
-        })
+                .map(|diagnostic| {
+                    crate::check::shown_diagnostic(diagnostic, &shown(diagnostic.file()))
+                })
+                .collect(),
+        }
     }
 
     /// Returns every mapping file under `roots` as `GET /operator/mappings`
@@ -174,14 +157,14 @@ impl Snapshot {
                 .diagnostics()
                 .iter()
                 .filter(|diagnostic| diagnostic.file() == located.path())
-                .map(|diagnostic| crate::check::diagnostic_json(diagnostic, located.wire()))
+                .map(|diagnostic| crate::check::shown_diagnostic(diagnostic, located.wire()))
                 .collect();
             listed.push(Listed {
                 path: located.wire().to_owned(),
-                language: located.language(),
-                kind: self.kind(&located),
+                language: located.language().into(),
+                kind: self.kind(&located).map(str::to_owned),
                 sha256: files::sha256(&bytes),
-                owner: located.owner(),
+                owner: located.owner().into(),
                 read_only: located.owner() == Owner::Provisioned,
                 diagnostics,
             });

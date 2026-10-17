@@ -10,7 +10,7 @@
 //! `GET /health/info` never re-type a version. No specification governs this:
 //! our own design.
 
-use serde::Serialize;
+use ferrobridge_operator_api::health::{Build, Info, Lane, Pin};
 
 /// The full git commit this binary was built from, or `unknown` outside a
 /// checkout.
@@ -37,23 +37,14 @@ pub const OPENEHR_CRATES: &str = env!("FERROBRIDGE_BUILD_OPENEHR_CRATES");
 /// The version `Cargo.lock` locks for `fhir-types`.
 pub const FHIR_TYPES: &str = env!("FERROBRIDGE_BUILD_FHIR_TYPES");
 
-/// One pin the process serves: a name and the version it is at.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Pin {
-    /// What is pinned, as the pin matrix names it.
-    pub name: &'static str,
-    /// The version, as the implementing crate states it.
-    pub version: String,
-}
-
 /// Returns the pins the process serves, in the order the banner prints them.
 ///
 /// The two mapping grammars are stated as `<language>/<version>` by their
 /// crates; the version after the slash is the pin.
 #[must_use]
 pub fn pins() -> Vec<Pin> {
-    let pin = |name, version: &str| Pin {
-        name,
+    let pin = |name: &str, version: &str| Pin {
+        name: name.to_owned(),
         version: version.to_owned(),
     };
     vec![
@@ -77,75 +68,23 @@ fn grammar_version(grammar: &str) -> &str {
         .map_or(grammar, |(_, version)| version)
 }
 
-/// What `GET /health/info` answers with.
-#[derive(Debug, Clone, Serialize)]
-pub struct Info {
-    /// The product name.
-    pub product: &'static str,
-    /// The product version.
-    pub version: &'static str,
-    /// The build facts.
-    pub build: Build,
-    /// The pins the process serves.
-    pub pins: Vec<Pin>,
-    /// The lanes this deployment configures, in banner order.
-    pub lanes: Vec<LaneInfo>,
-}
-
-/// One lane, as `GET /health/info` reports it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct LaneInfo {
-    /// The lane's name, as the banner names it.
-    pub name: &'static str,
-    /// Whether the configuration switches it on.
-    pub enabled: bool,
-    /// The socket address a face with a listener of its own binds.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub listen: Option<String>,
-    /// Whether that listener accepts connections now.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub up: Option<bool>,
-}
-
-/// The build facts, as `GET /health/info` reports them.
-#[derive(Debug, Clone, Copy, Serialize)]
-pub struct Build {
-    /// The full git commit, or `unknown`.
-    pub commit: &'static str,
-    /// The abbreviated git commit, or `unknown`.
-    pub commit_short: &'static str,
-    /// The build instant, RFC 3339 UTC.
-    pub built_at: &'static str,
-    /// The compiler.
-    pub rustc: &'static str,
-}
-
-impl Info {
-    /// Returns the facts of this build.
-    #[must_use]
-    pub fn current() -> Self {
-        Self {
-            product: crate::state::PRODUCT,
-            version: crate::state::VERSION,
-            build: Build {
-                commit: COMMIT,
-                commit_short: COMMIT_SHORT,
-                built_at: BUILT_AT,
-                rustc: RUSTC,
-            },
-            pins: pins(),
-            lanes: Vec::new(),
-        }
-    }
-
-    /// Returns these facts with `lanes` as the lanes reported.
-    #[must_use]
-    pub fn with_lanes(mut self, lanes: Vec<LaneInfo>) -> Self {
-        self.lanes = lanes;
-        self
+/// Returns what `GET /health/info` answers for this build with `lanes` as
+/// the lanes reported.
+#[must_use]
+pub fn info(lanes: Vec<Lane>) -> Info {
+    Info {
+        product: crate::state::PRODUCT.to_owned(),
+        version: crate::state::VERSION.to_owned(),
+        build: Build {
+            commit: COMMIT.to_owned(),
+            commit_short: COMMIT_SHORT.to_owned(),
+            built_at: BUILT_AT.to_owned(),
+            rustc: RUSTC.to_owned(),
+        },
+        pins: pins(),
+        lanes,
     }
 }
-
 /// Logs the build facts as one structured event.
 pub fn log() {
     tracing::info!(
@@ -161,7 +100,7 @@ pub fn log() {
 
 #[cfg(test)]
 mod tests {
-    use super::{BUILT_AT, COMMIT, COMMIT_SHORT, Info, grammar_version, pins};
+    use super::{BUILT_AT, COMMIT, COMMIT_SHORT, grammar_version, info, pins};
 
     #[test]
     fn the_grammar_version_is_the_part_after_the_slash() {
@@ -216,7 +155,7 @@ mod tests {
 
     #[test]
     fn the_info_document_carries_the_build_and_every_pin() {
-        let document = serde_json::to_value(Info::current()).expect("the info serializes");
+        let document = serde_json::to_value(info(Vec::new())).expect("the info serializes");
         assert_eq!(Some("FerroBRIDGE"), document["product"].as_str());
         assert_eq!(Some(COMMIT), document["build"]["commit"].as_str());
         assert_eq!(

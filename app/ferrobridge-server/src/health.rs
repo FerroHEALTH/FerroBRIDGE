@@ -6,9 +6,10 @@
 //! An indicator is a named, bounded check of one upstream. Liveness answers
 //! `200` while the process is up; readiness runs every registered indicator
 //! and answers `503` while any of them is down, with a body naming each one.
-//! No specification governs health probes: our own design.
+//! The body is the `ferrobridge_operator_api::health::Readiness` document
+//! the operator console reads. No specification governs health probes: our
+//! own design.
 
-use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::future::Future;
@@ -16,51 +17,13 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
+use ferrobridge_operator_api::health::{IndicatorState, Readiness, State};
+
 /// The upper bound on one indicator check.
 ///
 /// A wedged upstream cannot hang a probe: a check that runs past this is
 /// reported down with that as its detail.
 pub const CHECK_TIMEOUT: Duration = Duration::from_secs(2);
-
-/// The state of one indicator, or of the aggregate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum State {
-    /// The subsystem answered.
-    Up,
-    /// The subsystem did not answer.
-    Down,
-}
-
-/// The outcome of one indicator check.
-#[derive(Debug, Clone, Serialize)]
-pub struct IndicatorState {
-    /// Whether the subsystem answered.
-    pub state: State,
-    /// Why it did not, when it did not. Never a body and never a credential.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub detail: Option<String>,
-}
-
-impl IndicatorState {
-    /// Returns the state of a subsystem that answered.
-    #[must_use]
-    pub const fn up() -> Self {
-        Self {
-            state: State::Up,
-            detail: None,
-        }
-    }
-
-    /// Returns the state of a subsystem that did not answer, with the reason.
-    #[must_use]
-    pub fn down(detail: impl Into<String>) -> Self {
-        Self {
-            state: State::Down,
-            detail: Some(detail.into()),
-        }
-    }
-}
 
 /// The future one check returns.
 ///
@@ -119,7 +82,7 @@ impl Registry {
     /// The checks run on the request, one after another, each bounded to
     /// [`CHECK_TIMEOUT`]. A background loop would answer from a cache and call
     /// a dead upstream healthy until the next tick, so the probe asks.
-    pub async fn evaluate(&self) -> Report {
+    pub async fn evaluate(&self) -> Readiness {
         let mut indicators = BTreeMap::new();
         let mut state = State::Up;
         for indicator in self.indicators.iter() {
@@ -133,35 +96,26 @@ impl Registry {
             if outcome.state == State::Down {
                 state = State::Down;
             }
-            indicators.insert(indicator.name(), outcome);
+            indicators.insert(indicator.name().to_owned(), outcome);
         }
-        Report { state, indicators }
+        Readiness { state, indicators }
     }
 }
 
-/// What readiness answers with.
-#[derive(Debug, Clone, Serialize)]
-pub struct Report {
-    /// The aggregate: down while any indicator is down.
-    pub state: State,
-    /// Every indicator by name, in name order.
-    pub indicators: BTreeMap<&'static str, IndicatorState>,
-}
-
-impl Report {
-    /// Returns the HTTP status this report answers with.
-    #[must_use]
-    pub const fn status(&self) -> http::StatusCode {
-        match self.state {
-            State::Up => http::StatusCode::OK,
-            State::Down => http::StatusCode::SERVICE_UNAVAILABLE,
-        }
+/// Returns the HTTP status `report` answers with: `200` while the aggregate
+/// is up, `503` while it is down.
+#[must_use]
+pub const fn status(report: &Readiness) -> http::StatusCode {
+    match report.state {
+        State::Up => http::StatusCode::OK,
+        State::Down => http::StatusCode::SERVICE_UNAVAILABLE,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Check, HealthIndicator, IndicatorState, Registry, State};
+    use super::{Check, HealthIndicator, Registry, status};
+    use ferrobridge_operator_api::health::{IndicatorState, State};
     use http::StatusCode;
     use std::sync::Arc;
 
@@ -188,7 +142,7 @@ mod tests {
     async fn an_empty_registry_is_up() {
         let report = Registry::default().evaluate().await;
         assert_eq!(State::Up, report.state);
-        assert_eq!(StatusCode::OK, report.status());
+        assert_eq!(StatusCode::OK, status(&report));
         assert!(report.indicators.is_empty());
     }
 
@@ -200,7 +154,7 @@ mod tests {
         ]);
         let report = registry.evaluate().await;
         assert_eq!(State::Down, report.state);
-        assert_eq!(StatusCode::SERVICE_UNAVAILABLE, report.status());
+        assert_eq!(StatusCode::SERVICE_UNAVAILABLE, status(&report));
         assert_eq!(2, report.indicators.len());
         assert_eq!(
             Some(State::Down),

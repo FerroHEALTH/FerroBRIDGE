@@ -315,12 +315,12 @@ impl AppState {
     /// pins and every lane, the HL7 v2 lane with its listen address and
     /// whether its listener accepts now.
     #[must_use]
-    pub fn info(&self) -> crate::build_info::Info {
+    pub fn info(&self) -> ferrobridge_operator_api::health::Info {
         let lanes = self
             .lanes
             .iter()
-            .map(|lane| crate::build_info::LaneInfo {
-                name: lane.name,
+            .map(|lane| ferrobridge_operator_api::health::Lane {
+                name: lane.name.to_owned(),
                 enabled: lane.enabled,
                 listen: lane.listen.clone(),
                 up: lane.listen.as_ref().map(|_| {
@@ -330,7 +330,7 @@ impl AppState {
                 }),
             })
             .collect();
-        crate::build_info::Info::current().with_lanes(lanes)
+        crate::build_info::info(lanes)
     }
 
     /// Returns the facade, when its lane is on.

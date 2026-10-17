@@ -1120,16 +1120,20 @@ the console's server, which calls the bridge with the operator's own access
 token. The bridge validates that token as the resource server it already is
 (#400), serves no static asset and holds no browser session.
 
-**The console links two workspace crates and no others.** The server half
-may depend on `openehr-mapping-core`, for the `Diagnostic` a check answers,
-and on `fhir-types` with the `r4` and `terminology` features (the root set
-that emits them), for the `OperationOutcome` and the
-`CapabilityStatement` it renders. The browser half links neither and receives
-view data from server functions. A dependency-closure test fails on any
-other workspace member, so the console can never compile or run a mapping
-itself: every check, transform and save goes through the bridge. Linking the
-two crates is what `codegen.md` asks of a consumer, which may not shadow a
-model the workspace already defines.
+**The console links three workspace crates and no others.** The server half
+may depend on `openehr-mapping-core`, for the `Diagnostic` a check answers;
+on `fhir-types` with the `r4` and `terminology` features (the root set that
+emits them), for the `OperationOutcome` and the `CapabilityStatement` it
+renders; and on `ferrobridge-operator-api` (#777), the serde types of the
+bridge's health and operator documents, which the bridge serializes and the
+console decodes, so a field renamed on one side fails the other's build. The
+contract crate carries serde types and nothing else: no engine, no I/O. The
+browser half links none of them and receives view data from server
+functions. A dependency-closure test fails on any other workspace member, so
+the console can never compile or run a mapping itself: every check,
+transform and save goes through the bridge. Linking these crates is what
+`codegen.md` asks of a consumer, which may not shadow a model the workspace
+already defines.
 
 **The operator API is off by default.** It is mounted under `/operator` on
 the bridge's listener when `[operator] enabled = true`, and enabling it
@@ -1521,6 +1525,7 @@ published `openehr-*` crates do.
 | `ferrobridge-hl7v2` | the HL7 v2 face (#254): `mllp` (the MLLP Release 1 frame codec on `tokio-util` and the listener), `decode` (MSH-18 through `encoding_rs`, a byte outside the declared set refused), `parse` (positional split, escape decoding, the grouping by the `hl7v2-types` structure tree), `ack` (original-mode `AA`, `AE`, `AR`), `inbound` (one message through those steps), `map` (the interpreter of the `hl7.fhir.uv.v2mappings` ConceptMaps, read from a directory at run time, writing through `fhirconnect::tree` and translating every table value through `ferrobridge-term`; conditions and target notation on `logos` and `chumsky`) | hand-written | yes (0.0.0 reservation) |
 | `ferrobridge-fhirpath` | the FHIRPath evaluator (#436): FHIRPath Normative Release 2.0.0 with the FHIR R4 additions over the `fhir-types` `Value` tree, typed by the element table behind a version trait (`model::r4::R4`); a `logos` and `chumsky` parser, exact decimals, dates and times with their precision, a static path check against the context type, and the outward functions (`resolve()`, `memberOf()`, `conformsTo()` and the rest) over caller-supplied seams | hand-written | yes (0.0.0; the name is not yet reserved on crates.io) |
 | `ferrobridge-validator` | the FHIR R4 profile validator (#432, section 4.9): `package` (a FHIR package from a `.tgz` through `flate2` and `tar`, or an unpacked directory), `set` (the dependency closure and canonical resolution into the generated `fhir_types::r4` model), `validate` (the walk over the element table and the profile snapshot), `issue` and `report` (typed issues, the unevaluated list, the R4 `OperationOutcome`) | hand-written | yes (0.0.0; the name is not yet reserved on crates.io) |
+| `ferrobridge-operator-api` | the documents of the bridge's health and operator surfaces (#777): the build and lane information, readiness with its indicators, the engine state, the file listing and the load report, as serde types the server serializes and the operator console decodes; each diagnostic is the `openehr-mapping-core` `Diagnostic` in its own serde form | hand-written | yes (0.0.0; the name is not yet reserved on crates.io) |
 | `app/ferrobridge-server` | the one binary, `ferrobridge`: `serve` (the FHIR facade, the FHIRconnect operations, the ETL job API), `etl` (a batch run), `cdm init` (apply the DDL), `vocab load`, `mapping check`; thin `main.rs` over a `lib.rs`; the `cdr` module over the generated ITS-REST client of `openehr-its` (the commit headers, the kept upstream answer, the ids an `ETag` names, the template fetch, the AQL paging); the `redb` identity store; the `hl7v2` face beside the FHIR facade (the `[hl7v2]` MLLP listener, each message written through the facade's ingest service, the acknowledgment chosen from the commit outcome); the change-feed adapter | hand-written | no |
 | `tools/fhir-codegen` | the FHIR generator moved from the sibling, with its `emit --check` drift gate and its vendored packages | hand-written | no |
 | `tools/omop-cdm-codegen` | the CDM generator with its `emit --check` drift gate | hand-written | no |
@@ -1543,12 +1548,14 @@ flowchart BT
     HL --> TC
     FP["ferrobridge-fhirpath<br/>(the FHIRPath evaluator)"] --> FT
     VA["ferrobridge-validator<br/>(the R4 profile validator)"] --> FT
+    OA["ferrobridge-operator-api<br/>(the health and operator documents)"] --> MC
     SV["app/ferrobridge-server<br/>(the one binary)"] --> FC
     SV --> OM
     SV --> OC
     SV -->|"generated ITS-REST client"| OE
     SV --> TC
     SV -->|"the HL7 v2 face"| HL
+    SV --> OA
     TK["tools/ferrobridge-testkit<br/>(path-only dev-dependency)"] -.-> SV
     CG["tools/fhir-codegen"] -.->|"emits"| FT
     OG["tools/omop-cdm-codegen"] -.->|"emits"| OC
@@ -2319,7 +2326,7 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | Bulk load | binary `COPY` via `tokio-postgres`, `sqlx` for checked queries | throughput; the reference engine's per-row persist is its ceiling | ORM-style inserts |
 | Demographics | in order: the patient-to-EHR link through `EHR_STATUS.subject.external_ref`; `Patient` from EHR-side person templates through FHIRconnect; the FHIRconnect demographics endpoint as our own port over the identity store; `PARTY` objects over the ITS-REST Demographic API behind a feature labelled DEVELOPMENT; party-rooted mappings as our own extension; demographic AQL as Cadasto's experimental extension documents it, behind a feature labelled with that extension, backing demographic FHIR search (#465, #480) | the link and EHR-side templates rest on STABLE texts (RM Common IM §4.2.1.1, ITS-REST EHR); the Demographic API is `x-status: DEVELOPMENT` at 1.1.0 and on master and has no search; FHIRconnect `engine/demographics.adoc` defines no endpoint interface; AQL 1.1.0 defines no demographic semantics (QUERY §3.13.2), and the owner expects Cadasto's extension to become that specification (owner direction 2026-10-15) | demographics left outside |
 | Operator console shape | `app/ferrobridge-viewer`, a Leptos app rendered on the server and hydrated, with a backend-for-frontend, its own binary and image; halves chosen by target, never by feature; the operator's OIDC session on the console's server, which calls the bridge with the operator's token (section 4.10, #594) | the bridge authenticates every request by bearer token and holds no browser session (#400), so a console the bridge served would add a session and a static-asset surface; FerroFED's A55 is the family precedent; no specification governs the console: our own design | a client-side app served by the bridge; a console inside the server binary |
-| Console crate boundary | the server half links `openehr-mapping-core` and `fhir-types` (`r4`, `terminology`) and no other workspace crate, enforced by a dependency-closure test; the browser half links neither | `codegen.md` forbids a consumer shadowing a model the workspace defines (`Diagnostic`, `OperationOutcome`, `CapabilityStatement`); excluding the engine crates keeps every check, transform and save on the bridge | no workspace crate (shadow types for the three); the engine crates linked so the console compiles mappings itself |
+| Console crate boundary | the server half links `openehr-mapping-core`, `fhir-types` (`r4`, `terminology`) and `ferrobridge-operator-api` (the serde types of the health and operator documents, #777) and no other workspace crate, enforced by a dependency-closure test; the browser half links none | `codegen.md` forbids a consumer shadowing a model the workspace defines (`Diagnostic`, `OperationOutcome`, `CapabilityStatement`, and the bridge's own documents); one contract crate both sides compile against turns a renamed field into a build failure; excluding the engine crates keeps every check, transform and save on the bridge | no workspace crate (shadow types for the three); the console reading the bridge's documents by field name; the engine crates linked so the console compiles mappings itself |
 | Operator API | `/operator` on the bridge's listener, off unless `[operator] enabled`, refused at load without `[auth]`, every route requiring `auth.operator_scope`; the log names actor and file, never content | SMART scopes cover FHIR resources only; the bridge has no admin listener and the writes touch mapping files, never clinical data; no specification governs it: our own design | a second admin listener; an unguarded API on a private network |
 | Mapping ownership and saving | provisioned directories read-only; console saves go to `[operator] mapping_dir`, written to a temporary file, synced and renamed; a save over a provisioned path is refused | one owner per file (FerroFED A88); the server runs with a read-only root file system; a rename is atomic within one file system, so a reader sees the old file or the new one | writing back into the provisioned tree; saving without a check |
 | Mapping reload | the whole set compiled, any error keeps the running set; a clean set swapped in one pointer swap that each request reads at entry; each replica reloads on its own call or restart | requests in flight finish on the set they started with; a half-loaded set is never served; shared revisions are v0.0.16 | per-file hot reload; a file watcher; reload on save across replicas |

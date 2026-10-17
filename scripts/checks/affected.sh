@@ -542,6 +542,9 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+ferrobridge-viewer -ferrobridge-server"
   check "fhir-types reaches the console that links it" "crates/fhir-types/src/lib.rs" false \
     "+ferrobridge-viewer"
+  check "the operator contract reaches the server and the console" \
+    "crates/ferrobridge-operator-api/src/lib.rs" false \
+    "+ferrobridge-operator-api +ferrobridge-server +ferrobridge-viewer -fhir-types"
   check "another rule stays inert" ".claude/rules/testing.md" false ""
   check "the sqlx script reaches omop-cdm" "scripts/checks/sqlx-offline.sh" false \
     "+omop-cdm +omocl +ferrobridge-server"

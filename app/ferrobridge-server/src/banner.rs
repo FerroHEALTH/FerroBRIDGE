@@ -10,8 +10,9 @@
 //! a pipe or a log collector strips the escapes. No specification governs
 //! this: our own design.
 
-use crate::build_info::{self, Pin};
+use crate::build_info;
 use crate::startup::Lane;
+use ferrobridge_operator_api::health::Pin;
 
 /// The wordmark in the `FIGlet` `standard` face, kept as text so the banner
 /// needs no font file and no dependency.
@@ -188,7 +189,7 @@ mod tests {
             assert!(
                 banner
                     .lines()
-                    .any(|line| line.contains(pin.name) && line.ends_with(&pin.version)),
+                    .any(|line| line.contains(pin.name.as_str()) && line.ends_with(&pin.version)),
                 "{pin:?}\n{banner}"
             );
         }
