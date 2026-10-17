@@ -46,6 +46,14 @@ crates on crates.io.
   products fit together, and licensing and trademarks.
 ### Added
 
+- `ferrobridge mapping check` runs (#595). It loads the FHIRconnect tree of
+  `[mappings] directory`, compiles every context against its template from
+  `[mappings] templates` or the `[cdr]`, loads and validates the OMOCL files
+  of `[mappings] omocl`, and prints every diagnostic with its file, line,
+  column, severity, code and message, as text or with `--format json`. It
+  exits 0 when no diagnostic is an error, 1 when one is, 69 when the check
+  cannot run and 78 when the configuration names nothing to check. The
+  checker is the library module `check`, which the operator API reuses.
 - `scripts/deploy-probe.sh` probes a running deployment at a base URL (#220)
   and reports each lane (health, the facade under `/fhir`, the FHIRconnect
   operations) as `on`, `off`, `failing` or `uncovered`. An `uncovered` lane

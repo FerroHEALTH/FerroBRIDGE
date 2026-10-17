@@ -103,7 +103,20 @@ pub enum Vocab {
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 pub enum Mapping {
     /// Validates the configured mapping files and reports every diagnostic.
-    Check,
+    Check {
+        /// How the report is written to stdout.
+        #[arg(long, value_enum, default_value_t = ReportFormat::Text)]
+        format: ReportFormat,
+    },
+}
+
+/// How a job writes its report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum ReportFormat {
+    /// One line per diagnostic and a summary line.
+    Text,
+    /// One JSON document.
+    Json,
 }
 
 impl Command {
@@ -114,9 +127,8 @@ impl Command {
     #[must_use]
     pub const fn pending_issue(&self) -> Option<u32> {
         match self {
-            Self::Serve | Self::Cdm { .. } | Self::Etl { .. } => None,
+            Self::Serve | Self::Cdm { .. } | Self::Etl { .. } | Self::Mapping { .. } => None,
             Self::Vocab { .. } => Some(233),
-            Self::Mapping { .. } => Some(595),
         }
     }
 
@@ -135,7 +147,7 @@ impl Command {
                 command: Vocab::Load { .. },
             } => "vocab load",
             Self::Mapping {
-                command: Mapping::Check,
+                command: Mapping::Check { .. },
             } => "mapping check",
         }
     }
@@ -143,13 +155,13 @@ impl Command {
 
 #[cfg(test)]
 mod tests {
-    use super::{Cdm, Cli, Command, Etl, Mapping, Vocab};
+    use super::{Cdm, Cli, Command, Etl, Mapping, ReportFormat, Vocab};
     use clap::Parser;
     use std::path::PathBuf;
 
     #[test]
     fn every_documented_subcommand_parses() {
-        let cases: [(&[&str], Command); 8] = [
+        let cases: [(&[&str], Command); 9] = [
             (&["ferrobridge", "serve"], Command::Serve),
             (
                 &["ferrobridge", "etl", "run"],
@@ -219,7 +231,17 @@ mod tests {
             (
                 &["ferrobridge", "mapping", "check"],
                 Command::Mapping {
-                    command: Mapping::Check,
+                    command: Mapping::Check {
+                        format: ReportFormat::Text,
+                    },
+                },
+            ),
+            (
+                &["ferrobridge", "mapping", "check", "--format", "json"],
+                Command::Mapping {
+                    command: Mapping::Check {
+                        format: ReportFormat::Json,
+                    },
                 },
             ),
         ];
@@ -293,11 +315,14 @@ mod tests {
             "the loader waits on the observed export format"
         );
         assert_eq!(
-            Some(595),
+            None,
             Command::Mapping {
-                command: Mapping::Check
+                command: Mapping::Check {
+                    format: ReportFormat::Text
+                }
             }
-            .pending_issue()
+            .pending_issue(),
+            "the checker runs"
         );
     }
 }
