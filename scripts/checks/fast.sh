@@ -106,9 +106,10 @@ for package in $packages; do args+=(-p "$package"); done
 run cargo fmt --check "${args[@]}"
 run cargo clippy --locked "${args[@]}" --all-targets -- -D warnings
 run cargo nextest run --locked "${args[@]}" --no-tests=pass
-# `cargo test --doc` refuses a package without a library target.
+# `cargo test --doc` refuses a package without a library target; a `cdylib`
+# beside an `rlib` (the console) still has one.
 libraries="$(cargo metadata --no-deps --format-version 1 --locked |
-  jq -r '.packages[] | select(any(.targets[]; any(.kind[]; . == "lib"))) | .name' |
+  jq -r '.packages[] | select(any(.targets[]; any(.kind[]; . == "lib" or . == "rlib"))) | .name' |
   tr '\n' ' ')"
 docs=()
 for package in $packages; do
