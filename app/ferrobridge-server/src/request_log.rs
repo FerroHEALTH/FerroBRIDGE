@@ -31,10 +31,10 @@ pub const MAX_VALUE_LENGTH: usize = 64;
 /// Logs `request` after it completes and returns its response untouched.
 pub async fn log(State(state): State<Arc<AppState>>, request: Request, next: Next) -> Response {
     let method = request.method().clone();
-    let route = request
-        .extensions()
-        .get::<MatchedPath>()
-        .map_or_else(|| UNMATCHED.to_owned(), |matched| matched.as_str().to_owned());
+    let route = request.extensions().get::<MatchedPath>().map_or_else(
+        || UNMATCHED.to_owned(),
+        |matched| matched.as_str().to_owned(),
+    );
     let query = allowed_parameters(
         request.uri().query().unwrap_or_default(),
         state.logged_query_parameters(),
