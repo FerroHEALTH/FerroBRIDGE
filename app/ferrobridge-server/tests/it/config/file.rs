@@ -3,7 +3,8 @@
 
 //! The file: every section read, and the lanes it turns on.
 
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;

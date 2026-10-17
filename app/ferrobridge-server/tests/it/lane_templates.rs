@@ -55,7 +55,7 @@ async fn serve_template(cdr: &MockServer) {
 }
 
 /// Returns the mapping-set refusal inside a boot refusal.
-fn refusal(error: &ferrobridge_server::config::Error) -> Option<&mappings::Error> {
+fn refusal(error: &ferrobridge_server::config::error::Error) -> Option<&mappings::Error> {
     let mut cause = StdError::source(error);
     while let Some(current) = cause {
         if let Some(found) = current.downcast_ref::<mappings::Error>() {

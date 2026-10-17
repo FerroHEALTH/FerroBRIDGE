@@ -15,7 +15,8 @@ the real run path; a binary-only crate cannot be imported from `tests/`
   variable table in `website/book/src/operate/`, and a case under
   `tests/it/config/`. A key with no documented variable name is a key an
   operator cannot set. `src/config/` holds the tree and its resolved settings
-  in `mod.rs`, the environment overrides in `overrides`, each lane's
+  in `mod.rs`, the refusals (`Error`) in `error`, the environment overrides
+  in `overrides`, each lane's
   resolution in `resolve` and the upstream credentials in `credentials`.
 - **A secret is reachable through a `<key>_file` sibling, read once at boot**,
   and lives in a `SecretString` after that. A value and its `_file` together is

@@ -16,7 +16,7 @@ use std::ops::Range;
 use crate::telemetry::{FILTER_ENV, FORMAT_ENV};
 
 use super::ENV_PREFIX;
-use super::Error;
+use super::error::Error;
 
 /// One `FERROBRIDGE__` variable, with the key it addresses.
 #[derive(Debug)]

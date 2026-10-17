@@ -3,7 +3,8 @@
 
 //! The refusals to boot on an unknown key, a wrong type or a bad value.
 
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 

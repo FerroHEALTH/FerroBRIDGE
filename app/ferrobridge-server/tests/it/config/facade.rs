@@ -4,7 +4,8 @@
 //! The `[facade]` section: off until present, its policy, its store, and
 //! its refusals.
 
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 

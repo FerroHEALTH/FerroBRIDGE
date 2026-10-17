@@ -6,7 +6,8 @@
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use ferrobridge_server::operator::OperatorSettings;
 
 /// The smallest `[auth]` section that boots.

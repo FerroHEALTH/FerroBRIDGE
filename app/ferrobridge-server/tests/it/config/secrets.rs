@@ -3,7 +3,8 @@
 
 //! The `_file` secrets and the credentials sections.
 
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;

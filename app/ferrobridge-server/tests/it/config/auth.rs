@@ -11,7 +11,8 @@ use std::time::Duration;
 use ferrobridge_server::auth::AuthSettings;
 use ferrobridge_server::auth::OPERATOR_SCOPE;
 use ferrobridge_server::auth::TokenProfile;
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use jsonwebtoken::Algorithm;
 
 /// The smallest `[auth]` section that boots.

@@ -164,15 +164,15 @@ impl AppState {
     /// start.
     ///
     /// # Errors
-    /// Returns [`crate::config::Error::Client`] when an upstream client
+    /// Returns [`crate::config::error::Error::Client`] when an upstream client
     /// refuses the configuration it was handed, and
-    /// [`crate::config::Error::Mappings`] when the mapping set does not load.
-    pub async fn build(settings: &Settings) -> Result<Self, crate::config::Error> {
+    /// [`crate::config::error::Error::Mappings`] when the mapping set does not load.
+    pub async fn build(settings: &Settings) -> Result<Self, crate::config::error::Error> {
         let mut indicators: Vec<Arc<dyn crate::health::HealthIndicator>> = Vec::new();
         let mut cdr = None;
         if let Some(config) = settings.cdr.as_ref() {
             let client = crate::cdr::CdrClient::new(config).map_err(|source| {
-                crate::config::Error::Client {
+                crate::config::error::Error::Client {
                     upstream: "cdr",
                     source: Box::new(source),
                 }
@@ -184,7 +184,7 @@ impl AppState {
         if let Some(config) = settings.terminology.as_ref() {
             let client =
                 ferrobridge_term::client::Client::new(config.clone()).map_err(|source| {
-                    crate::config::Error::Client {
+                    crate::config::error::Error::Client {
                         upstream: "terminology",
                         source: Box::new(source),
                     }
@@ -197,7 +197,7 @@ impl AppState {
         }
         let programs = crate::mappings::load_configured(settings, cdr.as_ref())
             .await
-            .map_err(|source| crate::config::Error::Mappings {
+            .map_err(|source| crate::config::error::Error::Mappings {
                 source: Box::new(source),
             })?;
         let operations = programs.map(|programs| {

@@ -4,7 +4,8 @@
 //! The environment over the file: the tree overrides and the console
 //! variables.
 
-use ferrobridge_server::config::{Config, Error};
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::error::Error;
 use ferrobridge_server::telemetry::{DEFAULT_FILTER, FILTER_ENV, FORMAT_ENV, Format};
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
