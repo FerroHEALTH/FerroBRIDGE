@@ -5,6 +5,8 @@
 //! and `ofType` test a type and the types it specializes (N1 §6.3), and a
 //! type name may name a supertype (FHIR R4 §2.9.1.1).
 
+use ferrobridge_fhirpath::eval::error::EvalError;
+
 use super::support::{eval, json, truth};
 
 fn condition_with_an_age() -> fhir_types::codec::Value {
@@ -86,9 +88,52 @@ fn a_bundle_is_a_resource_and_no_domain_resource() {
 }
 
 #[test]
-fn a_primitive_is_its_own_type_only() {
-    // FHIR R4 §2.9.1.5: all primitives are independent types, so code is no string.
+fn a_code_is_a_string_and_an_element() {
+    // N1 §6.3.1: is tests the type or a subclass; FHIR R4 code has baseDefinition
+    // string (https://hl7.org/fhir/R4/datatypes.html#code), string has Element (§2.9.1.2).
     let patient = patient();
     assert_eq!(holds("gender is code", &patient), Some(true));
-    assert_eq!(holds("gender is string", &patient), Some(false));
+    assert_eq!(holds("gender is string", &patient), Some(true));
+    assert_eq!(holds("gender.is(FHIR.string)", &patient), Some(true));
+    assert_eq!(holds("gender is Element", &patient), Some(true));
+}
+
+#[test]
+fn a_code_is_no_id() {
+    // N1 §6.3.1: never a sibling; FHIR R4 code and id both specialize string.
+    let patient = patient();
+    assert_eq!(holds("gender is id", &patient), Some(false));
+}
+
+#[test]
+fn a_fhir_primitive_is_no_system_type() {
+    // FHIR R4 §2.9.1.2: Patient.name.given.is(System.string).not().
+    let patient = patient();
+    assert_eq!(holds("gender is System.String", &patient), Some(false));
+}
+
+#[test]
+fn of_type_keeps_every_primitive_independent() {
+    // FHIR R4 §2.9.1.5 ofType(): all primitives are independent types.
+    let patient = patient();
+    assert_eq!(holds("gender.ofType(string).empty()", &patient), Some(true));
+    assert_eq!(
+        holds("gender.ofType(code).count() = 1", &patient),
+        Some(true)
+    );
+}
+
+#[test]
+fn an_unresolvable_type_in_is_is_an_error() {
+    // N1 §6.3.1: if the identifier cannot be resolved to a valid type identifier,
+    // the evaluator will throw an error; System has no Patient (N1 §10.1).
+    let patient = patient();
+    assert!(matches!(
+        eval("Patient.is(System.Patient)", &patient),
+        Err(EvalError::UnknownType { .. })
+    ));
+    assert!(matches!(
+        eval("Patient is System.Patient", &patient),
+        Err(EvalError::UnknownType { .. })
+    ));
 }

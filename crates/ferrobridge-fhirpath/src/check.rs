@@ -20,7 +20,7 @@
 //! nothing in it is refused.
 
 use crate::ast::{BinaryOp, Expr, Literal, TypeSpecifier};
-use crate::model::{FhirType, Model, field_type, is_a, named_type, variant_type};
+use crate::model::{FhirType, Model, field_type, is_a, named_type, specializes, variant_type};
 use fhir_types::schema::Kind;
 
 /// A path the model refuses.
@@ -274,9 +274,9 @@ impl Checker<'_> {
         };
         let mut kept: Vec<FhirType> = Vec::new();
         for ty in types {
-            let found = if is_a(self.model, ty, target.name) {
+            let found = if specializes(self.model, ty, target.name) {
                 assume.then_some(*ty)
-            } else if assume && is_a(self.model, target, ty.name) {
+            } else if assume && specializes(self.model, target, ty.name) {
                 Some(*target)
             } else if assume {
                 None

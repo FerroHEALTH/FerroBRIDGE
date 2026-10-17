@@ -15,6 +15,7 @@
 use std::collections::BTreeMap;
 
 use ferrobridge_fhirpath::eval::convert::primitive_value;
+use ferrobridge_fhirpath::eval::error::EvalError;
 use ferrobridge_fhirpath::eval::{Environment, Focus};
 use ferrobridge_fhirpath::expression::Expression;
 use ferrobridge_fhirpath::model::r4::R4;
@@ -239,6 +240,13 @@ fn verdict(test: &Test, inputs: &BTreeMap<String, Result<Value, String>>) -> Res
     let result = match expression.evaluate(&environment, focus) {
         Ok(result) => result,
         Err(_) if invalid => return Ok(()),
+        // N1 §6.3.1 and §6.3.3: an identifier that cannot be resolved to a valid type
+        // identifier makes the evaluator throw an error, so a case expecting a result fails.
+        Err(error @ EvalError::UnknownType { .. }) => {
+            return Err(format!(
+                "refused as N1 §6.3.1 requires for an unresolvable type: {error}"
+            ));
+        }
         Err(error) => return Err(format!("does not evaluate: {error}")),
     };
     if let Some(kind) = &test.invalid {

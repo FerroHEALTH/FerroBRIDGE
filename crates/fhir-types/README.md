@@ -100,6 +100,18 @@ consumer walking a path resolves that member's contents against this entry. It
 is a table-only entry: the crate emits no `Element` Rust type, because an
 element whose type is `Element` becomes its own nested struct.
 
+Every type names the type it specializes, and `Schemas::base_of` reads it.
+A primitive has no element entry: `Schemas::primitives` lists each one with
+the type its `StructureDefinition.baseDefinition` names, which
+`Schemas::primitive_base_of` reads.
+
+```rust
+use fhir_types::r4::schema::SCHEMAS;
+
+assert_eq!(SCHEMAS.primitive_base_of("code"), Some("string"));
+assert_eq!(SCHEMAS.primitive_base_of("string"), Some("Element"));
+```
+
 ## Primitive lexical forms
 
 A primitive value the FHIR JSON representation carries as a string is held to

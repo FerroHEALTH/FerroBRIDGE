@@ -24,7 +24,11 @@ table, and another version plugs in by implementing `Model` over its own.
 `DomainResource` and a `Resource`, the abstract types included; a gap in the
 table is a generator change, never a constant here. A FHIR primitive maps
 onto the system types by the table of R4 §2.9.1.2: `date` is a
-`System.DateTime`, and every primitive is its own type for `is`.
+`System.DateTime`, and no FHIR primitive is of a system type for `is`.
+`is` walks a primitive up the base the table names for it
+(`Schemas::primitive_base_of`, `model::specializes`), so `code` is a
+`string` and an `Element` (N1 §6.3.1); `ofType()` and `as` keep every
+primitive an independent type (`model::is_a`, R4 §2.9.1.5).
 
 ## Strict, and an error is never an empty result
 
