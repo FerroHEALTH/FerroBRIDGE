@@ -232,3 +232,72 @@ async fn a_stored_container_the_uid_grammar_refuses_answers_a_typed_500_naming_t
     assert_eq!(0, asked, "the CDR is asked for no composition");
     Ok(())
 }
+
+/// Replaces the `value` of every element whose `archetype_node_id` is
+/// `node` inside `composition` with `value`.
+fn replace_value(composition: &mut serde_json::Value, node: &str, value: &serde_json::Value) {
+    match composition {
+        serde_json::Value::Object(object) => {
+            if object
+                .get("archetype_node_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(node)
+                && object.contains_key("value")
+            {
+                object.insert(String::from("value"), value.clone());
+            }
+            for member in object.values_mut() {
+                replace_value(member, node, value);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                replace_value(item, node, value);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[tokio::test]
+async fn a_composition_the_outbound_mapping_refuses_is_counted_as_a_mapping_failure()
+-> Result<(), Box<dyn StdError>> {
+    let harness = harness().await;
+    let id = create_one(&harness).await?;
+    let mut composition = harness.composition();
+    replace_value(
+        &mut composition,
+        "at0002",
+        &serde_json::json!({ "_type": "DV_QUANTITY", "magnitude": 1.0, "units": "mg" }),
+    );
+    mount_read(&harness.cdr, VERSION_ONE, &composition).await;
+    let (status, body) = call(
+        harness.app(),
+        Request::get(format!("/fhir/Condition/{id}")).body(Body::empty())?,
+    )
+    .await?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+    assert_eq!(
+        Some("processing"),
+        first_issue(&body)["code"].as_str(),
+        "{body}"
+    );
+    assert_eq!(1, harness.facade.usage().take().mapping_failures, "{body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_read_the_outbound_mapping_answers_counts_no_mapping_failure()
+-> Result<(), Box<dyn StdError>> {
+    let harness = harness().await;
+    let id = create_one(&harness).await?;
+    mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
+    let (status, body) = call(
+        harness.app(),
+        Request::get(format!("/fhir/Condition/{id}")).body(Body::empty())?,
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(0, harness.facade.usage().take().mapping_failures, "{body}");
+    Ok(())
+}

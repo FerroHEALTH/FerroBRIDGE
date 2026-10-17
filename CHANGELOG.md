@@ -173,8 +173,9 @@ crates on crates.io.
   message from its frame to its acknowledgment, the counters `hl7v2_aa`,
   `hl7v2_ae` and `hl7v2_ar` count the acknowledgment codes the face sent,
   and `mapping_failures` counts each resource or composition a FHIRconnect
-  program refused to map, on a facade or HL7 v2 ingest and on an operation
-  call. The book's usage report page lists the new keys.
+  program refused to map, on a facade or HL7 v2 ingest, on a facade read or
+  search (#773) and on an operation call. The book's usage report page lists
+  the new keys.
 - The server translates the codes of every `conceptmap` mapping through the
   configured `[terminology]` server (#722), on the FHIR facade, the
   `$tofhir` and `$toopenehr` operations and the HL7 v2 face. A composition

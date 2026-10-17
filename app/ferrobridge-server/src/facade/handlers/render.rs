@@ -41,6 +41,7 @@ use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::status;
 use crate::terminology::{Direction, Translator};
+use crate::usage_report::window::Window;
 
 /// What one rendered resource carries beside its body.
 #[derive(Debug, Clone)]
@@ -81,6 +82,8 @@ pub(crate) struct Origin<'a> {
     pub(crate) subject: Option<&'a Value>,
     /// The identity map every resource the run creates is bound in.
     pub(crate) store: &'a dyn Store,
+    /// The usage report's window an engine refusal of the run is counted in.
+    pub(crate) usage: &'a Window,
 }
 
 /// Returns the resource `composition` maps to, decorated with its identity
@@ -232,8 +235,11 @@ async fn produce(
         })
         .await;
     let identities = CreatedIdentities::new(origin.store, program.resource().as_str(), origin.id);
-    let produced = engine::outbound(program, index, composition, &identities, &resolved)
-        .map_err(|error| Refusal::from(crate::facade::ingest::engine_refusal(&error)))?;
+    let produced =
+        engine::outbound(program, index, composition, &identities, &resolved).map_err(|error| {
+            origin.usage.record_mapping_failure();
+            Refusal::from(crate::facade::ingest::engine_refusal(&error))
+        })?;
     let warnings = produced.warnings().to_vec();
     let (value, created) = produced.into_parts();
     Ok((value, created, warnings))
