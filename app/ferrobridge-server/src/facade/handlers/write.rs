@@ -77,7 +77,7 @@ pub(crate) async fn create(
     crate::facade::handlers::supported(facade, resource_type)?;
     let inbound = read::parse(body, resource_type)?;
     compartment::admit_inbound(facade, access, Permission::Create, &inbound)?;
-    let program = select_program(facade, &inbound, headers)?;
+    let program = &select_program(facade, &inbound, headers)?;
     let ingest = facade.ingest(facade.client_for(headers));
     let claim = ingest.claim_resource(&inbound)?;
 
@@ -166,7 +166,7 @@ pub(crate) async fn update(
     let inbound = read::parse(body, resource_type)?;
     same_id(&inbound, id)?;
     compartment::admit_inbound(facade, access, Permission::Update, &inbound)?;
-    let program = select_program(facade, &inbound, headers)?;
+    let program = &select_program(facade, &inbound, headers)?;
     let ingest = facade.ingest(facade.client_for(headers));
     resend(
         facade,
@@ -349,13 +349,13 @@ async fn precondition(
 }
 
 /// Selects the program one inbound resource runs.
-pub(crate) fn select_program<'a>(
-    facade: &'a Facade,
+pub(crate) fn select_program(
+    facade: &Facade,
     inbound: &Inbound,
     headers: &HeaderMap,
-) -> Result<&'a Loaded, Refusal> {
+) -> Result<Loaded, Refusal> {
     let pin = template_pin(headers);
-    Ok(ingest::select(facade.programs(), inbound, pin.as_ref())?)
+    Ok(ingest::select(&facade.programs(), inbound, pin.as_ref())?.clone())
 }
 
 /// Returns the `templateId` pin a request carries, when it carries one.

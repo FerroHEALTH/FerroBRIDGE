@@ -56,7 +56,7 @@ fn load(programs: &Programs, files: &[(&str, &str)]) -> Result<search::Catalog, 
 #[tokio::test]
 async fn the_fixture_declaration_loads_and_the_mapping_loader_skips_it() {
     let harness = harness().await;
-    let catalog = search::load(Path::new(FIXTURES), harness.facade.programs())
+    let catalog = search::load(Path::new(FIXTURES), &harness.facade.programs())
         .expect("the fixture declaration loads");
     assert_eq!(1, catalog.of_type("Condition").len());
     assert!(catalog.of_type("Observation").is_empty());
@@ -73,7 +73,7 @@ async fn the_fixture_declaration_loads_and_the_mapping_loader_skips_it() {
 async fn a_declaration_naming_no_loaded_context_refuses_the_start() {
     let harness = harness().await;
     let error = load(
-        harness.facade.programs(),
+        &harness.facade.programs(),
         &[("x.search.yml", "context: no.such.context\n")],
     )
     .expect_err("the context is unknown");
@@ -98,7 +98,7 @@ async fn a_path_that_does_not_parse_refuses_the_start() {
         let text = format!(
             "context: {CONTEXT}\nparameters:\n  when:\n    type: date\n    path: \"{path}\"\n"
         );
-        let error = load(harness.facade.programs(), &[("x.search.yml", &text)])
+        let error = load(&harness.facade.programs(), &[("x.search.yml", &text)])
             .expect_err("the path is refused");
         if placed {
             assert!(
@@ -113,7 +113,7 @@ async fn a_path_that_does_not_parse_refuses_the_start() {
         }
     }
     let error = load(
-        harness.facade.programs(),
+        &harness.facade.programs(),
         &[(
             "x.search.yml",
             &format!("context: {CONTEXT}\norder: [\"c/[\"]\n"),
@@ -141,7 +141,7 @@ async fn a_token_whose_code_and_system_cannot_be_read_from_one_node_refuses_the_
                 ""
             }
         );
-        let error = load(harness.facade.programs(), &[("x.search.yml", &text)])
+        let error = load(&harness.facade.programs(), &[("x.search.yml", &text)])
             .expect_err("the cluster repeats");
         assert!(
             matches!(error, DeclarationError::Template { .. }),
@@ -151,7 +151,7 @@ async fn a_token_whose_code_and_system_cannot_be_read_from_one_node_refuses_the_
     let bound = format!(
         "context: {CONTEXT}\nparameters:\n  site:\n    type: token\n    node: {{ class: CLUSTER, archetype: openEHR-EHR-CLUSTER.anatomical_location.v1 }}\n    path: items[at0002]/value\n"
     );
-    load(harness.facade.programs(), &[("x.search.yml", &bound)])
+    load(&harness.facade.programs(), &[("x.search.yml", &bound)])
         .expect("bound at the repeated cluster, code and system are one node's");
 }
 
@@ -167,7 +167,7 @@ async fn an_unknown_key_or_parameter_type_refuses_the_start() {
         format!("context: {CONTEXT}\npatient:\n  parameters: []\n"),
     ] {
         assert!(
-            load(harness.facade.programs(), &[("x.search.yml", &text)]).is_err(),
+            load(&harness.facade.programs(), &[("x.search.yml", &text)]).is_err(),
             "{text}"
         );
     }
@@ -178,7 +178,7 @@ async fn two_declarations_over_one_template_refuse_the_start() {
     let harness = harness().await;
     let text = format!("context: {CONTEXT}\n");
     let error = load(
-        harness.facade.programs(),
+        &harness.facade.programs(),
         &[("a.search.yml", &text), ("b.search.yaml", &text)],
     )
     .expect_err("one template answers one declaration");
@@ -194,7 +194,7 @@ async fn a_required_subject_refuses_a_search_that_names_none() -> Result<(), Box
     // scope is a 400.
     let base = harness().await;
     let catalog = load(
-        base.facade.programs(),
+        &base.facade.programs(),
         &[(
             "x.search.yml",
             &format!("context: {CONTEXT}\npatient:\n  parameters: [patient]\n  required: true\n"),

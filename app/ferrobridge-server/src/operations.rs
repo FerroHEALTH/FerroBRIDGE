@@ -153,7 +153,7 @@ async fn to_fhir_direct(
         .map(|request| with_query(request, &query))
         .and_then(|request| {
             run::to_fhir(
-                lane.programs(),
+                &lane.programs(),
                 &SCHEMAS,
                 &NoMappingFunctions,
                 &settings,
@@ -188,7 +188,7 @@ async fn to_openehr_direct(
     }
     match toopenehr_request(&body, &query).and_then(|request| {
         run::to_openehr(
-            lane.programs(),
+            &lane.programs(),
             &SCHEMAS,
             &NoMappingFunctions,
             &settings,
@@ -217,7 +217,7 @@ fn tofhir_answer(
     merge_query(&mut parameters, query);
     let request = ToFhirRequest::from_parameters(&parameters)?;
     let answer = run::to_fhir(
-        lane.programs(),
+        &lane.programs(),
         &SCHEMAS,
         &NoMappingFunctions,
         settings,
@@ -238,7 +238,7 @@ fn toopenehr_answer(
 ) -> Result<Response, OperationError> {
     let request = toopenehr_request(body, query)?;
     let answer = run::to_openehr(
-        lane.programs(),
+        &lane.programs(),
         &SCHEMAS,
         &NoMappingFunctions,
         settings,

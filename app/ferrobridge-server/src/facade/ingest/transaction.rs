@@ -71,7 +71,7 @@ const fn change_of(preceding: Option<&ObjectVersionId>) -> commit::Change {
 /// entry with no id has no key, so the Bundle it rides in cannot be
 /// recognised when it is sent again.
 fn sources_of(
-    mapped: &[Mapped<'_>],
+    mapped: &[Mapped],
     provenance: &Provenance,
 ) -> Result<Vec<Option<SourceVersion>>, Refused> {
     mapped
@@ -116,7 +116,7 @@ fn sources_of(
 /// two compositions. An entry that repeats another's version as well keeps
 /// the `422 duplicate` that names the repeat (no specification governs the
 /// split: our own design).
-fn distinct(mapped: &[Mapped<'_>], sources: &[Option<SourceVersion>]) -> Result<(), Refused> {
+fn distinct(mapped: &[Mapped], sources: &[Option<SourceVersion>]) -> Result<(), Refused> {
     let mut seen: BTreeMap<String, (&str, String)> = BTreeMap::new();
     let mut repeated = Vec::new();
     let mut versioned = Vec::new();
@@ -173,7 +173,7 @@ fn distinct(mapped: &[Mapped<'_>], sources: &[Option<SourceVersion>]) -> Result<
 /// so the Bundle neither commits its fresh entries nor answers the consumed
 /// ones; the refusal names every entry an earlier delivery consumed or
 /// committed, as `seen` marks them.
-fn partly_consumed(mapped: &[Mapped<'_>], seen: &[bool]) -> Refused {
+fn partly_consumed(mapped: &[Mapped], seen: &[bool]) -> Refused {
     let mut issues = vec![Issue::error(IssueType::Duplicate).diagnosing(
         "an earlier delivery consumed some entries of this Bundle and not the others, so nothing is committed",
     )];
@@ -191,7 +191,7 @@ fn partly_consumed(mapped: &[Mapped<'_>], seen: &[bool]) -> Refused {
 
 /// Returns one outcome per entry, in Bundle order, each mapped entry at the
 /// place `placed` gives it.
-pub(super) fn outcomes(partition: Partition<'_>, placed: Vec<Placed>) -> Vec<EntryOutcome> {
+pub(super) fn outcomes(partition: Partition, placed: Vec<Placed>) -> Vec<EntryOutcome> {
     let mut committed: Vec<Option<Committed>> = partition
         .mapped
         .iter()
@@ -374,7 +374,7 @@ impl Ingest<'_> {
     async fn preceding(
         &self,
         ehr_id: &EhrId,
-        mapped: &[Mapped<'_>],
+        mapped: &[Mapped],
         revised: &[Option<ConsumedSource>],
     ) -> Result<Vec<Option<ObjectVersionId>>, Refused> {
         let mut containers = BTreeSet::new();
@@ -436,7 +436,7 @@ impl Ingest<'_> {
     async fn commit_all(
         &self,
         ehr_id: &EhrId,
-        mapped: &[Mapped<'_>],
+        mapped: &[Mapped],
         preceding: &[Option<ObjectVersionId>],
     ) -> Result<(ContributionUid, Returned<Contribution>), Refused> {
         let system_id = &self.settings.system_id;

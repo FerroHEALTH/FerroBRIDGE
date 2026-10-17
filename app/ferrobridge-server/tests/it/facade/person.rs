@@ -81,6 +81,7 @@ fn person_composition(
         .facade
         .programs()
         .by_context(CONTEXT)
+        .cloned()
         .ok_or("the person context compiled")?;
     let document: fhir_types::codec::Value = serde_json::from_value(resource.clone())?;
     let built = ferrobridge_server::facade::engine::inbound(

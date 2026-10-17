@@ -26,7 +26,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// the clock lives.
 #[derive(Debug)]
 pub struct OperationsLane {
-    programs: ProgramSet,
+    programs: std::sync::RwLock<Arc<ProgramSet>>,
     device: String,
     composer: String,
     language: Option<String>,
@@ -38,7 +38,7 @@ impl OperationsLane {
     #[must_use]
     pub fn new(programs: ProgramSet, device: impl Into<String>) -> Self {
         Self {
-            programs,
+            programs: std::sync::RwLock::new(Arc::new(programs)),
             device: device.into(),
             composer: String::from(DEFAULT_COMPOSER),
             language: None,
@@ -64,10 +64,27 @@ impl OperationsLane {
         self
     }
 
-    /// Returns the compiled programs one call selects from.
+    /// Returns the compiled programs one call selects from, taken once per
+    /// request so a reload never changes them under it.
     #[must_use]
-    pub const fn programs(&self) -> &ProgramSet {
-        &self.programs
+    pub fn programs(&self) -> Arc<ProgramSet> {
+        // NOTE: no specification governs this: our own design; the lock only
+        // guards an `Arc` swap, so a poisoned lock still holds a whole set.
+        Arc::clone(
+            &self
+                .programs
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        )
+    }
+
+    /// Replaces the programs every later call selects from; a call in flight
+    /// finishes on the set it took.
+    pub fn replace(&self, programs: ProgramSet) {
+        *self
+            .programs
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Arc::new(programs);
     }
 
     /// Returns the settings of one run, stamped with the current time.

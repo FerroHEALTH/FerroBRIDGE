@@ -125,6 +125,7 @@ impl Harness {
             .facade
             .programs()
             .by_context("ferrobridge_facade.context")
+            .cloned()
             .expect("the fixture context compiled");
         let document: fhir_types::codec::Value = serde_json::from_value(resource.clone())
             .expect("the synthetic Condition reads as a lexical document");
@@ -266,7 +267,7 @@ async fn facade_over(
     if let Some(limits) = search {
         let catalog = ferrobridge_server::facade::search::load(
             std::path::Path::new(fixtures),
-            built.programs(),
+            &built.programs(),
         )
         .expect("the search declarations load");
         built = built.with_search(catalog, limits);

@@ -83,6 +83,7 @@ fn composition_under(
         .facade
         .programs()
         .by_context(context)
+        .cloned()
         .expect("the fixture context compiled");
     let document: fhir_types::codec::Value =
         serde_json::from_value(resource.clone()).expect("the Condition reads as a document");

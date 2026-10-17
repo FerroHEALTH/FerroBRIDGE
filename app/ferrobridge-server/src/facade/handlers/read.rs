@@ -59,7 +59,7 @@ pub(crate) async fn read(
     let internal = internal_id(id)?;
     let binding =
         binding(facade, resource_type, &internal)?.ok_or_else(|| unknown(resource_type, id))?;
-    let program = program_of(facade, &binding)?;
+    let program = &program_of(facade, &binding)?;
     let ehr_id = binding
         .ehr(&internal)
         .map_err(|error| stored_identifier(&error))?;
@@ -116,7 +116,7 @@ pub(crate) async fn vread(
     let internal = internal_id(id)?;
     let binding =
         binding(facade, resource_type, &internal)?.ok_or_else(|| unknown(resource_type, id))?;
-    let program = program_of(facade, &binding)?;
+    let program = &program_of(facade, &binding)?;
     let tree = VersionTreeId::new(vid).map_err(|error| {
         reply::refusal(
             StatusCode::NOT_FOUND,
@@ -280,13 +280,11 @@ pub(crate) fn binding(
 }
 
 /// Returns the program the identity map recorded for one binding.
-pub(crate) fn program_of<'a>(
-    facade: &'a Facade,
-    binding: &CompositionBinding,
-) -> Result<&'a Loaded, Refusal> {
+pub(crate) fn program_of(facade: &Facade, binding: &CompositionBinding) -> Result<Loaded, Refusal> {
     facade
         .programs()
         .by_context(&binding.context)
+        .cloned()
         .ok_or_else(|| {
             reply::refusal(
                 StatusCode::INTERNAL_SERVER_ERROR,

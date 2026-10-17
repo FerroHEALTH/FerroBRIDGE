@@ -207,7 +207,8 @@ fn set_counts(lanes: &mut [startup::Lane], name: &str, counts: startup::MappingC
 /// Returns what the operations lane compiled: one program per context, over
 /// the distinct templates the programs name.
 fn operation_counts(lane: &state::OperationsLane) -> startup::MappingCounts {
-    let programs = lane.programs().programs();
+    let set = lane.programs();
+    let programs = set.programs();
     let contexts: std::collections::BTreeSet<&str> = programs
         .iter()
         .map(|program| program.context().as_str())

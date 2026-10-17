@@ -277,9 +277,10 @@ fn metadata(
     shape: &capability::Shape,
 ) -> Result<Response, Refusal> {
     guard(headers, uri, Body::Absent)?;
+    let mappings = facade.mappings();
     let statement = capability::statement_of(
-        facade.programs(),
-        facade.search(),
+        mappings.programs(),
+        mappings.search(),
         &facade.settings().base_url,
         shape,
     );
