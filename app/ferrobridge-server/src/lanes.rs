@@ -243,7 +243,8 @@ async fn build_operator(
 ) -> anyhow::Result<operator::Operator> {
     use anyhow::Context;
 
-    let needs_cdr = settings.mapping_directory.is_some() && settings.mappings.is_none();
+    let needs_cdr = settings.mappings.is_none()
+        && (settings.mapping_directory.is_some() || operator_settings.mapping_dir.is_some());
     let cdr = match settings.cdr.as_ref() {
         Some(config) if needs_cdr => Some(
             cdr::CdrClient::new(config)

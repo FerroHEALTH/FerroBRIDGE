@@ -354,6 +354,10 @@ crates on crates.io.
 
 ### Fixed
 
+- The operator API checks and compiles the console's FHIRconnect files on
+  every save and reload when no `[mappings] directory` is provisioned
+  (#774). Before, those files were listed and never checked, so a broken
+  draft was written. In that deployment the templates come from the CDR.
 - The request log writes `<unmatched>` as the route of a request no route
   matched (#746), instead of the raw path the client sent, so an identifier
   in that path no longer reaches the log.

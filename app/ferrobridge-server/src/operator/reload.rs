@@ -75,7 +75,8 @@ pub struct Sources {
 #[derive(Debug, Clone, Default)]
 pub struct Reloader {
     /// The provisioned FHIRconnect directory, named in an operations lane
-    /// refusal.
+    /// refusal. The console's FHIRconnect files are checked whenever there
+    /// are any.
     pub fhirconnect: Option<PathBuf>,
     /// The template directory, when one is configured.
     pub templates: Option<PathBuf>,
@@ -170,7 +171,7 @@ impl Reloader {
             (None, None) => None,
         };
         let report = crate::check::check_files(
-            self.fhirconnect.is_some().then_some(fhirconnect),
+            (self.fhirconnect.is_some() || !fhirconnect.is_empty()).then_some(fhirconnect),
             templates,
             (self.omocl || !omocl.is_empty()).then_some(omocl),
         )
