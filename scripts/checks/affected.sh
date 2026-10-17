@@ -453,29 +453,31 @@ self_test() {
   manifest_diff() { printf '%s\n' "$diff_text"; }
   lock_at() { if [ "$1" = old ]; then printf '%s\n' "$lock_old"; else printf '%s\n' "$lock_new"; fi; }
   local q='"'
+  # The versions below are synthetic (9.9.x for a member, 8.8.x for a
+  # third-party crate), never a live pin.
   diff_text="--- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -1 +1 @@
--fhirconnect = { path = ${q}crates/fhirconnect${q}, version = ${q}0.1.117${q} }
-+fhirconnect = { path = ${q}crates/fhirconnect${q}, version = ${q}0.1.118${q} }"
+-fhirconnect = { path = ${q}crates/fhirconnect${q}, version = ${q}9.9.8${q} }
++fhirconnect = { path = ${q}crates/fhirconnect${q}, version = ${q}9.9.9${q} }"
   check "a member's version move in the manifest reaches that member" "Cargo.toml" false \
     "+fhirconnect +ferrobridge-server -fhir-types -fhir-codegen"
-  diff_text="+serde = { version = ${q}1.0.230${q} }"
+  diff_text="+serde = { version = ${q}8.8.9${q} }"
   check "a third-party requirement reaches everything" "Cargo.toml" false ALL
   diff_text="+opt-level = 0"
   check "a profile line reaches everything" "Cargo.toml" false ALL
   diff_text=""
   lock_old="[[package]]
 name = ${q}fhirconnect${q}
-version = ${q}0.1.117${q}
+version = ${q}9.9.8${q}
 [[package]]
 name = ${q}serde${q}
-version = ${q}1.0.229${q}
+version = ${q}8.8.8${q}
 source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
-  lock_new="${lock_old/0.1.117/0.1.118}"
+  lock_new="${lock_old/9.9.8/9.9.9}"
   check "a member's version move in the lock reaches that member" "Cargo.lock" false \
     "+fhirconnect +ferrobridge-server -fhir-types -fhir-codegen"
-  lock_new="${lock_old/1.0.229/1.0.230}"
+  lock_new="${lock_old/8.8.8/8.8.9}"
   check "a third-party move in the lock reaches everything" "Cargo.lock" false ALL
   check "the design record reaches the testkit's own tests" "docs/architecture.md" false \
     "+ferrobridge-testkit -fhirconnect -ferrobridge-server"
