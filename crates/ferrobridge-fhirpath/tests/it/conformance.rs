@@ -10,7 +10,9 @@
 //! with a `contextType` must pass that check. Any other case passes when the evaluation answers the
 //! expected outputs, in order unless the test says `ordered="false"`. A
 //! failing case records why, and a case on an input FHIR refuses records the
-//! rule the input breaks. No case is special-cased by its name.
+//! rule the input breaks. A case marked `checkOrderedFunctions="true"`
+//! evaluates with `Environment::with_strict_ordering`. No case is
+//! special-cased by its name.
 
 use std::collections::BTreeMap;
 
@@ -225,6 +227,11 @@ fn verdict(test: &Test, inputs: &BTreeMap<String, Result<Value, String>>) -> Res
     }
     let profiles = BaseDefinitions;
     let environment = Environment::new(model).with_profiles(&profiles);
+    let environment = if test.attribute("checkOrderedFunctions") == Some("true") {
+        environment.with_strict_ordering()
+    } else {
+        environment
+    };
     let focus = match (input, test.attribute("context")) {
         (Some(resource), Some(context)) => {
             let context = Expression::parse(context)

@@ -18,6 +18,7 @@ mod check;
 mod conformance;
 mod constraints;
 mod evaluate;
+mod ordering;
 mod parse;
 mod seams;
 mod suite;
