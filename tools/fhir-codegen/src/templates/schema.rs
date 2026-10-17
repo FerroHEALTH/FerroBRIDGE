@@ -18,8 +18,10 @@
 //! base chain passes through (`Resource`, `DomainResource`, `BackboneElement`,
 //! and from R5 `Base`, `DataType` and `BackboneType`), so
 //! [`Schemas::base_of`] walks every type to the root of the hierarchy. A
-//! primitive is not in the table, and neither is a constraint profile such as
-//! `SimpleQuantity`, which is no type of its own.
+//! primitive has no element entry: [`Schemas::primitives`] names each one
+//! with the type its `baseDefinition` names (`code` specializes `string`),
+//! which [`Schemas::primitive_base_of`] reads. A constraint profile such as
+//! `SimpleQuantity` is no type of its own and is in neither list.
 
 /// The scalar a primitive's `value` attribute carries in JSON.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,6 +181,20 @@ pub struct TypeSchema {
     pub base: Option<&'static str>,
 }
 
+/// One primitive type and the type it specializes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PrimitiveSchema {
+    /// The type code (`code`, `positiveInt`).
+    pub name: &'static str,
+    /// The type its `StructureDefinition.baseDefinition` names
+    /// (<https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.baseDefinition>):
+    /// another primitive (`code` specializes `string`), or the type at the
+    /// top of a primitive's chain: `Element` until R4B, which the table
+    /// carries, and from R5 the abstract `PrimitiveType`, which it does not.
+    /// `None` when the definition names none.
+    pub base: Option<&'static str>,
+}
+
 impl TypeSchema {
     /// The element a JSON member of this type's object names, with the
     /// alternative a choice form selects.
@@ -218,13 +234,16 @@ impl TypeSchema {
     }
 }
 
-/// A version's schema: every type, sorted by name, and the resource names.
+/// A version's schema: every type, sorted by name, the resource names and
+/// the primitive types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Schemas {
     /// The types, sorted by name.
     pub types: &'static [TypeSchema],
     /// The resource type names, sorted.
     pub resources: &'static [&'static str],
+    /// The primitive types, sorted by name.
+    pub primitives: &'static [PrimitiveSchema],
 }
 
 impl Schemas {
@@ -242,6 +261,17 @@ impl Schemas {
     #[must_use]
     pub fn base_of(&self, name: &str) -> Option<&'static str> {
         self.type_named(name).and_then(|schema| schema.base)
+    }
+
+    /// The type the primitive `name` specializes, `None` for a code that names
+    /// no primitive and for a primitive whose definition names no base.
+    #[must_use]
+    pub fn primitive_base_of(&self, name: &str) -> Option<&'static str> {
+        self.primitives
+            .binary_search_by(|p| p.name.cmp(name))
+            .ok()
+            .and_then(|i| self.primitives.get(i))
+            .and_then(|primitive| primitive.base)
     }
 
     /// Whether the type `name` is `ancestor` or specializes it, directly or

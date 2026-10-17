@@ -33,7 +33,9 @@ pub fn render_schema(model: &VersionModule) -> Result<String, fmt::Error> {
     );
     out.push_str("use super::super::schema::Schemas;\n");
     out.push_str(&RootScope::Terminology.cfg());
-    out.push_str("use super::super::schema::{FieldSchema, Kind, TypeSchema, ValueKind};\n\n");
+    out.push_str(
+        "use super::super::schema::{FieldSchema, Kind, PrimitiveSchema, TypeSchema, ValueKind};\n\n",
+    );
     out.push_str("/// The version's schema.\n");
     out.push_str("pub static SCHEMAS: Schemas = Schemas {\n    types: &[\n");
     let mut entries: Vec<&TypeDef> = model
@@ -94,8 +96,38 @@ pub fn render_schema(model: &VersionModule) -> Result<String, fmt::Error> {
         out.push_str(&ty.scope.cfg());
         writeln!(out, "        {:?},", ty.name)?;
     }
+    out.push_str("    ],\n    primitives: &[\n");
+    let mut primitives: Vec<(&str, &TypeDef)> = model
+        .types
+        .values()
+        .filter(|ty| ty.is_primitive)
+        .map(|ty| (ty.path.as_str(), ty))
+        .collect();
+    primitives.sort_by(|a, b| a.0.cmp(b.0));
+    for (code, ty) in primitives {
+        let base = ty
+            .base
+            .as_deref()
+            .map(|base| primitive_code(model, base))
+            .map_or_else(|| String::from("None"), |base| format!("Some({base:?})"));
+        out.push_str(&ty.scope.cfg());
+        writeln!(
+            out,
+            "        PrimitiveSchema {{ name: {code:?}, base: {base} }},"
+        )?;
+    }
     out.push_str("    ],\n};\n");
     Ok(out)
+}
+
+/// The FHIR name of the type a primitive's base names: a primitive's type
+/// code (`String` is `string`), a complex type's own name otherwise.
+fn primitive_code<'a>(model: &'a VersionModule, base: &'a str) -> &'a str {
+    model
+        .types
+        .get(base)
+        .filter(|ty| ty.is_primitive)
+        .map_or(base, |ty| ty.path.as_str())
 }
 
 /// The XML kind of a field or variant target.

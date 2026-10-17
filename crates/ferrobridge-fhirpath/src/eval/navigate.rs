@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use super::Engine;
 use super::error::EvalError;
 use crate::ast::TypeSpecifier;
-use crate::model::{FhirType, is_a, named_type};
+use crate::model::{FhirType, Model, is_a, named_type, specializes};
 use crate::value::{Collection, Item, SYSTEM_TYPES};
 
 /// A resolved type specifier.
@@ -111,16 +111,34 @@ impl<'a> Engine<'_, 'a> {
         })
     }
 
-    /// Whether `item` is of the type `ty` or a subtype (N1 §6.3.1): a FHIR
-    /// primitive is not of a system type (FHIR R4 §2.9.1.2).
+    /// Whether `item` is of the type `ty` or a subtype for `as` and
+    /// `ofType()`, every FHIR primitive an independent type (FHIR R4
+    /// §2.9.1.5): a FHIR primitive is not of a system type (FHIR R4 §2.9.1.2).
     pub(crate) fn is_type(&self, item: &Item<'a>, ty: &TypeRef) -> bool {
+        self.type_test(item, ty, is_a)
+    }
+
+    /// Whether `item` is of the type `ty` or a subclass for the `is` operator
+    /// and function (N1 §6.3.1), a FHIR primitive specializing the type its
+    /// definition names (`code` is a `string`).
+    pub(crate) fn is_instance(&self, item: &Item<'a>, ty: &TypeRef) -> bool {
+        self.type_test(item, ty, specializes)
+    }
+
+    /// The type test both forms share, with the walk up the FHIR hierarchy.
+    fn type_test(
+        &self,
+        item: &Item<'a>,
+        ty: &TypeRef,
+        walk: fn(&dyn Model, &FhirType, &str) -> bool,
+    ) -> bool {
         match (item, ty) {
             (_, TypeRef::System("Any")) => true,
             (Item::Node(_) | Item::Type(_), TypeRef::System(_)) => false,
             (other, TypeRef::System(name)) => other.system_type() == Some(*name),
             (Item::Node(node), TypeRef::Fhir(fhir)) => node
                 .fhir_type()
-                .is_some_and(|own| is_a(self.model(), own, fhir.name)),
+                .is_some_and(|own| walk(self.model(), own, fhir.name)),
             (_, TypeRef::Fhir(_)) => false,
         }
     }

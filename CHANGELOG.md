@@ -66,6 +66,20 @@ crates on crates.io.
   their type codes. The profile validator uses both and drops its own
   copy of the choice matching. The change adds API and breaks none;
   `fhirconnect` moves to 0.1.132 with the requirement.
+- `fhir-types` 0.1.119 lists every primitive type with the type its
+  `StructureDefinition.baseDefinition` names, in each version's
+  `schema::SCHEMAS.primitives`, read by `Schemas::primitive_base_of`
+  (`code` specializes `string`) (#635). The new `primitives` field breaks a
+  consumer that builds a `Schemas` value by hand: it adds the field.
+  `fhirconnect` 0.1.133 follows the requirement.
+
+### Fixed
+
+- The FHIRPath `is` operator and `is()` function test a FHIR primitive
+  against the types it specializes, so `Patient.gender is string` is true,
+  as FHIRPath N1 §6.3.1 and the R4 `code` definition ask; `ofType()` and
+  `as` keep every primitive an independent type (FHIR R4 fhirpath.html
+  §2.9.1.5) (#635).
 
 ### Fixed
 

@@ -29,9 +29,16 @@ pub trait Model: fmt::Debug + Send + Sync {
     /// `Resource`; R4 §2.9.1.1 lets a type name name such a supertype.
     ///
     /// A primitive has no base here, because R4 §2.9.1.5 considers every
-    /// primitive an independent type.
+    /// primitive an independent type for `ofType()`; [`Model::primitive_base`]
+    /// answers it for `is`.
     fn base(&self, name: &str) -> Option<&'static str> {
         self.schemas().base_of(name)
+    }
+
+    /// The type the primitive `name` specializes, its `baseDefinition` read
+    /// from the table: `code` is a `string`, and `string` an `Element`.
+    fn primitive_base(&self, name: &str) -> Option<&'static str> {
+        self.schemas().primitive_base_of(name)
     }
 }
 
@@ -285,6 +292,33 @@ pub fn is_a(model: &dyn Model, ty: &FhirType, name: &str) -> bool {
             return false;
         }
         current = model.base(candidate);
+    }
+    false
+}
+
+/// Whether `ty` is `name` or a subclass of it for the `is` operator.
+///
+/// N1 §6.3.1 makes `is` true of a subclass, and a primitive specializes the
+/// type its definition names: `code` is a `string`, and every primitive an
+/// `Element` (R4 §2.9.1.2). [`is_a`] keeps every primitive independent, as R4 §2.9.1.5 asks of
+/// `ofType()`.
+#[must_use]
+pub fn specializes(model: &dyn Model, ty: &FhirType, name: &str) -> bool {
+    let mut current = Some(ty.name);
+    let mut hops = 0_u8;
+    while let Some(candidate) = current {
+        if candidate == name {
+            return true;
+        }
+        hops = hops.saturating_add(1);
+        if hops > 16 {
+            return false;
+        }
+        current = if model.primitives().contains_key(candidate) {
+            model.primitive_base(candidate)
+        } else {
+            model.base(candidate)
+        };
     }
     false
 }

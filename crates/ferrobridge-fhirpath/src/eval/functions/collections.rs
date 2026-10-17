@@ -133,10 +133,12 @@ fn filtering<'a>(call: &Call<'_, '_, 'a>) -> Result<Option<Collection<'a>>, Eval
                 [item] => item,
                 items => return Err(EvalError::singleton(call.name, items.len())),
             };
-            let matches = call.engine.is_type(item, &ty);
             if call.name == "is" {
-                return Ok(Some(vec![Item::Boolean(matches)]));
+                return Ok(Some(vec![Item::Boolean(
+                    call.engine.is_instance(item, &ty),
+                )]));
             }
+            let matches = call.engine.is_type(item, &ty);
             Ok(Some(if matches {
                 vec![item.clone()]
             } else {

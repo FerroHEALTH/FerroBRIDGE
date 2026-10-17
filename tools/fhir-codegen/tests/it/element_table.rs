@@ -583,3 +583,51 @@ fn the_root_of_the_hierarchy_is_element_and_resource_until_r5_adds_base() {
         assert_eq!(schemas.base_of("Resource"), root, "{module}: Resource");
     }
 }
+
+#[test]
+fn every_primitive_names_the_base_its_definition_states() {
+    for ((module, _, package), (named, schemas)) in packages().into_iter().zip(tables()) {
+        assert_eq!(module, named, "the tables follow the package order");
+        let mut names = Vec::new();
+        for primitive in schemas.primitives {
+            let definition = package
+                .structure_definition_named(primitive.name)
+                .unwrap_or_else(|| panic!("{module}: {} has a definition", primitive.name));
+            assert_eq!(
+                primitive.base,
+                definition
+                    .base_definition
+                    .as_deref()
+                    .and_then(|url| url.rsplit('/').next()),
+                "{module}: the base of {}",
+                primitive.name
+            );
+            // NOTE: R5 and R6 root every primitive at the abstract PrimitiveType
+            // (https://hl7.org/fhir/R5/types.html), which no element entry needs.
+            if let Some(base) = primitive.base.filter(|base| *base != "PrimitiveType") {
+                assert!(
+                    schemas.type_named(base).is_some()
+                        || schemas.primitives.iter().any(|p| p.name == base),
+                    "{module}: {} names {base}, which the table carries",
+                    primitive.name
+                );
+            }
+            names.push(primitive.name);
+        }
+        let mut sorted = names.clone();
+        sorted.sort_unstable();
+        assert_eq!(names, sorted, "{module}: the primitives are sorted");
+        assert!(!names.is_empty(), "{module} carries its primitives");
+    }
+}
+
+#[test]
+fn a_code_specializes_string_and_a_string_element_in_r4() {
+    // FHIR R4 code: baseDefinition string (https://hl7.org/fhir/R4/datatypes.html#code).
+    let schemas = &fhir_types::r4::schema::SCHEMAS;
+    assert_eq!(schemas.primitive_base_of("code"), Some("string"));
+    assert_eq!(schemas.primitive_base_of("positiveInt"), Some("integer"));
+    assert_eq!(schemas.primitive_base_of("url"), Some("uri"));
+    assert_eq!(schemas.primitive_base_of("string"), Some("Element"));
+    assert_eq!(schemas.primitive_base_of("Quantity"), None);
+}
