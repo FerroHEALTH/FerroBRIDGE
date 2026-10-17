@@ -3,11 +3,13 @@
 
 # The container image
 
-FerroBRIDGE ships as one image carrying one binary. This page describes the
-image, the quickstart `compose.yaml` beside it, the variables the server reads,
-and the health probe you point your orchestrator at. Each release
-publishes the image to `ghcr.io/ferrohealth/ferrobridge` under its version
-tag, with provenance and SBOM attestations, beside the release binaries on the
+FerroBRIDGE ships as one image carrying one binary, and the
+[operator console](operator-console.md) as a second image beside it. This
+page describes both images, the quickstart `compose.yaml`, the variables the
+server reads, and the health probe you point your orchestrator at. Each
+release publishes the bridge to `ghcr.io/ferrohealth/ferrobridge` and the
+console to `ghcr.io/ferrohealth/ferrobridge-viewer` under its version tag,
+with provenance and SBOM attestations, beside the release binaries on the
 GitHub release page.
 
 No specification governs packaging, the process model, or health probes: this
@@ -233,6 +235,89 @@ Readiness then carries a `startup` indicator whose `detail` names the attempt
 and why it failed, beside the `cdr` indicator. A documented answer such as a
 `404` for a template the CDR does not hold still stops the start. On
 Kubernetes this keeps a pod that starts before its CDR out of a crash loop.
+
+## The operator console image
+
+The console is a separate binary, `ferrobridge-viewer`, that calls the
+bridge over its public HTTP surface. Its image follows the bridge image's
+rules:
+
+| Fact | Value |
+|---|---|
+| Registry and repository | `ghcr.io/ferrohealth/ferrobridge-viewer` |
+| Tag | the product version, the same as the bridge image of that release |
+| Base | the bridge image's base, at the same index digest |
+| Platforms | `linux/amd64` and `linux/arm64` |
+| User | uid 65532, gid 65532, written numerically |
+| Entrypoint | `/usr/local/bin/ferrobridge-viewer`, exec form, with `serve` as the default command |
+| Site bundle | `/site`, root-owned and read-only to the runtime user |
+| Port | 3000/tcp |
+| Health check | `HEALTHCHECK` through `ferrobridge-viewer healthcheck` |
+
+The image compiles nothing: the release lane builds the static console
+binary per architecture and the site bundle (the WebAssembly, its JavaScript
+glue and the stylesheet), attests both, and stages them before the image is
+built. It sets `FERROBRIDGE_VIEWER__SERVER__LISTEN=0.0.0.0:3000` and
+`FERROBRIDGE_VIEWER__SERVER__SITE_ROOT=/site`, because the binary's own
+defaults are loopback and a checkout's `target/site`.
+
+Unlike the bridge image, the console image declares a `HEALTHCHECK`. The base
+still has no shell and no HTTP client, so the probe is the binary's own
+`healthcheck` subcommand: it reads the same configuration as `serve`, asks
+`GET /health` on the listen port over loopback within 3 seconds, and exits 0
+on a `200` and 1 otherwise. Docker and Compose read the instruction;
+Kubernetes ignores it, so point a probe at `GET /health` on port 3000 there.
+
+Every key of the console's configuration is settable as
+`FERROBRIDGE_VIEWER__<SECTION>__<KEY>`, and every secret through its `_file`
+sibling, the same way the bridge reads its own
+([The operator console](operator-console.md) lists the keys).
+
+## The viewer profile
+
+The `viewer` profile of `compose.yaml` runs the console beside the bridge:
+
+```sh
+printf '%s' "$CLIENT_SECRET" > secrets/viewer_oidc_client_secret
+docker compose --profile viewer up
+```
+
+It publishes port 3000 on `127.0.0.1` (`FERROBRIDGE_VIEWER_PORT` moves it,
+and `FERROBRIDGE_BIND_HOST` names another interface, as for the bridge), and
+reaches the bridge at `http://ferrobridge:8080/` over the compose network.
+The service runs with a read-only root filesystem, every Linux capability
+dropped, and `no-new-privileges:true`. The console keeps its sessions in
+memory and writes no file, so it mounts no volume.
+
+Sign-in stays off until you name your OpenID Provider. Register the console
+there as a confidential client with the redirect URI
+`http://127.0.0.1:3000/auth/callback` (or the address you publish), write
+its client secret to `secrets/viewer_oidc_client_secret`, and set the
+provider in your shell or `.env`:
+
+```sh
+FERROBRIDGE_VIEWER__OIDC__ISSUER=https://idp.example.org/realms/ferrobridge
+FERROBRIDGE_VIEWER__OIDC__AUTHORIZATION_ENDPOINT=https://idp.example.org/realms/ferrobridge/protocol/openid-connect/auth
+FERROBRIDGE_VIEWER__OIDC__TOKEN_ENDPOINT=https://idp.example.org/realms/ferrobridge/protocol/openid-connect/token
+FERROBRIDGE_VIEWER__OIDC__JWKS_URI=https://idp.example.org/realms/ferrobridge/protocol/openid-connect/certs
+FERROBRIDGE_VIEWER__OIDC__CLIENT_ID=ferrobridge-viewer
+FERROBRIDGE_VIEWER__OIDC__CLIENT_SECRET_FILE=/run/secrets/viewer_oidc_client_secret
+FERROBRIDGE_VIEWER__OIDC__REDIRECT_URI=http://127.0.0.1:3000/auth/callback
+FERROBRIDGE_VIEWER__SESSION__SECURE_COOKIE=false
+```
+
+The client secret reaches the console as a compose secret mounted at
+`/run/secrets/viewer_oidc_client_secret`, so the value never enters the
+environment. `FERROBRIDGE_VIEWER__SESSION__SECURE_COOKIE=false` is for a
+console served over plain `http` on loopback, as above, and the console
+refuses it for any other redirect URI; behind an `https` reverse proxy, leave
+it unset so the session cookie carries `Secure`. The quickstart passes each
+of these variables through only when you set it, because an absent issuer is
+a console without sign-in while an empty one is a boot error.
+
+The console calls the bridge with the operator's own access token, so the
+bridge must validate it: turn on the bridge's `[auth]` section, and
+`[operator]` for the mapping files ([The operator API](operator-api.md)).
 
 ## The OMOP CDM profiles
 

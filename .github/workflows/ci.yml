@@ -185,6 +185,44 @@ jobs:
             hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d \
             hadolint --config .hadolint.yaml "${files[@]}"
 
+  # The quickstart and the console image, checked without publishing anything.
+  # `docker compose config` resolves compose.yaml under every profile, so a
+  # broken service, secret or interpolation fails here rather than at an
+  # operator's first `up`. The dry-run build stages placeholder files at the
+  # paths the release lane stages (release-viewer.yml) and builds
+  # docker/viewer/Dockerfile for one platform with no output, so a COPY path or
+  # a .dockerignore rule that misses the staged tree fails here too.
+  container-config:
+    name: compose config and viewer image dry run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: compose.yaml resolves under every profile
+        run: |
+          set -euo pipefail
+          mkdir -p secrets
+          : > secrets/cdm_url
+          : > secrets/cdm_password
+          : > secrets/cdr_bearer_token
+          : > secrets/viewer_oidc_client_secret
+          docker compose --profile viewer config
+          docker compose --profile cdm --profile vocab --profile viewer config --quiet
+      - name: docker/viewer/Dockerfile builds from a staged tree
+        run: |
+          set -euo pipefail
+          mkdir -p dist/viewer/linux_amd64 dist/viewer/site/pkg
+          : > dist/viewer/linux_amd64/ferrobridge-viewer
+          for file in ferrobridge-viewer.wasm ferrobridge-viewer.js ferrobridge-viewer.css; do
+            : > "dist/viewer/site/pkg/${file}"
+          done
+          docker buildx build --check -f docker/viewer/Dockerfile .
+          docker buildx build --platform linux/amd64 -f docker/viewer/Dockerfile .
+
   # The comment-style guard (.claude/rules/comments.md, RFC 505 and RFC 1574)
   # over the whole tree. It reads .rs files only, so it reports "no files to
   # check" today and gates from the first hand-written source file.
@@ -1152,6 +1190,7 @@ jobs:
       - workflow-lint
       - shellcheck
       - dockerfile-lint
+      - container-config
       - comment-style
       - file-length
       - versions

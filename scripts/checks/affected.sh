@@ -498,6 +498,11 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   check "the deployment probe is inert" "scripts/deploy-probe.sh" false ""
   check "another workflow is inert" ".github/workflows/docs.yml" false ""
   check "the book is inert" "website/book/src/index.md" false ""
+  # The console's image recipe and release lane are read by tier-1 jobs and
+  # the release lane alone, never by a cargo lane.
+  check "the console image recipe is inert" "docker/viewer/Dockerfile" false ""
+  check "the console release lane is inert" ".github/workflows/release-viewer.yml" false ""
+  check "the quickstart is inert" "compose.yaml" false ""
   check "the toolchain reaches everything" "rust-toolchain.toml" false ALL
   check "the pin matrix reaches every member testing with the testkit" "docs/VERSIONS.md" false \
     "+ferrobridge-testkit +fhirconnect +omocl +omop-cdm +ferrobridge-server -fhir-codegen"

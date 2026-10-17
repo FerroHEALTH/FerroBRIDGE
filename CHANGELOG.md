@@ -23,6 +23,22 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Added
+
+- The operator console ships as its own image,
+  `ghcr.io/ferrohealth/ferrobridge-viewer` (#603). `docker/viewer/Dockerfile`
+  builds it on the bridge image's distroless base, runs as `65532:65532`,
+  and probes itself with the binary's `healthcheck` subcommand. The
+  reusable `release-viewer.yml`, called from the release lane, builds the
+  console's musl binaries with `cargo auditable` and its site bundle, attaches
+  them to the release with their checksums, provenance and SBOMs, and pushes
+  the multi-platform image with the same attestations and self-verification
+  as the bridge image; a cut refuses to publish without those assets.
+  `compose.yaml` gains a `viewer` profile with a read-only root, every
+  capability dropped, `no-new-privileges`, and the OIDC client secret as a
+  file secret, and CI resolves the quickstart under every profile and
+  dry-runs the console image build.
+
 ## [0.0.7] - 2026-10-17
 
 ### Changed

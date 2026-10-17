@@ -2131,6 +2131,13 @@ Issues #22 and #23 carry the contracts; the decisions that shape them:
   four native targets; `compose.yaml` beside them. The finalize step refuses to
   publish an incomplete set, and immutable releases means there is no repair
   after publish.
+- **The operator console is a third reusable lane** (#603):
+  `release-viewer.yml` builds the console's two musl binaries and its site
+  bundle, attaches each with its checksum and provenance (and the binaries
+  with their SBOMs) to the draft, and builds
+  `ghcr.io/ferrohealth/ferrobridge-viewer` from them on the bridge image's
+  base with the same attestations and self-verification. The finalize step
+  checks the console's assets with the bridge's.
 - **The binary carries its own dependency list** (`cargo-auditable`), so
   `syft` can build the image SBOM from a distroless filesystem that holds one
   file; the image is built from the already-attested tarballs after verifying

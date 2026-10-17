@@ -142,18 +142,20 @@ which a bare PostgreSQL does not have.
 
 ### The shipped image and the quickstart
 
-`docker/Dockerfile` builds on one more image, pinned by the digest of its image
-index, which is what Docker resolves for a multi-platform build.
-`scripts/checks/versions.sh` reads its `FROM` line back against this row, and
-Dependabot (`docker`, over `/docker`) proposes the bumps.
+`docker/Dockerfile` and `docker/viewer/Dockerfile` build on one more image,
+pinned by the digest of its image index, which is what Docker resolves for a
+multi-platform build. `scripts/checks/versions.sh` reads both `FROM` lines
+back against this row, and Dependabot (`docker`, over `/docker` and
+`/docker/viewer`) proposes the bumps.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| Container base image | `gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3` | the `FROM` of `docker/Dockerfile`, and its `org.opencontainers.image.base.name` label without the digest |
+| Container base image | `gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3` | the `FROM` of `docker/Dockerfile` and of `docker/viewer/Dockerfile`, and each one's `org.opencontainers.image.base.name` label without the digest |
 
-The quickstart `compose.yaml` pulls `ghcr.io/ferrohealth/ferrobridge` at the
-release it shipped with, so its tag is the product version below rather than a
-pin of its own, and the guard compares the two. Its CDM service runs the same
+The quickstart `compose.yaml` pulls `ghcr.io/ferrohealth/ferrobridge` and,
+under its `viewer` profile, `ghcr.io/ferrohealth/ferrobridge-viewer` at the
+release it shipped with, so both tags are the product version below rather
+than pins of their own, and the guard compares them. Its CDM service runs the same
 `postgres:18.6` image the row above pins for the end-to-end lane, so a
 PostgreSQL bump moves one row and both readers follow it.
 
@@ -388,10 +390,10 @@ release without a reviewed change (`docs/release.md`).
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `cargo-auditable` | 0.7.5 | `.github/workflows/release-build.yml` |
+| `cargo-auditable` | 0.7.5 | `.github/workflows/release-build.yml`, `.github/workflows/release-viewer.yml` |
 | `cargo-cyclonedx` | 0.5.9 | `.github/workflows/release-build.yml` |
 | `cargo-fuzz` | 0.13.2 | `.github/workflows/fuzz.yml` (the fuzz lane, the one nightly-toolchain job; #155) |
-| `syft` | 1.51.1 | `.github/workflows/release-build.yml`, `.github/workflows/release-image.yml` |
+| `syft` | 1.51.1 | `.github/workflows/release-build.yml`, `.github/workflows/release-image.yml`, `.github/workflows/release-viewer.yml` |
 
 `scripts/checks/versions.sh` reads every `tool:` line of the two release
 workflows back against these rows, so a bump moves one row and the workflows
@@ -411,8 +413,8 @@ names the Tailwind release to cargo-leptos.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `cargo-leptos` | 0.3.11 | `.github/workflows/ci.yml` (the `viewer` job) |
-| `wasm-bindgen` | 0.2.129 | `.github/workflows/ci.yml` (the `viewer` job), the root `Cargo.toml` `[workspace.dependencies]` |
+| `cargo-leptos` | 0.3.11 | `.github/workflows/ci.yml` (the `viewer` job), `.github/workflows/release-viewer.yml` |
+| `wasm-bindgen` | 0.2.129 | `.github/workflows/ci.yml` (the `viewer` job), `.github/workflows/release-viewer.yml`, the root `Cargo.toml` `[workspace.dependencies]` |
 | Tailwind CSS | 4.3.3 | `scripts/release/viewer-tools.sh`, `scripts/release/viewer-site.sh` |
 | Binaryen | version_133 | `scripts/release/viewer-tools.sh` |
 

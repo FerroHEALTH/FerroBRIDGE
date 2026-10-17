@@ -110,6 +110,20 @@ carries its own provenance and an SPDX SBOM. To check one of those, pass
 the tag, and add `--predicate-type https://spdx.dev/Document/v2.3` to read the
 SBOM attestation in place of the provenance.
 
+**The operator console came from this repository's release-viewer lane.**
+
+```sh
+gh attestation verify oci://ghcr.io/ferrohealth/ferrobridge-viewer:X.Y.Z \
+  --repo FerroHEALTH/FerroBRIDGE \
+  --signer-workflow FerroHEALTH/FerroBRIDGE/.github/workflows/release-viewer.yml
+```
+
+The same check holds for the console's release assets,
+`ferrobridge-viewer-vX.Y.Z-<target>.tar.gz` and
+`ferrobridge-viewer-vX.Y.Z-site.tar.gz`, with the file in place of the
+`oci://` reference. Each platform manifest of the console image carries its
+provenance and an SPDX SBOM, as the bridge image's do.
+
 **The download is not corrupt.**
 
 ```sh

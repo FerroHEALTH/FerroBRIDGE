@@ -49,7 +49,8 @@ unsigned tag is refused at push time.
 not run on a push to `main`, on a pull request, or in a merge group.
 
 ```text
-plan ── github-release (draft) ── build-binaries ── build-image ── finalize-release (publish) ── crates
+plan ── github-release (draft) ─┬─ build-binaries ── build-image ─┬─ finalize-release (publish) ── crates
+                                └─ build-viewer ──────────────────┘
 ```
 
 - **plan** validates the tag shape, checks it against every file that declares
@@ -68,8 +69,14 @@ plan ── github-release (draft) ── build-binaries ── build-image ─�
 - **build-image** calls the reusable `release-image.yml` once the musl binaries
   exist, verifies them against the build lane's signer identity, and pushes
   `ghcr.io/ferrohealth/ferrobridge` for `linux/amd64` and `linux/arm64`.
+- **build-viewer** calls the reusable `release-viewer.yml` once the draft
+  exists. It builds the operator console's two musl binaries with
+  `cargo auditable` and its site bundle, attaches each with its checksum and
+  provenance (the binaries with an SBOM too), verifies them against its own
+  signer identity, and pushes `ghcr.io/ferrohealth/ferrobridge-viewer` for
+  `linux/amd64` and `linux/arm64` with the bridge image's attestations.
 - **finalize-release** checks that the draft carries every asset this version
-  promises, then publishes. Publishing last means a half-assembled release is
+  promises, the console's included, then publishes. Publishing last means a half-assembled release is
   never visible. A pre-release publishes with `--latest=false`.
 - **crates** uploads the `crates/*` members to crates.io once the release is
   public, so a refused upload never leaves a release half-cut. It runs in the

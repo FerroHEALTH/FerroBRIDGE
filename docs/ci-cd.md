@@ -31,6 +31,7 @@ the committed guards, so both are live code from day one and both need a gate.
 | `actionlint` | the official digest-pinned image, with `SHELLCHECK_OPTS='-e SC2016'` |
 | `shellcheck` | `--severity=style` over every tracked `*.sh` and every tracked extensionless file with a shell shebang |
 | `hadolint` | every tracked Dockerfile under `.hadolint.yaml` (`failure-threshold: warning`) |
+| `container-config` | `docker compose --profile viewer config` and the same over every profile, with empty secret files, then `docker buildx build --check` and a one-platform build with no output of `docker/viewer/Dockerfile` over placeholder files at the staged paths |
 | `comment-style` | `scripts/checks/comment-style.sh --all` |
 | `versions` | `scripts/checks/versions.sh` |
 | `profile-packages` | `scripts/vendor/profile-packages.sh` over a cache keyed on `--cache-key` (the profile packages fetched at build time and never committed, each checked at its pinned count and digest), then `--self-test` and `--check`: every `PROVENANCE.md` against its pin, no unpinned tree, and every `dependencies` entry of every fetched `package.json` pinned too |
@@ -41,9 +42,10 @@ the committed guards, so both are live code from day one and both need a gate.
 | `contribution-licence` | `scripts/checks/contribution-licence.sh` on a pull request: the licensing checkbox of the body is ticked |
 | `tracker-helpers` | the `--self-test` of `scripts/gh/fields.sh`, `labels.sh` and `migrate-fields.sh`, each driven against a stub `gh` on `PATH`, and of `scripts/deploy-probe.sh` against a stub `curl` |
 
-`hadolint` runs against a real recipe since #22: `docker/Dockerfile`, the one
-tracked Dockerfile, whose digest-pinned `FROM` the `versions` job checks
-against `docs/VERSIONS.md` in the same tier. `versions` still skips the checks
+`hadolint` runs against the two tracked recipes, `docker/Dockerfile` (#22)
+and `docker/viewer/Dockerfile` (#603), whose digest-pinned `FROM` lines the
+`versions` job checks against the one `docs/VERSIONS.md` row in the same
+tier. `versions` still skips the checks
 whose subject file is absent, reporting each skip with its reason, so it gains
 teeth as files appear.
 
@@ -463,21 +465,22 @@ governs this: our own design.
 
 ## The release lane beside this one
 
-`release.yml` is dormant until a `v*` tag is pushed, and it calls two reusable
+`release.yml` is dormant until a `v*` tag is pushed, and it calls three reusable
 workflows that this one never touches. They are named here because they share
 this file's pinning rules and because Dependabot's `github-actions` ecosystem
-bumps their actions along with `ci.yml`'s: all three live under
+bumps their actions along with `ci.yml`'s: all four live under
 `.github/workflows/`, which is the directory Dependabot and the zizmor and
 actionlint lanes read.
 
 | Workflow | Runs | Tools it pins |
 |---|---|---|
-| `release.yml` | on a `v*` tag: plan, draft, the two calls, publish, crates.io | none of its own |
+| `release.yml` | on a `v*` tag: plan, draft, the three calls, publish, crates.io | none of its own |
 | `release-build.yml` | called once per target, on a runner of that architecture | `cargo-auditable`, `cargo-cyclonedx`, `syft` |
 | `release-image.yml` | called once the musl binaries exist | `syft` |
+| `release-viewer.yml` | called once the draft exists: the console binaries, its site bundle and its image | `cargo-auditable`, `syft`, `cargo-leptos`, `wasm-bindgen` |
 
-Those three versions are rows of `docs/VERSIONS.md`, and
-`scripts/checks/versions.sh` reads every `tool:` line of the two release
+Those versions are rows of `docs/VERSIONS.md`, and
+`scripts/checks/versions.sh` reads every `tool:` line of the three release
 workflows back against them, the same way it reads `ci.yml`'s four analyzers.
 They decide what a consumer can prove about a published binary, so a floating
 version would change the contents of a release with no reviewed change.
