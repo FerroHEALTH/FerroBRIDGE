@@ -124,6 +124,10 @@ crates on crates.io.
 
 ### Fixed
 
+- The request log writes `<unmatched>` as the route of a request no route
+  matched (#746), instead of the raw path the client sent, so an identifier
+  in that path no longer reaches the log.
+
 - A percent-encoded `_count`, such as `_count=%32%30`, reads as its decoded
   value on every facade route (#523). The request guard read `_count` from
   the raw query and refused it with a `400`, while the search read the
