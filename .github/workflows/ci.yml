@@ -52,7 +52,6 @@ permissions: {}
 
 jobs:
   # ---- Tier 1: the checks that run on a repository with no code -------------
-
   # zizmor (https://docs.zizmor.sh/) is the static security analysis for GitHub
   # Actions, the machine check behind three properties this repository treats
   # as hard rules: every `uses:` pinned to a commit SHA (unpinned-uses), no
@@ -318,7 +317,6 @@ jobs:
           bash scripts/gh/migrate-fields.sh --self-test
 
   # ---- Tier 2: the Rust lanes, gated on the workspace existing --------------
-
   # The one job that decides whether the cargo tier runs at all, and which of
   # its lanes a change needs: it checks out, looks for a root Cargo.toml, and
   # reads the packages the change reaches (docs/ci-cd.md, "Lanes that run only
@@ -1050,7 +1048,6 @@ jobs:
           comment-summary-in-pr: on-failure
 
   # ---- The single required check -------------------------------------------
-
   # conclusion is the one status check the branch ruleset requires. It `needs`
   # every other job and runs on always(), so it reports even when every gated
   # Rust lane is skipped. It fails when a needed job failed or was cancelled
