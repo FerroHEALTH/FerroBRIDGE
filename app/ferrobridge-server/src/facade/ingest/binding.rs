@@ -190,7 +190,12 @@ impl Ingest<'_> {
                         .with_references(self.references),
                 )
             })
-            .await?;
+            .await;
+        let built = built.inspect_err(|_| {
+            if let Some(usage) = self.usage {
+                usage.record_mapping_failure();
+            }
+        })?;
         Ok((built.into_value(), now))
     }
 

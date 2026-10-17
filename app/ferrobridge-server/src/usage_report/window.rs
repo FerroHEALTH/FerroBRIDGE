@@ -1,19 +1,26 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The usage report's metrics window: a latency histogram and the server
-//! errors per request group, and the client refusals, recorded by the request
-//! log.
+//! The usage report's metrics window.
+//!
+//! It holds a latency histogram and the server errors per request group and
+//! the client refusals, recorded by the request log; the HL7 v2 messages and
+//! their acknowledgment codes, recorded by the face beside the
+//! acknowledgment; and the mapping failures, recorded where an engine refusal
+//! is known.
 //!
 //! A recording carries the method, the route TEMPLATE the request matched
-//! (never the path a client sent), the status and the latency; nothing of a
-//! request's parameters, body or caller reaches it, so nothing of them can
-//! reach a report. No specification governs this: our own design.
+//! (never the path a client sent), the status and the latency, or a
+//! message's latency and acknowledgment code, or nothing but the fact of a
+//! refusal; nothing of a request's parameters, body or caller reaches it, so
+//! nothing of them can reach a report. No specification governs this: our
+//! own design.
 
 use std::collections::BTreeMap;
 use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
+use ferrobridge_hl7v2::ack::Code;
 use http::{Method, StatusCode};
 
 use crate::usage_report::payload::{
@@ -121,6 +128,15 @@ impl GroupCounts {
         })
     }
 
+    /// Counts one recording that took `elapsed`.
+    fn time(&mut self, elapsed: Duration) {
+        let ms = elapsed.as_secs_f64() * 1000.0;
+        if let Some(slot) = self.buckets.get_mut(bucket_of(ms)) {
+            *slot = slot.saturating_add(1);
+        }
+        self.max_ms = self.max_ms.max(ms);
+    }
+
     /// Adds `other` to these counts.
     fn absorb(&mut self, other: &Self) {
         for (mine, theirs) in self.buckets.iter_mut().zip(other.buckets) {
@@ -138,6 +154,14 @@ pub struct Counts {
     pub groups: BTreeMap<Group, GroupCounts>,
     /// Responses with a 4xx status, over every counted group.
     pub responses_4xx: u64,
+    /// HL7 v2 acknowledgments with the code `AA`.
+    pub hl7v2_aa: u64,
+    /// HL7 v2 acknowledgments with the code `AE`.
+    pub hl7v2_ae: u64,
+    /// HL7 v2 acknowledgments with the code `AR`.
+    pub hl7v2_ar: u64,
+    /// Units a FHIRconnect program refused to map.
+    pub mapping_failures: u64,
 }
 
 impl Counts {
@@ -162,9 +186,23 @@ impl Counts {
                     .collect(),
                 counters: Counters {
                     responses_4xx: self.responses_4xx.min(MAX_COUNT),
+                    hl7v2_aa: self.hl7v2_aa.min(MAX_COUNT),
+                    hl7v2_ae: self.hl7v2_ae.min(MAX_COUNT),
+                    hl7v2_ar: self.hl7v2_ar.min(MAX_COUNT),
+                    mapping_failures: self.mapping_failures.min(MAX_COUNT),
                 },
             },
         }
+    }
+
+    /// Counts one acknowledgment with `code`.
+    fn acknowledge(&mut self, code: Code) {
+        let slot = match code {
+            Code::Accept => &mut self.hl7v2_aa,
+            Code::Error => &mut self.hl7v2_ae,
+            Code::Reject => &mut self.hl7v2_ar,
+        };
+        *slot = slot.saturating_add(1);
     }
 
     /// Adds `other` to these counts.
@@ -173,6 +211,10 @@ impl Counts {
             self.groups.entry(*group).or_default().absorb(counts);
         }
         self.responses_4xx = self.responses_4xx.saturating_add(other.responses_4xx);
+        self.hl7v2_aa = self.hl7v2_aa.saturating_add(other.hl7v2_aa);
+        self.hl7v2_ae = self.hl7v2_ae.saturating_add(other.hl7v2_ae);
+        self.hl7v2_ar = self.hl7v2_ar.saturating_add(other.hl7v2_ar);
+        self.mapping_failures = self.mapping_failures.saturating_add(other.mapping_failures);
     }
 }
 
@@ -196,19 +238,41 @@ impl Window {
         let Some(group) = Group::of(method, template) else {
             return;
         };
-        let ms = elapsed.as_secs_f64() * 1000.0;
         let mut counts = self.lock();
         if status.is_client_error() {
             counts.responses_4xx = counts.responses_4xx.saturating_add(1);
         }
         let entry = counts.groups.entry(group).or_default();
-        if let Some(slot) = entry.buckets.get_mut(bucket_of(ms)) {
-            *slot = slot.saturating_add(1);
-        }
+        entry.time(elapsed);
         if status.is_server_error() {
             entry.errors_5xx = entry.errors_5xx.saturating_add(1);
         }
-        entry.max_ms = entry.max_ms.max(ms);
+    }
+
+    /// Records one HL7 v2 message the face handled in `elapsed`, and the
+    /// acknowledgment code it answered with, `None` when it sent none.
+    pub fn record_message(&self, elapsed: Duration, code: Option<Code>) {
+        let mut counts = self.lock();
+        counts
+            .groups
+            .entry(Group::Hl7v2Message)
+            .or_default()
+            .time(elapsed);
+        if let Some(code) = code {
+            counts.acknowledge(code);
+        }
+    }
+
+    /// Records one HL7 v2 acknowledgment sent for no message, such as the
+    /// `AR` of a frame the listener could not read.
+    pub fn record_acknowledgment(&self, code: Code) {
+        self.lock().acknowledge(code);
+    }
+
+    /// Records one unit a FHIRconnect program refused to map.
+    pub fn record_mapping_failure(&self) {
+        let mut counts = self.lock();
+        counts.mapping_failures = counts.mapping_failures.saturating_add(1);
     }
 
     /// Takes the counts recorded so far and starts a fresh window.
@@ -271,6 +335,7 @@ fn to_f64(count: u64) -> f64 {
 mod tests {
     use std::time::Duration;
 
+    use ferrobridge_hl7v2::ack::Code;
     use http::{Method, StatusCode};
 
     use super::{Group, GroupCounts, Window, bucket_of};
@@ -390,5 +455,32 @@ mod tests {
         assert_eq!(group.total(), 3);
         assert_eq!(group.errors_5xx, 1);
         assert_eq!(next.responses_4xx, 1);
+    }
+
+    #[test]
+    fn messages_acknowledgments_and_mapping_failures_survive_a_restore() {
+        let window = Window::default();
+        window.record_message(Duration::from_millis(7), Some(Code::Accept));
+        window.record_message(Duration::from_millis(30), Some(Code::Error));
+        window.record_message(Duration::from_millis(1), None);
+        window.record_acknowledgment(Code::Reject);
+        window.record_mapping_failure();
+        let taken = window.take();
+        let messages = taken.groups.get(&Group::Hl7v2Message).expect("recorded");
+        assert_eq!(messages.total(), 3);
+        assert_eq!(messages.buckets[0], 1);
+        assert_eq!(messages.buckets[1], 1);
+        assert_eq!(messages.buckets[3], 1);
+        assert_eq!(messages.errors_5xx, 0);
+        assert_eq!((taken.hl7v2_aa, taken.hl7v2_ae, taken.hl7v2_ar), (1, 1, 1));
+        assert_eq!(taken.mapping_failures, 1);
+        window.restore(&taken);
+        window.record_mapping_failure();
+        let next = window.take();
+        assert_eq!(next.mapping_failures, 2);
+        assert_eq!(next.hl7v2_ar, 1);
+        let counters = next.to_metrics().window_24h.counters;
+        assert_eq!(counters.mapping_failures, 2);
+        assert_eq!(counters.hl7v2_aa, 1);
     }
 }

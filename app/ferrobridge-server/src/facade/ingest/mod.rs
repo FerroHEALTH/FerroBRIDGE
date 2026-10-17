@@ -58,6 +58,7 @@ use crate::facade::programs::Programs;
 use crate::facade::request::Inbound;
 use crate::facade::status;
 use crate::terminology::Translator;
+use crate::usage_report::window::Window;
 
 use binding::canonical_of;
 
@@ -375,6 +376,8 @@ pub struct Ingest<'a> {
     /// Where a `reference` mapping reads a resource the request does not
     /// carry.
     references: &'a dyn ReferenceSource,
+    /// The usage report's window every engine refusal is counted in.
+    usage: Option<&'a Window>,
 }
 
 /// The translator of an ingest built with none: no server, so a
@@ -524,7 +527,16 @@ impl<'a> Ingest<'a> {
             settings,
             translator: &NO_TRANSLATOR,
             references: &NoReferences,
+            usage: None,
         }
+    }
+
+    /// Returns this ingest counting every unit its programs refuse to map in
+    /// `usage`, the window the server's usage report takes.
+    #[must_use]
+    pub const fn with_usage(mut self, usage: &'a Window) -> Self {
+        self.usage = Some(usage);
+        self
     }
 
     /// Returns this ingest translating every `conceptmap` code through

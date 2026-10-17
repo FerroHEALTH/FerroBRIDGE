@@ -29,6 +29,7 @@ use ferrobridge_server::facade::programs;
 use ferrobridge_server::hl7v2::Face;
 use ferrobridge_server::hl7v2::Listener;
 use ferrobridge_server::hl7v2::Listening;
+use ferrobridge_server::usage_report::window::{Counts, Window};
 use ferrobridge_testkit::stubs::terminology;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
@@ -215,6 +216,8 @@ struct Serving {
     address: SocketAddr,
     /// Whether the listener reads up.
     listening: Listening,
+    /// The usage report's window the face counts its messages in.
+    usage: Arc<Window>,
     /// The switch that stops it.
     stop: Option<oneshot::Sender<()>>,
     /// The listener task.
@@ -226,7 +229,10 @@ impl Serving {
     async fn start(facade: Arc<Facade>, lane: Hl7v2Settings) -> Result<Self, Box<dyn StdError>> {
         let (terminology_server, terminology) = terminology_stub().await;
         let corpus = ferrobridge_server::hl7v2::load_corpus(&lane)?;
-        let face = Arc::new(Face::new(facade, corpus, Some(terminology), &lane));
+        let usage = Arc::new(Window::default());
+        let face = Arc::new(
+            Face::new(facade, corpus, Some(terminology), &lane).with_usage(Arc::clone(&usage)),
+        );
         let socket = TcpListener::bind("127.0.0.1:0").await?;
         let address = socket.local_addr()?;
         let listening = Listening::default();
@@ -244,6 +250,7 @@ impl Serving {
             _terminology: terminology_server,
             address,
             listening,
+            usage,
             stop: Some(stop),
             task,
         })
@@ -254,6 +261,11 @@ impl Serving {
         let mut stream = TcpStream::connect(self.address).await?;
         stream.write_all(&frame(message)).await?;
         read_ack(&mut stream).await
+    }
+
+    /// Takes what the face counted for the usage report so far.
+    fn usage(&self) -> Counts {
+        self.usage.take()
     }
 
     /// Signals the stop without waiting for the listener to end.
@@ -358,6 +370,26 @@ impl Running {
     }
 }
 
+/// Fails unless `counts` holds one HL7 v2 message, answered `(aa, ae, ar)`,
+/// and `mapping_failures` engine refusals.
+fn assert_counted(counts: &Counts, (aa, ae, ar): (u64, u64, u64), mapping_failures: u64) {
+    let messages = counts
+        .groups
+        .get(&ferrobridge_server::usage_report::payload::Group::Hl7v2Message)
+        .map(ferrobridge_server::usage_report::window::GroupCounts::total);
+    assert_eq!(Some(1), messages, "one message is timed");
+    assert_eq!(
+        (aa, ae, ar, mapping_failures),
+        (
+            counts.hl7v2_aa,
+            counts.hl7v2_ae,
+            counts.hl7v2_ar,
+            counts.mapping_failures
+        ),
+        "the acknowledgment codes and the mapping failures"
+    );
+}
+
 #[tokio::test]
 async fn a_mapped_message_commits_one_contribution_and_is_answered_aa()
 -> Result<(), Box<dyn StdError>> {
@@ -386,6 +418,7 @@ async fn a_mapped_message_commits_one_contribution_and_is_answered_aa()
         body.contains(CONTROL_ID) && body.contains("ORU^R01"),
         "the FEEDER_AUDIT names the message by MSH-10 and its type"
     );
+    assert_counted(&running.serving.usage(), (1, 0, 0), 0);
     running.stop().await
 }
 
@@ -443,6 +476,7 @@ async fn a_message_no_program_maps_is_answered_ae_naming_each_entry()
         "{ack}"
     );
     assert_eq!(0, running.contributions().await, "nothing is committed");
+    assert_counted(&running.serving.usage(), (0, 1, 0), 0);
     running.stop().await
 }
 
@@ -505,6 +539,7 @@ async fn a_cdr_that_fails_is_answered_ar_so_the_sender_resends() -> Result<(), B
     );
     assert!(!segments(&ack, "ERR").is_empty(), "{ack}");
     assert_eq!(0, running.contributions().await, "nothing is committed");
+    assert_counted(&running.serving.usage(), (0, 0, 1), 0);
     running.stop().await
 }
 
