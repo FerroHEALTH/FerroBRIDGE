@@ -107,6 +107,13 @@ crates on crates.io.
   minutes. `.gitignore` refuses the `*.pending-snap` and `*.snap.new` files
   insta writes (#839).
 
+### Fixed
+
+- `fhir-types` 0.1.125: the release-neutral `TypeRead::regex` reads a
+  primitive's lexical form from the STU3 extension
+  `structuredefinition-regex` as well as from R4's `regex`, so an STU3
+  primitive such as `date.value` reads its form instead of none (#875).
+
 ## [0.0.8] - 2026-10-18
 
 ### Added

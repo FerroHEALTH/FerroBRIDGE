@@ -5,6 +5,13 @@
 //! The release-neutral read of this version's `ElementDefinition`, emitted from
 //! its package (<https://hl7.org/fhir/R4/elementdefinition.html>).
 
+/// The extensions stating a primitive type's lexical form: `regex` from R4,
+/// `structuredefinition-regex` in STU3.
+const LEXICAL_FORMS: [&str; 2] = [
+    "http://hl7.org/fhir/StructureDefinition/regex",
+    "http://hl7.org/fhir/StructureDefinition/structuredefinition-regex",
+];
+
 #[expect(
     clippy::match_same_arms,
     reason = "an extension value is read by one arm per type the version admits, and every arm of a type that cannot carry the fact reads as absent"
@@ -76,8 +83,7 @@ impl super::super::definition::ElementDefinitionRead
                     .extension
                     .iter()
                     .filter(|extension| {
-                        Some(extension.url.as_str())
-                            == Some("http://hl7.org/fhir/StructureDefinition/regex")
+                        Some(extension.url.as_str()).is_some_and(|url| LEXICAL_FORMS.contains(&url))
                     })
                     .find_map(|extension| {
                         extension.value.as_ref().and_then(|value| match &value {

@@ -309,6 +309,25 @@ fn a_primitive_type_reads_its_regex_where_the_package_states_one() {
 }
 
 #[test]
+fn an_stu3_primitive_reads_its_regex_from_structuredefinition_regex() {
+    // STU3 states the lexical form of date.value in the structuredefinition-regex extension
+    // (STU3 datatypes.html#primitive), R4 in the regex extension.
+    let stu3: Stu3Element = core_element("hl7.fhir.r3.core", "date", "date.value");
+    let r4: R4Element = core_element("hl7.fhir.r4.core", "date", "date.value");
+    let regex = |element: &dyn ElementDefinitionRead| {
+        element
+            .types()
+            .first()
+            .and_then(|ty| ty.regex.map(str::to_owned))
+    };
+    assert_eq!(
+        regex(&stu3).as_deref(),
+        Some("-?[0-9]{4}(-(0[1-9]|1[0-2])(-(0[0-9]|[1-2][0-9]|3[0-1]))?)?")
+    );
+    assert!(regex(&r4).is_some(), "R4 states the form of date.value too");
+}
+
+#[test]
 fn a_structure_definition_reads_alike_in_both_releases() {
     let stu3: Stu3Structure = core_definition("hl7.fhir.r3.core", "Observation");
     let r4: R4Structure = core_definition("hl7.fhir.r4.core", "Observation");

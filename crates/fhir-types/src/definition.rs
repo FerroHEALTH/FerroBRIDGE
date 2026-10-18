@@ -32,9 +32,10 @@
 //! a constraint's best-practice flag
 //! (`http://hl7.org/fhir/StructureDefinition/elementdefinition-bestpractice`)
 //! and a primitive type's lexical form
-//! (`http://hl7.org/fhir/StructureDefinition/regex`). Each reads from the
-//! extension with that url where the element carries it, and as absent where
-//! it does not.
+//! (`http://hl7.org/fhir/StructureDefinition/regex`, which STU3 spells
+//! `http://hl7.org/fhir/StructureDefinition/structuredefinition-regex`). Each
+//! reads from the extension with that url where the element carries it, and
+//! as absent where it does not.
 
 use super::codec::{EncodeError, Value};
 
@@ -53,7 +54,8 @@ pub struct TypeRead<'a> {
     pub aggregation: Vec<&'a str>,
     /// The versioning rule of a reference (`type.versioning`).
     pub versioning: Option<&'a str>,
-    /// The lexical form a primitive type states in its `regex` extension.
+    /// The lexical form a primitive type states in its `regex` extension, or
+    /// in STU3 its `structuredefinition-regex` extension.
     pub regex: Option<&'a str>,
 }
 

@@ -23,7 +23,9 @@ resources are the authority for what it emits (`.claude/rules/codegen.md`).
   field's cardinality and type: a primitive reads its `value`, a choice reads
   each alternative, a `Reference` its `reference`, and a missing element
   reads as absent. An extension-carried fact reads the value of the
-  extension with its url, and the `StructureDefinitionRead` impl (#859)
+  extension with its url (a lexical form from either url the snapshot reader
+  accepts, listed once in the module as `LEXICAL_FORMS`, #875), and the
+  `StructureDefinitionRead` impl (#859)
   reads a context either as R4 entries or, where the version states context
   strings, as those strings with the version's `contextType`. No version is
   named.

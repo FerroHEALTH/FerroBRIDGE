@@ -39,7 +39,8 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
   as the value set's URL, so a validator reads every release through one
   trait and never through a model of its own. It also reads `isModifier` and
   the three facts core extensions carry: a binding's `maxValueSet`, a
-  constraint's best-practice flag and a type's `regex` (#859).
+  constraint's best-practice flag and a type's `regex` (#859), the last from
+  R4's `regex` or STU3's `structuredefinition-regex` extension (#875).
   `definition::StructureDefinitionRead` is the same for the definition around
   the elements (#859): url, version, type, base, kind, `abstract`,
   derivation, the snapshot, and the context, where STU3's `contextType` with
