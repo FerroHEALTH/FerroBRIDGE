@@ -744,6 +744,25 @@ ours:
   unit (section 9). What survives as a warning is the declared set (defaulted
   composition fields, `unidirectional` skips, fields the program lists as
   unmapped), and that set is asserted exactly by the round-trip tests.
+- **A produced FHIR document is held to the base constraints a mapping can
+  break before it leaves the engine** (#651). An error-severity constraint is
+  "a rule that all resources must conform to" (R4 conformance-rules.html
+  §2.1.0.6), and a context can produce a breach the decoder never reads: an
+  `extensionUrl` manual whose `extensionValue` wrote nothing left a url-only
+  extension on every KDS diagnosis read (#629, R4 `ext-1`). `to_fhir` checks
+  the resource it maps and every resource it creates through
+  `engine::invariant`, and a breach refuses the unit as
+  `EngineError::Invariant`, naming the constraint key and the instance path,
+  so the facade read and the operations lane both refuse it. **Decision:
+  targeted structural checks, one per constraint key, starting with `ext-1`,
+  rather than FHIRPath evaluation of the core constraints through
+  `ferrobridge-fhirpath`.** The constraint expressions live in the core
+  package's StructureDefinitions, which the server does not load at run time
+  (the element table carries no constraints), and evaluating them per read
+  would bring the profile validator's package set into the read path. A
+  check is added when a mapping can produce its breach; holding output to the
+  whole constraint set is the profile validator's job (section 4.9). No
+  specification governs where the check runs: our own design.
 
 ### 4.5 The FHIR path model
 
