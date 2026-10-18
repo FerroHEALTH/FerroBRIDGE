@@ -196,7 +196,11 @@ fn membership<'a>(
 
 /// Orders two system values of comparable types, `None` when unknown (N1
 /// §6.2).
-fn compare(a: &Item<'_>, b: &Item<'_>, operation: &str) -> Result<Option<Ordering>, EvalError> {
+pub(crate) fn compare(
+    a: &Item<'_>,
+    b: &Item<'_>,
+    operation: &str,
+) -> Result<Option<Ordering>, EvalError> {
     if let (Item::String(a), Item::String(b)) = (a, b) {
         return Ok(Some(a.cmp(b)));
     }

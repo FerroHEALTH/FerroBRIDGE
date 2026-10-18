@@ -9,6 +9,7 @@ mod collections;
 mod conversion;
 mod fhir;
 mod math;
+mod sorting;
 mod strings;
 mod text;
 mod tree;
@@ -114,6 +115,9 @@ impl<'a> Engine<'_, 'a> {
             frame,
         };
         if let Some(result) = boundary::call(&call)? {
+            return Ok(result);
+        }
+        if let Some(result) = sorting::call(&call)? {
             return Ok(result);
         }
         if let Some(result) = text::call(&call)? {

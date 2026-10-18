@@ -6,9 +6,11 @@
 //! `Environment::with_fhirpath_stu3_functions`; without it the evaluator is N1
 //! 2.0.0, the release FHIR R4 fhirpath.html §2.9 cites.
 
+use ferrobridge_fhirpath::ast::Expr;
 use ferrobridge_fhirpath::eval::error::EvalError;
 use ferrobridge_fhirpath::eval::{Environment, Focus, STU3_FUNCTIONS};
 use ferrobridge_fhirpath::expression::Expression;
+use ferrobridge_fhirpath::model::named_type;
 use ferrobridge_fhirpath::model::r4::R4;
 use ferrobridge_fhirpath::value::{Collection, Item};
 
@@ -325,4 +327,107 @@ fn comparable_answers_whether_the_units_are_commensurable() {
     assert_eq!(truth("1 'cm'.comparable(1 '[s]')"), Some(false));
     assert_eq!(truth("1 'cm'.comparable({})"), None);
     assert_eq!(truth("1 'cm'.comparable(1)"), None);
+}
+
+fn all_shown(expression: &str) -> Vec<String> {
+    stu3(expression)
+        .expect("evaluates")
+        .iter()
+        .map(ToString::to_string)
+        .collect()
+}
+
+#[test]
+fn sort_orders_by_value_or_by_its_keys() {
+    // FHIRPath 3.0.0 #sortkeyselector-this--any-asc--desc--keyselector-this--any-asc--desc---collection,
+    // the examples.
+    assert_eq!(all_shown("(3 | 1 | 2).sort()"), ["1", "2", "3"]);
+    assert_eq!(all_shown("(3 | 1 | 2).sort($this)"), ["1", "2", "3"]);
+    assert_eq!(all_shown("(3 | 1 | 2).sort($this desc)"), ["3", "2", "1"]);
+    assert_eq!(all_shown("('c' | 'a' | 'b').sort()"), ["a", "b", "c"]);
+    assert_eq!(
+        all_shown("('c' | 'a' | 'b').sort($this desc)"),
+        ["c", "b", "a"]
+    );
+    assert_eq!(all_shown("('3' | '1' | '10').sort()"), ["1", "10", "3"]);
+    assert_eq!(all_shown("(3 | 1 | 2).sort($this asc)"), ["1", "2", "3"]);
+}
+
+#[test]
+fn sort_takes_later_keys_only_on_a_tie() {
+    // FHIRPath 3.0.0 sort(): a later key decides only where the earlier keys are equal.
+    assert_eq!(
+        all_shown("('b2' | 'a1' | 'b1' | 'a2').sort(substring(0, 1) desc, substring(1, 1))"),
+        ["b1", "b2", "a1", "a2"]
+    );
+}
+
+#[test]
+fn sort_puts_an_empty_key_first() {
+    // FHIRPath 3.0.0 sort(): an empty value is lower than all other values.
+    assert_eq!(
+        all_shown("('bb' | 'a' | 'ccc').sort(iif($this = 'a', {}, length()))"),
+        ["a", "bb", "ccc"]
+    );
+}
+
+#[test]
+fn sort_refuses_a_key_of_several_items_and_mixed_types() {
+    // FHIRPath 3.0.0 sort(): a key of more than one item, and incompatible types, are errors.
+    assert!(matches!(
+        stu3("(1 | 2).sort(1 | 2)"),
+        Err(EvalError::Singleton { .. })
+    ));
+    assert!(matches!(
+        stu3("(1 | 'a').sort()"),
+        Err(EvalError::Type { .. })
+    ));
+}
+
+#[test]
+fn a_sort_key_carries_its_written_direction() {
+    // FHIRPath 3.0.0 grammar: `'sort' '(' (sortArgument (',' sortArgument)*)? ')'`.
+    let parsed = Expression::parse("name.sort(family desc, given asc, text)").expect("parses");
+    let Expr::Call { name, args, .. } = parsed.tree() else {
+        panic!("a call, got {:?}", parsed.tree());
+    };
+    assert_eq!(name, "sort");
+    assert!(matches!(
+        args.as_slice(),
+        [
+            Expr::SortKey {
+                descending: true,
+                ..
+            },
+            Expr::SortKey {
+                descending: false,
+                ..
+            },
+            Expr::Member { .. },
+        ]
+    ));
+    assert!(matches!(
+        Expression::parse("sort").expect("parses").tree(),
+        Expr::Member { .. }
+    ));
+}
+
+#[test]
+fn a_sort_key_is_checked_against_the_items_it_sorts() {
+    // FHIRPath 3.0.0 sort() is a scoped function: each key selector sees an item as $this.
+    let patient = named_type(&R4, "Patient").expect("Patient");
+    let parsed = Expression::parse("Patient.name.sort(family desc)").expect("parses");
+    assert!(parsed.check(&R4, patient).is_ok());
+    let wrong = Expression::parse("Patient.name.sort(gender)").expect("parses");
+    assert!(wrong.check(&R4, patient).is_err());
+}
+
+#[test]
+fn a_descending_string_key_is_desc_never_unary_minus() {
+    // FHIRPath 3.0.0 grammar: sortArgument is `expression ('asc' | 'desc')?`, and N1 §6.6
+    // defines unary minus on numbers and quantities alone.
+    assert!(matches!(
+        stu3("('a' | 'b').sort(-$this)"),
+        Err(EvalError::Type { .. })
+    ));
 }

@@ -92,6 +92,21 @@ fn an_ordered_path_and_a_single_value_are_not_refused() {
 }
 
 #[test]
+fn a_sorted_collection_is_ordered_again() {
+    // FHIRPath 3.0.0 sort() answers the items sorted, so their order is defined.
+    let patient = patient();
+    let parsed = Expression::parse("Patient.name.given.children().sort().first()")
+        .expect("the expression should parse");
+    let result = parsed.evaluate(
+        &Environment::new(&R4)
+            .with_strict_ordering()
+            .with_fhirpath_stu3_functions(),
+        Focus::resource(&patient),
+    );
+    assert!(result.is_ok(), "{result:?}");
+}
+
+#[test]
 fn the_mode_is_off_by_default() {
     // N1 §3.1: refusing is an implementation's choice; the default answers in document order.
     let patient = patient();

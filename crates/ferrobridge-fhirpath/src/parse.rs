@@ -207,10 +207,36 @@ fn invocation<'t>(
     expression: impl Parser<'t, &'t [Token], Expr, Extra<'t>> + Clone + 't,
 ) -> impl Parser<'t, &'t [Token], Expr, Extra<'t>> + Clone {
     let arguments = expression
+        .clone()
+        .separated_by(just(Token::Comma))
+        .collect::<Vec<Expr>>()
+        .delimited_by(just(Token::OpenParen), just(Token::CloseParen));
+    let direction = select! {
+        Token::Identifier(word) if word == "asc" => false,
+        Token::Identifier(word) if word == "desc" => true,
+    };
+    let sort_arguments = expression
+        .then(direction.or_not())
+        .map(|(key, direction)| match direction {
+            Some(descending) => Expr::SortKey {
+                key: Box::new(key),
+                descending,
+            },
+            None => key,
+        })
         .separated_by(just(Token::Comma))
         .collect::<Vec<Expr>>()
         .delimited_by(just(Token::OpenParen), just(Token::CloseParen));
     choice((
+        // NOTE: the FHIRPath 3.0.0 grammar gives sort() its own rule, `'sort' '('
+        // (sortArgument (',' sortArgument)*)? ')'`, where a key may carry asc or desc.
+        select! { Token::Identifier(name) if name == "sort" => name }
+            .then(sort_arguments)
+            .map(|(name, args)| Expr::Call {
+                input: None,
+                name,
+                args,
+            }),
         identifier()
             .then(arguments.or_not())
             .map(|(name, args)| match args {

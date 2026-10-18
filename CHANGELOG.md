@@ -59,6 +59,9 @@ crates on crates.io.
   offset, as the 3.0.0 examples show. `fhirpath-r4-stu3` moves to 85 of 104;
   the suite cases that contradict those examples are the upstream report
   #815.
+- The FHIRPath 3.0.0 opt-in adds `sort()`, with the `asc` and `desc` key
+  directions of the 3.0.0 grammar's `sortArgument` (#633), which completes
+  the 13 functions. `fhirpath-r4-stu3` moves to 93 of 104.
 
 - The FHIRPath evaluator has a strict ordering mode,
   `Environment::with_strict_ordering`, off by default (#636). It refuses

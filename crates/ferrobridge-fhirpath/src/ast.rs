@@ -166,6 +166,16 @@ pub enum Expr {
         /// The special variable.
         variable: Box<Expr>,
     },
+    /// A key of `sort()` written with its direction, `key asc` or `key desc`
+    /// (the FHIRPath 3.0.0 grammar's `sortArgument`,
+    /// <http://hl7.org/fhirpath/STU3/grammar.html>); it appears only as an
+    /// argument of `sort()`.
+    SortKey {
+        /// The key selector.
+        key: Box<Expr>,
+        /// Whether the key sorts descending.
+        descending: bool,
+    },
     /// `input[index]`.
     Indexer {
         /// The collection indexed.
