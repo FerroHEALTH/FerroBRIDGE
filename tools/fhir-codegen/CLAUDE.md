@@ -27,8 +27,10 @@ resources are the authority for what it emits (`.claude/rules/codegen.md`).
   accepts, listed once in the module as `LEXICAL_FORMS`, #875), and the
   `StructureDefinitionRead` impl (#859)
   reads a context either as R4 entries or, where the version states context
-  strings, as those strings with the version's `contextType`. No version is
-  named.
+  strings, as those strings with the version's `contextType`.
+  `render_definition::terminology` (#876) writes the `ValueSetRead`,
+  `ContainsRead`, `CodeSystemRead` and `ConceptRead` impls the same way, a
+  nested entry's read being its own type's slice. No version is named.
 - `search` (#522) emits the search parameter registry per version behind
   `resources`: every `SearchParameter` of the package apart from the
   specification's examples (`package::Package` leaves out the ids `example`

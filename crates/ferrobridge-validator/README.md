@@ -107,11 +107,9 @@ single `type.profile` and `type.targetProfile`, its `valueSetReference` and
 `valueSetUri` bindings, and its `contextType` with a list of context strings
 (`resource`, `datatype`, `extension`; a `datatype` context naming a primitive
 admits that primitive only). Invariants are evaluated as FHIRPath over the
-STU3 types. The package set's `ValueSets` and `CodeSystems` are not read for
-STU3, so no STU3 binding is decided locally: a coded value with a system is
-listed with that reason and kept as a pending check for a terminology
-server, and a bare code, whose system no value set read can supply, is
-listed.
+STU3 types. Bindings are decided from the STU3 `ValueSets` and `CodeSystems`
+of the package set as R4 ones are (STU3 names an imported value set as a
+`uri`), and a binding the set cannot decide goes to a terminology server.
 
 ## Message ids
 

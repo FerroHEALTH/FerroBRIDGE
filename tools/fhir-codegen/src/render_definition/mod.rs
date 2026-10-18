@@ -15,7 +15,10 @@
 //! <https://hl7.org/fhir/R4/elementdefinition.html>). An extension-carried
 //! fact reads the value of the extension with its url, and an STU3 context
 //! (a `contextType` beside a list of strings) reads in the shape of an R4
-//! context entry. Nothing here names a version.
+//! context entry. Nothing here names a version. `terminology` writes the
+//! `ValueSet` and `CodeSystem` reads the same way.
+
+mod terminology;
 
 use std::fmt::{self, Write};
 
@@ -166,6 +169,7 @@ pub fn render_definition(model: &VersionModule) -> Result<String, fmt::Error> {
         out.push_str(&structure.scope.cfg());
         render_structure(&mut out, &reader)?;
     }
+    terminology::render_terminology(&mut out, &reader)?;
     Ok(out)
 }
 
@@ -299,7 +303,7 @@ fn render_structured(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
             out,
             name,
             &format!("Result<Option<{D}::ChoiceValue>, {C}::EncodeError>"),
-            &reader.choice_value(own, name),
+            &reader.choice_value(own, name, "self"),
         )?;
     }
     Ok(())
@@ -461,14 +465,30 @@ impl Reader<'_> {
         )
     }
 
-    /// The JSON form of the choice element `name` of `ElementDefinition`.
-    fn choice_value(&self, path: &str, name: &str) -> String {
+    /// The JSON form of the choice element `name` of the struct at `path` on
+    /// `receiver`, as a `Result` of an `Option`.
+    fn choice_value(&self, path: &str, name: &str, receiver: &str) -> String {
+        let parts = format!(
+            "to_json_parts().map(|(suffix, value, element)| {D}::ChoiceValue {{ suffix, value, element }})"
+        );
         match self.field(path, name) {
+            Some(field) if field.ty.card == Cardinality::One => {
+                format!("{receiver}.{}.{parts}.map(Some)", field.name)
+            }
             Some(field) => format!(
-                "self.{}.as_ref().map(|value| value.to_json_parts().map(|(suffix, value, element)| {D}::ChoiceValue {{ suffix, value, element }})).transpose()",
+                "{receiver}.{}.as_ref().map(|value| value.{parts}).transpose()",
                 field.name
             ),
             None => String::from("Ok(None)"),
+        }
+    }
+
+    /// A slice read of the repeating element `name` of the struct at `path`
+    /// on `receiver`, empty where the version lacks it.
+    fn slice(&self, path: &str, name: &str, receiver: &str) -> String {
+        match self.field(path, name) {
+            Some(field) => format!("{receiver}.{}.as_slice()", field.name),
+            None => String::from("&[]"),
         }
     }
 

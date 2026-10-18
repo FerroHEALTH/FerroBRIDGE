@@ -36,6 +36,15 @@
 //! `http://hl7.org/fhir/StructureDefinition/structuredefinition-regex`). Each
 //! reads from the extension with that url where the element carries it, and
 //! as absent where it does not.
+//!
+//! A validator deciding a binding from the package set reads the
+//! `ValueSet`'s composition and expansion and the `CodeSystem`'s concepts
+//! (<https://hl7.org/fhir/R4/valueset.html>,
+//! <https://hl7.org/fhir/R4/codesystem.html>). STU3 names an imported value
+//! set as a `uri` and R4 as a `canonical`, and the releases differ in the
+//! value types a concept property takes. [`ValueSetRead`] and
+//! [`CodeSystemRead`] read them alike, a nested concept or expansion entry as
+//! the same type as its parent, and a property value in its JSON form.
 
 use super::codec::{EncodeError, Value};
 
@@ -233,4 +242,145 @@ pub trait StructureDefinitionRead {
     /// The FHIRPath rules about when an extension may be used
     /// (`StructureDefinition.contextInvariant`).
     fn context_invariants(&self) -> Vec<&str>;
+}
+
+/// One `ValueSet.compose.include.filter`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FilterRead<'a> {
+    /// The property filtered on (`filter.property`).
+    pub property: Option<&'a str>,
+    /// The operator (`filter.op`).
+    pub op: Option<&'a str>,
+    /// The value (`filter.value`).
+    pub value: Option<&'a str>,
+}
+
+/// One `ValueSet.compose.include` or `ValueSet.compose.exclude`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IncludeRead<'a> {
+    /// The code system the codes come from (`include.system`).
+    pub system: Option<&'a str>,
+    /// The code system version (`include.version`).
+    pub version: Option<&'a str>,
+    /// The codes it lists (`include.concept.code`).
+    pub concepts: Vec<&'a str>,
+    /// The filters it selects codes by (`include.filter`).
+    pub filters: Vec<FilterRead<'a>>,
+    /// The value sets it imports (`include.valueSet`): `uri`s in STU3,
+    /// canonicals from R4.
+    pub value_sets: Vec<&'a str>,
+}
+
+/// The `ValueSet.compose`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComposeRead<'a> {
+    /// Whether inactive codes are in the value set (`compose.inactive`).
+    pub inactive: Option<bool>,
+    /// The includes, in order.
+    pub includes: Vec<IncludeRead<'a>>,
+    /// The excludes, in order.
+    pub excludes: Vec<IncludeRead<'a>>,
+}
+
+/// The `ValueSet.expansion`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpansionRead<'a, C> {
+    /// The number of concepts in the whole expansion (`expansion.total`).
+    pub total: Option<i32>,
+    /// Where this page of a paged expansion starts (`expansion.offset`).
+    pub offset: Option<i32>,
+    /// The entries (`expansion.contains`).
+    pub contains: &'a [C],
+}
+
+/// The facts of a `ValueSet` a validator reads, the same in every release.
+pub trait ValueSetRead {
+    /// The release's `ValueSet.expansion.contains`.
+    type Contains: ContainsRead;
+
+    /// The composition (`ValueSet.compose`).
+    fn compose(&self) -> Option<ComposeRead<'_>>;
+
+    /// The expansion (`ValueSet.expansion`).
+    fn expansion(&self) -> Option<ExpansionRead<'_, Self::Contains>>;
+}
+
+/// One `ValueSet.expansion.contains` entry.
+pub trait ContainsRead: Sized {
+    /// The code system (`contains.system`).
+    fn system(&self) -> Option<&str>;
+
+    /// The code system version (`contains.version`).
+    fn version(&self) -> Option<&str>;
+
+    /// The code (`contains.code`).
+    fn code(&self) -> Option<&str>;
+
+    /// Whether the entry is not selectable (`contains.abstract`).
+    fn is_abstract(&self) -> Option<bool>;
+
+    /// The nested entries (`contains.contains`).
+    fn contains(&self) -> &[Self];
+}
+
+/// One `CodeSystem.property` declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PropertyRead<'a> {
+    /// The code concepts use for it (`property.code`).
+    pub code: Option<&'a str>,
+    /// The URI that defines it (`property.uri`).
+    pub uri: Option<&'a str>,
+}
+
+/// One `CodeSystem.concept.property` value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConceptPropertyRead<'a> {
+    /// The property code (`concept.property.code`).
+    pub code: Option<&'a str>,
+    /// The value in its JSON form (`concept.property.value[x]`).
+    pub value: Option<ChoiceValue>,
+}
+
+/// The facts of a `CodeSystem` a validator reads, the same in every release.
+pub trait CodeSystemRead {
+    /// The release's `CodeSystem.concept`.
+    type Concept: ConceptRead;
+
+    /// How much of the code system the resource carries
+    /// (`CodeSystem.content`).
+    fn content(&self) -> Option<&str>;
+
+    /// What the concept hierarchy means (`CodeSystem.hierarchyMeaning`).
+    fn hierarchy_meaning(&self) -> Option<&str>;
+
+    /// Whether codes compare case-sensitively (`CodeSystem.caseSensitive`).
+    fn case_sensitive(&self) -> Option<bool>;
+
+    /// The properties concepts may carry (`CodeSystem.property`).
+    fn properties(&self) -> Vec<PropertyRead<'_>>;
+
+    /// The top-level concepts (`CodeSystem.concept`).
+    fn concepts(&self) -> &[Self::Concept];
+}
+
+/// One `CodeSystem.concept`.
+pub trait ConceptRead: Sized {
+    /// The code (`concept.code`).
+    fn code(&self) -> Option<&str>;
+
+    /// The display (`concept.display`).
+    fn display(&self) -> Option<&str>;
+
+    /// The designation values (`concept.designation.value`).
+    fn designations(&self) -> Vec<&str>;
+
+    /// The property values (`concept.property`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EncodeError`] when a value has no JSON form.
+    fn properties(&self) -> Result<Vec<ConceptPropertyRead<'_>>, EncodeError>;
+
+    /// The nested concepts (`concept.concept`).
+    fn concepts(&self) -> &[Self];
 }

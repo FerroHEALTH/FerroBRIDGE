@@ -17,8 +17,6 @@ use std::sync::OnceLock;
 use fhir_types::codec::DecodeError;
 use fhir_types::codec::Json;
 use fhir_types::codec::Value;
-use fhir_types::r4::code_system::CodeSystem;
-use fhir_types::r4::value_set::ValueSet;
 
 use crate::canonical::Canonical;
 use crate::canonical::compare_versions;
@@ -30,16 +28,12 @@ use crate::release::Release;
 
 /// A set of packages with a complete dependency closure, read as the release
 /// `R`.
-///
-/// The `ValueSets` and `CodeSystems` are indexed only for a release that
-/// reads them ([`Release::READS_TERMINOLOGY`]), so none is decoded into the
-/// model of another release.
 #[derive(Debug)]
 pub struct PackageSet<R: Release = R4> {
     packages: Vec<Package>,
     structures: BTreeMap<String, Vec<Entry<R::StructureDefinition>>>,
-    value_sets: BTreeMap<String, Vec<Entry<ValueSet>>>,
-    code_systems: BTreeMap<String, Vec<Entry<CodeSystem>>>,
+    value_sets: BTreeMap<String, Vec<Entry<R::ValueSet>>>,
+    code_systems: BTreeMap<String, Vec<Entry<R::CodeSystem>>>,
     /// The dependency closure of each package, by position.
     closures: Vec<BTreeSet<PackageId>>,
 }
@@ -181,28 +175,6 @@ impl PackageSet<R4> {
     pub fn new(packages: Vec<Package>) -> Result<Self, LoadError> {
         Self::new_release(packages)
     }
-
-    /// Resolves `canonical` to the `ValueSet` it names, by the rules of
-    /// [`PackageSet::structure_definition`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ResolveError`] as [`PackageSet::structure_definition`] does.
-    pub fn value_set(&self, canonical: &str) -> Result<Arc<ValueSet>, ResolveError> {
-        self.value_set_in(canonical, None)
-            .map(|(value_set, _)| value_set)
-    }
-
-    /// Resolves `canonical` to the `CodeSystem` it names, by the rules of
-    /// [`PackageSet::structure_definition`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ResolveError`] as [`PackageSet::structure_definition`] does.
-    pub fn code_system(&self, canonical: &str) -> Result<Arc<CodeSystem>, ResolveError> {
-        self.code_system_in(canonical, None)
-            .map(|(code_system, _)| code_system)
-    }
 }
 
 impl<R: Release> PackageSet<R> {
@@ -268,8 +240,8 @@ impl<R: Release> PackageSet<R> {
             }
         }
         let mut structures: BTreeMap<String, Vec<Entry<R::StructureDefinition>>> = BTreeMap::new();
-        let mut value_sets: BTreeMap<String, Vec<Entry<ValueSet>>> = BTreeMap::new();
-        let mut code_systems: BTreeMap<String, Vec<Entry<CodeSystem>>> = BTreeMap::new();
+        let mut value_sets: BTreeMap<String, Vec<Entry<R::ValueSet>>> = BTreeMap::new();
+        let mut code_systems: BTreeMap<String, Vec<Entry<R::CodeSystem>>> = BTreeMap::new();
         for (index, package) in packages.iter().enumerate() {
             let label = format!("{}#{}", package.name(), package.version());
             let origin = PackageId(index);
@@ -283,11 +255,11 @@ impl<R: Release> PackageSet<R> {
                         .entry(url.clone())
                         .or_default()
                         .push(Entry::new(version, source, content, origin)),
-                    "ValueSet" if R::READS_TERMINOLOGY => value_sets
+                    "ValueSet" => value_sets
                         .entry(url.clone())
                         .or_default()
                         .push(Entry::new(version, source, content, origin)),
-                    "CodeSystem" if R::READS_TERMINOLOGY => code_systems
+                    "CodeSystem" => code_systems
                         .entry(url.clone())
                         .or_default()
                         .push(Entry::new(version, source, content, origin)),
@@ -334,6 +306,28 @@ impl<R: Release> PackageSet<R> {
             .map(|(definition, _)| definition)
     }
 
+    /// Resolves `canonical` to the `ValueSet` it names, by the rules of
+    /// [`PackageSet::structure_definition`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ResolveError`] as [`PackageSet::structure_definition`] does.
+    pub fn value_set(&self, canonical: &str) -> Result<Arc<R::ValueSet>, ResolveError> {
+        self.value_set_in(canonical, None)
+            .map(|(value_set, _)| value_set)
+    }
+
+    /// Resolves `canonical` to the `CodeSystem` it names, by the rules of
+    /// [`PackageSet::structure_definition`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ResolveError`] as [`PackageSet::structure_definition`] does.
+    pub fn code_system(&self, canonical: &str) -> Result<Arc<R::CodeSystem>, ResolveError> {
+        self.code_system_in(canonical, None)
+            .map(|(code_system, _)| code_system)
+    }
+
     /// Resolves `canonical` as referenced from the package `scope`, and
     /// returns the definition with the package that carries it.
     pub(crate) fn structure_definition_in(
@@ -355,7 +349,7 @@ impl<R: Release> PackageSet<R> {
         &self,
         canonical: &str,
         scope: Option<PackageId>,
-    ) -> Result<(Arc<ValueSet>, PackageId), ResolveError> {
+    ) -> Result<(Arc<R::ValueSet>, PackageId), ResolveError> {
         resolve(
             &self.packages,
             &self.value_sets,
@@ -370,7 +364,7 @@ impl<R: Release> PackageSet<R> {
         &self,
         canonical: &str,
         scope: Option<PackageId>,
-    ) -> Result<(Arc<CodeSystem>, PackageId), ResolveError> {
+    ) -> Result<(Arc<R::CodeSystem>, PackageId), ResolveError> {
         resolve(
             &self.packages,
             &self.code_systems,

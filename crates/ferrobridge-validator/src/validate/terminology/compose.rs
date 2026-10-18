@@ -8,11 +8,12 @@
 use std::sync::Arc;
 use std::sync::PoisonError;
 
-use fhir_types::r4::value_set::ValueSetCompose;
-use fhir_types::r4::value_set::ValueSetComposeInclude;
-use fhir_types::r4::value_set::ValueSetComposeIncludeFilter;
-use fhir_types::r4::value_set::ValueSetExpansion;
-use fhir_types::r4::value_set::ValueSetExpansionContains;
+use fhir_types::definition::ComposeRead;
+use fhir_types::definition::ContainsRead;
+use fhir_types::definition::ExpansionRead;
+use fhir_types::definition::FilterRead;
+use fhir_types::definition::IncludeRead;
+use fhir_types::definition::ValueSetRead;
 
 use crate::release::Release;
 use crate::report::Reason;
@@ -79,19 +80,14 @@ impl<R: Release> Validator<'_, R> {
             ) => return Ok(None),
             Err(error) => return Err(error.into()),
         };
-        let Some(compose) = &value_set.compose else {
+        let Some(compose) = value_set.compose() else {
             return Ok(None);
         };
-        let mut systems = compose.include.iter().map(|include| {
+        let mut systems = compose.includes.iter().map(|include| {
             include
-                .value_set
+                .value_sets
                 .is_empty()
-                .then(|| {
-                    include
-                        .system
-                        .as_ref()
-                        .and_then(|system| system.value.clone())
-                })
+                .then(|| include.system.map(str::to_owned))
                 .flatten()
         });
         let Some(Some(first)) = systems.next() else {
@@ -124,11 +120,13 @@ impl<R: Release> Validator<'_, R> {
         {
             return Ok(found.clone());
         }
-        if !R::READS_TERMINOLOGY {
-            return Ok(Err(Reason::TerminologyNotRead { release: R::NAME }));
-        }
         let index = match self.set.code_system_in(canonical, Some(scope)) {
-            Ok((system, _)) => Ok(Arc::new(CodeIndex::new(&system))),
+            Ok((system, _)) => Ok(Arc::new(CodeIndex::new(&*system).map_err(|source| {
+                ValidateError::CodeSystemValue {
+                    canonical: canonical.to_owned(),
+                    source,
+                }
+            })?)),
             Err(ResolveError::NotFound { .. } | ResolveError::Fragment { .. }) => {
                 Err(Reason::CodeSystemNotFound(canonical.to_owned()))
             }
@@ -153,11 +151,6 @@ impl<R: Release> Validator<'_, R> {
         code: &Coding<'_>,
         stack: &mut Vec<String>,
     ) -> Result<Membership, ValidateError> {
-        if !R::READS_TERMINOLOGY {
-            return Ok(Membership::Unknown(Reason::TerminologyNotRead {
-                release: R::NAME,
-            }));
-        }
         let (value_set, origin) = match self.set.value_set_in(canonical, Some(scope)) {
             Ok(found) => found,
             Err(ResolveError::NotFound { .. } | ResolveError::Fragment { .. }) => {
@@ -179,9 +172,8 @@ impl<R: Release> Validator<'_, R> {
         }
         stack.push(canonical.to_owned());
         let composed = value_set
-            .compose
-            .as_ref()
-            .map(|compose| self.composed(compose, origin, code, stack))
+            .compose()
+            .map(|compose| self.composed(&compose, origin, code, stack))
             .transpose();
         stack.pop();
         let composed = composed?;
@@ -189,9 +181,8 @@ impl<R: Release> Validator<'_, R> {
             return Ok(answer);
         }
         if let Some(answer) = value_set
-            .expansion
-            .as_ref()
-            .and_then(|expansion| expanded(expansion, code))
+            .expansion()
+            .and_then(|expansion| expanded(&expansion, code))
         {
             return Ok(answer);
         }
@@ -202,18 +193,18 @@ impl<R: Release> Validator<'_, R> {
     /// and in none of its excludes (valueset.html §4.9.5).
     fn composed(
         &self,
-        compose: &ValueSetCompose,
+        compose: &ComposeRead<'_>,
         origin: PackageId,
         code: &Coding<'_>,
         stack: &mut Vec<String>,
     ) -> Result<Membership, ValidateError> {
-        let active_only = compose.inactive.as_ref().and_then(|flag| flag.value) == Some(false);
-        let mut included = if compose.include.is_empty() {
+        let active_only = compose.inactive == Some(false);
+        let mut included = if compose.includes.is_empty() {
             Membership::Unknown(Reason::ValueSetNotEnumerated)
         } else {
             Membership::NotMember
         };
-        for include in &compose.include {
+        for include in &compose.includes {
             included = included.or(self.included(include, origin, code, active_only, stack)?);
             if included == Membership::Member {
                 break;
@@ -223,7 +214,7 @@ impl<R: Release> Validator<'_, R> {
             return Ok(included);
         }
         let mut excluded = Membership::NotMember;
-        for exclude in &compose.exclude {
+        for exclude in &compose.excludes {
             excluded = excluded.or(self.included(exclude, origin, code, false, stack)?);
         }
         Ok(included.and(excluded.not()))
@@ -233,7 +224,7 @@ impl<R: Release> Validator<'_, R> {
     /// system selection and each value set it imports.
     fn included(
         &self,
-        include: &ValueSetComposeInclude,
+        include: &IncludeRead<'_>,
         origin: PackageId,
         code: &Coding<'_>,
         active_only: bool,
@@ -241,17 +232,11 @@ impl<R: Release> Validator<'_, R> {
     ) -> Result<Membership, ValidateError> {
         let mut answer = include
             .system
-            .as_ref()
-            .and_then(|system| system.value.as_deref())
             .map(|system| self.selected(include, system, origin, code, active_only))
             .transpose()?;
         // NOTE: valueset.html §4.9.5 and §4.9.8: a code must be in all the imported value sets;
         // the ValueSet.compose.include.valueSet definition's "union" contradicts it and loses.
-        for imported in include
-            .value_set
-            .iter()
-            .filter_map(|canonical| canonical.value.as_deref())
-        {
+        for &imported in &include.value_sets {
             if answer == Some(Membership::NotMember) {
                 break;
             }
@@ -269,7 +254,7 @@ impl<R: Release> Validator<'_, R> {
     /// select.
     fn selected(
         &self,
-        include: &ValueSetComposeInclude,
+        include: &IncludeRead<'_>,
         system: &str,
         origin: PackageId,
         code: &Coding<'_>,
@@ -281,10 +266,7 @@ impl<R: Release> Validator<'_, R> {
         let Some(text) = code.code else {
             return Ok(Membership::NotMember);
         };
-        let pinned = include
-            .version
-            .as_ref()
-            .and_then(|version| version.value.as_deref());
+        let pinned = include.version;
         let every_version = pinned == Some("*");
         let pinned = pinned.filter(|version| *version != "*");
         // NOTE: valueset.html §4.9.8.2: a concept is identified by system, version and code, so
@@ -294,13 +276,8 @@ impl<R: Release> Validator<'_, R> {
         {
             return Ok(Membership::NotMember);
         }
-        let listed = !include.concept.is_empty();
-        if listed
-            && !include
-                .concept
-                .iter()
-                .any(|concept| concept.code.value.as_deref() == Some(text))
-        {
+        let listed = !include.concepts.is_empty();
+        if listed && !include.concepts.contains(&text) {
             return Ok(Membership::NotMember);
         }
         if listed && !active_only {
@@ -329,7 +306,7 @@ impl<R: Release> Validator<'_, R> {
             }
         }
         let mut answer = Membership::Member;
-        for filter in &include.filter {
+        for filter in &include.filters {
             answer = answer.and(filtered(&index, concept, filter, &label));
             if answer == Membership::NotMember {
                 break;
@@ -371,12 +348,12 @@ fn inactive(concept: &Concept) -> Option<bool> {
 fn filtered(
     index: &CodeIndex,
     concept: &Concept,
-    filter: &ValueSetComposeIncludeFilter,
+    filter: &FilterRead<'_>,
     label: &str,
 ) -> Membership {
-    let property = filter.property.value.as_deref().unwrap_or_default();
-    let op = filter.op.value.as_deref().unwrap_or_default();
-    let value = filter.value.value.as_deref().unwrap_or_default();
+    let property = filter.property.unwrap_or_default();
+    let op = filter.op.unwrap_or_default();
+    let value = filter.value.unwrap_or_default();
     let not_evaluated = || {
         Membership::Unknown(Reason::FilterNotEvaluated(format!(
             "{property} {op} {value}"
@@ -439,15 +416,14 @@ fn filtered(
 
 /// Answers whether `code` is in a complete, unpaged expansion; `None` when
 /// the expansion is partial.
-fn expanded(expansion: &ValueSetExpansion, code: &Coding<'_>) -> Option<Membership> {
-    let total = expansion.total.as_ref().and_then(|total| total.value);
-    let paged = expansion
-        .offset
-        .as_ref()
-        .and_then(|offset| offset.value)
-        .is_some_and(|offset| offset != 0);
+fn expanded<C: ContainsRead>(
+    expansion: &ExpansionRead<'_, C>,
+    code: &Coding<'_>,
+) -> Option<Membership> {
+    let total = expansion.total;
+    let paged = expansion.offset.is_some_and(|offset| offset != 0);
     let mut found = false;
-    let entries = walk_expansion(&expansion.contains, code, &mut found);
+    let entries = walk_expansion(expansion.contains, code, &mut found);
     // NOTE: ValueSet.expansion.offset and .total definitions: a paged expansion is a partial
     // view, so it counts only unpaged and holding every concept `total` counts.
     let complete =
@@ -464,27 +440,16 @@ fn expanded(expansion: &ValueSetExpansion, code: &Coding<'_>) -> Option<Membersh
 
 /// Counts the entries of an expansion's `contains` and their nested entries,
 /// setting `found` when a selectable one is `code`.
-fn walk_expansion(
-    contains: &[ValueSetExpansionContains],
-    code: &Coding<'_>,
-    found: &mut bool,
-) -> usize {
+fn walk_expansion<C: ContainsRead>(contains: &[C], code: &Coding<'_>, found: &mut bool) -> usize {
     let mut entries = 0_usize;
     for entry in contains {
         entries = entries.saturating_add(1);
-        let selectable = !entry
-            .r#abstract
-            .as_ref()
-            .and_then(|flag| flag.value)
-            .unwrap_or(false);
-        let same_code = entry.code.as_ref().and_then(|held| held.value.as_deref()) == code.code;
-        let same_system = code.system.is_none_or(|system| {
-            entry.system.as_ref().and_then(|held| held.value.as_deref()) == Some(system)
-        });
-        let entry_version = entry
-            .version
-            .as_ref()
-            .and_then(|held| held.value.as_deref());
+        let selectable = !entry.is_abstract().unwrap_or(false);
+        let same_code = entry.code() == code.code;
+        let same_system = code
+            .system
+            .is_none_or(|system| entry.system() == Some(system));
+        let entry_version = entry.version();
         let same_version = match (entry_version, code.version) {
             (Some(held), Some(asked)) => held == asked,
             _ => true,
@@ -492,7 +457,7 @@ fn walk_expansion(
         if selectable && code.code.is_some() && same_code && same_system && same_version {
             *found = true;
         }
-        entries = entries.saturating_add(walk_expansion(&entry.contains, code, found));
+        entries = entries.saturating_add(walk_expansion(entry.contains(), code, found));
     }
     entries
 }
