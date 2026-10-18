@@ -210,10 +210,6 @@ pub enum Reason {
     NotRestfulReference,
     /// The versioning rule is none of the three R4 defines.
     VersioningRule(String),
-    /// The target profile constrains the abstract `Resource` or
-    /// `DomainResource`, which the validator holds no resource to beyond
-    /// the core definitions.
-    AbstractProfile,
     /// A context of the extension's definition the walk cannot decide, and
     /// none it can decide admits the extension: each such context with why.
     ExtensionContext(String),
@@ -312,9 +308,6 @@ impl fmt::Display for Reason {
             ),
             Self::VersioningRule(rule) => {
                 write!(f, "the versioning rule {rule} is none R4 defines")
-            }
-            Self::AbstractProfile => {
-                f.write_str("a profile on Resource or DomainResource is not validated against")
             }
             Self::ExtensionContext(why) => {
                 write!(f, "the extension context is not decided ({why})")

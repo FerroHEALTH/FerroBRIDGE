@@ -320,15 +320,12 @@ impl<'i> Walk<'_, '_, 'i> {
             )) => return Ok(Verdict::Unknown(Reason::ProfileNotFound)),
             Err(error) => return Err(error),
         };
-        if matches!(structure.type_name(), "Resource" | "DomainResource") {
-            // NOTE: no specification governs this reading: our own design until abstract
-            // profiles are checked (#620); the core Resource and DomainResource admit any resource.
-            return Ok(if structure.url().starts_with(CORE) {
-                Verdict::Conforms
-            } else {
-                // TODO(#620): validate a target against a profile on an abstract base type.
-                Verdict::Unknown(Reason::AbstractProfile)
-            });
+        if matches!(structure.type_name(), "Resource" | "DomainResource")
+            && structure.url().starts_with(CORE)
+        {
+            // NOTE: no specification governs this reading: our own design; the core Resource
+            // and DomainResource admit any resource, and a profile on them is walked below.
+            return Ok(Verdict::Conforms);
         }
         let key = (address(target), Arc::as_ptr(&structure).addr());
         match self.memo(key) {

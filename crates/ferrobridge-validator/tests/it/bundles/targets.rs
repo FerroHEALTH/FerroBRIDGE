@@ -178,3 +178,58 @@ fn the_bundled_aggregation_needs_the_target_in_the_bundle() -> TestResult {
     assert_eq!(aggregation_reasons(&alone), [Reason::NoBundle]);
     Ok(())
 }
+/// A profile on the abstract `DomainResource` requiring `language`.
+fn languaged() -> serde_json::Value {
+    let mut definition = profile(
+        "languaged",
+        "DomainResource",
+        &json!([
+            {"id": "DomainResource", "path": "DomainResource", "min": 0, "max": "*"},
+            {"id": "DomainResource.language", "path": "DomainResource.language",
+             "min": 1, "max": "1", "type": [{"code": "code"}]}
+        ]),
+    );
+    definition["baseDefinition"] = json!("http://hl7.org/fhir/StructureDefinition/DomainResource");
+    definition
+}
+
+/// Validates `resource` against the Observation profile whose subject
+/// SHALL conform to [`languaged`].
+fn against_languaged(resource: &serde_json::Value) -> TestResult<Report> {
+    let targets = [format!("{BASE}languaged")];
+    let (_synthetic, set) = set_with(&[observation_profile(&targets, &[]), languaged()])?;
+    validate(&set, resource, Some(&format!("{BASE}observation-test")))
+}
+
+#[test]
+fn a_target_conforming_to_a_profile_on_domain_resource_passes() -> TestResult {
+    // StructureDefinition.type and baseDefinition: a profile on DomainResource constrains
+    // every resource type that specializes it.
+    let mut languaged_patient = patient();
+    languaged_patient["language"] = json!("en");
+    let report = against_languaged(&with_contained(languaged_patient))?;
+    assert!(report.is_valid(), "{:#?}", report.issues());
+    assert!(
+        target_reasons(&report, "Observation.subject").is_empty(),
+        "{:#?}",
+        report.unevaluated()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_target_breaking_a_profile_on_domain_resource_is_refused() -> TestResult {
+    let report = against_languaged(&with_contained(patient()))?;
+    let found: Vec<_> = report
+        .with_message(MessageId::TargetProfileMismatch)
+        .collect();
+    assert_eq!(found.len(), 1, "{:#?}", report.issues());
+    assert_eq!(found[0].expression, "Observation.subject");
+    assert!(
+        found[0].message.contains("language"),
+        "{}",
+        found[0].message
+    );
+    assert!(target_reasons(&report, "Observation.subject").is_empty());
+    Ok(())
+}
