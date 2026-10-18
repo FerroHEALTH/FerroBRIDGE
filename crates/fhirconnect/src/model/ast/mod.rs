@@ -28,6 +28,7 @@ use openehr_mapping_core::position::Located;
 use openehr_mapping_core::position::Position;
 
 use crate::model::ast::keyword::ConditionOperator;
+use crate::model::ast::keyword::ContextScope;
 use crate::model::ast::keyword::DataType;
 use crate::model::ast::keyword::Direction;
 use crate::model::ast::keyword::ExtensionMethod;
@@ -186,6 +187,9 @@ pub struct Mapping {
     pub reference: Option<ReferenceMapping>,
     /// The `metadata.name` of the model mapping a SLOT mapping redirects to.
     pub slot_archetype: Option<Located<MappingName>>,
+    /// The `metadata.name` of the context a SLOT mapping enters
+    /// (`types-of-mapping-files/sub-contexts.adoc`, §`slotContext`).
+    pub slot_context: Option<Located<MappingName>>,
     /// The external function a PROGRAMMED mapping runs.
     pub mapping_code: Option<Located<String>>,
     /// The openEHR LINK a LINKED mapping creates.
@@ -375,8 +379,24 @@ pub struct MappingContext {
     pub extensions: Vec<Located<MappingName>>,
     /// The operational models this context triggers, by `metadata.name`.
     pub operational: Vec<Located<MappingName>>,
+    /// Whether the context is a root or a sub-context, `None` when the file
+    /// writes no `scope`, which reads as `root`.
+    pub scope: Option<Located<ContextScope>>,
+    /// The sub-contexts this context enters through `slotContext`, by
+    /// `metadata.name`.
+    pub contexts: Vec<Located<MappingName>>,
     /// The mapping the engine starts at, by `metadata.name`.
     pub start: Located<MappingName>,
+}
+
+impl MappingContext {
+    /// Returns the scope the context declares, `root` when it writes none.
+    #[must_use]
+    pub fn scope(&self) -> ContextScope {
+        self.scope
+            .as_ref()
+            .map_or(ContextScope::Root, |scope| *scope.value())
+    }
 }
 
 /// One loaded context mapping file.

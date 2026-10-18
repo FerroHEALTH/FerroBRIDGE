@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A root context whose diagnosis model enters the sub-context beside it for
+# the Observation an evidence reference names, onto the synthetic
+# ferrobridge.diagnose.v1 template of the testkit. The profile URL is
+# example.org, which RFC 6761 section 6.5 reserves for examples.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_sub_parent.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://example.org/fhir/StructureDefinition/ferrobridge-sub-parent"
+  template:
+    id: "ferrobridge.diagnose.v1"
+  archetypes:
+    - "ferrobridge_sub_parent"
+  contexts:
+    - "ferrobridge_sub_evidence.context"
+  start: "ferrobridge_sub_parent"

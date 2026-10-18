@@ -240,9 +240,9 @@ fn walk_mappings(mappings: &[Mapping]) -> impl Iterator<Item = &Mapping> {
     while let Some(mapping) = stack.pop() {
         found.push(mapping);
         let nested = match *mapping.method() {
-            Method::Reference { ref mappings, .. } | Method::Slot { ref mappings, .. } => {
-                mappings.as_slice()
-            }
+            Method::Reference { ref mappings, .. }
+            | Method::Slot { ref mappings, .. }
+            | Method::SlotContext { ref mappings, .. } => mappings.as_slice(),
             Method::Value
             | Method::Link { .. }
             | Method::Programmed { .. }

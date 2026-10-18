@@ -139,6 +139,7 @@ fn lower_mapping(
         followed_by: lower_followed_by(lowering, node, path),
         reference: lower_reference(lowering, node, path),
         slot_archetype: lowering.optional_mapping_name(node, path, "slotArchetype"),
+        slot_context: lowering.optional_mapping_name(node, path, "slotContext"),
         mapping_code: lowering.optional_text(node, path, "mappingCode"),
         link: lower_link(lowering, node, path),
         participations_function: lowering.optional_text(node, path, "participationsFunction"),

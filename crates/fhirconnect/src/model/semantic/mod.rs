@@ -35,6 +35,12 @@ use crate::model::ast::keyword::Variable;
 use crate::model::error::ModelCode;
 use crate::model::load::MappingSet;
 
+mod sub_contexts;
+
+use sub_contexts::check_slot_context;
+use sub_contexts::require_context;
+use sub_contexts::validate_sub_contexts;
+
 /// The functions a PROGRAMMED mapping may name.
 ///
 /// "In this mapping an external bit of code is retrieved and executed by the
@@ -87,6 +93,7 @@ pub fn validate(set: &MappingSet, codes: &dyn MappingCodeRegistry) -> Vec<Diagno
     for context in set.contexts() {
         validate_context(set, context, &mut diagnostics);
     }
+    validate_sub_contexts(set, &mut diagnostics);
     diagnostics
 }
 
@@ -270,6 +277,8 @@ fn validate_mapping(
         ));
     }
 
+    check_slot_context(rules, mapping, path, diagnostics);
+
     if let Some(ref reference) = mapping.reference {
         let is_reference_variable = side(|with| with.openehr.as_ref()).is_some_and(|value| {
             Variable::from_str(value).is_ok_and(|variable| variable == Variable::Reference)
@@ -337,6 +346,16 @@ fn validate_context(
         &path.field("start"),
         diagnostics,
     );
+    for (index, reference) in context.contexts.iter().enumerate() {
+        require_context(
+            set,
+            file.file(),
+            &name,
+            reference,
+            &path.field("contexts").index(index),
+            diagnostics,
+        );
+    }
 }
 
 /// Refuses a cross-file reference that names no loaded model or extension.

@@ -13,6 +13,7 @@ mod extensions;
 mod methods;
 mod paths;
 mod program;
+mod sub_contexts;
 mod versions;
 
 use core::error::Error;
@@ -124,7 +125,7 @@ fn loaded_set(files: &[(&str, &str)]) -> Result<(tempfile::TempDir, MappingSet),
 }
 
 /// Renders a diagnostic list as one error message.
-fn render(diagnostics: &[Diagnostic]) -> String {
+pub(crate) fn render(diagnostics: &[Diagnostic]) -> String {
     diagnostics
         .iter()
         .map(|diagnostic| {
@@ -180,7 +181,7 @@ pub(crate) fn model(name: &str, archetype: &str, body: &str) -> String {
 }
 
 /// The header every small synthetic extension file in this test opens with.
-fn extension(name: &str, extends: &str, body: &str) -> String {
+pub(crate) fn extension(name: &str, extends: &str, body: &str) -> String {
     format!(
         "grammar: FHIRConnect/v1.0.0\ntype: extension\nmetadata:\n  name: {name}\n  version: \
          1.0.0\nspec:\n  system: FHIR\n  version: R4\n  extends: {extends}\n{body}"
@@ -249,7 +250,7 @@ const PROBLEM: &str = "mappings:\n  - name: \"problem\"\n    with:\n      fhir: 
                        \n      openehr: \"$archetype/data[at0001]/items[at0002]\"\n";
 
 /// Borrows a list of named files for [`set_of`].
-fn borrow<'a>(files: &'a [(&'static str, String)]) -> Vec<(&'static str, &'a str)> {
+pub(crate) fn borrow<'a>(files: &'a [(&'static str, String)]) -> Vec<(&'static str, &'a str)> {
     files
         .iter()
         .map(|(name, text)| (*name, text.as_str()))
@@ -257,7 +258,10 @@ fn borrow<'a>(files: &'a [(&'static str, String)]) -> Vec<(&'static str, &'a str
 }
 
 /// Compiles a small synthetic case and returns its refusals.
-fn refusals(files: &[(&str, &str)], context: &str) -> Result<Vec<Diagnostic>, Box<dyn Error>> {
+pub(crate) fn refusals(
+    files: &[(&str, &str)],
+    context: &str,
+) -> Result<Vec<Diagnostic>, Box<dyn Error>> {
     let set = set_of(files)?;
     match program_of(&set, context) {
         Ok(program) => Err(format!("the case compiled: {program}").into()),

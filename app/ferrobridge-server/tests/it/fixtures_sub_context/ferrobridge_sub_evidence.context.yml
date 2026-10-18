@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The sub-context of the suite, entered only through slotContext. Its
+# template is the cluster embedded in the parent's template, which the stub
+# CDR does not serve, so a sub-context whose template were fetched would fail
+# the load.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_sub_evidence.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  scope: "sub"
+  profile:
+    url: "http://example.org/fhir/StructureDefinition/ferrobridge-sub-evidence"
+  template:
+    id: "ferrobridge.evidence.v1"
+  archetypes:
+    - "ferrobridge_sub_evidence"
+  start: "ferrobridge_sub_evidence"

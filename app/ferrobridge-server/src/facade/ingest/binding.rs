@@ -172,6 +172,20 @@ impl Ingest<'_> {
         inbound: &Inbound,
         provenance: &Provenance,
     ) -> Result<(CanonicalComposition, String), EngineError> {
+        self.run_consuming(program, inbound, provenance)
+            .await
+            .map(|(composition, instant, _consumed)| (composition, instant))
+    }
+
+    /// Runs the engine as [`Ingest::run`] does, and also returns the literal
+    /// references whose resources a `slotContext` consumed
+    /// (`fhirconnect::engine::outcome::Outcome::consumed`).
+    pub(super) async fn run_consuming(
+        &self,
+        program: &Loaded,
+        inbound: &Inbound,
+        provenance: &Provenance,
+    ) -> Result<(CanonicalComposition, String, Vec<String>), EngineError> {
         // NOTE: no specification governs this: our own design, one instant serves
         // every defaulted time of one ingest, so each resource reads the clock once.
         let now = jiff::Timestamp::now().to_string();
@@ -196,7 +210,8 @@ impl Ingest<'_> {
                 usage.record_mapping_failure();
             }
         })?;
-        Ok((built.into_value(), now))
+        let consumed = built.consumed().to_vec();
+        Ok((built.into_value(), now, consumed))
     }
 
     /// Returns the commit headers one composition write carries.

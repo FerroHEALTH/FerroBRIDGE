@@ -254,6 +254,23 @@ pub struct Skipped {
     pub reason: SkipReason,
 }
 
+/// One Bundle entry another entry's mapping consumed through a
+/// `slotContext`, so it was not processed as a root.
+///
+/// "A resource that a parent context pulls in via `slotContext` is marked as
+/// resolved. The engine does not process it again as a root"
+/// (`docs/specs/fhirconnect/modules/ROOT/pages/engine/bundles.adoc`,
+/// §Resources consumed by a sub-context).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Consumed {
+    /// The `fullUrl` of the entry, or its position when it has none.
+    pub full_url: String,
+    /// The `resourceType` the entry declares.
+    pub resource_type: String,
+    /// The `fullUrl` of the entry whose mapping consumed it.
+    pub by: String,
+}
+
 /// One Bundle entry the service committed.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Committed {
@@ -293,6 +310,8 @@ pub enum EntryOutcome {
     Committed(Committed),
     /// No program ran over the entry.
     Skipped(Skipped),
+    /// Another entry's mapping consumed the entry through a `slotContext`.
+    Consumed(Consumed),
 }
 
 /// What one ingested Bundle produced.
@@ -344,7 +363,7 @@ impl Ingested {
     pub fn committed(&self) -> impl Iterator<Item = &Committed> {
         self.entries.iter().filter_map(|entry| match entry {
             EntryOutcome::Committed(committed) => Some(committed),
-            EntryOutcome::Skipped(_) => None,
+            EntryOutcome::Skipped(_) | EntryOutcome::Consumed(_) => None,
         })
     }
 
@@ -352,7 +371,16 @@ impl Ingested {
     pub fn skipped(&self) -> impl Iterator<Item = &Skipped> {
         self.entries.iter().filter_map(|entry| match entry {
             EntryOutcome::Skipped(skipped) => Some(skipped),
-            EntryOutcome::Committed(_) => None,
+            EntryOutcome::Committed(_) | EntryOutcome::Consumed(_) => None,
+        })
+    }
+
+    /// Returns the entries another entry consumed through a `slotContext`,
+    /// in Bundle order.
+    pub fn consumed(&self) -> impl Iterator<Item = &Consumed> {
+        self.entries.iter().filter_map(|entry| match entry {
+            EntryOutcome::Consumed(consumed) => Some(consumed),
+            EntryOutcome::Committed(_) | EntryOutcome::Skipped(_) => None,
         })
     }
 }
@@ -403,6 +431,8 @@ struct Mapped {
     composition: Box<Composition>,
     /// The instant the engine defaulted every clock-derived time from.
     instant: String,
+    /// The literal references whose resources a `slotContext` consumed.
+    consumed: Vec<String>,
 }
 
 /// Which versions of a committed contribution the entries being bound
@@ -432,6 +462,8 @@ enum Pending {
     Mapped(usize),
     /// No program ran over the entry.
     Skipped(Skipped),
+    /// Another entry's mapping consumed the entry.
+    Consumed(Consumed),
 }
 
 /// Every entry of a Bundle, mapped and partitioned.

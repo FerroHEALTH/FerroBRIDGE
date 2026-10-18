@@ -87,6 +87,7 @@ const MAPPING_KEYS: &[&str] = &[
     "followedBy",
     "reference",
     "slotArchetype",
+    "slotContext",
     "mappingCode",
     "link",
     "participationsFunction",
@@ -143,6 +144,8 @@ const CONTEXT_KEYS: &[&str] = &[
     "archetypes",
     "extensions",
     "operational",
+    "scope",
+    "contexts",
     "start",
 ];
 

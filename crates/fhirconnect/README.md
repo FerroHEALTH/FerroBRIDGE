@@ -133,8 +133,12 @@ openEHR.
   occurrences, the data-type cell, the write, then the `followedBy` children
   once per occurrence the parent bound. A `manual` entry merges every path it
   names into one element, a `slotArchetype` recurses with the whole chain
-  checked for a cycle, and `type: NONE` writes nothing and only anchors what
-  follows.
+  checked for a cycle, a `slotContext` enters a sub-context and maps from its
+  `start` with that context's own extensions into the parent composition, and
+  `type: NONE` writes nothing and only anchors what follows. A resource a
+  `slotContext` pulls in through a `reference` is named in
+  `Outcome::consumed`, so a caller splitting a Bundle does not process it again
+  as a root.
 - **A mapping with no `type` key converts through a derived pair.** The
   compiler derives it from the element's FHIR type and the node's openEHR
   class, the pairs of the data-type chapter the engine's cells carry. An

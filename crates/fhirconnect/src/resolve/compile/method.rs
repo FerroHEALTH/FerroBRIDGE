@@ -8,9 +8,15 @@ use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::matching::node_id_matches;
 use openehr_mapping_core::position::Located;
 
+use core::str::FromStr;
+
+use crate::model::ast::ContextMappingFile;
 use crate::model::ast::ManualEntry;
+use crate::model::ast::Mapping;
 use crate::model::ast::ModelMappingFile;
+use crate::model::ast::keyword::ContextScope;
 use crate::model::ast::keyword::Direction;
+use crate::model::ast::keyword::Variable;
 use crate::resolve::error::ResolveCode;
 use crate::resolve::extensions::Node;
 use crate::resolve::extensions::diagnostic;
@@ -37,6 +43,7 @@ impl<'a> Compiler<'a> {
         let declared = [
             method.reference.as_ref().map(|_| "reference"),
             method.slot_archetype.as_ref().map(|_| "slotArchetype"),
+            method.slot_context.as_ref().map(|_| "slotContext"),
             method.link.as_ref().map(|_| "link"),
             method.mapping_code.as_ref().map(|_| "mappingCode"),
             method
@@ -92,7 +99,10 @@ impl<'a> Compiler<'a> {
             };
         }
         if let Some(ref slot) = method.slot_archetype {
-            return self.slot(file, slot, scope, path);
+            return self.slot(file, slot, scope, &path.field("slotArchetype"));
+        }
+        if let Some(ref entered) = method.slot_context {
+            return self.slot_context(file, entered, scope, &path.field("slotContext"));
         }
         if let Some(ref link) = method.link {
             return Method::Link {
@@ -139,7 +149,7 @@ impl<'a> Compiler<'a> {
         path: &ModelPath,
     ) -> Method {
         let owner = file.header().name().value();
-        let at = path.field("slotArchetype");
+        let at = path.clone();
         let Some(slotted) = self.set.model(slot.value()) else {
             self.diagnostics.push(diagnostic(
                 file.file(),
@@ -214,6 +224,156 @@ impl<'a> Compiler<'a> {
             preprocessors: self.preprocessors(slotted, &inner),
             mappings: self.mappings(&merged.mappings, &inner),
         }
+    }
+
+    /// Compiles the context a `slotContext` enters.
+    ///
+    /// "The engine enters the referenced context, maps from its `start` with
+    /// its own `archetypes` and `extensions`, and returns", the sub-context
+    /// maps "into the parent composition", and it "must be listed under
+    /// `contexts`"
+    /// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/sub-contexts.adoc`,
+    /// §`slotContext` and §Rules). So the entered context's `start` is slotted
+    /// as a `slotArchetype` would slot it, under the entered context's
+    /// extensions, and the composition model a root context's `start` slots
+    /// is skipped there.
+    fn slot_context(
+        &mut self,
+        file: &'a ModelMappingFile,
+        entered: &Located<MappingName>,
+        scope: &Scope,
+        path: &ModelPath,
+    ) -> Method {
+        let owner = file.header().name().value();
+        let name = entered.value();
+        let Some(sub) = self.set.context(name) else {
+            self.diagnostics.push(diagnostic(
+                file.file(),
+                owner,
+                ResolveCode::UnknownContextReference,
+                entered.position(),
+                path,
+                format!("`{name}` is no context mapping of the loaded set"),
+            ));
+            return refused_entry(name);
+        };
+        if !self.may_enter(file, entered, sub, path) {
+            return refused_entry(name);
+        }
+        let declaration = sub.context();
+        let start = Located::new(
+            declaration.start.position(),
+            declaration.start.value().clone(),
+        );
+        // TODO(#886): check `template.id` against the template embedded at the slot node.
+        let extensions = self.extensions_of(sub);
+        let saved = core::mem::replace(&mut self.extensions, extensions);
+        self.entered.push(sub);
+        if !self.subs.iter().any(|seen| core::ptr::eq(*seen, sub)) {
+            self.subs.push(sub);
+        }
+        let inner = Scope {
+            nested: true,
+            ..scope.clone()
+        };
+        let slotted = self.slot(file, &start, &inner, path);
+        self.entered.pop();
+        self.extensions = saved;
+        match slotted {
+            Method::Slot {
+                model,
+                preprocessors,
+                mappings,
+            } => Method::SlotContext {
+                context: name.clone(),
+                model,
+                preprocessors,
+                mappings,
+            },
+            other => other,
+        }
+    }
+
+    /// Answers whether the walk may enter `sub` at a `slotContext` naming it:
+    /// the entering context lists it under `contexts`, it is not already on
+    /// the chain of entered contexts, and a `scope: sub` context's `start`
+    /// slots no composition (`sub-contexts.adoc`, §Rules and §Validation
+    /// errors). Each refusal is reported.
+    fn may_enter(
+        &mut self,
+        file: &'a ModelMappingFile,
+        entered: &Located<MappingName>,
+        sub: &'a ContextMappingFile,
+        path: &ModelPath,
+    ) -> bool {
+        let owner = file.header().name().value();
+        let name = entered.value();
+        if let Some(parent) = self.entered.last()
+            && !parent
+                .context()
+                .contexts
+                .iter()
+                .any(|listed| listed.value() == name)
+        {
+            self.diagnostics.push(diagnostic(
+                file.file(),
+                owner,
+                ResolveCode::UndeclaredSubContext,
+                entered.position(),
+                path,
+                format!(
+                    "`{name}` is entered here and `{}` does not list it under `contexts`",
+                    parent.header().name().value()
+                ),
+            ));
+            return false;
+        }
+        if self
+            .entered
+            .iter()
+            .any(|context| context.header().name().value() == name)
+        {
+            let chain: Vec<&str> = self
+                .entered
+                .iter()
+                .map(|context| context.header().name().value().as_str())
+                .collect();
+            self.diagnostics.push(diagnostic(
+                file.file(),
+                owner,
+                ResolveCode::CyclicSubContext,
+                entered.position(),
+                path,
+                format!(
+                    "`{name}` is entered again on the chain {}",
+                    chain.join(" -> ")
+                ),
+            ));
+            return false;
+        }
+        let declaration = sub.context();
+        let start = declaration.start.value();
+        if declaration.scope() == ContextScope::Sub
+            && let Some(model) = self.set.model(start)
+            && let Some(composition) = model
+                .mappings()
+                .iter()
+                .find(|mapping| slots_composition(mapping))
+        {
+            self.diagnostics.push(diagnostic(
+                model.file(),
+                start,
+                ResolveCode::SubContextComposition,
+                composition.position,
+                &ModelPath::root().field("mappings"),
+                format!(
+                    "`{start}` starts the `scope: sub` context `{name}` and slots a composition \
+                     model, and a sub-context never creates a composition"
+                ),
+            ));
+            return false;
+        }
+        true
     }
 
     /// Compiles one `manual` entry.
@@ -325,4 +485,31 @@ impl<'a> Compiler<'a> {
         };
         Some(ManualValue::Context(member.to_owned()))
     }
+}
+
+/// The method of a `slotContext` the compiler refused: the entry into the
+/// named context with nothing compiled under it, so the refusal is not
+/// followed by one about the mapping as a plain value.
+fn refused_entry(context: &MappingName) -> Method {
+    Method::SlotContext {
+        context: context.clone(),
+        model: context.clone(),
+        preprocessors: Vec::new(),
+        mappings: Vec::new(),
+    }
+}
+
+/// Whether `mapping` slots a composition model: a `slotArchetype` at
+/// `openehr: $composition`, the composition slot a root context's `start`
+/// carries (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/composition-element.adoc`).
+pub(super) fn slots_composition(mapping: &Mapping) -> bool {
+    mapping.slot_archetype.is_some()
+        && mapping
+            .with
+            .as_ref()
+            .and_then(|with| with.openehr.as_ref())
+            .is_some_and(|openehr| {
+                Variable::from_str(openehr.value())
+                    .is_ok_and(|variable| variable == Variable::Composition)
+            })
 }

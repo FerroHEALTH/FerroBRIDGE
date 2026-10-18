@@ -36,6 +36,7 @@ and what these schemas do instead.
 | the data-type `type` | an enum at mapping level, where the prose never writes it, and a free string inside `with`, where every example does | `types-of-mappings/data-type/data-mappings.adoc` | the same enum in both places |
 | `criteria` | a plain string, with `criterias` an untyped array | "`criteria` can be either a single element, or as a list" (`basics/Conditions.adoc`, §criteria) | a string or an array of strings |
 | every object | open at the root, in `metadata`, in `spec` and in `preprocessor` | a closed grammar | `additionalProperties: false` at every level |
+| `slotContext`, `context.scope`, `context.contexts` | absent from the rendered v1.0.0 schemas; the repository source at the pinned commit (`modules/ROOT/attachments/`) carries them | `types-of-mapping-files/sub-contexts.adoc` | `slotContext` a non-empty string that excludes `slotArchetype` on one mapping, `scope` the enum `root` or `sub`, `contexts` a list of names |
 
 ## What these keep from the published schemas
 

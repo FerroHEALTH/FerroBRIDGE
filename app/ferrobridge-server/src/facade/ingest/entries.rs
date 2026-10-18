@@ -18,6 +18,7 @@ use crate::facade::outcome::chain;
 use crate::facade::request::Inbound;
 use crate::facade::request::person_by_identifier;
 
+use super::Consumed;
 use super::Ingest;
 use super::Mapped;
 use super::Mapping;
@@ -55,6 +56,52 @@ fn local_subject(
     person_by_identifier(target, namespace)
 }
 
+/// One entry's `fullUrl`, its resource and what mapping it produced.
+type EntryResult<'e> = (String, Option<&'e Value>, Result<Mapping, Issue>);
+
+/// Returns, for each literal reference a mapped entry's `slotContext`
+/// consumed, the `fullUrl` of the first entry that consumed it.
+fn consumers_of(results: &[EntryResult<'_>]) -> BTreeMap<String, String> {
+    let mut consumers = BTreeMap::new();
+    for (_, _, result) in results {
+        if let Ok(Mapping::Mapped(one, _)) = result {
+            for literal in &one.consumed {
+                consumers
+                    .entry(literal.clone())
+                    .or_insert_with(|| one.full_url.clone());
+            }
+        }
+    }
+    consumers
+}
+
+/// Returns the `fullUrl` of the entry that consumed the entry at `full_url`,
+/// another than itself.
+///
+/// A literal reference names an entry by its `fullUrl`, or by its
+/// `<Type>/<id>` when it carries an id
+/// (<https://hl7.org/fhir/R4/bundle.html#references>), as the Bundle
+/// reference source resolves it.
+fn consumer<'c>(
+    consumers: &'c BTreeMap<String, String>,
+    full_url: &str,
+    resource: &Value,
+) -> Option<&'c str> {
+    let typed = match (
+        resource.get("resourceType").and_then(Value::as_str),
+        resource.get("id").and_then(Value::as_str),
+    ) {
+        (Some(kind), Some(id)) => Some(format!("{kind}/{id}")),
+        _ => None,
+    };
+    [Some(full_url.to_owned()), typed]
+        .into_iter()
+        .flatten()
+        .find_map(|key| consumers.get(&key))
+        .filter(|by| by.as_str() != full_url)
+        .map(String::as_str)
+}
+
 /// Returns the refusal of a Bundle no entry of which mapped, naming every
 /// entry that was skipped and why.
 pub(super) fn nothing_mapped(partition: &Partition) -> Refused {
@@ -87,6 +134,10 @@ pub(super) fn nothing_mapped(partition: &Partition) -> Refused {
 impl Ingest<'_> {
     /// Maps every entry, collecting the refusals rather than stopping at the
     /// first.
+    ///
+    /// Every entry is mapped first, and an entry another entry's mapping
+    /// consumed through a `slotContext` is then passed over as a root
+    /// ([`Consumed`]), whatever its own mapping did.
     pub(super) async fn map_entries(
         &self,
         entries: &[Value],
@@ -98,23 +149,41 @@ impl Ingest<'_> {
             .iter()
             .filter_map(|entry| Some((entry.get("fullUrl")?.as_str()?, entry.get("resource")?)))
             .collect();
+        let mut results = Vec::with_capacity(entries.len());
         for (index, entry) in entries.iter().enumerate() {
             let full_url = entry
                 .get("fullUrl")
                 .and_then(Value::as_str)
                 .map_or_else(|| format!("Bundle.entry[{index}]"), str::to_owned);
-            let Some(resource) = entry.get("resource") else {
-                partition.failures.push(
-                    Issue::error(IssueType::Required)
-                        .diagnosing("the entry carries no resource")
-                        .at(full_url),
-                );
-                continue;
+            let resource = entry.get("resource");
+            let result = match resource {
+                Some(resource) => {
+                    self.map_one(resource, &full_url, index, &locals, provenance)
+                        .await
+                }
+                None => Err(Issue::error(IssueType::Required)
+                    .diagnosing("the entry carries no resource")
+                    .at(full_url.clone())),
             };
-            match self
-                .map_one(resource, &full_url, index, &locals, provenance)
-                .await
+            results.push((full_url, resource, result));
+        }
+        let consumers = consumers_of(&results);
+        for (full_url, resource, result) in results {
+            if let Some(by) =
+                resource.and_then(|resource| consumer(&consumers, &full_url, resource))
             {
+                partition.pending.push(Pending::Consumed(Consumed {
+                    resource_type: resource
+                        .and_then(|resource| resource.get("resourceType"))
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_owned(),
+                    by: by.to_owned(),
+                    full_url,
+                }));
+                continue;
+            }
+            match result {
                 Ok(Mapping::Mapped(one, person)) => {
                     match partition.subject {
                         None => partition.subject = Some(person),
@@ -210,14 +279,14 @@ impl Ingest<'_> {
                 .diagnosing(text)
                 .at(String::from(full_url))
         })?;
-        let (composition, instant) =
-            self.run(program, &inbound, provenance)
-                .await
-                .map_err(|error| {
-                    Issue::error(IssueType::Processing)
-                        .diagnosing(chain(&error))
-                        .at(String::from(full_url))
-                })?;
+        let (composition, instant, consumed) = self
+            .run_consuming(program, &inbound, provenance)
+            .await
+            .map_err(|error| {
+                Issue::error(IssueType::Processing)
+                    .diagnosing(chain(&error))
+                    .at(String::from(full_url))
+            })?;
         let text = serde_json::to_string(composition.value()).map_err(|error| {
             Issue::error(IssueType::Exception)
                 .diagnosing(format!(
@@ -242,6 +311,7 @@ impl Ingest<'_> {
                 built: composition,
                 composition: Box::new(rm),
                 instant,
+                consumed,
             }),
             subject,
         ))

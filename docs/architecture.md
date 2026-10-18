@@ -662,6 +662,12 @@ is silent:**
   `metadata.name` only, and `appendTo` by the mapping `name` inside the
   extended model. There is no directory scope in the specification and the
   bridge invents none.
+- A `slotContext` (sub-contexts, #864) compiles the entered context's `start`
+  into the parent program under that context's own extensions, against the
+  parent's template, and skips a composition slot its `start` carries. A
+  `scope: sub` context is never compiled as a program and its template is
+  never fetched; the facade passes over, as a root, a Bundle entry a
+  `slotContext` consumed through a `reference`.
 - The version selectors the specification lacks (which `metadata.version` of a
   name loads; `spec.openEhrConfig.revision` against the OPT; `profile.version`
   against the instance; `template.sem_ver` against the OPT) are a refusal at

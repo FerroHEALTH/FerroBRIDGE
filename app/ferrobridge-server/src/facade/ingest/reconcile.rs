@@ -200,6 +200,7 @@ impl Ingest<'_> {
             built,
             composition: Box::new(rm),
             instant,
+            consumed: Vec::new(),
         }];
         let found = self
             .committed_versions(

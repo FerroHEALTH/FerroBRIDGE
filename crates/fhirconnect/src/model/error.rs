@@ -61,6 +61,15 @@ pub enum ModelCode {
     ReferenceWithoutReferenceVariable,
     /// A `mappingCode` names no registered function.
     UnknownMappingCode,
+    /// A `context.scope` value is outside `root` and `sub`.
+    InvalidContextScope,
+    /// The `contexts` of the loaded contexts reach a context again.
+    CyclicContextReference,
+    /// A `scope: sub` context is listed under no context's `contexts`.
+    UnreferencedSubContext,
+    /// A `slotContext` mapping writes `openehr: "$reference"`, which would
+    /// create a separate composition.
+    SubContextReferenceVariable,
 }
 
 impl ModelCode {
@@ -89,6 +98,10 @@ impl ModelCode {
             Self::ExtensionMethodOutsideExtensionFile => "fc-extension-method-outside-model",
             Self::ReferenceWithoutReferenceVariable => "fc-reference-without-reference-variable",
             Self::UnknownMappingCode => "fc-unknown-mapping-code",
+            Self::InvalidContextScope => "fc-invalid-context-scope",
+            Self::CyclicContextReference => "fc-cyclic-context-reference",
+            Self::UnreferencedSubContext => "fc-unreferenced-sub-context",
+            Self::SubContextReferenceVariable => "fc-sub-context-reference-variable",
         }
     }
 
@@ -117,6 +130,10 @@ impl ModelCode {
             Self::ExtensionMethodOutsideExtensionFile,
             Self::ReferenceWithoutReferenceVariable,
             Self::UnknownMappingCode,
+            Self::InvalidContextScope,
+            Self::CyclicContextReference,
+            Self::UnreferencedSubContext,
+            Self::SubContextReferenceVariable,
         ]
     }
 }
