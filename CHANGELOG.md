@@ -179,7 +179,11 @@ crates on crates.io.
   as FHIRPath N1 §6.3.1 and the R4 `code` definition ask; `ofType()` and
   `as` keep every primitive an independent type (FHIR R4 fhirpath.html
   §2.9.1.5) (#635).
-
+- A FHIRconnect operation the operations lane cannot serve answers with the
+  true reason (#810). With `[operations] enabled = false` the `503` now says
+  `[operations] enabled is false`; it said "no mapping set is configured"
+  even when `[mappings] directory` was set, which is still the reason when
+  it is not.
 - The operator console's theme switch returns to the page it was used on
   (#602). It returned only to the dashboard and the About page, so a switch
   on any page added since landed elsewhere; it now returns to every route

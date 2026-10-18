@@ -169,7 +169,7 @@ const PLAYGROUND_OFF: Shot = Shot {
     image: "playground-off",
     route: "/playground",
     url: "/playground",
-    ready: "//li[contains(., 'the FHIRconnect operations are not served')]",
+    ready: "//li[contains(., '[operations] enabled is false')]",
 };
 
 /// A draft the bridge refused to save.

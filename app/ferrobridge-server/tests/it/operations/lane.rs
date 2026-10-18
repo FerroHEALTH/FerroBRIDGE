@@ -1,15 +1,19 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The lane itself: absent without a mapping set, and its compiler warnings
-//! logged once as it loads.
+//! The lane itself: absent without a mapping set or when switched off, each
+//! answered with its own reason, and its compiler warnings logged once as it
+//! loads.
 
 use axum::Router;
 use axum::body::Body;
-use ferrobridge_server::config::MappingSettings;
+use ferrobridge_server::config::{Config, MappingSettings};
 use ferrobridge_server::mappings;
+use ferrobridge_server::state::AppState;
 use http::{Request, StatusCode, header};
+use std::collections::BTreeMap;
 use std::error::Error as StdError;
+use std::sync::Arc;
 
 use crate::support;
 
@@ -36,7 +40,63 @@ async fn the_operations_answer_unavailable_with_no_mapping_set() -> Result<(), B
     assert_eq!(FHIR_JSON, media);
     let answer: serde_json::Value = serde_json::from_str(&body)?;
     assert_eq!(Some("OperationOutcome"), answer["resourceType"].as_str());
+    assert_eq!(
+        Some("the FHIRconnect operations are not served: no mapping set is configured"),
+        answer["issue"][0]["details"]["text"].as_str(),
+        "{body}"
+    );
     Ok(())
+}
+
+/// Returns the reason the application `text` configures answers a
+/// `$toopenehr` with, which must be a `503`.
+async fn reason_of(text: &str) -> Result<String, Box<dyn StdError>> {
+    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
+    let state = AppState::build(&settings).await?;
+    let app = ferrobridge_server::router(Arc::new(state), &server_settings());
+    let (status, _media, body) = call(
+        app,
+        Request::post("/fhir/$toopenehr")
+            .header(header::CONTENT_TYPE, FHIR_JSON)
+            .body(Body::from(bundle()?))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::SERVICE_UNAVAILABLE, status, "{body}");
+    let answer: serde_json::Value = serde_json::from_str(&body)?;
+    Ok(answer["issue"][0]["details"]["text"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned())
+}
+
+#[tokio::test]
+async fn a_configuration_with_no_mapping_set_names_that_reason() -> Result<(), Box<dyn StdError>> {
+    assert_eq!(
+        "the FHIRconnect operations are not served: no mapping set is configured",
+        reason_of("").await?
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_lane_switched_off_names_the_switch_and_not_a_missing_mapping_set()
+-> Result<(), Box<dyn StdError>> {
+    let root = super::mapping_tree()?;
+    let text = format!(
+        "[mappings]\ndirectory = {}\ntemplates = {}\n\n[operations]\nenabled = false\n",
+        toml_path(&root.path().join("mappings")),
+        toml_path(&root.path().join("templates")),
+    );
+    assert_eq!(
+        "the FHIRconnect operations are not served: [operations] enabled is false",
+        reason_of(&text).await?
+    );
+    Ok(())
+}
+
+/// Returns `path` as a TOML basic string.
+fn toml_path(path: &std::path::Path) -> String {
+    format!("{:?}", path.display().to_string())
 }
 
 #[test]

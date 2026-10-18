@@ -47,6 +47,7 @@ use serde::Deserialize;
 
 use crate::state::AppState;
 use crate::state::OperationsLane;
+use crate::state::OperationsOff;
 use crate::terminology::Direction;
 use crate::usage_report::window::Window;
 
@@ -100,7 +101,7 @@ async fn to_fhir(
     body: String,
 ) -> Response {
     let Some(lane) = state.operations() else {
-        return unavailable();
+        return unavailable(state.operations_off());
     };
     let settings = lane.settings();
     if let Some(refusal) = fhir_media_type(&headers) {
@@ -121,7 +122,7 @@ async fn to_openehr(
     body: String,
 ) -> Response {
     let Some(lane) = state.operations() else {
-        return unavailable();
+        return unavailable(state.operations_off());
     };
     let settings = lane.settings();
     if let Some(refusal) = fhir_media_type(&headers) {
@@ -144,7 +145,7 @@ async fn to_fhir_direct(
     body: String,
 ) -> Response {
     let Some(lane) = state.operations() else {
-        return unavailable();
+        return unavailable(state.operations_off());
     };
     let settings = lane.settings();
     if let Some(refusal) = media_type(&headers, &[OPENEHR_JSON]) {
@@ -177,7 +178,7 @@ async fn to_openehr_direct(
     body: String,
 ) -> Response {
     let Some(lane) = state.operations() else {
-        return unavailable();
+        return unavailable(state.operations_off());
     };
     let settings = lane.settings();
     if let Some(refusal) = media_type(&headers, &[FHIR_JSON, "application/json"]) {
@@ -423,14 +424,18 @@ fn refused(usage: &Window, error: &OperationError) -> Response {
     outcome(status, &error.outcome())
 }
 
-/// Returns the `503` a call takes when the lane is off.
-fn unavailable() -> Response {
+/// Returns the `503` a call takes when the lane is off, naming why.
+fn unavailable(off: OperationsOff) -> Response {
+    let why = match off {
+        OperationsOff::Disabled => {
+            "the FHIRconnect operations are not served: [operations] enabled is false"
+        }
+        OperationsOff::NoMappingSet => {
+            "the FHIRconnect operations are not served: no mapping set is configured"
+        }
+    };
     let reported = OperationOutcome {
-        issue: vec![issues::issue(
-            issues::ERROR,
-            "not-supported",
-            "the FHIRconnect operations are not served: no mapping set is configured",
-        )],
+        issue: vec![issues::issue(issues::ERROR, "not-supported", why)],
         ..OperationOutcome::default()
     };
     outcome(StatusCode::SERVICE_UNAVAILABLE, &reported)
