@@ -2141,7 +2141,8 @@ scheme is the namespace) pinned by test, with the namespace, the id form and
 the `PARTY_REF.type` configured so the link matches the one the CDR's owner
 writes (`[facade] subject_namespace`, `subject_id_form`, `subject_type`;
 RM Common IM §4.2.1.1, the type checked against BASE `PARTY_REF`
-`Type_validity` through `openehr-base`, #467), and no subject id the CDR
+`Type_validity` through `openehr-base`, #467; a Patient keys its own EHR the
+same way under the owner-link forms, by its logical id, #867), and no subject id the CDR
 mints itself, such as a pseudonym, ever derived by the bridge; every declared `meta.profile` is
 considered, never only the first; `Prefer` is honoured and `Location` names
 the FHIR resource, with the openEHR version uid carried in `meta.source`; and

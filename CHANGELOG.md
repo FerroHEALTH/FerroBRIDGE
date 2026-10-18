@@ -39,6 +39,18 @@ crates on crates.io.
   `code_system` answer in the release's model, and
   `Reason::TerminologyNotRead` is gone.
 
+- A `Patient` keys its own EHR through the configured subject link (#867).
+  Under `[facade] subject_id_form = "logical_id"` or `"uuid"` a Patient create
+  or update finds or provisions its EHR by its logical id in
+  `subject_namespace`, the id a `Patient/<id>` reference of its resources
+  names, so on a CDR whose owner links each EHR under its own namespace the
+  Patient and its resources reach one EHR. A Patient with no `id`, or under
+  `uuid` one whose `id` is no UUID, is refused naming
+  `facade.subject_id_form`. In a Bundle, a subject reference to a Patient
+  entry that carries an `id` keys by that id too, and one without an `id`,
+  such as an HL7 v2 message's Patient, keeps the identifier key. Under
+  `reference` nothing changes.
+
 - The profile validator validates STU3 resources against STU3 profiles
   (#838). `PackageSet::<Stu3>::load_release` reads a package set as STU3, and
   `Validator` over it walks the STU3 element table with the checks, refusals

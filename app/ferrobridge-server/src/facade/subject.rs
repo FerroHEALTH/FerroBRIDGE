@@ -93,6 +93,16 @@ pub enum SubjectError {
         /// The configured form.
         form: IdForm,
     },
+    /// A `Patient` carries no logical id, which the configured id form keys
+    /// it by.
+    #[error(
+        "the Patient carries no logical id, which facade.subject_id_form = {} keys its EHR by",
+        form.as_str()
+    )]
+    NoPatientId {
+        /// The configured form.
+        form: IdForm,
+    },
     /// A logical id is not a UUID, which the configured id form requires.
     #[error("the patient id is no UUID, which facade.subject_id_form = uuid requires")]
     NotUuid,

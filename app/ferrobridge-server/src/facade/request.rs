@@ -14,6 +14,7 @@ use fhir_types::codec::Value;
 use crate::facade::identity::ExternalResourceId;
 use crate::facade::identity::IdError;
 use crate::facade::identity::PersonId;
+use crate::facade::subject::IdForm;
 use crate::facade::subject::SubjectError;
 use crate::facade::subject::SubjectLink;
 
@@ -43,6 +44,33 @@ pub(crate) fn person_by_identifier(
         .and_then(Value::as_str)
         .unwrap_or(namespace);
     Some(PersonId::new(system, value))
+}
+
+/// Returns the person the Patient `document` is, as `link` keys a Patient.
+///
+/// Under [`IdForm::Reference`] a Patient keys its EHR by its first
+/// `identifier` with a value ([`person_by_identifier`]), `None` when it
+/// carries none. Under [`IdForm::LogicalId`] and [`IdForm::Uuid`] it keys its
+/// EHR by its logical id in the link's namespace, the id a `Patient/<id>`
+/// reference of another resource names, so the Patient and the resources
+/// about it find one EHR.
+// NOTE: BASE §5.4.14 leaves namespaces "not yet standardised"; no specification governs this:
+// our own design, a Patient keys its EHR the way the configured link keys a reference to it.
+pub(crate) fn patient_person(
+    document: &Value,
+    link: &SubjectLink,
+) -> Option<Result<PersonId, RequestError>> {
+    match link.form() {
+        IdForm::Reference => person_by_identifier(document, link.namespace())
+            .map(|person| person.map_err(|source| RequestError::Subject { source })),
+        form @ (IdForm::LogicalId | IdForm::Uuid) => {
+            let person = match document.get("id").and_then(Value::as_str) {
+                Some(id) => link.person_of_patient(id),
+                None => Err(SubjectError::NoPatientId { form }),
+            };
+            Some(person.map_err(|source| RequestError::Link { source }))
+        }
+    }
 }
 
 /// Why one inbound document is not a resource this facade can take.
@@ -248,7 +276,7 @@ impl Inbound {
     /// `subject.identifier` carries both halves; a literal
     /// `subject.reference` is read through `link`, which gives the namespace a
     /// deployment gives its own references and the form of the id. A `Patient` is the subject itself
-    /// and is keyed as `person_by_identifier` keys it. No specification
+    /// and is keyed as `patient_person` keys it. No specification
     /// fixes the mapping from a FHIR subject to an openEHR subject: our own
     /// design.
     ///
@@ -265,9 +293,7 @@ impl Inbound {
             .or_else(|| self.document.get("patient"));
         let Some(reference) = named else {
             if self.resource_type == PATIENT {
-                return person_by_identifier(&self.document, fallback)
-                    .ok_or(RequestError::NoSubject)?
-                    .map_err(|source| RequestError::Subject { source });
+                return patient_person(&self.document, link).ok_or(RequestError::NoSubject)?;
             }
             return Err(RequestError::NoSubject);
         };
@@ -465,6 +491,64 @@ mod tests {
             patient.subject(&link()),
             Err(RequestError::NoSubject)
         ));
+    }
+
+    /// A UUID invented for the tests.
+    const UUID: &str = "2f6c1a7e-3b4d-4e5f-9a0b-1c2d3e4f5a6b";
+
+    /// A Patient with the logical id `id`, when given, and one identifier.
+    fn identified_patient(id: Option<&str>) -> Inbound {
+        let mut document = serde_json::json!({
+            "resourceType": "Patient",
+            "identifier": [{ "system": "http://example.org/mrn", "value": "p-3" }]
+        });
+        if let Some(id) = id {
+            document["id"] = serde_json::json!(id);
+        }
+        Inbound::read(&body(&document), "Patient").expect("the resource reads")
+    }
+
+    #[test]
+    fn under_an_owner_link_form_a_patient_is_its_own_subject_by_its_logical_id() {
+        let logical = identified_patient(Some("p-1"))
+            .subject(&link_in(IdForm::LogicalId))
+            .expect("the Patient names itself");
+        assert_eq!((FALLBACK, "p-1"), (logical.namespace(), logical.id()));
+        let uuid = identified_patient(Some(UUID))
+            .subject(&link_in(IdForm::Uuid))
+            .expect("the Patient names itself");
+        assert_eq!((FALLBACK, UUID), (uuid.namespace(), uuid.id()));
+        let reference = identified_patient(Some("p-1"))
+            .subject(&link())
+            .expect("the Patient names itself");
+        assert_eq!(
+            ("http://example.org/mrn", "p-3"),
+            (reference.namespace(), reference.id()),
+            "the reference form keys the Patient by its identifier as before"
+        );
+    }
+
+    #[test]
+    fn under_an_owner_link_form_a_patient_without_a_logical_id_is_refused_naming_the_key() {
+        for form in [IdForm::LogicalId, IdForm::Uuid] {
+            let error = identified_patient(None)
+                .subject(&link_in(form))
+                .expect_err("the link cannot key the Patient");
+            assert_eq!(
+                RequestError::Link {
+                    source: SubjectError::NoPatientId { form }
+                },
+                error
+            );
+            let text = crate::facade::outcome::chain(&error);
+            assert!(text.contains("facade.subject_id_form"), "{text}");
+        }
+        assert_eq!(
+            Err(RequestError::Link {
+                source: SubjectError::NotUuid
+            }),
+            identified_patient(Some("p-1")).subject(&link_in(IdForm::Uuid))
+        );
     }
 
     #[test]

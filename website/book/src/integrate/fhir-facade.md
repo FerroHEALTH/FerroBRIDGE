@@ -338,7 +338,8 @@ ITS-REST contribution so the CDR makes it atomic. The facade uses `fullUrl`
 in two places. It names each entry by its `fullUrl` in every refusal, or by
 its position when it has none. And a `subject` or
 `patient` reference whose value is another entry's `fullUrl` is read through
-that entry: the person is that entry's first `identifier` with a value. The
+that entry: the person is that entry's first `identifier` with a value, or under `subject_id_form` `logical_id` and
+`uuid` its logical id when the entry carries one. The
 facade resolves no other reference. A reference is mapped as the resource
 carries it, and the facade never fetches a referenced resource from anywhere.
 Any failure answers one `OperationOutcome` naming every failing entry, and

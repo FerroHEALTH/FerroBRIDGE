@@ -6,8 +6,11 @@
 
 use axum::body::Body;
 use ferrobridge_server::facade::Facade;
+use ferrobridge_server::facade::Settings;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::programs;
+use ferrobridge_server::facade::subject::IdForm;
+use ferrobridge_server::facade::subject::SubjectLink;
 use http::Request;
 use http::StatusCode;
 use http::header;
@@ -36,6 +39,14 @@ const CONTEXT: &str = "ferrobridge_kds_person.context";
 /// Returns a harness whose facade serves the KDS person mapping set over a
 /// CDR that serves the published `KDS_Person` template.
 async fn person_harness() -> Result<(Harness, tempfile::TempDir), Box<dyn StdError>> {
+    person_harness_with(settings()).await
+}
+
+/// Returns the harness of [`person_harness`] with the facade settings
+/// `facade_settings`.
+async fn person_harness_with(
+    facade_settings: Settings,
+) -> Result<(Harness, tempfile::TempDir), Box<dyn StdError>> {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(format!(
@@ -59,7 +70,7 @@ async fn person_harness() -> Result<(Harness, tempfile::TempDir), Box<dyn StdErr
         compiled,
         handle(&store),
         client(&cdr),
-        settings(),
+        facade_settings,
     ));
     Ok((Harness { cdr, store, facade }, directory))
 }
@@ -213,6 +224,135 @@ async fn a_stored_kds_person_composition_reads_back_as_the_patient() -> Result<(
         Some("synthetic-patient-0001"),
         read["identifier"][0]["value"].as_str(),
         "{read}"
+    );
+    Ok(())
+}
+
+/// A UUID invented for the tests.
+const PATIENT_UUID: &str = "7c1d2e3f-4a5b-4c6d-8e7f-0a1b2c3d4e5f";
+
+/// The facade settings with the subject link in the settings' namespace
+/// keyed by the id form `form`.
+fn settings_in(form: IdForm) -> Result<Settings, Box<dyn StdError>> {
+    let base = settings();
+    let subject = SubjectLink::new(base.subject.namespace(), form, "PERSON")?;
+    Ok(Settings { subject, ..base })
+}
+
+/// Posts `resource` under the id form `form` and returns the status, the
+/// body, and the query of the EHR lookup by subject when there was one.
+async fn post_under(
+    form: IdForm,
+    resource: &serde_json::Value,
+) -> Result<(StatusCode, serde_json::Value, Vec<(String, String)>), Box<dyn StdError>> {
+    let (harness, _directory) = person_harness_with(settings_in(form)?).await?;
+    mount_ehr(&harness.cdr).await;
+    mount_create(
+        &harness.cdr,
+        VERSION_ONE,
+        &person_composition(&harness, resource)?,
+    )
+    .await;
+    let (status, body) = call(harness.app(), post_patient(resource)?).await?;
+    let query = harness
+        .cdr
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .find(|request| request.method.as_str() == "GET" && request.url.path() == "/ehr")
+        .map(|lookup| lookup.url.query_pairs().into_owned().collect())
+        .unwrap_or_default();
+    Ok((status, body, query))
+}
+
+/// The `subject_id` and `subject_namespace` of an EHR lookup query.
+fn subject_of(query: &[(String, String)]) -> (Option<&str>, Option<&str>) {
+    let value = |key: &str| {
+        query
+            .iter()
+            .find(|(name, _)| name == key)
+            .map(|(_, value)| value.as_str())
+    };
+    (value("subject_id"), value("subject_namespace"))
+}
+
+#[tokio::test]
+async fn under_logical_id_a_patient_keys_its_ehr_by_its_logical_id() -> Result<(), Box<dyn StdError>>
+{
+    let (status, body, query) = post_under(IdForm::LogicalId, &patient()?).await?;
+    assert_eq!(StatusCode::CREATED, status, "{body}");
+    assert_eq!(
+        (
+            Some("ferrobridge-kds-patient-1"),
+            Some(settings().subject.namespace())
+        ),
+        subject_of(&query),
+        "{query:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn under_uuid_a_patient_keys_its_ehr_by_its_uuid_logical_id() -> Result<(), Box<dyn StdError>>
+{
+    let mut resource = patient()?;
+    resource["id"] = serde_json::json!(PATIENT_UUID);
+    let (status, body, query) = post_under(IdForm::Uuid, &resource).await?;
+    assert_eq!(StatusCode::CREATED, status, "{body}");
+    assert_eq!(
+        (Some(PATIENT_UUID), Some(settings().subject.namespace())),
+        subject_of(&query),
+        "{query:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn under_an_owner_link_form_a_patient_without_a_logical_id_is_refused_naming_the_key()
+-> Result<(), Box<dyn StdError>> {
+    for form in [IdForm::LogicalId, IdForm::Uuid] {
+        let mut resource = patient()?;
+        resource
+            .as_object_mut()
+            .ok_or("the Patient is an object")?
+            .remove("id");
+        let (status, body, query) = post_under(form, &resource).await?;
+        assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+        assert!(
+            body.to_string().contains("facade.subject_id_form"),
+            "the refusal names the key: {body}"
+        );
+        assert!(query.is_empty(), "no EHR is looked up: {query:?}");
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn under_uuid_a_patient_whose_logical_id_is_no_uuid_is_refused_naming_the_key()
+-> Result<(), Box<dyn StdError>> {
+    let (status, body, query) = post_under(IdForm::Uuid, &patient()?).await?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+    assert!(
+        body.to_string().contains("facade.subject_id_form"),
+        "the refusal names the key: {body}"
+    );
+    assert!(query.is_empty(), "no EHR is looked up: {query:?}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn under_reference_a_patient_still_keys_its_ehr_by_its_first_identifier()
+-> Result<(), Box<dyn StdError>> {
+    let (status, body, query) = post_under(IdForm::Reference, &patient()?).await?;
+    assert_eq!(StatusCode::CREATED, status, "{body}");
+    assert_eq!(
+        (
+            Some("synthetic-patient-0001"),
+            Some("http://example.org/fhir/sid/ferrobridge-patient")
+        ),
+        subject_of(&query),
+        "{query:?}"
     );
     Ok(())
 }

@@ -438,6 +438,12 @@ EHR to a demographic party under its own namespace takes that namespace and
 uid. A CDR that accepts only UUID pseudonyms as subject ids takes the
 namespace it lists and `uuid`, so a subject whose id is no UUID is refused
 with a diagnostic naming `facade.subject_id_form` before the CDR is called.
+Under `logical_id` and `uuid` a `Patient` keys its own EHR the same way, by
+its logical id in `subject_namespace`, so creating or updating a Patient finds
+the EHR its resources are written into; a Patient with no `id`, or under
+`uuid` one whose `id` is no UUID, is refused naming `facade.subject_id_form`.
+Under `reference` a Patient keys its EHR by its first `identifier` with a
+value, as before.
 The facade never derives a pseudonym itself: name a subject by the id the CDR
 already holds. A subject named by `identifier` keeps the identifier's
 `system` as its namespace and its `value` as its id. A `subject_type` outside
