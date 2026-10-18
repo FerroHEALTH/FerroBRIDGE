@@ -139,6 +139,11 @@ crates on crates.io.
 
 ### Changed
 
+- FHIRPath `distinct()` and `isDistinct()` are near-linear (#803). An item
+  is compared with `=` only against the kept items that share its value's
+  bucket, so the result is unchanged and 10000 distinct strings take 1.5 ms
+  where they took 1.4 s. The R4 core Bundle invariant `bdl-7` no longer
+  grows quadratically with a Bundle's entries.
 - `ferrobridge_fhirpath::model::path_types` types a path that continues
   through a choice element (`Observation.value[x].unit`, the `unit` of
   `Quantity`) or below a primitive (`string.extension`, the `extension` of
