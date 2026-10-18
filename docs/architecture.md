@@ -891,6 +891,11 @@ expression is a load error: the reference CDR's connector let `where()` and
   and is never turned into a `403`; a CDR `405` or `415` is a facade `500`,
   because it means the bridge chose a call the CDR does not offer; any CDR
   `5xx` is a `502` carrying the upstream status, never an empty Bundle. A
+  composition the CDR answered and the engine refuses to render on a read,
+  vread or search is a `500` with `issue.code` `processing` naming the
+  refusal and never a value (#831): the client sent no content and cannot
+  fix it (R4 http.html §3.1.0.4), while a write whose posted content the
+  engine refuses keeps its `422`. A
   disabled facade has no route, so it answers `404`, never `403`: capability
   is not authorisation.
 - **Two error vocabularies never mix on one wire.** Everything the facade

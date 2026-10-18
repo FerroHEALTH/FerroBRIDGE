@@ -300,6 +300,29 @@ async fn a_commit_time_that_is_no_date_time_is_a_bad_gateway() -> Result<(), Box
 }
 
 #[tokio::test]
+async fn a_version_the_outbound_mapping_refuses_is_a_500_naming_no_clinical_value()
+-> Result<(), Box<dyn StdError>> {
+    // NOTE: R4 http.html §3.1.0.4: a vread sends no content, so a stored composition the
+    // engine refuses is the server's failure, a `500` with `processing` (#831).
+    let harness = harness().await;
+    let id = create_one(&harness).await?;
+    mount_history(&harness.cdr, &[VERSION_ONE], COMMITTED).await;
+    mount_version(&harness.cdr, VERSION_ONE, &harness.refused_composition()).await;
+    let (status, body) = call(
+        harness.app(),
+        Request::get(format!("/fhir/Condition/{id}/_history/1")).body(Body::empty())?,
+    )
+    .await?;
+    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
+    assert_eq!(Some("processing"), first_issue(&body)["code"].as_str());
+    assert!(
+        !body.to_string().contains(super::REFUSED_UNITS),
+        "the outcome names no clinical value: {body}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_read_of_a_version_the_history_does_not_list_is_a_bad_gateway()
 -> Result<(), Box<dyn StdError>> {
     let harness = harness().await;

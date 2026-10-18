@@ -237,7 +237,9 @@ async fn produce(
     let produced =
         engine::outbound(program, index, composition, &identities, &resolved).map_err(|error| {
             origin.usage.record_mapping_failure();
-            Refusal::from(crate::facade::ingest::engine_refusal(&error))
+            Refusal::from(Refused::of_answer(
+                &status::of_outbound_refusal(&error),
+            ))
         })?;
     let warnings = produced.warnings().to_vec();
     let (value, created) = produced.into_parts();

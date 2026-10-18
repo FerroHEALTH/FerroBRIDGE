@@ -121,6 +121,19 @@ impl Harness {
         self.composition_of(&condition())
     }
 
+    /// Returns that composition with its diagnosis valued as a `DV_QUANTITY`
+    /// in [`REFUSED_UNITS`], which the outbound mapping cannot carry and so
+    /// refuses.
+    fn refused_composition(&self) -> serde_json::Value {
+        let mut composition = self.composition();
+        replace_value(
+            &mut composition,
+            "at0002",
+            &serde_json::json!({ "_type": "DV_QUANTITY", "magnitude": 1.0, "units": REFUSED_UNITS }),
+        );
+        composition
+    }
+
     /// Returns the canonical composition `resource` maps to.
     fn composition_of(&self, resource: &serde_json::Value) -> serde_json::Value {
         let loaded = self
@@ -567,5 +580,35 @@ fn settings_with(policy: Policy) -> Settings {
     Settings {
         ehr_policy: policy,
         ..settings()
+    }
+}
+
+/// The unit of the value [`Harness::refused_composition`] writes, distinct
+/// enough that a test can assert it never reaches an outcome.
+const REFUSED_UNITS: &str = "synthetic-refused-unit";
+
+/// Replaces the `value` of every element whose `archetype_node_id` is
+/// `node` inside `composition` with `value`.
+fn replace_value(composition: &mut serde_json::Value, node: &str, value: &serde_json::Value) {
+    match composition {
+        serde_json::Value::Object(object) => {
+            if object
+                .get("archetype_node_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(node)
+                && object.contains_key("value")
+            {
+                object.insert(String::from("value"), value.clone());
+            }
+            for member in object.values_mut() {
+                replace_value(member, node, value);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                replace_value(item, node, value);
+            }
+        }
+        _ => {}
     }
 }
