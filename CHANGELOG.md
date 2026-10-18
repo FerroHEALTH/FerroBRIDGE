@@ -37,6 +37,20 @@ crates on crates.io.
   both are checked through `openehr-base`. The bridge never derives a
   subject id the CDR mints itself, such as a pseudonym.
 
+- `fhir-types` 0.1.124 completes the release-neutral definition read (#859).
+  `ElementDefinitionRead` gains `is_modifier`, and its reads carry a type's
+  `regex`, a binding's `max_value_set` and a constraint's `best_practice`,
+  read from the core extensions with those urls in every version (STU3
+  states `maxValueSet` as a `Reference`, R4 as a `canonical`; the R5 and R6 core
+  packages define neither of the two binding and constraint extensions). The new `StructureDefinitionRead` reads the url,
+  version, type, base definition, kind, `abstract`, derivation, snapshot,
+  contexts and context invariants of every version: an STU3 context (one
+  `contextType` beside a list of strings) reads as the same `ContextRead`
+  entries as an R4 context, each release keeping its own type codes.
+  `fhirconnect` moves to 0.1.140 for the requirement. Breaking for a consumer
+  that builds `TypeRead`, `BindingRead` or `ConstraintRead` literals, or
+  implements `ElementDefinitionRead` itself.
+
 - The ITS-REST 1.1.0 Overview and System OpenAPI documents are vendored
   beside EHR, Query and Definition (#478). All five are `x-status: STABLE`
   at tag `Release-1.1.0`. The Overview defines the common headers the CDR

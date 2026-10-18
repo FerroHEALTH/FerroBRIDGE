@@ -1,4 +1,4 @@
-//! A release-neutral read of `ElementDefinition`.
+//! A release-neutral read of `ElementDefinition` and `StructureDefinition`.
 //!
 //! A profile validator reads the same facts from an element definition of
 //! any release: the path, the cardinality, the types with their profiles,
@@ -13,6 +13,24 @@
 //! `ElementDefinition`, emitted from that version's package, so a single
 //! profile becomes a one-item list and either binding form becomes the value
 //! set's URL. A fact a release does not define reads as absent.
+//!
+//! The same holds for the `StructureDefinition` around the elements. STU3
+//! states an extension's context as one `contextType` and a list of `context`
+//! strings (<https://hl7.org/fhir/STU3/structuredefinition-definitions.html#StructureDefinition.contextType>);
+//! R4 states a list of `context` entries, each with its own `type` and
+//! `expression` (<https://hl7.org/fhir/R4/structuredefinition-definitions.html#StructureDefinition.context>).
+//! Both read as a list of [`ContextRead`], the STU3 `contextType` beside each
+//! string. The type codes are each release's own and are not translated.
+//!
+//! Three facts are carried by an extension the core packages define: a
+//! binding's maximum value set
+//! (`http://hl7.org/fhir/StructureDefinition/elementdefinition-maxValueSet`),
+//! a constraint's best-practice flag
+//! (`http://hl7.org/fhir/StructureDefinition/elementdefinition-bestpractice`)
+//! and a primitive type's lexical form
+//! (`http://hl7.org/fhir/StructureDefinition/regex`). Each reads from the
+//! extension with that url where the element carries it, and as absent where
+//! it does not.
 
 use super::codec::{EncodeError, Value};
 
@@ -31,6 +49,8 @@ pub struct TypeRead<'a> {
     pub aggregation: Vec<&'a str>,
     /// The versioning rule of a reference (`type.versioning`).
     pub versioning: Option<&'a str>,
+    /// The lexical form a primitive type states in its `regex` extension.
+    pub regex: Option<&'a str>,
 }
 
 /// The `ElementDefinition.binding`.
@@ -41,6 +61,9 @@ pub struct BindingRead<'a> {
     /// The URL of the value set: `binding.valueSet` from R4, and in STU3
     /// `valueSetUri` or the reference of `valueSetReference`.
     pub value_set: Option<&'a str>,
+    /// The URL of the maximum value set its `elementdefinition-maxValueSet`
+    /// extension names.
+    pub max_value_set: Option<&'a str>,
 }
 
 /// One `ElementDefinition.constraint`.
@@ -58,6 +81,8 @@ pub struct ConstraintRead<'a> {
     pub xpath: Option<&'a str>,
     /// The definition that first stated the constraint (`constraint.source`).
     pub source: Option<&'a str>,
+    /// The boolean its `elementdefinition-bestpractice` extension states.
+    pub best_practice: Option<bool>,
 }
 
 /// One `ElementDefinition.slicing.discriminator`.
@@ -115,6 +140,10 @@ pub trait ElementDefinitionRead {
     /// The longest string the element admits (`ElementDefinition.maxLength`).
     fn max_length(&self) -> Option<i32>;
 
+    /// Whether the element modifies the meaning of its parent
+    /// (`ElementDefinition.isModifier`).
+    fn is_modifier(&self) -> Option<bool>;
+
     /// The element whose definition this one reuses
     /// (`ElementDefinition.contentReference`).
     fn content_reference(&self) -> Option<&str>;
@@ -144,4 +173,58 @@ pub trait ElementDefinitionRead {
     ///
     /// Returns [`EncodeError`] when the held value has no JSON form.
     fn pattern(&self) -> Result<Option<ChoiceValue>, EncodeError>;
+}
+
+/// One context an extension may be used in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextRead<'a> {
+    /// The context type, in the release's own codes: STU3 `contextType`
+    /// (`resource`, `datatype`, `extension`), R4 and later `context.type`
+    /// (`fhirpath`, `element`, `extension`).
+    pub kind: Option<&'a str>,
+    /// The context: an STU3 `context` string, or R4 `context.expression`.
+    pub expression: Option<&'a str>,
+}
+
+/// The facts of a `StructureDefinition` a validator reads, the same in every
+/// release.
+pub trait StructureDefinitionRead {
+    /// The release's `ElementDefinition`.
+    type Element: ElementDefinitionRead;
+
+    /// The canonical URL (`StructureDefinition.url`).
+    fn url(&self) -> Option<&str>;
+
+    /// The business version (`StructureDefinition.version`).
+    fn version(&self) -> Option<&str>;
+
+    /// The type the definition constrains or defines
+    /// (`StructureDefinition.type`).
+    fn type_name(&self) -> Option<&str>;
+
+    /// The definition this one derives from
+    /// (`StructureDefinition.baseDefinition`).
+    fn base_definition(&self) -> Option<&str>;
+
+    /// `primitive-type`, `complex-type`, `resource` or `logical`
+    /// (`StructureDefinition.kind`).
+    fn kind(&self) -> Option<&str>;
+
+    /// Whether the type is abstract (`StructureDefinition.abstract`).
+    fn is_abstract(&self) -> Option<bool>;
+
+    /// `specialization` or `constraint` (`StructureDefinition.derivation`).
+    fn derivation(&self) -> Option<&str>;
+
+    /// The snapshot's elements in order, `None` without a snapshot
+    /// (`StructureDefinition.snapshot.element`).
+    fn snapshot(&self) -> Option<&[Self::Element]>;
+
+    /// The contexts an extension may be used in
+    /// (`StructureDefinition.context`).
+    fn contexts(&self) -> Vec<ContextRead<'_>>;
+
+    /// The FHIRPath rules about when an extension may be used
+    /// (`StructureDefinition.contextInvariant`).
+    fn context_invariants(&self) -> Vec<&str>;
 }
