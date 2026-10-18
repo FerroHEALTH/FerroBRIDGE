@@ -173,7 +173,10 @@ impl super::super::codec::Json for Timing {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -187,7 +190,10 @@ impl super::super::codec::Json for Timing {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -204,10 +210,12 @@ impl super::super::codec::Json for Timing {
             }
         }
         let mut field_event = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_event, raw_event_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("event", |path| {
+                super::super::codec::pair_arrays(raw_event, raw_event_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_event.push(path.with_index("event", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -704,7 +712,10 @@ impl super::super::codec::Json for TimingRepeat {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -788,30 +799,36 @@ impl super::super::codec::Json for TimingRepeat {
             })?),
         };
         let mut field_day_of_week = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_day_of_week, raw_day_of_week_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("dayOfWeek", |path| {
+                super::super::codec::pair_arrays(raw_day_of_week, raw_day_of_week_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_day_of_week.push(path.with_index("dayOfWeek", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_time_of_day = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_time_of_day, raw_time_of_day_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("timeOfDay", |path| {
+                super::super::codec::pair_arrays(raw_time_of_day, raw_time_of_day_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_time_of_day.push(path.with_index("timeOfDay", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_when = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_when, raw_when_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("when", |path| {
+                super::super::codec::pair_arrays(raw_when, raw_when_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_when.push(path.with_index("when", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)

@@ -784,7 +784,10 @@ impl super::super::codec::Json for Immunization {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -798,7 +801,10 @@ impl super::super::codec::Json for Immunization {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -812,7 +818,10 @@ impl super::super::codec::Json for Immunization {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -830,7 +839,10 @@ impl super::super::codec::Json for Immunization {
         }
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -844,7 +856,10 @@ impl super::super::codec::Json for Immunization {
         }
         let mut field_based_on = Vec::new();
         if let Some(raw) = raw_based_on {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("basedOn", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -947,7 +962,10 @@ impl super::super::codec::Json for Immunization {
             .transpose()?;
         let mut field_supporting_information = Vec::new();
         if let Some(raw) = raw_supporting_information {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("supportingInformation", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1047,7 +1065,10 @@ impl super::super::codec::Json for Immunization {
             .transpose()?;
         let mut field_performer = Vec::new();
         if let Some(raw) = raw_performer {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("performer", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1061,7 +1082,8 @@ impl super::super::codec::Json for Immunization {
         }
         let mut field_note = Vec::new();
         if let Some(raw) = raw_note {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("note", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -1075,7 +1097,10 @@ impl super::super::codec::Json for Immunization {
         }
         let mut field_reason = Vec::new();
         if let Some(raw) = raw_reason {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("reason", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1095,7 +1120,10 @@ impl super::super::codec::Json for Immunization {
         };
         let mut field_subpotent_reason = Vec::new();
         if let Some(raw) = raw_subpotent_reason {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("subpotentReason", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1109,7 +1137,10 @@ impl super::super::codec::Json for Immunization {
         }
         let mut field_program_eligibility = Vec::new();
         if let Some(raw) = raw_program_eligibility {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("programEligibility", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1140,7 +1171,10 @@ impl super::super::codec::Json for Immunization {
             .transpose()?;
         let mut field_reaction = Vec::new();
         if let Some(raw) = raw_reaction {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("reaction", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1154,7 +1188,10 @@ impl super::super::codec::Json for Immunization {
         }
         let mut field_protocol_applied = Vec::new();
         if let Some(raw) = raw_protocol_applied {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("protocolApplied", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1580,7 +1617,10 @@ impl super::super::codec::Json for ImmunizationPerformer {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1594,7 +1634,10 @@ impl super::super::codec::Json for ImmunizationPerformer {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1814,7 +1857,10 @@ impl super::super::codec::Json for ImmunizationProgramEligibility {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1828,7 +1874,10 @@ impl super::super::codec::Json for ImmunizationProgramEligibility {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2105,7 +2154,10 @@ impl super::super::codec::Json for ImmunizationProtocolApplied {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2119,7 +2171,10 @@ impl super::super::codec::Json for ImmunizationProtocolApplied {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2156,7 +2211,10 @@ impl super::super::codec::Json for ImmunizationProtocolApplied {
             .transpose()?;
         let mut field_target_disease = Vec::new();
         if let Some(raw) = raw_target_disease {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("targetDisease", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2424,7 +2482,10 @@ impl super::super::codec::Json for ImmunizationReaction {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2438,7 +2499,10 @@ impl super::super::codec::Json for ImmunizationReaction {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

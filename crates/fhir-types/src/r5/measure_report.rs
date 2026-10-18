@@ -582,7 +582,10 @@ impl super::super::codec::Json for MeasureReport {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -596,7 +599,10 @@ impl super::super::codec::Json for MeasureReport {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -610,7 +616,10 @@ impl super::super::codec::Json for MeasureReport {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -628,7 +637,10 @@ impl super::super::codec::Json for MeasureReport {
         }
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -768,7 +780,8 @@ impl super::super::codec::Json for MeasureReport {
             .transpose()?;
         let mut field_group = Vec::new();
         if let Some(raw) = raw_group {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("group", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -782,7 +795,10 @@ impl super::super::codec::Json for MeasureReport {
         }
         let mut field_supplemental_data = Vec::new();
         if let Some(raw) = raw_supplemental_data {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("supplementalData", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -800,7 +816,10 @@ impl super::super::codec::Json for MeasureReport {
         }
         let mut field_evaluated_resource = Vec::new();
         if let Some(raw) = raw_evaluated_resource {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("evaluatedResource", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1217,7 +1236,10 @@ impl super::super::codec::Json for MeasureReportGroup {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1231,7 +1253,10 @@ impl super::super::codec::Json for MeasureReportGroup {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1281,7 +1306,10 @@ impl super::super::codec::Json for MeasureReportGroup {
             .transpose()?;
         let mut field_population = Vec::new();
         if let Some(raw) = raw_population {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("population", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1306,7 +1334,10 @@ impl super::super::codec::Json for MeasureReportGroup {
         };
         let mut field_stratifier = Vec::new();
         if let Some(raw) = raw_stratifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("stratifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1833,7 +1864,10 @@ impl super::super::codec::Json for MeasureReportGroupPopulation {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1847,7 +1881,10 @@ impl super::super::codec::Json for MeasureReportGroupPopulation {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1903,7 +1940,10 @@ impl super::super::codec::Json for MeasureReportGroupPopulation {
             .transpose()?;
         let mut field_subject_report = Vec::new();
         if let Some(raw) = raw_subject_report {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("subjectReport", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2169,7 +2209,10 @@ impl super::super::codec::Json for MeasureReportGroupStratifier {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2183,7 +2226,10 @@ impl super::super::codec::Json for MeasureReportGroupStratifier {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2220,7 +2266,10 @@ impl super::super::codec::Json for MeasureReportGroupStratifier {
             .transpose()?;
         let mut field_stratum = Vec::new();
         if let Some(raw) = raw_stratum {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("stratum", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2537,7 +2586,10 @@ impl super::super::codec::Json for MeasureReportGroupStratifierStratum {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2551,7 +2603,10 @@ impl super::super::codec::Json for MeasureReportGroupStratifierStratum {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2580,7 +2635,10 @@ impl super::super::codec::Json for MeasureReportGroupStratifierStratum {
         };
         let mut field_component = Vec::new();
         if let Some(raw) = raw_component {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("component", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2594,7 +2652,10 @@ impl super::super::codec::Json for MeasureReportGroupStratifierStratum {
         }
         let mut field_population = Vec::new();
         if let Some(raw) = raw_population {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("population", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2929,7 +2990,10 @@ impl super::super::codec::Json for MeasureReportGroupStratifierStratumComponent 
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2943,7 +3007,10 @@ impl super::super::codec::Json for MeasureReportGroupStratifierStratumComponent 
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3640,7 +3707,10 @@ impl super::super::codec::Json for MeasureReportGroupStratifierStratumPopulation
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3654,7 +3724,10 @@ impl super::super::codec::Json for MeasureReportGroupStratifierStratumPopulation
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3710,7 +3783,10 @@ impl super::super::codec::Json for MeasureReportGroupStratifierStratumPopulation
             .transpose()?;
         let mut field_subject_report = Vec::new();
         if let Some(raw) = raw_subject_report {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("subjectReport", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

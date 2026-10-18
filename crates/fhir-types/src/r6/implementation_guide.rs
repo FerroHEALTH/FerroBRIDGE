@@ -794,7 +794,10 @@ impl super::super::codec::Json for ImplementationGuide {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -808,7 +811,10 @@ impl super::super::codec::Json for ImplementationGuide {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -822,7 +828,10 @@ impl super::super::codec::Json for ImplementationGuide {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -843,7 +852,10 @@ impl super::super::codec::Json for ImplementationGuide {
         })?;
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -904,7 +916,10 @@ impl super::super::codec::Json for ImplementationGuide {
         };
         let mut field_contact = Vec::new();
         if let Some(raw) = raw_contact {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contact", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -924,7 +939,10 @@ impl super::super::codec::Json for ImplementationGuide {
         };
         let mut field_use_context = Vec::new();
         if let Some(raw) = raw_use_context {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("useContext", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -938,7 +956,10 @@ impl super::super::codec::Json for ImplementationGuide {
         }
         let mut field_jurisdiction = Vec::new();
         if let Some(raw) = raw_jurisdiction {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("jurisdiction", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -982,18 +1003,28 @@ impl super::super::codec::Json for ImplementationGuide {
             })?),
         };
         let mut field_fhir_version = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_fhir_version, raw_fhir_version_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("fhirVersion", |path| {
+                super::super::codec::pair_arrays(raw_fhir_version, raw_fhir_version_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_fhir_version.push(path.with_index("fhirVersion", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
+        if field_fhir_version.is_empty() && !path.is_lenient() {
+            return path.with("fhirVersion", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_depends_on = Vec::new();
         if let Some(raw) = raw_depends_on {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("dependsOn", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1007,7 +1038,10 @@ impl super::super::codec::Json for ImplementationGuide {
         }
         let mut field_global = Vec::new();
         if let Some(raw) = raw_global {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("global", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1458,7 +1492,10 @@ impl super::super::codec::Json for ImplementationGuideDefinition {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1472,7 +1509,10 @@ impl super::super::codec::Json for ImplementationGuideDefinition {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1490,7 +1530,10 @@ impl super::super::codec::Json for ImplementationGuideDefinition {
         }
         let mut field_grouping = Vec::new();
         if let Some(raw) = raw_grouping {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("grouping", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1504,7 +1547,10 @@ impl super::super::codec::Json for ImplementationGuideDefinition {
         }
         let mut field_resource = Vec::new();
         if let Some(raw) = raw_resource {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("resource", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1531,7 +1577,10 @@ impl super::super::codec::Json for ImplementationGuideDefinition {
             .transpose()?;
         let mut field_parameter = Vec::new();
         if let Some(raw) = raw_parameter {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("parameter", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1545,7 +1594,10 @@ impl super::super::codec::Json for ImplementationGuideDefinition {
         }
         let mut field_template = Vec::new();
         if let Some(raw) = raw_template {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("template", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1763,7 +1815,10 @@ impl super::super::codec::Json for ImplementationGuideDefinitionGrouping {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1777,7 +1832,10 @@ impl super::super::codec::Json for ImplementationGuideDefinitionGrouping {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2071,7 +2129,10 @@ impl super::super::codec::Json for ImplementationGuideDefinitionPage {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2085,7 +2146,10 @@ impl super::super::codec::Json for ImplementationGuideDefinitionPage {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2127,7 +2191,8 @@ impl super::super::codec::Json for ImplementationGuideDefinitionPage {
         })?;
         let mut field_page = Vec::new();
         if let Some(raw) = raw_page {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("page", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -2429,7 +2494,10 @@ impl super::super::codec::Json for ImplementationGuideDefinitionParameter {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2443,7 +2511,10 @@ impl super::super::codec::Json for ImplementationGuideDefinitionParameter {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2769,7 +2840,10 @@ impl super::super::codec::Json for ImplementationGuideDefinitionResource {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2783,7 +2857,10 @@ impl super::super::codec::Json for ImplementationGuideDefinitionResource {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2811,10 +2888,12 @@ impl super::super::codec::Json for ImplementationGuideDefinitionResource {
             )
         })?;
         let mut field_fhir_version = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_fhir_version, raw_fhir_version_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("fhirVersion", |path| {
+                super::super::codec::pair_arrays(raw_fhir_version, raw_fhir_version_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_fhir_version.push(path.with_index("fhirVersion", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -2839,10 +2918,12 @@ impl super::super::codec::Json for ImplementationGuideDefinitionResource {
             })?),
         };
         let mut field_profile = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_profile, raw_profile_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("profile", |path| {
+                super::super::codec::pair_arrays(raw_profile, raw_profile_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_profile.push(path.with_index("profile", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -3086,7 +3167,10 @@ impl super::super::codec::Json for ImplementationGuideDefinitionTemplate {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3100,7 +3184,10 @@ impl super::super::codec::Json for ImplementationGuideDefinitionTemplate {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3370,7 +3457,10 @@ impl super::super::codec::Json for ImplementationGuideDependsOn {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3384,7 +3474,10 @@ impl super::super::codec::Json for ImplementationGuideDependsOn {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3636,7 +3729,10 @@ impl super::super::codec::Json for ImplementationGuideGlobal {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3650,7 +3746,10 @@ impl super::super::codec::Json for ImplementationGuideGlobal {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3935,7 +4034,10 @@ impl super::super::codec::Json for ImplementationGuideManifest {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3949,7 +4051,10 @@ impl super::super::codec::Json for ImplementationGuideManifest {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3973,7 +4078,10 @@ impl super::super::codec::Json for ImplementationGuideManifest {
         };
         let mut field_resource = Vec::new();
         if let Some(raw) = raw_resource {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("resource", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3985,9 +4093,15 @@ impl super::super::codec::Json for ImplementationGuideManifest {
                 })?);
             }
         }
+        if field_resource.is_empty() && !path.is_lenient() {
+            return path.with("resource", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
+        }
         let mut field_page = Vec::new();
         if let Some(raw) = raw_page {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("page", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -4000,20 +4114,24 @@ impl super::super::codec::Json for ImplementationGuideManifest {
             }
         }
         let mut field_image = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_image, raw_image_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("image", |path| {
+                super::super::codec::pair_arrays(raw_image, raw_image_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_image.push(path.with_index("image", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_other = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_other, raw_other_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("other", |path| {
+                super::super::codec::pair_arrays(raw_other, raw_other_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_other.push(path.with_index("other", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -4247,7 +4365,10 @@ impl super::super::codec::Json for ImplementationGuideManifestPage {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -4261,7 +4382,10 @@ impl super::super::codec::Json for ImplementationGuideManifestPage {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -4287,10 +4411,12 @@ impl super::super::codec::Json for ImplementationGuideManifestPage {
             })?),
         };
         let mut field_anchor = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_anchor, raw_anchor_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("anchor", |path| {
+                super::super::codec::pair_arrays(raw_anchor, raw_anchor_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_anchor.push(path.with_index("anchor", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -4535,7 +4661,10 @@ impl super::super::codec::Json for ImplementationGuideManifestResource {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -4549,7 +4678,10 @@ impl super::super::codec::Json for ImplementationGuideManifestResource {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -4583,10 +4715,12 @@ impl super::super::codec::Json for ImplementationGuideManifestResource {
             })?),
         };
         let mut field_profile = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_profile, raw_profile_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("profile", |path| {
+                super::super::codec::pair_arrays(raw_profile, raw_profile_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_profile.push(path.with_index("profile", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)

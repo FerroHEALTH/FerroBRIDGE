@@ -124,7 +124,10 @@ impl super::super::codec::Json for ContactDetail {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -144,7 +147,10 @@ impl super::super::codec::Json for ContactDetail {
         };
         let mut field_telecom = Vec::new();
         if let Some(raw) = raw_telecom {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("telecom", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

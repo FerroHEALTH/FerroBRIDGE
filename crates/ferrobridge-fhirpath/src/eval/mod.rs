@@ -33,6 +33,30 @@ use crate::value::{Collection, Item};
 use convert::UCUM;
 use error::EvalError;
 
+/// The functions FHIRPath 3.0.0 adds as Standard for Trial Use that the HL7
+/// FHIRPath test suite for FHIR R4 exercises
+/// (<http://hl7.org/fhirpath/STU3/>, each a section marked STU).
+///
+/// FHIR R4 cites FHIRPath release 2, N1 2.0.0 (fhirpath.html §2.9), which
+/// defines none of them, so an evaluation calls one only with
+/// [`Environment::with_fhirpath_stu3_functions`]; without it the call is
+/// [`EvalError::UnknownFunction`].
+pub const STU3_FUNCTIONS: [&str; 13] = [
+    "comparable",
+    "decode",
+    "encode",
+    "escape",
+    "highBoundary",
+    "join",
+    "lowBoundary",
+    "matchesFull",
+    "precision",
+    "sort",
+    "split",
+    "trim",
+    "unescape",
+];
+
 /// What an evaluation runs with: the type model, the environment variables
 /// and the seams the caller supplies.
 pub struct Environment<'a> {
@@ -44,6 +68,7 @@ pub struct Environment<'a> {
     definitions: Option<&'a dyn Definitions>,
     now: Option<jiff::Timestamp>,
     strict_ordering: bool,
+    stu3_functions: bool,
 }
 
 impl fmt::Debug for Environment<'_> {
@@ -57,6 +82,7 @@ impl fmt::Debug for Environment<'_> {
             .field("definitions", &self.definitions.is_some())
             .field("now", &self.now)
             .field("strict_ordering", &self.strict_ordering)
+            .field("stu3_functions", &self.stu3_functions)
             .finish()
     }
 }
@@ -74,6 +100,7 @@ impl<'a> Environment<'a> {
             definitions: None,
             now: None,
             strict_ordering: false,
+            stu3_functions: false,
         }
     }
 
@@ -133,6 +160,19 @@ impl<'a> Environment<'a> {
     #[must_use]
     pub const fn with_strict_ordering(mut self) -> Self {
         self.strict_ordering = true;
+        self
+    }
+
+    /// Admits the functions of [`STU3_FUNCTIONS`], which FHIRPath 3.0.0 adds
+    /// as Standard for Trial Use.
+    ///
+    /// Without it the evaluator is FHIRPath N1 2.0.0, the release FHIR R4
+    /// cites (fhirpath.html §2.9), and a call to one of them is
+    /// [`EvalError::UnknownFunction`]. Those this crate does not implement yet
+    /// stay that error with the option on.
+    #[must_use]
+    pub const fn with_fhirpath_stu3_functions(mut self) -> Self {
+        self.stu3_functions = true;
         self
     }
 

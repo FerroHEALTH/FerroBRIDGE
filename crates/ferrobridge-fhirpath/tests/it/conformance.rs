@@ -1,8 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The HL7 FHIRPath test suite for FHIR R4 (`tests-fhir-r4.xml`) as the
-//! `fhirpath-r4` conformance corpus, one case per `test` element.
+//! The HL7 FHIRPath test suite for FHIR R4 (`tests-fhir-r4.xml`) as two
+//! conformance corpora, one case per `test` element: `fhirpath-r4-stu3` holds
+//! every test whose expression calls a function FHIRPath 3.0.0 adds
+//! (`eval::STU3_FUNCTIONS`, found by its name), run with
+//! `Environment::with_fhirpath_stu3_functions`, and `fhirpath-r4` every other
+//! test, run as FHIRPath N1 2.0.0.
 //!
 //! A case expecting the expression refused (`invalid`) passes when it fails
 //! to parse, fails the static check against the input's resource type or
@@ -15,10 +19,11 @@
 //! special-cased by its name.
 
 use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
 use ferrobridge_fhirpath::eval::convert::primitive_value;
 use ferrobridge_fhirpath::eval::error::EvalError;
-use ferrobridge_fhirpath::eval::{Environment, Focus};
+use ferrobridge_fhirpath::eval::{Environment, Focus, STU3_FUNCTIONS};
 use ferrobridge_fhirpath::expression::Expression;
 use ferrobridge_fhirpath::model::r4::R4;
 use ferrobridge_fhirpath::model::{FhirType, Model, named_type, resource_type};
@@ -26,6 +31,7 @@ use ferrobridge_fhirpath::seam::{Profiles, SeamError};
 use ferrobridge_fhirpath::value::{Collection, Item};
 use ferrobridge_testkit::conformance::{Case, Corpus, record};
 use fhir_types::codec::Value;
+use regex::Regex;
 use rust_decimal::Decimal;
 
 use super::suite::{Output, Test, read};
@@ -189,7 +195,11 @@ fn context_types(model: &dyn Model, test: &Test) -> Result<Option<Vec<FhirType>>
 }
 
 /// The verdict on one test.
-fn verdict(test: &Test, inputs: &BTreeMap<String, Result<Value, String>>) -> Result<(), String> {
+fn verdict(
+    test: &Test,
+    inputs: &BTreeMap<String, Result<Value, String>>,
+    stu3: bool,
+) -> Result<(), String> {
     let model: &dyn Model = &R4;
     let invalid = test.invalid.is_some();
     let expression = match Expression::parse(&test.expression) {
@@ -229,6 +239,11 @@ fn verdict(test: &Test, inputs: &BTreeMap<String, Result<Value, String>>) -> Res
     let environment = Environment::new(model).with_profiles(&profiles);
     let environment = if test.attribute("checkOrderedFunctions") == Some("true") {
         environment.with_strict_ordering()
+    } else {
+        environment
+    };
+    let environment = if stu3 {
+        environment.with_fhirpath_stu3_functions()
     } else {
         environment
     };
@@ -284,8 +299,32 @@ fn verdict(test: &Test, inputs: &BTreeMap<String, Result<Value, String>>) -> Res
     }
 }
 
+/// Whether `expression` calls one of the functions FHIRPath 3.0.0 adds
+/// (`STU3_FUNCTIONS`), found by the function name followed by `(`, so an
+/// expression that does not parse as N1 is routed too.
+fn calls_stu3_function(expression: &str) -> bool {
+    static CALL: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(&format!(r"\b(?:{})\s*\(", STU3_FUNCTIONS.join("|")))
+            .expect("the pattern should compile")
+    });
+    CALL.is_match(expression)
+}
+
 #[test]
 fn conformance_fhirpath_r4() {
+    run(Corpus::FhirpathR4);
+}
+
+#[test]
+fn conformance_fhirpath_r4_stu3() {
+    run(Corpus::FhirpathR4Stu3);
+}
+
+/// Runs the suite's share of `corpus`: the tests that call a FHIRPath 3.0.0
+/// function for `FhirpathR4Stu3`, with the opt-in on, and every other test
+/// for `FhirpathR4`, as N1 2.0.0.
+fn run(corpus: Corpus) {
+    let stu3 = corpus == Corpus::FhirpathR4Stu3;
     let directory = suite_dir();
     let text = std::fs::read_to_string(directory.join("fhirpath/tests-fhir-r4.xml"))
         .expect("the suite should be vendored");
@@ -319,9 +358,12 @@ fn conformance_fhirpath_r4() {
         } else {
             format!("{base}#{count}")
         };
-        let case = match verdict(test, &inputs) {
+        if calls_stu3_function(&test.expression) != stu3 {
+            continue;
+        }
+        let case = match verdict(test, &inputs, stu3) {
             Ok(()) => Case::pass(id),
-            Err(reason) => match test.attribute("version") {
+            Err(reason) => match test.attribute("version").filter(|_| !stu3) {
                 Some(version) => Case::fail(
                     id,
                     format!("targets FHIRPath {version}, beyond N1 2.0.0: {reason}"),
@@ -331,7 +373,7 @@ fn conformance_fhirpath_r4() {
         };
         cases.push(case);
     }
-    let outcome = record(Corpus::FhirpathR4, &cases).expect("the corpus should record");
+    let outcome = record(corpus, &cases).expect("the corpus should record");
     assert!(
         outcome.regressed.is_empty(),
         "cases the pass list records fail now: {:#?}",

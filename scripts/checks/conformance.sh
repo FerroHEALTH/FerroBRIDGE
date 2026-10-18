@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# The conformance gate (#24): runs the thirteen corpus tests, compares what they
+# The conformance gate (#24): runs the fourteen corpus tests, compares what they
 # measured with the committed pass lists under conformance/, and renders one
 # shields.io endpoint badge per corpus (https://shields.io/badges/endpoint-badge),
 # one per HL7 v2 message family and one per HL7 v2 version (#366), and the
@@ -60,6 +60,7 @@ readonly CORPUS_TESTS=(
   'fhir-r6 ferrobridge-testkit conformance_the_fhir_r6_examples_hold_their_pass_list'
   'fhir-r4-facade ferrobridge-server conformance_the_fhir_r4_examples_hold_their_facade_pass_list'
   'fhirpath-r4 ferrobridge-fhirpath conformance_fhirpath_r4'
+  'fhirpath-r4-stu3 ferrobridge-fhirpath conformance_fhirpath_r4_stu3'
 )
 # Whether $1 equals one of the remaining arguments.
 contains() {
@@ -154,7 +155,8 @@ label_of() {
     fhir-r5) echo "FHIR R5" ;;
     fhir-r6) echo "FHIR R6" ;;
     fhir-r4-facade) echo "FHIR R4 facade" ;;
-    fhirpath-r4) echo "FHIRPath R4 test suite" ;;
+    fhirpath-r4) echo "FHIRPath R4 test suite, N1" ;;
+    fhirpath-r4-stu3) echo "FHIRPath R4 test suite, 3.0.0 STU functions" ;;
     *) return 1 ;;
   esac
 }
@@ -392,8 +394,9 @@ render_block() {
     badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
   done
   echo
-  echo 'FHIRPath 2.0.0 with the FHIR R4 additions:'
+  echo 'FHIRPath with the FHIR R4 additions, N1 2.0.0, then the tests of the functions 3.0.0 adds as STU, behind their opt-in:'
   badge_link "$(label_of fhirpath-r4)" fhirpath-r4 conformance/fhirpath-r4/pass-list.txt
+  badge_link "$(label_of fhirpath-r4-stu3)" fhirpath-r4-stu3 conformance/fhirpath-r4-stu3/pass-list.txt
   echo
   echo 'HL7 v2, by corpus, then by message family and by version across both corpora:'
   badge_link "$(label_of hl7v2)" hl7v2 conformance/hl7v2/pass-list.txt

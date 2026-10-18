@@ -203,7 +203,10 @@ impl super::super::codec::Json for VirtualServiceDetail {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -240,13 +243,16 @@ impl super::super::codec::Json for VirtualServiceDetail {
             })?),
         };
         let mut field_additional_info = Vec::new();
-        for (index, (value, element)) in super::super::codec::pair_arrays(
-            raw_additional_info,
-            raw_additional_info_element,
-            path,
-        )?
-        .into_iter()
-        .enumerate()
+        for (index, (value, element)) in path
+            .with("additionalInfo", |path| {
+                super::super::codec::pair_arrays(
+                    raw_additional_info,
+                    raw_additional_info_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_additional_info.push(path.with_index("additionalInfo", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)

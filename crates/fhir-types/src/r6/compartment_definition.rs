@@ -615,7 +615,10 @@ impl super::super::codec::Json for CompartmentDefinition {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -629,7 +632,10 @@ impl super::super::codec::Json for CompartmentDefinition {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -643,7 +649,10 @@ impl super::super::codec::Json for CompartmentDefinition {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -711,7 +720,10 @@ impl super::super::codec::Json for CompartmentDefinition {
         };
         let mut field_contact = Vec::new();
         if let Some(raw) = raw_contact {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contact", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -731,7 +743,10 @@ impl super::super::codec::Json for CompartmentDefinition {
         };
         let mut field_use_context = Vec::new();
         if let Some(raw) = raw_use_context {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("useContext", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -757,7 +772,10 @@ impl super::super::codec::Json for CompartmentDefinition {
         })?;
         let mut field_resource = Vec::new();
         if let Some(raw) = raw_resource {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("resource", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1124,7 +1142,10 @@ impl super::super::codec::Json for CompartmentDefinitionResource {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1138,7 +1159,10 @@ impl super::super::codec::Json for CompartmentDefinitionResource {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1158,10 +1182,12 @@ impl super::super::codec::Json for CompartmentDefinitionResource {
             super::super::codec::Primitive::from_json_parts(raw_code, raw_code_element, path)
         })?;
         let mut field_param = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_param, raw_param_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("param", |path| {
+                super::super::codec::pair_arrays(raw_param, raw_param_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_param.push(path.with_index("param", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)

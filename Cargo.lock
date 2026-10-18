@@ -1400,6 +1400,7 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 name = "ferrobridge-fhirpath"
 version = "0.0.0"
 dependencies = [
+ "base64 0.23.1",
  "chumsky",
  "ferrobridge-testkit",
  "fhir-types",
@@ -1639,7 +1640,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-types"
-version = "0.1.119"
+version = "0.1.120"
 dependencies = [
  "quick-xml",
  "regex",
@@ -1649,7 +1650,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.133"
+version = "0.1.134"
 dependencies = [
  "ferrobridge-testkit",
  "fhir-types",

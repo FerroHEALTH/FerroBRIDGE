@@ -43,6 +43,15 @@ crates on crates.io.
   and dark at 1440 pixels for the book's operator console page, and a guard
   in the ordinary suite fails on a console route without both images. The
   test OpenID Provider of the testkit can now sign a real browser in.
+- The FHIRPath evaluator admits the functions FHIRPath 3.0.0 adds as
+  Standard for Trial Use behind the opt-in
+  `Environment::with_fhirpath_stu3_functions` (#633), so the default stays
+  FHIRPath N1 2.0.0, the release FHIR R4 cites. This change implements
+  `matchesFull()`, `trim()`, `split()`, `join()`, `encode()`, `decode()`,
+  `escape()` and `unescape()`. HL7's FHIRPath R4 suite now counts as two
+  corpora with a badge each: `fhirpath-r4` (874 of 886, N1) and
+  `fhirpath-r4-stu3` (33 of 104, the tests that call one of the 13 3.0.0
+  functions, run with the opt-in).
 
 - The FHIRPath evaluator has a strict ordering mode,
   `Environment::with_strict_ordering`, off by default (#636). It refuses
@@ -119,6 +128,13 @@ crates on crates.io.
   release build; the matching rules of R4 bundle.html §2.36.4.1 are
   unchanged.
 
+- The profile validator checks an invariant a profile declares on a choice
+  element it narrows against the types the profile keeps (#573, R4
+  elementdefinition.html §2.30.0.4.2): an expression naming a member only
+  a removed type defines is listed as refused at the check stage. An
+  invariant the profile inherits is still checked against every type the
+  base choice admits.
+
 ### Fixed
 
 - The FHIRPath `is` operator and `is()` function test a FHIR primitive
@@ -157,6 +173,21 @@ crates on crates.io.
   at `<Type>.id`. One R4 example leaves the `fhir-r4` pass list, a
   `SearchParameter` whose 67-character id breaks the form.
   `fhirconnect` moves to 0.1.133 with the requirement.
+- `fhir-types` 0.1.120 refuses a resource whose required repeating element
+  is absent (#312): a `1..*` element such as `Provenance.target` or
+  `SearchParameter.base` fails to decode with `MissingProperty` at its own
+  path (R4 elementdefinition-definitions.html#ElementDefinition.min), and an
+  empty array or a too-short one fails there too (json.html §2.6.2), where
+  an empty array was reported at its parent. A `Path::lenient` reader keeps
+  the items it finds. Each string primitive's lexical form is public as
+  `<Primitive>::check(text)` with the new `codec::LexicalError`, and each
+  version's `primitives::check_value(code, value)` decodes a JSON value as
+  the primitive a type code names; the HL7 v2 face checks a value with it
+  in place of decoding a probe `Extension`. A consumer that decoded a
+  resource missing a required list before gets an error now. The
+  `fhir-stu3`, `fhir-r4` and `fhir-r4b` pass lists lose the
+  `SearchParameter` examples that carry no `base`. `fhirconnect` moves to
+  0.1.134 with the requirement.
 
 ## [0.0.7] - 2026-10-17
 

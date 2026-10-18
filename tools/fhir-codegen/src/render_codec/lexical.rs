@@ -126,5 +126,34 @@ pub(super) fn render_lexical_form(
         "        Err(path.error({C}::DecodeErrorKind::BadValue))"
     )?;
     writeln!(out, "    }}")?;
+    writeln!(out, "}}")?;
+    writeln!(out, "\nimpl {} {{", ty.name)?;
+    writeln!(
+        out,
+        "    /// Checks `text` against the lexical form of `{}`, the one the decoder holds a value to.",
+        ty.path
+    )?;
+    writeln!(out, "    ///")?;
+    writeln!(out, "    /// # Errors")?;
+    writeln!(out, "    ///")?;
+    writeln!(
+        out,
+        "    /// Returns [`{C}::LexicalError`] naming `{}` when `text` is outside the form.",
+        ty.path
+    )?;
+    writeln!(
+        out,
+        "    pub fn check(text: &str) -> Result<(), {C}::LexicalError> {{"
+    )?;
+    writeln!(out, "        if {form}.is_match(text.as_bytes()) {{")?;
+    writeln!(out, "            Ok(())")?;
+    writeln!(out, "        }} else {{")?;
+    writeln!(
+        out,
+        "            Err({C}::LexicalError {{ type_code: {:?} }})",
+        ty.path
+    )?;
+    writeln!(out, "        }}")?;
+    writeln!(out, "    }}")?;
     writeln!(out, "}}")
 }

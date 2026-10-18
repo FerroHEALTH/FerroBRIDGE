@@ -543,7 +543,10 @@ impl super::super::codec::Json for AdverseEvent {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -557,7 +560,10 @@ impl super::super::codec::Json for AdverseEvent {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -571,7 +577,10 @@ impl super::super::codec::Json for AdverseEvent {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -640,7 +649,10 @@ impl super::super::codec::Json for AdverseEvent {
         };
         let mut field_reaction = Vec::new();
         if let Some(raw) = raw_reaction {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("reaction", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -725,7 +737,10 @@ impl super::super::codec::Json for AdverseEvent {
         };
         let mut field_suspect_entity = Vec::new();
         if let Some(raw) = raw_suspect_entity {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("suspectEntity", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -739,7 +754,10 @@ impl super::super::codec::Json for AdverseEvent {
         }
         let mut field_subject_medical_history = Vec::new();
         if let Some(raw) = raw_subject_medical_history {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("subjectMedicalHistory", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -757,7 +775,10 @@ impl super::super::codec::Json for AdverseEvent {
         }
         let mut field_reference_document = Vec::new();
         if let Some(raw) = raw_reference_document {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("referenceDocument", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -775,7 +796,8 @@ impl super::super::codec::Json for AdverseEvent {
         }
         let mut field_study = Vec::new();
         if let Some(raw) = raw_study {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("study", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -1143,7 +1165,10 @@ impl super::super::codec::Json for AdverseEventSuspectEntity {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1157,7 +1182,10 @@ impl super::super::codec::Json for AdverseEventSuspectEntity {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

@@ -351,7 +351,10 @@ impl super::super::codec::Json for SubstanceReferenceInformation {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -365,7 +368,10 @@ impl super::super::codec::Json for SubstanceReferenceInformation {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -379,7 +385,10 @@ impl super::super::codec::Json for SubstanceReferenceInformation {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -403,7 +412,8 @@ impl super::super::codec::Json for SubstanceReferenceInformation {
         };
         let mut field_gene = Vec::new();
         if let Some(raw) = raw_gene {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("gene", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -417,7 +427,10 @@ impl super::super::codec::Json for SubstanceReferenceInformation {
         }
         let mut field_gene_element = Vec::new();
         if let Some(raw) = raw_gene_element {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("geneElement", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -431,7 +444,10 @@ impl super::super::codec::Json for SubstanceReferenceInformation {
         }
         let mut field_classification = Vec::new();
         if let Some(raw) = raw_classification {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("classification", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -445,7 +461,10 @@ impl super::super::codec::Json for SubstanceReferenceInformation {
         }
         let mut field_target = Vec::new();
         if let Some(raw) = raw_target {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("target", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -721,7 +740,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationClassification {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -735,7 +757,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationClassification {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -779,7 +804,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationClassification {
             .transpose()?;
         let mut field_subtype = Vec::new();
         if let Some(raw) = raw_subtype {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("subtype", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -793,7 +821,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationClassification {
         }
         let mut field_source = Vec::new();
         if let Some(raw) = raw_source {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("source", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1010,7 +1041,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationGene {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1024,7 +1058,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationGene {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1068,7 +1105,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationGene {
             .transpose()?;
         let mut field_source = Vec::new();
         if let Some(raw) = raw_source {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("source", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1280,7 +1320,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationGeneElement {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1294,7 +1337,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationGeneElement {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1338,7 +1384,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationGeneElement {
             .transpose()?;
         let mut field_source = Vec::new();
         if let Some(raw) = raw_source {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("source", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1628,7 +1677,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationTarget {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1642,7 +1694,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationTarget {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1749,7 +1804,10 @@ impl super::super::codec::Json for SubstanceReferenceInformationTarget {
             .transpose()?;
         let mut field_source = Vec::new();
         if let Some(raw) = raw_source {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("source", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

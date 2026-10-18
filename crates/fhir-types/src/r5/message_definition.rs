@@ -834,7 +834,10 @@ impl super::super::codec::Json for MessageDefinition {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -848,7 +851,10 @@ impl super::super::codec::Json for MessageDefinition {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -862,7 +868,10 @@ impl super::super::codec::Json for MessageDefinition {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -886,7 +895,10 @@ impl super::super::codec::Json for MessageDefinition {
         };
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -928,10 +940,12 @@ impl super::super::codec::Json for MessageDefinition {
             })?),
         };
         let mut field_replaces = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_replaces, raw_replaces_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("replaces", |path| {
+                super::super::codec::pair_arrays(raw_replaces, raw_replaces_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_replaces.push(path.with_index("replaces", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -957,7 +971,10 @@ impl super::super::codec::Json for MessageDefinition {
         };
         let mut field_contact = Vec::new();
         if let Some(raw) = raw_contact {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contact", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -977,7 +994,10 @@ impl super::super::codec::Json for MessageDefinition {
         };
         let mut field_use_context = Vec::new();
         if let Some(raw) = raw_use_context {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("useContext", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -991,7 +1011,10 @@ impl super::super::codec::Json for MessageDefinition {
         }
         let mut field_jurisdiction = Vec::new();
         if let Some(raw) = raw_jurisdiction {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("jurisdiction", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1028,10 +1051,12 @@ impl super::super::codec::Json for MessageDefinition {
             })?),
         };
         let mut field_parent = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_parent, raw_parent_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("parent", |path| {
+                super::super::codec::pair_arrays(raw_parent, raw_parent_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_parent.push(path.with_index("parent", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -1056,7 +1081,8 @@ impl super::super::codec::Json for MessageDefinition {
         };
         let mut field_focus = Vec::new();
         if let Some(raw) = raw_focus {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("focus", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -1076,7 +1102,10 @@ impl super::super::codec::Json for MessageDefinition {
         };
         let mut field_allowed_response = Vec::new();
         if let Some(raw) = raw_allowed_response {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("allowedResponse", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1481,7 +1510,10 @@ impl super::super::codec::Json for MessageDefinitionAllowedResponse {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1495,7 +1527,10 @@ impl super::super::codec::Json for MessageDefinitionAllowedResponse {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1840,7 +1875,10 @@ impl super::super::codec::Json for MessageDefinitionFocus {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1854,7 +1892,10 @@ impl super::super::codec::Json for MessageDefinitionFocus {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

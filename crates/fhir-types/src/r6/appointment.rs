@@ -906,7 +906,10 @@ impl super::super::codec::Json for Appointment {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -920,7 +923,10 @@ impl super::super::codec::Json for Appointment {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -934,7 +940,10 @@ impl super::super::codec::Json for Appointment {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -952,7 +961,10 @@ impl super::super::codec::Json for Appointment {
         }
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -982,7 +994,8 @@ impl super::super::codec::Json for Appointment {
             .transpose()?;
         let mut field_class = Vec::new();
         if let Some(raw) = raw_class {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("class", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -996,7 +1009,10 @@ impl super::super::codec::Json for Appointment {
         }
         let mut field_service_category = Vec::new();
         if let Some(raw) = raw_service_category {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("serviceCategory", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1010,7 +1026,10 @@ impl super::super::codec::Json for Appointment {
         }
         let mut field_service_type = Vec::new();
         if let Some(raw) = raw_service_type {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("serviceType", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1024,7 +1043,10 @@ impl super::super::codec::Json for Appointment {
         }
         let mut field_specialty = Vec::new();
         if let Some(raw) = raw_specialty {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("specialty", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1051,7 +1073,10 @@ impl super::super::codec::Json for Appointment {
             .transpose()?;
         let mut field_reason = Vec::new();
         if let Some(raw) = raw_reason {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("reason", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1084,7 +1109,10 @@ impl super::super::codec::Json for Appointment {
         };
         let mut field_replaces = Vec::new();
         if let Some(raw) = raw_replaces {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("replaces", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1098,7 +1126,10 @@ impl super::super::codec::Json for Appointment {
         }
         let mut field_virtual_service = Vec::new();
         if let Some(raw) = raw_virtual_service {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("virtualService", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1112,7 +1143,10 @@ impl super::super::codec::Json for Appointment {
         }
         let mut field_supporting_information = Vec::new();
         if let Some(raw) = raw_supporting_information {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("supportingInformation", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1174,7 +1208,10 @@ impl super::super::codec::Json for Appointment {
         };
         let mut field_requested_period = Vec::new();
         if let Some(raw) = raw_requested_period {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("requestedPeriod", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1188,7 +1225,8 @@ impl super::super::codec::Json for Appointment {
         }
         let mut field_slot = Vec::new();
         if let Some(raw) = raw_slot {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("slot", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -1202,7 +1240,10 @@ impl super::super::codec::Json for Appointment {
         }
         let mut field_account = Vec::new();
         if let Some(raw) = raw_account {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("account", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1228,7 +1269,8 @@ impl super::super::codec::Json for Appointment {
         };
         let mut field_note = Vec::new();
         if let Some(raw) = raw_note {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("note", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -1242,7 +1284,10 @@ impl super::super::codec::Json for Appointment {
         }
         let mut field_patient_instruction = Vec::new();
         if let Some(raw) = raw_patient_instruction {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("patientInstruction", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1260,7 +1305,10 @@ impl super::super::codec::Json for Appointment {
         }
         let mut field_based_on = Vec::new();
         if let Some(raw) = raw_based_on {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("basedOn", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1287,7 +1335,10 @@ impl super::super::codec::Json for Appointment {
             .transpose()?;
         let mut field_participant = Vec::new();
         if let Some(raw) = raw_participant {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("participant", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1298,6 +1349,11 @@ impl super::super::codec::Json for Appointment {
                     )
                 })?);
             }
+        }
+        if field_participant.is_empty() && !path.is_lenient() {
+            return path.with("participant", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         let field_recurrence_id = match (raw_recurrence_id, raw_recurrence_id_element) {
             (None, None) => None,
@@ -1314,7 +1370,10 @@ impl super::super::codec::Json for Appointment {
             };
         let mut field_recurrence_template = Vec::new();
         if let Some(raw) = raw_recurrence_template {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("recurrenceTemplate", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1764,7 +1823,10 @@ impl super::super::codec::Json for AppointmentParticipant {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1778,7 +1840,10 @@ impl super::super::codec::Json for AppointmentParticipant {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1796,7 +1861,8 @@ impl super::super::codec::Json for AppointmentParticipant {
         }
         let mut field_type = Vec::new();
         if let Some(raw) = raw_type {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("type", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -2192,7 +2258,10 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplate {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2206,7 +2275,10 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplate {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2260,13 +2332,16 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplate {
             })?),
         };
         let mut field_occurrence_date = Vec::new();
-        for (index, (value, element)) in super::super::codec::pair_arrays(
-            raw_occurrence_date,
-            raw_occurrence_date_element,
-            path,
-        )?
-        .into_iter()
-        .enumerate()
+        for (index, (value, element)) in path
+            .with("occurrenceDate", |path| {
+                super::super::codec::pair_arrays(
+                    raw_occurrence_date,
+                    raw_occurrence_date_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_occurrence_date.push(path.with_index("occurrenceDate", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -2312,23 +2387,32 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplate {
             })
             .transpose()?;
         let mut field_excluding_date = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_excluding_date, raw_excluding_date_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("excludingDate", |path| {
+                super::super::codec::pair_arrays(
+                    raw_excluding_date,
+                    raw_excluding_date_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_excluding_date.push(path.with_index("excludingDate", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_excluding_recurrence_id = Vec::new();
-        for (index, (value, element)) in super::super::codec::pair_arrays(
-            raw_excluding_recurrence_id,
-            raw_excluding_recurrence_id_element,
-            path,
-        )?
-        .into_iter()
-        .enumerate()
+        for (index, (value, element)) in path
+            .with("excludingRecurrenceId", |path| {
+                super::super::codec::pair_arrays(
+                    raw_excluding_recurrence_id,
+                    raw_excluding_recurrence_id_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_excluding_recurrence_id.push(path.with_index(
                 "excludingRecurrenceId",
@@ -2620,7 +2704,10 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplateMonthlyTemplate 
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2634,7 +2721,10 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplateMonthlyTemplate 
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2890,7 +2980,10 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplateWeeklyTemplate {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2904,7 +2997,10 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplateWeeklyTemplate {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2921,14 +3017,21 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplateWeeklyTemplate {
             }
         }
         let mut field_days_of_week = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_days_of_week, raw_days_of_week_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("daysOfWeek", |path| {
+                super::super::codec::pair_arrays(raw_days_of_week, raw_days_of_week_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_days_of_week.push(path.with_index("daysOfWeek", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
+        }
+        if field_days_of_week.is_empty() && !path.is_lenient() {
+            return path.with("daysOfWeek", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         let field_week_interval = match (raw_week_interval, raw_week_interval_element) {
             (None, None) => None,
@@ -3111,7 +3214,10 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplateYearlyTemplate {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -3125,7 +3231,10 @@ impl super::super::codec::Json for AppointmentRecurrenceTemplateYearlyTemplate {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

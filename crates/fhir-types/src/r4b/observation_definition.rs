@@ -494,7 +494,10 @@ impl super::super::codec::Json for ObservationDefinition {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -508,7 +511,10 @@ impl super::super::codec::Json for ObservationDefinition {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -522,7 +528,10 @@ impl super::super::codec::Json for ObservationDefinition {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -540,7 +549,10 @@ impl super::super::codec::Json for ObservationDefinition {
         }
         let mut field_category = Vec::new();
         if let Some(raw) = raw_category {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("category", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -565,7 +577,10 @@ impl super::super::codec::Json for ObservationDefinition {
         })?;
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -578,13 +593,16 @@ impl super::super::codec::Json for ObservationDefinition {
             }
         }
         let mut field_permitted_data_type = Vec::new();
-        for (index, (value, element)) in super::super::codec::pair_arrays(
-            raw_permitted_data_type,
-            raw_permitted_data_type_element,
-            path,
-        )?
-        .into_iter()
-        .enumerate()
+        for (index, (value, element)) in path
+            .with("permittedDataType", |path| {
+                super::super::codec::pair_arrays(
+                    raw_permitted_data_type,
+                    raw_permitted_data_type_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_permitted_data_type.push(path.with_index(
                 "permittedDataType",
@@ -636,7 +654,10 @@ impl super::super::codec::Json for ObservationDefinition {
             .transpose()?;
         let mut field_qualified_interval = Vec::new();
         if let Some(raw) = raw_qualified_interval {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("qualifiedInterval", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1092,7 +1113,10 @@ impl super::super::codec::Json for ObservationDefinitionQualifiedInterval {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1106,7 +1130,10 @@ impl super::super::codec::Json for ObservationDefinitionQualifiedInterval {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1156,7 +1183,10 @@ impl super::super::codec::Json for ObservationDefinitionQualifiedInterval {
             .transpose()?;
         let mut field_applies_to = Vec::new();
         if let Some(raw) = raw_applies_to {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("appliesTo", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1467,7 +1497,10 @@ impl super::super::codec::Json for ObservationDefinitionQuantitativeDetails {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1481,7 +1514,10 @@ impl super::super::codec::Json for ObservationDefinitionQuantitativeDetails {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
