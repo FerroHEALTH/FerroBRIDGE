@@ -25,6 +25,24 @@ crates on crates.io.
 
 ### Added
 
+- The operator console has browser journeys, screenshots and a book page
+  (#602). The journeys drive headless Chrome through chromedriver with the
+  `thirtyfour` WebDriver client against a running bridge (`ferrobridge
+  serve`'s run path over a `wiremock` CDR and a synthetic mapping tree) and
+  a running console serving its release site bundle, and fail on any error
+  the browser logs. They cover the sign-in, the shell and its theme switch
+  and sign-out, the engine state, every mapping file view, the transform
+  playground (an answer, a refusal, and an operations lane that is off) and
+  the mapping editor end to end: a refused draft leaves the disk and the
+  running set unchanged, a save is byte-identical and reloads the programs,
+  and the bridge's audit line names the actor and the file and nothing of
+  the draft. They run behind `FERROBRIDGE_JOURNEYS=1` in the new
+  `journeys (browser)` CI job at the Chrome for Testing release
+  `docs/VERSIONS.md` pins, which `scripts/release/journey-tools.sh` installs
+  locally. `FERROBRIDGE_SCREENSHOTS=1` captures every console page in light
+  and dark at 1440 pixels for the book's operator console page, and a guard
+  in the ordinary suite fails on a console route without both images. The
+  test OpenID Provider of the testkit can now sign a real browser in.
 - The FHIRPath evaluator admits the functions FHIRPath 3.0.0 adds as
   Standard for Trial Use behind the opt-in
   `Environment::with_fhirpath_stu3_functions` (#633), so the default stays
@@ -140,6 +158,19 @@ crates on crates.io.
   `as` keep every primitive an independent type (FHIR R4 fhirpath.html
   §2.9.1.5) (#635).
 
+### Fixed
+
+- The operator console's theme switch returns to the page it was used on
+  (#602). It returned only to the dashboard and the About page, so a switch
+  on any page added since landed elsewhere; it now returns to every route
+  of the console, a file path below `/files` and `/edit` included, and still
+  never off the console.
+- The operator console serves the brand favicon at `/favicon.ico` (#602).
+  Every first page a browser loaded asked for it and logged a `404`.
+- A bridge refusal the console draws carries each issue's `details.text` as
+  well as its `diagnostics` (#602). The FHIRconnect operations put their
+  reason in `details.text`, so a refused `$tofhir` or `$toopenehr` showed
+  its status and no reason.
 - The profile validator holds a child that a profile's snapshot leaves out
   to the core definition of the type declaring it (#484), so the core
   bindings, invariants and fixed values of that child apply. Before, a

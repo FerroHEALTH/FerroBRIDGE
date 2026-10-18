@@ -150,6 +150,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "arc-swap"
+version = "1.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c049c0be4daef0b145cb3555416b3b8ef5b7888a38aea1a3a155801fe7b0810b"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "arraydeque"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1518,11 +1527,16 @@ dependencies = [
 name = "ferrobridge-testkit"
 version = "0.0.7"
 dependencies = [
+ "anyhow",
  "aws-lc-rs",
+ "base64 0.23.1",
+ "ferrobridge-server",
+ "ferrobridge-viewer",
  "fhir-types",
  "jiff",
  "jsonwebtoken",
  "reqwest",
+ "rustix",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -1530,8 +1544,12 @@ dependencies = [
  "sqlx",
  "tempfile",
  "testcontainers",
+ "thirtyfour",
  "thiserror 2.0.21",
  "tokio",
+ "toml",
+ "tracing-subscriber",
+ "url",
  "wiremock",
 ]
 
@@ -3566,6 +3584,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
+name = "pastey"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ee67f1008b1ba2321834326597b8e186293b049a023cdef258527550b9935b4"
+
+[[package]]
 name = "pathdiff"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5055,6 +5079,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "stringmatch"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6aadc0801d92f0cdc26127c67c4b8766284f52a5ba22894f285e3101fa57d05d"
+dependencies = [
+ "regex",
+]
+
+[[package]]
 name = "stringprep"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5246,6 +5279,34 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
+ "url",
+]
+
+[[package]]
+name = "thirtyfour"
+version = "0.37.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a9c6d349d6b4a7243df43b9852fd0f93ef113c23ada67201374c1af904b1263"
+dependencies = [
+ "arc-swap",
+ "async-trait",
+ "base64 0.22.1",
+ "bytes",
+ "cfg-if",
+ "const_format",
+ "futures-util",
+ "http",
+ "indexmap 2.14.2",
+ "pastey",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "stringmatch",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-stream",
+ "tracing",
  "url",
 ]
 
@@ -5460,6 +5521,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]

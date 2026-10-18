@@ -36,6 +36,8 @@
 #   lint_matrix    the clippy and msrv shards as a matrix (JSON, one line)
 #   viewer         ferrobridge-viewer is affected (its wasm32 lint and its
 #                  site bundle)
+#   journeys       ferrobridge-viewer or ferrobridge-server is affected (the
+#                  console's browser journeys, which run both)
 #
 # A path reaches a package in three ways. A path under a member's directory
 # reaches that member and every member whose Rust source names that
@@ -160,6 +162,11 @@ classify() {
     # measure it; each reaches the console as its own files would.
     .claude/rules/leptos-ui.md) echo "packages ferrobridge-viewer" ;;
     scripts/release/viewer-*.sh | scripts/checks/viewer-*.sh) echo "packages ferrobridge-viewer" ;;
+    # Installs the browser the console's journeys drive.
+    scripts/release/journey-tools.sh) echo "packages ferrobridge-viewer" ;;
+    # Read by the testkit's screenshot guard: every console screenshot and
+    # every book page that shows one.
+    website/book/src/*) echo "only ferrobridge-testkit" ;;
     scripts/checks/affected.sh | scripts/checks/fast.sh) echo ci ;;
     .github/*) echo inert ;;
     .claude/* | website/* | assets/* | docker/* | fuzz/* | scripts/gh/* | scripts/release/*) echo inert ;;
@@ -311,6 +318,12 @@ emit() {
   echo "e2e_packages=$e2e"
   if has "$packages" ferrobridge-viewer; then flag=true; else flag=false; fi
   echo "viewer=$flag"
+  if has "$packages" ferrobridge-viewer || has "$packages" ferrobridge-server; then
+    flag=true
+  else
+    flag=false
+  fi
+  echo "journeys=$flag"
   echo "test_matrix=$(matrix "$graph" "$packages" "$TEST_SHARDS" test_weight)"
   echo "lint_matrix=$(matrix "$graph" "$packages" "$LINT_SHARDS" lint_weight)"
 }
@@ -497,7 +510,16 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   check "the changelog is inert" "CHANGELOG.md" false ""
   check "the deployment probe is inert" "scripts/deploy-probe.sh" false ""
   check "another workflow is inert" ".github/workflows/docs.yml" false ""
-  check "the book is inert" "website/book/src/index.md" false ""
+  # The screenshot guard reads every page of the book and every console
+  # screenshot; the rest of the site reaches no cargo lane.
+  check "a book page reaches the screenshot guard" "website/book/src/index.md" false \
+    "+ferrobridge-testkit -ferrobridge-server -ferrobridge-viewer"
+  check "a console screenshot reaches the screenshot guard" \
+    "website/book/src/operate/img/console/dashboard.png" false \
+    "+ferrobridge-testkit -ferrobridge-server -ferrobridge-viewer"
+  check "the book theme is inert" "website/book/theme/favicon.svg" false ""
+  check "the journeys' browser install reaches the console" "scripts/release/journey-tools.sh" false \
+    "+ferrobridge-viewer +ferrobridge-testkit -ferrobridge-server"
   # The console's image recipe and release lane are read by tier-1 jobs and
   # the release lane alone, never by a cargo lane.
   check "the console image recipe is inert" "docker/viewer/Dockerfile" false ""
@@ -529,8 +551,11 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+fhir-types +ferrobridge-testkit +fhirconnect +ferrobridge-validator +ferrobridge-server +fhir-codegen -omop-cdm-codegen"
   check "the testkit reaches every member testing with it" "tools/ferrobridge-testkit/src/lib.rs" false \
     "+ferrobridge-testkit +openehr-mapping-core +omocl +omop-cdm +ferrobridge-server -fhir-types -fhir-codegen"
-  check "the FerroPULSE vendor script reaches the server alone" "scripts/vendor/ferropulse-schemas.sh" false \
-    "+ferrobridge-server -ferrobridge-testkit -fhir-codegen"
+  # The testkit's console journeys run the server, so they are its one
+  # dev-dependant.
+  check "the FerroPULSE vendor script reaches the server and its journeys" \
+    "scripts/vendor/ferropulse-schemas.sh" false \
+    "+ferrobridge-server +ferrobridge-testkit -fhir-codegen -ferrobridge-viewer"
   check "the console reaches itself and nothing it does not link" \
     "app/ferrobridge-viewer/src/lib.rs" false \
     "+ferrobridge-viewer -fhir-types -openehr-mapping-core -ferrobridge-server"

@@ -148,3 +148,22 @@ async fn the_bundle_is_served_compressed_and_revalidated() {
     );
     assert_eq!("no-cache", header(&response, &CACHE_CONTROL));
 }
+
+#[tokio::test]
+async fn the_favicon_the_site_root_holds_is_served_whole() {
+    let site = site();
+    let shipped = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/public/favicon.ico"))
+        .expect("the shipped favicon");
+    std::fs::write(site.path().join("favicon.ico"), &shipped).expect("the favicon");
+    let response = send(&site, get("/favicon.ico")).await;
+    assert_eq!(StatusCode::OK, response.status());
+    assert_hardened(&response);
+    assert!(
+        response.headers().get(CONTENT_ENCODING).is_none(),
+        "only the bundle under /pkg/ is compressed"
+    );
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("the body reads");
+    assert_eq!(shipped, bytes.to_vec(), "the favicon arrives byte for byte");
+}

@@ -128,7 +128,7 @@ Two tools run the bridge's operations as the operator, and keep nothing:
 What you enter goes to the bridge in the request body alone, never in an
 address or the browser's history, and the console logs none of it. The
 operations lane must be on for the playground; when it is off, the
-playground shows the bridge's `404`.
+playground shows the bridge's `503` and the reason the bridge gave.
 
 The mapping counts, the overview and the files read the operator API, so they need
 `[operator] enabled = true` on the bridge and an operator token that
@@ -140,6 +140,109 @@ The theme switch offers light, dark and system, which follows the
 operating system. The choice is kept in a cookie and the server draws each
 page in it, so nothing is kept in the browser's storage. Both themes meet
 WCAG 2.2 AA contrast.
+
+## Every screen
+
+Each screen below is shown in the light theme, with a link to the same
+screen in the dark theme. The browser journeys take them against a running
+bridge with a synthetic mapping set, so what you read is what the console
+draws.
+
+### Signing in
+
+![The sign-in card a visitor reads](img/console/sign-in.png)
+
+The sign-in card a visitor reads. [Dark theme](img/console/sign-in-dark.png).
+
+### Engine state
+
+![The dashboard](img/console/dashboard.png)
+
+The dashboard: the bridge, its lanes, its pins, its readiness and its
+mapping counts. [Dark theme](img/console/dashboard-dark.png).
+
+![The mappings overview](img/console/mappings.png)
+
+The mappings overview: each context, the templates, the OMOCL files and the
+diagnostics. [Dark theme](img/console/mappings-dark.png).
+
+![The capability](img/console/capability.png)
+
+The `CapabilityStatement` and the SMART discovery document.
+[Dark theme](img/console/capability-dark.png).
+
+### Mapping files
+
+![The file list](img/console/files.png)
+
+Every mapping file the bridge reads. [Dark theme](img/console/files-dark.png).
+
+![A context mapping file](img/console/file-context.png)
+
+A context mapping file, with its lines and its diagnostics.
+[Dark theme](img/console/file-context-dark.png).
+
+![A model mapping file](img/console/file-model.png)
+
+A model mapping file. [Dark theme](img/console/file-model-dark.png).
+
+### The editor
+
+![A new file in the editor](img/console/edit-new.png)
+
+A new console file. [Dark theme](img/console/edit-new-dark.png).
+
+![A provisioned file in the editor](img/console/edit-provisioned.png)
+
+A provisioned file, which the console checks and never saves over.
+[Dark theme](img/console/edit-provisioned-dark.png).
+
+![A draft the bridge refused](img/console/edit-refused.png)
+
+A draft that does not compile: nothing is written and the running set is
+unchanged. [Dark theme](img/console/edit-refused-dark.png).
+
+![A draft the bridge saved](img/console/edit-saved.png)
+
+A saved draft, with the reload's report and the file's new SHA-256.
+[Dark theme](img/console/edit-saved-dark.png).
+
+### Tools
+
+![The transform playground](img/console/playground.png)
+
+The transform playground. [Dark theme](img/console/playground-dark.png).
+
+![A transform the bridge answered](img/console/playground-answered.png)
+
+A `$toopenehr` the bridge answered with a composition.
+[Dark theme](img/console/playground-answered-dark.png).
+
+![A transform the bridge refused](img/console/playground-refused.png)
+
+A `$tofhir` the bridge refused, with its status and its reason.
+[Dark theme](img/console/playground-refused-dark.png).
+
+![A bridge whose operations lane is off](img/console/playground-off.png)
+
+A bridge whose operations lane is off answers `503`.
+[Dark theme](img/console/playground-off-dark.png).
+
+![The validation dry run](img/console/validate.png)
+
+The validation dry run over the types the `CapabilityStatement` declares
+`$validate` on. [Dark theme](img/console/validate-dark.png).
+
+### Elsewhere
+
+![The About page](img/console/about.png)
+
+The About page. [Dark theme](img/console/about-dark.png).
+
+![The page for an unknown path](img/console/not-found.png)
+
+The page for a path the console does not serve, answered `404`.
+[Dark theme](img/console/not-found-dark.png).
 
 ## Signing out
 
