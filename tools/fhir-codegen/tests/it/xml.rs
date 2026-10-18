@@ -397,6 +397,43 @@ fn the_narrative_div_is_held_to_the_xhtml_namespace() {
     }
 }
 
+/// A prefix inside the narrative with no namespace declaration in scope makes
+/// the document not namespace-well-formed (Namespaces in XML 1.0 §5, Prefix
+/// Declared), so the reader refuses it as malformed XML naming the prefix, on
+/// the `div`, on an element inside it, and on an attribute.
+#[test]
+fn an_unbound_prefix_inside_the_narrative_is_malformed_xml() {
+    for schemas in namespace_versions() {
+        for (div, path, prefix) in [
+            (
+                r#"<h:div><p>synthetic</p></h:div>"#,
+                "Resource.text.div",
+                "h",
+            ),
+            (
+                r#"<div xmlns="http://www.w3.org/1999/xhtml"><p>synthetic <x:b>text</x:b></p></div>"#,
+                "Resource.text.div",
+                "x",
+            ),
+            (
+                r#"<div xmlns="http://www.w3.org/1999/xhtml"><p y:title="t">synthetic</p></div>"#,
+                "Resource.text.div.y:title",
+                "y",
+            ),
+        ] {
+            let refused = from_xml(schemas, &with_narrative(div)).expect_err(div);
+            let DecodeErrorKind::MalformedXml { reason } = &refused.kind else {
+                panic!("{div}: {:?}", refused.kind);
+            };
+            assert!(
+                reason.contains(&format!("prefix {prefix} ")),
+                "{div}: {reason}"
+            );
+            assert_eq!(refused.path, path, "{div}");
+        }
+    }
+}
+
 /// The `div` string of the narrative `xml` reads to.
 fn narrative_of(schemas: &Schemas, xml: &str) -> String {
     let read = from_xml(schemas, xml).expect(xml);

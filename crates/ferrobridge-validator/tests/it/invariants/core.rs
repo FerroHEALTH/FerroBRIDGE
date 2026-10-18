@@ -277,6 +277,19 @@ fn txt_1_reads_the_narrative_through_html_checks() -> TestResult {
     Ok(())
 }
 
+/// R4 Narrative.div `txt-2`: "The narrative SHALL have some non-whitespace
+/// content", evaluated through `htmlChecks()` as the package states it.
+#[test]
+fn txt_2_refuses_a_narrative_of_whitespace_alone() -> TestResult {
+    let report = against_core(&json!({
+        "resourceType": "Patient",
+        "text": {"status": "generated",
+                 "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"> \n <p>  </p></div>"}
+    }))?;
+    assert_eq!(failed_at(&report, "txt-2"), ["Patient.text.div"]);
+    Ok(())
+}
+
 #[test]
 fn a_valid_patient_raises_no_invariant_and_lists_none() -> TestResult {
     let report = against_core(&json!({

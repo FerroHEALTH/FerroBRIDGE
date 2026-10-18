@@ -931,7 +931,11 @@ fn read_wrapped_resource(
 /// the `xml` namespace is refused as [`DecodeErrorKind::UnknownProperty`] for
 /// the same reason. A declaration of the XML Schema instance namespace on any
 /// of these elements is refused as in the rest of the resource (R4 xml.html
-/// §2.6.1.1).
+/// §2.6.1.1). An element or attribute name under a prefix with no declaration
+/// in scope is refused as [`DecodeErrorKind::MalformedXml`] before either rule
+/// ([`unbound_prefix`]). The content rules `txt-1` and `txt-2` are invariants
+/// of `Narrative.div` (R4 narrative.html#Narrative), which the profile
+/// validator evaluates; the reader holds the div to well-formed XML alone.
 fn read_xhtml(
     reader: &mut NsReader<&[u8]>,
     start: &BytesStart<'_>,
@@ -1033,6 +1037,15 @@ fn write_xhtml_tag(
         refuse_schema_instance(&attr, path)?;
         attributes.push(attr);
     }
+    if let ResolveResult::Unknown(prefix) = reader.resolver().resolve_element(element.name()).0 {
+        return Err(unbound_prefix(&prefix, path));
+    }
+    for attr in &attributes {
+        if let ResolveResult::Unknown(prefix) = reader.resolver().resolve_attribute(attr.key).0 {
+            let key = attr.key.as_ref();
+            return path.with(key, |path| Err(unbound_prefix(&prefix, path)));
+        }
+    }
     if !in_namespace(reader, element, XHTML_NAMESPACE) {
         return Err(path.error(DecodeErrorKind::UnknownElement));
     }
@@ -1069,6 +1082,20 @@ fn write_xhtml_tag(
     raw.push_str(&tag);
     raw.push_str(if empty { "/>" } else { ">" });
     Ok(())
+}
+
+/// The refusal of a narrative element or attribute name whose prefix has no
+/// namespace declaration in scope.
+///
+/// Such a document is not namespace-well-formed: "The namespace prefix,
+/// unless it is `xml` or `xmlns`, MUST have been declared in a namespace
+/// declaration attribute" (Namespaces in XML 1.0 §5, Namespace constraint:
+/// Prefix Declared, <https://www.w3.org/TR/xml-names/#nsc-NSDeclared>), so the
+/// reader refuses it as malformed XML before any FHIR rule applies.
+fn unbound_prefix(prefix: &str, path: &Path) -> DecodeError {
+    path.error(DecodeErrorKind::MalformedXml {
+        reason: format!("the prefix {prefix} has no namespace declaration in scope"),
+    })
 }
 
 /// The unescaped, normalized value of `attribute`.
