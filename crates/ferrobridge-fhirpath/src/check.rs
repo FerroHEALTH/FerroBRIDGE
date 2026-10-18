@@ -185,6 +185,7 @@ impl Checker<'_> {
                 self.infer(operand, focus, this)?;
                 self.resolve(type_specifier)
             }
+            Expr::SortKey { key, .. } => self.infer(key, focus, this),
         }
     }
 
@@ -424,7 +425,7 @@ impl Checker<'_> {
                     None => from.clone(),
                 };
                 self.infer(arg, &guarded, &guarded)?
-            } else if lambdas.contains(&index) {
+            } else if lambdas.contains(&index) || name == "sort" {
                 self.infer(arg, from, from)?
             } else {
                 self.infer(arg, focus, this)?
@@ -438,7 +439,7 @@ impl Checker<'_> {
                 None => from.clone(),
             },
             "first" | "last" | "tail" | "skip" | "take" | "single" | "distinct" | "intersect"
-            | "exclude" | "trace" | "checkModifiers" | "slice" => from.clone(),
+            | "exclude" | "trace" | "checkModifiers" | "slice" | "sort" => from.clone(),
             "select" => first,
             "union" | "combine" => union(from.clone(), first),
             "extension" => named_type(self.model, "Extension").map(|ty| vec![ty]),

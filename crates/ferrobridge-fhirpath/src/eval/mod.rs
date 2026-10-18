@@ -503,6 +503,9 @@ impl<'e, 'a> Engine<'e, 'a> {
                     _ => Ok(Vec::new()),
                 }
             }
+            // NOTE: the FHIRPath 3.0.0 grammar admits a direction only on a sort() key, and
+            // sort() reads it there; evaluated anywhere else the key is its selector.
+            Expr::SortKey { key, .. } => self.eval(key, frame),
         }
     }
 

@@ -69,6 +69,14 @@ testMatches/testMatchesFullWithinUrl1a
 testMatches/testMatchesFullWithinUrl2
 testMatches/testMatchesFullWithinUrl3
 testMatches/testMatchesFullWithinUrl4
+testSort/testSort1
+testSort/testSort2
+testSort/testSort3
+testSort/testSort4
+testSort/testSort5
+testSort/testSort6
+testSort/testSort7
+testSort/testSort9
 testSplit/testSplit1
 testSplit/testSplit2
 testSplit/testSplit3
