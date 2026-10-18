@@ -50,6 +50,14 @@ construction.
   required `conclusion`, the Rust gates, Dependabot, CodeQL, Scorecard, the
   release lane with signed tags and crates.io Trusted Publishing, templates,
   labels, and the ruleset with merge queue and signed commits.
+- **Every component is shared, never single use** (owner, 2026-10-18: "not
+  single use compoanats they should be used propperly shared"). A product
+  that needs something FerroUI lacks files a FerroUI issue (label
+  `component`); the piece is built in FerroUI generically, documented, shown
+  in the gallery for every brand in light and dark, tested and
+  contrast-checked, released as a `0.1.x`, and the product pins it. One
+  worker owns changes to FerroUI at a time, so releases never collide. The
+  crate is `ferrohealth-ui` (`ferroui` on crates.io is an unrelated project).
 - **Look at the result.** After the switch, run every console, capture every
   screen in light and dark, and look at each screenshot before calling it
   done ([[autonomous-loop]]).
