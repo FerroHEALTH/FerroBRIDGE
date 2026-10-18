@@ -6,8 +6,10 @@
 Mappings are the product. FerroBRIDGE reads specification-conformant YAML and
 never carries a hand-coded converter for one FHIR resource or one OMOP table. A
 per-resource converter is refused in review, because it defeats the reason the
-project exists. The loader described here is designed and not yet built, so
-read this page as the contract it is being built to.
+project exists. `ferrobridge serve` loads the mapping set at start and refuses
+a file it cannot compile there, `ferrobridge mapping check` checks a tree
+without serving it, and the [operator API](../operate/operator-api.md) lists,
+checks, saves and reloads the files of a running bridge.
 
 <!-- toc -->
 
@@ -126,10 +128,9 @@ mapping file cannot introduce new executable behaviour into a deployment.
 
 ## Where the mapping libraries come from
 
-No mapping library is vendored yet. The plan on record is to vendor the
-published FHIRconnect and OMOCL libraries verbatim through committed fetch
-scripts, with provenance recorded beside them, and to exercise them in full:
-every file loads and validates, or carries a recorded skip with its reason.
-That corpus is how FerroBRIDGE finds out that a grammar feature it has not
-implemented exists, which is why it lands with the first engine work rather
-than after it.
+The published FHIRconnect and OMOCL libraries are vendored verbatim under
+`docs/specs/fhirconnect-mapping-lib/` and `docs/specs/omocl/` by committed
+fetch scripts, with provenance recorded beside them. Both run as conformance
+corpora: every file loads and validates, or carries a recorded skip with its
+reason, and each corpus keeps a pass list with a badge in the README. The
+corpus is how FerroBRIDGE finds a grammar feature it has not implemented.

@@ -43,10 +43,11 @@ release is cut when its milestone has no open issue left.
 
 ## What is most useful right now
 
-The project is in its design phase, so evidence beats code. A specification
+Code against an open issue is welcome, and so is evidence. A specification
 citation that contradicts a decision on record, a measurement, or first-hand
-experience with FHIRconnect, OMOCL, or an openEHR CDR in production is worth
-more than a speculative implementation.
+experience with FHIRconnect, OMOCL or an openEHR CDR in production can change
+what gets built next. A conformance case that fails is a good place to start:
+each failing case names its reason in the result the conformance gate reads.
 
 ## Licence of contributions
 

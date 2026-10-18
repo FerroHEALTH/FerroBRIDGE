@@ -68,26 +68,114 @@ HL7 v2, by corpus, then by message family and by version across both corpora:
 [![HL7 v2.8](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fhl7v2-version-2.8.json)](conformance/hl7v2/pass-list.txt)
 <!-- badges:end -->
 
-A pure-Rust, standalone bridge between openEHR and two interoperability
-targets: HL7 FHIR, driven by the FHIRconnect specification (model-mapping and
-contextual-mapping YAML validated against its published JSON schemas), and the
-OMOP Common Data Model, driven by the OMOCL specification. Mappings are
-specification-conformant YAML, never hand-coded per resource or table. It runs
-as its own server beside any openEHR CDR reached over the openEHR ITS-REST API,
-never as a compile-time dependency of one, and uses any FHIR terminology server
-for code systems and value sets.
+FerroBRIDGE is a standalone bridge between openEHR and two interoperability
+targets. It maps openEHR to HL7 FHIR through the FHIRconnect specification and
+to the OMOP Common Data Model through the OMOCL specification. Mappings are
+specification-conformant YAML files that FerroBRIDGE validates against the
+published schemas; nothing is hand-coded per FHIR resource or per OMOP table.
 
-## Status: designed, not yet built
+It is written in Rust and runs as its own server. It reaches any openEHR CDR
+over the openEHR ITS-REST API and any FHIR terminology server for code systems
+and value sets. FerroEHR is the reference CDR and FerroTERM the reference
+terminology server; neither is a compile-time dependency.
 
-The research pass over the specifications and the prior art is done and its
-result is [`docs/architecture.md`](docs/architecture.md): FHIRconnect and OMOCL
-are two mapping languages sharing one header, so FerroBRIDGE is one shared
-foundation with two interpreters and two sinks; it pins FHIRconnect v1.0.0 on
-FHIR R4 and OMOCL v1.0.0 on OMOP CDM v5.4; the FHIR side is a REST facade over
-the CDR and the OMOP side a batch ETL into a CDM database. The first milestone is
-one verbatim round trip per target on upstream mapping files. Follow
-[issue #1](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1) for the
-decisions and their citations.
+The latest release is
+[v0.0.8](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.8),
+cut on 2026-10-18. [`CHANGELOG.md`](CHANGELOG.md) lists what every release
+added, changed and fixed.
+
+## What ships
+
+- **The `ferrobridge` binary and its container image**,
+  `ghcr.io/ferrohealth/ferrobridge`. Each release attaches a Linux binary per
+  architecture and pushes a multi-platform image, each with provenance and an
+  SBOM you can verify ([`SECURITY.md`](SECURITY.md#verifying-a-release)).
+- **A FHIR R4 facade over the CDR**, mounted under `/fhir`. It answers
+  `create`, `read`, `vread`, `update`, `transaction`, `batch` and `$validate`,
+  and search over the AQL projections a `*.search.yml` file declares beside a
+  context mapping. It stores no clinical data. It can act as a SMART App
+  Launch 2.x resource server that checks every access token, with SMART v2
+  scopes per interaction and the patient compartment.
+- **The `$tofhir` and `$toopenehr` operations**, which run a FHIRconnect
+  mapping without a CDR.
+- **The OMOP ETL**: `ferrobridge cdm init` creates a CDM v5.4 schema, and
+  `ferrobridge etl run` reads compositions over AQL and writes OMOP rows
+  through the OMOCL engine.
+- **An HL7 v2 face**: an MLLP listener that maps each message through the
+  HL7 v2-to-FHIR guide's ConceptMaps and writes it through the facade as one
+  transaction.
+- **A FHIRPath evaluator and a FHIR R4 profile validator**, as library crates.
+  The evaluator implements FHIRPath N1 2.0.0 with the FHIR R4 additions. The
+  validator holds a resource to the profiles of a package set it reads offline
+  and lists every constraint it could not evaluate.
+- **The operator console**, `ghcr.io/ferrohealth/ferrobridge-viewer`: a web
+  console behind OpenID Connect sign-in. It shows the engine state, lists and
+  edits the mapping files, and runs the transform playground and the
+  validation dry run.
+- **Library crates on crates.io**, listed [below](#crates).
+
+The conformance badges at the top of this page measure each part against its
+corpus; every badge links to its pass list.
+
+## Run it
+
+[`compose.yaml`](compose.yaml) is a standalone quickstart. Download it, create
+the secret files it lists in its header, and start the bridge:
+
+```bash
+docker compose up
+curl http://127.0.0.1:8080/health/liveness
+```
+
+Every lane is off until you configure it, so an unconfigured server answers
+`/` and the health routes and nothing else. You turn a lane on with
+environment variables: `FERROBRIDGE__CDR__BASE_URL` for the CDR,
+`FERROBRIDGE__TERMINOLOGY__BASE_URL` for the terminology server and
+`FERROBRIDGE__CDM__URL_FILE` for the CDM database. The file names every key.
+Three profiles add services:
+
+- `cdm` starts a PostgreSQL CDM database and applies the CDM v5.4 DDL;
+- `vocab` runs `vocab load` over an OHDSI Athena export you downloaded
+  yourself. That job does not load yet: it exits naming
+  [#233](https://github.com/FerroHEALTH/FerroBRIDGE/issues/233);
+- `viewer` runs the operator console beside the bridge.
+
+```bash
+docker compose --profile cdm up
+docker compose --profile viewer up
+```
+
+To run the image without compose, pull
+`ghcr.io/ferrohealth/ferrobridge:0.0.8`. To run the binary, download the
+archive for your architecture from the
+[release](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest). The
+binary's subcommands are `serve`, `cdm init`, `etl run`, `mapping check` and
+`vocab load`. The book's
+[configuration](https://ferrobridge.eu/docs/operate/configuration.html) and
+[container](https://ferrobridge.eu/docs/operate/container.html) pages cover
+both in full.
+
+## Crates
+
+The library crates are published on crates.io. `fhir-types`,
+`openehr-mapping-core` and `fhirconnect` are on the crate line; the other
+crates hold their names at 0.0.0 until their first release on it. The book's
+[crate versions](https://ferrobridge.eu/docs/contribute/crate-versions.html)
+page explains how they move: every change moves a crate one patch, a breaking
+change included, so pin a crate exactly (for example `fhirconnect = "=0.1.136"`).
+
+| Crate | What it is | crates.io |
+|---|---|---|
+| `fhir-types` | the FHIR model STU3 to R6, generated from the HL7 packages (Apache-2.0) | [![fhir-types](https://img.shields.io/crates/v/fhir-types.svg)](https://crates.io/crates/fhir-types) |
+| `openehr-mapping-core` | the mapping header, loader and registry FHIRconnect and OMOCL share | [![openehr-mapping-core](https://img.shields.io/crates/v/openehr-mapping-core.svg)](https://crates.io/crates/openehr-mapping-core) |
+| `fhirconnect` | the FHIRconnect language: its file model, path model, compiler and engine | [![fhirconnect](https://img.shields.io/crates/v/fhirconnect.svg)](https://crates.io/crates/fhirconnect) |
+| `omocl` | the OMOCL language and its engine | [![omocl](https://img.shields.io/crates/v/omocl.svg)](https://crates.io/crates/omocl) |
+| `omop-cdm` | the OMOP CDM v5.4 row types, DDL and writer | [![omop-cdm](https://img.shields.io/crates/v/omop-cdm.svg)](https://crates.io/crates/omop-cdm) |
+| `ferrobridge-term` | the FHIR terminology client | [![ferrobridge-term](https://img.shields.io/crates/v/ferrobridge-term.svg)](https://crates.io/crates/ferrobridge-term) |
+| `hl7v2-types` | the HL7 v2 tables, generated (Apache-2.0) | [![hl7v2-types](https://img.shields.io/crates/v/hl7v2-types.svg)](https://crates.io/crates/hl7v2-types) |
+| `ferrobridge-hl7v2` | the HL7 v2 face: MLLP, parsing and the v2-to-FHIR map | [![ferrobridge-hl7v2](https://img.shields.io/crates/v/ferrobridge-hl7v2.svg)](https://crates.io/crates/ferrobridge-hl7v2) |
+| `ferrobridge-fhirpath` | the FHIRPath evaluator | [![ferrobridge-fhirpath](https://img.shields.io/crates/v/ferrobridge-fhirpath.svg)](https://crates.io/crates/ferrobridge-fhirpath) |
+| `ferrobridge-validator` | the FHIR R4 profile validator | [![ferrobridge-validator](https://img.shields.io/crates/v/ferrobridge-validator.svg)](https://crates.io/crates/ferrobridge-validator) |
 
 ## Documentation
 
@@ -118,28 +206,23 @@ What holds for every product is written once, in the family book at
 [how the products fit together](https://ferrohealth.eu/docs/architecture.html),
 and [licensing and trademarks](https://ferrohealth.eu/docs/licensing.html).
 
-## What is decided
+## How it is built
 
-- **A standalone server.** FerroBRIDGE is its own process and its own image. It
-  is not a crate inside a CDR, not a plugin, and not a library a CDR links. It
-  reaches the CDR over ITS-REST like any other client, which is what lets it
-  work against a CDR it did not build.
-- **Mapping-driven, never hand-coded.** Mappings are specification-conformant
-  YAML validated against the published schemas. A hand-written per-resource or
-  per-table converter is refused in review, because it is the thing this
-  project exists to avoid.
-- **Pure Rust.** No JVM, and a single binary, like the rest of the family.
-- **Business Source License 1.1.** Free for every non-production use and for
-  non-commercial production use, a commercial licence for production use in a
-  business: [do you need a commercial
-  licence?](#do-you-need-a-commercial-licence)
+- **A standalone server.** FerroBRIDGE is its own process and its own image.
+  It reaches the CDR over ITS-REST like any other client, so it works against
+  a CDR it did not build.
+- **Mapping-driven.** A FHIRconnect or OMOCL file is validated against its
+  schema at load, and a file the engine cannot compile is refused at load,
+  never on the first request that touches it.
+- **One foundation, two interpreters.** FHIRconnect and OMOCL share a header,
+  a loader and a registry (`openehr-mapping-core`); each language keeps its
+  own parser, validator and engine.
+- **Pure Rust.** One binary and no JVM, like the rest of the FerroHEALTH
+  family.
 
-## What is open
-
-The crate layout, the engine design, whether a generated model layer exists on
-the FHIR side or the openEHR side, the version pins for every specification,
-and the acceptance instrument. Each is a question for issue #1 rather than an
-assumption, and the answer arrives with its citation.
+[`docs/architecture.md`](docs/architecture.md) records every decision with its
+ground, including where no specification governs a choice and FerroBRIDGE
+makes its own. Its section 14 is the build order, release by release.
 
 ## Do you need a commercial licence?
 
@@ -189,9 +272,9 @@ shares are on the family book's
 ## Contributing
 
 [`CONTRIBUTING.md`](CONTRIBUTING.md) has the rules, and the open issues are the
-worklist. While the project is in its design phase the most useful contribution
-is evidence: a specification citation, a measurement, or first-hand experience
-with FHIRconnect, OMOCL, or an openEHR CDR in production.
+worklist, grouped into release milestones. A specification citation, a
+measurement, or first-hand experience with FHIRconnect, OMOCL or an openEHR CDR
+in production is as useful as code.
 
 - [`CLAUDE.md`](CLAUDE.md): the working discipline, in full.
 - [`AI_STATEMENT.md`](AI_STATEMENT.md): how AI tools are used to build this,

@@ -23,8 +23,8 @@ the next releases add.
 What the design settles: one shared mapping foundation with two interpreters
 and two sinks, FHIRconnect v1.0.0 on FHIR R4 and OMOCL v1.0.0 on OMOP CDM v5.4,
 a FHIR facade over the CDR on one side and a batch ETL into a CDM database on
-the other. The [build order](evaluate/build-order.md) page says what comes
-first.
+the other. The [build order](evaluate/build-order.md) page lists what each
+release shipped and what the next milestones hold.
 
 ## What this book leaves to the family book
 
