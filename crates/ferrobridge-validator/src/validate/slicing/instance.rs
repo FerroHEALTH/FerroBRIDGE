@@ -251,7 +251,7 @@ impl<'i> Walk<'_, '_, 'i> {
         let Some(reference) = reference else {
             return Err(Reason::ReferenceOutOfScope);
         };
-        match self.validator().resolver().resolve(reference, self.scope()) {
+        match self.resolve_reference(reference) {
             Resolution::Found { target, .. } => {
                 node_of_resource(target).ok_or(Reason::UnresolvedReference)
             }

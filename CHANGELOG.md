@@ -110,6 +110,15 @@ crates on crates.io.
   consumer that builds a `Schemas` value by hand: it adds the field.
   `fhirconnect` 0.1.133 follows the requirement.
 
+### Changed
+
+- The profile validator indexes each Bundle once per validation, its
+  entries by `fullUrl` and by their resource, so resolving a reference
+  inside a Bundle no longer scans every entry twice (#515). A synthetic
+  document of 12002 entries validates in 3.6 s instead of 9.9 s in a
+  release build; the matching rules of R4 bundle.html §2.36.4.1 are
+  unchanged.
+
 ### Fixed
 
 - The FHIRPath `is` operator and `is()` function test a FHIR primitive
