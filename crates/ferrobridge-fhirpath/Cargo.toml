@@ -24,8 +24,8 @@ include = ["src/**", "vendor/ucum/**", "README.md", "LICENSE"]
 # The base64 and url base64 forms of FHIRPath 3.0.0 encode() and decode().
 base64.workspace = true
 chumsky.workspace = true
-# The R4 element table is the type source of the R4 model.
-fhir-types = { workspace = true, features = ["r4", "resources"] }
+# The STU3 and R4 element tables are the type sources of the two models.
+fhir-types = { workspace = true, features = ["stu3", "r4", "resources"] }
 jiff.workspace = true
 logos.workspace = true
 # The XHTML narrative that htmlChecks() reads.

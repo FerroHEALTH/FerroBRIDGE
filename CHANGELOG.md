@@ -48,6 +48,12 @@ crates on crates.io.
 
 ### Added
 
+- The FHIRPath evaluator has an STU3 type model, `model::stu3::Stu3`, over
+  the generated STU3 element table (#837), so paths, `ofType()`, `is` and
+  `as` resolve against STU3 types (an STU3 `valueAttachment`,
+  `Patient.animal`). Every STU3 core invariant with a typed element passes
+  the static check, except the two the package publishes with a defect
+  (`inv-1`, `sdf-15`).
 - The R4 profile validator is held to the HL7 FHIR Validator 6.10.4 on a
   synthetic corpus, the `validator-agreement` conformance corpus (#442): ten
   cases (conforming resources, and resources that break one invariant, one

@@ -4,7 +4,7 @@
 //! The invariants of the vendored FHIR packages
 //! (`ElementDefinition.constraint.expression`, FHIR R4 conformance rules
 //! <https://hl7.org/fhir/R4/conformance-rules.html#constraints>): every one
-//! parses, every R4 core one passes the static check against the element it
+//! parses, every R4 and STU3 core one passes the static check against the element it
 //! constrains, and a sample evaluates on synthetic resources as the rule
 //! reads.
 //!
@@ -18,6 +18,7 @@ use std::sync::LazyLock;
 use ferrobridge_fhirpath::eval::{Environment, Focus};
 use ferrobridge_fhirpath::expression::Expression;
 use ferrobridge_fhirpath::model::r4::R4;
+use ferrobridge_fhirpath::model::stu3::Stu3;
 use ferrobridge_fhirpath::model::{choice_element, named_type, path_types};
 use ferrobridge_fhirpath::value::Collection;
 use fhir_types::codec::Value;
@@ -88,8 +89,10 @@ fn collect(path: &Path, found: &mut BTreeSet<Constraint>) {
     if !text.contains("\"constraint\"") {
         return;
     }
-    let definition: Definition =
-        serde_json::from_str(&text).expect("the definition should be JSON");
+    // NOTE: RFC 8259 §8.1 lets a parser ignore a leading byte order mark, which four files of
+    // hl7.fhir.r3.core 3.0.2 carry (StructureDefinition-Request.json among them).
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
+    let definition: Definition = serde_json::from_str(text).expect("the definition should be JSON");
     for element in definition.snapshot.element {
         for invariant in element.constraint {
             if let Some(expression) = invariant.expression {
@@ -104,7 +107,19 @@ static R4_CORE: LazyLock<BTreeSet<Constraint>> = LazyLock::new(|| constraints("h
 
 /// The invariants the packages publish with a defect, by package, key and
 /// the element they constrain, with the evidence from the package.
-const DEFECTIVE: [(&str, &str, &str, &str); 4] = [
+const DEFECTIVE: [(&str, &str, &str, &str); 6] = [
+    (
+        "hl7.fhir.r3.core",
+        "inv-1",
+        "Extension",
+        "as in R4, the allergyintolerance-substanceExposureRisk extension names its parts as `extension` slices, so `substanceExposureRisk` is no element of Extension",
+    ),
+    (
+        "hl7.fhir.r3.core",
+        "sdf-15",
+        "StructureDefinition.snapshot",
+        "STU3 places sdf-15 on StructureDefinition.snapshot, yet it reads `kind` and `snapshot`, elements of StructureDefinition itself, where R4 places the same expression",
+    ),
     (
         "hl7.fhir.r4.core",
         "cid-0",
@@ -276,6 +291,112 @@ fn every_r4_core_constraint_checks_against_its_element() {
         ["cid-0", "inv-1"],
         "the recorded defects are refused"
     );
+}
+
+#[test]
+fn every_stu3_core_constraint_checks_against_its_stu3_element() {
+    let package = "hl7.fhir.r3.core";
+    let found = constraints(package);
+    let (unparsed, _) = unparsed(package, &found);
+    assert!(
+        unparsed.is_empty(),
+        "STU3 invariants that do not parse: {unparsed:#?}"
+    );
+    let mut checked = 0;
+    let mut skipped = BTreeSet::new();
+    let mut refused = Vec::new();
+    let mut expected = Vec::new();
+    for (key, path, expression) in &found {
+        let Some(contexts) = path_types(&Stu3, path) else {
+            skipped.insert(path.split('.').next().unwrap_or(path));
+            continue;
+        };
+        checked += 1;
+        let parsed = Expression::parse(expression).expect("the invariant should parse");
+        match (
+            parsed.check_any(&Stu3, &contexts),
+            defective(package, key, path),
+        ) {
+            (Err(_), true) => expected.push(key.as_str()),
+            (Err(error), false) => refused.push(format!("{key} on {path}: {error}")),
+            (Ok(()), true) => refused.push(format!(
+                "{key} on {path}: recorded as defective, yet it checks"
+            )),
+            (Ok(()), false) => {}
+        }
+    }
+    assert!(
+        refused.is_empty(),
+        "STU3 invariants the check refuses: {refused:#?}"
+    );
+    assert_eq!(
+        expected,
+        ["inv-1", "sdf-15"],
+        "the recorded defects are refused"
+    );
+    assert_eq!(
+        checked, 1069,
+        "the STU3 core invariants with a context type"
+    );
+    // NOTE: STU3 StructureDefinition.kind `logical` marks Event, MetadataResource and Request,
+    // and no element of the STU3 closure is a uuid, so the table carries none of the four.
+    assert_eq!(
+        skipped.into_iter().collect::<Vec<_>>(),
+        ["Event", "MetadataResource", "Request", "uuid"],
+        "only the logical models and uuid stay untyped"
+    );
+}
+
+/// Evaluates an invariant of the STU3 core package by key on `resource`
+/// with the STU3 model.
+fn stu3_invariant<'a>(key: &str, resource: &'a Value) -> Collection<'a> {
+    let found = constraints("hl7.fhir.r3.core");
+    let (_, _, expression) = found
+        .iter()
+        .find(|(candidate, ..)| candidate == key)
+        .expect("the invariant should exist");
+    Expression::parse(expression)
+        .expect("the invariant should parse")
+        .evaluate(&Environment::new(&Stu3), Focus::resource(resource))
+        .expect("the invariant should evaluate")
+}
+
+#[test]
+fn obs_6_reads_an_stu3_attachment_value() {
+    // STU3 Observation.value[x] admits Attachment, which R4 drops; obs-6 refuses a value
+    // beside a dataAbsentReason (https://hl7.org/fhir/STU3/observation.html#invs).
+    let observation = json(
+        r#"{"resourceType": "Observation", "status": "final", "code": {"text": "x"},
+            "valueAttachment": {"contentType": "text/plain"},
+            "dataAbsentReason": {"text": "asked"}}"#,
+    );
+    assert_eq!(truth(&stu3_invariant("obs-6", &observation)), Some(false));
+    let typed = Expression::parse("Observation.value.ofType(Attachment).contentType")
+        .expect("the expression should parse")
+        .evaluate(&Environment::new(&Stu3), Focus::resource(&observation))
+        .expect("the path should evaluate");
+    assert_eq!(typed.len(), 1);
+    let r4 = Expression::parse("Observation.value.ofType(Attachment)")
+        .expect("the expression should parse")
+        .evaluate(&Environment::new(&R4), Focus::resource(&observation))
+        .expect("the path should evaluate");
+    assert!(r4.is_empty(), "R4 Observation has no valueAttachment");
+}
+
+#[test]
+fn an_stu3_path_resolves_against_stu3_types() {
+    // STU3 Patient.animal (https://hl7.org/fhir/STU3/patient.html) is no element of R4 Patient.
+    let patient = json(r#"{"resourceType": "Patient", "animal": {"species": {"text": "dog"}}}"#);
+    let path = Expression::parse("Patient.animal.species.text = 'dog'")
+        .expect("the expression should parse");
+    let answer = path
+        .evaluate(&Environment::new(&Stu3), Focus::resource(&patient))
+        .expect("STU3 Patient has an animal");
+    assert_eq!(truth(&answer), Some(true));
+    let patient_type = named_type(&Stu3, "Patient").expect("STU3 Patient");
+    assert!(path.check(&Stu3, patient_type).is_ok());
+    let r4_type = named_type(&R4, "Patient").expect("R4 Patient");
+    assert!(path.check(&R4, r4_type).is_err());
 }
 
 #[test]
