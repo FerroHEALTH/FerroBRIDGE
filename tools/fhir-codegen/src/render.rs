@@ -133,6 +133,9 @@ pub fn render_module(
         crate::render_codec::render_codec(model, &mut out, ty)?;
         out.push('\n');
     }
+    if module == PRIMITIVES_MODULE {
+        crate::render_codec::render_value_check(model, &mut out, types)?;
+    }
     Ok(out)
 }
 

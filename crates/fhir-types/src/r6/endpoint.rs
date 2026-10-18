@@ -525,7 +525,10 @@ impl super::super::codec::Json for Endpoint {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -539,7 +542,10 @@ impl super::super::codec::Json for Endpoint {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -553,7 +559,10 @@ impl super::super::codec::Json for Endpoint {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -571,7 +580,10 @@ impl super::super::codec::Json for Endpoint {
         }
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -588,7 +600,10 @@ impl super::super::codec::Json for Endpoint {
         })?;
         let mut field_connection_type = Vec::new();
         if let Some(raw) = raw_connection_type {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("connectionType", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -599,6 +614,11 @@ impl super::super::codec::Json for Endpoint {
                     )
                 })?);
             }
+        }
+        if field_connection_type.is_empty() && !path.is_lenient() {
+            return path.with("connectionType", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         let field_name = match (raw_name, raw_name_element) {
             (None, None) => None,
@@ -614,7 +634,10 @@ impl super::super::codec::Json for Endpoint {
         };
         let mut field_environment_type = Vec::new();
         if let Some(raw) = raw_environment_type {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("environmentType", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -641,7 +664,10 @@ impl super::super::codec::Json for Endpoint {
             .transpose()?;
         let mut field_contact = Vec::new();
         if let Some(raw) = raw_contact {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contact", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -681,7 +707,10 @@ impl super::super::codec::Json for Endpoint {
             .transpose()?;
         let mut field_payload = Vec::new();
         if let Some(raw) = raw_payload {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("payload", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -697,10 +726,12 @@ impl super::super::codec::Json for Endpoint {
             super::super::codec::Primitive::from_json_parts(raw_address, raw_address_element, path)
         })?;
         let mut field_header = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_header, raw_header_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("header", |path| {
+                super::super::codec::pair_arrays(raw_header, raw_header_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_header.push(path.with_index("header", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -1039,7 +1070,10 @@ impl super::super::codec::Json for EndpointPayload {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1053,7 +1087,10 @@ impl super::super::codec::Json for EndpointPayload {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1071,7 +1108,8 @@ impl super::super::codec::Json for EndpointPayload {
         }
         let mut field_type = Vec::new();
         if let Some(raw) = raw_type {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("type", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -1084,33 +1122,40 @@ impl super::super::codec::Json for EndpointPayload {
             }
         }
         let mut field_mime_type = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_mime_type, raw_mime_type_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("mimeType", |path| {
+                super::super::codec::pair_arrays(raw_mime_type, raw_mime_type_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_mime_type.push(path.with_index("mimeType", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_profile_canonical = Vec::new();
-        for (index, (value, element)) in super::super::codec::pair_arrays(
-            raw_profile_canonical,
-            raw_profile_canonical_element,
-            path,
-        )?
-        .into_iter()
-        .enumerate()
+        for (index, (value, element)) in path
+            .with("profileCanonical", |path| {
+                super::super::codec::pair_arrays(
+                    raw_profile_canonical,
+                    raw_profile_canonical_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_profile_canonical.push(path.with_index("profileCanonical", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_profile_uri = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_profile_uri, raw_profile_uri_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("profileUri", |path| {
+                super::super::codec::pair_arrays(raw_profile_uri, raw_profile_uri_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_profile_uri.push(path.with_index("profileUri", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)

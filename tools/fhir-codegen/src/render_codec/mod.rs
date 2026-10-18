@@ -107,6 +107,74 @@ pub fn render_codec(model: &VersionModule, out: &mut String, ty: &TypeDef) -> fm
     }
 }
 
+/// Renders `check_value`, which holds a JSON value to the primitive a type
+/// code names, through that primitive's own decoder.
+///
+/// A consumer that writes a value into an element knows the element's type
+/// code and nothing else, so the check is keyed by the code
+/// (<https://hl7.org/fhir/R4/datatypes.html#primitive>) and decodes the value
+/// as the primitive's JSON value (<https://hl7.org/fhir/R4/json.html#primitive>).
+///
+/// # Errors
+///
+/// Returns [`fmt::Error`] only if writing to the string fails, which `String` never does.
+pub fn render_value_check(
+    model: &VersionModule,
+    out: &mut String,
+    types: &[&TypeDef],
+) -> fmt::Result {
+    let version = model.name.to_uppercase();
+    writeln!(
+        out,
+        "\n/// Checks `value` as the JSON value of the FHIR primitive `code`: its JSON type,"
+    )?;
+    writeln!(
+        out,
+        "/// its lexical form and, for an integer type, its range, exactly as the decoder does"
+    )?;
+    writeln!(
+        out,
+        "/// (<https://hl7.org/fhir/{version}/datatypes.html#primitive>)."
+    )?;
+    writeln!(out, "///")?;
+    writeln!(
+        out,
+        "/// Answers `None` when this version defines no primitive named `code`."
+    )?;
+    writeln!(out, "///")?;
+    writeln!(out, "/// # Errors")?;
+    writeln!(out, "///")?;
+    writeln!(
+        out,
+        "/// The inner result is the decoder's [`{C}::DecodeError`] at the path `code` for a value"
+    )?;
+    writeln!(out, "/// the primitive refuses.")?;
+    writeln!(out, "#[must_use]")?;
+    writeln!(
+        out,
+        "pub fn check_value(code: &str, value: &{C}::Value) -> Option<Result<(), {C}::DecodeError>> {{"
+    )?;
+    writeln!(out, "    let mut path = {C}::Path::root(code);")?;
+    writeln!(out, "    let checked = match code {{")?;
+    let mut primitives: Vec<&&TypeDef> = types
+        .iter()
+        .filter(|ty| ty.is_primitive && matches!(ty.kind, TypeKind::Struct { .. }))
+        .collect();
+    primitives.sort_by(|a, b| a.path.cmp(&b.path));
+    for ty in primitives {
+        out.push_str(&ty.scope.cfg());
+        writeln!(
+            out,
+            "        {:?} => <{} as {C}::Primitive>::from_json_parts(Some(value), None, &mut path).map(|_| ()),",
+            ty.path, ty.name
+        )?;
+    }
+    writeln!(out, "        _ => return None,")?;
+    writeln!(out, "    }};")?;
+    writeln!(out, "    Some(checked)")?;
+    writeln!(out, "}}")
+}
+
 fn render_deserialize(out: &mut String, name: &str) -> fmt::Result {
     writeln!(out, "\nimpl<'de> serde::Deserialize<'de> for {name} {{")?;
     writeln!(

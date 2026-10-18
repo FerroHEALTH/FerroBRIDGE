@@ -218,7 +218,10 @@ impl super::super::codec::Json for Meta {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -249,10 +252,12 @@ impl super::super::codec::Json for Meta {
             })?),
         };
         let mut field_profile = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_profile, raw_profile_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("profile", |path| {
+                super::super::codec::pair_arrays(raw_profile, raw_profile_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_profile.push(path.with_index("profile", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -260,7 +265,10 @@ impl super::super::codec::Json for Meta {
         }
         let mut field_security = Vec::new();
         if let Some(raw) = raw_security {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("security", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -274,7 +282,8 @@ impl super::super::codec::Json for Meta {
         }
         let mut field_tag = Vec::new();
         if let Some(raw) = raw_tag {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("tag", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {

@@ -462,7 +462,10 @@ impl super::super::codec::Json for AuditEvent {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -476,7 +479,10 @@ impl super::super::codec::Json for AuditEvent {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -490,7 +496,10 @@ impl super::super::codec::Json for AuditEvent {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -519,7 +528,10 @@ impl super::super::codec::Json for AuditEvent {
         })?;
         let mut field_subtype = Vec::new();
         if let Some(raw) = raw_subtype {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("subtype", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -571,7 +583,10 @@ impl super::super::codec::Json for AuditEvent {
         };
         let mut field_purpose_of_event = Vec::new();
         if let Some(raw) = raw_purpose_of_event {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("purposeOfEvent", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -585,7 +600,8 @@ impl super::super::codec::Json for AuditEvent {
         }
         let mut field_agent = Vec::new();
         if let Some(raw) = raw_agent {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("agent", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -596,6 +612,11 @@ impl super::super::codec::Json for AuditEvent {
                     )
                 })?);
             }
+        }
+        if field_agent.is_empty() && !path.is_lenient() {
+            return path.with("agent", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         let field_source = path.with("source", |path| {
             let value = raw_source
@@ -610,7 +631,10 @@ impl super::super::codec::Json for AuditEvent {
         })?;
         let mut field_entity = Vec::new();
         if let Some(raw) = raw_entity {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("entity", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1050,7 +1074,10 @@ impl super::super::codec::Json for AuditEventAgent {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1064,7 +1091,10 @@ impl super::super::codec::Json for AuditEventAgent {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1095,7 +1125,8 @@ impl super::super::codec::Json for AuditEventAgent {
             .transpose()?;
         let mut field_role = Vec::new();
         if let Some(raw) = raw_role {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("role", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -1153,10 +1184,12 @@ impl super::super::codec::Json for AuditEventAgent {
             })
             .transpose()?;
         let mut field_policy = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_policy, raw_policy_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("policy", |path| {
+                super::super::codec::pair_arrays(raw_policy, raw_policy_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_policy.push(path.with_index("policy", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -1190,7 +1223,10 @@ impl super::super::codec::Json for AuditEventAgent {
             .transpose()?;
         let mut field_purpose_of_use = Vec::new();
         if let Some(raw) = raw_purpose_of_use {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("purposeOfUse", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1445,7 +1481,10 @@ impl super::super::codec::Json for AuditEventAgentNetwork {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1459,7 +1498,10 @@ impl super::super::codec::Json for AuditEventAgentNetwork {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1806,7 +1848,10 @@ impl super::super::codec::Json for AuditEventEntity {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1820,7 +1865,10 @@ impl super::super::codec::Json for AuditEventEntity {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1890,7 +1938,10 @@ impl super::super::codec::Json for AuditEventEntity {
             .transpose()?;
         let mut field_security_label = Vec::new();
         if let Some(raw) = raw_security_label {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("securityLabel", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1922,7 +1973,10 @@ impl super::super::codec::Json for AuditEventEntity {
         };
         let mut field_detail = Vec::new();
         if let Some(raw) = raw_detail {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("detail", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2173,7 +2227,10 @@ impl super::super::codec::Json for AuditEventEntityDetail {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2187,7 +2244,10 @@ impl super::super::codec::Json for AuditEventEntityDetail {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2503,7 +2563,10 @@ impl super::super::codec::Json for AuditEventSource {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2517,7 +2580,10 @@ impl super::super::codec::Json for AuditEventSource {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -2552,7 +2618,8 @@ impl super::super::codec::Json for AuditEventSource {
         })?;
         let mut field_type = Vec::new();
         if let Some(raw) = raw_type {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("type", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {

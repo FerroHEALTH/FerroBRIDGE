@@ -376,7 +376,10 @@ impl super::super::codec::Json for Permission {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -390,7 +393,10 @@ impl super::super::codec::Json for Permission {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -404,7 +410,10 @@ impl super::super::codec::Json for Permission {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -437,10 +446,12 @@ impl super::super::codec::Json for Permission {
             })
             .transpose()?;
         let mut field_date = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_date, raw_date_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("date", |path| {
+                super::super::codec::pair_arrays(raw_date, raw_date_element, path)
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_date.push(path.with_index("date", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
@@ -481,7 +492,8 @@ impl super::super::codec::Json for Permission {
         })?;
         let mut field_rule = Vec::new();
         if let Some(raw) = raw_rule {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("rule", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -730,7 +742,10 @@ impl super::super::codec::Json for PermissionJustification {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -744,7 +759,10 @@ impl super::super::codec::Json for PermissionJustification {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -762,7 +780,8 @@ impl super::super::codec::Json for PermissionJustification {
         }
         let mut field_basis = Vec::new();
         if let Some(raw) = raw_basis {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("basis", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -776,7 +795,10 @@ impl super::super::codec::Json for PermissionJustification {
         }
         let mut field_evidence = Vec::new();
         if let Some(raw) = raw_evidence {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("evidence", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1021,7 +1043,10 @@ impl super::super::codec::Json for PermissionRule {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1035,7 +1060,10 @@ impl super::super::codec::Json for PermissionRule {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1059,7 +1087,8 @@ impl super::super::codec::Json for PermissionRule {
         };
         let mut field_data = Vec::new();
         if let Some(raw) = raw_data {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("data", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -1073,7 +1102,10 @@ impl super::super::codec::Json for PermissionRule {
         }
         let mut field_activity = Vec::new();
         if let Some(raw) = raw_activity {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("activity", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1087,7 +1119,8 @@ impl super::super::codec::Json for PermissionRule {
         }
         let mut field_limit = Vec::new();
         if let Some(raw) = raw_limit {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("limit", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -1321,7 +1354,10 @@ impl super::super::codec::Json for PermissionRuleActivity {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1335,7 +1371,10 @@ impl super::super::codec::Json for PermissionRuleActivity {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1353,7 +1392,8 @@ impl super::super::codec::Json for PermissionRuleActivity {
         }
         let mut field_actor = Vec::new();
         if let Some(raw) = raw_actor {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("actor", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -1367,7 +1407,10 @@ impl super::super::codec::Json for PermissionRuleActivity {
         }
         let mut field_action = Vec::new();
         if let Some(raw) = raw_action {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("action", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1381,7 +1424,10 @@ impl super::super::codec::Json for PermissionRuleActivity {
         }
         let mut field_purpose = Vec::new();
         if let Some(raw) = raw_purpose {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("purpose", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1629,7 +1675,10 @@ impl super::super::codec::Json for PermissionRuleData {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1643,7 +1692,10 @@ impl super::super::codec::Json for PermissionRuleData {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1661,7 +1713,10 @@ impl super::super::codec::Json for PermissionRuleData {
         }
         let mut field_resource = Vec::new();
         if let Some(raw) = raw_resource {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("resource", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1675,7 +1730,10 @@ impl super::super::codec::Json for PermissionRuleData {
         }
         let mut field_security = Vec::new();
         if let Some(raw) = raw_security {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("security", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1689,7 +1747,10 @@ impl super::super::codec::Json for PermissionRuleData {
         }
         let mut field_period = Vec::new();
         if let Some(raw) = raw_period {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("period", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1909,7 +1970,10 @@ impl super::super::codec::Json for PermissionRuleDataResource {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1923,7 +1987,10 @@ impl super::super::codec::Json for PermissionRuleDataResource {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

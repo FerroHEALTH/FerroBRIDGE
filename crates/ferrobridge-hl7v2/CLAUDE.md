@@ -107,7 +107,7 @@ an assignment outside the concatenation grammar or joining two parts with no
 offset is no `dateTime`), and a resource that does not decode as R4 are each
 a typed `Outcome`, counted and never dropped. Before a value is written,
 `map::constraint` checks it against its primitive's lexical form through the
-`fhir-types` decoder; after the writes, it drops every element and resource
+`fhir-types` primitive check (`r4::primitives::check_value`); after the writes, it drops every element and resource
 lacking an element the element table marks required, where a primitive
 counts as present by its value or by its `_name` sibling holding an
 extension (R4 JSON §Primitive Types). Both read the

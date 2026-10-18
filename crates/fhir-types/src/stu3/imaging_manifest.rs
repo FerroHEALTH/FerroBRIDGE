@@ -374,7 +374,10 @@ impl super::super::codec::Json for ImagingManifest {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -388,7 +391,10 @@ impl super::super::codec::Json for ImagingManifest {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -402,7 +408,10 @@ impl super::super::codec::Json for ImagingManifest {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -469,7 +478,8 @@ impl super::super::codec::Json for ImagingManifest {
         };
         let mut field_study = Vec::new();
         if let Some(raw) = raw_study {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("study", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -480,6 +490,11 @@ impl super::super::codec::Json for ImagingManifest {
                     )
                 })?);
             }
+        }
+        if field_study.is_empty() && !path.is_lenient() {
+            return path.with("study", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,
@@ -758,7 +773,10 @@ impl super::super::codec::Json for ImagingManifestStudy {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -772,7 +790,10 @@ impl super::super::codec::Json for ImagingManifestStudy {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -806,7 +827,10 @@ impl super::super::codec::Json for ImagingManifestStudy {
             .transpose()?;
         let mut field_endpoint = Vec::new();
         if let Some(raw) = raw_endpoint {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("endpoint", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -820,7 +844,10 @@ impl super::super::codec::Json for ImagingManifestStudy {
         }
         let mut field_series = Vec::new();
         if let Some(raw) = raw_series {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("series", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -831,6 +858,11 @@ impl super::super::codec::Json for ImagingManifestStudy {
                     )
                 })?);
             }
+        }
+        if field_series.is_empty() && !path.is_lenient() {
+            return path.with("series", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,
@@ -1051,7 +1083,10 @@ impl super::super::codec::Json for ImagingManifestStudySeries {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1065,7 +1100,10 @@ impl super::super::codec::Json for ImagingManifestStudySeries {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1086,7 +1124,10 @@ impl super::super::codec::Json for ImagingManifestStudySeries {
         })?;
         let mut field_endpoint = Vec::new();
         if let Some(raw) = raw_endpoint {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("endpoint", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1100,7 +1141,10 @@ impl super::super::codec::Json for ImagingManifestStudySeries {
         }
         let mut field_instance = Vec::new();
         if let Some(raw) = raw_instance {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("instance", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1111,6 +1155,11 @@ impl super::super::codec::Json for ImagingManifestStudySeries {
                     )
                 })?);
             }
+        }
+        if field_instance.is_empty() && !path.is_lenient() {
+            return path.with("instance", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         Ok(Self {
             id: field_id,
@@ -1301,7 +1350,10 @@ impl super::super::codec::Json for ImagingManifestStudySeriesInstance {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1315,7 +1367,10 @@ impl super::super::codec::Json for ImagingManifestStudySeriesInstance {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {

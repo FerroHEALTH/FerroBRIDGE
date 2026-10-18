@@ -76,6 +76,23 @@ pub(crate) fn checked_base64_binary(
     }
 }
 
+impl Base64Binary {
+    /// Checks `text` against the lexical form of `base64Binary`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `base64Binary` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if BASE64_BINARY_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError {
+                type_code: "base64Binary",
+            })
+        }
+    }
+}
+
 impl super::super::codec::Primitive for Base64Binary {
     fn value_json(
         &self,
@@ -429,6 +446,23 @@ pub(crate) fn checked_canonical(
     }
 }
 
+impl Canonical {
+    /// Checks `text` against the lexical form of `canonical`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `canonical` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if CANONICAL_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError {
+                type_code: "canonical",
+            })
+        }
+    }
+}
+
 impl super::super::codec::Primitive for Canonical {
     fn value_json(
         &self,
@@ -624,6 +658,21 @@ pub(crate) fn checked_code(
         Ok(text)
     } else {
         Err(path.error(super::super::codec::DecodeErrorKind::BadValue))
+    }
+}
+
+impl Code {
+    /// Checks `text` against the lexical form of `code`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `code` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if CODE_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError { type_code: "code" })
+        }
     }
 }
 
@@ -828,6 +877,21 @@ pub(crate) fn checked_date(
     }
 }
 
+impl Date {
+    /// Checks `text` against the lexical form of `date`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `date` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if DATE_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError { type_code: "date" })
+        }
+    }
+}
+
 impl super::super::codec::Primitive for Date {
     fn value_json(
         &self,
@@ -1028,6 +1092,23 @@ pub(crate) fn checked_date_time(
         Ok(text)
     } else {
         Err(path.error(super::super::codec::DecodeErrorKind::BadValue))
+    }
+}
+
+impl DateTime {
+    /// Checks `text` against the lexical form of `dateTime`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `dateTime` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if DATE_TIME_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError {
+                type_code: "dateTime",
+            })
+        }
     }
 }
 
@@ -1404,6 +1485,21 @@ pub(crate) fn checked_id(
     }
 }
 
+impl Id {
+    /// Checks `text` against the lexical form of `id`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `id` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if ID_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError { type_code: "id" })
+        }
+    }
+}
+
 impl super::super::codec::Primitive for Id {
     fn value_json(
         &self,
@@ -1600,6 +1696,23 @@ pub(crate) fn checked_instant(
         Ok(text)
     } else {
         Err(path.error(super::super::codec::DecodeErrorKind::BadValue))
+    }
+}
+
+impl Instant {
+    /// Checks `text` against the lexical form of `instant`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `instant` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if INSTANT_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError {
+                type_code: "instant",
+            })
+        }
     }
 }
 
@@ -2114,6 +2227,23 @@ pub(crate) fn checked_markdown(
     }
 }
 
+impl Markdown {
+    /// Checks `text` against the lexical form of `markdown`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `markdown` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if MARKDOWN_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError {
+                type_code: "markdown",
+            })
+        }
+    }
+}
+
 impl super::super::codec::Primitive for Markdown {
     fn value_json(
         &self,
@@ -2307,6 +2437,21 @@ pub(crate) fn checked_oid(
         Ok(text)
     } else {
         Err(path.error(super::super::codec::DecodeErrorKind::BadValue))
+    }
+}
+
+impl Oid {
+    /// Checks `text` against the lexical form of `oid`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `oid` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if OID_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError { type_code: "oid" })
+        }
     }
 }
 
@@ -2663,6 +2808,23 @@ pub(crate) fn checked_string(
     }
 }
 
+impl String {
+    /// Checks `text` against the lexical form of `string`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `string` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if STRING_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError {
+                type_code: "string",
+            })
+        }
+    }
+}
+
 impl super::super::codec::Primitive for String {
     fn value_json(
         &self,
@@ -2860,6 +3022,21 @@ pub(crate) fn checked_time(
         Ok(text)
     } else {
         Err(path.error(super::super::codec::DecodeErrorKind::BadValue))
+    }
+}
+
+impl Time {
+    /// Checks `text` against the lexical form of `time`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `time` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if TIME_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError { type_code: "time" })
+        }
     }
 }
 
@@ -3216,6 +3393,21 @@ pub(crate) fn checked_uri(
     }
 }
 
+impl Uri {
+    /// Checks `text` against the lexical form of `uri`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `uri` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if URI_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError { type_code: "uri" })
+        }
+    }
+}
+
 impl super::super::codec::Primitive for Uri {
     fn value_json(
         &self,
@@ -3409,6 +3601,21 @@ pub(crate) fn checked_url(
         Ok(text)
     } else {
         Err(path.error(super::super::codec::DecodeErrorKind::BadValue))
+    }
+}
+
+impl Url {
+    /// Checks `text` against the lexical form of `url`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `url` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if URL_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError { type_code: "url" })
+        }
     }
 }
 
@@ -3607,6 +3814,21 @@ pub(crate) fn checked_uuid(
         Ok(text)
     } else {
         Err(path.error(super::super::codec::DecodeErrorKind::BadValue))
+    }
+}
+
+impl Uuid {
+    /// Checks `text` against the lexical form of `uuid`, the one the decoder holds a value to.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::super::codec::LexicalError`] naming `uuid` when `text` is outside the form.
+    pub fn check(text: &str) -> Result<(), super::super::codec::LexicalError> {
+        if UUID_LEXICAL_FORM.is_match(text.as_bytes()) {
+            Ok(())
+        } else {
+            Err(super::super::codec::LexicalError { type_code: "uuid" })
+        }
     }
 }
 
@@ -3813,4 +4035,155 @@ impl super::super::codec::Primitive for Xhtml {
         }
         Ok(Self { value })
     }
+}
+
+/// Checks `value` as the JSON value of the FHIR primitive `code`: its JSON type,
+/// its lexical form and, for an integer type, its range, exactly as the decoder does
+/// (<https://hl7.org/fhir/R6/datatypes.html#primitive>).
+///
+/// Answers `None` when this version defines no primitive named `code`.
+///
+/// # Errors
+///
+/// The inner result is the decoder's [`super::super::codec::DecodeError`] at the path `code` for a value
+/// the primitive refuses.
+#[must_use]
+pub fn check_value(
+    code: &str,
+    value: &super::super::codec::Value,
+) -> Option<Result<(), super::super::codec::DecodeError>> {
+    let mut path = super::super::codec::Path::root(code);
+    let checked = match code {
+        #[cfg(feature = "terminology")]
+        "base64Binary" => <Base64Binary as super::super::codec::Primitive>::from_json_parts(
+            Some(value),
+            None,
+            &mut path,
+        )
+        .map(|_| ()),
+        #[cfg(feature = "terminology")]
+        "boolean" => <Boolean as super::super::codec::Primitive>::from_json_parts(
+            Some(value),
+            None,
+            &mut path,
+        )
+        .map(|_| ()),
+        #[cfg(feature = "terminology")]
+        "canonical" => <Canonical as super::super::codec::Primitive>::from_json_parts(
+            Some(value),
+            None,
+            &mut path,
+        )
+        .map(|_| ()),
+        #[cfg(feature = "terminology")]
+        "code" => {
+            <Code as super::super::codec::Primitive>::from_json_parts(Some(value), None, &mut path)
+                .map(|_| ())
+        }
+        #[cfg(feature = "terminology")]
+        "date" => {
+            <Date as super::super::codec::Primitive>::from_json_parts(Some(value), None, &mut path)
+                .map(|_| ())
+        }
+        #[cfg(feature = "terminology")]
+        "dateTime" => <DateTime as super::super::codec::Primitive>::from_json_parts(
+            Some(value),
+            None,
+            &mut path,
+        )
+        .map(|_| ()),
+        #[cfg(feature = "terminology")]
+        "decimal" => <Decimal as super::super::codec::Primitive>::from_json_parts(
+            Some(value),
+            None,
+            &mut path,
+        )
+        .map(|_| ()),
+        #[cfg(feature = "terminology")]
+        "id" => {
+            <Id as super::super::codec::Primitive>::from_json_parts(Some(value), None, &mut path)
+                .map(|_| ())
+        }
+        #[cfg(feature = "terminology")]
+        "instant" => <Instant as super::super::codec::Primitive>::from_json_parts(
+            Some(value),
+            None,
+            &mut path,
+        )
+        .map(|_| ()),
+        #[cfg(feature = "terminology")]
+        "integer" => <Integer as super::super::codec::Primitive>::from_json_parts(
+            Some(value),
+            None,
+            &mut path,
+        )
+        .map(|_| ()),
+        #[cfg(feature = "terminology")]
+        "integer64" => <Integer64 as super::super::codec::Primitive>::from_json_parts(
+            Some(value),
+            None,
+            &mut path,
+        )
+        .map(|_| ()),
+        #[cfg(feature = "terminology")]
+        "markdown" => <Markdown as super::super::codec::Primitive>::from_json_parts(
+            Some(value),
+            None,
+            &mut path,
+        )
+        .map(|_| ()),
+        #[cfg(feature = "terminology")]
+        "oid" => {
+            <Oid as super::super::codec::Primitive>::from_json_parts(Some(value), None, &mut path)
+                .map(|_| ())
+        }
+        #[cfg(feature = "terminology")]
+        "positiveInt" => <PositiveInt as super::super::codec::Primitive>::from_json_parts(
+            Some(value),
+            None,
+            &mut path,
+        )
+        .map(|_| ()),
+        #[cfg(feature = "terminology")]
+        "string" => <String as super::super::codec::Primitive>::from_json_parts(
+            Some(value),
+            None,
+            &mut path,
+        )
+        .map(|_| ()),
+        #[cfg(feature = "terminology")]
+        "time" => {
+            <Time as super::super::codec::Primitive>::from_json_parts(Some(value), None, &mut path)
+                .map(|_| ())
+        }
+        #[cfg(feature = "terminology")]
+        "unsignedInt" => <UnsignedInt as super::super::codec::Primitive>::from_json_parts(
+            Some(value),
+            None,
+            &mut path,
+        )
+        .map(|_| ()),
+        #[cfg(feature = "terminology")]
+        "uri" => {
+            <Uri as super::super::codec::Primitive>::from_json_parts(Some(value), None, &mut path)
+                .map(|_| ())
+        }
+        #[cfg(feature = "terminology")]
+        "url" => {
+            <Url as super::super::codec::Primitive>::from_json_parts(Some(value), None, &mut path)
+                .map(|_| ())
+        }
+        #[cfg(feature = "terminology")]
+        "uuid" => {
+            <Uuid as super::super::codec::Primitive>::from_json_parts(Some(value), None, &mut path)
+                .map(|_| ())
+        }
+        #[cfg(feature = "terminology")]
+        "xhtml" => {
+            <Xhtml as super::super::codec::Primitive>::from_json_parts(Some(value), None, &mut path)
+                .map(|_| ())
+        }
+        _ => return None,
+    };
+    Some(checked)
 }

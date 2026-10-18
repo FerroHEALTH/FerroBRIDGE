@@ -444,7 +444,10 @@ impl super::super::codec::Json for Schedule {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -458,7 +461,10 @@ impl super::super::codec::Json for Schedule {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -472,7 +478,10 @@ impl super::super::codec::Json for Schedule {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -490,7 +499,10 @@ impl super::super::codec::Json for Schedule {
         }
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -510,7 +522,10 @@ impl super::super::codec::Json for Schedule {
         };
         let mut field_service_category = Vec::new();
         if let Some(raw) = raw_service_category {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("serviceCategory", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -524,7 +539,10 @@ impl super::super::codec::Json for Schedule {
         }
         let mut field_service_type = Vec::new();
         if let Some(raw) = raw_service_type {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("serviceType", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -538,7 +556,10 @@ impl super::super::codec::Json for Schedule {
         }
         let mut field_specialty = Vec::new();
         if let Some(raw) = raw_specialty {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("specialty", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -558,7 +579,8 @@ impl super::super::codec::Json for Schedule {
         };
         let mut field_actor = Vec::new();
         if let Some(raw) = raw_actor {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("actor", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -569,6 +591,11 @@ impl super::super::codec::Json for Schedule {
                     )
                 })?);
             }
+        }
+        if field_actor.is_empty() && !path.is_lenient() {
+            return path.with("actor", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         let field_planning_horizon = raw_planning_horizon
             .map(|value| {

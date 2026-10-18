@@ -53,6 +53,15 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
   A primitive carried as a JSON number or a boolean keeps its scalar parse.
   STU3 states a primitive value's type in its `_code` JSON-type extension and
   its form in `structuredefinition-regex`; the emitter reads both.
+  Each string primitive's form is public as `<Primitive>::check(text)`,
+  answering a `codec::LexicalError`, and each version's
+  `primitives::check_value(code, value)` decodes a JSON value as the
+  primitive a type code names, so a consumer never decodes a probe resource
+  to check a value before writing it.
+- A repeating element whose `min` is above 0 is refused when absent
+  (`MissingProperty`) or short (`WrongCardinality`) at its own path, and an
+  empty array (`Empty`) at its own path too (json.html §2.6.2: arrays are
+  never empty). A `Path::lenient` reader keeps the items it finds.
 - `codec::Value` converts to `serde_json::Value` only when every number comes
   back in the text the document carried, and otherwise reports a
   `ValueConversionError` with the element path; `Value::from_serde_json` is the

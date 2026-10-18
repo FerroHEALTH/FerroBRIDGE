@@ -9,43 +9,27 @@
 //! among them at <https://hl7.org/fhir/R4/datatypes.html#url>) and the
 //! minimum cardinality of each element
 //! (<https://hl7.org/fhir/R4/elementdefinition.html>, `ElementDefinition.min`).
-//! Both are read from `fhir-types`: the lexical forms through its decoder, the
+//! Both are read from `fhir-types`: the lexical forms through its primitive checks, the
 //! cardinalities from its element table. Nothing here names a resource or an
 //! element.
 
-use fhir_types::codec::{DecodeErrorKind, Json, Object, Path, Value};
-use fhir_types::r4::extension::Extension;
+use fhir_types::codec::{DecodeErrorKind, Object, Value};
+use fhir_types::r4::primitives::check_value;
 use fhir_types::r4::schema::SCHEMAS;
 use fhir_types::schema::{FieldSchema, Kind, TypeSchema};
 
-/// The url of the extension a lexical probe decodes, itself a valid `uri`.
-const PROBE_URL: &str = "urn:ferrobridge:lexical-probe";
-
 /// Checks `value` against the lexical form of the FHIR primitive `code`.
-///
-/// A code `Extension.value[x]` does not carry (`xhtml`) is not checked here.
 ///
 /// # Errors
 ///
 /// Returns the decoder's refusal when the value is outside the primitive's
 /// lexical form or of the wrong JSON kind.
 pub(super) fn lexical(code: &str, value: &Value) -> Result<(), DecodeErrorKind> {
-    let mut characters = code.chars();
-    let Some(first) = characters.next() else {
-        return Ok(());
-    };
-    let key = format!("value{}{}", first.to_ascii_uppercase(), characters.as_str());
-    // NOTE: HL7 R4 extensibility §Extension: `value[x]` is an open type admitting
-    // every primitive, so its decoder holds each primitive's lexical form.
-    if SCHEMAS.element(&format!("Extension.{key}")).is_none() {
-        return Ok(());
-    }
-    let mut probe = Object::new();
-    probe.insert(String::from("url"), Value::String(String::from(PROBE_URL)));
-    probe.insert(key, value.clone());
-    match Extension::from_json(&probe, &mut Path::root("Extension")) {
-        Ok(_) => Ok(()),
-        Err(error) => Err(error.kind),
+    // NOTE: R4 datatypes.html §Primitive Types: a code naming no primitive (a complex
+    // type) states no lexical form, so there is nothing to hold the value to.
+    match check_value(code, value) {
+        Some(Err(error)) => Err(error.kind),
+        Some(Ok(())) | None => Ok(()),
     }
 }
 

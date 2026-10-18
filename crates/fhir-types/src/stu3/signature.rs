@@ -218,7 +218,10 @@ impl super::super::codec::Json for Signature {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -232,7 +235,8 @@ impl super::super::codec::Json for Signature {
         }
         let mut field_type = Vec::new();
         if let Some(raw) = raw_type {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("type", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -243,6 +247,11 @@ impl super::super::codec::Json for Signature {
                     )
                 })?);
             }
+        }
+        if field_type.is_empty() && !path.is_lenient() {
+            return path.with("type", |path| {
+                Err(path.error(super::super::codec::DecodeErrorKind::MissingProperty))
+            });
         }
         let field_when = path.with("when", |path| {
             super::super::codec::Primitive::from_json_parts(raw_when, raw_when_element, path)

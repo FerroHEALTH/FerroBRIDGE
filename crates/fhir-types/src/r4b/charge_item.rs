@@ -750,7 +750,10 @@ impl super::super::codec::Json for ChargeItem {
             .transpose()?;
         let mut field_contained = Vec::new();
         if let Some(raw) = raw_contained {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("contained", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -764,7 +767,10 @@ impl super::super::codec::Json for ChargeItem {
         }
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -778,7 +784,10 @@ impl super::super::codec::Json for ChargeItem {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -796,7 +805,10 @@ impl super::super::codec::Json for ChargeItem {
         }
         let mut field_identifier = Vec::new();
         if let Some(raw) = raw_identifier {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("identifier", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -809,23 +821,32 @@ impl super::super::codec::Json for ChargeItem {
             }
         }
         let mut field_definition_uri = Vec::new();
-        for (index, (value, element)) in
-            super::super::codec::pair_arrays(raw_definition_uri, raw_definition_uri_element, path)?
-                .into_iter()
-                .enumerate()
+        for (index, (value, element)) in path
+            .with("definitionUri", |path| {
+                super::super::codec::pair_arrays(
+                    raw_definition_uri,
+                    raw_definition_uri_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_definition_uri.push(path.with_index("definitionUri", index, |path| {
                 super::super::codec::Primitive::from_json_parts(value, element, path)
             })?);
         }
         let mut field_definition_canonical = Vec::new();
-        for (index, (value, element)) in super::super::codec::pair_arrays(
-            raw_definition_canonical,
-            raw_definition_canonical_element,
-            path,
-        )?
-        .into_iter()
-        .enumerate()
+        for (index, (value, element)) in path
+            .with("definitionCanonical", |path| {
+                super::super::codec::pair_arrays(
+                    raw_definition_canonical,
+                    raw_definition_canonical_element,
+                    path,
+                )
+            })?
+            .into_iter()
+            .enumerate()
         {
             field_definition_canonical.push(path.with_index(
                 "definitionCanonical",
@@ -838,7 +859,10 @@ impl super::super::codec::Json for ChargeItem {
         })?;
         let mut field_part_of = Vec::new();
         if let Some(raw) = raw_part_of {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("partOf", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -898,7 +922,10 @@ impl super::super::codec::Json for ChargeItem {
         };
         let mut field_performer = Vec::new();
         if let Some(raw) = raw_performer {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("performer", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -964,7 +991,10 @@ impl super::super::codec::Json for ChargeItem {
             .transpose()?;
         let mut field_bodysite = Vec::new();
         if let Some(raw) = raw_bodysite {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("bodysite", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1022,7 +1052,10 @@ impl super::super::codec::Json for ChargeItem {
         };
         let mut field_reason = Vec::new();
         if let Some(raw) = raw_reason {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("reason", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1036,7 +1069,10 @@ impl super::super::codec::Json for ChargeItem {
         }
         let mut field_service = Vec::new();
         if let Some(raw) = raw_service {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("service", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1061,7 +1097,10 @@ impl super::super::codec::Json for ChargeItem {
         };
         let mut field_account = Vec::new();
         if let Some(raw) = raw_account {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("account", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1075,7 +1114,8 @@ impl super::super::codec::Json for ChargeItem {
         }
         let mut field_note = Vec::new();
         if let Some(raw) = raw_note {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("note", |path| super::super::codec::expect_array(raw, path))?
                 .iter()
                 .enumerate()
             {
@@ -1089,7 +1129,10 @@ impl super::super::codec::Json for ChargeItem {
         }
         let mut field_supporting_information = Vec::new();
         if let Some(raw) = raw_supporting_information {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("supportingInformation", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1567,7 +1610,10 @@ impl super::super::codec::Json for ChargeItemPerformer {
             .transpose()?;
         let mut field_extension = Vec::new();
         if let Some(raw) = raw_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("extension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
@@ -1581,7 +1627,10 @@ impl super::super::codec::Json for ChargeItemPerformer {
         }
         let mut field_modifier_extension = Vec::new();
         if let Some(raw) = raw_modifier_extension {
-            for (index, value) in super::super::codec::expect_array(raw, path)?
+            for (index, value) in path
+                .with("modifierExtension", |path| {
+                    super::super::codec::expect_array(raw, path)
+                })?
                 .iter()
                 .enumerate()
             {
