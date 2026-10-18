@@ -189,14 +189,28 @@ fn every_r4_core_constraint_parses() {
 fn every_r4_core_constraint_checks_against_its_element() {
     let mut checked = 0;
     let mut on_choices = Vec::new();
+    let mut through_choices = 0;
+    let mut below_primitives = 0;
+    let mut skipped = BTreeSet::new();
     let mut refused = Vec::new();
     let mut expected = Vec::new();
     for (key, path, expression) in R4_CORE.iter() {
+        let root = path.split('.').next().unwrap_or(path);
         let Some(contexts) = path_types(&R4, path) else {
+            skipped.insert(root);
             continue;
         };
         if choice_element(&R4, path).is_some() {
             on_choices.push(key.clone());
+        }
+        if path
+            .rsplit_once('.')
+            .is_some_and(|(parent, _)| parent.contains("[x]"))
+        {
+            through_choices += 1;
+        }
+        if named_type(&R4, root).is_some_and(|ty| ty.is_primitive()) && path.contains('.') {
+            below_primitives += 1;
         }
         let parsed = Expression::parse(expression).expect("the invariant should parse");
         checked += 1;
@@ -225,6 +239,30 @@ fn every_r4_core_constraint_checks_against_its_element() {
             "{key} sits on a choice element and is checked"
         );
     }
+    // R4 §2.9.1.1: a path through a choice element reaches the element in every type the
+    // choice admits, as `Observation.value[x].unit` does in the vital-signs profiles.
+    assert_eq!(
+        through_choices, 14,
+        "the R4 core package holds 14 invariants below a choice element"
+    );
+    // R4 §2.9.1.2: every primitive specializes Element, so `string.extension` is checked.
+    assert_eq!(
+        below_primitives, 40,
+        "the R4 core package holds 40 invariants on the children of primitive types"
+    );
+    // NOTE: R4 StructureDefinition.kind `logical` marks these five as logical models, no type
+    // an instance holds, so the element table carries none of them and their invariants type nothing.
+    assert_eq!(
+        skipped.into_iter().collect::<Vec<_>>(),
+        [
+            "Definition",
+            "Event",
+            "FiveWs",
+            "MetadataResource",
+            "Request"
+        ],
+        "only the logical models stay untyped"
+    );
     assert!(
         checked > 1000,
         "only {checked} invariants had a context type"
@@ -546,4 +584,28 @@ fn a_path_over_a_choice_ignores_the_type_of_each_value() {
         .expect("the expression should parse")
         .evaluate(&Environment::new(&R4), Focus::resource(&observation));
     assert!(typo.is_err(), "no type of Observation.value defines unitt");
+}
+
+/// The names of the types `path` reaches.
+fn reached(path: &str) -> Option<Vec<&'static str>> {
+    path_types(&R4, path).map(|types| types.iter().map(|ty| ty.name).collect())
+}
+
+#[test]
+fn a_path_through_a_choice_reaches_the_types_that_define_its_next_element() {
+    // R4 §2.9.1.1: `Observation.value[x].unit` is the unit of the Quantity alternative.
+    assert_eq!(reached("Observation.value[x].unit"), Some(vec!["string"]));
+    assert_eq!(
+        reached("Observation.component.value[x].system"),
+        Some(vec!["uri"])
+    );
+    assert_eq!(reached("Observation.value[x].unitt"), None);
+}
+
+#[test]
+fn a_path_below_a_primitive_reaches_the_elements_of_element() {
+    // R4 §2.9.1.2: FHIR.string specializes FHIR.Element, with its id and extension.
+    assert_eq!(reached("string.extension"), Some(vec!["Extension"]));
+    assert_eq!(reached("code.id"), Some(vec!["string"]));
+    assert_eq!(reached("string.value"), None);
 }

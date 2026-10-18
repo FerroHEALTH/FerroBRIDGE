@@ -139,6 +139,12 @@ crates on crates.io.
 
 ### Changed
 
+- `ferrobridge_fhirpath::model::path_types` types a path that continues
+  through a choice element (`Observation.value[x].unit`, the `unit` of
+  `Quantity`) or below a primitive (`string.extension`, the `extension` of
+  `Element`), so the R4 core constraint sweep now also checks those 54
+  invariants (#572). Only the invariants of the five logical models remain
+  untyped.
 - The profile validator and the HL7 v2 face each state their support for
   an STU3 terminology server (#558). The validator supports one: a binding
   to a versioned value set, which STU3 `$validate-code` cannot carry, is set
