@@ -183,6 +183,10 @@ fn render_files(
         format!("{crate_banner}{}", include_str!("templates/schema.rs")),
     );
     files.insert(
+        String::from("definition.rs"),
+        format!("{crate_banner}{}", include_str!("templates/definition.rs")),
+    );
+    files.insert(
         String::from("xml.rs"),
         format!("{crate_banner}{}", include_str!("templates/xml.rs")),
     );
@@ -211,6 +215,12 @@ fn render_version_files(
         format!("{}/schema.rs", model.name),
         crate::render_schema::render_schema(model)?,
     );
+    if crate::render_definition::defines_element_definition(model) {
+        files.insert(
+            format!("{}/definition.rs", model.name),
+            crate::render_definition::render_definition(model)?,
+        );
+    }
     for (module, types) in model.modules() {
         files.insert(
             format!("{}/{module}.rs", model.name),

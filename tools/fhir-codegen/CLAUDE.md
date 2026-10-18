@@ -17,6 +17,12 @@ resources are the authority for what it emits (`.claude/rules/codegen.md`).
   types each references, per version, and marks every item with the `cfg` of
   the narrowest feature that selects it. A shape the consumer lacks is fixed
   here, never shadowed downstream.
+- `render_definition` (#836) writes each version's `ElementDefinitionRead`
+  impl (the trait is `templates/definition.rs`) by finding the field the
+  version defines for each read element and spelling its read from the
+  field's cardinality and type: a primitive reads its `value`, a choice reads
+  each alternative, a `Reference` its `reference`, and a missing element
+  reads as absent. No version is named.
 - `search` (#522) emits the search parameter registry per version behind
   `resources`: every `SearchParameter` of the package apart from the
   specification's examples (`package::Package` leaves out the ids `example`
