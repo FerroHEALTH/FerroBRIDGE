@@ -22,14 +22,14 @@ has every change of every release.
 | [v0.0.5](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.5) | 2026-10-01 | The repository's move to the FerroHEALTH organization, with the image at `ghcr.io/ferrohealth/ferrobridge`. |
 | [v0.0.6](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.6) | 2026-10-17 | FHIR STU3 beside R4 to R6; the FHIRPath evaluator with UCUM; the profile validator's foundation, slicing, bindings, bundles and invariants; FHIR search over AQL projections; SMART App Launch on the facade and OAuth toward the CDR; the OMOP PERSON rows and the deletion check. |
 | [v0.0.7](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.7) | 2026-10-17 | Facade hardening: search answers the entry that matched, every error answers an `OperationOutcome`, and the identity store gains its repair paths. |
-| [v0.0.8](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.8) | 2026-10-18 | The operator console and its image, the operator API, `ferrobridge mapping check`, and the profile validator's agreement corpus against the HL7 FHIR Validator. |
+| [v0.0.8](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.8) | 2026-10-18 | The operator console and its image, the operator API and `ferrobridge mapping check`; and most of the profile validator work planned for v0.0.9: the agreement corpus against the HL7 FHIR Validator, and the extension context and reference versioning checks. |
 
 ## Next
 
 The milestones after v0.0.8, each one theme:
 
-1. **v0.0.9, the profile validator finished.** The extension context and
-   reference versioning checks, and STU3 profiles.
+1. **v0.0.9, the profile validator finished.** STU3 profiles validating STU3
+   resources, over a release-neutral definition read the generator emits.
 2. **v0.0.10, openEHR demographics.** The patient-to-EHR link and Patient,
    Practitioner and Organization over the Demographic API.
 3. **v0.0.11, FHIRconnect breadth.** The full data-type matrix, the remaining
