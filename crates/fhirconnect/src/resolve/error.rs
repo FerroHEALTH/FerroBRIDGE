@@ -96,6 +96,16 @@ pub enum ResolveCode {
     /// The template version the context pins is not the one the template
     /// carries.
     TemplateSemVerMismatch,
+    /// A `slotContext` names a context the entering context does not list
+    /// under `contexts`.
+    UndeclaredSubContext,
+    /// A `scope: sub` context is compiled as a root.
+    SubContextAsRoot,
+    /// The `start` of a `scope: sub` context slots a composition model.
+    SubContextComposition,
+    /// A `slotContext` enters a context already on the chain of entered
+    /// contexts.
+    CyclicSubContext,
 }
 
 impl ResolveCode {
@@ -138,6 +148,10 @@ impl ResolveCode {
             Self::MalformedContextValue => "fc-malformed-context-value",
             Self::TemplateIdMismatch => "fc-template-id-mismatch",
             Self::TemplateSemVerMismatch => "fc-template-sem-ver-mismatch",
+            Self::UndeclaredSubContext => "fc-undeclared-sub-context",
+            Self::SubContextAsRoot => "fc-sub-context-as-root",
+            Self::SubContextComposition => "fc-sub-context-composition",
+            Self::CyclicSubContext => "fc-cyclic-sub-context",
         }
     }
 
@@ -180,6 +194,10 @@ impl ResolveCode {
             Self::MalformedContextValue,
             Self::TemplateIdMismatch,
             Self::TemplateSemVerMismatch,
+            Self::UndeclaredSubContext,
+            Self::SubContextAsRoot,
+            Self::SubContextComposition,
+            Self::CyclicSubContext,
         ]
     }
 }

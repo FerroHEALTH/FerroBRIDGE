@@ -16,6 +16,7 @@ use crate::engine::seam::ReferenceError;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::binding::ResourceType;
 use crate::resolve::program::mapping::Mapping;
+use crate::resolve::program::mapping::Method;
 use crate::tree::Occurrence;
 
 use crate::tree::element::Table;
@@ -144,6 +145,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
             ));
             return Ok(());
         };
+        // NOTE: sub-contexts.adoc §Rules: "A resource consumed through `slotContext` is marked as
+        // resolved", so the run names it for the caller that splits the Bundle.
+        let enters_context = mappings
+            .iter()
+            .any(|inner| matches!(*inner.method(), Method::SlotContext { .. }));
+        if enters_context && !literal.starts_with('#') && !self.consumed.contains(&literal) {
+            self.consumed.push(literal.clone());
+        }
         let outer = core::mem::replace(&mut self.fhir, fetched);
         let held_pin = self.fhir_pin.take();
         self.references.push(literal);

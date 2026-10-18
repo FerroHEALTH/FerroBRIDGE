@@ -35,7 +35,9 @@ use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_rm::v1_2::paths::RmPath;
 
+use crate::model::ast::ContextMappingFile;
 use crate::model::ast::ModelMappingFile;
+use crate::model::ast::keyword::ContextScope;
 use crate::model::ast::keyword::DataType;
 use crate::model::ast::keyword::Direction;
 use crate::model::load::MappingSet;
@@ -110,6 +112,9 @@ struct Scope {
     prefix: String,
     /// The model mappings on the slot chain, the start first.
     chain: Vec<MappingName>,
+    /// Whether the walk is inside a context entered through `slotContext`,
+    /// where a slot of a composition model is skipped.
+    nested: bool,
 }
 
 impl Scope {
@@ -183,6 +188,10 @@ struct Compiler<'a> {
     extensions: Vec<&'a ModelMappingFile>,
     diagnostics: Vec<Diagnostic>,
     models: Vec<ModelBinding>,
+    /// The contexts the walk is inside, the root first.
+    entered: Vec<&'a ContextMappingFile>,
+    /// Every context a `slotContext` entered, in first-entry order.
+    subs: Vec<&'a ContextMappingFile>,
 }
 
 impl<'a> Compiler<'a> {
@@ -203,7 +212,34 @@ impl<'a> Compiler<'a> {
             extensions: Vec::new(),
             diagnostics: Vec::new(),
             models: Vec::new(),
+            entered: Vec::new(),
+            subs: Vec::new(),
         }
+    }
+
+    /// Refuses `file` as the root of a program when it is a `scope: sub`
+    /// context, answering whether it did.
+    fn refuses_as_root(&mut self, file: &ContextMappingFile) -> bool {
+        let declaration = file.context();
+        // NOTE: sub-contexts.adoc §`scope`: a `scope: sub` context "is never a root: it does not split
+        // bundles and is only entered via `slotContext`".
+        if declaration.scope() != ContextScope::Sub {
+            return false;
+        }
+        let context = file.header().name().value();
+        let position = declaration.scope.as_ref().map_or(
+            declaration.position,
+            openehr_mapping_core::position::Located::position,
+        );
+        self.diagnostics.push(diagnostic(
+            file.file(),
+            context,
+            ResolveCode::SubContextAsRoot,
+            position,
+            &ModelPath::root().field("context").field("scope"),
+            format!("`{context}` is `scope: sub`, so it is entered through `slotContext` only"),
+        ));
+        true
     }
 
     /// Compiles one context, or returns `None` when it cannot start.
@@ -220,6 +256,10 @@ impl<'a> Compiler<'a> {
             return None;
         };
         let declaration = file.context();
+        if self.refuses_as_root(file) {
+            return None;
+        }
+        self.entered.push(file);
         let profile = Self::profile_of(file);
         let template = self.template_of(file);
         let start_name = declaration.start.value();
@@ -271,11 +311,15 @@ impl<'a> Compiler<'a> {
                 .map(|url| url.value().clone()),
             prefix: String::new(),
             chain: vec![start_name.clone()],
+            nested: false,
         };
         let merged = self.merge(start);
         let mappings = self.mappings(&merged.mappings, &scope);
         let preprocessors = self.preprocessors(start, &scope);
         self.unreached_extensions(file);
+        for sub in core::mem::take(&mut self.subs) {
+            self.unreached_extensions(sub);
+        }
         Some(
             Program::new(ProgramParts {
                 context: context.clone(),

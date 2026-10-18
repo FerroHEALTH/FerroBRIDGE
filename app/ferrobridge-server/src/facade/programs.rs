@@ -286,7 +286,9 @@ fn referenced(mappings: &[Mapping], created: &mut BTreeSet<String>) {
                 created.insert(String::from(resource.as_str()));
                 referenced(mappings, created);
             }
-            Method::Slot { ref mappings, .. } => referenced(mappings, created),
+            Method::Slot { ref mappings, .. } | Method::SlotContext { ref mappings, .. } => {
+                referenced(mappings, created);
+            }
             Method::Value
             | Method::Link { .. }
             | Method::Programmed { .. }
@@ -391,8 +393,7 @@ pub async fn fetch_templates(
     set: &MappingSet,
     client: &crate::cdr::CdrClient,
 ) -> Result<BTreeMap<String, Arc<WebTemplateIndex>>, LoadError> {
-    if let Some(context) = set
-        .contexts()
+    if let Some(context) = crate::mappings::compile::roots(set)
         .find(|context| crate::mappings::compile::template_of(context).is_none())
     {
         return Err(LoadError::NoTemplateId {
@@ -407,8 +408,7 @@ pub async fn fetch_templates(
                 | crate::mappings::Error::TemplateRefused { template, .. } => template.clone(),
                 _ => String::new(),
             };
-            let context = set
-                .contexts()
+            let context = crate::mappings::compile::roots(set)
                 .find(|context| {
                     crate::mappings::compile::template_of(context).as_deref()
                         == Some(template.as_str())

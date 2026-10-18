@@ -435,6 +435,12 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 ref model,
                 ref preprocessors,
                 ref mappings,
+            }
+            | Method::SlotContext {
+                ref model,
+                ref preprocessors,
+                ref mappings,
+                ..
             } => {
                 let name = String::from(model.as_str());
                 if self.chain.contains(&name) {

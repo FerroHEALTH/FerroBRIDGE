@@ -17,6 +17,7 @@ mod functions;
 mod links;
 mod reference;
 mod split;
+mod sub_context;
 mod tail;
 mod translate;
 
@@ -61,9 +62,9 @@ fn mapping<'program>(program: &'program Program, name: &str) -> Option<&'program
                 return Some(found);
             }
             let nested = match *mapping.method() {
-                Method::Slot { ref mappings, .. } | Method::Reference { ref mappings, .. } => {
-                    mappings.as_slice()
-                }
+                Method::Slot { ref mappings, .. }
+                | Method::SlotContext { ref mappings, .. }
+                | Method::Reference { ref mappings, .. } => mappings.as_slice(),
                 Method::Value
                 | Method::Link { .. }
                 | Method::Programmed { .. }

@@ -25,6 +25,34 @@ crates on crates.io.
 
 ### Added
 
+- FHIRconnect sub-contexts (#864, `types-of-mapping-files/sub-contexts.adoc`).
+  `fhirconnect` 0.1.143 reads `slotContext` on a mapping, and `scope` (`root`
+  or `sub`) and `contexts` on a context. The strict schemas carry all three,
+  with `slotArchetype` and `slotContext` mutually exclusive.
+  - The semantic rules refuse:
+    - a `slotContext` or a `contexts` entry naming no loaded context;
+    - a `slotContext` at `openehr: $reference`;
+    - a `scope: sub` context no context lists;
+    - a cycle through `contexts`.
+  - The resolver compiles a `slotContext` into the parent program as
+    `Method::SlotContext`, from the entered context's `start` with that
+    context's own extensions and against the parent's template, and skips the
+    composition slot of a root context entered this way. It refuses:
+    - a sub-context compiled as a root;
+    - a `slotContext` the entering context does not list;
+    - a sub-context whose `start` slots a composition;
+    - a `start` that does not match the slot's archetype.
+  - The engine maps a sub-context into the parent composition in both
+    directions, and `Outcome::consumed` names the resource a `slotContext`
+    pulled in through a `reference`.
+  - The server loads only root contexts as programs and never fetches a
+    sub-context's template. A transaction passes over, as a root, an entry
+    another entry's `slotContext` consumed, and answers it `200 OK` with no
+    location of its own. An entry nothing consumes is still processed as a
+    root.
+  - The check of a sub-context's `template.id` against the template embedded
+    at its slot node is #886.
+
 - `fhir-types` 0.1.126 reads `ValueSet` and `CodeSystem` release-neutrally
   (#876). `definition::ValueSetRead` covers the composition (includes,
   excludes, filters, imports, `inactive`) and the expansion, and

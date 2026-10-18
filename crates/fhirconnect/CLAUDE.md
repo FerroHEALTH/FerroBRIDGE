@@ -62,6 +62,12 @@ occurrence axis; it never sees a path string and never reads a mapping file. A
 mapping that cannot be resolved is a refusal at load, never a failure on the
 request that first touches it.
 
+A `slotContext` is compiled where it stands: the entered context's `start`
+is slotted as a `slotArchetype` would slot it, with the compiler's extension
+set swapped for the entered context's for the duration, and the composition
+slot of a root context entered this way skipped (`Method::SlotContext`). A
+`scope: sub` context is refused as a root; a caller loads only roots.
+
 Every diagnostic the compiler raises is collected. A run reports every
 disagreement it found, because a mapping author fixing one refusal at a time is
 how a load loop turns into an afternoon.

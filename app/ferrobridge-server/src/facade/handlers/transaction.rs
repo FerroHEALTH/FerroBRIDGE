@@ -35,6 +35,8 @@ use crate::facade::commit::Change;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::Refusal;
 use crate::facade::handlers::read;
+use crate::facade::ingest::Committed;
+use crate::facade::ingest::EntryOutcome;
 use crate::facade::ingest::Ingested;
 use crate::facade::ingest::Provenance;
 use crate::facade::ingest::UnmappedEntries;
@@ -159,36 +161,56 @@ fn admit_entries(facade: &Facade, access: &Access, bundle: &Value) -> Result<(),
 /// the tag are the ones a single create answers. An entry this delivery
 /// committed as a first version answers `201 Created`; one it committed as a
 /// later version of a known resource answers `200 OK`, as a single create of
-/// that resource does, and so does one an earlier delivery consumed.
+/// that resource does, and so does one an earlier delivery consumed. An entry
+/// another entry's mapping consumed through a `slotContext` is content of that
+/// entry's composition (`engine/bundles.adoc`, §Resources consumed by a
+/// sub-context), so it answers `200 OK` with no location of its own: no
+/// specification governs this: our own design.
 fn response_bundle(base_url: &str, ingested: &Ingested) -> Bundle {
     let base = base_url.trim_end_matches('/');
     Bundle {
         r#type: RESPONSE.into(),
         entry: ingested
-            .committed()
-            .map(|entry| BundleEntry {
-                response: Some(BundleEntryResponse {
-                    status: match entry.change {
-                        Some(Change::Creation) => "201 Created",
-                        Some(Change::Modification) | None => "200 OK",
-                    }
-                    .into(),
-                    location: Some(
-                        format!(
-                            "{base}/{}/{}/_history/{}",
-                            entry.resource_type,
-                            entry.id,
-                            entry.version.version_tree_id().value()
-                        )
-                        .into(),
-                    ),
-                    etag: Some(format!("W/\"{}\"", entry.version.version_tree_id().value()).into()),
-                    ..BundleEntryResponse::default()
+            .entries()
+            .iter()
+            .filter_map(|outcome| match outcome {
+                EntryOutcome::Committed(entry) => Some(committed_entry(base, entry)),
+                EntryOutcome::Consumed(_) => Some(BundleEntry {
+                    response: Some(BundleEntryResponse {
+                        status: "200 OK".into(),
+                        ..BundleEntryResponse::default()
+                    }),
+                    ..BundleEntry::default()
                 }),
-                ..BundleEntry::default()
+                EntryOutcome::Skipped(_) => None,
             })
             .collect(),
         ..Bundle::default()
+    }
+}
+
+/// Returns the response entry of one committed entry.
+fn committed_entry(base: &str, entry: &Committed) -> BundleEntry {
+    BundleEntry {
+        response: Some(BundleEntryResponse {
+            status: match entry.change {
+                Some(Change::Creation) => "201 Created",
+                Some(Change::Modification) | None => "200 OK",
+            }
+            .into(),
+            location: Some(
+                format!(
+                    "{base}/{}/{}/_history/{}",
+                    entry.resource_type,
+                    entry.id,
+                    entry.version.version_tree_id().value()
+                )
+                .into(),
+            ),
+            etag: Some(format!("W/\"{}\"", entry.version.version_tree_id().value()).into()),
+            ..BundleEntryResponse::default()
+        }),
+        ..BundleEntry::default()
     }
 }
 

@@ -41,6 +41,22 @@ pub enum Method {
         /// Its compiled mappings, under this mapping's anchors.
         mappings: Vec<Mapping>,
     },
+    /// The mapping enters a context and maps from its `start` with that
+    /// context's extensions, expanded here
+    /// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/sub-contexts.adoc`,
+    /// §`slotContext`).
+    SlotContext {
+        /// The context the slot enters.
+        context: MappingName,
+        /// The model mapping that context starts at.
+        model: MappingName,
+        /// The preprocessor of that file and of every extension applied to it,
+        /// in application order, which gates the slotted mappings.
+        preprocessors: Vec<Preprocessor>,
+        /// Its compiled mappings, under this mapping's anchors and with the
+        /// entered context's extensions applied.
+        mappings: Vec<Mapping>,
+    },
     /// The mapping initializes another resource, whose mappings follow.
     Reference {
         /// The resource type the reference names.
@@ -366,6 +382,21 @@ impl Mapping {
                 ref mappings,
             } => {
                 writeln!(f, "{inner}slotArchetype {model}")?;
+                let under = "  ".repeat(depth.saturating_add(2));
+                for preprocessor in preprocessors {
+                    render_preprocessor(f, &under, preprocessor)?;
+                }
+                for mapping in mappings {
+                    mapping.render(f, depth.saturating_add(2))?;
+                }
+            }
+            Method::SlotContext {
+                ref context,
+                ref model,
+                ref preprocessors,
+                ref mappings,
+            } => {
+                writeln!(f, "{inner}slotContext {context} start {model}")?;
                 let under = "  ".repeat(depth.saturating_add(2));
                 for preprocessor in preprocessors {
                     render_preprocessor(f, &under, preprocessor)?;

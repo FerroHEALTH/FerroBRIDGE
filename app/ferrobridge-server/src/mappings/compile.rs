@@ -15,6 +15,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use fhirconnect::model::ast::keyword::ContextScope;
 use fhirconnect::model::load::MappingSet;
 use fhirconnect::model::semantic::StaticMappingCodes;
 use fhirconnect::resolve::program::Program;
@@ -208,7 +209,7 @@ pub async fn cdr_templates(
     client: &crate::cdr::CdrClient,
 ) -> Result<Templates, Error> {
     let mut wanted: BTreeMap<String, (String, PathBuf)> = BTreeMap::new();
-    for context in set.contexts() {
+    for context in roots(set) {
         if let Some(template) = template_of(context) {
             wanted.entry(template).or_insert_with(|| {
                 (
@@ -274,7 +275,7 @@ pub fn compile(
     skip: &[Refusal],
 ) -> Compiled {
     let mut compiled = Compiled::default();
-    for context in set.contexts() {
+    for context in roots(set) {
         let file = context.file();
         let name = context.header().name().value();
         let Some(template) = template_of(context) else {
@@ -335,6 +336,20 @@ pub fn compile(
         }
     }
     compiled
+}
+
+/// Returns the root contexts of `set`: every context but a `scope: sub` one.
+///
+/// A sub-context "is never a root" and maps into the template of the context
+/// that enters it
+/// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/sub-contexts.adoc`,
+/// §`scope` and §Rules), so it is compiled inside that context's program and
+/// its own template is never fetched.
+pub fn roots(
+    set: &MappingSet,
+) -> impl Iterator<Item = &fhirconnect::model::ast::ContextMappingFile> {
+    set.contexts()
+        .filter(|context| context.context().scope() == ContextScope::Root)
 }
 
 /// Returns the template identifier one context names, if it names one.

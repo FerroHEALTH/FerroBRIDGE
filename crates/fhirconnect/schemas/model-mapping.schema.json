@@ -214,6 +214,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["name"],
+      "not": { "required": ["slotArchetype", "slotContext"] },
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "type": { "$ref": "#/definitions/dataType" },
@@ -245,6 +246,7 @@
           }
         },
         "slotArchetype": { "type": ["string", "null"] },
+        "slotContext": { "type": "string", "minLength": 1 },
         "mappingCode": { "type": "string", "minLength": 1 },
         "link": { "$ref": "#/definitions/link" },
         "participationsFunction": { "type": "string", "minLength": 1 },

@@ -222,7 +222,13 @@ impl<'a> Compiler<'a> {
         let name = model.header().name().value();
         let mine = self.extensions_for(model);
         let merged = apply(model, &mine, &mut self.diagnostics);
-        if !self.models.iter().any(|model| model.name() == name) {
+        // NOTE: no specification governs this: our own design; a model a sub-context slots under its
+        // own extensions is listed once per distinct set of applied extensions.
+        if !self
+            .models
+            .iter()
+            .any(|model| model.name() == name && model.extensions() == merged.applied.as_slice())
+        {
             self.models.push(ModelBinding::new(
                 name.clone(),
                 model.header().version().value().clone(),

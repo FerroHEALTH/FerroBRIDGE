@@ -146,6 +146,62 @@ impl FromStr for ExtensionMethod {
     }
 }
 
+/// Whether a context is a root or is entered only through `slotContext`.
+///
+/// "A sub-context is an ordinary `type: context` file with `scope: sub` in
+/// its `context` block. It is never a root ... `scope` defaults to `root`"
+/// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/sub-contexts.adoc`,
+/// §`scope`), and the repository-source context schema fixes the two values
+/// with an `enum`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub enum ContextScope {
+    /// The context splits a Bundle and runs on its own.
+    #[default]
+    Root,
+    /// The context is entered through `slotContext` only.
+    Sub,
+}
+
+impl ContextScope {
+    /// Every spelling the schema enum admits.
+    pub const ADMITTED: &'static [&'static str] = &["root", "sub"];
+
+    /// Returns the spelling the schema enum fixes.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Root => "root",
+            Self::Sub => "sub",
+        }
+    }
+}
+
+impl fmt::Display for ContextScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for ContextScope {
+    type Err = KeywordError;
+
+    /// Parses the value case-exactly, as a JSON Schema `enum` matches.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`KeywordError`] for a value outside `root` and `sub`.
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "root" => Ok(Self::Root),
+            "sub" => Ok(Self::Sub),
+            _ => Err(KeywordError {
+                value: value.to_owned(),
+                admitted: Self::ADMITTED,
+            }),
+        }
+    }
+}
+
 /// The data type a `with` block pins the pair of paths to.
 ///
 /// The set is the `enum` of the published model schema

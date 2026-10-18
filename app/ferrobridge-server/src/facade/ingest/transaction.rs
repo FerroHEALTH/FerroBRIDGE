@@ -215,6 +215,7 @@ pub(super) fn outcomes(partition: Partition, placed: Vec<Placed>) -> Vec<EntryOu
         .into_iter()
         .filter_map(|slot| match slot {
             Pending::Skipped(skipped) => Some(EntryOutcome::Skipped(skipped)),
+            Pending::Consumed(consumed) => Some(EntryOutcome::Consumed(consumed)),
             Pending::Mapped(index) => committed
                 .get_mut(index)
                 .and_then(Option::take)

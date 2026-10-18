@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The diagnosis model of the sub-context suite: the problem name, and the
+# evidence Observation entered through the sub-context at the problem
+# qualifier slot of the synthetic ferrobridge.diagnose.v1 template.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_sub_parent
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "problemDiagnose"
+    with:
+      fhir: "$resource.code"
+      openehr: "$archetype/data[at0001]/items[at0002]"
+      type: "CODEABLECONCEPT"
+
+  - name: "evidence"
+    with:
+      fhir: "$resource.evidence.detail"
+      openehr: "$reference"
+    reference:
+      resourceType: "Observation"
+      mappings:
+        - name: "qualifier"
+          with:
+            fhir: "$fhirRoot"
+            openehr: "$archetype/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]"
+          slotContext: "ferrobridge_sub_evidence.context"

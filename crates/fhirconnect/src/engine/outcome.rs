@@ -33,6 +33,7 @@ pub struct Outcome<T> {
     value: T,
     warnings: Vec<Warning>,
     created: Vec<Value>,
+    consumed: Vec<String>,
 }
 
 impl<T> Outcome<T> {
@@ -43,6 +44,7 @@ impl<T> Outcome<T> {
             value,
             warnings: Vec::new(),
             created: Vec::new(),
+            consumed: Vec::new(),
         }
     }
 
@@ -53,6 +55,7 @@ impl<T> Outcome<T> {
             value,
             warnings,
             created: Vec::new(),
+            consumed: Vec::new(),
         }
     }
 
@@ -62,6 +65,25 @@ impl<T> Outcome<T> {
     pub fn with_created(mut self, created: Vec<Value>) -> Self {
         self.created = created;
         self
+    }
+
+    /// Returns this outcome with the references a `slotContext` consumed.
+    #[must_use]
+    pub fn with_consumed(mut self, consumed: Vec<String>) -> Self {
+        self.consumed = consumed;
+        self
+    }
+
+    /// Returns the literal references whose resources a `slotContext` pulled
+    /// into this run, in the order it entered them.
+    ///
+    /// "A resource consumed through `slotContext` is marked as resolved. The
+    /// engine does not process it again as a root"
+    /// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/sub-contexts.adoc`,
+    /// §Rules), so a caller splitting a Bundle leaves these out.
+    #[must_use]
+    pub fn consumed(&self) -> &[String] {
+        &self.consumed
     }
 
     /// Returns the resources the run created beside its value, in the order
@@ -108,6 +130,7 @@ impl<T> Outcome<T> {
             value: transform(self.value),
             warnings: self.warnings,
             created: self.created,
+            consumed: self.consumed,
         }
     }
 }

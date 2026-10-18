@@ -293,7 +293,7 @@ pub fn to_openehr<T: Table + ?Sized>(
             source: Box::new(source),
         })?;
     run.carried_whole(&built, &routed)?;
-    Ok(Outcome::new(built, run.warnings))
+    Ok(Outcome::new(built, run.warnings).with_consumed(run.consumed))
 }
 
 /// Runs `program` over a composition, producing a FHIR resource.
@@ -385,6 +385,8 @@ struct Run<'a, T: Table + ?Sized> {
     references: Vec<String>,
     /// The resources the run created beside its own.
     created: Vec<Value>,
+    /// The literal references a `slotContext` consumed.
+    consumed: Vec<String>,
     /// The instance a `hierarchy.split` fixes for each openEHR axis it pins.
     pins: Vec<(FlatId, RmPosition)>,
     /// The FHIR element a split out of FHIR fixes, as its repeating axes and
@@ -429,6 +431,7 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             chain: Vec::new(),
             references: Vec::new(),
             created: Vec::new(),
+            consumed: Vec::new(),
             pins: Vec::new(),
             fhir_pin: None,
             translations: BTreeMap::new(),

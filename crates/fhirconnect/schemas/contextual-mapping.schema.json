@@ -57,6 +57,8 @@
         "archetypes": { "$ref": "#/definitions/nameList" },
         "extensions": { "$ref": "#/definitions/nameList" },
         "operational": { "$ref": "#/definitions/nameList" },
+        "scope": { "type": "string", "enum": ["root", "sub"] },
+        "contexts": { "$ref": "#/definitions/nameList" },
         "start": { "type": "string", "minLength": 1 }
       }
     }

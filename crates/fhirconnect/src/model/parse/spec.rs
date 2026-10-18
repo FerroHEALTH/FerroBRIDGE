@@ -18,6 +18,7 @@ use crate::model::ast::Preprocessor;
 use crate::model::ast::ProfileRef;
 use crate::model::ast::SplitTarget;
 use crate::model::ast::TemplateRef;
+use crate::model::ast::keyword::ContextScope;
 use crate::model::ast::keyword::Direction;
 use crate::model::error::ModelCode;
 
@@ -193,6 +194,13 @@ pub(super) fn lower_context_block(
     let archetypes = lower_name_list(lowering, block, &block_path, "archetypes", true);
     let extensions = lower_name_list(lowering, block, &block_path, "extensions", false);
     let operational = lower_name_list(lowering, block, &block_path, "operational", false);
+    let scope = lowering.optional_keyword::<ContextScope>(
+        block,
+        &block_path,
+        "scope",
+        ModelCode::InvalidContextScope,
+    );
+    let contexts = lower_name_list(lowering, block, &block_path, "contexts", false);
     let start_text = lowering.required_text(block, &block_path, "start")?;
     let start = lowering.mapping_name(&start_text, &block_path.field("start"))?;
 
@@ -203,6 +211,8 @@ pub(super) fn lower_context_block(
         archetypes,
         extensions,
         operational,
+        scope,
+        contexts,
         start,
     })
 }

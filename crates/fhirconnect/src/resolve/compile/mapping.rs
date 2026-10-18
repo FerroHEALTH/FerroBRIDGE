@@ -29,6 +29,7 @@ use crate::resolve::compile::Compiler;
 use crate::resolve::compile::Derivation;
 use crate::resolve::compile::Scope;
 use crate::resolve::compile::Site;
+use crate::resolve::compile::method::slots_composition;
 use crate::resolve::compile::openehr::walks_below;
 
 impl<'a> Compiler<'a> {
@@ -40,6 +41,9 @@ impl<'a> Compiler<'a> {
     pub(super) fn mappings(&mut self, nodes: &[Node<'a>], scope: &Scope) -> Vec<Mapping> {
         nodes
             .iter()
+            // NOTE: composition-element.adoc: a context entered via `slotContext` "maps into the
+            // parent composition; if its `start` slots a composition model, that mapping is skipped".
+            .filter(|node| !(scope.nested && slots_composition(node.mapping)))
             .map(|node| {
                 let path = node.path.clone();
                 self.mapping(node, scope, &path)
