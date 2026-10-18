@@ -13,11 +13,12 @@
 //! §2.3.0.1), and a `canonical` when it carries `|[version]` (§2.3.0.5).
 
 use fhir_types::codec::Value;
-use fhir_types::r4::schema::SCHEMAS;
+use fhir_types::schema::Schemas;
 
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::report::Constraint;
 use crate::report::Reason;
 use crate::validate::reference::literal;
@@ -37,8 +38,9 @@ enum Form {
     Assumed,
 }
 
-/// The form of the literal `reference`.
-fn reference_form(reference: &str) -> Form {
+/// The form of the literal `reference`, its resource types read from the
+/// element table `schemas`.
+fn reference_form(schemas: &Schemas, reference: &str) -> Form {
     if reference.starts_with('#') || reference.contains(':') && !reference.contains("://") {
         return Form::Assumed;
     }
@@ -47,7 +49,7 @@ fn reference_form(reference: &str) -> Form {
     let resource = |at: usize| {
         segments
             .get(at)
-            .is_some_and(|name| SCHEMAS.is_resource(name))
+            .is_some_and(|name| schemas.is_resource(name))
     };
     let count = segments.len();
     let history = count >= 4 && segments.get(count - 2) == Some(&"_history") && resource(count - 4);
@@ -69,12 +71,12 @@ fn canonical_form(value: &str) -> Form {
     }
 }
 
-impl<'i> Walk<'_, '_, 'i> {
+impl<'i, R: Release> Walk<'_, '_, 'i, R> {
     /// Holds the `Reference` or `canonical` `occurrence` holds to the
     /// versioning rule `rule` of element `id` of `structure`.
     pub(crate) fn versioning(
         &mut self,
-        structure: &Structure,
+        structure: &Structure<R>,
         id: &str,
         rule: &str,
         code: Option<&str>,
@@ -94,7 +96,7 @@ impl<'i> Walk<'_, '_, 'i> {
                     );
                     return;
                 };
-                reference_form(reference)
+                reference_form(R::schemas(), reference)
             }
             Some("canonical") => match occurrence.value.and_then(Value::as_str) {
                 Some(value) => canonical_form(value),
@@ -155,27 +157,32 @@ impl<'i> Walk<'_, '_, 'i> {
 mod tests {
     use super::Form;
     use super::canonical_form;
+    use fhir_types::r4::schema::SCHEMAS;
+
     use super::reference_form;
 
     #[test]
     fn a_literal_reference_is_read_for_its_version() {
-        assert_eq!(reference_form("Patient/1"), Form::Independent);
-        assert_eq!(reference_form("Patient/1/_history/2"), Form::Specific);
+        assert_eq!(reference_form(&SCHEMAS, "Patient/1"), Form::Independent);
         assert_eq!(
-            reference_form("http://example.org/fhir/Patient/1/_history/2"),
+            reference_form(&SCHEMAS, "Patient/1/_history/2"),
             Form::Specific
         );
         assert_eq!(
-            reference_form("http://example.org/fhir/Patient/1"),
+            reference_form(&SCHEMAS, "http://example.org/fhir/Patient/1/_history/2"),
+            Form::Specific
+        );
+        assert_eq!(
+            reference_form(&SCHEMAS, "http://example.org/fhir/Patient/1"),
             Form::Independent
         );
-        assert_eq!(reference_form("#p1"), Form::Assumed);
+        assert_eq!(reference_form(&SCHEMAS, "#p1"), Form::Assumed);
         assert_eq!(
-            reference_form("urn:uuid:00000000-0000-0000-0000-000000000001"),
+            reference_form(&SCHEMAS, "urn:uuid:00000000-0000-0000-0000-000000000001"),
             Form::Assumed
         );
         assert_eq!(
-            reference_form("http://example.org/document.pdf"),
+            reference_form(&SCHEMAS, "http://example.org/document.pdf"),
             Form::Assumed
         );
     }

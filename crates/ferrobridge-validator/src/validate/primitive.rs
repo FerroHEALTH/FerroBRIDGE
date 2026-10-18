@@ -5,6 +5,7 @@
 //! and the lengths.
 
 use fhir_types::codec::Value;
+use fhir_types::definition::ElementDefinitionRead;
 use fhir_types::schema::ValueKind;
 use regex::bytes::Regex;
 use regex::bytes::RegexBuilder;
@@ -12,12 +13,10 @@ use regex::bytes::RegexBuilder;
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::validate::ValidateError;
 use crate::validate::structure::Structure;
 use crate::validate::walk::Walk;
-
-/// The extension that carries a primitive's lexical form.
-const REGEX: &str = "http://hl7.org/fhir/StructureDefinition/regex";
 
 /// What the core definition of a primitive type says about its value.
 #[derive(Debug)]
@@ -28,28 +27,23 @@ pub(crate) struct PrimitiveRule {
 
 impl PrimitiveRule {
     /// Reads the rule from the `<code>.value` element of the primitive's
-    /// core definition: the `regex` extension on its type, and its
-    /// `maxLength`.
+    /// core definition: the lexical form its type states in an extension,
+    /// and its `maxLength`.
     ///
     /// The regexes are informative (datatypes.html §2.24.0.1, "Issues with
     /// the specified regexes"), and the package form is the one the version's
     /// own tooling reads, so the validator reads it rather than a copy.
-    pub(crate) fn read(structure: &Structure, code: &str) -> Result<Self, ValidateError> {
+    pub(crate) fn read<R: Release>(
+        structure: &Structure<R>,
+        code: &str,
+    ) -> Result<Self, ValidateError> {
         let Some(element) = structure.element(&format!("{code}.value")) else {
             return Ok(Self {
                 lexical: None,
                 max_length: None,
             });
         };
-        let pattern = element
-            .r#type
-            .iter()
-            .flat_map(|kind| kind.extension.iter())
-            .find(|extension| extension.url == REGEX)
-            .and_then(|extension| match &extension.value {
-                Some(fhir_types::r4::extension::ExtensionValue::String(text)) => text.value.clone(),
-                _ => None,
-            });
+        let pattern = element.types().into_iter().find_map(|kind| kind.regex);
         // NOTE: the forms are XML Schema patterns (https://www.w3.org/TR/xmlschema-2/#regexs),
         // so they match anchored, over bytes, with Unicode mode off, as fhir-types compiles them.
         let lexical = pattern
@@ -64,9 +58,7 @@ impl PrimitiveRule {
             })
             .transpose()?;
         let max_length = element
-            .max_length
-            .as_ref()
-            .and_then(|length| length.value)
+            .max_length()
             .and_then(|length| usize::try_from(length).ok());
         Ok(Self {
             lexical,
@@ -86,7 +78,7 @@ fn integer_range(code: &str) -> Option<(i64, i64)> {
     }
 }
 
-impl Walk<'_, '_, '_> {
+impl<R: Release> Walk<'_, '_, '_, R> {
     /// Checks one primitive value of the type `code`, which JSON carries as
     /// `kind`.
     pub(crate) fn primitive_value(

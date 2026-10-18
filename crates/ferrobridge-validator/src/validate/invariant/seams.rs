@@ -15,6 +15,7 @@ use ferrobridge_fhirpath::seam::ResolveContext;
 use ferrobridge_fhirpath::seam::SeamError;
 use fhir_types::codec::Value;
 
+use crate::release::Release;
 use crate::report::Reason;
 use crate::set::PackageId;
 use crate::set::ResolveError;
@@ -53,16 +54,16 @@ enum Unanswered {
 
 /// Resolves a reference for `resolve()` from inside the resources the walk
 /// is in.
-pub(super) struct References<'v, 'set, 's, 'i> {
-    validator: &'v Validator<'set>,
+pub(super) struct References<'v, 'set, 's, 'i, R: Release> {
+    validator: &'v Validator<'set, R>,
     scope: &'s [&'i Value],
     indexes: &'s Indexes<'i>,
 }
 
-impl<'v, 'set, 's, 'i> References<'v, 'set, 's, 'i> {
+impl<'v, 'set, 's, 'i, R: Release> References<'v, 'set, 's, 'i, R> {
     /// Creates the resolver of `validator` over `scope`.
     pub(super) const fn new(
-        validator: &'v Validator<'set>,
+        validator: &'v Validator<'set, R>,
         scope: &'s [&'i Value],
         indexes: &'s Indexes<'i>,
     ) -> Self {
@@ -74,7 +75,7 @@ impl<'v, 'set, 's, 'i> References<'v, 'set, 's, 'i> {
     }
 }
 
-impl fmt::Debug for References<'_, '_, '_, '_> {
+impl<R: Release> fmt::Debug for References<'_, '_, '_, '_, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("References")
             .field("scope", &self.scope.len())
@@ -82,7 +83,7 @@ impl fmt::Debug for References<'_, '_, '_, '_> {
     }
 }
 
-impl seam::Resolver for References<'_, '_, '_, '_> {
+impl<R: Release> seam::Resolver for References<'_, '_, '_, '_, R> {
     fn resolve(
         &self,
         reference: &str,
@@ -98,7 +99,7 @@ impl seam::Resolver for References<'_, '_, '_, '_> {
             && let Some(&innermost) = self.scope.last()
             && innermost.get("resourceType").and_then(Value::as_str) == Some("Bundle")
         {
-            found = from_bundle(innermost, reference, self.indexes);
+            found = from_bundle(R::schemas(), innermost, reference, self.indexes);
         }
         match found {
             Resolution::Found { target, .. } => Ok(Some(target.clone())),
@@ -115,20 +116,20 @@ impl seam::Resolver for References<'_, '_, '_, '_> {
 
 /// Answers `memberOf()` from the value sets of the package set, as the
 /// definition carrying the invariant references them.
-pub(super) struct Terminology<'v, 'set> {
-    validator: &'v Validator<'set>,
+pub(super) struct Terminology<'v, 'set, R: Release> {
+    validator: &'v Validator<'set, R>,
     scope: PackageId,
 }
 
-impl<'v, 'set> Terminology<'v, 'set> {
+impl<'v, 'set, R: Release> Terminology<'v, 'set, R> {
     /// Creates the terminology of `validator` for a definition of the
     /// package `scope`.
-    pub(super) const fn new(validator: &'v Validator<'set>, scope: PackageId) -> Self {
+    pub(super) const fn new(validator: &'v Validator<'set, R>, scope: PackageId) -> Self {
         Self { validator, scope }
     }
 }
 
-impl fmt::Debug for Terminology<'_, '_> {
+impl<R: Release> fmt::Debug for Terminology<'_, '_, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Terminology")
             .field("scope", &self.scope)
@@ -147,7 +148,7 @@ const fn coding<'c>(position: usize, coding: &seam::Coding<'c>) -> Coding<'c> {
     }
 }
 
-impl seam::Terminology for Terminology<'_, '_> {
+impl<R: Release> seam::Terminology for Terminology<'_, '_, R> {
     fn member_of(&self, coded: &seam::Coded<'_>, value_set: &str) -> Result<bool, SeamError> {
         let question = match coded {
             seam::Coded::Code(code) => Coded::code(code),
@@ -184,20 +185,20 @@ impl seam::Terminology for Terminology<'_, '_> {
 
 /// Answers `conformsTo()` with a validation of its own against the profile
 /// the package set carries.
-pub(super) struct Conformance<'v, 'set> {
-    validator: &'v Validator<'set>,
+pub(super) struct Conformance<'v, 'set, R: Release> {
+    validator: &'v Validator<'set, R>,
     depth: u8,
 }
 
-impl<'v, 'set> Conformance<'v, 'set> {
+impl<'v, 'set, R: Release> Conformance<'v, 'set, R> {
     /// Creates the profile check of `validator` for a walk `depth`
     /// `conformsTo()` calls deep.
-    pub(super) const fn new(validator: &'v Validator<'set>, depth: u8) -> Self {
+    pub(super) const fn new(validator: &'v Validator<'set, R>, depth: u8) -> Self {
         Self { validator, depth }
     }
 }
 
-impl fmt::Debug for Conformance<'_, '_> {
+impl<R: Release> fmt::Debug for Conformance<'_, '_, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Conformance")
             .field("depth", &self.depth)
@@ -205,7 +206,7 @@ impl fmt::Debug for Conformance<'_, '_> {
     }
 }
 
-impl seam::Profiles for Conformance<'_, '_> {
+impl<R: Release> seam::Profiles for Conformance<'_, '_, R> {
     fn conforms_to(
         &self,
         value: &Value,

@@ -213,6 +213,12 @@ pub enum Reason {
     /// A context of the extension's definition the walk cannot decide, and
     /// none it can decide admits the extension: each such context with why.
     ExtensionContext(String),
+    /// The package set's `ValueSets` and `CodeSystems` are not read for this
+    /// release, so it decides no binding.
+    TerminologyNotRead {
+        /// The release, `STU3`.
+        release: &'static str,
+    },
 }
 
 impl fmt::Display for Reason {
@@ -312,6 +318,10 @@ impl fmt::Display for Reason {
             Self::ExtensionContext(why) => {
                 write!(f, "the extension context is not decided ({why})")
             }
+            Self::TerminologyNotRead { release } => write!(
+                f,
+                "the package set's value sets and code systems are not read for {release}"
+            ),
         }
     }
 }

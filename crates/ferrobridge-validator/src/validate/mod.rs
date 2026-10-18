@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The validator: an instance walked over the R4 element table, held to the
+//! The validator: an instance walked over its release's element table, held to the
 //! snapshot of the profile it is validated against and of every datatype and
 //! extension definition it reaches.
 //!
-//! The element table `fhir_types::r4::schema::SCHEMAS` is the base structure:
+//! The release's element table (`fhir_types::r4::schema::SCHEMAS` for R4) is the base structure:
 //! which members an object may carry, their base cardinality, their types,
 //! and the hop a `contentReference` makes. The snapshot elements of the
 //! `StructureDefinitions` in play add the profile's constraints: cardinality,
@@ -44,6 +44,8 @@ use std::sync::PoisonError;
 use fhir_types::codec::EncodeError;
 use fhir_types::codec::Value;
 
+use crate::release::R4;
+use crate::release::Release;
 use crate::report::Reason;
 use crate::report::Report;
 use crate::set::PackageId;
@@ -56,17 +58,21 @@ use resolver::Resolver;
 use structure::Structure;
 use terminology::index::CodeIndex;
 
-/// The canonical base of the definitions FHIR R4 core publishes.
+/// The canonical base of the definitions the FHIR core packages publish.
 const CORE: &str = "http://hl7.org/fhir/StructureDefinition/";
 
 /// A canonical as one package references it: the cache key of a resolution.
 type Scoped = (String, Option<PackageId>);
 
-/// Validates R4 resources against the profiles of a package set.
+/// The element definition of the release `R`.
+pub(crate) type Element<R> = <R as Release>::ElementDefinition;
+
+/// Validates resources of the release `R` against the profiles of a package
+/// set read as that release.
 #[derive(Debug)]
-pub struct Validator<'set> {
-    set: &'set PackageSet,
-    structures: Mutex<BTreeMap<Scoped, Arc<Structure>>>,
+pub struct Validator<'set, R: Release = R4> {
+    set: &'set PackageSet<R>,
+    structures: Mutex<BTreeMap<Scoped, Arc<Structure<R>>>>,
     primitives: Mutex<BTreeMap<String, Arc<PrimitiveRule>>>,
     code_systems: Mutex<BTreeMap<Scoped, Result<Arc<CodeIndex>, Reason>>>,
     resolver: Box<dyn Resolver>,
@@ -126,23 +132,23 @@ pub enum ValidateError {
         source: EncodeError,
     },
     /// The element table names a type it does not carry.
-    #[error("the R4 element table carries no type {name}")]
+    #[error("the element table carries no type {name}")]
     UnknownType {
         /// The type name.
         name: String,
     },
 }
 
-impl<'set> Validator<'set> {
+impl<'set, R: Release> Validator<'set, R> {
     /// Creates a validator over `set`.
     #[must_use]
-    pub fn new(set: &'set PackageSet) -> Self {
+    pub fn new(set: &'set PackageSet<R>) -> Self {
         Self {
             set,
             structures: Mutex::new(BTreeMap::new()),
             primitives: Mutex::new(BTreeMap::new()),
             code_systems: Mutex::new(BTreeMap::new()),
-            resolver: Box::new(Bundled),
+            resolver: Box::new(Bundled::new(R::schemas())),
             expressions: Mutex::new(BTreeMap::new()),
             checked: Mutex::new(BTreeMap::new()),
             best_practice: BestPractice::Warning,
@@ -193,8 +199,8 @@ impl<'set> Validator<'set> {
     fn structure(
         &self,
         canonical: &str,
-        from: Option<&Structure>,
-    ) -> Result<Arc<Structure>, ValidateError> {
+        from: Option<&Structure<R>>,
+    ) -> Result<Arc<Structure<R>>, ValidateError> {
         let scope = from.map(Structure::origin);
         let key = (canonical.to_owned(), scope);
         if let Some(found) = self
@@ -215,7 +221,7 @@ impl<'set> Validator<'set> {
     }
 
     /// Returns the core definition of the type `name`.
-    fn core(&self, name: &str) -> Result<Arc<Structure>, ValidateError> {
+    fn core(&self, name: &str) -> Result<Arc<Structure<R>>, ValidateError> {
         self.structure(&format!("{CORE}{name}"), None)
     }
 

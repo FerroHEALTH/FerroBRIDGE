@@ -9,24 +9,26 @@
 use std::sync::Arc;
 
 use fhir_types::codec::Value;
-use fhir_types::r4::element_definition::ElementDefinition;
-use fhir_types::r4::schema::SCHEMAS;
+use fhir_types::definition::ElementDefinitionRead;
 
 use crate::canonical::Canonical;
+use crate::release::Release;
 use crate::set::ResolveError;
+use crate::validate::Element;
 use crate::validate::ValidateError;
 use crate::validate::Validator;
+use crate::validate::matching::Stem;
 use crate::validate::matching::value_of;
 use crate::validate::slicing::path::Step;
 use crate::validate::structure::Structure;
 
 /// Where a discriminator path ends in a slice's definition.
 #[derive(Debug)]
-pub(crate) enum Located {
+pub(crate) enum Located<R: Release> {
     /// An element definition, narrowed to one type by `ofType()`.
     Element {
         /// The snapshot holding it.
-        structure: Arc<Structure>,
+        structure: Arc<Structure<R>>,
         /// Its id.
         id: String,
         /// The type `ofType()` narrowed it to.
@@ -38,9 +40,9 @@ pub(crate) enum Located {
     Missing,
 }
 
-impl Located {
+impl<R: Release> Located<R> {
     /// Returns the snapshot the path ends in, when it ends at an element.
-    pub(crate) fn structure(&self) -> Option<&Structure> {
+    pub(crate) fn structure(&self) -> Option<&Structure<R>> {
         match self {
             Self::Element { structure, .. } => Some(structure),
             Self::Targets(_) | Self::Missing => None,
@@ -48,7 +50,7 @@ impl Located {
     }
 
     /// Returns the element definition, when the path ends at one.
-    pub(crate) fn element(&self) -> Option<&ElementDefinition> {
+    pub(crate) fn element(&self) -> Option<&Element<R>> {
         match self {
             Self::Element { structure, id, .. } => structure.element(id),
             Self::Targets(_) | Self::Missing => None,
@@ -64,13 +66,13 @@ impl Located {
         };
         self.element()
             .into_iter()
-            .flat_map(|element| &element.r#type)
+            .flat_map(ElementDefinitionRead::types)
             .filter_map(|kind| {
-                let code = kind.code.value.clone()?;
+                let code = kind.code?.to_owned();
                 let profiles = kind
-                    .profile
+                    .profiles
                     .iter()
-                    .filter_map(|profile| profile.value.clone())
+                    .map(|profile| (*profile).to_owned())
                     .collect();
                 only.is_none_or(|only| only == code)
                     .then_some((code, profiles))
@@ -85,12 +87,12 @@ impl Located {
 ///
 /// Returns [`ValidateError`] when a definition the path hops into cannot be
 /// read; one the set does not carry ends the path as [`Located::Missing`].
-pub(crate) fn locate(
-    validator: &Validator<'_>,
-    structure: &Arc<Structure>,
+pub(crate) fn locate<R: Release>(
+    validator: &Validator<'_, R>,
+    structure: &Arc<Structure<R>>,
     slice: &str,
     steps: &[Step],
-) -> Result<Located, ValidateError> {
+) -> Result<Located<R>, ValidateError> {
     let mut structure = Arc::clone(structure);
     let mut id = slice.to_owned();
     let mut only: Option<String> = None;
@@ -105,13 +107,10 @@ pub(crate) fn locate(
             let targets: Vec<String> = here
                 .element()
                 .into_iter()
-                .flat_map(|element| &element.r#type)
-                .filter(|kind| {
-                    only.as_deref()
-                        .is_none_or(|only| kind.code.value.as_deref() == Some(only))
-                })
-                .flat_map(|kind| &kind.target_profile)
-                .filter_map(|profile| profile.value.clone())
+                .flat_map(ElementDefinitionRead::types)
+                .filter(|kind| only.as_deref().is_none_or(|only| kind.code == Some(only)))
+                .flat_map(|kind| kind.target_profiles)
+                .map(str::to_owned)
                 .collect();
             if last {
                 return Ok(Located::Targets(targets));
@@ -157,8 +156,8 @@ pub(crate) fn locate(
 /// Takes `step` inside `structure` from the element `id`: the id it leads
 /// to and the type it narrows to, `None` when the snapshot defines nothing
 /// there.
-fn within(
-    structure: &Structure,
+fn within<R: Release>(
+    structure: &Structure<R>,
     id: &str,
     step: &Step,
 ) -> Result<Option<(String, Option<String>)>, ValidateError> {
@@ -176,8 +175,8 @@ fn within(
             let choice = id.rsplit('.').next().unwrap_or(id).trim_end_matches("[x]");
             let suffix = structure
                 .element(id)
-                .and_then(|element| element.path.value.as_deref())
-                .and_then(|path| SCHEMAS.element(path))
+                .and_then(|element| element.path())
+                .and_then(|path| R::schemas().element(path))
                 .and_then(|(_, field)| field.choices().find(|form| form.code == code.as_str()))
                 .map(|form| form.suffix);
             let slice = suffix.map(|suffix| format!("{id}:{choice}{suffix}"));
@@ -203,17 +202,16 @@ fn within(
 
 /// Answers whether the extension slice `slice` is the one for `url`: its type
 /// names the url's profile, or its `url` is fixed to it.
-fn names_extension(
-    structure: &Structure,
+fn names_extension<R: Release>(
+    structure: &Structure<R>,
     slice: &str,
-    element: &ElementDefinition,
+    element: &Element<R>,
     url: &str,
 ) -> Result<bool, ValidateError> {
     let profiled = element
-        .r#type
+        .types()
         .iter()
-        .flat_map(|kind| &kind.profile)
-        .filter_map(|profile| profile.value.as_deref())
+        .flat_map(|kind| kind.profiles.iter())
         .any(|profile| Canonical::parse(profile).url() == url);
     if profiled {
         return Ok(true);
@@ -222,7 +220,7 @@ fn names_extension(
     let Some(element) = structure.element(&id) else {
         return Ok(false);
     };
-    let fixed = value_of(element, "fixed").map_err(|source| ValidateError::Encode {
+    let fixed = value_of(element, Stem::Fixed).map_err(|source| ValidateError::Encode {
         structure: structure.url().to_owned(),
         element: id,
         source,
@@ -230,14 +228,17 @@ fn names_extension(
     Ok(fixed.is_some_and(|fixed| fixed == Value::String(url.to_owned())))
 }
 
+/// A snapshot a path hops into, and the id of its root.
+type Hop<R> = (Arc<Structure<R>>, String);
+
 /// Hops from the element `here` into the definition of its one type: the
 /// profile the type names when it names one, the core definition otherwise.
 /// Returns the snapshot and the id of its root.
-fn hop(
-    validator: &Validator<'_>,
-    here: &Located,
-    from: &Structure,
-) -> Result<Option<(Arc<Structure>, String)>, ValidateError> {
+fn hop<R: Release>(
+    validator: &Validator<'_, R>,
+    here: &Located<R>,
+    from: &Structure<R>,
+) -> Result<Option<Hop<R>>, ValidateError> {
     let types = here.types();
     let [(code, profiles)] = types.as_slice() else {
         return Ok(None);
@@ -255,11 +256,11 @@ fn hop(
 
 /// Resolves `canonical` as the definition `from` names it, `None` when the
 /// set does not carry it.
-fn resolved(
-    validator: &Validator<'_>,
+fn resolved<R: Release>(
+    validator: &Validator<'_, R>,
     canonical: &str,
-    from: &Structure,
-) -> Result<Option<Arc<Structure>>, ValidateError> {
+    from: &Structure<R>,
+) -> Result<Option<Arc<Structure<R>>>, ValidateError> {
     match validator.structure(canonical, Some(from)) {
         Ok(structure) => Ok(Some(structure)),
         Err(ValidateError::Resolve(

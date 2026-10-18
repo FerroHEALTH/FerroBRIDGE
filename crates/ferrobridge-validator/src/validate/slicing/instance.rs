@@ -6,14 +6,15 @@
 
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
-use fhir_types::r4::schema::SCHEMAS;
 use fhir_types::schema::FieldSchema;
 use fhir_types::schema::Kind;
+use fhir_types::schema::Schemas;
 use fhir_types::schema::TypeSchema;
 
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::report::Reason;
 use crate::validate::resolver::Resolution;
 use crate::validate::slicing::path::Step;
@@ -45,14 +46,22 @@ pub(crate) enum NodeKind {
 }
 
 impl<'i> Node<'i> {
-    /// Returns the node of one occurrence of `field` in the form `form`.
+    /// Returns the node of one occurrence of `field` in the form `form`, its
+    /// type read from the element table `schemas`.
     pub(crate) fn item(
+        schemas: &'static Schemas,
         field: &'static FieldSchema,
         form: &Form,
         occurrence: &Occurrence<'i>,
     ) -> Option<Self> {
         let code = form.choice.or_else(|| field.types.first().copied());
-        node(form.kind, code, occurrence.value, occurrence.element)
+        node(
+            schemas,
+            form.kind,
+            code,
+            occurrence.value,
+            occurrence.element,
+        )
     }
 
     /// Returns the type name: a primitive's code, or a datatype's or
@@ -76,6 +85,7 @@ impl<'i> Node<'i> {
 
 /// The node of a value of `kind`, `None` for a choice or an unknown type.
 fn node<'i>(
+    schemas: &'static Schemas,
     kind: Kind,
     code: Option<&'static str>,
     value: Option<&'i Value>,
@@ -84,13 +94,13 @@ fn node<'i>(
     let kind = match kind {
         Kind::Attribute | Kind::Primitive(_) => NodeKind::Primitive(code?),
         Kind::Xhtml => NodeKind::Primitive("xhtml"),
-        Kind::Complex(name) => NodeKind::Complex(SCHEMAS.type_named(name)?),
+        Kind::Complex(name) => NodeKind::Complex(schemas.type_named(name)?),
         Kind::Resource => {
             let name = value?.get("resourceType")?.as_str()?;
             NodeKind::Resource(
-                SCHEMAS
+                schemas
                     .is_resource(name)
-                    .then(|| SCHEMAS.type_named(name))??,
+                    .then(|| schemas.type_named(name))??,
             )
         }
         Kind::Choice(_) => return None,
@@ -104,6 +114,7 @@ fn node<'i>(
 
 /// The nodes of the member `key` of `object`, of `kind`, repeating or not.
 fn members<'i>(
+    schemas: &'static Schemas,
     object: &'i Object,
     key: &str,
     kind: Kind,
@@ -120,7 +131,9 @@ fn members<'i>(
         if value.is_none() && element.is_none() {
             return Vec::new();
         }
-        return node(kind, code, value, element).into_iter().collect();
+        return node(schemas, kind, code, value, element)
+            .into_iter()
+            .collect();
     }
     let values = value.and_then(Value::as_array).unwrap_or_default();
     let elements = element.and_then(Value::as_array).unwrap_or_default();
@@ -128,13 +141,13 @@ fn members<'i>(
         .filter_map(|index| {
             let value = values.get(index).filter(|item| !item.is_null());
             let element = elements.get(index).filter(|item| !item.is_null());
-            node(kind, code, value, element)
+            node(schemas, kind, code, value, element)
         })
         .collect()
 }
 
 /// The children of `node` named `name`, every type of a choice included.
-fn children<'i>(node: &Node<'i>, name: &str) -> Vec<Node<'i>> {
+fn children<'i>(schemas: &'static Schemas, node: &Node<'i>, name: &str) -> Vec<Node<'i>> {
     let Some(object) = node.object() else {
         return Vec::new();
     };
@@ -142,7 +155,7 @@ fn children<'i>(node: &Node<'i>, name: &str) -> Vec<Node<'i>> {
         NodeKind::Complex(schema) | NodeKind::Resource(schema) => schema,
         // NOTE: datatypes.html §2.24.0.1: a primitive's children are its id and extensions.
         NodeKind::Primitive(_) => {
-            return match (name, SCHEMAS.type_named("Extension")) {
+            return match (name, schemas.type_named("Extension")) {
                 ("extension", Some(extension)) => object
                     .get("extension")
                     .and_then(Value::as_array)
@@ -166,6 +179,7 @@ fn children<'i>(node: &Node<'i>, name: &str) -> Vec<Node<'i>> {
             .choices()
             .flat_map(|choice| {
                 members(
+                    schemas,
                     object,
                     &format!("{}{}", field.name, choice.suffix),
                     choice.kind,
@@ -175,6 +189,7 @@ fn children<'i>(node: &Node<'i>, name: &str) -> Vec<Node<'i>> {
             })
             .collect(),
         kind => members(
+            schemas,
             object,
             field.name,
             kind,
@@ -185,14 +200,15 @@ fn children<'i>(node: &Node<'i>, name: &str) -> Vec<Node<'i>> {
 }
 
 /// Answers whether `node` is of the type `name`; a resource is also of
-/// every type its base chain reaches (`DomainResource`, `Resource`).
-pub(super) fn is_type(node: &Node<'_>, name: &str) -> bool {
+/// every type its base chain reaches (`DomainResource`, `Resource`) in the
+/// element table `schemas`.
+pub(super) fn is_type(schemas: &Schemas, node: &Node<'_>, name: &str) -> bool {
     node.type_name() == name
         || (matches!(node.kind, NodeKind::Resource(_))
-            && SCHEMAS.specializes(node.type_name(), name))
+            && schemas.specializes(node.type_name(), name))
 }
 
-impl<'i> Walk<'_, '_, 'i> {
+impl<'i, R: Release> Walk<'_, '_, 'i, R> {
     /// Follows `steps` from `start`, `Err` with the reason when a reference
     /// on the way does not resolve.
     ///
@@ -209,10 +225,13 @@ impl<'i> Walk<'_, '_, 'i> {
         let mut nodes = vec![start];
         for step in steps {
             nodes = match step {
-                Step::Member(name) => nodes.iter().flat_map(|node| children(node, name)).collect(),
+                Step::Member(name) => nodes
+                    .iter()
+                    .flat_map(|node| children(R::schemas(), node, name))
+                    .collect(),
                 Step::Extension(url) => nodes
                     .iter()
-                    .flat_map(|node| children(node, "extension"))
+                    .flat_map(|node| children(R::schemas(), node, "extension"))
                     .filter(|extension| {
                         extension
                             .value
@@ -223,7 +242,7 @@ impl<'i> Walk<'_, '_, 'i> {
                     .collect(),
                 Step::OfType(name) => nodes
                     .into_iter()
-                    .filter(|node| is_type(node, name))
+                    .filter(|node| is_type(R::schemas(), node, name))
                     .collect(),
                 Step::Resolve => {
                     let mut resolved = Vec::new();
@@ -253,7 +272,7 @@ impl<'i> Walk<'_, '_, 'i> {
         };
         match self.resolve_reference(reference) {
             Resolution::Found { target, .. } => {
-                node_of_resource(target).ok_or(Reason::UnresolvedReference)
+                node_of_resource(R::schemas(), target).ok_or(Reason::UnresolvedReference)
             }
             Resolution::OutOfScope => Err(Reason::ReferenceOutOfScope),
             Resolution::Ambiguous => Err(Reason::AmbiguousReference),
@@ -274,6 +293,6 @@ impl<'i> Walk<'_, '_, 'i> {
 }
 
 /// The node of the resource `value`.
-fn node_of_resource(value: &Value) -> Option<Node<'_>> {
-    node(Kind::Resource, None, Some(value), None)
+fn node_of_resource<'i>(schemas: &'static Schemas, value: &'i Value) -> Option<Node<'i>> {
+    node(schemas, Kind::Resource, None, Some(value), None)
 }

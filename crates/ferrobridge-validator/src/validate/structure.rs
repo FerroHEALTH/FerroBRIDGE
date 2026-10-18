@@ -6,10 +6,12 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use fhir_types::r4::element_definition::ElementDefinition;
-use fhir_types::r4::structure_definition::StructureDefinition;
+use fhir_types::definition::ElementDefinitionRead;
+use fhir_types::definition::StructureDefinitionRead;
 
+use super::Element;
 use super::ValidateError;
+use crate::release::Release;
 use crate::set::PackageId;
 
 /// The snapshot of one `StructureDefinition`, its elements by id.
@@ -20,30 +22,30 @@ use crate::set::PackageId;
 /// elements inside it have ids of their own. An element without an id is
 /// indexed by its path, where the first element of the path wins.
 #[derive(Debug)]
-pub(crate) struct Structure {
+pub(crate) struct Structure<R: Release> {
     url: String,
-    definition: Arc<StructureDefinition>,
+    definition: Arc<R::StructureDefinition>,
     by_id: BTreeMap<String, usize>,
     origin: PackageId,
 }
 
-impl Structure {
+impl<R: Release> Structure<R> {
     /// Indexes `definition`, which SHALL carry a snapshot.
     pub(crate) fn new(
-        definition: Arc<StructureDefinition>,
+        definition: Arc<R::StructureDefinition>,
         origin: PackageId,
     ) -> Result<Self, ValidateError> {
-        let url = definition.url.value.clone().unwrap_or_default();
-        let Some(snapshot) = &definition.snapshot else {
+        let url = definition.url().unwrap_or_default().to_owned();
+        let Some(snapshot) = definition.snapshot() else {
             return Err(ValidateError::NoSnapshot { url });
         };
         let mut by_id = BTreeMap::new();
-        for (index, element) in snapshot.element.iter().enumerate() {
+        for (index, element) in snapshot.iter().enumerate() {
             let id = element
-                .id
-                .clone()
-                .or_else(|| element.path.value.clone())
-                .unwrap_or_default();
+                .element_id()
+                .or_else(|| element.path())
+                .unwrap_or_default()
+                .to_owned();
             if id.is_empty() {
                 continue;
             }
@@ -68,19 +70,19 @@ impl Structure {
     }
 
     /// Returns the definition.
-    pub(crate) fn definition(&self) -> &StructureDefinition {
+    pub(crate) fn definition(&self) -> &R::StructureDefinition {
         &self.definition
     }
 
     /// Returns the type the definition constrains.
     pub(crate) fn type_name(&self) -> &str {
-        self.definition.r#type.value.as_deref().unwrap_or_default()
+        self.definition.type_name().unwrap_or_default()
     }
 
     /// Returns the element with `id`.
-    pub(crate) fn element(&self, id: &str) -> Option<&ElementDefinition> {
+    pub(crate) fn element(&self, id: &str) -> Option<&Element<R>> {
         let index = *self.by_id.get(id)?;
-        self.definition.snapshot.as_ref()?.element.get(index)
+        self.definition.snapshot()?.get(index)
     }
 
     /// Returns the slices of the slicing entry `entry`, in snapshot order,
@@ -89,18 +91,17 @@ impl Structure {
     /// The slices of `Patient.identifier` are `Patient.identifier:name`, and
     /// the re-slices of the slice `Patient.identifier:name` are
     /// `Patient.identifier:name/reslice` (profiling.html §5.1.0.14).
-    pub(crate) fn slices(&self, entry: &str) -> Vec<(&str, &ElementDefinition)> {
+    pub(crate) fn slices(&self, entry: &str) -> Vec<(&str, &Element<R>)> {
         let last = entry.rsplit('.').next().unwrap_or(entry);
         let separator = if last.contains(':') { '/' } else { ':' };
-        let Some(snapshot) = &self.definition.snapshot else {
+        let Some(snapshot) = self.definition.snapshot() else {
             return Vec::new();
         };
         snapshot
-            .element
             .iter()
-            .filter(|element| element.slice_name.is_some())
+            .filter(|element| element.slice_name().is_some())
             .filter_map(|element| {
-                let id = element.id.as_deref()?;
+                let id = element.element_id()?;
                 let name = id.strip_prefix(entry)?.strip_prefix(separator)?;
                 let simple = !name.is_empty() && !name.contains(['.', ':', '/']);
                 simple.then_some((id, element))

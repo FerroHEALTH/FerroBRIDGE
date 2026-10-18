@@ -1,15 +1,16 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! A FHIR R4 profile validator over FHIR packages read offline.
+//! A FHIR R4 and STU3 profile validator over FHIR packages read offline.
 //!
 //! [`set::PackageSet::load`] reads packages from `.tgz` files and unpacked
 //! directories, checks that every dependency their manifests name is present,
 //! and resolves `StructureDefinitions` by canonical into the generated
-//! `fhir_types::r4` model. [`validate::Validator`] walks an instance, the
-//! lexical document model of `fhir-types`, over the R4 element table and
-//! holds it to the snapshot of the profile it is validated against
-//! (<https://hl7.org/fhir/R4/validation.html>,
+//! `fhir_types::r4` model; [`set::PackageSet::load_release`] reads them as
+//! another [`release::Release`], [`release::Stu3`]. [`validate::Validator`]
+//! walks an instance, the lexical document model of `fhir-types`, over the
+//! release's element table and holds it to the snapshot of the profile it is
+//! validated against (<https://hl7.org/fhir/R4/validation.html>,
 //! <https://hl7.org/fhir/R4/profiling.html>). The result is a
 //! [`report::Report`] of typed [`issue::Issue`]s that converts into an R4
 //! `OperationOutcome`, and that names every constraint the validator met and
@@ -35,6 +36,7 @@
 pub mod canonical;
 pub mod issue;
 pub mod package;
+pub mod release;
 pub mod report;
 pub mod set;
 pub mod terminology;

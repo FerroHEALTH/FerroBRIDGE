@@ -14,6 +14,7 @@ use fhir_types::r4::value_set::ValueSetComposeIncludeFilter;
 use fhir_types::r4::value_set::ValueSetExpansion;
 use fhir_types::r4::value_set::ValueSetExpansionContains;
 
+use crate::release::Release;
 use crate::report::Reason;
 use crate::set::PackageId;
 use crate::set::ResolveError;
@@ -26,7 +27,7 @@ use crate::validate::terminology::Membership;
 use crate::validate::terminology::index::CodeIndex;
 use crate::validate::terminology::index::Concept;
 
-impl Validator<'_> {
+impl<R: Release> Validator<'_, R> {
     /// Answers whether `coded` holds a code of the value set `canonical`
     /// names, as a definition of the package `scope` references it.
     ///
@@ -123,6 +124,9 @@ impl Validator<'_> {
         {
             return Ok(found.clone());
         }
+        if !R::READS_TERMINOLOGY {
+            return Ok(Err(Reason::TerminologyNotRead { release: R::NAME }));
+        }
         let index = match self.set.code_system_in(canonical, Some(scope)) {
             Ok((system, _)) => Ok(Arc::new(CodeIndex::new(&system))),
             Err(ResolveError::NotFound { .. } | ResolveError::Fragment { .. }) => {
@@ -149,6 +153,11 @@ impl Validator<'_> {
         code: &Coding<'_>,
         stack: &mut Vec<String>,
     ) -> Result<Membership, ValidateError> {
+        if !R::READS_TERMINOLOGY {
+            return Ok(Membership::Unknown(Reason::TerminologyNotRead {
+                release: R::NAME,
+            }));
+        }
         let (value_set, origin) = match self.set.value_set_in(canonical, Some(scope)) {
             Ok(found) => found,
             Err(ResolveError::NotFound { .. } | ResolveError::Fragment { .. }) => {

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BUSL-1.1
 [package]
 name = "ferrobridge-validator"
-description = "A FHIR R4 profile validator over packages read offline, the generated fhir-types model and its element table"
+description = "A FHIR R4 and STU3 profile validator over packages read offline, the generated fhir-types model and its element table"
 # 0.0.0 holds the name until the first publish; the crate line is the fhir-types line (docs/VERSIONS.md).
 version = "0.0.0"
 edition.workspace = true
@@ -28,9 +28,9 @@ ferrobridge-term.workspace = true
 ferrobridge-fhirpath.workspace = true
 # The `.tgz` form of a FHIR package.
 flate2.workspace = true
-# StructureDefinitions decode into the generated R4 model, and the R4 element
-# table is the base structure an instance is walked over.
-fhir-types = { workspace = true, features = ["r4", "resources"] }
+# StructureDefinitions decode into the generated model of their release (STU3
+# or R4), whose element table is the base structure an instance is walked over.
+fhir-types = { workspace = true, features = ["stu3", "r4", "resources"] }
 # The upstream status a failed terminology call carries.
 http.workspace = true
 # The lexical form of a primitive: the `regex` extension of its definition.

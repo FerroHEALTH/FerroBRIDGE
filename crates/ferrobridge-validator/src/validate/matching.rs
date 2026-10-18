@@ -4,30 +4,36 @@
 //! `fixed[x]` and `pattern[x]`: the value an element definition sets, matched
 //! against an occurrence.
 
-use fhir_types::codec::Json as _;
 use fhir_types::codec::Value;
-use fhir_types::r4::element_definition::ElementDefinition;
+use fhir_types::definition::ElementDefinitionRead;
 
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::validate::ValidateError;
 use crate::validate::walk::Walk;
 
-/// The JSON value of `element`'s `fixed[x]` or `pattern[x]`, by its member
-/// name stem.
-pub(crate) fn value_of(
-    element: &ElementDefinition,
-    stem: &str,
+/// Which value an element definition sets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Stem {
+    /// `fixed[x]`.
+    Fixed,
+    /// `pattern[x]`.
+    Pattern,
+}
+
+/// The JSON value of `element`'s `fixed[x]` or `pattern[x]`; a primitive
+/// written only as its `_` sibling has none.
+pub(crate) fn value_of<E: ElementDefinitionRead>(
+    element: &E,
+    stem: Stem,
 ) -> Result<Option<Value>, fhir_types::codec::EncodeError> {
-    let object = element.to_json()?;
-    Ok(object
-        .into_iter()
-        .find(|(key, _)| {
-            key.strip_prefix(stem)
-                .is_some_and(|rest| rest.starts_with(|c: char| c.is_ascii_uppercase()))
-        })
-        .map(|(_, value)| value))
+    let choice = match stem {
+        Stem::Fixed => element.fixed()?,
+        Stem::Pattern => element.pattern()?,
+    };
+    Ok(choice.and_then(|choice| choice.value))
 }
 
 /// Answers whether `instance` is exactly `fixed`.
@@ -86,7 +92,7 @@ pub(crate) fn contains_pattern(pattern: &Value, instance: &Value) -> bool {
     }
 }
 
-impl Walk<'_, '_, '_> {
+impl<R: Release> Walk<'_, '_, '_, R> {
     /// Matches one occurrence against `element`'s `fixed[x]` and
     /// `pattern[x]`.
     ///
@@ -94,21 +100,18 @@ impl Walk<'_, '_, '_> {
     /// with only a `_` sibling has no value and matches neither.
     pub(crate) fn fixed_and_pattern(
         &mut self,
-        element: &ElementDefinition,
+        element: &R::ElementDefinition,
         structure: &str,
         id: &str,
         value: Option<&Value>,
         location: &str,
     ) -> Result<(), ValidateError> {
-        if element.fixed.is_none() && element.pattern.is_none() {
-            return Ok(());
-        }
         let encode = |source| ValidateError::Encode {
             structure: structure.to_owned(),
             element: id.to_owned(),
             source,
         };
-        if let Some(fixed) = value_of(element, "fixed").map_err(encode)?
+        if let Some(fixed) = value_of(element, Stem::Fixed).map_err(encode)?
             && !value.is_some_and(|held| equals_fixed(&fixed, held))
         {
             let shown = serde_json::to_string(&fixed).unwrap_or_default();
@@ -120,7 +123,7 @@ impl Walk<'_, '_, '_> {
                 format!("the value is not the fixed value {shown} that {id} sets"),
             );
         }
-        if let Some(pattern) = value_of(element, "pattern").map_err(encode)?
+        if let Some(pattern) = value_of(element, Stem::Pattern).map_err(encode)?
             && !value.is_some_and(|held| contains_pattern(&pattern, held))
         {
             let shown = serde_json::to_string(&pattern).unwrap_or_default();

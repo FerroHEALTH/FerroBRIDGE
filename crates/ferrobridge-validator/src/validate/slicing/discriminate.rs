@@ -7,13 +7,17 @@
 
 use std::sync::Arc;
 
-use fhir_types::r4::element_definition::ElementDefinition;
+use fhir_types::definition::ElementDefinitionRead;
+use fhir_types::schema::Schemas;
 
 use crate::issue::Issue;
+use crate::release::Release;
 use crate::report::Constraint;
 use crate::report::Reason;
 use crate::set::ResolveError;
+use crate::validate::Element;
 use crate::validate::ValidateError;
+use crate::validate::matching::Stem;
 use crate::validate::matching::contains_pattern;
 use crate::validate::matching::equals_fixed;
 use crate::validate::matching::value_of;
@@ -33,21 +37,20 @@ use crate::validate::terminology::Membership;
 use crate::validate::walk::Walk;
 
 /// Whether `code` names an abstract resource type (`Resource`,
-/// `DomainResource`), one the element table carries with no resource of
-/// that name.
-fn is_abstract_resource(code: &str) -> bool {
-    let schemas = &fhir_types::r4::schema::SCHEMAS;
+/// `DomainResource`), one the element table `schemas` carries with no
+/// resource of that name.
+fn is_abstract_resource(schemas: &Schemas, code: &str) -> bool {
     !schemas.is_resource(code)
         && schemas.type_named(code).is_some()
         && schemas.specializes(code, "Resource")
 }
 
-impl<'i> Walk<'_, '_, 'i> {
+impl<'i, R: Release> Walk<'_, '_, 'i, R> {
     /// Evaluates `discriminator` for the slice `slice_id` over `nodes`, the
     /// nodes its path selects from the item.
     pub(crate) fn discriminate(
         &mut self,
-        structure: &Arc<Structure>,
+        structure: &Arc<Structure<R>>,
         slice_id: &str,
         discriminator: &Discriminator,
         nodes: &[Node<'i>],
@@ -79,8 +82,8 @@ impl<'i> Walk<'_, '_, 'i> {
                 let Some(element) = located.element() else {
                     return Ok(unknown(Reason::NoDiscriminatorValue));
                 };
-                let min = element.min.as_ref().and_then(|min| min.value).unwrap_or(0);
-                let max = element.max.as_ref().and_then(|max| max.value.as_deref());
+                let min = element.min().unwrap_or(0);
+                let max = element.max();
                 Ok(if min > 0 {
                     verdict(!nodes.is_empty())
                 } else if max == Some("0") {
@@ -96,7 +99,7 @@ impl<'i> Walk<'_, '_, 'i> {
                     Err(reason) => return Ok(unknown(reason)),
                 };
                 Ok(verdict(nodes.iter().any(|node| {
-                    allowed.iter().any(|name| is_type(node, name))
+                    allowed.iter().any(|name| is_type(R::schemas(), node, name))
                 })))
             }
             "profile" => {
@@ -124,8 +127,8 @@ impl<'i> Walk<'_, '_, 'i> {
     /// `element` sets.
     fn value(
         &self,
-        located: &Located,
-        element: &ElementDefinition,
+        located: &Located<R>,
+        element: &Element<R>,
         discriminator: &Discriminator,
         nodes: &[Node<'i>],
     ) -> Result<Verdict, ValidateError> {
@@ -147,24 +150,23 @@ impl<'i> Walk<'_, '_, 'i> {
                 Verdict::NoMatch
             }
         };
-        if let Some(fixed) = value_of(element, "fixed").map_err(encode)? {
+        if let Some(fixed) = value_of(element, Stem::Fixed).map_err(encode)? {
             return Ok(verdict(nodes.iter().any(|node| {
                 node.value.is_some_and(|held| equals_fixed(&fixed, held))
             })));
         }
-        if let Some(pattern) = value_of(element, "pattern").map_err(encode)? {
+        if let Some(pattern) = value_of(element, Stem::Pattern).map_err(encode)? {
             return Ok(verdict(nodes.iter().any(|node| {
                 node.value
                     .is_some_and(|held| contains_pattern(&pattern, held))
             })));
         }
         let binding = element
-            .binding
-            .as_ref()
-            .filter(|binding| binding.strength.value.as_deref() == Some("required"));
+            .binding()
+            .filter(|binding| binding.strength == Some("required"));
         let Some(value_set) = binding
-            .and_then(|binding| binding.value_set.as_ref())
-            .and_then(|set| set.value.clone())
+            .and_then(|binding| binding.value_set)
+            .map(str::to_owned)
         else {
             return Ok(Verdict::Unknown(vec![Unknown {
                 constraint: discriminator.constraint(),
@@ -204,8 +206,8 @@ impl<'i> Walk<'_, '_, 'i> {
     /// when a profile naming one is not in the set.
     fn allowed_types(
         &self,
-        located: &Located,
-        slice: &Structure,
+        located: &Located<R>,
+        slice: &Structure<R>,
     ) -> Result<Result<Vec<String>, Reason>, ValidateError> {
         let from = located.structure().unwrap_or(slice);
         let type_of = |canonical: &str| -> Result<Result<String, Reason>, ValidateError> {
@@ -223,7 +225,7 @@ impl<'i> Walk<'_, '_, 'i> {
             Located::Targets(targets) => profiled.extend(targets.iter().cloned()),
             Located::Element { .. } => {
                 for (code, profiles) in located.types() {
-                    if is_abstract_resource(&code) && !profiles.is_empty() {
+                    if is_abstract_resource(R::schemas(), &code) && !profiles.is_empty() {
                         profiled.extend(profiles);
                     } else {
                         allowed.push(code);
@@ -245,7 +247,7 @@ impl<'i> Walk<'_, '_, 'i> {
     fn conforms_to_any(
         &mut self,
         nodes: &[Node<'i>],
-        (profiles, from): (&[String], &Structure),
+        (profiles, from): (&[String], &Structure<R>),
         location: &str,
         discriminator: &Discriminator,
     ) -> Result<Verdict, ValidateError> {
