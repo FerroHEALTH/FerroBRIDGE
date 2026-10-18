@@ -65,7 +65,7 @@ pub(crate) fn subject_of(facade: &Facade, ehr_id: &EhrId) -> Result<Option<Value
         .store()
         .person_of(ehr_id)
         .map_err(|error| crate::facade::handlers::write::store_refusal(&error))?;
-    Ok(person.map(|person| complete::reference_to(&person, &facade.settings().subject_namespace)))
+    Ok(person.map(|person| complete::reference_to(&person, &facade.settings().subject)))
 }
 
 /// Where one rendered resource comes from: the composition version, the

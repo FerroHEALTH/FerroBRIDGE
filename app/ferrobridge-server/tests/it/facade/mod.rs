@@ -212,7 +212,7 @@ pub(crate) fn settings() -> Settings {
     Settings {
         base_url: String::from(BASE_URL),
         ehr_policy: Policy::Existing,
-        subject_namespace: String::from("http://example.org/fhir"),
+        subject: support::subject_link("http://example.org/fhir"),
         system_id: String::from("ferrobridge.test"),
         language: String::from("en"),
         territory: String::from("GB"),

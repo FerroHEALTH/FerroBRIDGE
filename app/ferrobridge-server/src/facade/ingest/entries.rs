@@ -200,10 +200,10 @@ impl Ingest<'_> {
                 };
             }
         };
-        let namespace = self.settings.subject_namespace.as_str();
-        let subject = match local_subject(&inbound, locals, namespace) {
+        let link = &self.settings.subject;
+        let subject = match local_subject(&inbound, locals, link.namespace()) {
             Some(local) => local.map_err(|error| chain(&error)),
-            None => inbound.subject(namespace).map_err(|error| chain(&error)),
+            None => inbound.subject(link).map_err(|error| chain(&error)),
         }
         .map_err(|text| {
             Issue::error(IssueType::Required)

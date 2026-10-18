@@ -77,7 +77,7 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
         settings: crate::facade::Settings {
             base_url: facade.base_url.clone(),
             ehr_policy,
-            subject_namespace: facade.subject_namespace.clone(),
+            subject: subject_link(facade)?,
             system_id: facade.system_id.clone(),
             language: facade.composition_language.clone(),
             territory: facade.composition_territory.clone(),
@@ -86,6 +86,28 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
         search: search_limits(facade)?,
         references: reference_policy(facade)?,
     })
+}
+
+/// Returns the subject link `facade` configures.
+fn subject_link(facade: &Facade) -> Result<crate::facade::subject::SubjectLink, Error> {
+    const FORM: &str = "facade.subject_id_form";
+    let form = crate::facade::subject::IdForm::parse(&facade.subject_id_form).ok_or_else(|| {
+        Error::SubjectIdForm {
+            key: String::from(FORM),
+            value: facade.subject_id_form.clone(),
+        }
+    })?;
+    crate::facade::subject::SubjectLink::new(&facade.subject_namespace, form, &facade.subject_type)
+        .map_err(|source| {
+            let key = match source {
+                crate::facade::subject::SubjectError::PartyType { .. } => "facade.subject_type",
+                _ => "facade.subject_namespace",
+            };
+            Error::Subject {
+                key: String::from(key),
+                source: Box::new(source),
+            }
+        })
 }
 
 /// Returns the reference policy `facade` configures.

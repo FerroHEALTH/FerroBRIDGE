@@ -26,6 +26,7 @@ use crate::facade::identity::PersonId;
 use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::status;
+use crate::facade::subject::SubjectLink;
 
 /// The element names a resource names its subject by, in the order the fill
 /// tries them.
@@ -34,15 +35,14 @@ const SUBJECT_ELEMENTS: [&str; 2] = ["subject", "patient"];
 /// Returns the `Reference` a resource names `person` by.
 ///
 /// The value is the inverse of how the ingest reads a subject, so a read sent
-/// back as an update resolves to the same EHR: a person keyed by a literal
-/// reference in the deployment's `subject_namespace` is that reference again,
-/// and every other person is a logical reference by its identifier
+/// back as an update resolves to the same EHR: a person the subject link reads
+/// from a literal reference is that reference again, and every other person is
+/// a logical reference by its identifier
 /// (<https://hl7.org/fhir/R4/references.html#logical>).
 #[must_use]
-pub(crate) fn reference_to(person: &PersonId, subject_namespace: &str) -> Value {
-    let literal = person.namespace() == subject_namespace && person.id().contains('/');
-    let reference = if literal {
-        serde_json::json!({ "reference": person.id() })
+pub(crate) fn reference_to(person: &PersonId, link: &SubjectLink) -> Value {
+    let reference = if let Some(literal) = link.reference_of(person) {
+        serde_json::json!({ "reference": literal })
     } else {
         serde_json::json!({
             "type": "Patient",
@@ -218,12 +218,19 @@ fn holds(value: &Value) -> bool {
 mod tests {
     use super::{absent_required, fill_subject, reference_to, refusal};
     use crate::facade::identity::PersonId;
+    use crate::facade::subject::IdForm;
+    use crate::facade::subject::SubjectLink;
     use fhir_types::codec::Object;
     use fhir_types::codec::Value;
     use http::StatusCode;
 
     /// A synthetic value no refusal may carry onto the wire.
     const MARKER: &str = "ferrobridge-synthetic-clinical-marker";
+
+    /// Returns the subject link in `ferrobridge` with the id form `form`.
+    fn link(form: IdForm) -> SubjectLink {
+        SubjectLink::new("ferrobridge", form, "PERSON").expect("a legal subject link")
+    }
 
     /// Returns `literal` as a resource object.
     fn object(literal: serde_json::Value) -> Object {
@@ -250,7 +257,7 @@ mod tests {
     fn the_subject_is_filled_from_the_binding_and_the_resource_is_then_complete() {
         let mut body = object(serde_json::json!({ "resourceType": "Condition" }));
         let person = PersonId::new("http://example.org/fhir/sid/mrn", "p-1").expect("a person");
-        let subject = reference_to(&person, "ferrobridge");
+        let subject = reference_to(&person, &link(IdForm::Reference));
         assert_eq!(
             Some("Condition.subject"),
             fill_subject(&mut body, "Condition", Some(&subject))
@@ -267,7 +274,7 @@ mod tests {
             "subject": mapped
         }));
         let person = PersonId::new("ferrobridge", "Patient/bound").expect("a person");
-        let subject = reference_to(&person, "ferrobridge");
+        let subject = reference_to(&person, &link(IdForm::Reference));
         assert_eq!(None, fill_subject(&mut body, "Condition", Some(&subject)));
         assert_eq!(Some(&Value::from_serde_json(mapped)), body.get("subject"));
     }
@@ -277,7 +284,7 @@ mod tests {
         // R4 allergyintolerance.html: AllergyIntolerance.patient is 1..1.
         let mut body = object(serde_json::json!({ "resourceType": "AllergyIntolerance" }));
         let person = PersonId::new("ferrobridge", "Patient/p-1").expect("a person");
-        let subject = reference_to(&person, "ferrobridge");
+        let subject = reference_to(&person, &link(IdForm::Reference));
         assert_eq!(
             Some("AllergyIntolerance.patient"),
             fill_subject(&mut body, "AllergyIntolerance", Some(&subject))
@@ -295,7 +302,7 @@ mod tests {
         let literal = PersonId::new("ferrobridge", "Patient/p-1").expect("a person");
         assert_eq!(
             Value::from_serde_json(serde_json::json!({ "reference": "Patient/p-1" })),
-            reference_to(&literal, "ferrobridge")
+            reference_to(&literal, &link(IdForm::Reference))
         );
         let logical = PersonId::new("http://example.org/fhir/sid/mrn", "p-1").expect("a person");
         assert_eq!(
@@ -303,7 +310,16 @@ mod tests {
                 "type": "Patient",
                 "identifier": { "system": "http://example.org/fhir/sid/mrn", "value": "p-1" }
             })),
-            reference_to(&logical, "ferrobridge")
+            reference_to(&logical, &link(IdForm::Reference))
+        );
+    }
+
+    #[test]
+    fn a_bare_logical_id_renders_as_a_patient_reference_under_the_logical_id_form() {
+        let bare = PersonId::new("ferrobridge", "p-1").expect("a person");
+        assert_eq!(
+            Value::from_serde_json(serde_json::json!({ "reference": "Patient/p-1" })),
+            reference_to(&bare, &link(IdForm::LogicalId))
         );
     }
 

@@ -65,7 +65,7 @@ async fn a_patient_search_pages_the_committed_conditions_back_from_a_real_cdr()
             Settings {
                 base_url: String::from(BASE.trim_end_matches('/')),
                 ehr_policy: Policy::CreateOnFirstWrite,
-                subject_namespace: String::from(NAMESPACE),
+                subject: crate::support::subject_link(NAMESPACE),
                 system_id: String::from("ferrobridge.e2e"),
                 language: String::from("en"),
                 territory: String::from("GB"),
@@ -152,7 +152,7 @@ async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
             Settings {
                 base_url: String::from(BASE.trim_end_matches('/')),
                 ehr_policy: Policy::CreateOnFirstWrite,
-                subject_namespace: String::from(NAMESPACE),
+                subject: crate::support::subject_link(NAMESPACE),
                 system_id: String::from("ferrobridge.e2e"),
                 language: String::from("de"),
                 territory: String::from("DE"),

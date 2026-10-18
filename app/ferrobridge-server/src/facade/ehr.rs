@@ -31,15 +31,13 @@ use crate::cdr::ids::SubjectNamespace;
 use crate::facade::identity::PersonId;
 use crate::facade::identity::store::Store;
 use crate::facade::identity::store::StoreError;
+use crate::facade::subject::SubjectLink;
 
 /// The archetype every openEHR `EHR_STATUS` declares.
 ///
 /// The root archetype of the class is `openEHR-EHR-EHR_STATUS.generic.v1`
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/ehr.html>).
 const EHR_STATUS_ARCHETYPE: &str = "openEHR-EHR-EHR_STATUS.generic.v1";
-
-/// The reference-model class a subject reference points at.
-const PARTY_TYPE: &str = "PERSON";
 
 /// Whether the facade may create an EHR it does not find.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -96,7 +94,8 @@ pub enum EhrError {
     },
 }
 
-/// Returns the EHR of `person`, resolving or creating it per `policy`.
+/// Returns the EHR of `person`, resolving or creating it per `policy`, with
+/// the `PARTY_REF.type` `link` configures on an EHR it creates.
 ///
 /// # Errors
 ///
@@ -107,6 +106,7 @@ pub async fn resolve(
     client: &CdrClient,
     store: &dyn Store,
     person: &PersonId,
+    link: &SubjectLink,
     policy: Policy,
 ) -> Result<EhrId, EhrError> {
     if let Some(known) = store.ehr_of(person).map_err(store_error)? {
@@ -133,7 +133,7 @@ pub async fn resolve(
                     subject: person.to_string(),
                 });
             }
-            Policy::CreateOnFirstWrite => create(client, person).await?,
+            Policy::CreateOnFirstWrite => create(client, person, link).await?,
         },
     };
     store.record_ehr(person, &ehr_id).map_err(store_error)
@@ -144,8 +144,12 @@ pub async fn resolve(
 /// Under `return=minimal` the service answers `201` or `204`, and the `ETag`
 /// of either names the new `ehr_id` (`ehr-codegen.openapi.yaml`,
 /// `ehr_create`).
-async fn create(client: &CdrClient, person: &PersonId) -> Result<EhrId, EhrError> {
-    let status = status_of(person);
+async fn create(
+    client: &CdrClient,
+    person: &PersonId,
+    link: &SubjectLink,
+) -> Result<EhrId, EhrError> {
+    let status = status_of(person, link);
     let answered = client
         .create_ehr(Some(&status), Prefer::Minimal)
         .await
@@ -170,9 +174,10 @@ async fn create(client: &CdrClient, person: &PersonId) -> Result<EhrId, EhrError
     }
 }
 
-/// Returns the `EHR_STATUS` an EHR for `person` is created with.
+/// Returns the `EHR_STATUS` an EHR for `person` is created with, its subject
+/// a `PARTY_REF` of the type `link` configures.
 #[must_use]
-pub fn status_of(person: &PersonId) -> EhrStatus {
+pub fn status_of(person: &PersonId, link: &SubjectLink) -> EhrStatus {
     EhrStatus {
         name: DvText::DvText(DvTextData {
             value: String::from("EHR Status"),
@@ -201,7 +206,7 @@ pub fn status_of(person: &PersonId) -> EhrStatus {
         subject: PartySelf {
             external_ref: Some(PartyRef {
                 namespace: String::from(person.namespace()),
-                r#type: String::from(PARTY_TYPE),
+                r#type: String::from(link.party_type()),
                 id: ObjectId::GenericId(GenericId {
                     value: String::from(person.id()),
                     scheme: String::from(person.namespace()),
@@ -238,9 +243,17 @@ fn store_error(source: StoreError) -> EhrError {
 
 #[cfg(test)]
 mod tests {
-    use super::{EHR_STATUS_ARCHETYPE, PARTY_TYPE, Policy, status_of};
+    use super::{EHR_STATUS_ARCHETYPE, Policy, status_of};
     use crate::facade::identity::PersonId;
+    use crate::facade::subject::IdForm;
+    use crate::facade::subject::SubjectLink;
     use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
+
+    /// Returns a subject link whose `PARTY_REF.type` is `party_type`.
+    fn link(party_type: &str) -> SubjectLink {
+        SubjectLink::new("http://example.org/mrn", IdForm::Reference, party_type)
+            .expect("a legal subject link")
+    }
 
     #[test]
     fn the_default_policy_writes_into_an_existing_ehr_only() {
@@ -250,14 +263,14 @@ mod tests {
     #[test]
     fn the_status_subject_is_a_generic_id_in_the_namespace() {
         let person = PersonId::new("http://example.org/mrn", "p-1").expect("a legal person id");
-        let status = status_of(&person);
+        let status = status_of(&person, &link("PERSON"));
         assert_eq!(EHR_STATUS_ARCHETYPE, status.archetype_node_id);
         let reference = status
             .subject
             .external_ref
             .expect("the subject names an external reference");
         assert_eq!("http://example.org/mrn", reference.namespace);
-        assert_eq!(PARTY_TYPE, reference.r#type);
+        assert_eq!("PERSON", reference.r#type);
         let ObjectId::GenericId(id) = reference.id else {
             panic!("the subject id is a GENERIC_ID whose scheme is the namespace");
         };
@@ -268,7 +281,7 @@ mod tests {
     #[test]
     fn the_status_names_the_rm_release_its_types_come_from() {
         let person = PersonId::new("http://example.org/mrn", "p-1").expect("a legal person id");
-        let status = status_of(&person);
+        let status = status_of(&person, &link("PERSON"));
         let details = status
             .archetype_details
             .expect("an archetype root carries its details");
@@ -279,9 +292,20 @@ mod tests {
     }
 
     #[test]
+    fn the_subject_names_the_configured_party_type() {
+        let person = PersonId::new("http://example.org/mrn", "g-1").expect("a legal person id");
+        let status = status_of(&person, &link("GROUP"));
+        let reference = status
+            .subject
+            .external_ref
+            .expect("the subject names an external reference");
+        assert_eq!("GROUP", reference.r#type);
+    }
+
+    #[test]
     fn a_created_ehr_is_queryable_and_modifiable() {
         let person = PersonId::new("http://example.org/mrn", "p-1").expect("a legal person id");
-        let status = status_of(&person);
+        let status = status_of(&person, &link("PERSON"));
         assert!(status.is_queryable);
         assert!(status.is_modifiable);
     }

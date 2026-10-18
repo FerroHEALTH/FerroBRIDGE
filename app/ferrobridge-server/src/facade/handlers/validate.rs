@@ -59,7 +59,7 @@ pub(crate) async fn validate(
     crate::facade::handlers::supported(facade, resource_type)?;
     let inbound = read::parse(body, resource_type)?;
     let program = &write::select_program(facade, &inbound, headers)?;
-    let person = match inbound.subject(&facade.settings().subject_namespace) {
+    let person = match inbound.subject(&facade.settings().subject) {
         Ok(person) => person,
         Err(refusal) => {
             return Ok(reply::issues(

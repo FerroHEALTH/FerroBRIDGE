@@ -80,6 +80,23 @@ pub enum Error {
         #[source]
         source: std::net::AddrParseError,
     },
+    /// The subject id form names none of the three forms.
+    #[error("{key} is `{value}`; the forms are reference, logical_id and uuid")]
+    SubjectIdForm {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: String,
+    },
+    /// A subject link key breaks a `PARTY_REF` invariant.
+    #[error("{key} cannot be part of the EHR subject link")]
+    Subject {
+        /// The key that holds it.
+        key: String,
+        /// What the link reported.
+        #[source]
+        source: Box<crate::facade::subject::SubjectError>,
+    },
     /// The EHR policy names neither of the two values.
     #[error("{key} is `{value}`; the policies are existing and create_on_first_write")]
     EhrPolicy {

@@ -1,11 +1,13 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The `[facade]` section: off until present, its policy, its store, and
-//! its refusals.
+//! The `[facade]` section: off until present, its policy, its store, its
+//! subject link, and its refusals.
 
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::error::Error;
+use ferrobridge_server::facade::subject::IdForm;
+use ferrobridge_server::facade::subject::SubjectError;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 
@@ -197,4 +199,112 @@ fn a_fetch_base_that_is_no_http_base_refuses_to_boot() -> Result<(), Box<dyn Std
 fn an_unknown_reference_key_refuses_to_boot() {
     let text = format!("{ENABLED}\n[facade.references]\nfetch_everything = true\n");
     assert!(Config::from_sources(Some(&text), &BTreeMap::new()).is_err());
+}
+/// The `[facade]` section `extra` adds to, with the two required fields set.
+fn facade_with(extra: &str) -> String {
+    format!(
+        "[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n{extra}"
+    )
+}
+
+#[test]
+fn the_subject_link_defaults_to_the_reference_form_and_a_person() -> Result<(), Box<dyn StdError>> {
+    let settings = Config::from_sources(Some(&facade_with("")), &BTreeMap::new())?.resolve()?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    let link = &facade.settings.subject;
+    assert_eq!("ferrobridge", link.namespace());
+    assert_eq!(IdForm::Reference, link.form());
+    assert_eq!("PERSON", link.party_type());
+    Ok(())
+}
+
+#[test]
+fn the_subject_link_takes_the_cdr_owners_namespace_form_and_type() -> Result<(), Box<dyn StdError>>
+{
+    let text = facade_with(concat!(
+        "subject_namespace = \"fhir_facade\"\n",
+        "subject_id_form = \"logical_id\"\n",
+        "subject_type = \"PARTY\"\n",
+    ));
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    let link = &facade.settings.subject;
+    assert_eq!("fhir_facade", link.namespace());
+    assert_eq!(IdForm::LogicalId, link.form());
+    assert_eq!("PARTY", link.party_type());
+    let person = link.person_of_patient("p-1")?;
+    assert_eq!(("fhir_facade", "p-1"), (person.namespace(), person.id()));
+    Ok(())
+}
+
+#[test]
+fn a_subject_type_outside_type_validity_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    // BASE base_types PARTY_REF §Invariants, Type_validity: PATIENT is no party type.
+    let text = facade_with("subject_type = \"PATIENT\"\n");
+    let error = Config::from_sources(Some(&text), &BTreeMap::new())?
+        .resolve()
+        .expect_err("the type is one of the BASE party types");
+    match &error {
+        Error::Subject { key, source } => {
+            assert_eq!("facade.subject_type", key);
+            assert!(matches!(
+                source.as_ref(),
+                SubjectError::PartyType { value, .. } if value == "PATIENT"
+            ));
+        }
+        other => return Err(format!("expected a subject link error, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_subject_namespace_breaking_the_object_ref_rule_refuses_to_boot()
+-> Result<(), Box<dyn StdError>> {
+    let text = facade_with("subject_namespace = \"9-local\"\n");
+    let error = Config::from_sources(Some(&text), &BTreeMap::new())?
+        .resolve()
+        .expect_err("the namespace starts with a letter");
+    match &error {
+        Error::Subject { key, source } => {
+            assert_eq!("facade.subject_namespace", key);
+            assert!(matches!(source.as_ref(), SubjectError::Namespace { .. }));
+        }
+        other => return Err(format!("expected a subject link error, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_subject_id_form_the_facade_does_not_know_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    let text = facade_with("subject_id_form = \"pseudonym\"\n");
+    let error = Config::from_sources(Some(&text), &BTreeMap::new())?
+        .resolve()
+        .expect_err("the form is one of three values");
+    match &error {
+        Error::SubjectIdForm { key, value } => {
+            assert_eq!("facade.subject_id_form", key);
+            assert_eq!("pseudonym", value);
+        }
+        other => return Err(format!("expected a subject id form error, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn the_subject_link_keys_are_set_from_the_environment() -> Result<(), Box<dyn StdError>> {
+    let environment = BTreeMap::from([
+        (
+            String::from("FERROBRIDGE__FACADE__SUBJECT_ID_FORM"),
+            String::from("uuid"),
+        ),
+        (
+            String::from("FERROBRIDGE__FACADE__SUBJECT_TYPE"),
+            String::from("GROUP"),
+        ),
+    ]);
+    let settings = Config::from_sources(Some(&facade_with("")), &environment)?.resolve()?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    assert_eq!(IdForm::Uuid, facade.settings.subject.form());
+    assert_eq!("GROUP", facade.settings.subject.party_type());
+    Ok(())
 }

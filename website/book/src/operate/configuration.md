@@ -421,12 +421,28 @@ This lane reaches identifiable data, and the server says so once at start-up.
 | `base_url` | `http://127.0.0.1:8080/fhir` | The absolute FHIR service base a client reaches, which `Location` is written under |
 | `ehr_policy` | `existing` | `existing` writes only into an EHR the CDR already holds; `create_on_first_write` creates one for an unknown subject |
 | `identity_store` | `identity.redb` | The file the identity map is kept in, opened at boot and refused when it cannot be written |
-| `subject_namespace` | `ferrobridge` | The namespace a subject identifier is looked up in on the CDR |
+| `subject_namespace` | `ferrobridge` | The namespace a literal subject reference is looked up in on the CDR, the `PARTY_REF.namespace` of `EHR_STATUS.subject` |
+| `subject_id_form` | `reference` | How the id of a literal subject reference is written: `reference` keeps `Patient/<id>`, `logical_id` keeps the bare `<id>`, and `uuid` keeps the bare `<id>` and refuses one that is no UUID |
+| `subject_type` | `PERSON` | The `PARTY_REF.type` of the subject of an EHR the facade creates, one of the BASE `Type_validity` values (`PERSON`, `ORGANISATION`, `GROUP`, `AGENT`, `ROLE`, `PARTY`, `ACTOR`) or `ANY` |
 | `system_id` | `FerroBRIDGE` | The `AUDIT_DETAILS.system_id` every commit records |
 | `composition_language` | none, required | The `COMPOSITION.language` every commit carries, an ISO 639-1 code |
 | `composition_territory` | none, required | The `COMPOSITION.territory` every commit carries, an ISO 3166-1 code |
 | `search_count` | `20` | The page size of a search that names no `_count` |
 | `search_count_max` | `100` | The largest page one search answers; a larger `_count` is answered with this many |
+
+The three `subject_` keys make the facade's link between a Patient and its
+EHR match the one the CDR's owner writes, because the facade finds an EHR
+with `GET /ehr?subject_id=&subject_namespace=`. A CDR whose owner links each
+EHR to a demographic party under its own namespace takes that namespace and
+`logical_id`, so a subject `Patient/<party uid>` is looked up as the party
+uid. A CDR that accepts only UUID pseudonyms as subject ids takes the
+namespace it lists and `uuid`, so a subject whose id is no UUID is refused
+with a diagnostic naming `facade.subject_id_form` before the CDR is called.
+The facade never derives a pseudonym itself: name a subject by the id the CDR
+already holds. A subject named by `identifier` keeps the identifier's
+`system` as its namespace and its `value` as its id. A `subject_type` outside
+the BASE set, or a `subject_namespace` that breaks the `OBJECT_REF`
+namespace rule, is a boot error naming the key.
 
 The two composition fields have no default. FHIRconnect puts them on the
 project performing the mapping, and there is no correct language for a clinical

@@ -17,6 +17,17 @@ use std::time::Duration;
 use tracing_subscriber::fmt::MakeWriter;
 use wiremock::MockServer;
 
+/// Returns the subject link in `namespace` with the reference id form and the
+/// `PERSON` type, the facade's defaults.
+pub(crate) fn subject_link(namespace: &str) -> ferrobridge_server::facade::subject::SubjectLink {
+    ferrobridge_server::facade::subject::SubjectLink::new(
+        namespace,
+        ferrobridge_server::facade::subject::IdForm::Reference,
+        "PERSON",
+    )
+    .expect("a legal subject link")
+}
+
 /// A `tracing` writer that keeps every line in memory.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Logs(Arc<Mutex<Vec<u8>>>);

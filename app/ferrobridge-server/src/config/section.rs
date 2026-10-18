@@ -82,8 +82,14 @@ pub struct Facade {
     pub ehr_policy: String,
     /// The file the identity map is kept in.
     pub identity_store: PathBuf,
-    /// The namespace a literal subject reference is read in.
+    /// The namespace a literal subject reference is read in, the
+    /// `PARTY_REF.namespace` of `EHR_STATUS.subject`.
     pub subject_namespace: String,
+    /// How the id of a literal subject reference is written:
+    /// `reference`, `logical_id` or `uuid`.
+    pub subject_id_form: String,
+    /// The `PARTY_REF.type` of the subject of an EHR the facade creates.
+    pub subject_type: String,
     /// The `AUDIT_DETAILS.system_id` every commit records.
     pub system_id: String,
     /// The `COMPOSITION.language` every commit carries, ISO 639-1.
@@ -112,6 +118,8 @@ impl Default for Facade {
             ehr_policy: String::from("existing"),
             identity_store: PathBuf::from("identity.redb"),
             subject_namespace: String::from("ferrobridge"),
+            subject_id_form: String::from("reference"),
+            subject_type: String::from("PERSON"),
             system_id: String::from("FerroBRIDGE"),
             composition_language: String::new(),
             composition_territory: String::new(),

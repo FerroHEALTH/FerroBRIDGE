@@ -271,7 +271,8 @@ EHR and the composition does not hold it. When the rendered resource has no
 `subject` (or `patient`, on a type that names its subject so), the facade
 writes it from the identity map: the person the map recorded for the
 composition's EHR, as a literal reference when the person was keyed by one in
-`subject_namespace`, and otherwise as a logical reference with `type: Patient`
+`subject_namespace` (`Patient/<id>` again under every `subject_id_form`), and
+otherwise as a logical reference with `type: Patient`
 and the person's `identifier`. That is the form a create reads back into the
 same EHR, so you can send a read body back as an update unchanged. A subject
 the mapping wrote is kept. The log line of the request counts the elements the
