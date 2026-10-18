@@ -6,9 +6,11 @@
 //! What an element is, whether it repeats, which types a choice admits and
 //! where a content reference lands all come from the generated element table
 //! of `fhir-types` (`fhir_types::schema::Schemas`); a version plugs in by
-//! implementing [`Model`] over its table. [`r4::R4`] is the R4 table.
+//! implementing [`Model`] over its table. [`r4::R4`] is the R4 table and
+//! [`stu3::Stu3`] the STU3 one.
 
 pub mod r4;
+pub mod stu3;
 
 use std::collections::BTreeMap;
 use std::fmt;

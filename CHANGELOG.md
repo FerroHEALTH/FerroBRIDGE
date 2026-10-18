@@ -59,6 +59,12 @@ crates on crates.io.
 
 ### Added
 
+- The FHIRPath evaluator has an STU3 type model, `model::stu3::Stu3`, over
+  the generated STU3 element table (#837), so paths, `ofType()`, `is` and
+  `as` resolve against STU3 types (an STU3 `valueAttachment`,
+  `Patient.animal`). Every STU3 core invariant with a typed element passes
+  the static check, except the two the package publishes with a defect
+  (`inv-1`, `sdf-15`).
 - `fhir-types` 0.1.123 carries a release-neutral read of `ElementDefinition`,
   `definition::ElementDefinitionRead`, implemented for every version's
   generated `ElementDefinition` from that version's package (#836). It reads

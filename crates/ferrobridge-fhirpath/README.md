@@ -33,6 +33,10 @@ error and an empty result are distinct outcomes.
 `htmlChecks()` reads the narrative rules of FHIR R4. `trace()` logs through
 `tracing` the name, the count and the item types, never a value.
 
+The type model is a trait over the element table of one FHIR version:
+`model::r4::R4` reads the R4 table and `model::stu3::Stu3` the STU3 one, so
+paths, `ofType()`, `is` and `as` resolve against that version's types.
+
 The default evaluator is FHIRPath N1 2.0.0, the release FHIR R4 cites, so a
 function only a later release defines is an error.
 `Environment::with_fhirpath_stu3_functions` admits the functions FHIRPath
