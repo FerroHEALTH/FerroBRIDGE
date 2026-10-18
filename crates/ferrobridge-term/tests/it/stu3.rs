@@ -635,3 +635,37 @@ async fn the_same_requests_are_sent_unchanged_in_r4() -> Result<(), Box<dyn StdE
     );
     Ok(())
 }
+#[tokio::test]
+async fn check_names_the_parameter_stu3_lacks_and_passes_the_rest() -> Result<(), Box<dyn StdError>>
+{
+    let server = MockServer::start().await;
+    let stu3 = client(&server, STU3)?;
+    let mut versioned = validation(Coded::Coding(member()));
+    versioned.value_set_version = Some("2.0.0".to_owned());
+    let error = stu3
+        .check(&Request::ValidateCode(versioned.clone()))
+        .expect_err("STU3 $validate-code has no valueSetVersion");
+    assert!(
+        matches!(
+            &error,
+            Error::UnsupportedParameter {
+                operation: "ValueSet/$validate-code",
+                parameter: "valueSetVersion",
+                wire_version: WireVersion::Stu3,
+            }
+        ),
+        "{error:?}"
+    );
+    let mapped = Translation::new("http://example.org/a", "x")
+        .with_concept_map("http://example.org/ConceptMap/m");
+    assert!(stu3.check(&Request::Translate(mapped.clone())).is_err());
+    assert!(
+        stu3.check(&Request::ValidateCode(validation(Coded::Coding(member()))))
+            .is_ok()
+    );
+    let r4 = client(&server, WireVersion::R4)?;
+    assert!(r4.check(&Request::ValidateCode(versioned)).is_ok());
+    assert!(r4.check(&Request::Translate(mapped)).is_ok());
+    assert_eq!(0, received(&server).await?);
+    Ok(())
+}

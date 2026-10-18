@@ -61,6 +61,10 @@ is the one async step: it sends the distinct questions as one call or one
 batch, turns answers into issues, lifts the listing of each binding it
 answered, and leaves a refused or failed one listed with
 `Reason::TerminologyFailed`. A slicing discriminator never asks a server.
+An STU3 terminology server is supported: a question its release cannot
+carry (a versioned value set, STU3 `$validate-code` having no
+`valueSetVersion`) is set aside through `Terminology::supports` with the
+client's `UnsupportedParameter` and stays listed, and the rest are sent.
 
 ## Never a silent pass
 

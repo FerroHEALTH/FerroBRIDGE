@@ -14,6 +14,12 @@
 //! answered. A check the server refused or failed stays listed with the
 //! failure class and the upstream status, never passed.
 //!
+//! An STU3 terminology server is supported: `ferrobridge-term` writes each
+//! question in the release the client is configured for. A question that
+//! release cannot carry (a binding to a versioned value set, as STU3
+//! `$validate-code` has no `valueSetVersion`) is set aside with the client's
+//! typed refusal and stays listed, and the other questions are still sent.
+//!
 //! ```no_run
 //! use ferrobridge_term::client::Client;
 //! use ferrobridge_term::config::{Config, WireVersion};
@@ -41,6 +47,7 @@ use std::future::Future;
 use ferrobridge_term::client::Client;
 use ferrobridge_term::error::Error;
 use ferrobridge_term::outcome::Coded;
+use ferrobridge_term::outcome::Request;
 use ferrobridge_term::outcome::ValidateOutcome;
 use ferrobridge_term::outcome::Validation;
 
@@ -64,6 +71,16 @@ pub trait Terminology {
         &self,
         validations: &[Validation],
     ) -> impl Future<Output = Result<Vec<Result<ValidateOutcome, Error>>, Error>> + Send;
+
+    /// Answers whether the server's wire release can carry `validation`,
+    /// sending nothing.
+    ///
+    /// # Errors
+    /// Returns the refusal the question would meet, such as
+    /// [`Error::UnsupportedParameter`]. The default carries every question.
+    fn supports(&self, _validation: &Validation) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Terminology for Client {
@@ -72,6 +89,10 @@ impl Terminology for Client {
         validations: &[Validation],
     ) -> impl Future<Output = Result<Vec<Result<ValidateOutcome, Error>>, Error>> + Send {
         Self::validate_all(self, validations)
+    }
+
+    fn supports(&self, validation: &Validation) -> Result<(), Error> {
+        self.check(&Request::ValidateCode(validation.clone()))
     }
 }
 
@@ -153,15 +174,7 @@ impl Report {
             });
             asked.push(position);
         }
-        let answers: Vec<Result<ValidateOutcome, Reason>> =
-            match terminology.validate_all(&questions).await {
-                Ok(answers) if answers.len() == questions.len() => answers
-                    .into_iter()
-                    .map(|answer| answer.map_err(|error| failure(&error)))
-                    .collect(),
-                Ok(_) => questions.iter().map(|_| Err(batch_arity())).collect(),
-                Err(error) => questions.iter().map(|_| Err(failure(&error))).collect(),
-            };
+        let answers = ask(terminology, &questions).await;
         let mut failed: BTreeMap<Key, (String, Reason)> = BTreeMap::new();
         for (check, position) in pending.iter().zip(asked) {
             let reason = match answers.get(position) {
@@ -228,6 +241,46 @@ impl PendingBinding {
             _ => "",
         }
     }
+}
+
+/// Asks `terminology` every one of `questions` its wire release can carry,
+/// answering all of them by position: a question set aside answers with the
+/// refusal it would meet.
+async fn ask<T: Terminology + ?Sized>(
+    terminology: &T,
+    questions: &[Validation],
+) -> Vec<Result<ValidateOutcome, Reason>> {
+    let mut answers: Vec<Option<Result<ValidateOutcome, Reason>>> = Vec::new();
+    let mut sent = Vec::new();
+    for question in questions {
+        // NOTE: a batch holding one question the release cannot carry is refused whole, so it
+        // is set aside with its refusal and the others go; no specification governs this.
+        match terminology.supports(question) {
+            Ok(()) => {
+                sent.push(question.clone());
+                answers.push(None);
+            }
+            Err(error) => answers.push(Some(Err(failure(&error)))),
+        }
+    }
+    let mut replies: Vec<Result<ValidateOutcome, Reason>> =
+        match terminology.validate_all(&sent).await {
+            Ok(replies) if replies.len() == sent.len() => replies
+                .into_iter()
+                .map(|reply| reply.map_err(|error| failure(&error)))
+                .collect(),
+            Ok(_) => sent.iter().map(|_| Err(batch_arity())).collect(),
+            Err(error) => sent.iter().map(|_| Err(failure(&error))).collect(),
+        };
+    replies.reverse();
+    answers
+        .into_iter()
+        .map(|answer| {
+            answer
+                .or_else(|| replies.pop())
+                .unwrap_or_else(|| Err(batch_arity()))
+        })
+        .collect()
 }
 
 /// The reason a failed call leaves a binding unevaluated.

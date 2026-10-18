@@ -10,6 +10,7 @@ mod compose;
 mod eu;
 mod server;
 mod strengths;
+mod stu3;
 
 use ferrobridge_validator::report::Constraint;
 use ferrobridge_validator::report::Reason;

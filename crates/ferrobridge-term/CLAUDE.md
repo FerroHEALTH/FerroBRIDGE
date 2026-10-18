@@ -20,7 +20,9 @@ invocation and the failure shape.
   before encoding it.
 - **A parameter a release does not declare is refused, never dropped.** STU3
   has no `$translate` `url` and no `$validate-code` `valueSetVersion`, so a
-  request naming one is `Error::UnsupportedParameter` before anything is sent.
+  request naming one is `Error::UnsupportedParameter` before anything is sent,
+  and `Client::check` answers the same question without sending, so a
+  caller can set such a request aside before a batch.
   A parameter STU3 declares under another name (`version` for R4's
   `systemVersion`) is mapped, with the citation beside the mapping.
 - **A negative answer stated in `out` parameters is an outcome; a refusal is an
