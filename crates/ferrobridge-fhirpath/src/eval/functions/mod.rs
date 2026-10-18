@@ -9,10 +9,11 @@ mod conversion;
 mod fhir;
 mod math;
 mod strings;
+mod text;
 mod tree;
 
 use super::error::EvalError;
-use super::{Engine, Frame};
+use super::{Engine, Frame, STU3_FUNCTIONS};
 use crate::ast::Expr;
 use crate::value::{Collection, Item};
 
@@ -99,6 +100,11 @@ impl<'a> Engine<'_, 'a> {
         args: &[Expr],
         frame: &Frame<'a>,
     ) -> Result<Collection<'a>, EvalError> {
+        if STU3_FUNCTIONS.contains(&name) && !self.env.stu3_functions {
+            return Err(EvalError::UnknownFunction {
+                name: String::from(name),
+            });
+        }
         let call = Call {
             engine: self,
             name,
@@ -106,6 +112,9 @@ impl<'a> Engine<'_, 'a> {
             args,
             frame,
         };
+        if let Some(result) = text::call(&call)? {
+            return Ok(result);
+        }
         if let Some(result) = collections::call(&call)? {
             return Ok(result);
         }

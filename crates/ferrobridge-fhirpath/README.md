@@ -33,6 +33,13 @@ error and an empty result are distinct outcomes.
 `htmlChecks()` reads the narrative rules of FHIR R4. `trace()` logs through
 `tracing` the name, the count and the item types, never a value.
 
+The default evaluator is FHIRPath N1 2.0.0, the release FHIR R4 cites, so a
+function only a later release defines is an error.
+`Environment::with_fhirpath_stu3_functions` admits the functions FHIRPath
+3.0.0 adds as Standard for Trial Use that `eval::STU3_FUNCTIONS` lists, of
+which `matchesFull()`, `encode()`, `decode()`, `escape()`, `unescape()`,
+`trim()`, `split()` and `join()` are implemented.
+
 Quantities compare, convert and add across commensurable UCUM units, in the
 more granular of the two, and `toQuantity(unit)` converts to the unit asked
 for. A product or a quotient carries the UCUM unit with identical units
@@ -52,8 +59,10 @@ licence of this crate.
 
 ## Conformance
 
-The HL7 FHIRPath test suite for FHIR R4 runs as the `fhirpath-r4` corpus of
-the FerroBRIDGE conformance gate; every failing test records its reason.
+The HL7 FHIRPath test suite for FHIR R4 runs as two corpora of the
+FerroBRIDGE conformance gate: `fhirpath-r4-stu3` holds the tests that call a
+function FHIRPath 3.0.0 adds, run with the opt-in, and `fhirpath-r4` every
+other test, run as N1. Every failing test records its reason.
 Every invariant of the FHIR R4 core package parses and passes the static check
 against the element it constrains.
 

@@ -21,6 +21,8 @@ publish = true
 include = ["src/**", "vendor/ucum/**", "README.md", "LICENSE"]
 
 [dependencies]
+# The base64 and url base64 forms of FHIRPath 3.0.0 encode() and decode().
+base64.workspace = true
 chumsky.workspace = true
 # The R4 element table is the type source of the R4 model.
 fhir-types = { workspace = true, features = ["r4", "resources"] }
@@ -32,6 +34,8 @@ regex.workspace = true
 # The exact decimal of System.Decimal and System.Quantity; `maths` carries the
 # checked exp, ln, power and square root of N1 section 5.7.
 rust_decimal = { workspace = true, features = ["maths"] }
+# The JSON string form of FHIRPath 3.0.0 escape() and unescape().
+serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
@@ -39,7 +43,6 @@ tracing.workspace = true
 ferrobridge-testkit.workspace = true
 quick-xml.workspace = true
 serde.workspace = true
-serde_json.workspace = true
 
 [lints]
 workspace = true
