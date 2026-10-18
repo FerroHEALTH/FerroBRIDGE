@@ -198,9 +198,9 @@ pub fn status_of(person: &PersonId, link: &SubjectLink) -> EhrStatus {
                 value: String::from(EHR_STATUS_ARCHETYPE),
             },
             template_id: None,
-            // NOTE: <https://specifications.openehr.org/releases/RM/development/common.html#_archetyped_class>,
-            // `rm_version` names the RM the value was built against, the `v1_2` generation (#844).
-            rm_version: String::from(openehr_rm::Generation::V1_2.spec_version()),
+            // NOTE: RM Common IM Release 1.1.0 §3.2.3 `rm_version`; this `EHR_STATUS` carries no attribute
+            // the development line changed, so it was created to Release 1.1.0.
+            rm_version: String::from(openehr_rm::Generation::V1_1.spec_version()),
         }),
         feeder_audit: None,
         subject: PartySelf {
@@ -279,16 +279,13 @@ mod tests {
     }
 
     #[test]
-    fn the_status_names_the_rm_release_its_types_come_from() {
+    fn the_status_names_rm_release_1_1_0() {
         let person = PersonId::new("http://example.org/mrn", "p-1").expect("a legal person id");
         let status = status_of(&person, &link("PERSON"));
         let details = status
             .archetype_details
             .expect("an archetype root carries its details");
-        assert_eq!(
-            openehr_rm::Generation::V1_2.spec_version(),
-            details.rm_version
-        );
+        assert_eq!("1.1.0", details.rm_version);
     }
 
     #[test]

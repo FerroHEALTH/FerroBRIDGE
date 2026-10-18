@@ -67,7 +67,7 @@ expression: inbound.value().value()
           "_type": "ARCHETYPE_ID",
           "value": "openEHR-EHR-EVALUATION.problem_diagnosis.v1"
         },
-        "rm_version": "1.2.0"
+        "rm_version": "1.1.0"
       },
       "subject": {
         "_type": "PARTY_SELF"
@@ -101,7 +101,7 @@ expression: inbound.value().value()
       "_type": "ARCHETYPE_ID",
       "value": "openEHR-EHR-COMPOSITION.ferrobridge_report.v1"
     },
-    "rm_version": "1.2.0",
+    "rm_version": "1.1.0",
     "template_id": {
       "_type": "TEMPLATE_ID",
       "value": "ferrobridge.diagnose.v1"

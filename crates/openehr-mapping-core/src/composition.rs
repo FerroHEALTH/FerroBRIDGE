@@ -318,6 +318,10 @@ impl WebTemplateIndex {
     /// timestamp, which the builder uses for the `ctx/time` default alone
     /// (Simplified Formats, §Context); this crate reads no clock.
     ///
+    /// Every `ARCHETYPED.rm_version` names the RM release the composition
+    /// conforms to: Release 1.1.0, unless it holds an element the development
+    /// line changed (a `GENERIC_ENTRY` whose `data` is no `ITEM_TREE`).
+    ///
     /// # Errors
     ///
     /// Returns [`PathError::UnknownNode`] when a value names a node of another
@@ -340,12 +344,13 @@ impl WebTemplateIndex {
                 source: Box::new(source),
             }
         })?;
-        let built =
+        let mut built =
             openehr_sdt::flat::build::build_composition(&document, self.web_template(), now)
                 .map_err(|source| PathError::CompositionBuild {
                     template_id: self.template_id().to_owned(),
                     source: Box::new(source),
                 })?;
+        crate::release::stamp(&mut built);
         let messages = openehr_sdt::rm_instance::validate_composition(&built, self.web_template());
         if !messages.is_empty() {
             return Err(PathError::InvalidComposition {
@@ -369,6 +374,7 @@ impl WebTemplateIndex {
     /// paths (Simplified Formats, §Flat format), the second form a composition
     /// is exchanged in. `now` is the caller's current timestamp, used for the
     /// `ctx/time` default alone; this crate reads no clock.
+    /// The `rm_version` stamp follows [`Self::build_composition`].
     ///
     /// # Errors
     ///
@@ -386,12 +392,13 @@ impl WebTemplateIndex {
                 source: Box::new(source),
             }
         })?;
-        let built =
+        let mut built =
             openehr_sdt::flat::build::build_composition(&document, self.web_template(), now)
                 .map_err(|source| PathError::CompositionBuild {
                     template_id: self.template_id().to_owned(),
                     source: Box::new(source),
                 })?;
+        crate::release::stamp(&mut built);
         let messages = openehr_sdt::rm_instance::validate_composition(&built, self.web_template());
         if !messages.is_empty() {
             return Err(PathError::InvalidComposition {
