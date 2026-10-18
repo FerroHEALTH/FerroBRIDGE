@@ -109,6 +109,13 @@ crates on crates.io.
 
 ### Fixed
 
+- `/health/readiness` no longer answers `200` while the server is still
+  handing the listener from the boot probe routes to the lanes (#796). When
+  the CDR was not ready at boot, a successful retry marked the `startup`
+  indicator up while the probe routes, which answer `503` for every other
+  route, were still serving, so readiness reported ready a moment before
+  the lanes did. The indicator now stays down, naming the handover, until
+  the lanes serve their own readiness.
 - The FHIRPath `is` operator and `is()` function test a FHIR primitive
   against the types it specializes, so `Patient.gender is string` is true,
   as FHIRPath N1 §6.3.1 and the R4 `code` definition ask; `ofType()` and
