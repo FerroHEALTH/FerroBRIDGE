@@ -10,14 +10,17 @@
 # reads.
 #
 #   scripts/checks/pin-freshness.sh
+#   scripts/checks/pin-freshness.sh --self-test
 #
 # Reads each pin from docs/VERSIONS.md and each newest release tag from the
 # upstream project's GitHub releases, which is the tag the container image and
 # the installer both carry. A corpus pinned by commit on a repository with no
 # releases is read against the newest commit of the branch it follows, and a
 # FHIR package (a core package, THO, the v2-to-FHIR guide, an examples package
-# or a root of the profile set) against the registry's `latest` version. Needs
-# an authenticated `gh`, curl and jq.
+# or a root of the profile set) against the registry's `latest` version, and
+# the Chrome for Testing release against the newest Stable version its JSON
+# endpoint lists. Needs an authenticated `gh`, curl and jq. `--self-test` runs
+# the Chrome for Testing reader over fixtures and needs no network.
 #
 # Exit 0 when every pin is current, 1 when at least one is behind (each such
 # line starts with STALE), 2 when a release could not be read, so a network
@@ -52,6 +55,74 @@ matrix_pin() {
       if (label == want) { split(value, f, " "); print f[1]; exit }
     }' "$MATRIX"
 }
+
+# The Chrome for Testing release the browser journeys run Chrome and
+# chromedriver at, read against the newest Stable release the Chrome for
+# Testing JSON endpoints publish (#821).
+readonly CHROME_LABEL="Chrome for Testing (Chrome and chromedriver)"
+readonly CHROME_FEED=https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
+
+# The version of the Stable channel in the last-known-good-versions JSON on
+# stdin; fails when the document names no Stable version.
+chrome_stable() {
+  jq -er '.channels.Stable.version | select(type == "string" and length > 0)'
+}
+
+# The line one pin LABEL at PINNED gets against the newest release LATEST read
+# from SOURCE: `current` when they are equal, `STALE` when they differ.
+verdict() {
+  if [ "$2" = "$3" ]; then
+    printf 'current    %s %s (%s)\n' "$1" "$2" "$4"
+  else
+    printf 'STALE      %s: pinned %s, newest upstream release %s (%s)\n' "$1" "$2" "$3" "$4"
+  fi
+}
+
+# Runs the Chrome for Testing reader and the verdict over fixtures, and the
+# matrix reader over the Chrome row, with no network.
+self_test() {
+  local failures=0 got
+  expect() {
+    if [ "$2" != "$1" ]; then
+      printf 'pin-freshness: self-test: %s gave "%s", wanted "%s"\n' "$3" "$2" "$1" >&2
+      failures=$((failures + 1))
+    fi
+  }
+  got="$(chrome_stable <<< '{"timestamp":"2026-10-17T00:00:00Z","channels":{"Stable":{"channel":"Stable","version":"155.0.8059.84","revision":"1"},"Beta":{"channel":"Beta","version":"156.0.8100.10","revision":"2"}}}')"
+  expect "155.0.8059.84" "$got" "the Stable channel of a feed"
+  if got="$(chrome_stable <<< '{"channels":{"Beta":{"version":"156.0.8100.10"}}}' 2>/dev/null)"; then
+    expect "a failure" "$got" "a feed with no Stable channel"
+  fi
+  if got="$(chrome_stable <<< 'not json' 2>/dev/null)"; then
+    expect "a failure" "$got" "a feed that is no JSON"
+  fi
+  got="$(verdict "$CHROME_LABEL" 1.2.3.4 1.2.3.4 feed | cut -c1-10)"
+  expect "current   " "$got" "an equal pin"
+  got="$(verdict "$CHROME_LABEL" 1.2.3.4 1.2.3.5 feed | cut -c1-10)"
+  expect "STALE     " "$got" "a pin behind the newest Stable"
+  got="$(matrix_pin "$CHROME_LABEL")"
+  case "$got" in
+    [0-9]*.[0-9]*.[0-9]*.[0-9]*) ;;
+    *) expect "a four-part version" "$got" "the Chrome for Testing row of $MATRIX" ;;
+  esac
+  if [ "$failures" -gt 0 ]; then
+    echo "pin-freshness: self-test: $failures check(s) failed" >&2
+    exit 1
+  fi
+  echo "pin-freshness: self-test passed"
+}
+
+case "${1:-}" in
+  "") ;;
+  --self-test)
+    self_test
+    exit 0
+    ;;
+  *)
+    echo "usage: scripts/checks/pin-freshness.sh [--self-test]" >&2
+    exit 2
+    ;;
+esac
 
 stale=0
 unreadable=0
@@ -189,6 +260,18 @@ while IFS=$'\t' read -r label url; do
   fi
 done <<< "$WATCHED_PACKAGES"
 
+pinned="$(matrix_pin "$CHROME_LABEL")"
+if [ -z "$pinned" ]; then
+  printf 'UNREADABLE %s: no pin row in %s\n' "$CHROME_LABEL" "$MATRIX"
+  unreadable=1
+elif ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$CHROME_FEED" | chrome_stable 2>&1)"; then
+  printf 'UNREADABLE %s: could not read the newest Stable release from %s (%s)\n' \
+    "$CHROME_LABEL" "$CHROME_FEED" "$latest"
+  unreadable=1
+else
+  verdict "$CHROME_LABEL" "$pinned" "$latest" "$CHROME_FEED"
+  [ "$pinned" = "$latest" ] || stale=1
+fi
 
 [ "$unreadable" -eq 0 ] || exit 2
 exit "$stale"
