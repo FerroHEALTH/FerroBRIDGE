@@ -4,8 +4,8 @@
 //! The FHIR release a package set is read as and an instance is validated
 //! in.
 //!
-//! A release names its generated `StructureDefinition` and
-//! `ElementDefinition`, which the validator reads through the release-neutral
+//! A release names its generated `StructureDefinition`, `ElementDefinition`,
+//! `ValueSet` and `CodeSystem`, which the validator reads through the release-neutral
 //! `fhir_types::definition` traits, its element table, and the FHIRPath type
 //! model its invariants are checked and evaluated against. [`R4`] and
 //! [`Stu3`] are the two releases the validator walks.
@@ -14,8 +14,10 @@ use std::fmt;
 
 use ferrobridge_fhirpath::model::Model;
 use fhir_types::codec::Json;
+use fhir_types::definition::CodeSystemRead;
 use fhir_types::definition::ElementDefinitionRead;
 use fhir_types::definition::StructureDefinitionRead;
+use fhir_types::definition::ValueSetRead;
 use fhir_types::schema::Schemas;
 
 /// Keeps the set of releases closed to this crate.
@@ -38,13 +40,14 @@ pub trait Release:
     /// The release's generated `ElementDefinition`.
     type ElementDefinition: ElementDefinitionRead + fmt::Debug + Send + Sync;
 
+    /// The release's generated `ValueSet`.
+    type ValueSet: ValueSetRead + Json + fmt::Debug + Send + Sync;
+
+    /// The release's generated `CodeSystem`.
+    type CodeSystem: CodeSystemRead + Json + fmt::Debug + Send + Sync;
+
     /// The release's name in messages, `R4` or `STU3`.
     const NAME: &'static str;
-
-    /// Whether the package set's `ValueSets` and `CodeSystems` are read to
-    /// decide a binding; where they are not, every binding is one the
-    /// package set cannot decide.
-    const READS_TERMINOLOGY: bool;
 
     /// The codes an extension's definition types its contexts with: R4
     /// `extension-context-type`, STU3 `extension-context`.
@@ -67,9 +70,10 @@ impl sealed::Sealed for R4 {}
 impl Release for R4 {
     type StructureDefinition = fhir_types::r4::structure_definition::StructureDefinition;
     type ElementDefinition = fhir_types::r4::element_definition::ElementDefinition;
+    type ValueSet = fhir_types::r4::value_set::ValueSet;
+    type CodeSystem = fhir_types::r4::code_system::CodeSystem;
 
     const NAME: &'static str = "R4";
-    const READS_TERMINOLOGY: bool = true;
     const CONTEXT_TYPES: &'static [&'static str] = &["fhirpath", "element", "extension"];
 
     fn schemas() -> &'static Schemas {
@@ -94,10 +98,10 @@ impl sealed::Sealed for Stu3 {}
 impl Release for Stu3 {
     type StructureDefinition = fhir_types::stu3::structure_definition::StructureDefinition;
     type ElementDefinition = fhir_types::stu3::element_definition::ElementDefinition;
+    type ValueSet = fhir_types::stu3::value_set::ValueSet;
+    type CodeSystem = fhir_types::stu3::code_system::CodeSystem;
 
     const NAME: &'static str = "STU3";
-    // TODO(#876): read the STU3 ValueSets and CodeSystems through a release-neutral read.
-    const READS_TERMINOLOGY: bool = false;
     const CONTEXT_TYPES: &'static [&'static str] = &["resource", "datatype", "extension"];
 
     fn schemas() -> &'static Schemas {

@@ -15,19 +15,16 @@ Validator is prior art and the agreement target (#442), never the oracle.
 ## No second model
 
 The release is a type parameter: `release::Release` is sealed to `R4` and
-`Stu3`, and names the generated `StructureDefinition` and
-`ElementDefinition`, the element table (`SCHEMAS`) and the FHIRPath model.
-`PackageSet<R>` and `Validator<'_, R>` default to R4 (`PackageSet::load`),
-and `PackageSet::<Stu3>::load_release` reads STU3. A StructureDefinition
-decodes into the release's generated model and every check reads it through
-`fhir_types::definition::{ElementDefinitionRead, StructureDefinitionRead}`;
-an instance stays a `fhir_types::codec::Value`. When the generated model
-cannot carry what a check needs, that is a generator change
-(`.claude/rules/codegen.md`), never a local struct. The `ValueSets` and
-`CodeSystems` decode into the R4 model and are indexed only for a release
-with `READS_TERMINOLOGY`; STU3 has no release-neutral read of them yet
-(#876), so an STU3 binding is never decided locally and is listed with
-`Reason::TerminologyNotRead`.
+`Stu3`, and names the generated `StructureDefinition`, `ElementDefinition`,
+`ValueSet` and `CodeSystem`, the element table (`SCHEMAS`) and the FHIRPath
+model. `PackageSet<R>` and `Validator<'_, R>` default to R4
+(`PackageSet::load`), and `PackageSet::<Stu3>::load_release` reads STU3.
+Every resource decodes into the release's generated model and every check
+reads it through `fhir_types::definition` (`ElementDefinitionRead`,
+`StructureDefinitionRead`, `ValueSetRead`, `CodeSystemRead`); an instance
+stays a `fhir_types::codec::Value`. When the generated model cannot carry
+what a check needs, that is a generator change (`.claude/rules/codegen.md`),
+never a local struct.
 
 ## Layout
 

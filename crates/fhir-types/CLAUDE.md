@@ -45,7 +45,12 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
   the elements (#859): url, version, type, base, kind, `abstract`,
   derivation, the snapshot, and the context, where STU3's `contextType` with
   its list of strings reads in the shape of R4's `type` and `expression`
-  entries, each release's codes kept.
+  entries, each release's codes kept. `definition::ValueSetRead` and
+  `definition::CodeSystemRead` (#876) read the composition, the expansion
+  and the concepts a binding is decided from, a nested concept or expansion
+  entry through the same trait as its parent (`ConceptRead`,
+  `ContainsRead`) and a concept property value in its JSON form; STU3's
+  `uri` imports read as R4's canonicals.
 - `search_parameters::SEARCH_PARAMETERS` is the one search parameter registry
   per version, behind `resources`: a consumer checks a search parameter code,
   type or canonical against it and never keeps its own copy of the

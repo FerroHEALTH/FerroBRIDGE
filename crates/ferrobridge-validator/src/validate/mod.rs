@@ -131,6 +131,15 @@ pub enum ValidateError {
         #[source]
         source: EncodeError,
     },
+    /// A concept property value of a code system has no JSON form.
+    #[error("a concept property value of {canonical} has no JSON form")]
+    CodeSystemValue {
+        /// The code system, as `url` or `url|version`.
+        canonical: String,
+        /// The encode error.
+        #[source]
+        source: EncodeError,
+    },
     /// The element table names a type it does not carry.
     #[error("the element table carries no type {name}")]
     UnknownType {

@@ -286,3 +286,203 @@ impl super::super::definition::StructureDefinitionRead
             .collect()
     }
 }
+
+#[cfg(feature = "terminology")]
+impl super::super::definition::ValueSetRead for super::value_set::ValueSet {
+    type Contains = super::value_set::ValueSetExpansionContains;
+
+    fn compose(&self) -> Option<super::super::definition::ComposeRead<'_>> {
+        self.compose
+            .as_ref()
+            .map(|item| super::super::definition::ComposeRead {
+                inactive: item.inactive.as_ref().and_then(|value| value.value),
+                includes: item
+                    .include
+                    .iter()
+                    .map(|item| super::super::definition::IncludeRead {
+                        system: item
+                            .system
+                            .as_ref()
+                            .and_then(|value| value.value.as_deref()),
+                        version: item
+                            .version
+                            .as_ref()
+                            .and_then(|value| value.value.as_deref()),
+                        concepts: item
+                            .concept
+                            .iter()
+                            .filter_map(|item| item.code.value.as_deref())
+                            .collect(),
+                        filters: item
+                            .filter
+                            .iter()
+                            .map(|item| super::super::definition::FilterRead {
+                                property: item.property.value.as_deref(),
+                                op: item.op.value.as_deref(),
+                                value: item.value.value.as_deref(),
+                            })
+                            .collect(),
+                        value_sets: item
+                            .value_set
+                            .iter()
+                            .filter_map(|value| value.value.as_deref())
+                            .collect(),
+                    })
+                    .collect(),
+                excludes: item
+                    .exclude
+                    .iter()
+                    .map(|item| super::super::definition::IncludeRead {
+                        system: item
+                            .system
+                            .as_ref()
+                            .and_then(|value| value.value.as_deref()),
+                        version: item
+                            .version
+                            .as_ref()
+                            .and_then(|value| value.value.as_deref()),
+                        concepts: item
+                            .concept
+                            .iter()
+                            .filter_map(|item| item.code.value.as_deref())
+                            .collect(),
+                        filters: item
+                            .filter
+                            .iter()
+                            .map(|item| super::super::definition::FilterRead {
+                                property: item.property.value.as_deref(),
+                                op: item.op.value.as_deref(),
+                                value: item.value.value.as_deref(),
+                            })
+                            .collect(),
+                        value_sets: item
+                            .value_set
+                            .iter()
+                            .filter_map(|value| value.value.as_deref())
+                            .collect(),
+                    })
+                    .collect(),
+            })
+    }
+
+    fn expansion(&self) -> Option<super::super::definition::ExpansionRead<'_, Self::Contains>> {
+        self.expansion
+            .as_ref()
+            .map(|item| super::super::definition::ExpansionRead {
+                total: item.total.as_ref().and_then(|value| value.value),
+                offset: item.offset.as_ref().and_then(|value| value.value),
+                contains: item.contains.as_slice(),
+            })
+    }
+}
+
+#[cfg(feature = "terminology")]
+impl super::super::definition::ContainsRead for super::value_set::ValueSetExpansionContains {
+    fn system(&self) -> Option<&str> {
+        self.system
+            .as_ref()
+            .and_then(|value| value.value.as_deref())
+    }
+
+    fn version(&self) -> Option<&str> {
+        self.version
+            .as_ref()
+            .and_then(|value| value.value.as_deref())
+    }
+
+    fn code(&self) -> Option<&str> {
+        self.code.as_ref().and_then(|value| value.value.as_deref())
+    }
+
+    fn is_abstract(&self) -> Option<bool> {
+        self.r#abstract.as_ref().and_then(|value| value.value)
+    }
+
+    fn contains(&self) -> &[Self] {
+        self.contains.as_slice()
+    }
+}
+
+#[cfg(feature = "terminology")]
+impl super::super::definition::CodeSystemRead for super::code_system::CodeSystem {
+    type Concept = super::code_system::CodeSystemConcept;
+
+    fn content(&self) -> Option<&str> {
+        self.content.value.as_deref()
+    }
+
+    fn hierarchy_meaning(&self) -> Option<&str> {
+        self.hierarchy_meaning
+            .as_ref()
+            .and_then(|value| value.value.as_deref())
+    }
+
+    fn case_sensitive(&self) -> Option<bool> {
+        self.case_sensitive.as_ref().and_then(|value| value.value)
+    }
+
+    fn properties(&self) -> Vec<super::super::definition::PropertyRead<'_>> {
+        self.property
+            .iter()
+            .map(|item| super::super::definition::PropertyRead {
+                code: item.code.value.as_deref(),
+                uri: item.uri.as_ref().and_then(|value| value.value.as_deref()),
+            })
+            .collect()
+    }
+
+    fn concepts(&self) -> &[Self::Concept] {
+        self.concept.as_slice()
+    }
+}
+
+#[cfg(feature = "terminology")]
+impl super::super::definition::ConceptRead for super::code_system::CodeSystemConcept {
+    fn code(&self) -> Option<&str> {
+        self.code.value.as_deref()
+    }
+
+    fn display(&self) -> Option<&str> {
+        self.display
+            .as_ref()
+            .and_then(|value| value.value.as_deref())
+    }
+
+    fn designations(&self) -> Vec<&str> {
+        self.designation
+            .iter()
+            .filter_map(|item| item.value.value.as_deref())
+            .collect()
+    }
+
+    fn properties(
+        &self,
+    ) -> Result<
+        Vec<super::super::definition::ConceptPropertyRead<'_>>,
+        super::super::codec::EncodeError,
+    > {
+        self.property
+            .iter()
+            .map(|item| {
+                Ok(super::super::definition::ConceptPropertyRead {
+                    code: item.code.value.as_deref(),
+                    value: item
+                        .value
+                        .to_json_parts()
+                        .map(
+                            |(suffix, value, element)| super::super::definition::ChoiceValue {
+                                suffix,
+                                value,
+                                element,
+                            },
+                        )
+                        .map(Some)?,
+                })
+            })
+            .collect()
+    }
+
+    fn concepts(&self) -> &[Self] {
+        self.concept.as_slice()
+    }
+}

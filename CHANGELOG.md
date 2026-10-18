@@ -25,6 +25,20 @@ crates on crates.io.
 
 ### Added
 
+- `fhir-types` 0.1.126 reads `ValueSet` and `CodeSystem` release-neutrally
+  (#876). `definition::ValueSetRead` covers the composition (includes,
+  excludes, filters, imports, `inactive`) and the expansion, and
+  `definition::CodeSystemRead` covers content, hierarchy meaning, case
+  sensitivity, the declared properties and the concepts. A nested concept or
+  expansion entry is read through the same trait as its parent
+  (`ConceptRead`, `ContainsRead`). Every version implements them from its own
+  package, and STU3's `uri` imports read as R4's canonicals. The profile
+  validator now decides STU3 bindings from the STU3 `ValueSets` and
+  `CodeSystems` of the package set as it does R4 ones. `Release` names the
+  release's `ValueSet` and `CodeSystem`, `PackageSet::value_set` and
+  `code_system` answer in the release's model, and
+  `Reason::TerminologyNotRead` is gone.
+
 - The profile validator validates STU3 resources against STU3 profiles
   (#838). `PackageSet::<Stu3>::load_release` reads a package set as STU3, and
   `Validator` over it walks the STU3 element table with the checks, refusals
