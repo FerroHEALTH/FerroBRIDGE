@@ -27,6 +27,7 @@ pub mod loader;
 pub mod path;
 pub mod position;
 pub mod registry;
+mod release;
 pub mod schema;
 pub mod template;
 pub mod value;

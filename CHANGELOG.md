@@ -183,6 +183,12 @@ crates on crates.io.
 
 ### Fixed
 
+- Every composition the bridge builds, and every `EHR_STATUS` the facade
+  creates, names RM Release 1.1.0 in `ARCHETYPED.rm_version` in place of
+  1.2.0, a release openEHR has not published (RM Common IM Release 1.1.0
+  §3.2.3). A composition holding a `GENERIC_ENTRY` whose `data` is no
+  `ITEM_TREE`, which only the development line admits, keeps 1.2.0
+  (`openehr-mapping-core` 0.1.114, `fhirconnect` 0.1.144; #844).
 - `fhir-types` 0.1.125: the release-neutral `TypeRead::regex` reads a
   primitive's lexical form from the STU3 extension
   `structuredefinition-regex` as well as from R4's `regex`, so an STU3
