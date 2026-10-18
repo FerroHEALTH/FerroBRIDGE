@@ -61,11 +61,12 @@ construction.
 - **Look at the result.** After the switch, run every console, capture every
   screen in light and dark, and look at each screenshot before calling it
   done ([[autonomous-loop]]).
-- **FerroEHR, FerroFED and FerroTERM lead; FerroBRIDGE never does** (owner,
-  2026-10-18: "FerroBRIDGE is the newest of them all so please FerroEHR and
-  FerroFED and FerroTERM are more leading"). A component takes FerroEHR's
-  shape first, then FerroFED's, then FerroTERM's; FerroBRIDGE's console
-  patterns are replaced.
+- **The best of each product, in one harmonized style** (owner,
+  2026-10-18: "we just need to take the best of each product … create an
+  harmonized UI style"). Each component compares the four products' versions
+  and takes the best on its merits; FerroBRIDGE's console is the newest and
+  usually loses. The chosen piece is restyled to the one type scale, spacing,
+  radius, hover and focus treatment, so no component looks foreign.
 - **Quality control before every FerroUI release.** The gallery's stat cards,
   tabs and hover states shipped worse than FerroEHR's and the owner caught
   it. Every release PR compares each component with the reference product's
