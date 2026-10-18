@@ -80,8 +80,8 @@ The `Client::translate` documentation carries the worked example.
 
 ## Status
 
-The crate version is a placeholder while the crate line settles; the tracker
-carries the build order.
+The crate is on the crate line (`docs/VERSIONS.md`): every change moves it one
+patch, a breaking change included, so pin it exactly.
 
 ## Licence
 

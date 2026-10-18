@@ -28,8 +28,10 @@ rule, machine-enforced by the `crate-version-guard` CI job.
   adopts the product version or a specification version; it is the crates' own
   SemVer line. `fhir-types` carries the line (its pin is the `fhir-types` row
   of `docs/VERSIONS.md`); `openehr-mapping-core` and `fhirconnect` joined it
-  at their first publish (#397), and every other member still holds its name
-  at the 0.0.0 placeholder until it joins the line at its own first publish.
+  at their first publish (#397), `ferrobridge-term`, `ferrobridge-fhirpath`
+  and `ferrobridge-validator` at 0.1.126 (#432), and every other member still
+  holds its name at the 0.0.0 placeholder until it joins the line at its own
+  first publish.
 
 ## The bump rule
 

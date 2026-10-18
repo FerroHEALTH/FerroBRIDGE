@@ -164,8 +164,9 @@ both in full.
 ## Crates
 
 The library crates are published on crates.io. `fhir-types`,
-`openehr-mapping-core` and `fhirconnect` are on the crate line; the other
-crates hold their names at 0.0.0 until their first release on it. The book's
+`openehr-mapping-core`, `fhirconnect`, `ferrobridge-term`,
+`ferrobridge-fhirpath` and `ferrobridge-validator` are on the crate line; the
+other crates hold their names at 0.0.0 until their first release on it. The book's
 [crate versions](https://ferrobridge.eu/docs/contribute/crate-versions.html)
 page explains how they move: every change moves a crate one patch, a breaking
 change included, so pin a crate exactly (for example `fhirconnect = "=0.1.136"`).

@@ -58,8 +58,8 @@ label is a reviewed decision rather than a local one.
 
 ## Two things that are normal
 
-**A 0.0.0 version is a name reservation.** Every member except `fhir-types`
-still holds its crates.io name at 0.0.0, and the guard says so rather than
+**A 0.0.0 version is a name reservation.** A member that has not joined the
+crate line holds its crates.io name at 0.0.0, and the guard says so rather than
 demanding a bump: content under a reservation changes until the first real
 version.
 
