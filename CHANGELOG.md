@@ -25,6 +25,12 @@ crates on crates.io.
 
 ### Added
 
+- A FHIRconnect sub-context's `template.id` is checked against the template
+  the parent's OPT 1.4 states at the slot node (`C_ARCHETYPE_ROOT.template_id`,
+  read by the new `WebTemplateIndex::embedded_template`). A different template
+  is refused as `fc-sub-context-template-mismatch`, and a slot node that states
+  none leaves the warning `fc-sub-context-template-undecided`
+  (`sub-contexts.adoc` §Validation errors; #886).
 - FHIRconnect sub-contexts (#864, `types-of-mapping-files/sub-contexts.adoc`).
   `fhirconnect` 0.1.143 reads `slotContext` on a mapping, and `scope` (`root`
   or `sub`) and `contexts` on a context. The strict schemas carry all three,

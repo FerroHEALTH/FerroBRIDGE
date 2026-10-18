@@ -3,6 +3,7 @@
 
 //! The concept methods, the slots and the `manual` entries of a mapping.
 
+use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::ModelPath;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::matching::node_id_matches;
@@ -265,7 +266,7 @@ impl<'a> Compiler<'a> {
             declaration.start.position(),
             declaration.start.value().clone(),
         );
-        // TODO(#886): check `template.id` against the template embedded at the slot node.
+        self.check_embedded_template(file, entered, sub, scope, path);
         let extensions = self.extensions_of(sub);
         let saved = core::mem::replace(&mut self.extensions, extensions);
         self.entered.push(sub);
@@ -291,6 +292,65 @@ impl<'a> Compiler<'a> {
                 mappings,
             },
             other => other,
+        }
+    }
+
+    /// Checks that the `template.id` of `sub` is the template the parent's
+    /// operational template embeds at the slot node (`sub-contexts.adoc`,
+    /// §Rules and §Validation errors, "template mismatch").
+    ///
+    /// A slot node at which the operational template states no embedded
+    /// template leaves the rule undecided, and that is a warning. No
+    /// specification governs the undecided case: our own design.
+    fn check_embedded_template(
+        &mut self,
+        file: &'a ModelMappingFile,
+        entered: &Located<MappingName>,
+        sub: &'a ContextMappingFile,
+        scope: &Scope,
+        path: &ModelPath,
+    ) {
+        let Some(declared) = sub.context().template.id.as_ref() else {
+            return;
+        };
+        let Ok((node, rest, _)) = self.locate(&scope.openehr) else {
+            return;
+        };
+        if !rest.segments.is_empty() {
+            return;
+        }
+        let owner = file.header().name().value();
+        let name = entered.value();
+        match self.template.embedded_template(node) {
+            Some(embedded) if embedded == declared.value() => {}
+            Some(embedded) => self.diagnostics.push(diagnostic(
+                file.file(),
+                owner,
+                ResolveCode::SubContextTemplateMismatch,
+                entered.position(),
+                path,
+                format!(
+                    "`{name}` declares the template `{}` and the operational template embeds \
+                     `{embedded}` at `{}`",
+                    declared.value(),
+                    node.aql_path().as_str()
+                ),
+            )),
+            None => self.diagnostics.push(
+                Diagnostic::warning(
+                    file.file().to_path_buf(),
+                    ResolveCode::SubContextTemplateUndecided.into(),
+                    format!(
+                        "`{name}` declares the template `{}` and the operational template \
+                         states no embedded template at `{}`, so the two cannot be compared",
+                        declared.value(),
+                        node.aql_path().as_str()
+                    ),
+                )
+                .with_position(entered.position())
+                .with_mapping_name(owner.clone())
+                .with_model_path(path.clone()),
+            ),
         }
     }
 

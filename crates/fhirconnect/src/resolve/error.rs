@@ -106,6 +106,12 @@ pub enum ResolveCode {
     /// A `slotContext` enters a context already on the chain of entered
     /// contexts.
     CyclicSubContext,
+    /// A sub-context's `template.id` is not the template the parent's
+    /// operational template embeds at the slot node.
+    SubContextTemplateMismatch,
+    /// The parent's operational template states no embedded template at the
+    /// slot node, so a sub-context's `template.id` cannot be checked.
+    SubContextTemplateUndecided,
 }
 
 impl ResolveCode {
@@ -152,6 +158,8 @@ impl ResolveCode {
             Self::SubContextAsRoot => "fc-sub-context-as-root",
             Self::SubContextComposition => "fc-sub-context-composition",
             Self::CyclicSubContext => "fc-cyclic-sub-context",
+            Self::SubContextTemplateMismatch => "fc-sub-context-template-mismatch",
+            Self::SubContextTemplateUndecided => "fc-sub-context-template-undecided",
         }
     }
 
@@ -198,6 +206,8 @@ impl ResolveCode {
             Self::SubContextAsRoot,
             Self::SubContextComposition,
             Self::CyclicSubContext,
+            Self::SubContextTemplateMismatch,
+            Self::SubContextTemplateUndecided,
         ]
     }
 }

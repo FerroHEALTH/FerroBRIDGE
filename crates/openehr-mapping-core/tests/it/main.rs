@@ -9,6 +9,7 @@
 mod anchors;
 mod corpus;
 mod diagnostic;
+mod embedded;
 mod header;
 mod malformed;
 mod paths;
