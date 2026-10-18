@@ -220,6 +220,17 @@ async fn a_plain_theme_post_returns_to_the_consoles_own_page_alone() -> Result<(
     .await?;
     assert_eq!(StatusCode::SEE_OTHER, response.status());
     assert_eq!("/about", header(&response, "location"));
+    for page in [
+        "/files",
+        "/files/fhirconnect/diagnose.yml",
+        "/edit",
+        "/playground",
+    ] {
+        let body = format!("theme=dark&back={}", page.replace('/', "%2F"));
+        let (response, _body) = send(&service, theme_post(&body, "text/html", &cookie)?).await?;
+        assert_eq!(StatusCode::SEE_OTHER, response.status(), "{page}");
+        assert_eq!(page, header(&response, "location"), "{page}");
+    }
     let (response, _body) = send(
         &service,
         theme_post(

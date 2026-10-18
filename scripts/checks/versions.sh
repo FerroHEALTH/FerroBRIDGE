@@ -34,6 +34,10 @@
 #                          the wasm-bindgen crate requirement, and the
 #                          Tailwind CSS and Binaryen releases of
 #                          scripts/release/viewer-{tools,site}.sh.
+#                          The browser journeys: the thirtyfour requirement,
+#                          the chrome-version of the ci.yml journeys job, and
+#                          the release and SHA-256 digests of
+#                          scripts/release/journey-tools.sh.
 #   6. docs toolchain      the mdBook, mdbook-toc and mdbook-mermaid defaults of
 #                          .github/actions/docs-toolchain/action.yml against
 #                          docs/VERSIONS.md.
@@ -420,6 +424,27 @@ if [ -f app/ferrobridge-viewer/Cargo.toml ]; then
   console_pin "Tailwind CSS" "${tailwind#v}" scripts/release/viewer-site.sh
   console_pin Binaryen "$(shell_pin binaryen_version scripts/release/viewer-tools.sh)" \
     scripts/release/viewer-tools.sh
+  # The browser journeys: the WebDriver client, the Chrome for Testing
+  # release the journeys job installs, and the local install of that release
+  # with each zip's SHA-256.
+  console_pin thirtyfour "$(manifest_req thirtyfour)" "the root Cargo.toml"
+  if [ -f .github/workflows/ci.yml ]; then
+    found="$(sed -nE 's|^[[:space:]]*chrome-version:[[:space:]]*([^[:space:]#]+).*|\1|p' .github/workflows/ci.yml | sort -u)"
+    if [ "$(printf '%s\n' "$found" | grep -c . || true)" -gt 1 ]; then
+      bad "Chrome for Testing: ci.yml installs more than one version ($(printf '%s' "$found" | tr '\n' ' '))"
+    else
+      console_pin "Chrome for Testing (Chrome and chromedriver)" "$found" .github/workflows/ci.yml
+    fi
+  fi
+  for pair in \
+    "Chrome for Testing (Chrome and chromedriver)|chrome_version" \
+    "Chrome for Testing, chrome-linux64.zip SHA-256|chrome_linux64_sha256" \
+    "Chrome for Testing, chrome-mac-arm64.zip SHA-256|chrome_mac_arm64_sha256" \
+    "Chrome for Testing, chromedriver-linux64.zip SHA-256|chromedriver_linux64_sha256" \
+    "Chrome for Testing, chromedriver-mac-arm64.zip SHA-256|chromedriver_mac_arm64_sha256"; do
+    console_pin "${pair%|*}" "$(shell_pin "${pair#*|}" scripts/release/journey-tools.sh)" \
+      scripts/release/journey-tools.sh
+  done
 else
   note "no app/ferrobridge-viewer yet, skipped"
 fi

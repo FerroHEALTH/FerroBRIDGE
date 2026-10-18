@@ -420,6 +420,37 @@ names the Tailwind release to cargo-leptos.
 
 `scripts/checks/versions.sh` reads each of them back against these rows.
 
+## Operator console browser journeys
+
+The browser journeys (#602) drive the console in headless Chrome over
+WebDriver, through chromedriver, with the `thirtyfour` client, a test-only
+dependency of the testkit. Chrome and chromedriver come as one Chrome for
+Testing release, which `browser-actions/setup-chrome` installs in the
+`journeys (browser)` job of `ci.yml`, so the browser and its driver always
+match. `thirtyfour` 0.37.5 is the newest release older than two weeks on
+2026-10-18, and the Chrome for Testing release is the one FerroFED's journeys
+pin, the newest stable one on 2026-10-14.
+
+For a local run, `scripts/release/journey-tools.sh` installs the same
+release into `target/journey-tools`, where the journeys look first. It takes
+each download URL from the Chrome for Testing JSON API
+(`known-good-versions-with-downloads.json`) and checks each zip against the
+SHA-256 below before it unpacks it. Chrome for Testing publishes no SHA-256;
+each digest is the one FerroFED took on 2026-10-16 of a download whose MD5
+equals the `x-goog-hash` the storage bucket serves with it, and the
+`mac-arm64` pair verified again here on 2026-10-18.
+
+| Item | Pin | Repeated in |
+|---|---|---|
+| `thirtyfour` | 0.37.5 | the root `Cargo.toml` `[workspace.dependencies]` |
+| Chrome for Testing (Chrome and chromedriver) | 155.0.8059.79 | the `chrome-version` of `.github/workflows/ci.yml`, and `scripts/release/journey-tools.sh` |
+| Chrome for Testing, `chrome-linux64.zip` SHA-256 | `bcd9a79130d7e44d70f93be87042e9bcee7fe0f0b3898e06b8c9bed5fb619dcd` | `scripts/release/journey-tools.sh` |
+| Chrome for Testing, `chrome-mac-arm64.zip` SHA-256 | `e141a7cbf948780bb7d381860bd5a7944c6736f79b9918b9826fccb199d28ea4` | `scripts/release/journey-tools.sh` |
+| Chrome for Testing, `chromedriver-linux64.zip` SHA-256 | `876f0ea4095237bb3e93321d95758d38c9195989935d7bdc9f51d8e26bc6a3a1` | `scripts/release/journey-tools.sh` |
+| Chrome for Testing, `chromedriver-mac-arm64.zip` SHA-256 | `ca9a98c74b8d3904be6536ff6d26493abb7d7a476e2b384a75cd55d101bce29d` | `scripts/release/journey-tools.sh` |
+
+`scripts/checks/versions.sh` reads each of them back against these rows.
+
 ## GitHub Actions pins
 
 Every `uses:` in `.github/workflows/**` is pinned to a full commit SHA with a

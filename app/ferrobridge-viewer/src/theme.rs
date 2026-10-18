@@ -102,14 +102,46 @@ pub async fn set_theme(
     server::keep(&theme, back.as_deref())
 }
 
-/// The console's own pages, the only places a theme post returns to.
-const PAGES: [&str; 2] = ["/", crate::app::ABOUT];
+/// The console's own pages, each route of its router, the places a theme
+/// post returns to.
+const PAGES: [&str; 8] = [
+    "/",
+    crate::app::ABOUT,
+    crate::engine::MAPPINGS,
+    crate::engine::CAPABILITY,
+    crate::engine::FILES,
+    crate::tools::PLAYGROUND,
+    crate::tools::VALIDATE,
+    crate::editor::EDIT,
+];
 
-/// The page `path` names when it is exactly one of the console's own pages,
-/// and `None` for anything else, so a post never redirects off the console.
+/// The pages whose route takes a file path after them, which a theme post
+/// returns to with that path.
+const UNDER: [&str; 2] = [crate::engine::FILES, crate::editor::EDIT];
+
+/// The page `path` names when it is one of the console's own pages, and
+/// `None` for anything else, so a post never redirects off the console.
+///
+/// Each route of the console's router is returned to as it is, and a page
+/// below `/files` or `/edit` when what follows is plain path segments of
+/// visible ASCII.
 #[must_use]
-pub fn return_path(path: &str) -> Option<&'static str> {
-    PAGES.into_iter().find(|page| *page == path)
+pub fn return_path(path: &str) -> Option<&str> {
+    if PAGES.contains(&path) {
+        return Some(path);
+    }
+    let rest = UNDER
+        .into_iter()
+        .find_map(|page| path.strip_prefix(page)?.strip_prefix('/'))?;
+    let plain = rest.split('/').all(|segment| {
+        !segment.is_empty()
+            && segment != "."
+            && segment != ".."
+            && segment
+                .chars()
+                .all(|c| c.is_ascii_graphic() && !matches!(c, '?' | '#' | '\\'))
+    });
+    plain.then_some(path)
 }
 
 /// The server half: the cookie the choice is kept in, and the choice a
@@ -152,8 +184,13 @@ pub mod server {
                 .and_then(|accept| accept.to_str().ok())
                 .is_some_and(|accept| accept.contains("text/html"))
         });
-        if plain && let Some(page) = back.and_then(crate::theme::return_path) {
-            response.insert_header(http::header::LOCATION, HeaderValue::from_static(page));
+        // NOTE: no specification governs this: our own design; a return path is
+        // visible ASCII, so one no header can carry is no page to return to.
+        let page = back
+            .and_then(crate::theme::return_path)
+            .and_then(|page| HeaderValue::from_str(page).ok());
+        if plain && let Some(page) = page {
+            response.insert_header(http::header::LOCATION, page);
             response.set_status(http::StatusCode::SEE_OTHER);
         }
         Ok(Outcome::Shown(()))
@@ -200,6 +237,18 @@ mod tests {
             assert_eq!(Some(path), super::return_path(path), "{path}");
         }
         for path in [
+            "/mappings",
+            "/capability",
+            "/files",
+            "/files/fhirconnect/diagnose.context.yml",
+            "/playground",
+            "/validate",
+            "/edit",
+            "/edit/omocl/medical_data/cluster/Specimen_v1.yml",
+        ] {
+            assert_eq!(Some(path), super::return_path(path), "{path}");
+        }
+        for path in [
             "",
             "about",
             "//attacker.example.net/",
@@ -209,6 +258,14 @@ mod tests {
             "/\\attacker.example.net",
             "/login",
             "/api/theme",
+            "/files/",
+            "/files//attacker.example.net",
+            "/files/../login",
+            "/files/a?b",
+            "/files/a\\b",
+            "/files/a b",
+            "/filesx",
+            "/edit/./a.yml",
         ] {
             assert_eq!(None, super::return_path(path), "{path}");
         }

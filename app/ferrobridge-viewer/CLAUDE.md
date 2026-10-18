@@ -41,6 +41,13 @@ crate.
   `tests/it/contrast.rs` holds every pair to WCAG 2.2 AA. The theme is the
   server's, drawn from its cookie as `data-theme`; the browser keeps no
   storage.
+- **A route has a journey and two screenshots.** The browser journeys and
+  the book's screenshots live in the testkit
+  (`tools/ferrobridge-testkit/tests/it/journeys/`); a new route joins the
+  shots of `journeys::screenshots`, whose guard fails without its light and
+  dark image on the book's operator console page. Capture them with
+  `scripts/release/journey-tools.sh target/journey-tools`, the release site
+  bundle, and `FERROBRIDGE_SCREENSHOTS=1`.
 - **The security headers are tested in-process** (`tests/it/server.rs`): a
   new route keeps the CSP nonce, `nosniff`, `DENY`, `no-referrer` and
   `no-store` on documents, and only `/pkg/` is compressed.

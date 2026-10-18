@@ -301,8 +301,14 @@ so the stylesheet's `scroll-padding-top` clears it for a focused control
   touches the build surface.
 - **Browser journeys** drive the console in headless Chrome through a
   WebDriver client in Rust, never Playwright, which is JavaScript and falls
-  under the no-JavaScript mandate. A new screen gets its journey in the same
-  change once the journey lane exists (#260).
+  under the no-JavaScript mandate. They live in
+  `tools/ferrobridge-testkit/tests/it/journeys/` behind
+  `FERROBRIDGE_JOURNEYS=1`, run against a running bridge and console in the
+  `journeys (browser)` CI job, and fail on any `SEVERE` entry the browser
+  logs. A new screen or route gets its journey and its light and dark
+  screenshots (`FERROBRIDGE_SCREENSHOTS=1`, shown on the book's operator
+  console page) in the same change; the screenshot guard of the ordinary
+  suite fails on a route without both.
 - **Never weaken a gate to make a change pass.** A failing wasm32 clippy pass
   usually means a dependency cannot compile for the browser, which is the
   gate working.

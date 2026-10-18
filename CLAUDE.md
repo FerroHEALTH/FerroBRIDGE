@@ -211,7 +211,14 @@ the testkit tool crate. Beside it:
   `vendor/` is the ignored home of the five HL7 FHIR examples packages the
   per-version model corpora read, fetched at build time (#373, #454).
   `vocabulary` holds the synthetic OHDSI vocabulary for the ten vocabulary
-  tables and its `COPY` loader (the observed Athena shape is #88).
+  tables and its `COPY` loader (the observed Athena shape is #88). `oidc` is
+  the test OpenID Provider, which can also sign a real browser in.
+  `tests/it/journeys/` holds the operator console's browser journeys (#602),
+  `thirtyfour` over the Chrome for Testing release
+  `scripts/release/journey-tools.sh` installs, against a running bridge and
+  console behind the `FERROBRIDGE_JOURNEYS` gate, and the book's console
+  screenshots behind `FERROBRIDGE_SCREENSHOTS`, with the guard that every
+  console route has both.
 - `docs/specs/`: the vendored specification corpora (#71), one directory per
   corpus with a `PROVENANCE.md`, fetched by `scripts/vendor/*.sh` from the pins
   in `docs/VERSIONS.md`: FHIRconnect with its schemas and the draft REST API

@@ -9,23 +9,32 @@
 //! signs the ID Tokens a test chooses (OpenID Connect Core 1.0 §2), and
 //! answers the token endpoint's authorization code and refresh token grants
 //! (RFC 6749 §4.1.3, §6) with the [`TokenAnswer`] a test mounts, or refuses
-//! them (RFC 6749 §5.2). Its authorization and end-session endpoints are
-//! addresses on the same server that nothing calls: the console redirects a
-//! browser there, and a test reads the redirect. No specification governs
+//! them (RFC 6749 §5.2). Its authorization and end-session endpoints answer
+//! nothing until [`Provider::approve`] makes them sign a real browser in, as
+//! the console's browser journeys need; until then the console redirects a
+//! browser there and a test reads the redirect. No specification governs
 //! the harness: our own design.
 
+use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::{Arc, Mutex, PoisonError};
 
-use aws_lc_rs::rand::SystemRandom;
+use aws_lc_rs::digest::{SHA256, digest};
+use aws_lc_rs::rand::{SecureRandom as _, SystemRandom};
 use aws_lc_rs::signature::{ECDSA_P256_SHA256_FIXED_SIGNING, EcdsaKeyPair};
+use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use jsonwebtoken::jwk::{Jwk, JwkSet, KeyAlgorithm, PublicKeyUse};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use serde::Serialize;
 use wiremock::matchers::{body_string_contains, method, path};
-use wiremock::{Mock, MockServer, Request, ResponseTemplate};
+use wiremock::{Mock, MockServer, Request, Respond, ResponseTemplate};
 
 /// The path the key set answers at.
 pub const JWKS_PATH: &str = "/jwks.json";
+
+/// The path the authorization server metadata answers at (RFC 8414 §3).
+pub const METADATA_PATH: &str = "/.well-known/oauth-authorization-server";
 
 /// The path of the authorization endpoint.
 pub const AUTHORIZATION_PATH: &str = "/authorize";
@@ -247,6 +256,99 @@ impl Provider {
         Ok(())
     }
 
+    /// Publishes the provider's authorization server metadata (RFC 8414 §3)
+    /// at `/.well-known/oauth-authorization-server`, for a resource server
+    /// that discovers its key set from the issuer.
+    pub async fn publish_metadata(&self) {
+        let body = serde_json::json!({
+            "issuer": self.issuer(),
+            "jwks_uri": self.jwks_uri(),
+            "authorization_endpoint": self.authorization_endpoint(),
+            "token_endpoint": self.token_endpoint(),
+            "end_session_endpoint": self.end_session_endpoint(),
+            "response_types_supported": ["code"],
+            "code_challenge_methods_supported": ["S256"],
+        })
+        .to_string();
+        Mock::given(method("GET"))
+            .and(path(METADATA_PATH))
+            .respond_with(json(200, body))
+            .mount(&self.server)
+            .await;
+    }
+
+    /// Signs an access token in the RFC 9068 profile for `audience`
+    /// granting `scope`, valid for an hour.
+    ///
+    /// # Errors
+    /// Returns [`ProviderError::Sign`] when the token cannot be signed.
+    pub fn access_token(&self, audience: &str, scope: &str) -> Result<String, ProviderError> {
+        let now = jiff::Timestamp::now().as_second();
+        let mut header = Self::header();
+        header.typ = Some(String::from("at+jwt"));
+        let claims = serde_json::json!({
+            "iss": self.issuer(),
+            "aud": audience,
+            "sub": "synthetic-operator",
+            "client_id": "ferrobridge-viewer",
+            "iat": now,
+            "exp": now.saturating_add(3600),
+            "jti": "synthetic-operator-access",
+            "scope": scope,
+        });
+        self.sign(&header, &claims)
+    }
+
+    /// Makes the provider sign a browser in: the authorization endpoint
+    /// approves every request of `client_id` at once and redirects back with
+    /// a fresh code and the request's `state` (RFC 6749 §4.1.2), the token
+    /// endpoint trades that code once for the verifier whose `S256`
+    /// challenge the request carried (RFC 7636 §4.6) and answers with
+    /// `access_token` and an ID Token carrying the request's `nonce`
+    /// (OpenID Connect Core 1.0 §3.1.3.7), and the end-session endpoint
+    /// sends the browser to its `post_logout_redirect_uri` (OpenID Connect
+    /// RP-Initiated Logout 1.0 §2).
+    pub async fn approve(&self, client_id: &str, access_token: &str) {
+        let codes = Codes::default();
+        Mock::given(method("GET"))
+            .and(path(AUTHORIZATION_PATH))
+            .respond_with(Approve {
+                issuer: self.issuer(),
+                client_id: client_id.to_owned(),
+                encoding: self.encoding.clone(),
+                codes: Arc::clone(&codes),
+            })
+            .mount(&self.server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path(TOKEN_PATH))
+            .and(body_string_contains("grant_type=authorization_code"))
+            .respond_with(Trade {
+                codes,
+                access_token: access_token.to_owned(),
+            })
+            .mount(&self.server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path(END_SESSION_PATH))
+            .respond_with(EndSession)
+            .mount(&self.server)
+            .await;
+    }
+
+    /// Returns the query pairs of every request the authorization endpoint
+    /// received, oldest first; `None` when the server records no requests.
+    pub async fn authorization_requests(&self) -> Option<Vec<BTreeMap<String, String>>> {
+        let received = self.server.received_requests().await?;
+        Some(
+            received
+                .iter()
+                .filter(|request| request.url.path() == AUTHORIZATION_PATH)
+                .map(|request| request.url.query_pairs().into_owned().collect())
+                .collect(),
+        )
+    }
+
     /// Mounts `answer` for a token request whose form carries `grant`.
     async fn answer_grant(&self, grant: &str, answer: &TokenAnswer) -> Result<(), ProviderError> {
         let body = serde_json::to_string(answer).map_err(ProviderError::Json)?;
@@ -257,6 +359,147 @@ impl Provider {
             .mount(&self.server)
             .await;
         Ok(())
+    }
+}
+
+/// What one approved authorization request leaves for the token request:
+/// the ID Token to answer with and the PKCE challenge to hold the verifier
+/// to.
+#[derive(Debug)]
+struct Approved {
+    /// The signed ID Token.
+    id_token: String,
+    /// The `code_challenge` the request carried.
+    challenge: String,
+}
+
+/// The codes the provider has issued and not yet traded.
+type Codes = Arc<Mutex<BTreeMap<String, Approved>>>;
+
+/// A plain-text refusal of `status` saying `why`.
+fn refused(status: u16, why: &str) -> ResponseTemplate {
+    ResponseTemplate::new(status).set_body_string(why.to_owned())
+}
+
+/// A fresh authorization code: 16 random bytes, base64url.
+fn fresh_code() -> Option<String> {
+    let mut bytes = [0_u8; 16];
+    SystemRandom::new().fill(&mut bytes).ok()?;
+    Some(URL_SAFE_NO_PAD.encode(bytes))
+}
+
+/// The authorization endpoint of [`Provider::approve`].
+struct Approve {
+    /// The issuer identifier the ID Token names.
+    issuer: String,
+    /// The one client it approves.
+    client_id: String,
+    /// The key the ID Token is signed with.
+    encoding: EncodingKey,
+    /// Where an approved request waits for its token request.
+    codes: Codes,
+}
+
+impl Respond for Approve {
+    fn respond(&self, request: &Request) -> ResponseTemplate {
+        let pairs: BTreeMap<String, String> = request.url.query_pairs().into_owned().collect();
+        let field = |name: &str| pairs.get(name).map(String::as_str);
+        let (Some(redirect), Some(state), Some(nonce), Some(challenge), Some("S256")) = (
+            field("redirect_uri"),
+            field("state"),
+            field("nonce"),
+            field("code_challenge"),
+            field("code_challenge_method"),
+        ) else {
+            return refused(400, "the authorization request is incomplete");
+        };
+        if field("client_id") != Some(self.client_id.as_str())
+            || field("response_type") != Some("code")
+        {
+            return refused(400, "the request names another client or grant");
+        }
+        let Ok(mut location) = url::Url::parse(redirect) else {
+            return refused(400, "the redirect_uri is no URL");
+        };
+        let claims = IdTokenClaims::new(&self.issuer, &self.client_id, nonce);
+        let signed = serde_json::to_value(&claims).ok().and_then(|payload| {
+            jsonwebtoken::encode(&Provider::header(), &payload, &self.encoding).ok()
+        });
+        let (Some(id_token), Some(code)) = (signed, fresh_code()) else {
+            return refused(500, "the ID Token or the code could not be made");
+        };
+        self.codes
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(
+                code.clone(),
+                Approved {
+                    id_token,
+                    challenge: challenge.to_owned(),
+                },
+            );
+        location
+            .query_pairs_mut()
+            .append_pair("code", &code)
+            .append_pair("state", state);
+        ResponseTemplate::new(303).insert_header("location", location.as_str())
+    }
+}
+
+/// The token endpoint of [`Provider::approve`].
+struct Trade {
+    /// The codes the authorization endpoint issued.
+    codes: Codes,
+    /// The access token every trade answers with.
+    access_token: String,
+}
+
+impl Respond for Trade {
+    fn respond(&self, request: &Request) -> ResponseTemplate {
+        let form: BTreeMap<String, String> = url::form_urlencoded::parse(&request.body)
+            .into_owned()
+            .collect();
+        let (Some(code), Some(verifier)) = (form.get("code"), form.get("code_verifier")) else {
+            return refused(400, "the token request is incomplete");
+        };
+        let approved = self
+            .codes
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(code);
+        let Some(approved) = approved else {
+            return refused(400, "the code was never issued or is spent");
+        };
+        let challenge = URL_SAFE_NO_PAD.encode(digest(&SHA256, verifier.as_bytes()));
+        if challenge != approved.challenge {
+            return refused(400, "the code verifier does not answer the challenge");
+        }
+        let answer = TokenAnswer {
+            expires_in: Some(3600),
+            id_token: Some(approved.id_token),
+            ..TokenAnswer::bearer(&self.access_token)
+        };
+        match serde_json::to_string(&answer) {
+            Ok(body) => json(200, body),
+            Err(_unwritable) => refused(500, "the answer could not be written"),
+        }
+    }
+}
+
+/// The end-session endpoint of [`Provider::approve`].
+struct EndSession;
+
+impl Respond for EndSession {
+    fn respond(&self, request: &Request) -> ResponseTemplate {
+        let redirect = request
+            .url
+            .query_pairs()
+            .find(|(name, _)| name == "post_logout_redirect_uri")
+            .map(|(_, value)| value.into_owned());
+        match redirect {
+            Some(redirect) => ResponseTemplate::new(303).insert_header("location", redirect),
+            None => refused(400, "no post_logout_redirect_uri"),
+        }
     }
 }
 

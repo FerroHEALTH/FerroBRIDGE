@@ -229,7 +229,9 @@ pub mod server {
         }
     }
 
-    /// The diagnostics of the R4 `OperationOutcome` `body` holds, in order.
+    /// The words of each issue of the R4 `OperationOutcome` `body` holds, in
+    /// order: its `details.text` and its `diagnostics`, each when present
+    /// (FHIR R4 `operationoutcome.html`, `OperationOutcome.issue`).
     fn diagnostics(body: &str) -> Vec<String> {
         // NOTE: no specification governs this: our own design; a refusal body
         // that is no OperationOutcome carries no diagnostics, and its status stands.
@@ -244,7 +246,14 @@ pub mod server {
                 outcome
                     .issue
                     .into_iter()
-                    .filter_map(|issue| issue.diagnostics.and_then(|text| text.value))
+                    .flat_map(|issue| {
+                        let details = issue
+                            .details
+                            .and_then(|details| details.text)
+                            .and_then(|text| text.value);
+                        let diagnostics = issue.diagnostics.and_then(|text| text.value);
+                        details.into_iter().chain(diagnostics)
+                    })
                     .collect()
             })
             .unwrap_or_default()
@@ -277,6 +286,23 @@ pub mod server {
                     diagnostics: vec![String::from("the operator scope is missing")],
                 }),
                 refusal(&forbidden)
+            );
+            let detailed = BridgeError::Refused {
+                status: StatusCode::SERVICE_UNAVAILABLE,
+                body: String::from(
+                    r#"{"resourceType":"OperationOutcome","issue":[{"severity":"error","code":"not-supported","details":{"text":"the operations are not served"},"diagnostics":"no mapping set"}]}"#,
+                ),
+            };
+            assert_eq!(
+                Ok(Refusal::Bridge {
+                    status: 503,
+                    diagnostics: vec![
+                        String::from("the operations are not served"),
+                        String::from("no mapping set"),
+                    ],
+                }),
+                refusal(&detailed),
+                "an issue's details.text is its words too"
             );
             let plain = BridgeError::Refused {
                 status: StatusCode::SERVICE_UNAVAILABLE,

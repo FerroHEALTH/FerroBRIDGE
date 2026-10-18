@@ -16,6 +16,9 @@ publish = false
 # The test OpenID Provider: its per-run ES256 key pair, the ID Tokens it
 # signs, the JWK Set it publishes, and the times its claims carry.
 aws-lc-rs.workspace = true
+# The base64url of a code the provider approves a browser with, and of the
+# PKCE challenge it holds the verifier to (RFC 7636 §4.6).
+base64.workspace = true
 jiff.workspace = true
 jsonwebtoken.workspace = true
 reqwest.workspace = true
@@ -27,6 +30,8 @@ tempfile.workspace = true
 testcontainers.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["time"] }
+# The redirect an approved authorization request is answered with.
+url.workspace = true
 wiremock.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -39,7 +44,20 @@ fhir-types = { workspace = true, features = ["stu3", "r4", "r4b", "r5", "r6", "r
 # The corpus suite re-hashes the vendored FHIRconnect schemas, so it needs a
 # sha256 the workspace does not otherwise carry.
 sha2.workspace = true
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time", "process", "io-util"] }
+# The operator console's browser journeys (#602) run the bridge and the
+# console in-process, path-only: neither is published, and the journeys
+# drive both as the shipped binaries serve them.
+ferrobridge-server = { path = "../../app/ferrobridge-server" }
+ferrobridge-viewer = { path = "../../app/ferrobridge-viewer" }
+anyhow.workspace = true
+thirtyfour.workspace = true
+toml.workspace = true
+tracing-subscriber.workspace = true
+
+# The process group a journey's chromedriver runs in, killed with it.
+[target.'cfg(unix)'.dev-dependencies]
+rustix.workspace = true
 
 [lints]
 workspace = true

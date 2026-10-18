@@ -12,8 +12,9 @@
 # resolution nothing to change, and --locked is passed to the compile itself.
 #
 # The bundle is target/site: pkg/ferrobridge-viewer.wasm, its JavaScript glue
-# and the stylesheet. The server binary is built apart from it, with cargo,
-# because the bundle is the same for every architecture.
+# and the stylesheet, and the favicon from public/. The server binary is built
+# apart from it, with cargo, because the bundle is the same for every
+# architecture.
 #
 # Usage: scripts/release/viewer-site.sh [--release]
 set -Eeuo pipefail
@@ -71,7 +72,7 @@ cd "$viewer"
 cargo leptos build --frontend-only --lib-cargo-args=--locked "$@"
 
 missing=0
-for file in pkg/ferrobridge-viewer.wasm pkg/ferrobridge-viewer.js pkg/ferrobridge-viewer.css; do
+for file in pkg/ferrobridge-viewer.wasm pkg/ferrobridge-viewer.js pkg/ferrobridge-viewer.css favicon.ico; do
   if [ ! -s "$root/target/site/$file" ]; then
     echo "viewer-site: the bundle has no $file" >&2
     missing=1
