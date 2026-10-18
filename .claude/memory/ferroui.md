@@ -61,3 +61,14 @@ construction.
 - **Look at the result.** After the switch, run every console, capture every
   screen in light and dark, and look at each screenshot before calling it
   done ([[autonomous-loop]]).
+- **FerroEHR, FerroFED and FerroTERM lead; FerroBRIDGE never does** (owner,
+  2026-10-18: "FerroBRIDGE is the newest of them all so please FerroEHR and
+  FerroFED and FerroTERM are more leading"). A component takes FerroEHR's
+  shape first, then FerroFED's, then FerroTERM's; FerroBRIDGE's console
+  patterns are replaced.
+- **Quality control before every FerroUI release.** The gallery's stat cards,
+  tabs and hover states shipped worse than FerroEHR's and the owner caught
+  it. Every release PR compares each component with the reference product's
+  screenshot, captures hover and focus states in light and dark, and says per
+  screen what was checked; the orchestrator looks at every screenshot before
+  the tag.
