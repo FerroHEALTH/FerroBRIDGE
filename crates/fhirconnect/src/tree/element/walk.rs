@@ -128,11 +128,11 @@ impl<T: Table + ?Sized> Walk<'_, T> {
             types,
         };
         self.owner = String::from(field.path);
-        if let Kind::Choice(variants) = kind {
+        if let Kind::Choice(_) = kind {
             self.location = Location::Choice(String::from(field.path));
             self.moves.push(Move::Choice {
                 field: resolved,
-                variants,
+                schema: field,
             });
             return Ok(());
         }
@@ -217,20 +217,21 @@ impl<T: Table + ?Sized> Walk<'_, T> {
 
     /// Fixes the alternative of the choice element the walk stands on.
     fn choose(&mut self, element: &str, name: &str) -> Result<(), ResolveError> {
-        let Some(Move::Choice { field, variants }) = self.moves.last() else {
+        let Some(Move::Choice { field, schema }) = self.moves.last() else {
             return Err(ResolveError::UnresolvedChoice {
                 element: String::from(element),
             });
         };
-        let (suffix, kind) = variants
-            .iter()
-            .find(|(suffix, _)| suffix.eq_ignore_ascii_case(name))
+        let (suffix, kind) = schema
+            .choices()
+            .find(|form| form.suffix.eq_ignore_ascii_case(name))
+            .map(|form| (form.suffix, form.kind))
             .ok_or_else(|| ResolveError::ChoiceType {
                 element: String::from(element),
                 requested: String::from(name),
-                admitted: variants
-                    .iter()
-                    .map(|(suffix, _)| *suffix)
+                admitted: schema
+                    .choices()
+                    .map(|form| form.suffix)
                     .collect::<Vec<_>>()
                     .join(", "),
             })?;
@@ -238,12 +239,12 @@ impl<T: Table + ?Sized> Walk<'_, T> {
         let chosen = Field {
             path: field.path.clone(),
             key: format!("{}{suffix}", field.key),
-            kind: *kind,
+            kind,
             min: field.min,
             max: field.max,
             types,
         };
-        self.location = self.landing(*kind)?;
+        self.location = self.landing(kind)?;
         let last = self.moves.len().saturating_sub(1);
         if let Some(slot) = self.moves.get_mut(last) {
             *slot = Move::Member(chosen);
@@ -459,23 +460,13 @@ fn named(schema: &'static TypeSchema, name: &str) -> Option<Named> {
     if let Some(field) = schema.fields.iter().find(|field| field.name == name) {
         return Some((field, field.kind, String::from(name), field.types));
     }
-    schema.fields.iter().find_map(|field| {
-        let Kind::Choice(variants) = field.kind else {
-            return None;
-        };
-        let suffix = name.strip_prefix(field.name)?;
-        variants
-            .iter()
-            .find(|(candidate, _)| *candidate == suffix)
-            .map(|(_, kind)| {
-                (
-                    field,
-                    *kind,
-                    String::from(name),
-                    alternative(field.types, suffix),
-                )
-            })
-    })
+    let member = schema.member(name).filter(|member| !member.sibling)?;
+    let field = member.field;
+    let types = match member.choice {
+        Some(code) => alternative(field.types, code),
+        None => field.types,
+    };
+    Some((field, member.kind, String::from(name), types))
 }
 
 /// The type codes of the choice alternative `suffix` names, out of the

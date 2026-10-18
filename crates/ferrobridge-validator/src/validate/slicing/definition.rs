@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use fhir_types::codec::Value;
 use fhir_types::r4::element_definition::ElementDefinition;
+use fhir_types::r4::schema::SCHEMAS;
 
 use crate::canonical::Canonical;
 use crate::set::ResolveError;
@@ -18,7 +19,6 @@ use crate::validate::Validator;
 use crate::validate::matching::value_of;
 use crate::validate::slicing::path::Step;
 use crate::validate::structure::Structure;
-use crate::validate::walk::members::upper_first;
 
 /// Where a discriminator path ends in a slice's definition.
 #[derive(Debug)]
@@ -174,11 +174,16 @@ fn within(
             // NOTE: elementdefinition.html §2.30.0.3: the id of a type slice is the choice
             // id with the slice named for the type, `Patient.deceased[x]:deceasedBoolean`.
             let choice = id.rsplit('.').next().unwrap_or(id).trim_end_matches("[x]");
-            let slice = format!("{id}:{choice}{}", upper_first(code));
-            let found = if structure.element(&slice).is_some() {
-                slice
-            } else {
-                id.to_owned()
+            let suffix = structure
+                .element(id)
+                .and_then(|element| element.path.value.as_deref())
+                .and_then(|path| SCHEMAS.element(path))
+                .and_then(|(_, field)| field.choices().find(|form| form.code == code.as_str()))
+                .map(|form| form.suffix);
+            let slice = suffix.map(|suffix| format!("{id}:{choice}{suffix}"));
+            let found = match slice {
+                Some(slice) if structure.element(&slice).is_some() => slice,
+                _ => id.to_owned(),
             };
             Some((found, Some(code.clone())))
         }

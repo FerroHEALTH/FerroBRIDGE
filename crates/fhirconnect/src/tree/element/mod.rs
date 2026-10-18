@@ -19,6 +19,7 @@
 
 pub mod walk;
 
+use fhir_types::schema::FieldSchema;
 use fhir_types::schema::Kind;
 use fhir_types::schema::Schemas;
 use fhir_types::schema::TypeSchema;
@@ -138,8 +139,9 @@ pub enum Move {
     Choice {
         /// The choice element, keyed by its stem name.
         field: Field,
-        /// The suffix and kind of each alternative the definition lists.
-        variants: &'static [(&'static str, Kind)],
+        /// The choice element's entry in the element table, whose
+        /// [`FieldSchema::choices`] lists the alternatives.
+        schema: &'static FieldSchema,
     },
     /// Into the `extension` list, taking the entry with this url.
     ///

@@ -14,6 +14,7 @@
 //! nothing, and the engine finishes the resolution.
 
 use fhir_types::codec::Value;
+use fhir_types::schema::FieldSchema;
 use fhir_types::schema::Kind;
 
 use crate::tree::Occurrence;
@@ -205,11 +206,10 @@ fn advance<'tree>(
             }
             Ok(next)
         }
-        Move::Choice { field, variants } => {
+        Move::Choice { field, schema } => {
             let mut next = Vec::new();
             for cursor in &cursors {
-                let Some((suffix, kind)) =
-                    alternative(cursor, field.path(), field.key(), variants)?
+                let Some((suffix, kind)) = alternative(cursor, field.path(), field.key(), schema)?
                 else {
                     continue;
                 };
@@ -289,7 +289,7 @@ fn alternative(
     cursor: &Cursor<'_>,
     element: &str,
     stem: &str,
-    variants: &[(&'static str, Kind)],
+    schema: &'static FieldSchema,
 ) -> Result<Option<(&'static str, Kind)>, ReadError> {
     let object = cursor.value.as_object().ok_or_else(|| ReadError::Shape {
         element: String::from(element),
@@ -297,7 +297,8 @@ fn alternative(
         found: json_kind(cursor.value),
     })?;
     let mut found: Option<(&'static str, Kind)> = None;
-    for &(suffix, kind) in variants {
+    for form in schema.choices() {
+        let (suffix, kind) = (form.suffix, form.kind);
         let key = format!("{stem}{suffix}");
         if !object.contains_key(&key) {
             continue;
