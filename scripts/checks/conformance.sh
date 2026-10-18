@@ -404,15 +404,26 @@ render_block() {
   echo 'The R4 profile validator against the HL7 FHIR Validator 6.10.4 on a synthetic corpus, every disagreement adjudicated:'
   badge_link "$(label_of validator-agreement)" validator-agreement conformance/validator-agreement/pass-list.txt
   echo
-  echo 'HL7 v2, by corpus, then by message family and by version across both corpora:'
+  echo 'HL7 v2, by corpus:'
   badge_link "$(label_of hl7v2)" hl7v2 conformance/hl7v2/pass-list.txt
   badge_link "$(label_of hl7v2-smoke)" hl7v2-smoke conformance/hl7v2-smoke/pass-list.txt
-  for name in ${families[@]+"${families[@]}"}; do
-    badge_link "HL7 v2 $(tr '[:lower:]' '[:upper:]' <<<"${name#hl7v2-family-}")" "$name" conformance/hl7v2/pass-list.txt
-  done
-  for name in ${versions[@]+"${versions[@]}"}; do
-    badge_link "HL7 v${name#hl7v2-version-}" "$name" conformance/hl7v2/pass-list.txt
-  done
+  # The per-family and per-version badges fold into a collapsed block, so the
+  # per-corpus badges stay in view; GitHub renders Markdown inside <details>
+  # only after a blank line.
+  if [[ ${#families[@]} -gt 0 || ${#versions[@]} -gt 0 ]]; then
+    echo
+    echo '<details>'
+    echo '<summary>HL7 v2 by message family and by version, across both corpora</summary>'
+    echo
+    for name in ${families[@]+"${families[@]}"}; do
+      badge_link "HL7 v2 $(tr '[:lower:]' '[:upper:]' <<<"${name#hl7v2-family-}")" "$name" conformance/hl7v2/pass-list.txt
+    done
+    for name in ${versions[@]+"${versions[@]}"}; do
+      badge_link "HL7 v${name#hl7v2-version-}" "$name" conformance/hl7v2/pass-list.txt
+    done
+    echo
+    echo '</details>'
+  fi
   echo '<!-- badges:end -->'
 }
 
