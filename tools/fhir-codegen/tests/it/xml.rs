@@ -405,11 +405,7 @@ fn the_narrative_div_is_held_to_the_xhtml_namespace() {
 fn an_unbound_prefix_inside_the_narrative_is_malformed_xml() {
     for schemas in namespace_versions() {
         for (div, path, prefix) in [
-            (
-                r#"<h:div><p>synthetic</p></h:div>"#,
-                "Resource.text.div",
-                "h",
-            ),
+            ("<h:div><p>synthetic</p></h:div>", "Resource.text.div", "h"),
             (
                 r#"<div xmlns="http://www.w3.org/1999/xhtml"><p>synthetic <x:b>text</x:b></p></div>"#,
                 "Resource.text.div",
