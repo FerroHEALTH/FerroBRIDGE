@@ -204,7 +204,7 @@ default branch.
 | HL7 v2-to-FHIR guide | `hl7.fhir.uv.v2mappings` 1.0.0 (FHIR 4.0.1; package CC0-1.0, repository `HL7/v2-to-fhir` Apache-2.0, tag `1.0.0` at `873b331b`) | the machine-readable v2-to-R4 corpus (263 ConceptMaps) the HL7 v2 face executes (#251); vendored as the sixth FHIR package (#252) |
 | HL7 v2 definitions | `HL7/v2ig` `input/sourceOfTruth` at `3adcdbfff654ccbff5cd33aa34bd909a087e8e19` (1694 files, v2.9.1-derived logical StructureDefinitions; no LICENSE, the v2+ page licenses copying "for internal purposes only") | the generator input for the v2 message-structure table (#253); fetched at build time into an ignored directory and never committed, per the redistribution rule; the owner holds the HL7 membership condition |
 | HL7 v2 legacy tables | `usnistgov/igamt-hl7Tools-service` `src/main/resources/hl7db` at `83322dffdac18cb129a1bd80149f5439cf5686fd` (169 files, the NIST IGAMT export of HL7's v2 database for versions 2.1 to 2.8.2; no LICENSE, HL7's content) | the generator input for the structures v2.9.1 withdrew (#303); fetched at build time into an ignored directory and never committed, on the same terms as the definitions |
-| openEHR ITS-REST | 1.1.0 (OpenAPI at `openEHR/specifications-ITS-REST` tag `Release-1.1.0`, commit `24058992`; each document declares CC-BY-ND-3.0 in `info.license` while the repository's `LICENSE` file is Apache-2.0, both recorded in the provenance; modules EHR, Query and Definition, `STABLE`) | the released REST API a conformant CDR speaks; Admin and Demographic are `x-status: DEVELOPMENT` in the same release; the bridge depends on Demographic only behind a feature labelled DEVELOPMENT (section 15, #470); every tagged OAS file says `info.version: latest`, so provenance records tag and blob |
+| openEHR ITS-REST | 1.1.0 (OpenAPI at `openEHR/specifications-ITS-REST` tag `Release-1.1.0`, commit `24058992`; each document declares CC-BY-ND-3.0 in `info.license` while the repository's `LICENSE` file is Apache-2.0, both recorded in the provenance; modules Overview, System, EHR, Query and Definition, `STABLE`) | the released REST API a conformant CDR speaks; Admin and Demographic are `x-status: DEVELOPMENT` in the same release; the bridge depends on Demographic only behind a feature labelled DEVELOPMENT (section 15, #470); every tagged OAS file says `info.version: latest`, so provenance records tag and blob |
 | `openehr-base` | 0.0.87 (minor line 0.0; Apache-2.0) | the RM foundation types, including partial ISO 8601 dates (section 3); the line moved from 0.0.61 to 0.0.64 between passes, to 0.0.69 on 2026-09-24, to 0.0.71 on 2026-09-25 and to 0.0.72 the same day, to 0.0.84 on 2026-10-05, to 0.0.86 on 2026-10-15, and to 0.0.87 on 2026-10-16, the line the federation gateway pins, with no change to the surfaces named here |
 | `openehr-rm` | 0.0.87 (Apache-2.0) | the RM 1.1.0 model, its canonical JSON codec and the BASE path parser |
 | `openehr-its` | 0.0.87 (Apache-2.0) | the ITS wire layer: the OPT 1.4 codec, the canonical JSON and XML codecs, the ITS-REST 1.1.0 data types; the bridge takes `default-features = false` with `opt14`, `json` and `rest` (the DTOs without axum), and #285 adds `rest-client`, whose 0.0.72 commit headers, `4xx` error bodies and `SecretString` credentials the CDR client takes as they stand (#293) |
@@ -1274,7 +1274,7 @@ because no concept exists. The reference engine has not moved since
   default-filled dates as a documented failure mode).
 - **The batch path is the conformant baseline; a change feed is an adapter.**
   ITS-REST 1.1.0 defines no change notification, subscription or bulk export
-  (verified over the three `STABLE` OpenAPI documents). The reference CDR
+  (verified over the five `STABLE` OpenAPI documents). The reference CDR
   publishes every commit through a transactional outbox to AMQP as its own
   extension, and its planned secondary-use read model (its issue #3160) names
   OMOP CDM as a target fed from that stream. FerroBRIDGE's incremental mode is
@@ -1984,8 +1984,9 @@ facade, the operations and the ETL runner.
 FHIRconnect schemas; the draft REST API chapter and its FSH operation
 definitions at the pinned pull-request commit; the FHIRconnect mapping
 library; the OMOCL corpus; the CDM CSV definitions and PostgreSQL DDL; the
-three `STABLE` ITS-REST OpenAPI documents (read by the client's contract
-tests); the seven HL7 packages the FHIR generator reads; and, when a context
+five `STABLE` ITS-REST OpenAPI documents (Overview, System, EHR, Query
+and Definition, each checked `STABLE` by the corpus test); the seven HL7
+packages the FHIR generator reads; and, when a context
 targeting it is authored, the HL7 Europe and MII profile packages of section
 4.8, each pinned by version in `docs/VERSIONS.md`.
 

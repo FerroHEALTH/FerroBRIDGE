@@ -4,8 +4,8 @@
 # scripts/vendor/its-rest.sh
 #
 # Vendors the openEHR ITS-REST OpenAPI documents into docs/specs/its-rest/
-# (.claude/rules/vendored-inputs.md): the three STABLE code-generation documents
-# for the EHR, Query and Definition modules, the AsciiDoc sources of the
+# (.claude/rules/vendored-inputs.md): the five STABLE code-generation documents
+# for the Overview, System, EHR, Query and Definition modules, the AsciiDoc sources of the
 # Simplified Formats and Simplified Data Template sub-specifications (the FLAT
 # format the composition seam reads and writes), plus the repository's licence
 # file.
@@ -37,6 +37,8 @@ dest="docs/specs/its-rest"
 oas="computable/OAS"
 
 paths=(
+  "$oas/overview-codegen.openapi.yaml"
+  "$oas/system-codegen.openapi.yaml"
   "$oas/ehr-codegen.openapi.yaml"
   "$oas/query-codegen.openapi.yaml"
   "$oas/definition-codegen.openapi.yaml"
@@ -115,7 +117,8 @@ carries no release identity of its own. The tag, the commit it resolves to, and
 the git blob id of each file are what identify these bytes
 (docs/architecture.md section 2).
 
-Each of the three is \`x-status: STABLE\`, which the script checks. The Admin and
+Each of the five (Overview, System, EHR, Query and Definition) is
+\`x-status: STABLE\`, which the script checks. The Admin and
 Demographic documents of the same release are \`x-status: DEVELOPMENT\` and are
 not vendored.
 

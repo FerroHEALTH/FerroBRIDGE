@@ -295,15 +295,15 @@ fn the_cdm_corpus_carries_the_four_postgresql_ddl_files() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn the_its_rest_corpus_carries_the_three_stable_documents() -> Result<(), Box<dyn Error>> {
+fn the_its_rest_corpus_carries_the_five_stable_documents() -> Result<(), Box<dyn Error>> {
     let oas = repo_root().join("docs/specs/its-rest/computable/OAS");
     let files = files_under(&oas)?;
     assert_eq!(
         count_with_extension(&files, &["yaml"]),
-        3,
-        "the bridge depends on the EHR, Query and Definition documents, and on no other"
+        5,
+        "the corpus is the Overview, System, EHR, Query and Definition documents, and no other"
     );
-    for module in ["ehr", "query", "definition"] {
+    for module in ["overview", "system", "ehr", "query", "definition"] {
         let path = oas.join(format!("{module}-codegen.openapi.yaml"));
         let text = std::fs::read_to_string(&path)?;
         assert!(

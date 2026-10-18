@@ -23,6 +23,16 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Added
+
+- The ITS-REST 1.1.0 Overview and System OpenAPI documents are vendored
+  beside EHR, Query and Definition (#478). All five are `x-status: STABLE`
+  at tag `Release-1.1.0`. The Overview defines the common headers the CDR
+  client sends (`openehr-version`, `openehr-audit-details`,
+  `openehr-template-id`), and System defines the `OPTIONS /` capability call.
+  `scripts/vendor/its-rest.sh` fetches and checks all five, and the corpus
+  test reads each.
+
 ## [0.0.8] - 2026-10-18
 
 ### Added
