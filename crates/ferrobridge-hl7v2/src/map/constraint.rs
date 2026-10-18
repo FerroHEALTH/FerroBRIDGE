@@ -9,7 +9,7 @@
 //! among them at <https://hl7.org/fhir/R4/datatypes.html#url>) and the
 //! minimum cardinality of each element
 //! (<https://hl7.org/fhir/R4/elementdefinition.html>, `ElementDefinition.min`).
-//! Both are read from `fhir-types`: the lexical forms through its decoder, the
+//! Both are read from `fhir-types`: the lexical forms through its primitive checks, the
 //! cardinalities from its element table. Nothing here names a resource or an
 //! element.
 

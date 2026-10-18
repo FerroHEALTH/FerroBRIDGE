@@ -111,6 +111,21 @@ crates on crates.io.
   at `<Type>.id`. One R4 example leaves the `fhir-r4` pass list, a
   `SearchParameter` whose 67-character id breaks the form.
   `fhirconnect` moves to 0.1.133 with the requirement.
+- `fhir-types` 0.1.120 refuses a resource whose required repeating element
+  is absent (#312): a `1..*` element such as `Provenance.target` or
+  `SearchParameter.base` fails to decode with `MissingProperty` at its own
+  path (R4 elementdefinition-definitions.html#ElementDefinition.min), and an
+  empty array or a too-short one fails there too (json.html §2.6.2), where
+  an empty array was reported at its parent. A `Path::lenient` reader keeps
+  the items it finds. Each string primitive's lexical form is public as
+  `<Primitive>::check(text)` with the new `codec::LexicalError`, and each
+  version's `primitives::check_value(code, value)` decodes a JSON value as
+  the primitive a type code names; the HL7 v2 face checks a value with it
+  in place of decoding a probe `Extension`. A consumer that decoded a
+  resource missing a required list before gets an error now. The
+  `fhir-stu3`, `fhir-r4` and `fhir-r4b` pass lists lose the
+  `SearchParameter` examples that carry no `base`. `fhirconnect` moves to
+  0.1.134 with the requirement.
 
 ## [0.0.7] - 2026-10-17
 
