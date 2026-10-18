@@ -872,4 +872,4 @@ testWhere/testWhere1
 testWhere/testWhere2
 testWhere/testWhere3
 testWhere/testWhere4
-total 990
+total 886

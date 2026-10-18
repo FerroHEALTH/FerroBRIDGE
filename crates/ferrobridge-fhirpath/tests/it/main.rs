@@ -21,6 +21,7 @@ mod evaluate;
 mod ordering;
 mod parse;
 mod seams;
+mod stu3;
 mod suite;
 mod support;
 mod types;

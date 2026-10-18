@@ -25,6 +25,16 @@ crates on crates.io.
 
 ### Added
 
+- The FHIRPath evaluator admits the functions FHIRPath 3.0.0 adds as
+  Standard for Trial Use behind the opt-in
+  `Environment::with_fhirpath_stu3_functions` (#633), so the default stays
+  FHIRPath N1 2.0.0, the release FHIR R4 cites. This change implements
+  `matchesFull()`, `trim()`, `split()`, `join()`, `encode()`, `decode()`,
+  `escape()` and `unescape()`. HL7's FHIRPath R4 suite now counts as two
+  corpora with a badge each: `fhirpath-r4` (874 of 886, N1) and
+  `fhirpath-r4-stu3` (33 of 104, the tests that call one of the 13 3.0.0
+  functions, run with the opt-in).
+
 - The FHIRPath evaluator has a strict ordering mode,
   `Environment::with_strict_ordering`, off by default (#636). It refuses
   `first()`, `last()`, `tail()`, `skip()`, `take()` and the indexer over a
