@@ -114,6 +114,16 @@ pub fn render_definition(model: &VersionModule) -> Result<String, fmt::Error> {
         "Option<&str>",
         &reader.text_opt(own, "contentReference", "self"),
     )?;
+    render_structured(&mut out, &reader)?;
+    writeln!(out, "}}")?;
+    Ok(out)
+}
+
+/// Writes the methods that read a backbone element of `ElementDefinition`
+/// (the types, the binding, the constraints and the slicing) and the two
+/// choice values.
+fn render_structured(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
+    let own = ELEMENT_DEFINITION;
     let ty = "ElementDefinition.type";
     let type_read = format!(
         "{D}::TypeRead {{ code: {}, profiles: {}, target_profiles: {}, aggregation: {}, versioning: {} }}",
@@ -124,7 +134,7 @@ pub fn render_definition(model: &VersionModule) -> Result<String, fmt::Error> {
         reader.text_opt(ty, "versioning", "item"),
     );
     method(
-        &mut out,
+        out,
         "types",
         &format!("Vec<{D}::TypeRead<'_>>"),
         &reader.struct_list(own, "type", "self", &type_read),
@@ -136,7 +146,7 @@ pub fn render_definition(model: &VersionModule) -> Result<String, fmt::Error> {
         reader.text_opt(binding, "valueSet", "item"),
     );
     method(
-        &mut out,
+        out,
         "binding",
         &format!("Option<{D}::BindingRead<'_>>"),
         &reader.struct_opt(own, "binding", "self", &binding_read),
@@ -152,7 +162,7 @@ pub fn render_definition(model: &VersionModule) -> Result<String, fmt::Error> {
         reader.text_opt(constraint, "source", "item"),
     );
     method(
-        &mut out,
+        out,
         "constraints",
         &format!("Vec<{D}::ConstraintRead<'_>>"),
         &reader.struct_list(own, "constraint", "self", &constraint_read),
@@ -172,21 +182,20 @@ pub fn render_definition(model: &VersionModule) -> Result<String, fmt::Error> {
         reader.text_opt(slicing, "rules", "item"),
     );
     method(
-        &mut out,
+        out,
         "slicing",
         &format!("Option<{D}::SlicingRead<'_>>"),
         &reader.struct_opt(own, "slicing", "self", &slicing_read),
     )?;
     for name in ["fixed", "pattern"] {
         method(
-            &mut out,
+            out,
             name,
             &format!("Result<Option<{D}::ChoiceValue>, {C}::EncodeError>"),
             &reader.choice_value(own, name),
         )?;
     }
-    writeln!(out, "}}")?;
-    Ok(out)
+    Ok(())
 }
 
 /// Writes one trait method returning `ty` as `body`.
@@ -323,7 +332,7 @@ impl Reader<'_> {
         match target {
             Target::Inline(scalar) => inline(*scalar, value, read, Cardinality::One),
             Target::Named(name) => match self.model.types.get(name) {
-                Some(ty) if ty.is_primitive => self.primitive_value(ty, value, read),
+                Some(ty) if ty.is_primitive => Self::primitive_value(ty, value, read),
                 Some(TypeDef {
                     kind: TypeKind::Choice { variants, .. },
                     module,
@@ -350,7 +359,7 @@ impl Reader<'_> {
     }
 
     /// The read of the primitive `ty`'s `value`, held by reference in `value`.
-    fn primitive_value(&self, ty: &TypeDef, value: &str, read: Read) -> String {
+    fn primitive_value(ty: &TypeDef, value: &str, read: Read) -> String {
         let TypeKind::Struct { fields } = &ty.kind else {
             return String::from("None");
         };

@@ -31,9 +31,14 @@ fn observation_element<T: Json>(package: &str, path: &str) -> T {
     let text = fs::read_to_string(file).expect("the package carries Observation");
     let raw: serde_json::Value =
         serde_json::from_str(without_byte_order_mark(&text)).expect("the definition parses");
-    let element = raw["snapshot"]["element"]
-        .as_array()
-        .and_then(|elements| elements.iter().find(|element| element["path"] == path))
+    let element = raw
+        .pointer("/snapshot/element")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|elements| {
+            elements.iter().find(|element| {
+                element.get("path").and_then(serde_json::Value::as_str) == Some(path)
+            })
+        })
         .expect("the snapshot carries the element");
     decode(&element.to_string())
 }
@@ -156,7 +161,8 @@ const SHARED: &str = r##"{
 fn a_shared_element_reads_the_same_in_both_releases() {
     let stu3: Stu3Element = decode(SHARED);
     let r4: R4Element = decode(SHARED);
-    for element in [&stu3 as &dyn ElementDefinitionRead, &r4] {
+    let elements: [&dyn ElementDefinitionRead; 2] = [&stu3, &r4];
+    for element in elements {
         assert_eq!(element.element_id(), Some("Observation.component:systolic"));
         assert_eq!(element.slice_name(), Some("systolic"));
         assert_eq!(element.min(), Some(1));
