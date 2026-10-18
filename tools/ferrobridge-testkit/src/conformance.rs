@@ -70,11 +70,14 @@ pub enum Corpus {
     /// The tests of the same suite that call a function FHIRPath 3.0.0 adds as
     /// Standard for Trial Use, run with that opt-in, one case per test.
     FhirpathR4Stu3,
+    /// The R4 profile validator against the HL7 FHIR Validator's recorded
+    /// outcomes on a synthetic corpus, one case per resource.
+    ValidatorAgreement,
 }
 
 impl Corpus {
     /// Every corpus, in the order the gate reports them.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 15] = [
         Self::FhirconnectMappingLib,
         Self::Omocl,
         Self::Roundtrip,
@@ -89,6 +92,7 @@ impl Corpus {
         Self::FhirR4Facade,
         Self::FhirpathR4,
         Self::FhirpathR4Stu3,
+        Self::ValidatorAgreement,
     ];
 
     /// Returns the corpus identifier, which names its directory under
@@ -110,6 +114,7 @@ impl Corpus {
             Self::FhirR4Facade => "fhir-r4-facade",
             Self::FhirpathR4 => "fhirpath-r4",
             Self::FhirpathR4Stu3 => "fhirpath-r4-stu3",
+            Self::ValidatorAgreement => "validator-agreement",
         }
     }
 

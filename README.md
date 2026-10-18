@@ -36,6 +36,9 @@ FHIRPath with the FHIR R4 additions, N1 2.0.0, then the tests of the functions 3
 [![FHIRPath R4 test suite, N1](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Ffhirpath-r4.json)](conformance/fhirpath-r4/pass-list.txt)
 [![FHIRPath R4 test suite, 3.0.0 STU functions](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Ffhirpath-r4-stu3.json)](conformance/fhirpath-r4-stu3/pass-list.txt)
 
+The R4 profile validator against the HL7 FHIR Validator 6.10.4 on a synthetic corpus, every disagreement adjudicated:
+[![R4 profile validator, agreement with the HL7 FHIR Validator](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fvalidator-agreement.json)](conformance/validator-agreement/pass-list.txt)
+
 HL7 v2, by corpus, then by message family and by version across both corpora:
 [![HL7 v2 message corpora](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fhl7v2.json)](conformance/hl7v2/pass-list.txt)
 [![HL7 v2 smoke corpora (NIST, AIRA)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fhl7v2-smoke.json)](conformance/hl7v2-smoke/pass-list.txt)

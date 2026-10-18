@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# The conformance gate (#24): runs the fourteen corpus tests, compares what they
+# The conformance gate (#24): runs the fifteen corpus tests, compares what they
 # measured with the committed pass lists under conformance/, and renders one
 # shields.io endpoint badge per corpus (https://shields.io/badges/endpoint-badge),
 # one per HL7 v2 message family and one per HL7 v2 version (#366), and the
@@ -37,7 +37,8 @@
 # on disk at their pins). The five FHIR model corpora and the R4 facade corpus
 # read the HL7 examples packages (#373), fetched the same way through
 # scripts/vendor/fhir-packages.sh --build-time. The R4 profile validator's
-# package set is fetched the same way through scripts/vendor/profile-packages.sh.
+# package set is fetched the same way through scripts/vendor/profile-packages.sh,
+# for the whole run and for the validator-agreement corpus alone.
 #
 # Needs cargo, cargo-nextest, jq, and the tools that script needs. Exit 0 when
 # clean, 1 on a regression, (under --check) drift or no cargo on PATH, 2 on a
@@ -61,6 +62,7 @@ readonly CORPUS_TESTS=(
   'fhir-r4-facade ferrobridge-server conformance_the_fhir_r4_examples_hold_their_facade_pass_list'
   'fhirpath-r4 ferrobridge-fhirpath conformance_fhirpath_r4'
   'fhirpath-r4-stu3 ferrobridge-fhirpath conformance_fhirpath_r4_stu3'
+  'validator-agreement ferrobridge-validator conformance_the_validator_agrees_with_the_hl7_validator_on_its_corpus'
 )
 # Whether $1 equals one of the remaining arguments.
 contains() {
@@ -157,6 +159,7 @@ label_of() {
     fhir-r4-facade) echo "FHIR R4 facade" ;;
     fhirpath-r4) echo "FHIRPath R4 test suite, N1" ;;
     fhirpath-r4-stu3) echo "FHIRPath R4 test suite, 3.0.0 STU functions" ;;
+    validator-agreement) echo "R4 profile validator, agreement with the HL7 FHIR Validator" ;;
     *) return 1 ;;
   esac
 }
@@ -229,7 +232,7 @@ fi
 
 # The R4 profile validator's package set (#435), fetched at build time and
 # kept the same way, so the validator corpus finds it on disk.
-if [[ -z "$only" ]] && ! scripts/vendor/profile-packages.sh; then
+if [[ -z "$only" || "$only" = validator-agreement ]] && ! scripts/vendor/profile-packages.sh; then
   echo "conformance: the profile packages could not be fetched" >&2
   exit 2
 fi
@@ -397,6 +400,9 @@ render_block() {
   echo 'FHIRPath with the FHIR R4 additions, N1 2.0.0, then the tests of the functions 3.0.0 adds as STU, behind their opt-in:'
   badge_link "$(label_of fhirpath-r4)" fhirpath-r4 conformance/fhirpath-r4/pass-list.txt
   badge_link "$(label_of fhirpath-r4-stu3)" fhirpath-r4-stu3 conformance/fhirpath-r4-stu3/pass-list.txt
+  echo
+  echo 'The R4 profile validator against the HL7 FHIR Validator 6.10.4 on a synthetic corpus, every disagreement adjudicated:'
+  badge_link "$(label_of validator-agreement)" validator-agreement conformance/validator-agreement/pass-list.txt
   echo
   echo 'HL7 v2, by corpus, then by message family and by version across both corpora:'
   badge_link "$(label_of hl7v2)" hl7v2 conformance/hl7v2/pass-list.txt

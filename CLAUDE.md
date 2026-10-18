@@ -251,10 +251,11 @@ the testkit tool crate. Beside it:
   that the tracker reports closed;
   `pin-freshness.sh`, every pin no ecosystem watches against its newest
   upstream release; and `conformance.sh`, the pass-list gate over the six
-  corpora under `conformance/` (thirteen: the two mapping libraries, the
+  corpora under `conformance/` (fifteen: the two mapping libraries, the
   round-trip laws, the REST API draft, the two HL7 v2 message sets, the five
-  FHIR examples packages per version, STU3 to R6, the R4 facade, and the HL7
-  FHIRPath test suite for R4) (a regression fails, a new pass asks for the
+  FHIR examples packages per version, STU3 to R6, the R4 facade, the HL7
+  FHIRPath test suite for R4 as N1 and with the 3.0.0 STU functions, and
+  the R4 profile validator's agreement with the HL7 FHIR Validator) (a regression fails, a new pass asks for the
   list, `--update` rewrites the lists and the shields.io badge JSON).
   `affected.sh` computes the packages a change reaches, which decides the
   CI lanes a pull request runs, and `fast.sh` is the default local gate over
