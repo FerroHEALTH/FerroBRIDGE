@@ -37,7 +37,14 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
   from that version's package: STU3's single `type.profile` and
   `targetProfile` read as lists and its `valueSetUri` or `valueSetReference`
   as the value set's URL, so a validator reads every release through one
-  trait and never through a model of its own.
+  trait and never through a model of its own. It also reads `isModifier` and
+  the three facts core extensions carry: a binding's `maxValueSet`, a
+  constraint's best-practice flag and a type's `regex` (#859).
+  `definition::StructureDefinitionRead` is the same for the definition around
+  the elements (#859): url, version, type, base, kind, `abstract`,
+  derivation, the snapshot, and the context, where STU3's `contextType` with
+  its list of strings reads in the shape of R4's `type` and `expression`
+  entries, each release's codes kept.
 - `search_parameters::SEARCH_PARAMETERS` is the one search parameter registry
   per version, behind `resources`: a consumer checks a search parameter code,
   type or canonical against it and never keeps its own copy of the

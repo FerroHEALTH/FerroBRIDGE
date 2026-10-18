@@ -5,6 +5,10 @@
 //! The release-neutral read of this version's `ElementDefinition`, emitted from
 //! its package (<https://hl7.org/fhir/R4/elementdefinition.html>).
 
+#[expect(
+    clippy::match_same_arms,
+    reason = "an extension value is read by one arm per type the version admits, and every arm of a type that cannot carry the fact reads as absent"
+)]
 impl super::super::definition::ElementDefinitionRead
     for super::element_definition::ElementDefinition
 {
@@ -32,6 +36,10 @@ impl super::super::definition::ElementDefinitionRead
 
     fn max_length(&self) -> Option<i32> {
         self.max_length.as_ref().and_then(|value| value.value)
+    }
+
+    fn is_modifier(&self) -> Option<bool> {
+        self.is_modifier.as_ref().and_then(|value| value.value)
     }
 
     fn content_reference(&self) -> Option<&str> {
@@ -64,40 +72,92 @@ impl super::super::definition::ElementDefinitionRead
                     .versioning
                     .as_ref()
                     .and_then(|value| value.value.as_deref()),
+                regex: item
+                    .extension
+                    .iter()
+                    .filter(|extension| {
+                        Some(extension.url.as_str())
+                            == Some("http://hl7.org/fhir/StructureDefinition/regex")
+                    })
+                    .find_map(|extension| {
+                        extension.value.as_ref().and_then(|value| match &value {
+                            super::extension::ExtensionValue::Base64Binary(held) => {
+                                held.value.as_deref()
+                            }
+                            super::extension::ExtensionValue::Boolean(_) => None,
+                            super::extension::ExtensionValue::Canonical(held) => {
+                                held.value.as_deref()
+                            }
+                            super::extension::ExtensionValue::Code(held) => held.value.as_deref(),
+                            super::extension::ExtensionValue::Date(held) => held.value.as_deref(),
+                            super::extension::ExtensionValue::DateTime(held) => {
+                                held.value.as_deref()
+                            }
+                            super::extension::ExtensionValue::Decimal(held) => {
+                                held.value.as_deref()
+                            }
+                            super::extension::ExtensionValue::Id(held) => held.value.as_deref(),
+                            super::extension::ExtensionValue::Instant(held) => {
+                                held.value.as_deref()
+                            }
+                            super::extension::ExtensionValue::Integer(_) => None,
+                            super::extension::ExtensionValue::Markdown(held) => {
+                                held.value.as_deref()
+                            }
+                            super::extension::ExtensionValue::Oid(held) => held.value.as_deref(),
+                            super::extension::ExtensionValue::PositiveInt(_) => None,
+                            super::extension::ExtensionValue::String(held) => held.value.as_deref(),
+                            super::extension::ExtensionValue::Time(held) => held.value.as_deref(),
+                            super::extension::ExtensionValue::UnsignedInt(_) => None,
+                            super::extension::ExtensionValue::Uri(held) => held.value.as_deref(),
+                            super::extension::ExtensionValue::Url(held) => held.value.as_deref(),
+                            super::extension::ExtensionValue::Uuid(held) => held.value.as_deref(),
+                            super::extension::ExtensionValue::Address(_) => None,
+                            super::extension::ExtensionValue::Age(_) => None,
+                            super::extension::ExtensionValue::Annotation(_) => None,
+                            super::extension::ExtensionValue::Attachment(_) => None,
+                            super::extension::ExtensionValue::CodeableConcept(_) => None,
+                            super::extension::ExtensionValue::Coding(_) => None,
+                            super::extension::ExtensionValue::ContactPoint(_) => None,
+                            super::extension::ExtensionValue::Count(_) => None,
+                            super::extension::ExtensionValue::Distance(_) => None,
+                            super::extension::ExtensionValue::Duration(_) => None,
+                            super::extension::ExtensionValue::HumanName(_) => None,
+                            super::extension::ExtensionValue::Identifier(_) => None,
+                            super::extension::ExtensionValue::Money(_) => None,
+                            super::extension::ExtensionValue::Period(_) => None,
+                            super::extension::ExtensionValue::Quantity(_) => None,
+                            super::extension::ExtensionValue::Range(_) => None,
+                            super::extension::ExtensionValue::Ratio(_) => None,
+                            super::extension::ExtensionValue::Reference(held) => held
+                                .reference
+                                .as_ref()
+                                .and_then(|value| value.value.as_deref()),
+                            super::extension::ExtensionValue::SampledData(_) => None,
+                            super::extension::ExtensionValue::Signature(_) => None,
+                            super::extension::ExtensionValue::Timing(_) => None,
+                            super::extension::ExtensionValue::ContactDetail(_) => None,
+                            super::extension::ExtensionValue::Contributor(_) => None,
+                            super::extension::ExtensionValue::DataRequirement(_) => None,
+                            super::extension::ExtensionValue::Expression(_) => None,
+                            super::extension::ExtensionValue::ParameterDefinition(_) => None,
+                            super::extension::ExtensionValue::RelatedArtifact(_) => None,
+                            super::extension::ExtensionValue::TriggerDefinition(_) => None,
+                            super::extension::ExtensionValue::UsageContext(_) => None,
+                            super::extension::ExtensionValue::Dosage(_) => None,
+                            super::extension::ExtensionValue::Meta(_) => None,
+                        })
+                    }),
             })
             .collect()
     }
 
     fn binding(&self) -> Option<super::super::definition::BindingRead<'_>> {
-        self.binding
-            .as_ref()
-            .map(|item| super::super::definition::BindingRead {
-                strength: item.strength.value.as_deref(),
-                value_set: item
-                    .value_set
-                    .as_ref()
-                    .and_then(|value| value.value.as_deref()),
-            })
+        self.binding.as_ref().map(|item| super::super::definition::BindingRead { strength: item.strength.value.as_deref(), value_set: item.value_set.as_ref().and_then(|value| value.value.as_deref()), max_value_set: item.extension.iter().filter(|extension| Some(extension.url.as_str()) == Some("http://hl7.org/fhir/StructureDefinition/elementdefinition-maxValueSet")).find_map(|extension| extension.value.as_ref().and_then(|value| match &value { super::extension::ExtensionValue::Base64Binary(held) => held.value.as_deref(), super::extension::ExtensionValue::Boolean(_) => None, super::extension::ExtensionValue::Canonical(held) => held.value.as_deref(), super::extension::ExtensionValue::Code(held) => held.value.as_deref(), super::extension::ExtensionValue::Date(held) => held.value.as_deref(), super::extension::ExtensionValue::DateTime(held) => held.value.as_deref(), super::extension::ExtensionValue::Decimal(held) => held.value.as_deref(), super::extension::ExtensionValue::Id(held) => held.value.as_deref(), super::extension::ExtensionValue::Instant(held) => held.value.as_deref(), super::extension::ExtensionValue::Integer(_) => None, super::extension::ExtensionValue::Markdown(held) => held.value.as_deref(), super::extension::ExtensionValue::Oid(held) => held.value.as_deref(), super::extension::ExtensionValue::PositiveInt(_) => None, super::extension::ExtensionValue::String(held) => held.value.as_deref(), super::extension::ExtensionValue::Time(held) => held.value.as_deref(), super::extension::ExtensionValue::UnsignedInt(_) => None, super::extension::ExtensionValue::Uri(held) => held.value.as_deref(), super::extension::ExtensionValue::Url(held) => held.value.as_deref(), super::extension::ExtensionValue::Uuid(held) => held.value.as_deref(), super::extension::ExtensionValue::Address(_) => None, super::extension::ExtensionValue::Age(_) => None, super::extension::ExtensionValue::Annotation(_) => None, super::extension::ExtensionValue::Attachment(_) => None, super::extension::ExtensionValue::CodeableConcept(_) => None, super::extension::ExtensionValue::Coding(_) => None, super::extension::ExtensionValue::ContactPoint(_) => None, super::extension::ExtensionValue::Count(_) => None, super::extension::ExtensionValue::Distance(_) => None, super::extension::ExtensionValue::Duration(_) => None, super::extension::ExtensionValue::HumanName(_) => None, super::extension::ExtensionValue::Identifier(_) => None, super::extension::ExtensionValue::Money(_) => None, super::extension::ExtensionValue::Period(_) => None, super::extension::ExtensionValue::Quantity(_) => None, super::extension::ExtensionValue::Range(_) => None, super::extension::ExtensionValue::Ratio(_) => None, super::extension::ExtensionValue::Reference(held) => held.reference.as_ref().and_then(|value| value.value.as_deref()), super::extension::ExtensionValue::SampledData(_) => None, super::extension::ExtensionValue::Signature(_) => None, super::extension::ExtensionValue::Timing(_) => None, super::extension::ExtensionValue::ContactDetail(_) => None, super::extension::ExtensionValue::Contributor(_) => None, super::extension::ExtensionValue::DataRequirement(_) => None, super::extension::ExtensionValue::Expression(_) => None, super::extension::ExtensionValue::ParameterDefinition(_) => None, super::extension::ExtensionValue::RelatedArtifact(_) => None, super::extension::ExtensionValue::TriggerDefinition(_) => None, super::extension::ExtensionValue::UsageContext(_) => None, super::extension::ExtensionValue::Dosage(_) => None, super::extension::ExtensionValue::Meta(_) => None, })) })
     }
 
     fn constraints(&self) -> Vec<super::super::definition::ConstraintRead<'_>> {
-        self.constraint
-            .iter()
-            .map(|item| super::super::definition::ConstraintRead {
-                key: item.key.value.as_deref(),
-                severity: item.severity.value.as_deref(),
-                human: item.human.value.as_deref(),
-                expression: item
-                    .expression
-                    .as_ref()
-                    .and_then(|value| value.value.as_deref()),
-                xpath: item.xpath.as_ref().and_then(|value| value.value.as_deref()),
-                source: item
-                    .source
-                    .as_ref()
-                    .and_then(|value| value.value.as_deref()),
-            })
-            .collect()
+        self.constraint.iter().map(|item| super::super::definition::ConstraintRead { key: item.key.value.as_deref(), severity: item.severity.value.as_deref(), human: item.human.value.as_deref(), expression: item.expression.as_ref().and_then(|value| value.value.as_deref()), xpath: item.xpath.as_ref().and_then(|value| value.value.as_deref()), source: item.source.as_ref().and_then(|value| value.value.as_deref()), best_practice: item.extension.iter().filter(|extension| Some(extension.url.as_str()) == Some("http://hl7.org/fhir/StructureDefinition/elementdefinition-bestpractice")).find_map(|extension| extension.value.as_ref().and_then(|value| match &value { super::extension::ExtensionValue::Base64Binary(_) => None, super::extension::ExtensionValue::Boolean(held) => held.value, super::extension::ExtensionValue::Canonical(_) => None, super::extension::ExtensionValue::Code(_) => None, super::extension::ExtensionValue::Date(_) => None, super::extension::ExtensionValue::DateTime(_) => None, super::extension::ExtensionValue::Decimal(_) => None, super::extension::ExtensionValue::Id(_) => None, super::extension::ExtensionValue::Instant(_) => None, super::extension::ExtensionValue::Integer(_) => None, super::extension::ExtensionValue::Markdown(_) => None, super::extension::ExtensionValue::Oid(_) => None, super::extension::ExtensionValue::PositiveInt(_) => None, super::extension::ExtensionValue::String(_) => None, super::extension::ExtensionValue::Time(_) => None, super::extension::ExtensionValue::UnsignedInt(_) => None, super::extension::ExtensionValue::Uri(_) => None, super::extension::ExtensionValue::Url(_) => None, super::extension::ExtensionValue::Uuid(_) => None, super::extension::ExtensionValue::Address(_) => None, super::extension::ExtensionValue::Age(_) => None, super::extension::ExtensionValue::Annotation(_) => None, super::extension::ExtensionValue::Attachment(_) => None, super::extension::ExtensionValue::CodeableConcept(_) => None, super::extension::ExtensionValue::Coding(_) => None, super::extension::ExtensionValue::ContactPoint(_) => None, super::extension::ExtensionValue::Count(_) => None, super::extension::ExtensionValue::Distance(_) => None, super::extension::ExtensionValue::Duration(_) => None, super::extension::ExtensionValue::HumanName(_) => None, super::extension::ExtensionValue::Identifier(_) => None, super::extension::ExtensionValue::Money(_) => None, super::extension::ExtensionValue::Period(_) => None, super::extension::ExtensionValue::Quantity(_) => None, super::extension::ExtensionValue::Range(_) => None, super::extension::ExtensionValue::Ratio(_) => None, super::extension::ExtensionValue::Reference(_) => None, super::extension::ExtensionValue::SampledData(_) => None, super::extension::ExtensionValue::Signature(_) => None, super::extension::ExtensionValue::Timing(_) => None, super::extension::ExtensionValue::ContactDetail(_) => None, super::extension::ExtensionValue::Contributor(_) => None, super::extension::ExtensionValue::DataRequirement(_) => None, super::extension::ExtensionValue::Expression(_) => None, super::extension::ExtensionValue::ParameterDefinition(_) => None, super::extension::ExtensionValue::RelatedArtifact(_) => None, super::extension::ExtensionValue::TriggerDefinition(_) => None, super::extension::ExtensionValue::UsageContext(_) => None, super::extension::ExtensionValue::Dosage(_) => None, super::extension::ExtensionValue::Meta(_) => None, })) }).collect()
     }
 
     fn slicing(&self) -> Option<super::super::definition::SlicingRead<'_>> {
@@ -155,5 +215,67 @@ impl super::super::definition::ElementDefinitionRead
                 })
             })
             .transpose()
+    }
+}
+
+#[cfg(feature = "resources")]
+impl super::super::definition::StructureDefinitionRead
+    for super::structure_definition::StructureDefinition
+{
+    type Element = super::element_definition::ElementDefinition;
+
+    fn url(&self) -> Option<&str> {
+        self.url.value.as_deref()
+    }
+
+    fn version(&self) -> Option<&str> {
+        self.version
+            .as_ref()
+            .and_then(|value| value.value.as_deref())
+    }
+
+    fn type_name(&self) -> Option<&str> {
+        self.r#type.value.as_deref()
+    }
+
+    fn base_definition(&self) -> Option<&str> {
+        self.base_definition
+            .as_ref()
+            .and_then(|value| value.value.as_deref())
+    }
+
+    fn kind(&self) -> Option<&str> {
+        self.kind.value.as_deref()
+    }
+
+    fn derivation(&self) -> Option<&str> {
+        self.derivation
+            .as_ref()
+            .and_then(|value| value.value.as_deref())
+    }
+
+    fn is_abstract(&self) -> Option<bool> {
+        self.r#abstract.value
+    }
+
+    fn snapshot(&self) -> Option<&[Self::Element]> {
+        self.snapshot.as_ref().map(|item| item.element.as_slice())
+    }
+
+    fn contexts(&self) -> Vec<super::super::definition::ContextRead<'_>> {
+        self.context
+            .iter()
+            .map(|item| super::super::definition::ContextRead {
+                kind: item.r#type.value.as_deref(),
+                expression: item.expression.value.as_deref(),
+            })
+            .collect()
+    }
+
+    fn context_invariants(&self) -> Vec<&str> {
+        self.context_invariant
+            .iter()
+            .filter_map(|value| value.value.as_deref())
+            .collect()
     }
 }

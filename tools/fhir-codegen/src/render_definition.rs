@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The release-neutral read of `ElementDefinition`, one impl per version.
+//! The release-neutral read of `ElementDefinition` and `StructureDefinition`,
+//! one impl each per version.
 //!
 //! The trait and its read structs are the crate-level `definition.rs`
 //! (`templates/definition.rs`). This module writes each version's impl from
@@ -11,15 +12,35 @@
 //! as a list, a `valueSet[x]` choice (STU3) and a `valueSet` canonical (R4)
 //! both read as the value set's URL, and an element the version lacks reads as
 //! absent (<https://hl7.org/fhir/STU3/elementdefinition.html>,
-//! <https://hl7.org/fhir/R4/elementdefinition.html>). Nothing here names a
-//! version.
+//! <https://hl7.org/fhir/R4/elementdefinition.html>). An extension-carried
+//! fact reads the value of the extension with its url, and an STU3 context
+//! (a `contextType` beside a list of strings) reads in the shape of an R4
+//! context entry. Nothing here names a version.
 
 use std::fmt::{self, Write};
 
 use crate::lower::{Cardinality, Field, Scalar, Target, TypeDef, TypeKind, VersionModule};
 
-/// The type the read is implemented for.
+/// The type the element read is implemented for.
 const ELEMENT_DEFINITION: &str = "ElementDefinition";
+
+/// The type the structure read is implemented for.
+const STRUCTURE_DEFINITION: &str = "StructureDefinition";
+
+/// The extension naming a binding's maximum value set.
+const MAX_VALUE_SET: &str = "http://hl7.org/fhir/StructureDefinition/elementdefinition-maxValueSet";
+
+/// The extension marking a constraint as a best practice.
+const BEST_PRACTICE: &str =
+    "http://hl7.org/fhir/StructureDefinition/elementdefinition-bestpractice";
+
+/// The lint expectation over the element impl: an extension's `value[x]` is read by
+/// a `match` with one arm per type the version admits, and the arms of the
+/// types that cannot carry the fact all read as absent.
+const SAME_ARMS: &str = "#[expect(\n    clippy::match_same_arms,\n    reason = \"an extension value is read by one arm per type the version admits, and every arm of a type that cannot carry the fact reads as absent\"\n)]\n";
+
+/// The extension stating a primitive type's lexical form.
+const REGEX: &str = "http://hl7.org/fhir/StructureDefinition/regex";
 
 /// The codec module from a version file.
 const C: &str = "super::super::codec";
@@ -34,6 +55,8 @@ enum Read {
     Text,
     /// A scalar copied out (`u32`, `i32`, `bool`).
     Copy,
+    /// A `bool` copied out, where a choice also offers other scalars.
+    Bool,
 }
 
 /// Whether `model` defines `ElementDefinition`, so its version gets the
@@ -70,7 +93,7 @@ pub fn render_definition(model: &VersionModule) -> Result<String, fmt::Error> {
     let own = ELEMENT_DEFINITION;
     writeln!(
         out,
-        "impl {D}::ElementDefinitionRead for super::element_definition::ElementDefinition {{"
+        "{SAME_ARMS}impl {D}::ElementDefinitionRead for super::element_definition::ElementDefinition {{"
     )?;
     method(
         &mut out,
@@ -110,13 +133,78 @@ pub fn render_definition(model: &VersionModule) -> Result<String, fmt::Error> {
     )?;
     method(
         &mut out,
+        "is_modifier",
+        "Option<bool>",
+        &reader.copy_opt(own, "isModifier", "self"),
+    )?;
+    method(
+        &mut out,
         "content_reference",
         "Option<&str>",
         &reader.text_opt(own, "contentReference", "self"),
     )?;
     render_structured(&mut out, &reader)?;
     writeln!(out, "}}")?;
+    if let Some(structure) = model.types.get(STRUCTURE_DEFINITION) {
+        writeln!(out)?;
+        out.push_str(&structure.scope.cfg());
+        render_structure(&mut out, &reader)?;
+    }
     Ok(out)
+}
+
+/// Writes the `StructureDefinitionRead` impl.
+fn render_structure(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
+    let own = STRUCTURE_DEFINITION;
+    writeln!(
+        out,
+        "impl {D}::StructureDefinitionRead for super::structure_definition::StructureDefinition {{\n    type Element = super::element_definition::ElementDefinition;\n"
+    )?;
+    for (name, element) in [
+        ("url", "url"),
+        ("version", "version"),
+        ("type_name", "type"),
+        ("base_definition", "baseDefinition"),
+        ("kind", "kind"),
+        ("derivation", "derivation"),
+    ] {
+        method(
+            out,
+            name,
+            "Option<&str>",
+            &reader.text_opt(own, element, "self"),
+        )?;
+    }
+    method(
+        out,
+        "is_abstract",
+        "Option<bool>",
+        &reader.copy_opt(own, "abstract", "self"),
+    )?;
+    let snapshot = match (
+        reader.field(own, "snapshot"),
+        reader.field("StructureDefinition.snapshot", "element"),
+    ) {
+        (Some(snapshot), Some(element)) => format!(
+            "self.{}.as_ref().map(|item| item.{}.as_slice())",
+            snapshot.name, element.name
+        ),
+        _ => String::from("None"),
+    };
+    method(out, "snapshot", "Option<&[Self::Element]>", &snapshot)?;
+    method(
+        out,
+        "contexts",
+        &format!("Vec<{D}::ContextRead<'_>>"),
+        &reader.contexts(),
+    )?;
+    method(
+        out,
+        "context_invariants",
+        "Vec<&str>",
+        &reader.text_list(own, "contextInvariant", "self"),
+    )?;
+    writeln!(out, "}}")
 }
 
 /// Writes the methods that read a backbone element of `ElementDefinition`
@@ -126,12 +214,13 @@ fn render_structured(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
     let own = ELEMENT_DEFINITION;
     let ty = "ElementDefinition.type";
     let type_read = format!(
-        "{D}::TypeRead {{ code: {}, profiles: {}, target_profiles: {}, aggregation: {}, versioning: {} }}",
+        "{D}::TypeRead {{ code: {}, profiles: {}, target_profiles: {}, aggregation: {}, versioning: {}, regex: {} }}",
         reader.text_opt(ty, "code", "item"),
         reader.text_list(ty, "profile", "item"),
         reader.text_list(ty, "targetProfile", "item"),
         reader.text_list(ty, "aggregation", "item"),
         reader.text_opt(ty, "versioning", "item"),
+        reader.extension(ty, "item", REGEX, Read::Text),
     );
     method(
         out,
@@ -141,9 +230,10 @@ fn render_structured(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
     )?;
     let binding = "ElementDefinition.binding";
     let binding_read = format!(
-        "{D}::BindingRead {{ strength: {}, value_set: {} }}",
+        "{D}::BindingRead {{ strength: {}, value_set: {}, max_value_set: {} }}",
         reader.text_opt(binding, "strength", "item"),
         reader.text_opt(binding, "valueSet", "item"),
+        reader.extension(binding, "item", MAX_VALUE_SET, Read::Text),
     );
     method(
         out,
@@ -153,13 +243,14 @@ fn render_structured(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
     )?;
     let constraint = "ElementDefinition.constraint";
     let constraint_read = format!(
-        "{D}::ConstraintRead {{ key: {}, severity: {}, human: {}, expression: {}, xpath: {}, source: {} }}",
+        "{D}::ConstraintRead {{ key: {}, severity: {}, human: {}, expression: {}, xpath: {}, source: {}, best_practice: {} }}",
         reader.text_opt(constraint, "key", "item"),
         reader.text_opt(constraint, "severity", "item"),
         reader.text_opt(constraint, "human", "item"),
         reader.text_opt(constraint, "expression", "item"),
         reader.text_opt(constraint, "xpath", "item"),
         reader.text_opt(constraint, "source", "item"),
+        reader.extension(constraint, "item", BEST_PRACTICE, Read::Bool),
     );
     method(
         out,
@@ -310,6 +401,46 @@ impl Reader<'_> {
         }
     }
 
+    /// The read of the value of the extension whose url is `url`, among the
+    /// extensions of the struct at `path` on `receiver`; absent where the
+    /// struct carries none with that url.
+    fn extension(&self, path: &str, receiver: &str, url: &str, read: Read) -> String {
+        let Some(field) = self.field(path, "extension") else {
+            return String::from("None");
+        };
+        let url_read = self.text_opt("Extension", "url", "extension");
+        let value = self.optional("Extension", "value", "extension", read);
+        format!(
+            "{receiver}.{}.iter().filter(|extension| {url_read} == Some({url:?})).find_map(|extension| {value})",
+            field.name
+        )
+    }
+
+    /// The read of `StructureDefinition.context`: each R4 context entry's
+    /// `type` and `expression`, or each STU3 `context` string with the one
+    /// `contextType` beside it.
+    fn contexts(&self) -> String {
+        let own = STRUCTURE_DEFINITION;
+        let entry = "StructureDefinition.context";
+        if self.type_at(entry).is_some() {
+            let read = format!(
+                "{D}::ContextRead {{ kind: {}, expression: {} }}",
+                self.text_opt(entry, "type", "item"),
+                self.text_opt(entry, "expression", "item"),
+            );
+            return self.struct_list(own, "context", "self", &read);
+        }
+        let Some(field) = self.field(own, "context") else {
+            return String::from("Vec::new()");
+        };
+        format!(
+            "self.{}.iter().map(|item| {D}::ContextRead {{ kind: {}, expression: {} }}).collect()",
+            field.name,
+            self.text_opt(own, "contextType", "self"),
+            self.value(&field.ty.target, "item", Read::Text),
+        )
+    }
+
     /// The JSON form of the choice element `name` of `ElementDefinition`.
     fn choice_value(&self, path: &str, name: &str) -> String {
         match self.field(path, name) {
@@ -341,10 +472,11 @@ impl Reader<'_> {
                     let arms: Vec<String> = variants
                         .iter()
                         .map(|variant| {
+                            let read = self.value(&variant.target, "held", read);
+                            let held = if read == "None" { "_" } else { "held" };
                             format!(
-                                "super::{module}::{name}::{}(held) => {}",
-                                variant.name,
-                                self.value(&variant.target, "held", read)
+                                "super::{module}::{name}::{}({held}) => {read}",
+                                variant.name
                             )
                         })
                         .collect();
@@ -379,10 +511,10 @@ fn inline(scalar: Scalar, place: &str, read: Read, card: Cardinality) -> String 
     match (scalar, read, card) {
         (Scalar::Str, Read::Text, Cardinality::One) => format!("Some({place}.as_str())"),
         (Scalar::Str, Read::Text, _) => format!("{place}.as_deref()"),
-        (Scalar::Bool | Scalar::I32 | Scalar::U32, Read::Copy, Cardinality::One) => {
-            format!("Some({place})")
-        }
-        (Scalar::Bool | Scalar::I32 | Scalar::U32, Read::Copy, _) => place.to_owned(),
+        (Scalar::Bool | Scalar::I32 | Scalar::U32, Read::Copy, Cardinality::One)
+        | (Scalar::Bool, Read::Bool, Cardinality::One) => format!("Some({place})"),
+        (Scalar::Bool | Scalar::I32 | Scalar::U32, Read::Copy, _)
+        | (Scalar::Bool, Read::Bool, _) => place.to_owned(),
         _ => String::from("None"),
     }
 }

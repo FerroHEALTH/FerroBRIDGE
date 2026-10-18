@@ -22,7 +22,11 @@ resources are the authority for what it emits (`.claude/rules/codegen.md`).
   version defines for each read element and spelling its read from the
   field's cardinality and type: a primitive reads its `value`, a choice reads
   each alternative, a `Reference` its `reference`, and a missing element
-  reads as absent. No version is named.
+  reads as absent. An extension-carried fact reads the value of the
+  extension with its url, and the `StructureDefinitionRead` impl (#859)
+  reads a context either as R4 entries or, where the version states context
+  strings, as those strings with the version's `contextType`. No version is
+  named.
 - `search` (#522) emits the search parameter registry per version behind
   `resources`: every `SearchParameter` of the package apart from the
   specification's examples (`package::Package` leaves out the ids `example`

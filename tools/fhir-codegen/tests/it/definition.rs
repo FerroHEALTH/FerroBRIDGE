@@ -10,7 +10,9 @@ use std::fs;
 
 use fhir_codegen::package::without_byte_order_mark;
 use fhir_types::codec::{Json, Path, Value, expect_object};
-use fhir_types::definition::{ChoiceValue, ElementDefinitionRead};
+use fhir_types::definition::{
+    ChoiceValue, ContextRead, ElementDefinitionRead, StructureDefinitionRead,
+};
 
 use crate::vendor_dir;
 
@@ -201,4 +203,182 @@ fn a_constraint_xpath_reads_as_absent_in_r5_which_drops_it() {
     let constraint = &r5.constraints()[0];
     assert_eq!(constraint.xpath, None);
     assert_eq!(constraint.expression, Some("true"));
+}
+/// The element at `path` of the core definition `name` of the vendored
+/// package `package`, decoded as `T`.
+fn core_element<T: Json>(package: &str, name: &str, path: &str) -> T {
+    let raw = core_definition_json(package, name);
+    let element = raw
+        .pointer("/snapshot/element")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|elements| {
+            elements
+                .iter()
+                .find(|element| element.get("id").and_then(serde_json::Value::as_str) == Some(path))
+        })
+        .expect("the snapshot carries the element");
+    decode(&element.to_string())
+}
+
+/// The core definition `name` of the vendored package `package`, as JSON.
+fn core_definition_json(package: &str, name: &str) -> serde_json::Value {
+    let file = vendor_dir()
+        .join(package)
+        .join(format!("package/StructureDefinition-{name}.json"));
+    let text = fs::read_to_string(file).expect("the package carries the definition");
+    serde_json::from_str(without_byte_order_mark(&text)).expect("the definition parses")
+}
+
+/// The core definition `name` of the vendored package `package`, decoded as
+/// `T`.
+fn core_definition<T: Json>(package: &str, name: &str) -> T {
+    let text = core_definition_json(package, name).to_string();
+    let value: Value = serde_json::from_str(&text).expect("the definition is JSON");
+    let mut path = Path::root("StructureDefinition");
+    let object = expect_object(&value, &path).expect("the definition is an object");
+    T::from_json(object, &mut path).expect("the definition decodes")
+}
+
+type Stu3Structure = fhir_types::stu3::structure_definition::StructureDefinition;
+type R4Structure = fhir_types::r4::structure_definition::StructureDefinition;
+
+/// Holds that `T` implements the structure read.
+const fn implements_the_structure_read<T: StructureDefinitionRead>() {}
+
+#[test]
+fn every_version_implements_the_structure_read() {
+    implements_the_structure_read::<Stu3Structure>();
+    implements_the_structure_read::<R4Structure>();
+    implements_the_structure_read::<fhir_types::r4b::structure_definition::StructureDefinition>();
+    implements_the_structure_read::<fhir_types::r5::structure_definition::StructureDefinition>();
+    implements_the_structure_read::<fhir_types::r6::structure_definition::StructureDefinition>();
+}
+
+#[test]
+fn is_modifier_reads_alike_in_both_releases() {
+    let stu3: Stu3Element = observation_element("hl7.fhir.r3.core", "Observation.status");
+    let r4: R4Element = observation_element("hl7.fhir.r4.core", "Observation.status");
+    assert_eq!(stu3.is_modifier(), Some(true));
+    assert_eq!(stu3.is_modifier(), r4.is_modifier());
+}
+
+#[test]
+fn a_maximum_value_set_reads_as_its_url_from_a_reference_and_a_canonical() {
+    // STU3 states elementdefinition-maxValueSet as valueReference, R4 as valueCanonical.
+    let stu3: Stu3Element = core_element("hl7.fhir.r3.core", "Account", "Account.language");
+    let r4: R4Element = core_element("hl7.fhir.r4.core", "Account", "Account.language");
+    let max = |element: &dyn ElementDefinitionRead| {
+        element
+            .binding()
+            .and_then(|binding| binding.max_value_set.map(str::to_owned))
+    };
+    assert_eq!(
+        max(&stu3).as_deref(),
+        Some("http://hl7.org/fhir/ValueSet/all-languages")
+    );
+    assert_eq!(max(&stu3), max(&r4));
+}
+
+#[test]
+fn a_best_practice_constraint_reads_its_flag() {
+    let r4: R4Element = core_element("hl7.fhir.r4.core", "DomainResource", "DomainResource");
+    let flag = |key: &str| {
+        r4.constraints()
+            .into_iter()
+            .find(|constraint| constraint.key == Some(key))
+            .and_then(|constraint| constraint.best_practice)
+    };
+    assert_eq!(flag("dom-6"), Some(true));
+    assert_eq!(flag("dom-2"), None, "a constraint without the extension");
+}
+
+#[test]
+fn a_primitive_type_reads_its_regex_where_the_package_states_one() {
+    // R4 states the lexical form of string.value in the regex extension of its type; the
+    // STU3 package states none.
+    let stu3: Stu3Element = core_element("hl7.fhir.r3.core", "string", "string.value");
+    let r4: R4Element = core_element("hl7.fhir.r4.core", "string", "string.value");
+    let regex = |element: &dyn ElementDefinitionRead| {
+        element
+            .types()
+            .first()
+            .and_then(|ty| ty.regex.map(str::to_owned))
+    };
+    assert_eq!(regex(&r4).as_deref(), Some("[ \\r\\n\\t\\S]+"));
+    assert_eq!(regex(&stu3), None);
+}
+
+#[test]
+fn a_structure_definition_reads_alike_in_both_releases() {
+    let stu3: Stu3Structure = core_definition("hl7.fhir.r3.core", "Observation");
+    let r4: R4Structure = core_definition("hl7.fhir.r4.core", "Observation");
+    assert_eq!(
+        stu3.url(),
+        Some("http://hl7.org/fhir/StructureDefinition/Observation")
+    );
+    assert_eq!(stu3.url(), r4.url());
+    assert_eq!(stu3.type_name(), Some("Observation"));
+    assert_eq!(stu3.type_name(), r4.type_name());
+    assert_eq!(stu3.kind(), Some("resource"));
+    assert_eq!(stu3.kind(), r4.kind());
+    assert_eq!(stu3.is_abstract(), Some(false));
+    assert_eq!(stu3.is_abstract(), r4.is_abstract());
+    assert_eq!(stu3.derivation(), Some("specialization"));
+    assert_eq!(stu3.derivation(), r4.derivation());
+    assert_eq!(
+        stu3.base_definition(),
+        Some("http://hl7.org/fhir/StructureDefinition/DomainResource")
+    );
+    assert_eq!(stu3.base_definition(), r4.base_definition());
+    assert_eq!(
+        stu3.version(),
+        None,
+        "the STU3 core package states no version"
+    );
+    assert_eq!(r4.version(), Some("4.0.1"));
+    let first = |snapshot: Option<&[R4Element]>| {
+        snapshot
+            .and_then(|elements| elements.first())
+            .and_then(|element| element.path().map(str::to_owned))
+    };
+    assert_eq!(first(r4.snapshot()).as_deref(), Some("Observation"));
+    assert_eq!(
+        stu3.snapshot()
+            .and_then(|elements| elements.first())
+            .and_then(ElementDefinitionRead::path),
+        Some("Observation")
+    );
+}
+
+#[test]
+fn an_stu3_context_reads_in_the_shape_of_an_r4_context_entry() {
+    // STU3 patient-birthTime: contextType resource, context ["Patient.birthDate"]; R4: one
+    // entry of type element with that expression. The codes stay each release's own.
+    let stu3: Stu3Structure = core_definition("hl7.fhir.r3.core", "patient-birthTime");
+    let r4: R4Structure = core_definition("hl7.fhir.r4.core", "patient-birthTime");
+    assert_eq!(
+        stu3.contexts(),
+        [ContextRead {
+            kind: Some("resource"),
+            expression: Some("Patient.birthDate")
+        }]
+    );
+    assert_eq!(
+        r4.contexts(),
+        [ContextRead {
+            kind: Some("element"),
+            expression: Some("Patient.birthDate")
+        }]
+    );
+}
+
+#[test]
+fn context_invariants_read_alike_in_both_releases() {
+    let stu3: Stu3Structure = core_definition("hl7.fhir.r3.core", "questionnaire-minOccurs");
+    let r4: R4Structure = core_definition("hl7.fhir.r4.core", "questionnaire-minOccurs");
+    assert_eq!(
+        stu3.context_invariants(),
+        ["type!='display' and (required=true or %extension.valueInteger=0)"]
+    );
+    assert_eq!(stu3.context_invariants(), r4.context_invariants());
 }
