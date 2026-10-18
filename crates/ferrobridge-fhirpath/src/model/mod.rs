@@ -249,12 +249,58 @@ pub fn choice_types(model: &dyn Model, field: &'static FieldSchema) -> Option<Ve
 /// The types an element path admits, for checking an expression whose
 /// context is that element: every type of a choice element (R4 §2.9.1.1),
 /// the one type [`path_type`] names otherwise.
+///
+/// A path that continues through a choice element reaches the types of the
+/// next element in every admitted type that defines it
+/// (`Observation.value[x].unit` is the `unit` of `Quantity`), and a path
+/// below a primitive reaches the elements of `Element`, which every
+/// primitive specializes (`string.extension`, R4 §2.9.1.2).
 #[must_use]
 pub fn path_types(model: &dyn Model, path: &str) -> Option<Vec<FhirType>> {
     if let Some(field) = choice_element(model, path) {
         return choice_types(model, field);
     }
-    path_type(model, path).map(|ty| vec![ty])
+    if let Some(ty) = path_type(model, path) {
+        return Some(vec![ty]);
+    }
+    walk(model, path)
+}
+
+/// The types `path` reaches, segment by segment from the type its first
+/// segment names, through every type a choice admits and through the
+/// elements of `Element` below a primitive; `None` when a segment is no
+/// element of any type reached so far, or reaches a resource.
+fn walk(model: &dyn Model, path: &str) -> Option<Vec<FhirType>> {
+    let schemas = model.schemas();
+    let mut segments = path.split('.');
+    let mut reach = vec![named_type(model, segments.next()?)?];
+    for segment in segments {
+        let mut next: Vec<FhirType> = Vec::new();
+        for ty in &reach {
+            let owner = if ty.is_primitive() {
+                "Element"
+            } else {
+                ty.schema()?.path
+            };
+            let Some((_, field)) = schemas.element(&format!("{owner}.{segment}")) else {
+                continue;
+            };
+            let types = match field.kind {
+                Kind::Choice(_) => choice_types(model, field)?,
+                kind => vec![field_type(model, field, kind)?],
+            };
+            for found in types {
+                if !next.contains(&found) {
+                    next.push(found);
+                }
+            }
+        }
+        if next.is_empty() {
+            return None;
+        }
+        reach = next;
+    }
+    Some(reach)
 }
 
 /// The choice element an element path names, in its base form
