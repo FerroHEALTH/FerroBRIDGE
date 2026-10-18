@@ -137,6 +137,10 @@ crates on crates.io.
 
 ### Changed
 
+- `ferrobridge-validator`, `ferrobridge-term` and `ferrobridge-fhirpath` join
+  the crate line at 0.1.126, leaving their 0.0.0 name reservations, so the
+  next publish ships the validator as it stands on `main`. Pin each exactly,
+  as for every crate of the line (#432).
 - The README's generated badge block keeps the two HL7 v2 corpus badges in
   view and folds the per-family and per-version badges into a collapsed
   block, which `scripts/checks/conformance.sh --update` renders (#860).

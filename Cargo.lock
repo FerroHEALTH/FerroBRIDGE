@@ -1398,7 +1398,7 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "ferrobridge-fhirpath"
-version = "0.0.0"
+version = "0.1.126"
 dependencies = [
  "base64 0.23.1",
  "chumsky",
@@ -1507,7 +1507,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.0.0"
+version = "0.1.126"
 dependencies = [
  "backon",
  "ferrobridge-testkit",
@@ -1555,7 +1555,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.0.0"
+version = "0.1.126"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",

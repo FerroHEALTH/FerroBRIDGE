@@ -3,8 +3,8 @@
 [package]
 name = "ferrobridge-validator"
 description = "A FHIR R4 and STU3 profile validator over packages read offline, the generated fhir-types model and its element table"
-# 0.0.0 holds the name until the first publish; the crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.0.0"
+# The crate line is the fhir-types line (docs/VERSIONS.md).
+version = "0.1.126"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
