@@ -145,9 +145,18 @@ pub fn not_ready(error: &anyhow::Error) -> bool {
     })
 }
 
+/// The reason readiness gives between a successful start and the lanes taking
+/// over the listener.
+const HANDING_OVER: &str = "the lanes started and are taking over the listener";
+
 /// Runs `attempt` again after `first` failed, until it succeeds or fails with
 /// an error that is not [`not_ready`], waiting `backoff` before each attempt
 /// and recording each wait on `status`.
+///
+/// A success leaves `status` waiting on the handover, never ready: the routes
+/// serving while the start waits answer `503` for everything but the probes,
+/// so their readiness answers `200` at no moment, and the lanes' own
+/// readiness reports the start once they serve.
 ///
 /// # Errors
 /// Returns the first error, `first` included, that does not mean the CDR is
@@ -184,7 +193,9 @@ where
         attempts = attempts.saturating_add(1);
         match attempt().await {
             Ok(started) => {
-                status.ready();
+                // NOTE: no specification governs this: our own design; the probe routes answer
+                // `503` for every other route, so readiness stays down until the lanes serve.
+                status.waiting(String::from(HANDING_OVER));
                 return Ok(started);
             }
             Err(next) => error = next,
@@ -400,5 +411,27 @@ mod tests {
         assert_eq!(Some("the CDR answered 503"), status.reason().as_deref());
         status.ready();
         assert_eq!(None, status.reason());
+    }
+
+    #[tokio::test]
+    async fn a_start_that_succeeds_leaves_readiness_down_until_the_lanes_serve() {
+        let status = Status::starting();
+        let first = anyhow::Error::new(crate::cdr::error::CdrError::client(
+            openehr_its::rest::client::ClientError::ServiceFailure {
+                method: http::Method::GET,
+                path: String::from("/definition/template/adl1.4/t"),
+                status: http::StatusCode::SERVICE_UNAVAILABLE,
+                body: openehr_its::rest::client::ErrorBody::from_bytes(Vec::new()),
+            },
+            None,
+        ));
+        assert!(not_ready(&first), "a 503 means the CDR is not ready");
+        let backoff = Backoff {
+            initial: Duration::from_millis(1),
+            max: Duration::from_millis(1),
+        };
+        let started = super::retry(&status, backoff, first, || async { Ok(()) }).await;
+        assert!(started.is_ok());
+        assert_eq!(Some(super::HANDING_OVER), status.reason().as_deref());
     }
 }
