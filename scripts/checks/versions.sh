@@ -7,9 +7,12 @@
 # in its design phase, so a check whose subject file is absent SKIPS LOUDLY
 # with a printed reason, and gains teeth the moment the file appears.
 #
-#   1. specification pins  the five rows of the docs/architecture.md pin table
+#   1. specification pins  the six rows of the docs/architecture.md pin table
 #                          (FHIRconnect, FHIR, OMOCL, OMOP CDM, openEHR
-#                          ITS-REST) against docs/VERSIONS.md.
+#                          ITS-REST, openEHR RM) against docs/VERSIONS.md,
+#                          and every openehr_rm::v1_N path in hand-written
+#                          .rs under app/, crates/ and tools/ against the
+#                          generation the openEHR RM row records.
 #   2. model crates        fhir-types and the openehr-* crates across
 #                          docs/architecture.md, docs/VERSIONS.md, and the root
 #                          Cargo.toml [workspace.dependencies] requirement,
@@ -150,7 +153,7 @@ action_default() {
 echo "== specification pins (docs/architecture.md <-> docs/VERSIONS.md)"
 if [ -f docs/architecture.md ] && [ -f docs/VERSIONS.md ]; then
   agreed=0
-  for item in "FHIRconnect" "FHIR" "OMOCL" "OMOP CDM" "openEHR ITS-REST"; do
+  for item in "FHIRconnect" "FHIR" "OMOCL" "OMOP CDM" "openEHR ITS-REST" "openEHR RM"; do
     arch="$(pin_of "$item" docs/architecture.md)"
     matrix="$(pin_of "$item" docs/VERSIONS.md)"
     if [ -z "$arch" ]; then
@@ -163,9 +166,33 @@ if [ -f docs/architecture.md ] && [ -f docs/VERSIONS.md ]; then
       agreed=$((agreed + 1))
     fi
   done
-  [ "$agreed" -eq 5 ] && note "OK: all five specification pins agree"
+  [ "$agreed" -eq 6 ] && note "OK: all six specification pins agree"
 else
   note "no docs/architecture.md or docs/VERSIONS.md yet, skipped"
+fi
+
+echo "== openEHR RM generation (docs/VERSIONS.md <-> hand-written openehr_rm::v1_N paths)"
+if [ -f docs/VERSIONS.md ]; then
+  rm_row="$(grep -E '^\| openEHR RM \|' docs/VERSIONS.md || true)"
+  generation="$(grep -oE 'openehr_rm::v1_[0-9]+' <<<"$rm_row" | head -n1 || true)"
+  if [ -z "$generation" ]; then
+    bad "docs/VERSIONS.md: the openEHR RM row names no openehr_rm::v1_N generation"
+  else
+    strays=0
+    while IFS= read -r file; do
+      # A generated file follows its generator, which is checked on its own.
+      head -n1 "$file" | grep -q '@generated' && continue
+      while IFS= read -r used; do
+        if [ "$used" != "$generation" ]; then
+          bad "$file names $used, the openEHR RM row of docs/VERSIONS.md records $generation"
+          strays=$((strays + 1))
+        fi
+      done < <(grep -oE 'openehr_rm::v1_[0-9]+' "$file" | sort -u)
+    done < <(git ls-files -z -- 'app/*.rs' 'crates/*.rs' 'tools/*.rs' | xargs -0 grep -lE 'openehr_rm::v1_[0-9]+' || true)
+    [ "$strays" -eq 0 ] && note "OK: every hand-written openehr_rm path names $generation"
+  fi
+else
+  note "no docs/VERSIONS.md yet, skipped"
 fi
 
 echo "== model crate pins (docs/architecture.md <-> docs/VERSIONS.md <-> Cargo.toml)"
