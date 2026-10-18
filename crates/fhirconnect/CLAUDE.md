@@ -95,7 +95,11 @@ exists to prevent.
 
 A skipped element is a typed outcome carried to the caller, never a log line,
 and the declared set of losses is closed: the round-trip tests assert it
-exactly. An element the program cannot map refuses the unit.
+exactly. An element the program cannot map refuses the unit, and so does a
+produced FHIR document that breaks a base constraint `engine::invariant`
+checks (`ext-1` first): `to_fhir` answers `EngineError::Invariant` with the
+key and the instance path. A new check there is one constraint key, a
+structural test, and a case that produces its breach.
 
 Every warning carries the `Location` the engine knew when it raised it: the
 FHIR target rendered by `tree::locate` at the binding's FHIR occurrence (the

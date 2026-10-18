@@ -12,6 +12,7 @@ use openehr_rm::v1_2::paths::EhrUriError;
 use crate::engine::condition::ConditionError;
 use crate::engine::family::FamilyError;
 use crate::engine::fhir::FhirError;
+use crate::engine::invariant::Breach;
 use crate::engine::lens::LensError;
 use crate::engine::rm::RmError;
 use crate::engine::seam::ReferenceError;
@@ -299,6 +300,18 @@ pub enum EngineError {
         /// The refusal the builder returned.
         #[source]
         source: Box<PathError>,
+    },
+    /// The FHIR document the run produced breaks an error-severity
+    /// constraint of the base specification, so it does not leave the engine
+    /// (R4 conformance-rules.html §2.1.0.6: "a rule that all resources must
+    /// conform to").
+    #[error("the resource the context {context} produced breaks a constraint")]
+    Invariant {
+        /// The context mapping the program compiled from.
+        context: String,
+        /// The constraint and the element that breaks it.
+        #[source]
+        breach: Breach,
     },
 }
 
