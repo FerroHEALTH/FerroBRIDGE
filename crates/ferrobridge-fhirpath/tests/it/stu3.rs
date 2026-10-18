@@ -221,3 +221,108 @@ fn matches_full_takes_the_i_and_m_flags_and_refuses_others() {
     assert_eq!(truth("'ABC'.matchesFull('abc')"), Some(false));
     assert!(argument_error("'ABC'.matchesFull('abc', 'x')"));
 }
+
+/// The one item an evaluation answers, rendered.
+fn shown(expression: &str) -> Option<String> {
+    match stu3(expression).expect("evaluates").as_slice() {
+        [] => None,
+        [item] => Some(item.to_string()),
+        other => panic!("expected one item, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_decimal_boundary_is_half_a_unit_of_its_last_place_away() {
+    // FHIRPath 3.0.0 #lowboundaryprecision-integer-decimal--date--datetime--time and
+    // #highboundaryprecision-integer-decimal--date--datetime--time, the examples.
+    for (expression, expected) in [
+        ("1.587.lowBoundary()", "1.58650000"),
+        ("1.587.lowBoundary(6)", "1.586500"),
+        ("1.587.lowBoundary(2)", "1.58"),
+        ("1.587.lowBoundary(0)", "1"),
+        ("(-1.587).lowBoundary()", "-1.58750000"),
+        ("(-1.587).lowBoundary(2)", "-1.59"),
+        ("(-1.587).lowBoundary(0)", "-2"),
+        ("1.587.highBoundary()", "1.58750000"),
+        ("1.587.highBoundary(2)", "1.59"),
+        ("1.587.highBoundary(0)", "2"),
+        ("(-1.587).highBoundary(6)", "-1.586500"),
+        ("(-1.587).highBoundary(2)", "-1.58"),
+        ("(-1.587).highBoundary(0)", "-1"),
+        ("120.lowBoundary(2)", "119.50"),
+    ] {
+        assert_eq!(shown(expression).as_deref(), Some(expected), "{expression}");
+    }
+}
+
+#[test]
+fn a_boundary_of_the_last_place_rounds_away_from_the_value() {
+    // FHIRPath 3.0.0: 1.587.highBoundary(2) is 1.59, so 0.0034 (0.00335 to 0.00345) is
+    // 0.1 to one place at the high end and -0.0034 is -0.1 at the low end.
+    assert_eq!(shown("0.0034.highBoundary(1)").as_deref(), Some("0.1"));
+    assert_eq!(shown("(-0.0034).lowBoundary(1)").as_deref(), Some("-0.1"));
+    assert_eq!(shown("0.0034.lowBoundary(1)").as_deref(), Some("0.0"));
+}
+
+#[test]
+fn a_precision_beyond_the_greatest_held_or_below_zero_is_empty() {
+    // FHIRPath 3.0.0: a precision greater than the implementation's maximum is empty.
+    assert_eq!(shown("1.587.lowBoundary(39)"), None);
+    assert_eq!(shown("1.587.highBoundary(29)"), None);
+    assert_eq!(shown("1.587.lowBoundary(-1)"), None);
+}
+
+#[test]
+fn a_date_and_time_boundary_fills_the_missing_components() {
+    // FHIRPath 3.0.0 lowBoundary() and highBoundary(), the date and time examples; the
+    // offset stays the value's own, so an hour without one answers none.
+    for (expression, expected) in [
+        ("@2014.lowBoundary(6)", "2014-01"),
+        ("@2014.highBoundary(6)", "2014-12"),
+        ("@2014-01-01T08.lowBoundary(17)", "2014-01-01T08:00:00.000"),
+        ("@2014-01-01T08.highBoundary(17)", "2014-01-01T08:59:59.999"),
+        (
+            "@2014-01-01T08:05+08:00.lowBoundary(17)",
+            "2014-01-01T08:05:00.000+08:00",
+        ),
+        ("@2014-01-01T08.lowBoundary(8)", "2014-01-01"),
+        ("@T10:30.lowBoundary(9)", "10:30:00.000"),
+        ("@T10:30.highBoundary(9)", "10:30:59.999"),
+    ] {
+        assert_eq!(shown(expression).as_deref(), Some(expected), "{expression}");
+    }
+}
+
+#[test]
+fn a_quantity_has_no_boundary() {
+    // FHIRPath 3.0.0: the function can only be used with Decimal, Date, DateTime and Time.
+    assert!(matches!(
+        stu3("1.587 'cm'.lowBoundary(8)"),
+        Err(EvalError::Type { .. })
+    ));
+}
+
+#[test]
+fn precision_counts_the_digits_as_written() {
+    // FHIRPath 3.0.0 #precision--integer, the examples.
+    for (expression, expected) in [
+        ("1.58700.precision()", "5"),
+        ("100.precision()", "0"),
+        ("@2014.precision()", "4"),
+        ("@2014-01-05T10:30:00.000.precision()", "17"),
+        ("@T10:30.precision()", "4"),
+        ("@T10:30:00.000.precision()", "9"),
+    ] {
+        assert_eq!(shown(expression).as_deref(), Some(expected), "{expression}");
+    }
+}
+
+#[test]
+fn comparable_answers_whether_the_units_are_commensurable() {
+    // FHIRPath 3.0.0 #comparableother--quantity--boolean.
+    assert_eq!(truth("1 'cm'.comparable(1 '[in_i]')"), Some(true));
+    assert_eq!(truth("1 'cm'.comparable(1 's')"), Some(false));
+    assert_eq!(truth("1 'cm'.comparable(1 '[s]')"), Some(false));
+    assert_eq!(truth("1 'cm'.comparable({})"), None);
+    assert_eq!(truth("1 'cm'.comparable(1)"), None);
+}

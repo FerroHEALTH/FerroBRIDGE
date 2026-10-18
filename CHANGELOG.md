@@ -52,6 +52,13 @@ crates on crates.io.
   corpora with a badge each: `fhirpath-r4` (874 of 886, N1) and
   `fhirpath-r4-stu3` (33 of 104, the tests that call one of the 13 3.0.0
   functions, run with the opt-in).
+- The FHIRPath 3.0.0 opt-in adds `lowBoundary()`, `highBoundary()`,
+  `precision()` and `comparable()` (#633). A decimal boundary is half a unit
+  of its last place away, rounded outward to the precision asked for. A date
+  and time boundary fills the missing components and keeps the value's own
+  offset, as the 3.0.0 examples show. `fhirpath-r4-stu3` moves to 85 of 104;
+  the suite cases that contradict those examples are the upstream report
+  #815.
 
 - The FHIRPath evaluator has a strict ordering mode,
   `Environment::with_strict_ordering`, off by default (#636). It refuses
