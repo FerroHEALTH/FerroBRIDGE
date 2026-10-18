@@ -13,6 +13,7 @@
 //! design; the codecs answer to <https://hl7.org/fhir/json.html> and
 //! <https://hl7.org/fhir/xml.html> of each version.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::path::Path;
 
@@ -130,11 +131,97 @@ fn fetched(package: Package) -> bool {
     present
 }
 
-/// Runs every example of `package` and records the verdicts as `corpus`.
+/// The elements whose shape the 6.0.0-ballot5 core model changed from R5 and
+/// whose 6.0.0-ballot5 examples carry a value the new model refuses, with the
+/// change.
+///
+/// The examples package writes `null` or `{}` where a value of the R5 type
+/// did not carry over into the ballot's type, and keeps an element the ballot
+/// removed. R6 ballot5 json.html §2.1.6.4 says "Objects are never empty", and
+/// its §2.1.6.4.3 admits `null` only in an array of primitive values aligned
+/// with its `_` array, so the decoder refuses each one. A failure on a listed
+/// element stays a failure, never a pass, and carries the outcome
+/// `ballot-drift <element>` so the corpus counts it; every element listed
+/// must still meet such a failure, so the list follows the pins (#380).
+const R6_BALLOT_DRIFT: [(&str, &str); 10] = [
+    (
+        "AllergyIntolerance.category",
+        "CodeableConcept 0..*, code 0..* in R5",
+    ),
+    (
+        "ClinicalUseDefinition.subject",
+        "CodeableReference 1..*, Reference 0..* in R5",
+    ),
+    (
+        "Condition.bodyStructure",
+        "CodeableReference 0..*, new in the ballot",
+    ),
+    (
+        "DiagnosticReport.conclusionCode",
+        "CodeableReference 0..*, CodeableConcept 0..* in R5",
+    ),
+    (
+        "OrganizationAffiliation.network",
+        "removed in the ballot, Reference 0..* in R5",
+    ),
+    (
+        "Procedure.bodyStructure",
+        "CodeableReference 0..*, new in the ballot",
+    ),
+    (
+        "Provenance.authorization",
+        "CodeableConcept 0..*, CodeableReference 0..* in R5",
+    ),
+    (
+        "ServiceRequest.asNeededFor",
+        "CodeableConcept 0..*, new in the ballot",
+    ),
+    ("Task.focus", "BackboneElement 0..*, Reference 0..1 in R5"),
+    (
+        "TerminologyCapabilities.codeSystem.version",
+        "BackboneElement 0..*, items written as null",
+    ),
+];
+
+/// The element a decode failure of `original` lands on, as the resource type
+/// holding it and the element names below that resource (`Task.focus`), or
+/// `None` for a failure of any other kind.
+///
+/// The failure names an instance path from `Resource` (`Resource.entry[0].
+/// resource.category[0]`); the walk follows it through `original` and starts
+/// over at every object carrying a `resourceType`, so a contained or bundled
+/// resource names its own type.
+fn failed_element(original: &Value, failure: &str) -> Option<String> {
+    let rest = failure.strip_prefix("JSON decode: Resource.")?;
+    let (path, _) = rest.split_once(": ")?;
+    let mut current = original;
+    let mut resource = original.get("resourceType")?.as_str()?;
+    let mut names: Vec<&str> = Vec::new();
+    for segment in path.split('.') {
+        let (name, index) = match segment.split_once('[') {
+            Some((name, index)) => (name, index.strip_suffix(']')?.parse::<usize>().ok()),
+            None => (segment, None),
+        };
+        names.push(name);
+        current = current.get(name)?;
+        if let Some(index) = index {
+            current = current.as_array()?.get(index)?;
+        }
+        if let Some(found) = current.get("resourceType").and_then(Value::as_str) {
+            resource = found;
+            names.clear();
+        }
+    }
+    Some(format!("{resource}.{}", names.join(".")))
+}
+
+/// Runs every example of `package` and records the verdicts as `corpus`,
+/// counting a failure on an element `drift` lists as `ballot-drift`.
 fn measure<T: Json>(
     package: Package,
     corpus: Corpus,
     schemas: &Schemas,
+    drift: &[(&str, &str)],
 ) -> Result<(), Box<dyn Error>> {
     if !fetched(package) {
         return Ok(());
@@ -146,6 +233,7 @@ fn measure<T: Json>(
         files.len()
     );
     let mut cases = Vec::with_capacity(files.len());
+    let mut met: BTreeSet<String> = BTreeSet::new();
     for file in &files {
         let id = file
             .file_name()
@@ -153,7 +241,14 @@ fn measure<T: Json>(
             .ok_or("an example file has a UTF-8 name")?;
         cases.push(match failure::<T>(schemas, file) {
             None => Case::pass(id),
-            Some(reason) => Case::fail(id, reason),
+            Some(reason) => match drifted(file, &reason, drift)? {
+                Some(element) => {
+                    met.insert(element.clone());
+                    let outcomes = BTreeMap::from([(format!("ballot-drift {element}"), 1)]);
+                    Case::fail(id, reason).with_outcomes(outcomes)
+                }
+                None => Case::fail(id, reason),
+            },
         });
     }
     let outcome = record(corpus, &cases)?;
@@ -162,7 +257,32 @@ fn measure<T: Json>(
         "cases the {corpus} pass list records no longer pass: {:?}",
         outcome.regressed
     );
+    let stale: Vec<&str> = drift
+        .iter()
+        .map(|(element, _)| *element)
+        .filter(|element| !met.contains(*element))
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "{corpus} lists ballot drift no example meets any more: {stale:?}"
+    );
     Ok(())
+}
+
+/// The element of `drift` the failure `reason` of `file` lands on, `None`
+/// when it lands on no listed element.
+fn drifted(
+    file: &Path,
+    reason: &str,
+    drift: &[(&str, &str)],
+) -> Result<Option<String>, Box<dyn Error>> {
+    if drift.is_empty() {
+        return Ok(None);
+    }
+    let text = std::fs::read_to_string(file)?;
+    let original: Value = serde_json::from_str(without_byte_order_mark(&text))?;
+    Ok(failed_element(&original, reason)
+        .filter(|element| drift.iter().any(|(listed, _)| listed == element)))
 }
 
 #[test]
@@ -171,6 +291,7 @@ fn conformance_the_fhir_stu3_examples_hold_their_pass_list() -> Result<(), Box<d
         Package::Stu3,
         Corpus::FhirStu3,
         &fhir_types::stu3::schema::SCHEMAS,
+        &[],
     )
 }
 
@@ -180,6 +301,7 @@ fn conformance_the_fhir_r4_examples_hold_their_pass_list() -> Result<(), Box<dyn
         Package::R4,
         Corpus::FhirR4,
         &fhir_types::r4::schema::SCHEMAS,
+        &[],
     )
 }
 
@@ -189,6 +311,7 @@ fn conformance_the_fhir_r4b_examples_hold_their_pass_list() -> Result<(), Box<dy
         Package::R4b,
         Corpus::FhirR4b,
         &fhir_types::r4b::schema::SCHEMAS,
+        &[],
     )
 }
 
@@ -198,6 +321,7 @@ fn conformance_the_fhir_r5_examples_hold_their_pass_list() -> Result<(), Box<dyn
         Package::R5,
         Corpus::FhirR5,
         &fhir_types::r5::schema::SCHEMAS,
+        &[],
     )
 }
 
@@ -207,7 +331,40 @@ fn conformance_the_fhir_r6_examples_hold_their_pass_list() -> Result<(), Box<dyn
         Package::R6,
         Corpus::FhirR6,
         &fhir_types::r6::schema::SCHEMAS,
+        &R6_BALLOT_DRIFT,
     )
+}
+
+#[test]
+fn a_failure_names_the_element_of_the_innermost_resource() -> Result<(), Box<dyn Error>> {
+    let bundle: Value = serde_json::from_str(
+        r#"{"resourceType":"Bundle","entry":[{"resource":{"resourceType":"AllergyIntolerance","category":[null]}}]}"#,
+    )?;
+    assert_eq!(
+        failed_element(
+            &bundle,
+            "JSON decode: Resource.entry[0].resource.category[0]: expected an object"
+        )
+        .as_deref(),
+        Some("AllergyIntolerance.category")
+    );
+    let capabilities: Value = serde_json::from_str(
+        r#"{"resourceType":"TerminologyCapabilities","codeSystem":[{},{"version":[null]}]}"#,
+    )?;
+    assert_eq!(
+        failed_element(
+            &capabilities,
+            "JSON decode: Resource.codeSystem[1].version[0]: expected an object"
+        )
+        .as_deref(),
+        Some("TerminologyCapabilities.codeSystem.version")
+    );
+    assert_eq!(
+        failed_element(&capabilities, "the JSON round trip differs at id (value)"),
+        None,
+        "only a decode failure names an element"
+    );
+    Ok(())
 }
 
 #[test]
