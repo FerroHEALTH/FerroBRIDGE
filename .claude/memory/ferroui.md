@@ -32,6 +32,11 @@ construction.
   at a release tag), the lockfile records it, and Dependabot proposes the
   update. The crate ships its stylesheet and tokens.
 - **All four switch in one coordinated change**, not one product at a time.
+- **FerroTERM's console becomes server rendered** like the others (owner,
+  2026-10-18: "yes do that then while you do the rewrite"): its own
+  `ferroterm-viewer` binary and image, a backend-for-frontend holding the
+  operator's session, the terminology server serving no UI files, so FerroUI
+  targets one rendering model (server rendered and hydrated).
 - **The owner signed off on editing the sibling repositories for this
   migration** (2026-10-18: "it's an sign off you are allwed to update there
   repo's"). Each change is made in that repository's own checkout, branch and
