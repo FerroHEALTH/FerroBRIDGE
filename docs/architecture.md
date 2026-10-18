@@ -2222,7 +2222,7 @@ the order and the reason for it.
 flowchart LR
     A["v0.0.2<br/>foundation:<br/>fhir-types move, core,<br/>clients, testkit, server shape,<br/>container, release lane"] --> B["v0.0.3<br/>FHIR round trip:<br/>fhirconnect, $tofhir and $toopenehr,<br/>facade, identity store"]
     A --> C["v0.0.4<br/>OMOP round trip:<br/>omocl, vocabulary, COPY writer,<br/>etl and cdm init, conformance gate"]
-    B --> D["v0.0.5<br/>FHIR breadth:<br/>full lens matrix, reference,<br/>split, LINKED, batch, PROGRAMMED"]
+    B --> D["v0.0.5<br/>the move to the<br/>FerroHEALTH organization"]
     C --> E["v0.0.6<br/>STU3, FHIRPath,<br/>validator foundation,<br/>search, SMART"]
     D --> E
     E --> F["v0.0.7<br/>facade hardening"]
@@ -2265,11 +2265,10 @@ side table; `FactRelationshipCustomConverter`; `OBSERVATION_PERIOD`, the era
 SQL and AQL visits; the `etl` and `cdm init` subcommands; the conformance gate
 over both corpora (#24); the round trip of section 11.
 
-**v0.0.5, FHIR breadth.** The full data-type matrix; `reference`, `hierarchy`
-split, LINKED and bundle splitting by `meta.profile`; reference fetching with
-cycle protection; batch; the PROGRAMMED registry with the eight library codes;
-terminology display resolution; the full library compiles or every failure is
-a recorded library defect; the OBSERVATION-with-events round trip.
+**v0.0.5, the organization move.** The repository moved to the FerroHEALTH
+organization and the image to `ghcr.io/ferrohealth/ferrobridge`; that move is
+the whole release. The FHIR breadth this milestone was first planned for is
+the theme of v0.0.11.
 
 **Small releases from v0.0.6 on.** A milestone holds one theme of 5 to 25
 issues and is cut when its theme is done, so a release never waits on an
@@ -2294,11 +2293,15 @@ listed, read, checked, saved and reloaded; `$validate`, `$tofhir` and
 checking a tree; and `app/ferrobridge-viewer` with OIDC sign-in, the shell
 and theme, engine state, the transform playground, the validation dry run,
 the mapping editor, browser journeys, its image, its release lane and a
-`viewer` profile in `compose.yaml`.
+`viewer` profile in `compose.yaml`. The release also carried most of the
+profile validator work planned for v0.0.9: the agreement corpus with the HL7
+FHIR Validator (#442), the extension context (#481) and reference versioning
+(#514) checks, and the gaps in `fhir-types` the validator found.
 
-**v0.0.9, the profile validator finished.** Agreement with the HL7 FHIR
-Validator on a shared corpus, the extension context and reference versioning
-checks, and the `fhir-types` gaps the validator found.
+**v0.0.9, the profile validator finished.** STU3 profiles validating STU3
+resources (#456): the release-neutral definition read the generator emits
+(#836, #859), the FHIRPath STU3 type model (#837), and the validator walk over
+them (#838).
 
 **v0.0.10, openEHR demographics.** The patient-to-EHR link, demographic AQL as
 Cadasto's experimental extension documents it, the FHIRconnect demographics
