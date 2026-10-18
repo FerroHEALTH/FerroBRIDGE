@@ -19,6 +19,7 @@ use fhir_codegen::package::Package;
 
 mod closure;
 mod codec;
+mod definition;
 mod element_table;
 mod emit;
 mod layout;

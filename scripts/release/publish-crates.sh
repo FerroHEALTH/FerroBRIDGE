@@ -31,13 +31,12 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 # Dependency order: a crate is uploaded only after every sibling it depends on
-# is on the index. `ferrobridge-operator-api` joins once its name is reserved
-# by hand (a first version cannot use Trusted Publishing); only unpublished
-# app crates link it.
+# is on the index.
 readonly CRATES=(
   fhir-types
   hl7v2-types
   openehr-mapping-core
+  ferrobridge-operator-api
   fhirconnect
   omocl
   omop-cdm

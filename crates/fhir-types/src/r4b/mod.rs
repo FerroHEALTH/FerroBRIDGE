@@ -105,6 +105,8 @@ pub mod coverage_eligibility_response;
 #[cfg(feature = "terminology")]
 pub mod data_requirement;
 #[cfg(feature = "resources")]
+pub mod definition;
+#[cfg(feature = "resources")]
 pub mod detected_issue;
 #[cfg(feature = "resources")]
 pub mod device;

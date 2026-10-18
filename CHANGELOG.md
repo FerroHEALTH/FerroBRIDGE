@@ -34,6 +34,17 @@ crates on crates.io.
   test reads each.
 ### Changed
 
+- The openEHR RM is pinned (#476): the conformance target is RM Release
+  1.1.0, the newest published release, and the code compiles against the
+  `openehr_rm::v1_2` development generation, which `openehr-sdt` and
+  `openehr-its` build on. `docs/VERSIONS.md` and `docs/architecture.md` §2
+  carry the sixth specification row and what `v1_2` changes against Release
+  1.1.0 (`EHR.tags`, `GENERIC_ENTRY.data` widened to `ITEM`,
+  `PARTY.reverse_relationships` removed); §3 records the `1.2.0`
+  `ARCHETYPED.rm_version` stamp as a deviation (#844).
+  `scripts/checks/versions.sh` compares six specification pins and fails a
+  hand-written `openehr_rm::v1_N` path under `app/`, `crates/` or `tools/`
+  that names another generation.
 - `scripts/vendor/profile-packages.sh` hashes a profile package tree once
   (#840): the count and digest of a verified tree are stamped under the
   ignored `target/` with a fingerprint of its files' sizes and modification
@@ -54,6 +65,18 @@ crates on crates.io.
   `Patient.animal`). Every STU3 core invariant with a typed element passes
   the static check, except the two the package publishes with a defect
   (`inv-1`, `sdf-15`).
+- `fhir-types` 0.1.123 carries a release-neutral read of `ElementDefinition`,
+  `definition::ElementDefinitionRead`, implemented for every version's
+  generated `ElementDefinition` from that version's package (#836). It reads
+  the element id, path, slice name, cardinality, `maxLength`,
+  `contentReference`, the types with their profiles, target profiles,
+  aggregation and versioning, the binding strength and value set, the
+  constraints, the slicing, and `fixed[x]` and `pattern[x]` in their JSON
+  form. STU3's single `type.profile` and `type.targetProfile` read as lists,
+  and its `binding.valueSetUri` or `valueSetReference` as the value set's
+  URL (STU3 and R4 elementdefinition.html), so the profile validator can
+  read STU3 definitions without a second model. `fhirconnect` moves to
+  0.1.138 with the requirement.
 - The R4 profile validator is held to the HL7 FHIR Validator 6.10.4 on a
   synthetic corpus, the `validator-agreement` conformance corpus (#442): ten
   cases (conforming resources, and resources that break one invariant, one

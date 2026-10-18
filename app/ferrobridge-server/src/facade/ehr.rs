@@ -193,8 +193,8 @@ pub fn status_of(person: &PersonId) -> EhrStatus {
                 value: String::from(EHR_STATUS_ARCHETYPE),
             },
             template_id: None,
-            // NOTE: RM Release-1.2.0 common.html#_archetyped_class, `rm_version` names
-            // the release the value was built from, which is the `v1_2` generation.
+            // NOTE: <https://specifications.openehr.org/releases/RM/development/common.html#_archetyped_class>,
+            // `rm_version` names the RM the value was built against, the `v1_2` generation (#844).
             rm_version: String::from(openehr_rm::Generation::V1_2.spec_version()),
         }),
         feeder_audit: None,

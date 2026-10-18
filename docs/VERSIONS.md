@@ -25,6 +25,7 @@ records why the value is what it is. The guard compares the first token of each
 | OMOCL | v1.0.0 | `docs/architecture.md`, later the `omocl-*` crates |
 | OMOP CDM | v5.4 | `docs/architecture.md`, `tools/omop-cdm-codegen` and the `omop-cdm` crate constant, and its embedded DDL |
 | openEHR ITS-REST | 1.1.0 | `docs/architecture.md`, the `ferrobridge-server` CDR module constant |
+| openEHR RM | 1.1.0 (compiled as `openehr_rm::v1_2`) | `docs/architecture.md`, every hand-written `openehr_rm::v1_N` path under `app/`, `crates/` and `tools/`, which names the generation this row records |
 
 ## Corpora and machine-readable inputs
 
@@ -308,7 +309,7 @@ at the line's current value.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `fhir-types` | 0.1.122 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
+| `fhir-types` | 0.1.123 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
 
 ## Language and runtime
 

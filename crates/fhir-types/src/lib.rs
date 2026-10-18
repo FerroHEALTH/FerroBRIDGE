@@ -21,6 +21,7 @@
 )]
 
 pub mod codec;
+pub mod definition;
 pub mod operation;
 #[cfg(feature = "r4")]
 pub mod r4;
