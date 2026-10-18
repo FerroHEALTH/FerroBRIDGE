@@ -105,3 +105,33 @@ async fn a_row_on_an_empty_field_whose_condition_names_another_writes_nothing() 
         "{patient:?}"
     );
 }
+#[tokio::test]
+async fn an_stu3_terminology_client_is_refused_before_any_translation_is_sent() {
+    // STU3 ConceptMap/$translate declares no `url`, and every table map is named by its url.
+    let parsed = support::parsed(&fixtures::oru_r01());
+    let corpus = support::corpus();
+    let server = wiremock::MockServer::start().await;
+    let base = format!("{}/stu3", server.uri())
+        .parse()
+        .expect("a base url");
+    let config =
+        ferrobridge_term::config::Config::new(base, ferrobridge_term::config::WireVersion::Stu3);
+    let client = ferrobridge_term::client::Client::new(config).expect("a client");
+    let refused = map(&parsed, &corpus, Some(&client)).await;
+    let Err(ferrobridge_hl7v2::map::MapError::Terminology { source, .. }) = refused else {
+        panic!("an STU3 client fails the run: {refused:?}");
+    };
+    assert!(
+        matches!(
+            source.as_ref(),
+            ferrobridge_term::error::Error::UnsupportedParameter {
+                operation: "ConceptMap/$translate",
+                parameter: "url",
+                ..
+            }
+        ),
+        "{source:?}"
+    );
+    let received = server.received_requests().await.unwrap_or_default();
+    assert!(received.is_empty(), "nothing is sent");
+}

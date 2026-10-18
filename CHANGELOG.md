@@ -136,6 +136,18 @@ crates on crates.io.
 
 ### Changed
 
+- The profile validator and the HL7 v2 face each state their support for
+  an STU3 terminology server (#558). The validator supports one: a binding
+  to a versioned value set, which STU3 `$validate-code` cannot carry, is set
+  aside with the client's `UnsupportedParameter` and stays listed while the
+  other bindings are still sent, where before one such binding failed the
+  whole batch. The HL7 v2 face does not: its translations name each table
+  map by canonical `url`, which STU3 `$translate` lacks, so the run fails
+  before anything is sent. `ferrobridge-term` gains `Client::check`, which
+  answers whether the configured release can carry a request without
+  sending it, and the validator's `Terminology` trait gains `supports`,
+  defaulted.
+
 - The profile validator indexes each Bundle once per validation, its
   entries by `fullUrl` and by their resource, so resolving a reference
   inside a Bundle no longer scans every entry twice (#515). A synthetic
@@ -164,8 +176,6 @@ crates on crates.io.
   as FHIRPath N1 §6.3.1 and the R4 `code` definition ask; `ofType()` and
   `as` keep every primitive an independent type (FHIR R4 fhirpath.html
   §2.9.1.5) (#635).
-
-### Fixed
 
 - The operator console's theme switch returns to the page it was used on
   (#602). It returned only to the dashboard and the About page, so a switch

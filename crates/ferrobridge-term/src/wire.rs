@@ -338,6 +338,11 @@ macro_rules! per_release {
                 }
             }
 
+            /// Returns the parameter of `request` this release cannot carry.
+            pub(crate) const fn unsupported_parameter(request: &Request) -> Option<&'static str> {
+                unsupported(request)
+            }
+
             /// Returns the FHIR JSON body that carries `request`.
             pub(crate) fn request_body(request: &Request) -> Result<String, RequestError> {
                 Ok(serde_json::to_string(&encode(request)?)?)
@@ -606,6 +611,15 @@ pub(crate) fn outcome(version: WireVersion, body: &str) -> Result<Outcome, BodyE
         WireVersion::Stu3 => stu3::outcome(body),
         WireVersion::R4 => r4::outcome(body),
         WireVersion::R4B => r4b::outcome(body),
+    }
+}
+
+/// Returns the parameter of `request` that `version` cannot carry.
+pub(crate) const fn unsupported(version: WireVersion, request: &Request) -> Option<&'static str> {
+    match version {
+        WireVersion::Stu3 => stu3::unsupported_parameter(request),
+        WireVersion::R4 => r4::unsupported_parameter(request),
+        WireVersion::R4B => r4b::unsupported_parameter(request),
     }
 }
 

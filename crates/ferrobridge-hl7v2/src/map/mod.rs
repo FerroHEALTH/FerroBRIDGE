@@ -671,12 +671,20 @@ impl Mapped {
 /// Maps `parsed` through `corpus`, translating table values on
 /// `terminology`.
 ///
+/// Each translation names its table map by canonical `url`, which an R4 or
+/// R4B terminology server takes. An STU3 server is not supported: STU3
+/// `ConceptMap/$translate` declares no `url`
+/// (<https://hl7.org/fhir/STU3/conceptmap-operations.html#translate>), and
+/// addressing the map by `source` and `target` instead would let the server
+/// answer from another map.
+///
 /// # Errors
 ///
 /// Returns [`MapError::NoMessageMap`] when the corpus has no message map for
 /// the structure, [`MapError::Stopped`] when a `NOT VALUED ERROR` condition
 /// holds, [`MapError::Terminology`] when the terminology server refuses a
-/// translation or cannot be reached, and [`MapError::NoMessageHeader`] when
+/// translation or cannot be reached, or the client speaks STU3 (the
+/// client's `UnsupportedParameter`, sent before any request), and [`MapError::NoMessageHeader`] when
 /// the message Bundle would carry no `MessageHeader`.
 pub async fn map(
     parsed: &Parsed,

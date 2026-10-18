@@ -128,7 +128,12 @@ one place the derived `urn:ferrobridge:hl7v2-hd:` form is built, written as
 a fallback that a row of the guide at the same element replaces
 (`Run::write`). A refused or failed translation
 fails the run with the upstream status (`MapError::Terminology`); an absent
-terminology server is `no-terminology`, never a code passed through.
+terminology server is `no-terminology`, never a code passed through. An STU3
+terminology server is not supported: each translation names its table map
+by canonical `url`, which STU3 `$translate` does not declare, and its
+`source` and `target` would let the server pick a map other than the
+guide's, so the client refuses the first translation with
+`UnsupportedParameter` and nothing is sent.
 
 The condition, assignment and target grammars are `logos` lexers under
 `chumsky` parsers, the pair `openehr-query` builds its AQL parser on. The

@@ -89,6 +89,28 @@ impl Client {
         &self.config
     }
 
+    /// Checks that the configured release can carry `request`, sending
+    /// nothing.
+    ///
+    /// A caller that sends several requests uses this to set aside one the
+    /// release cannot carry, since a batch holding it is refused whole.
+    ///
+    /// # Errors
+    /// Returns [`Error::UnsupportedParameter`] when `request` names a
+    /// parameter the configured release does not declare: a concept map
+    /// `url` or a value set version on an STU3 client.
+    pub fn check(&self, request: &Request) -> Result<(), Error> {
+        let version = self.config.wire_version;
+        match crate::wire::unsupported(version, request) {
+            Some(parameter) => Err(Error::UnsupportedParameter {
+                operation: request.operation(),
+                parameter,
+                wire_version: version,
+            }),
+            None => Ok(()),
+        }
+    }
+
     /// Returns the status the server answers `GET [base]/metadata` with.
     ///
     /// Every FHIR REST server states its capabilities at that path
