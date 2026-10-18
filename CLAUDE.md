@@ -173,7 +173,8 @@ the testkit tool crate. Beside it:
   `ucum` converts quantities by UCUM, reading the UCUM essence embedded whole
   from `vendor/ucum/` (#459).
   The HL7 FHIRPath R4 test suite under `docs/specs/fhirpath-tests/` is its
-  `fhirpath-r4` corpus.
+  `fhirpath-r4` corpus (FHIRPath N1) and its `fhirpath-r4-stu3` corpus (the
+  cases that use the FHIRPath 3.0.0 STU functions, run behind their opt-in).
 - `crates/ferrobridge-validator`: the FHIR R4 profile validator (#432,
   foundation #437). `package` reads a package from a `.tgz` (`flate2`, `tar`)
   or a directory, `set` refuses a missing dependency by name and resolves
