@@ -276,7 +276,7 @@ impl Inbound {
     /// `subject.identifier` carries both halves; a literal
     /// `subject.reference` is read through `link`, which gives the namespace a
     /// deployment gives its own references and the form of the id. A `Patient` is the subject itself
-    /// and is keyed as [`patient_person`] keys it. No specification
+    /// and is keyed as `patient_person` keys it. No specification
     /// fixes the mapping from a FHIR subject to an openEHR subject: our own
     /// design.
     ///
