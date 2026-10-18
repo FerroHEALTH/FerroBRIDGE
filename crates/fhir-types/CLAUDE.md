@@ -32,6 +32,12 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
   JSON never re-derives the choice matching. Its `primitives` list names each
   primitive's `baseDefinition`, so a consumer walks `code` to `string` without
   a constant of its own.
+- `definition::ElementDefinitionRead` is the release-neutral read of
+  `ElementDefinition` (#836), implemented per version in `<version>/definition`
+  from that version's package: STU3's single `type.profile` and
+  `targetProfile` read as lists and its `valueSetUri` or `valueSetReference`
+  as the value set's URL, so a validator reads every release through one
+  trait and never through a model of its own.
 - `search_parameters::SEARCH_PARAMETERS` is the one search parameter registry
   per version, behind `resources`: a consumer checks a search parameter code,
   type or canonical against it and never keeps its own copy of the

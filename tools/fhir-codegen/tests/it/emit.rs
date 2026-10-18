@@ -56,10 +56,10 @@ fn emitting_twice_is_byte_identical_and_check_passes() {
     emit(&r4b_only(second.path(), false)).expect("second emit");
     // The 893 types with a Rust type of their own, plus the table-only `Element`.
     assert_eq!(report.types.get("r4b"), Some(&894));
-    // The version's types, operations, `mod.rs`, `schema.rs`, and
-    // `search_parameters.rs`, plus `lib.rs`, `codec.rs`, `operation.rs`,
-    // `schema.rs`, `search.rs`, and `xml.rs`.
-    assert_eq!(report.files.len(), 200);
+    // The version's types, operations, `mod.rs`, `schema.rs`, `definition.rs`
+    // and `search_parameters.rs`, plus `lib.rs`, `codec.rs`, `definition.rs`,
+    // `operation.rs`, `schema.rs`, `search.rs`, and `xml.rs`.
+    assert_eq!(report.files.len(), 202);
     assert!(
         !report.files.contains(&String::from("r4b/element.rs")),
         "the table-only Element entry claims no module of its own"
