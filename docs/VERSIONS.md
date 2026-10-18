@@ -429,7 +429,8 @@ Testing release, which `browser-actions/setup-chrome` installs in the
 `journeys (browser)` job of `ci.yml`, so the browser and its driver always
 match. `thirtyfour` 0.37.5 is the newest release older than two weeks on
 2026-10-18, and the Chrome for Testing release is the one FerroFED's journeys
-pin, the newest stable one on 2026-10-14.
+pin, the newest stable one on 2026-10-14. The weekly
+`scripts/checks/pin-freshness.sh` reports a newer Stable release.
 
 For a local run, `scripts/release/journey-tools.sh` installs the same
 release into `target/journey-tools`, where the journeys look first. It takes
