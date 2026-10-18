@@ -127,6 +127,7 @@ async fn a_bridge_whose_operations_are_off_refuses_the_transform() -> Result<(),
         browser
             .text("p", "503: the bridge refused the request.")
             .await?;
+        browser.text("li", "[operations] enabled is false").await?;
         browser
             .console_clean("an operations lane that is off")
             .await

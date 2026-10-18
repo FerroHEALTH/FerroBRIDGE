@@ -128,6 +128,16 @@ impl OperationsLane {
 /// (`engine/defaults-for-fields.adoc`).
 const DEFAULT_COMPOSER: &str = "FHIRconnect";
 
+/// Why the FHIRconnect operations are not served.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OperationsOff {
+    /// No `[mappings] directory` is set, so there is no mapping set to run.
+    #[default]
+    NoMappingSet,
+    /// `[operations] enabled = false` turned the lane off.
+    Disabled,
+}
+
 /// The state the router is built over.
 #[derive(Debug)]
 pub struct AppState {
@@ -142,6 +152,9 @@ pub struct AppState {
     facade: Option<Arc<crate::facade::Facade>>,
     /// The FHIRconnect operations lane, when a mapping set is configured.
     operations: Option<Arc<OperationsLane>>,
+    /// Why the operations are not served, when [`Self::operations`] is
+    /// `None`.
+    operations_off: OperationsOff,
     /// The lanes the boot summary reported, for `GET /health/info`.
     lanes: Vec<crate::startup::Lane>,
     /// Whether the HL7 v2 listener accepts, when the face runs.
@@ -219,6 +232,11 @@ impl AppState {
             logged_query_parameters: settings.telemetry.logged_query_parameters.clone(),
             facade: None,
             operations,
+            operations_off: if settings.operations.enabled {
+                OperationsOff::NoMappingSet
+            } else {
+                OperationsOff::Disabled
+            },
             lanes: Vec::new(),
             hl7v2: None,
             auth: None,
@@ -237,6 +255,7 @@ impl AppState {
             logged_query_parameters: Vec::new(),
             facade: None,
             operations: None,
+            operations_off: OperationsOff::default(),
             lanes: Vec::new(),
             hl7v2: None,
             auth: None,
@@ -357,6 +376,13 @@ impl AppState {
     #[must_use]
     pub fn operations(&self) -> Option<&OperationsLane> {
         self.operations.as_deref()
+    }
+
+    /// Returns why the operations are not served, which matters only while
+    /// [`Self::operations`] is `None`.
+    #[must_use]
+    pub const fn operations_off(&self) -> OperationsOff {
+        self.operations_off
     }
 
     /// Returns a shared handle on the operations lane, for the reload that
