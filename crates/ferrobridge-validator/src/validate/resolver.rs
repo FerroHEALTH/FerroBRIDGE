@@ -8,7 +8,10 @@
 //! of references inside a Bundle
 //! (<https://hl7.org/fhir/R4/bundle.html#references>, §2.36.4.1).
 
+use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::fmt;
+use std::rc::Rc;
 
 use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
@@ -45,17 +48,71 @@ pub(crate) enum Via<'i> {
     },
 }
 
+/// The entries of one Bundle, by `fullUrl` in entry order and by the
+/// address of their resource.
+#[derive(Debug, Default)]
+pub(crate) struct Index<'i> {
+    by_url: BTreeMap<&'i str, Vec<&'i Value>>,
+    by_resource: BTreeMap<usize, &'i Value>,
+}
+
+impl<'i> Index<'i> {
+    /// Indexes the entries of `bundle`.
+    fn new(bundle: &'i Value) -> Self {
+        let mut index = Self::default();
+        for entry in entries(bundle) {
+            if let Some(url) = entry.get("fullUrl").and_then(Value::as_str) {
+                index.by_url.entry(url).or_default().push(entry);
+            }
+            if let Some(resource) = entry.get("resource") {
+                index
+                    .by_resource
+                    .entry(std::ptr::from_ref(resource).addr())
+                    .or_insert(entry);
+            }
+        }
+        index
+    }
+}
+
+/// The indexes of the Bundles one validation meets, built on first use and
+/// keyed by the address of the Bundle, which the instance keeps for the
+/// whole validation.
+#[derive(Debug, Default)]
+pub(crate) struct Indexes<'i> {
+    built: RefCell<BTreeMap<usize, Rc<Index<'i>>>>,
+}
+
+impl<'i> Indexes<'i> {
+    /// Returns the index of `bundle`.
+    fn of(&self, bundle: &'i Value) -> Rc<Index<'i>> {
+        let key = std::ptr::from_ref(bundle).addr();
+        Rc::clone(
+            self.built
+                .borrow_mut()
+                .entry(key)
+                .or_insert_with(|| Rc::new(Index::new(bundle))),
+        )
+    }
+}
+
 /// Resolves a reference from inside the resources being validated.
 ///
 /// `scope` holds the resources the walk is inside, the outermost first, so a
 /// resolver can search the container of the item, or a Bundle around it.
 pub(crate) trait Resolver: fmt::Debug + Send + Sync {
-    /// Resolves `reference`, a `Reference.reference`, from inside `scope`.
-    fn resolve<'i>(&self, reference: &str, scope: &[&'i Value]) -> Resolution<'i>;
+    /// Resolves `reference`, a `Reference.reference`, from inside `scope`,
+    /// reading a Bundle through `indexes`.
+    fn resolve<'i>(
+        &self,
+        reference: &str,
+        scope: &[&'i Value],
+        indexes: &Indexes<'i>,
+    ) -> Resolution<'i>;
 
     /// Returns the Bundle whose entries the resolver searches from inside
     /// `scope`, when there is one.
-    fn bundle<'i>(&self, scope: &[&'i Value]) -> Option<&'i Value>;
+    fn bundle<'i>(&self, scope: &[&'i Value], indexes: &Indexes<'i>) -> Option<&'i Value>;
 }
 
 /// Resolves the local references `#id` against the contained resources of
@@ -64,7 +121,12 @@ pub(crate) trait Resolver: fmt::Debug + Send + Sync {
 pub(crate) struct Contained;
 
 impl Resolver for Contained {
-    fn resolve<'i>(&self, reference: &str, scope: &[&'i Value]) -> Resolution<'i> {
+    fn resolve<'i>(
+        &self,
+        reference: &str,
+        scope: &[&'i Value],
+        _indexes: &Indexes<'i>,
+    ) -> Resolution<'i> {
         let Some(id) = reference.strip_prefix('#') else {
             return Resolution::OutOfScope;
         };
@@ -86,7 +148,7 @@ impl Resolver for Contained {
         })
     }
 
-    fn bundle<'i>(&self, _scope: &[&'i Value]) -> Option<&'i Value> {
+    fn bundle<'i>(&self, _scope: &[&'i Value], _indexes: &Indexes<'i>) -> Option<&'i Value> {
         None
     }
 }
@@ -98,11 +160,16 @@ impl Resolver for Contained {
 pub(crate) struct Bundled;
 
 impl Resolver for Bundled {
-    fn resolve<'i>(&self, reference: &str, scope: &[&'i Value]) -> Resolution<'i> {
+    fn resolve<'i>(
+        &self,
+        reference: &str,
+        scope: &[&'i Value],
+        indexes: &Indexes<'i>,
+    ) -> Resolution<'i> {
         if reference.starts_with('#') {
-            return Contained.resolve(reference, scope);
+            return Contained.resolve(reference, scope, indexes);
         }
-        let Some((bundle, entry)) = context(scope) else {
+        let Some((bundle, entry)) = context(scope, indexes) else {
             return Resolution::OutOfScope;
         };
         let Some(from) = entry.get("resource") else {
@@ -114,11 +181,11 @@ impl Resolver for Bundled {
             // not RESTful "has no defined meaning within this specification".
             return Resolution::OutOfScope;
         };
-        lookup(bundle, &url, version, from)
+        lookup((bundle, indexes), &url, version, from)
     }
 
-    fn bundle<'i>(&self, scope: &[&'i Value]) -> Option<&'i Value> {
-        context(scope).map(|(bundle, _)| bundle)
+    fn bundle<'i>(&self, scope: &[&'i Value], indexes: &Indexes<'i>) -> Option<&'i Value> {
+        context(scope, indexes).map(|(bundle, _)| bundle)
     }
 }
 
@@ -128,12 +195,16 @@ impl Resolver for Bundled {
 ///
 /// A relative reference has no entry `fullUrl` to resolve against here, so
 /// it is out of scope.
-pub(crate) fn from_bundle<'i>(bundle: &'i Value, reference: &str) -> Resolution<'i> {
+pub(crate) fn from_bundle<'i>(
+    bundle: &'i Value,
+    reference: &str,
+    indexes: &Indexes<'i>,
+) -> Resolution<'i> {
     if !has_scheme(reference) {
         return Resolution::OutOfScope;
     }
     match absolute(reference, None) {
-        Some((url, version)) => lookup(bundle, &url, version, bundle),
+        Some((url, version)) => lookup((bundle, indexes), &url, version, bundle),
         None => Resolution::OutOfScope,
     }
 }
@@ -141,16 +212,19 @@ pub(crate) fn from_bundle<'i>(bundle: &'i Value, reference: &str) -> Resolution<
 /// The entry of `bundle` whose `fullUrl` is `url`, at `version` when one is
 /// given, reached from the entry resource `from`.
 fn lookup<'i>(
-    bundle: &'i Value,
+    (bundle, indexes): (&'i Value, &Indexes<'i>),
     url: &str,
     version: Option<&str>,
     from: &'i Value,
 ) -> Resolution<'i> {
     // NOTE: bundle.html §2.36.4.1: a version-specific reference drops its version to match
     // the fullUrl, "and then match the version based on Resource.meta.versionId".
-    let found: Vec<&'i Value> = entries(bundle)
-        .iter()
-        .filter(|entry| entry.get("fullUrl").and_then(Value::as_str) == Some(url))
+    let index = indexes.of(bundle);
+    let found: Vec<&'i Value> = index
+        .by_url
+        .get(url)
+        .into_iter()
+        .flatten()
         .filter_map(|entry| entry.get("resource"))
         .filter(|resource| version.is_none_or(|version| version_id(resource) == Some(version)))
         .collect();
@@ -174,18 +248,15 @@ fn lookup<'i>(
 /// as those for resolving resources in the resource that contains the
 /// contained resource" (bundle.html §2.36.4.1), so a contained resource
 /// resolves through the entry of its container.
-fn context<'i>(scope: &[&'i Value]) -> Option<(&'i Value, &'i Value)> {
+fn context<'i>(scope: &[&'i Value], indexes: &Indexes<'i>) -> Option<(&'i Value, &'i Value)> {
     for (index, &resource) in scope.iter().enumerate().rev() {
         let outer = scope.get(..index).unwrap_or_default();
         for &candidate in outer.iter().rev() {
             if candidate.get("resourceType").and_then(Value::as_str) != Some("Bundle") {
                 continue;
             }
-            if let Some(entry) = entries(candidate).iter().find(|entry| {
-                entry
-                    .get("resource")
-                    .is_some_and(|held| std::ptr::eq(held, resource))
-            }) {
+            let index = indexes.of(candidate);
+            if let Some(&entry) = index.by_resource.get(&std::ptr::from_ref(resource).addr()) {
                 return Some((candidate, entry));
             }
         }
@@ -332,6 +403,7 @@ mod tests {
 
     use super::Bundled;
     use super::Contained;
+    use super::Indexes;
     use super::Resolution;
     use super::Resolver;
     use super::Via;
@@ -352,7 +424,7 @@ mod tests {
     fn a_local_reference_resolves_to_the_contained_resource() {
         let resource =
             json(r#"{"resourceType":"List","contained":[{"resourceType":"Patient","id":"p1"}]}"#);
-        let found = Contained.resolve("#p1", &[&resource]);
+        let found = Contained.resolve("#p1", &[&resource], &Indexes::default());
         assert!(matches!(
             found,
             Resolution::Found {
@@ -362,11 +434,11 @@ mod tests {
         ));
         assert_eq!(id_of(found), Some("p1"));
         assert!(matches!(
-            Contained.resolve("#p2", &[&resource]),
+            Contained.resolve("#p2", &[&resource], &Indexes::default()),
             Resolution::Missing
         ));
         assert!(matches!(
-            Contained.resolve("Patient/p1", &[&resource]),
+            Contained.resolve("Patient/p1", &[&resource], &Indexes::default()),
             Resolution::OutOfScope
         ));
     }
@@ -382,7 +454,7 @@ mod tests {
             .and_then(|items| items.first())
             .expect("the contained patient");
         assert_eq!(
-            id_of(Contained.resolve("#", &[&resource, inner])),
+            id_of(Contained.resolve("#", &[&resource, inner], &Indexes::default())),
             Some("l")
         );
     }
@@ -422,7 +494,11 @@ mod tests {
             .and_then(Value::as_array)
             .and_then(|items| items.first())
             .expect("the device");
-        let found = Bundled.resolve("Patient/p1", &[&bundle, observation, device]);
+        let found = Bundled.resolve(
+            "Patient/p1",
+            &[&bundle, observation, device],
+            &Indexes::default(),
+        );
         assert_eq!(id_of(found), Some("p1"));
         assert!(matches!(
             found,

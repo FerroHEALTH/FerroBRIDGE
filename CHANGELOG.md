@@ -44,6 +44,13 @@ crates on crates.io.
   in the ordinary suite fails on a console route without both images. The
   test OpenID Provider of the testkit can now sign a real browser in.
 
+- The FHIRPath evaluator has a strict ordering mode,
+  `Environment::with_strict_ordering`, off by default (#636). It refuses
+  `first()`, `last()`, `tail()`, `skip()`, `take()` and the indexer over a
+  collection derived from `children()` or `descendants()` with
+  `EvalError::Unordered`, the error FHIRPath N1 §3.1 lets an implementation
+  return for an order-dependent operation on a list whose order is
+  undefined.
 - The profile validator holds every resolved extension to where its
   definition admits it (#481): each `StructureDefinition.context` of the
   types `element`, `extension` and `fhirpath`, read as R4
@@ -102,6 +109,15 @@ crates on crates.io.
   (`code` specializes `string`) (#635). The new `primitives` field breaks a
   consumer that builds a `Schemas` value by hand: it adds the field.
   `fhirconnect` 0.1.133 follows the requirement.
+
+### Changed
+
+- The profile validator indexes each Bundle once per validation, its
+  entries by `fullUrl` and by their resource, so resolving a reference
+  inside a Bundle no longer scans every entry twice (#515). A synthetic
+  document of 12002 entries validates in 3.6 s instead of 9.9 s in a
+  release build; the matching rules of R4 bundle.html §2.36.4.1 are
+  unchanged.
 
 ### Fixed
 

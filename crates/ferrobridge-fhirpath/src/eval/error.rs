@@ -119,6 +119,15 @@ pub enum EvalError {
         /// The extension's url.
         url: String,
     },
+    /// An order-dependent operation over a collection whose order N1 §3.1
+    /// leaves undefined, refused in the strict ordering mode.
+    #[error(
+        "{operation} needs an ordered input, and the order of a collection derived from children() or descendants() is undefined"
+    )]
+    Unordered {
+        /// The function name, or `[]` for the indexer.
+        operation: String,
+    },
     /// An argument outside what the function admits.
     #[error("{function}() received an invalid argument: {reason}")]
     Argument {
