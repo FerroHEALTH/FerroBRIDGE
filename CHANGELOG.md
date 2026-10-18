@@ -27,6 +27,18 @@ crates on crates.io.
 
 ### Added
 
+- `fhir-types` 0.1.123 carries a release-neutral read of `ElementDefinition`,
+  `definition::ElementDefinitionRead`, implemented for every version's
+  generated `ElementDefinition` from that version's package (#836). It reads
+  the element id, path, slice name, cardinality, `maxLength`,
+  `contentReference`, the types with their profiles, target profiles,
+  aggregation and versioning, the binding strength and value set, the
+  constraints, the slicing, and `fixed[x]` and `pattern[x]` in their JSON
+  form. STU3's single `type.profile` and `type.targetProfile` read as lists,
+  and its `binding.valueSetUri` or `valueSetReference` as the value set's
+  URL (STU3 and R4 elementdefinition.html), so the profile validator can
+  read STU3 definitions without a second model. `fhirconnect` moves to
+  0.1.138 with the requirement.
 - The R4 profile validator is held to the HL7 FHIR Validator 6.10.4 on a
   synthetic corpus, the `validator-agreement` conformance corpus (#442): ten
   cases (conforming resources, and resources that break one invariant, one
