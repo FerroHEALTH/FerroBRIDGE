@@ -322,7 +322,7 @@ impl<'i> Walk<'_, '_, 'i> {
         if let Some(path) = choice {
             focus = focus.defined_by(path);
         }
-        let references = References::new(self.validator(), scope);
+        let references = References::new(self.validator(), scope, self.indexes());
         let terminology = Terminology::new(self.validator(), structure.origin());
         let conformance = Conformance::new(self.validator(), self.depth());
         let mut environment = Environment::new(&R4)

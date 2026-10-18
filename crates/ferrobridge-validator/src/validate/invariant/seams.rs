@@ -20,6 +20,7 @@ use crate::set::PackageId;
 use crate::set::ResolveError;
 use crate::validate::ValidateError;
 use crate::validate::Validator;
+use crate::validate::resolver::Indexes;
 use crate::validate::resolver::Resolution;
 use crate::validate::resolver::from_bundle;
 use crate::validate::terminology::Coded;
@@ -55,12 +56,21 @@ enum Unanswered {
 pub(super) struct References<'v, 'set, 's, 'i> {
     validator: &'v Validator<'set>,
     scope: &'s [&'i Value],
+    indexes: &'s Indexes<'i>,
 }
 
 impl<'v, 'set, 's, 'i> References<'v, 'set, 's, 'i> {
     /// Creates the resolver of `validator` over `scope`.
-    pub(super) const fn new(validator: &'v Validator<'set>, scope: &'s [&'i Value]) -> Self {
-        Self { validator, scope }
+    pub(super) const fn new(
+        validator: &'v Validator<'set>,
+        scope: &'s [&'i Value],
+        indexes: &'s Indexes<'i>,
+    ) -> Self {
+        Self {
+            validator,
+            scope,
+            indexes,
+        }
     }
 }
 
@@ -78,14 +88,17 @@ impl seam::Resolver for References<'_, '_, '_, '_> {
         reference: &str,
         _context: ResolveContext<'_>,
     ) -> Result<Option<Value>, SeamError> {
-        let mut found = self.validator.resolver().resolve(reference, self.scope);
+        let mut found = self
+            .validator
+            .resolver()
+            .resolve(reference, self.scope, self.indexes);
         // NOTE: no specification governs this: our own design; on the Bundle element no entry
         // holds the reference, so only an absolute one resolves, against the entries' fullUrls.
         if matches!(found, Resolution::OutOfScope)
             && let Some(&innermost) = self.scope.last()
             && innermost.get("resourceType").and_then(Value::as_str) == Some("Bundle")
         {
-            found = from_bundle(innermost, reference);
+            found = from_bundle(innermost, reference, self.indexes);
         }
         match found {
             Resolution::Found { target, .. } => Ok(Some(target.clone())),
