@@ -51,7 +51,7 @@ readonly CORPUS_TESTS=(
   'fhirconnect-mapping-lib fhirconnect conformance_the_fhirconnect_corpus_holds_its_pass_list'
   'omocl omocl conformance_the_omocl_corpus_holds_its_pass_list'
   'roundtrip fhirconnect conformance_the_round_trip_chains_hold_their_pass_list'
-  'draft-rest-api fhirconnect conformance_the_draft_operation_definitions_hold_their_pass_list'
+  'rest-api fhirconnect conformance_the_rest_api_operation_definitions_hold_their_pass_list'
   'hl7v2 ferrobridge-hl7v2 conformance_the_vendored_hl7v2_corpora_hold_their_pass_list'
   'hl7v2-smoke ferrobridge-hl7v2 conformance_the_fetched_hl7v2_corpora_hold_their_pass_list'
   'fhir-stu3 ferrobridge-testkit conformance_the_fhir_stu3_examples_hold_their_pass_list'
@@ -148,7 +148,7 @@ label_of() {
     fhirconnect-mapping-lib) echo "FHIRconnect mapping library" ;;
     omocl) echo "OMOCL mapping library" ;;
     roundtrip) echo "FHIR round-trip laws" ;;
-    draft-rest-api) echo "FHIRconnect REST API (draft)" ;;
+    rest-api) echo "FHIRconnect REST API" ;;
     hl7v2) echo "HL7 v2 message corpora" ;;
     hl7v2-smoke) echo "HL7 v2 smoke corpora (NIST, AIRA)" ;;
     fhir-stu3) echo "FHIR STU3" ;;
@@ -387,7 +387,7 @@ render_block() {
   echo
   echo 'FHIRconnect 1.0.0:'
   badge_link "$(label_of fhirconnect-mapping-lib)" fhirconnect-mapping-lib conformance/fhirconnect-mapping-lib/pass-list.txt
-  badge_link "$(label_of draft-rest-api)" draft-rest-api conformance/draft-rest-api/pass-list.txt
+  badge_link "$(label_of rest-api)" rest-api conformance/rest-api/pass-list.txt
   echo
   echo 'OMOCL 1.0.0:'
   badge_link "$(label_of omocl)" omocl conformance/omocl/pass-list.txt

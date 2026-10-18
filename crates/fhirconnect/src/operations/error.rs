@@ -143,7 +143,7 @@ pub enum OperationError {
     /// Neither the mapping nor the composition gives the mapped resource an
     /// identity.
     ///
-    /// The draft puts a `Provenance` in every `$tofhir` Bundle, and
+    /// The chapter puts a `Provenance` in every `$tofhir` Bundle, and
     /// `Provenance.target` is a reference, so a resource with no identity
     /// cannot be the target of one.
     #[error(

@@ -3,8 +3,8 @@
 
 //! The HTTP surface of the two FHIRconnect operations.
 //!
-//! The draft REST API chapter of the FHIRconnect specification (pull request
-//! #93, vendored at its pinned commit) defines `POST [base]/$tofhir` and
+//! The REST API chapter of the FHIRconnect specification
+//! (`engine/rest-api.adoc`, vendored at the pinned specification commit) defines `POST [base]/$tofhir` and
 //! `POST [base]/$toopenehr` against the service base, both following the FHIR
 //! R4 operations framework, plus a direct form outside the FHIR
 //! implementation guide where the payload is the body itself. All four are
@@ -54,7 +54,7 @@ use crate::usage_report::window::Window;
 /// The FHIR JSON media type, the one both operations exchange.
 pub const FHIR_JSON: &str = "application/fhir+json";
 
-/// The media type the draft defines for an unwrapped openEHR payload.
+/// The media type the chapter defines for an unwrapped openEHR payload.
 pub const OPENEHR_JSON: &str = fhirconnect::operations::OPENEHR_JSON;
 
 /// The route prefix the FHIR surface is served under.
@@ -399,7 +399,7 @@ fn with_query(request: ToFhirRequest, query: &OperationQuery) -> ToFhirRequest {
 
 /// Returns the response one refusal answers with.
 ///
-/// The status is FerroBRIDGE's own: the draft fixes none. A request the caller
+/// The status is FerroBRIDGE's own: the chapter fixes none. A request the caller
 /// can correct is `400`, a mapping that cannot be performed over a
 /// well-formed request is `422`
 /// (<https://hl7.org/fhir/R4/http.html#4.4.1.2>).

@@ -37,8 +37,7 @@ its pin from this table, and `scripts/checks/versions.sh` reads each vendored
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| FHIRconnect REST API chapter (draft, unmerged) | `SevKohler/FHIRconnect-spec` pull request #93 at head `2bf2a2fe91bae2ae659cda1665826567ea81b4af` | `docs/architecture.md` §2 and §4.7, `scripts/vendor/fhirconnect.sh`, `docs/specs/fhirconnect/draft-rest-api/PROVENANCE.md`, `crates/fhirconnect/tests/fixtures/draft-rest-api/PROVENANCE.md` |
-| FHIRconnect specification source | `SevKohler/FHIRconnect-spec` commit `195b07fdb4c78da0432fdd1e9dbd127b81be6165` | `docs/architecture.md` §2, `scripts/vendor/fhirconnect.sh`, `docs/specs/fhirconnect/PROVENANCE.md` |
+| FHIRconnect specification source | `SevKohler/FHIRconnect-spec` commit `e587164102921c73eea262a18f3457b18e4a2a40` (carries the REST API chapter, pull request #93, and the sub-contexts, pull request #100) | `docs/architecture.md` §2 and §4.7, `scripts/vendor/fhirconnect.sh`, `docs/specs/fhirconnect/PROVENANCE.md`, `crates/fhirconnect/tests/fixtures/rest-api/PROVENANCE.md` |
 | FHIRconnect mapping library (corpus, never an oracle) | `SevKohler/FHIRconnect-mapping-lib` commit `6bd4c19a2f96821c04fbeed3c6f6c190fd85825b` | `docs/architecture.md` §2, `scripts/vendor/fhirconnect-mapping-lib.sh`, `docs/specs/fhirconnect-mapping-lib/PROVENANCE.md` |
 | OMOCL corpus | `SevKohler/OMOCL` commit `c082db8ed81a062a574a2c058366045f600c2ed7` (grammar `OMOCL/v1.0.0`; the git tag `v1.0.0` carries pre-grammar files) | `docs/architecture.md` §2, `scripts/vendor/omocl.sh`, `docs/specs/omocl/PROVENANCE.md` |
 | OMOP CDM definitions and PostgreSQL DDL | `OHDSI/CommonDataModel` tag `v5.4.3` | `docs/architecture.md` §2, `scripts/vendor/omop-cdm.sh`, `docs/specs/omop-cdm/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of every file it emits |

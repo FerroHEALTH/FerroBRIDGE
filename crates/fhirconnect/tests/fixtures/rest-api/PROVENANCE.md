@@ -3,17 +3,20 @@
 
 # Provenance: the worked examples of the FHIRconnect REST API chapter
 
-Each file is one `[source,json]` block of the draft chapter, copied verbatim
-from the vendored text at its pinned commit. They are the wire fixtures the
-contract tests round trip, so a change to the chapter shows up as a failing
-test rather than as silent drift. The chapter is an **unmerged draft**, pull
-request #93 of the FHIRconnect specification, so these examples are not part of
-any release.
+Each file is one `[source,json]` block of the REST API chapter, copied
+verbatim from the vendored text at the pinned specification commit. They are
+the wire fixtures the contract tests round trip, so a change to the chapter
+shows up as a failing test rather than as silent drift. The chapter merged as
+pull request #93 of the FHIRconnect specification; every block below is
+byte-identical to the one the pull request carried at its head
+`2bf2a2fe91bae2ae659cda1665826567ea81b4af`, where the files were first
+extracted on 2026-09-15.
 
-- Source: `docs/specs/fhirconnect/draft-rest-api/modules/ROOT/pages/engine/rest-api.adoc`
-- Upstream: <https://github.com/SevKohler/FHIRconnect-spec/pull/93>
-- Pin: pull request #93 at head commit `2bf2a2fe91bae2ae659cda1665826567ea81b4af`
-- Extracted: 2026-09-15
+- Source: `docs/specs/fhirconnect/modules/ROOT/pages/engine/rest-api.adoc`
+- Upstream: <https://github.com/SevKohler/FHIRconnect-spec>
+- Pin: commit `e587164102921c73eea262a18f3457b18e4a2a40`, the "FHIRconnect
+  specification source" row of `docs/VERSIONS.md`
+- Re-checked: 2026-10-18
 - Upstream licence: Apache License 2.0, the `LICENSE` file of the same
   repository, vendored at `../../../../../docs/specs/fhirconnect/LICENSE`
 

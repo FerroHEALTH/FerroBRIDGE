@@ -28,7 +28,7 @@ and what these schemas do instead.
 | mapping-level `conceptmap` | absent the same way | `types-of-mappings/concept-type/manual.adoc`, §ConceptMaps | a non-empty string |
 | `spec.conceptmap` | absent | the same section, which attaches a concept map "inside the header" | a non-empty string |
 | `spec.openEhrConfig.revision` | absent from the closed `openEhrConfig`, so the key the prose writes cannot appear | `basics/main.adoc`, §Spec: "the `openEHRCondig.revision` states what revision of the archetype this mapping applies for", and the worked example writes it | a non-empty string |
-| `spec.unidirectional` | absent | `basics/main.adoc`, §Direction, which pins a whole file to one direction | the same case-insensitive pattern the mapping-level key takes |
+| `spec.unidirectional` | a free string | `basics/main.adoc`, §Direction, which pins a whole file to one direction and fixes two values | the same case-insensitive pattern the mapping-level key takes |
 | `manual` | `type: array` carrying object `properties` and no `items`, so it validates nothing | `types-of-mappings/concept-type/manual.adoc` | items typed: `name` required, `fhir` and `openehr` each one `{path, value}` pair or a list of them, plus the two conditions, `value` and `unidirectional` |
 | `hierarchy.split.openehr` | written outside `properties`, so it is unvalidated | `types-of-mappings/concept-type/HierarchyMappings.adoc` | typed exactly as `hierarchy.split.fhir` is |
 | `operator` | a free string | the operator table in `basics/Conditions.adoc`, §operator | an enum of `one of`, `not of`, `empty`, `not empty`, `type` |

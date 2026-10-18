@@ -170,7 +170,7 @@ async fn a_template_the_cdr_does_not_hold_names_the_context_and_the_status()
 async fn a_served_operations_lane_is_declared_at_the_system_level() -> Result<(), Box<dyn StdError>>
 {
     // R4 CapabilityStatement.rest.operation carries the system-level
-    // operations; both FSH definitions of the draft chapter set `system = true`.
+    // operations; both FSH definitions of the REST API chapter set `system = true`.
     let harness = harness().await;
     let (status, body) = call(
         harness.app_with_operations(),
@@ -212,7 +212,7 @@ async fn an_absent_operations_lane_is_not_declared() -> Result<(), Box<dyn StdEr
 
 #[tokio::test]
 async fn the_direct_forms_of_the_operations_are_never_declared() -> Result<(), Box<dyn StdError>> {
-    // rest-api.adoc (draft), Direct payload invocation: "intentionally not
+    // rest-api.adoc, Direct payload invocation: "intentionally not
     // part of the FHIRconnect FHIR Implementation Guide".
     let harness = harness().await;
     let (_, body) = call(

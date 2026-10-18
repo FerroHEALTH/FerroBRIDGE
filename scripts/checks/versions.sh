@@ -640,7 +640,7 @@ pinned_ref_of() {
 }
 
 corpora="docs/specs/fhirconnect|FHIRconnect specification source
-docs/specs/fhirconnect/draft-rest-api|FHIRconnect REST API chapter (draft, unmerged)
+crates/fhirconnect/tests/fixtures/rest-api|FHIRconnect specification source
 docs/specs/fhirconnect-mapping-lib|FHIRconnect mapping library (corpus, never an oracle)
 docs/specs/omocl|OMOCL corpus
 docs/specs/omop-cdm|OMOP CDM definitions and PostgreSQL DDL

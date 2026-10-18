@@ -156,9 +156,9 @@ openEHR.
 
 `operations` is the two FHIRconnect operations, `$tofhir` and `$toopenehr`,
 over the generated FHIR model. The governing text is the REST API chapter of
-the FHIRconnect specification, an unmerged draft (specification pull request
-#93) vendored at its pinned commit, read together with the FHIR R4 operations
-framework.
+the FHIRconnect specification (`engine/rest-api.adoc` and the FSH operation
+definitions under `rest/`), vendored at the pinned specification commit, read
+together with the FHIR R4 operations framework.
 
 - **The contracts follow the framework.** `contract` carries
   `ToFhirRequest`/`ToFhirResponse` and `ToOpenehrRequest`/`ToOpenehrResponse`

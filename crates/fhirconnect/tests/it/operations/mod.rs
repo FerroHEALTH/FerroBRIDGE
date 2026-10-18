@@ -1,12 +1,11 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The two FHIRconnect operations, against the DRAFT REST API chapter.
+//! The two FHIRconnect operations, against the REST API chapter.
 //!
-//! Every wire case here reads the chapter at its pinned commit, an unmerged
-//! draft (pull request #93 of the specification), so the fixtures under
-//! `tests/fixtures/draft-rest-api/` are the chapter's own worked examples and
-//! the expectations move with it when it merges.
+//! Every wire case here reads the chapter at the pinned specification commit,
+//! so the fixtures under `tests/fixtures/rest-api/` are the chapter's own
+//! worked examples and the expectations move with the pin.
 
 mod definitions;
 mod examples;
@@ -60,10 +59,10 @@ const NOW: &str = "2026-09-15T10:00:00Z";
 /// The `Device` reference a call that supplies no `context.who` gets.
 const DEVICE: &str = "Device/ferrobridge";
 
-/// Returns the text of one vendored draft example.
-fn draft(name: &str) -> Result<String, Box<dyn Error>> {
+/// Returns the text of one worked example of the chapter.
+fn example(name: &str) -> Result<String, Box<dyn Error>> {
     Ok(std::fs::read_to_string(format!(
-        "{FIXTURES}/draft-rest-api/{name}"
+        "{FIXTURES}/rest-api/{name}"
     ))?)
 }
 

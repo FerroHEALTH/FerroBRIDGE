@@ -221,7 +221,7 @@ the testkit tool crate. Beside it:
   console route has both.
 - `docs/specs/`: the vendored specification corpora (#71), one directory per
   corpus with a `PROVENANCE.md`, fetched by `scripts/vendor/*.sh` from the pins
-  in `docs/VERSIONS.md`: FHIRconnect with its schemas and the draft REST API
+  in `docs/VERSIONS.md`: FHIRconnect with its schemas and the REST API
   chapter, the FHIRconnect mapping library, OMOCL, the OMOP CDM v5.4
   definitions and PostgreSQL DDL, and the ITS-REST OpenAPI documents. Beside
   them, `fhir-packages/` holds the R4 profile validator's package set (#435),

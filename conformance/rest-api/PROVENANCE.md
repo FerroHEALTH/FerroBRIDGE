@@ -1,17 +1,17 @@
 <!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
-# Provenance: the draft REST API pass list
+# Provenance: the REST API pass list
 
-`pass-list.txt` records which FSH operation definitions of the draft
+`pass-list.txt` records which FSH operation definitions of the
 FHIRconnect REST API chapter pass, one file name per line, and the definition
 count on its `total` line. It holds no copy of the chapter. The definitions are
-`docs/specs/fhirconnect/draft-rest-api/rest/input/fsh/operations/`, at the pin
+`docs/specs/fhirconnect/rest/input/fsh/operations/`, at the pin
 `docs/VERSIONS.md` records and `docs/specs/fhirconnect/PROVENANCE.md`
 describes.
 
 - Written by:
-  `operations::definitions::conformance_the_draft_operation_definitions_hold_their_pass_list`
+  `operations::definitions::conformance_the_rest_api_operation_definitions_hold_their_pass_list`
   in `crates/fhirconnect/tests/it/operations/definitions.rs`, under
   `scripts/checks/conformance.sh --update`.
 - A definition passes when the wire contract reads every `in` parameter and

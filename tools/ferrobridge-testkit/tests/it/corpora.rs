@@ -14,10 +14,6 @@ use sha2::Digest;
 const CORPORA: &[(&str, &str)] = &[
     ("FHIRconnect specification source", "docs/specs/fhirconnect"),
     (
-        "FHIRconnect REST API chapter (draft, unmerged)",
-        "docs/specs/fhirconnect/draft-rest-api",
-    ),
-    (
         "FHIRconnect mapping library (corpus, never an oracle)",
         "docs/specs/fhirconnect-mapping-lib",
     ),

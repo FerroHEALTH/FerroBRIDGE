@@ -157,12 +157,10 @@ done <<< "$WATCHED"
 
 # One "matrix label<TAB>upstream repository<TAB>branch" record per line: a
 # corpus pinned by commit on a repository that publishes no releases, read
-# against the newest commit of the branch the pin follows. The REST API
-# chapter is pinned at the head of an upstream pull request and is read
-# against the default branch it merges into. The two KDS fixture rows pin one
-# file each, and the UCUM row a release tag, so neither is read here.
+# against the newest commit of the branch the pin follows. The two KDS fixture
+# rows pin one file each, and the UCUM row a release tag, so neither is read
+# here.
 readonly WATCHED_COMMITS="\
-FHIRconnect REST API chapter (draft, unmerged)	SevKohler/FHIRconnect-spec	main
 FHIRconnect specification source	SevKohler/FHIRconnect-spec	main
 FHIRconnect mapping library (corpus, never an oracle)	SevKohler/FHIRconnect-mapping-lib	main
 OMOCL corpus	SevKohler/OMOCL	main
