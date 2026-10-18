@@ -317,15 +317,81 @@ pub fn contains(
     Ok(false)
 }
 
+/// The bucket an item falls in for [`distinct`]: two items `=` calls equal
+/// always share one, so only the items of a bucket need comparing.
+///
+/// Strings, Booleans and numbers are equal only to a value of their own kind
+/// with the same value (N1 §6.1.1), and a quantity that converts to the unit
+/// `'1'` is equal to the number it converts to (N1 §5.5), so those key by
+/// value. Every other kind shares one bucket per kind, compared item by item.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum Bucket {
+    /// A Boolean.
+    Boolean(bool),
+    /// A String.
+    String(String),
+    /// An Integer, a Decimal, or a quantity in the unit `'1'`, by value.
+    Number(Decimal),
+    /// A `Date` or a `DateTime`, which compare across the two types.
+    DateTime,
+    /// A Time.
+    Time,
+    /// A quantity that does not convert to `'1'`.
+    Quantity,
+    /// A complex element or resource.
+    Node,
+    /// A type description.
+    Type,
+}
+
+/// The bucket of a system value.
+fn bucket(item: &Item<'_>) -> Bucket {
+    match item {
+        Item::Boolean(value) => Bucket::Boolean(*value),
+        Item::String(value) => Bucket::String(value.clone()),
+        Item::Integer(value) => Bucket::Number(Decimal::from(*value).normalize()),
+        Item::Decimal(value) => Bucket::Number(value.normalize()),
+        Item::Date(_) | Item::DateTime(_) => Bucket::DateTime,
+        Item::Time(_) => Bucket::Time,
+        Item::Quantity(value) => match value.convert(&Unit::one()) {
+            Some(number) => Bucket::Number(number.value.normalize()),
+            None => Bucket::Quantity,
+        },
+        Item::Node(_) => Bucket::Node,
+        Item::Type(_) => Bucket::Type,
+    }
+}
+
 /// The distinct items of `items`, the first of each kept in order.
+///
+/// Each item is compared with `=` (N1 §5.1.4) against the kept items of its
+/// bucket only, so a collection of distinct strings or numbers costs a map
+/// lookup per item.
 ///
 /// # Errors
 ///
 /// Returns [`EvalError::Document`] when a node contradicts the model.
 pub fn distinct<'a>(model: &dyn Model, items: Collection<'a>) -> Result<Collection<'a>, EvalError> {
     let mut kept: Collection<'a> = Vec::with_capacity(items.len());
+    let mut buckets: BTreeMap<Bucket, Vec<usize>> = BTreeMap::new();
     for item in items {
-        if !contains(model, &kept, &item)? {
+        // NOTE: N1 §6.1.1 answers empty for an item with no value, so it equals nothing and stays.
+        let Some(key) = system(model, &item)?.as_ref().map(bucket) else {
+            kept.push(item);
+            continue;
+        };
+        let members = buckets.entry(key).or_default();
+        let mut seen = false;
+        for index in members.iter() {
+            if let Some(candidate) = kept.get(*index)
+                && equal(model, candidate, &item)? == Some(true)
+            {
+                seen = true;
+                break;
+            }
+        }
+        if !seen {
+            members.push(kept.len());
             kept.push(item);
         }
     }

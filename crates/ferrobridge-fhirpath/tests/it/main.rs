@@ -17,6 +17,7 @@
 mod check;
 mod conformance;
 mod constraints;
+mod distinct;
 mod evaluate;
 mod ordering;
 mod parse;
