@@ -227,13 +227,3 @@ pub(super) fn forms(field: &'static FieldSchema, object: &Object) -> Vec<Form> {
         }
     }
 }
-
-/// `code` with its first letter in upper case, the suffix a choice form
-/// carries (json.html §2.6.2).
-pub(crate) fn upper_first(code: &str) -> String {
-    let mut chars = code.chars();
-    chars
-        .next()
-        .map(|first| first.to_ascii_uppercase().to_string() + chars.as_str())
-        .unwrap_or_default()
-}

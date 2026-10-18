@@ -63,10 +63,10 @@ pub(super) fn prune(
             Kind::Primitive(_) => {
                 descend(object, &format!("_{}", field.name), "Element", at, dropped);
             }
-            Kind::Choice(variants) => {
-                for (suffix, kind) in variants {
-                    let key = format!("{}{suffix}", field.name);
-                    match kind {
+            Kind::Choice(_) => {
+                for form in field.choices() {
+                    let key = format!("{}{}", field.name, form.suffix);
+                    match form.kind {
                         Kind::Complex(name) => descend(object, &key, name, at, dropped),
                         Kind::Primitive(_) => {
                             descend(object, &format!("_{key}"), "Element", at, dropped);
@@ -98,9 +98,9 @@ fn present(object: &Object, field: &FieldSchema) -> bool {
             || (matches!(kind, Kind::Primitive(_)) && extended(object.get(&format!("_{key}"))))
     };
     match field.kind {
-        Kind::Choice(variants) => variants
-            .iter()
-            .any(|(suffix, kind)| carried(&format!("{}{suffix}", field.name), *kind)),
+        Kind::Choice(_) => field
+            .choices()
+            .any(|form| carried(&format!("{}{}", field.name, form.suffix), form.kind)),
         kind => carried(field.name, kind),
     }
 }

@@ -151,6 +151,14 @@ crates on crates.io.
   sending it, and the validator's `Terminology` trait gains `supports`,
   defaulted.
 
+- `fhirconnect` 0.1.135, the HL7 v2 face and the profile validator name a
+  choice element's JSON members through the element table's
+  `FieldSchema::choices` and `TypeSchema::member` (#813), so the R4
+  json.html §2.6.2 naming rule lives in `fhir-types` alone. Breaking for a
+  consumer of `fhirconnect::tree::element::Move`: `Move::Choice` carries
+  `schema: &'static FieldSchema` in place of `variants`, whose alternatives
+  `schema.choices()` lists.
+
 - The profile validator indexes each Bundle once per validation, its
   entries by `fullUrl` and by their resource, so resolving a reference
   inside a Bundle no longer scans every entry twice (#515). A synthetic

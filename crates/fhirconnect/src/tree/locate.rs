@@ -67,16 +67,13 @@ pub fn locate(document: &Value, resolved: &Resolved, occurrence: &Occurrence) ->
                     held
                 };
             }
-            Move::Choice {
-                ref field,
-                variants,
-            } => {
+            Move::Choice { ref field, schema } => {
                 path.push('.');
                 path.push_str(element_name(field.path()));
                 let held = cursor.and_then(|value| {
-                    variants
-                        .iter()
-                        .find_map(|(suffix, _)| value.get(&format!("{}{suffix}", field.key())))
+                    schema
+                        .choices()
+                        .find_map(|form| value.get(&format!("{}{}", field.key(), form.suffix)))
                 });
                 cursor = if field.repeats() {
                     index_into(&mut path, held, indices.next())

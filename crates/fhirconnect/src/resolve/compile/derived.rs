@@ -5,6 +5,7 @@
 
 use core::str::FromStr;
 
+use fhir_types::schema::Kind;
 use fhir_types::schema::ValueKind;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::ModelPath;
@@ -151,7 +152,10 @@ impl<'a> Compiler<'a> {
             return Some(Derived::Choice { read, write: None });
         }
         let variants = match read.resolved().moves().last() {
-            Some(Move::Choice { variants, .. }) => *variants,
+            Some(Move::Choice { schema, .. }) => match schema.kind {
+                Kind::Choice(variants) => variants,
+                _ => &[],
+            },
             _ => &[],
         };
         let Some(suffix) = derive::alternative(class, variants) else {
@@ -193,7 +197,10 @@ impl<'a> Compiler<'a> {
         path: &ModelPath,
     ) -> Option<Derived> {
         let variants = match fhir.resolved().moves().last() {
-            Some(Move::Choice { variants, .. }) => *variants,
+            Some(Move::Choice { schema, .. }) => match schema.kind {
+                Kind::Choice(variants) => variants,
+                _ => &[],
+            },
             _ => &[],
         };
         let Some(suffix) = derive::suffix_of(code, variants) else {
