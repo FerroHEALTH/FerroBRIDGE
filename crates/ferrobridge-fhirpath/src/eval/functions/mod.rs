@@ -4,6 +4,7 @@
 //! The functions of N1 §5, §7 and §10.2, and the functions FHIR R4 adds
 //! (<https://hl7.org/fhir/R4/fhirpath.html#2.9.1.5>).
 
+mod boundary;
 mod collections;
 mod conversion;
 mod fhir;
@@ -112,6 +113,9 @@ impl<'a> Engine<'_, 'a> {
             args,
             frame,
         };
+        if let Some(result) = boundary::call(&call)? {
+            return Ok(result);
+        }
         if let Some(result) = text::call(&call)? {
             return Ok(result);
         }

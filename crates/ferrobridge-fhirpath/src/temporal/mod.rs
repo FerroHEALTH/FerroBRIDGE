@@ -10,6 +10,7 @@
 //! precision compared as a decimal.
 
 pub mod arithmetic;
+pub mod boundary;
 mod compare;
 pub mod parse;
 

@@ -37,8 +37,7 @@ The default evaluator is FHIRPath N1 2.0.0, the release FHIR R4 cites, so a
 function only a later release defines is an error.
 `Environment::with_fhirpath_stu3_functions` admits the functions FHIRPath
 3.0.0 adds as Standard for Trial Use that `eval::STU3_FUNCTIONS` lists, of
-which `matchesFull()`, `encode()`, `decode()`, `escape()`, `unescape()`,
-`trim()`, `split()` and `join()` are implemented.
+which every function but `sort()` is implemented.
 
 Quantities compare, convert and add across commensurable UCUM units, in the
 more granular of the two, and `toQuantity(unit)` converts to the unit asked

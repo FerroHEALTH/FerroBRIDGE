@@ -121,6 +121,11 @@ fn matches(item: &Item<'_>, expected: &Output) -> Result<bool, String> {
         }
     }
     let text = expected.text.strip_prefix('@').unwrap_or(&expected.text);
+    // N1 §4.1.6: a time literal is written `@T` and the time itself, so the `T` is no part of it.
+    let text = match value {
+        Item::Time(_) => text.strip_prefix('T').unwrap_or(text),
+        _ => text,
+    };
     if let (Some(a), Ok(b)) = (number(&value), text.parse::<Decimal>()) {
         return Ok(a == b);
     }
