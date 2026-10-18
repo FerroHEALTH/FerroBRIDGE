@@ -205,6 +205,14 @@ crates on crates.io.
 
 ### Fixed
 
+- A facade read, vread or search whose stored composition the engine refuses
+  to render answers `500` with an `OperationOutcome` whose `issue.code` is
+  `processing`, naming the refusal and never a clinical value (#831). It
+  answered `422` before, the status of a write whose posted content is at
+  fault; a read sends no content, so the failure is the server's (R4
+  http.html §3.1.0.4). The row is `facade::status::OUTBOUND_REFUSED`, with
+  a wire test per path; a write whose content the engine refuses keeps its
+  `422`.
 - `/health/readiness` no longer answers `200` while the server is still
   handing the listener from the boot probe routes to the lanes (#796). When
   the CDR was not ready at boot, a successful retry marked the `startup`

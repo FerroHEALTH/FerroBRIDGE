@@ -24,7 +24,9 @@
 //!   the token endpoint's refusal;
 //! - a CDR `400` on a search query is a `500`, because the bridge wrote the
 //!   AQL, and a CDR `408` on one is a `502`;
-//! - a connect failure or a timeout is a `502`.
+//! - a connect failure or a timeout is a `502`;
+//! - a composition the engine refuses to render on a read, vread or search is
+//!   a `500` with `processing`, because the client sent no content.
 
 use http::StatusCode;
 use openehr_its::rest::client::ClientError;
@@ -194,6 +196,33 @@ pub const INTERNAL: Row = Row {
     openehr: "no CDR call was made",
     fhir: "hl7.org/fhir/R4/http.html, 500 Internal Server Error",
 };
+
+/// A stored composition the engine refuses to render as FHIR.
+///
+/// The CDR answered the read, vread or search with a composition, and the
+/// outbound run refused it (a mapping that cannot carry it, or a produced
+/// resource that breaks a base constraint). The client sent no content and
+/// cannot fix it, so the fault is the server's: a `500` whose
+/// `OperationOutcome` carries `processing` (<https://hl7.org/fhir/R4/http.html>
+/// §3.1.0.4, <https://hl7.org/fhir/R4/valueset-issue-type.html>). A write
+/// whose posted content the engine refuses keeps its `422`.
+pub const OUTBOUND_REFUSED: Row = Row {
+    status: StatusCode::INTERNAL_SERVER_ERROR,
+    issue: IssueType::Processing,
+    openehr: "ehr-codegen.openapi.yaml, composition_get 200 and query-codegen.openapi.yaml 200: the CDR answered",
+    fhir: "hl7.org/fhir/R4/http.html §3.1.0.4, 500; operationoutcome.html, issue-type processing",
+};
+
+/// Returns the answer a read, vread or search gives when the engine refuses
+/// to render the composition the CDR returned.
+///
+/// The diagnostics are the refusal's cause chain, which names the context,
+/// the mapping, the element and the constraint, never a value of either
+/// document.
+#[must_use]
+pub fn of_outbound_refusal(error: &fhirconnect::engine::traverse::error::EngineError) -> Answer {
+    Answer::new(OUTBOUND_REFUSED, crate::facade::outcome::chain(error))
+}
 
 /// What the facade answers, with the row that decided it.
 #[derive(Debug, Clone)]
