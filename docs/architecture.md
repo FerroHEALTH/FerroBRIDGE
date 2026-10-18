@@ -204,7 +204,7 @@ default branch.
 | HL7 v2-to-FHIR guide | `hl7.fhir.uv.v2mappings` 1.0.0 (FHIR 4.0.1; package CC0-1.0, repository `HL7/v2-to-fhir` Apache-2.0, tag `1.0.0` at `873b331b`) | the machine-readable v2-to-R4 corpus (263 ConceptMaps) the HL7 v2 face executes (#251); vendored as the sixth FHIR package (#252) |
 | HL7 v2 definitions | `HL7/v2ig` `input/sourceOfTruth` at `3adcdbfff654ccbff5cd33aa34bd909a087e8e19` (1694 files, v2.9.1-derived logical StructureDefinitions; no LICENSE, the v2+ page licenses copying "for internal purposes only") | the generator input for the v2 message-structure table (#253); fetched at build time into an ignored directory and never committed, per the redistribution rule; the owner holds the HL7 membership condition |
 | HL7 v2 legacy tables | `usnistgov/igamt-hl7Tools-service` `src/main/resources/hl7db` at `83322dffdac18cb129a1bd80149f5439cf5686fd` (169 files, the NIST IGAMT export of HL7's v2 database for versions 2.1 to 2.8.2; no LICENSE, HL7's content) | the generator input for the structures v2.9.1 withdrew (#303); fetched at build time into an ignored directory and never committed, on the same terms as the definitions |
-| openEHR ITS-REST | 1.1.0 (OpenAPI at `openEHR/specifications-ITS-REST` tag `Release-1.1.0`, commit `24058992`; each document declares CC-BY-ND-3.0 in `info.license` while the repository's `LICENSE` file is Apache-2.0, both recorded in the provenance; modules EHR, Query and Definition, `STABLE`) | the released REST API a conformant CDR speaks; Admin and Demographic are `x-status: DEVELOPMENT` in the same release; the bridge depends on Demographic only behind a feature labelled DEVELOPMENT (section 15, #470); every tagged OAS file says `info.version: latest`, so provenance records tag and blob |
+| openEHR ITS-REST | 1.1.0 (OpenAPI at `openEHR/specifications-ITS-REST` tag `Release-1.1.0`, commit `24058992`; each document declares CC-BY-ND-3.0 in `info.license` while the repository's `LICENSE` file is Apache-2.0, both recorded in the provenance; modules Overview, System, EHR, Query and Definition, `STABLE`) | the released REST API a conformant CDR speaks; Admin and Demographic are `x-status: DEVELOPMENT` in the same release; the bridge depends on Demographic only behind a feature labelled DEVELOPMENT (section 15, #470); every tagged OAS file says `info.version: latest`, so provenance records tag and blob |
 | `openehr-base` | 0.0.87 (minor line 0.0; Apache-2.0) | the RM foundation types, including partial ISO 8601 dates (section 3); the line moved from 0.0.61 to 0.0.64 between passes, to 0.0.69 on 2026-09-24, to 0.0.71 on 2026-09-25 and to 0.0.72 the same day, to 0.0.84 on 2026-10-05, to 0.0.86 on 2026-10-15, and to 0.0.87 on 2026-10-16, the line the federation gateway pins, with no change to the surfaces named here |
 | `openehr-rm` | 0.0.87 (Apache-2.0) | the RM 1.1.0 model, its canonical JSON codec and the BASE path parser |
 | `openehr-its` | 0.0.87 (Apache-2.0) | the ITS wire layer: the OPT 1.4 codec, the canonical JSON and XML codecs, the ITS-REST 1.1.0 data types; the bridge takes `default-features = false` with `opt14`, `json` and `rest` (the DTOs without axum), and #285 adds `rest-client`, whose 0.0.72 commit headers, `4xx` error bodies and `SecretString` credentials the CDR client takes as they stand (#293) |
@@ -212,7 +212,7 @@ default branch.
 | `openehr-query` | 0.0.87 (BUSL-1.1) | the AQL 1.1.0 parser and canonical printer. `openehr-term` (Apache-2.0 AND CC-BY-SA-3.0) and `openehr-lang` arrive transitively |
 | `openehr-am` | 0.0.87 (Apache-2.0) | the generated AM 2.4 model: the AOM2 `OPERATIONAL_TEMPLATE` and `ARCHETYPE_HRID` types an ADL 2 template decodes into (section 3); taken directly because the bridge names those types |
 | `openehr-adl` | not taken in the first cut (0.0.87, BUSL-1.1) | the ADL 2 text parser, flattener and OPT2 generator; the bridge fetches an ADL 2 template as AOM2 canonical JSON, so it never parses ADL source (section 3); taken later only if a CDR serves ADL 2 templates as text alone |
-| `fhir-types` | 0.1.121 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
+| `fhir-types` | 0.1.122 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
 | openFHIR, the FHIRconnect reference engine | 3.0.1 (2026-09-09), read for behaviour only | never an oracle; section 4.4 records the 3.0.0 behaviour changes and what the bridge takes |
 | Eos, the OMOCL reference engine | 0.0.62 (2024-03-20), last commit 2026-03-09 | never an oracle; dormant, so its behaviour is prior art with no expected movement |
 | FHIR terminology operations | R4, R4B tolerant | `CodeSystem/$lookup`, `ConceptMap/$translate`, `ValueSet/$validate-code`; a server may answer R4 or R4B; the reference server selects the version by path (section 6) |
@@ -744,6 +744,25 @@ ours:
   unit (section 9). What survives as a warning is the declared set (defaulted
   composition fields, `unidirectional` skips, fields the program lists as
   unmapped), and that set is asserted exactly by the round-trip tests.
+- **A produced FHIR document is held to the base constraints a mapping can
+  break before it leaves the engine** (#651). An error-severity constraint is
+  "a rule that all resources must conform to" (R4 conformance-rules.html
+  §2.1.0.6), and a context can produce a breach the decoder never reads: an
+  `extensionUrl` manual whose `extensionValue` wrote nothing left a url-only
+  extension on every KDS diagnosis read (#629, R4 `ext-1`). `to_fhir` checks
+  the resource it maps and every resource it creates through
+  `engine::invariant`, and a breach refuses the unit as
+  `EngineError::Invariant`, naming the constraint key and the instance path,
+  so the facade read and the operations lane both refuse it. **Decision:
+  targeted structural checks, one per constraint key, starting with `ext-1`,
+  rather than FHIRPath evaluation of the core constraints through
+  `ferrobridge-fhirpath`.** The constraint expressions live in the core
+  package's StructureDefinitions, which the server does not load at run time
+  (the element table carries no constraints), and evaluating them per read
+  would bring the profile validator's package set into the read path. A
+  check is added when a mapping can produce its breach; holding output to the
+  whole constraint set is the profile validator's job (section 4.9). No
+  specification governs where the check runs: our own design.
 
 ### 4.5 The FHIR path model
 
@@ -872,6 +891,11 @@ expression is a load error: the reference CDR's connector let `where()` and
   and is never turned into a `403`; a CDR `405` or `415` is a facade `500`,
   because it means the bridge chose a call the CDR does not offer; any CDR
   `5xx` is a `502` carrying the upstream status, never an empty Bundle. A
+  composition the CDR answered and the engine refuses to render on a read,
+  vread or search is a `500` with `issue.code` `processing` naming the
+  refusal and never a value (#831): the client sent no content and cannot
+  fix it (R4 http.html §3.1.0.4), while a write whose posted content the
+  engine refuses keeps its `422`. A
   disabled facade has no route, so it answers `404`, never `403`: capability
   is not authorisation.
 - **Two error vocabularies never mix on one wire.** Everything the facade
@@ -1250,7 +1274,7 @@ because no concept exists. The reference engine has not moved since
   default-filled dates as a documented failure mode).
 - **The batch path is the conformant baseline; a change feed is an adapter.**
   ITS-REST 1.1.0 defines no change notification, subscription or bulk export
-  (verified over the three `STABLE` OpenAPI documents). The reference CDR
+  (verified over the five `STABLE` OpenAPI documents). The reference CDR
   publishes every commit through a transactional outbox to AMQP as its own
   extension, and its planned secondary-use read model (its issue #3160) names
   OMOP CDM as a target fed from that stream. FerroBRIDGE's incremental mode is
@@ -1960,8 +1984,9 @@ facade, the operations and the ETL runner.
 FHIRconnect schemas; the draft REST API chapter and its FSH operation
 definitions at the pinned pull-request commit; the FHIRconnect mapping
 library; the OMOCL corpus; the CDM CSV definitions and PostgreSQL DDL; the
-three `STABLE` ITS-REST OpenAPI documents (read by the client's contract
-tests); the seven HL7 packages the FHIR generator reads; and, when a context
+five `STABLE` ITS-REST OpenAPI documents (Overview, System, EHR, Query
+and Definition, each checked `STABLE` by the corpus test); the seven HL7
+packages the FHIR generator reads; and, when a context
 targeting it is authored, the HL7 Europe and MII profile packages of section
 4.8, each pinned by version in `docs/VERSIONS.md`.
 

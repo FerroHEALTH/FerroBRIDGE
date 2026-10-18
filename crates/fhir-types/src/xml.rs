@@ -386,6 +386,24 @@ fn in_namespace(reader: &NsReader<&[u8]>, start: &BytesStart<'_>, namespace: &st
     )
 }
 
+/// Refuses `start`, an element the reader has just read, at the child `name`
+/// of `path` when its prefix has no namespace declaration in scope
+/// ([`unbound_prefix`]).
+fn refuse_unbound_element(
+    reader: &NsReader<&[u8]>,
+    start: &BytesStart<'_>,
+    name: Option<&str>,
+    path: &mut Path,
+) -> Result<(), DecodeError> {
+    let ResolveResult::Unknown(prefix) = reader.resolver().resolve_element(start.name()).0 else {
+        return Ok(());
+    };
+    match name {
+        Some(name) => path.with(name, |path| Err(unbound_prefix(&prefix, path))),
+        None => Err(unbound_prefix(&prefix, path)),
+    }
+}
+
 /// Reads one resource element.
 ///
 /// A root or nested resource element outside the FHIR namespace is refused
@@ -400,6 +418,7 @@ fn read_resource(
     path: &mut Path,
 ) -> Result<Object, DecodeError> {
     let name = local_name(start.name().as_ref());
+    refuse_unbound_element(reader, start, None, path)?;
     let schema = schemas
         .type_named(&name)
         .filter(|_| schemas.is_resource(&name))
@@ -424,10 +443,12 @@ fn read_resource(
 ///
 /// FHIR's own attributes (`value`, `id`, `url`) are unprefixed; a prefixed
 /// attribute is read only when its prefix resolves to the FHIR namespace, and
-/// one in any other namespace, or under a prefix with no binding in scope, is
-/// refused as [`DecodeErrorKind::UnknownProperty`] at its local name: "the
+/// one in any other namespace is refused as
+/// [`DecodeErrorKind::UnknownProperty`] at its local name: "the
 /// only other namespace that occurs in FHIR resources is the XHTML namespace"
-/// (R4 xml.html §2.6.1), and XHTML belongs only inside the narrative.
+/// (R4 xml.html §2.6.1), and XHTML belongs only inside the narrative. One
+/// under a prefix with no declaration in scope is malformed XML before any of
+/// that ([`unbound_prefix`]).
 fn attribute(
     reader: &NsReader<&[u8]>,
     attribute: Result<Attribute<'_>, quick_xml::events::attributes::AttrError>,
@@ -452,7 +473,10 @@ fn attribute(
     match reader.resolver().resolve_attribute(QName(key)).0 {
         ResolveResult::Unbound => {}
         ResolveResult::Bound(Namespace(bound)) if bound == FHIR_NAMESPACE => {}
-        ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+        ResolveResult::Unknown(prefix) => {
+            return path.with(&local_name(key), |path| Err(unbound_prefix(&prefix, path)));
+        }
+        ResolveResult::Bound(_) => {
             return path.with(&local_name(key), |path| {
                 Err(path.error(DecodeErrorKind::UnknownProperty))
             });
@@ -701,6 +725,7 @@ fn read_child(
     collector: &mut Collector,
 ) -> Result<(), DecodeError> {
     let name = local_name(child.name().as_ref());
+    refuse_unbound_element(reader, child, Some(&name), path)?;
     // NOTE: R4 xml.html §2.6.1: "FHIR elements are always in the namespace
     // http://hl7.org/fhir"; the narrative `div` is XHTML and `read_xhtml` reads it.
     let field = field_of(schema, &name)
@@ -836,6 +861,7 @@ fn read_extension(
     index: usize,
 ) -> Result<Object, DecodeError> {
     let name = local_name(child.name().as_ref());
+    refuse_unbound_element(reader, child, Some(&name), path)?;
     if name != "extension" || !in_namespace(reader, child, FHIR_NAMESPACE) {
         return path.with(&name, |path| {
             Err(path.error(DecodeErrorKind::UnknownElement))
@@ -1088,8 +1114,8 @@ fn write_xhtml_tag(
     Ok(())
 }
 
-/// The refusal of a narrative element or attribute name whose prefix has no
-/// namespace declaration in scope.
+/// The refusal of an element or attribute name, in the resource or in its
+/// narrative, whose prefix has no namespace declaration in scope.
 ///
 /// Such a document is not namespace-well-formed: "The namespace prefix,
 /// unless it is `xml` or `xmlns`, MUST have been declared in a namespace

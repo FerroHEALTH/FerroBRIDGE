@@ -65,7 +65,7 @@ name: ferrobridge
 
 services:
   ferrobridge:
-    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.7}
+    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.8}
     container_name: ferrobridge
     restart: unless-stopped
     ports:
@@ -166,7 +166,7 @@ services:
   #
   #   docker compose --profile cdm run --rm cdm-init
   cdm-init:
-    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.7}
+    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.8}
     profiles: [cdm]
     command: ["cdm", "init"]
     restart: "no"
@@ -193,7 +193,7 @@ services:
   # TODO(#233): `vocab load` exits 2 today naming that issue, so this service is
   # the shape the job runs in rather than a working load.
   vocab-load:
-    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.7}
+    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.8}
     profiles: [vocab]
     command: ["vocab", "load", "/vocabulary", "--schema", "cdm"]
     restart: "no"
@@ -243,7 +243,7 @@ services:
   # token: turn on its [auth] section, and [operator] for the mapping files.
   # The image's own HEALTHCHECK runs the binary's `healthcheck` subcommand.
   viewer:
-    image: ghcr.io/ferrohealth/ferrobridge-viewer:${FERROBRIDGE_VERSION:-0.0.7}
+    image: ghcr.io/ferrohealth/ferrobridge-viewer:${FERROBRIDGE_VERSION:-0.0.8}
     profiles: [viewer]
     restart: unless-stopped
     depends_on:

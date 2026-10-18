@@ -40,6 +40,8 @@ pub mod family;
 
 pub mod fhir;
 
+pub mod invariant;
+
 pub mod lens;
 
 pub mod origin;

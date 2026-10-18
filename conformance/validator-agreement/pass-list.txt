@@ -1,0 +1,10 @@
+01-patient-conforming
+02-patient-gender-outside-its-required-binding
+03-patient-contact-breaking-pat-1
+04-observation-conforming
+05-observation-breaking-obs-6
+06-patient-eu-core-conforming
+07-patient-eu-core-without-its-birth-date
+08-eps-bundle-conforming
+10-eps-bundle-patient-without-its-birth-date
+total 10

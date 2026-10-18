@@ -14,6 +14,7 @@
     reason = "test assertions"
 )]
 
+mod agreement;
 mod bindings;
 mod bundles;
 mod cardinality;

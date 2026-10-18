@@ -47,6 +47,7 @@ use openehr_mapping_core::index::paths::FlatId;
 
 use crate::engine::context::CallContext;
 use crate::engine::family;
+use crate::engine::invariant;
 use crate::engine::origin::Origin;
 use crate::engine::outcome::Location;
 use crate::engine::outcome::Outcome;
@@ -308,7 +309,10 @@ pub fn to_openehr<T: Table + ?Sized>(
 /// # Errors
 ///
 /// Returns [`EngineError::NotApplicable`] when the program's own
-/// `openehrCondition` does not hold over the composition, and [`EngineError`]
+/// `openehrCondition` does not hold over the composition,
+/// [`EngineError::Invariant`] when the produced resource or one it created
+/// breaks a constraint [`crate::engine::invariant::check`] holds it to, and
+/// [`EngineError`]
 /// for any element the program cannot map.
 pub fn to_fhir<T: Table + ?Sized>(
     program: &Program,
@@ -336,6 +340,12 @@ pub fn to_fhir<T: Table + ?Sized>(
         &Binding::default(),
     )?;
     let created = core::mem::take(&mut run.created);
+    for document in core::iter::once(&run.fhir).chain(&created) {
+        invariant::check(document).map_err(|breach| EngineError::Invariant {
+            context: String::from(program.context().as_str()),
+            breach,
+        })?;
+    }
     Ok(Outcome::new(run.fhir, run.warnings).with_created(created))
 }
 

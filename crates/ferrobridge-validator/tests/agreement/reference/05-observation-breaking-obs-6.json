@@ -1,0 +1,11 @@
+{
+  "validator": "HL7 FHIR Validator",
+  "issues": [
+    {
+      "severity": "error",
+      "location": "Observation",
+      "rule": "constraint:obs-6",
+      "text": "Constraint failed: obs-6: 'dataAbsentReason SHALL only be present if Observation.value[x] is not present'"
+    }
+  ]
+}

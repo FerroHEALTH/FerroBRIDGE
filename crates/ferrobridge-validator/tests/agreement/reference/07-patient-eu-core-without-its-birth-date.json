@@ -1,0 +1,11 @@
+{
+  "validator": "HL7 FHIR Validator",
+  "issues": [
+    {
+      "severity": "error",
+      "location": "Patient",
+      "rule": "Validation_VAL_Profile_Minimum",
+      "text": "Patient.birthDate: minimum required = 1, but only found 0 (from http://hl7.eu/fhir/base/StructureDefinition/patient-eu-core|2.0.1)"
+    }
+  ]
+}

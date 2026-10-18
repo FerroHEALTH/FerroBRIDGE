@@ -25,6 +25,51 @@ crates on crates.io.
 
 ### Added
 
+- The ITS-REST 1.1.0 Overview and System OpenAPI documents are vendored
+  beside EHR, Query and Definition (#478). All five are `x-status: STABLE`
+  at tag `Release-1.1.0`. The Overview defines the common headers the CDR
+  client sends (`openehr-version`, `openehr-audit-details`,
+  `openehr-template-id`), and System defines the `OPTIONS /` capability call.
+  `scripts/vendor/its-rest.sh` fetches and checks all five, and the corpus
+  test reads each.
+### Changed
+
+- `scripts/vendor/profile-packages.sh` hashes a profile package tree once
+  (#840): the count and digest of a verified tree are stamped under the
+  ignored `target/` with a fingerprint of its files' sizes and modification
+  and change times, and a run that finds the fingerprint unchanged reads them
+  from the stamp and says so. A changed or added file changes the
+  fingerprint and the tree is hashed again; the pin is compared on every run.
+  A second run over the 17 trees takes about 2 seconds instead of about 3
+  minutes. `.gitignore` refuses the `*.pending-snap` and `*.snap.new` files
+  insta writes (#839).
+
+## [0.0.8] - 2026-10-18
+
+### Added
+
+- The R4 profile validator is held to the HL7 FHIR Validator 6.10.4 on a
+  synthetic corpus, the `validator-agreement` conformance corpus (#442): ten
+  cases (conforming resources, and resources that break one invariant, one
+  required binding, one profile cardinality, one slice and one entry
+  profile, the EU ones against `patient-eu-core` and `bundle-eu-eps`), the
+  reference outcomes recorded beside them, and
+  `scripts/vendor/hl7-validator-agreement.sh`, which fetches the jar and the
+  packages it loads by sha256 from the new "HL7 FHIR Validator" table of
+  `docs/VERSIONS.md` and regenerates the outcomes offline. Nine of ten agree;
+  the tenth is adjudicated in the test (the reference indexes a Bundle entry
+  off by one, FHIRPath N1 §5.3.1).
+
+- `fhirconnect` 0.1.136 holds every FHIR resource a run out of openEHR
+  produces or creates to R4 `ext-1` before it leaves the engine (#651). An
+  extension with a url and no value, or with a value and nested extensions,
+  refuses the run as the new `EngineError::Invariant`, naming the constraint
+  and the instance path, so a facade read or a `$tofhir` call refuses it
+  instead of answering a resource that breaks an error-severity constraint
+  (R4 conformance-rules.html §2.1.0.6). `engine::invariant` holds the checks,
+  one per constraint key; `docs/architecture.md` §4.4 records why they are
+  targeted checks and not FHIRPath evaluation. A consumer matching
+  `EngineError` exhaustively gains a variant.
 - The operator console has browser journeys, screenshots and a book page
   (#602). The journeys drive headless Chrome through chromedriver with the
   `thirtyfour` WebDriver client against a running bridge (`ferrobridge
@@ -186,6 +231,22 @@ crates on crates.io.
 
 ### Fixed
 
+- A facade read, vread or search whose stored composition the engine refuses
+  to render answers `500` with an `OperationOutcome` whose `issue.code` is
+  `processing`, naming the refusal and never a clinical value (#831). It
+  answered `422` before, the status of a write whose posted content is at
+  fault; a read sends no content, so the failure is the server's (R4
+  http.html §3.1.0.4). The row is `facade::status::OUTBOUND_REFUSED`, with
+  a wire test per path; a write whose content the engine refuses keeps its
+  `422`.
+- `fhir-types` 0.1.122: the XML reader refuses an element or attribute under
+  a prefix with no namespace declaration in scope as `MalformedXml` naming
+  the prefix anywhere in a resource, not only inside the narrative, since
+  such a document is not namespace-well-formed (Namespaces in XML 1.0 §5,
+  Prefix Declared) (#830). Outside the narrative it answered
+  `UnknownProperty` for an attribute and `WrongRoot` for a root before; the
+  refusal stays a refusal and only its kind changes. `fhirconnect` moves to
+  0.1.137 with the requirement.
 - `/health/readiness` no longer answers `200` while the server is still
   handing the listener from the boot probe routes to the lanes (#796). When
   the CDR was not ready at boot, a successful retry marked the `startup`
@@ -3249,7 +3310,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.7...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.8...HEAD
+[0.0.8]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.4...v0.0.5

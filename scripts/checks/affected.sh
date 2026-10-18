@@ -191,6 +191,8 @@ classify() {
     scripts/checks/sqlx-offline.sh) echo "packages omop-cdm" ;;
     # Writes only the vendored FerroPULSE schema the server's tests read.
     scripts/vendor/ferropulse-schemas.sh) echo "packages ferrobridge-server" ;;
+    # Writes only the agreement corpus's reference outcomes the validator's tests read.
+    scripts/vendor/hl7-validator-agreement.sh) echo "packages ferrobridge-validator" ;;
     crates/* | app/* | tools/*) echo member ;;
     *) echo global ;;
   esac
@@ -201,18 +203,24 @@ classify() {
 # where [a, b] in `lib` means b depends on a as a normal or build dependency,
 # in `dev` as a dev-dependency, and in `reads` that b's source names a's
 # directory in a string literal (it reads a's files).
+reads_in() {
+  # Every string literal in a Rust source of the working tree of the
+  # repository at $1 that names a member directory, as `file<TAB>dir`:
+  # tracked and untracked files alike, ignored files left out, so a file not
+  # yet committed reads as it will once it is. The generated trees name none
+  # and are large, so they are left out too.
+  git -C "$1" grep --untracked -oE '"[^"]*(crates|tools|app)/[A-Za-z0-9_-]+' -- '*.rs' \
+    ':(exclude)crates/fhir-types/src' ':(exclude)crates/hl7v2-types/src' \
+    ':(exclude)crates/omop-cdm/src/generated' |
+    sed -E 's#^([^:]*):.*[^A-Za-z0-9_-]((crates|tools|app)/[A-Za-z0-9_-]+)$#\1'$'\t''\2#' |
+    sort -u || true
+}
+
 graph() {
   local metadata reads
   metadata="$(cargo metadata --no-deps --format-version 1 --locked)" ||
     die "cargo metadata failed"
-  # Every string literal in a Rust source that names a member directory, as
-  # `file<TAB>dir`. The generated trees name none and are large, so they are
-  # left out.
-  reads="$(git grep -oE '"[^"]*(crates|tools|app)/[A-Za-z0-9_-]+' -- '*.rs' \
-    ':(exclude)crates/fhir-types/src' ':(exclude)crates/hl7v2-types/src' \
-    ':(exclude)crates/omop-cdm/src/generated' |
-    sed -E 's#^([^:]*):.*[^A-Za-z0-9_-]((crates|tools|app)/[A-Za-z0-9_-]+)$#\1'$'\t''\2#' |
-    sort -u || true)"
+  reads="$(reads_in .)"
   jq -c --arg reads "$reads" '
     .workspace_root as $root
     | [.packages[] | {name, dir: (.manifest_path | ltrimstr($root + "/") | rtrimstr("/Cargo.toml"))}] as $members
@@ -556,6 +564,9 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   check "the FerroPULSE vendor script reaches the server and its journeys" \
     "scripts/vendor/ferropulse-schemas.sh" false \
     "+ferrobridge-server +ferrobridge-testkit -fhir-codegen -ferrobridge-viewer"
+  check "the agreement vendor script reaches the validator" \
+    "scripts/vendor/hl7-validator-agreement.sh" false \
+    "+ferrobridge-validator -fhir-codegen -ferrobridge-viewer"
   check "the console reaches itself and nothing it does not link" \
     "app/ferrobridge-viewer/src/lib.rs" false \
     "+ferrobridge-viewer -fhir-types -openehr-mapping-core -ferrobridge-server"
@@ -602,6 +613,29 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
       failures=$((failures + 1))
     fi
   done
+  # The reads are taken from the working tree: a tracked file and an untracked
+  # one both name a member directory, and an ignored one does not count.
+  local scratch read_lines
+  scratch="$(mktemp -d)"
+  git -C "$scratch" init -q
+  mkdir -p "$scratch/tools/reader/src"
+  printf 'const A: &str = "../../crates/tracked";\n' > "$scratch/tools/reader/src/tracked.rs"
+  printf 'const B: &str = "../../crates/untracked";\n' > "$scratch/tools/reader/src/untracked.rs"
+  printf 'const C: &str = "../../crates/ignored";\n' > "$scratch/tools/reader/src/ignored.rs"
+  printf 'ignored.rs\n' > "$scratch/.gitignore"
+  git -C "$scratch" add .gitignore tools/reader/src/tracked.rs
+  read_lines="$(reads_in "$scratch")"
+  rm -rf "$scratch"
+  for want in tracked untracked; do
+    if ! grep -qx "tools/reader/src/$want.rs"$'\t'"crates/$want" <<<"$read_lines"; then
+      echo "self-test: the $want file's read is missing: '$read_lines'" >&2
+      failures=$((failures + 1))
+    fi
+  done
+  if grep -q "crates/ignored" <<<"$read_lines"; then
+    echo "self-test: an ignored file was read: '$read_lines'" >&2
+    failures=$((failures + 1))
+  fi
   if [ "$failures" -ne 0 ]; then
     die "self-test: $failures check(s) failed"
   fi

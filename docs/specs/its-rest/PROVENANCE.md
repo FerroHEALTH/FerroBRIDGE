@@ -9,15 +9,15 @@ docs/VERSIONS.md and re-run the script.
 
 - Source: <https://github.com/openEHR/specifications-ITS-REST>
 - Pin: tag `Release-1.1.0`, which resolves to commit `24058992d5fa96e8dfbd855d9c133f328387fc09`
-- Fetched: 2026-09-24
+- Fetched: 2026-10-18
 - Upstream licence: the specification content declares `Creative Commons Attribution-NoDerivs 3.0 Unported` in each
   document's `info.license`. The repository's own `LICENSE` file is the
   Apache License 2.0 and is vendored beside this file, so both statements are
   here and neither is assumed.
 - Layout: the upstream paths, unchanged
-- Files: 17
+- Files: 19
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `f9874abc6e3eb4e1d4146707ff41f2114c08104f19ef93058c866f78c22f2354`
+  `PROVENANCE.md` excluded): `82ec7e41eae60182db9b3189da1a05805b38ab7585318c48ce126ec720dece71`
 
 ## Why a blob id per file
 
@@ -26,7 +26,8 @@ carries no release identity of its own. The tag, the commit it resolves to, and
 the git blob id of each file are what identify these bytes
 (docs/architecture.md section 2).
 
-Each of the three is `x-status: STABLE`, which the script checks. The Admin and
+Each of the five (Overview, System, EHR, Query and Definition) is
+`x-status: STABLE`, which the script checks. The Admin and
 Demographic documents of the same release are `x-status: DEVELOPMENT` and are
 not vendored.
 
@@ -41,7 +42,9 @@ families (`master05-rm_mapping.adoc`) are specified there.
 | `LICENSE` | `c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4` | `261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64` |
 | `computable/OAS/definition-codegen.openapi.yaml` | `6c30fe7552ee7fea57ae97e00137f863a0b28a733c27dc4ed97c5ea9bacae930` | `28fec040ff586e0e425bf6c1303716b4c638bb7f` |
 | `computable/OAS/ehr-codegen.openapi.yaml` | `a0e37a217524c5a2c6351d128041c88d1c137fcde106badda05dde8c0269cd5c` | `d18ba6bbb0ac503a62840c0e83d8fdfbb72bf415` |
+| `computable/OAS/overview-codegen.openapi.yaml` | `67761b4b06d6439a146ae04857520dad4bf1bacf448380d265dfff282a7788b9` | `79bd302402949f1b364e0d0f3b3adb3b2ace96ec` |
 | `computable/OAS/query-codegen.openapi.yaml` | `d92e82c9cd6c9c8f6543ea425ea88b11e2fd0b133a1003347d470625d1d19bec` | `0a56228f763f1306a85a1edf4258a3a8a1d07757` |
+| `computable/OAS/system-codegen.openapi.yaml` | `82c8a6583d833da395f7add0961c27f3796c32a55256a01b54e541ad232d4213` | `e815cbe028eaa70ebf21e9536fe657209a5b3bc4` |
 | `docs/simplified_data_template/manifest_vars.adoc` | `ce57e6dc7b29a182074f2045ead7197eb2b4b048438cd29cb43266f314686561` | `a02f2c66dc9cd10ece8be8d6b0d03ad50385ee69` |
 | `docs/simplified_data_template/master.adoc` | `0b590f86097ae634f05db56bf50814ff2a87cfc7a7118e78ae34e2980f9ba9a1` | `33ef9465ebbc0f07d965bce0149f2f740758912e` |
 | `docs/simplified_data_template/master00-amendment_record.adoc` | `96f160d1caa4cf0616c0f53114468801c938f86afa0803654350edc95cbed93c` | `d738d214623ead7649aa944422fce5268d3359b6` |

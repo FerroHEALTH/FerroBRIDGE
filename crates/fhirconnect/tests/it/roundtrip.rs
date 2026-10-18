@@ -120,6 +120,41 @@ pub(crate) fn kds_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn 
     Ok((program, index))
 }
 
+/// Compiles the project context with the text of the project file `file`
+/// passed through `patch`, for a test that reproduces a defect the committed
+/// file no longer carries; the patched copy lives in the returned directory.
+pub(crate) fn kds_program_patched(
+    file: &str,
+    patch: impl FnOnce(String) -> String,
+) -> Result<(Arc<Program>, WebTemplateIndex, tempfile::TempDir), Box<dyn Error>> {
+    let directory = tempfile::tempdir()?;
+    let patched = directory.path().join(file);
+    std::fs::write(&patched, patch(std::fs::read_to_string(project(file))?))?;
+    let files: Vec<String> = PUBLISHED
+        .iter()
+        .map(|published_file| published(published_file))
+        .chain(PROJECT.iter().map(|project_file| {
+            if *project_file == file {
+                patched.to_string_lossy().into_owned()
+            } else {
+                project(project_file)
+            }
+        }))
+        .collect();
+    let set = load_set(files, &StaticMappingCodes::default())
+        .map_err(|diagnostics| render(&diagnostics))?;
+    let index = kds_template()?;
+    let program = compile(
+        &set,
+        &MappingName::new(CONTEXT)?,
+        &index,
+        &SCHEMAS,
+        &StaticMappingCodes::default(),
+    )
+    .map_err(|diagnostics| render(&diagnostics))?;
+    Ok((program, index, directory))
+}
+
 /// Compiles the project context and returns it with the published files it
 /// loads, relative to the vendored library.
 pub(crate) fn kds_chain() -> Result<crate::support::Chain, Box<dyn Error>> {

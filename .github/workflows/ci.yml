@@ -267,6 +267,9 @@ jobs:
         with:
           persist-credentials: false
       - run: bash scripts/checks/versions.sh
+      # The weekly freshness read's own reader of the Chrome for Testing
+      # feed, over fixtures and with no network.
+      - run: bash scripts/checks/pin-freshness.sh --self-test
 
   # The profile validator's package set (#435), fetched at build time and
   # never committed (docs/specs/fhir-packages/hl7.fhir.eu.eps#1.0.0-ballot/

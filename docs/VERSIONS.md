@@ -42,7 +42,7 @@ its pin from this table, and `scripts/checks/versions.sh` reads each vendored
 | OMOCL corpus | `SevKohler/OMOCL` commit `c082db8ed81a062a574a2c058366045f600c2ed7` (grammar `OMOCL/v1.0.0`; the git tag `v1.0.0` carries pre-grammar files) | `docs/architecture.md` §2, `scripts/vendor/omocl.sh`, `docs/specs/omocl/PROVENANCE.md` |
 | OMOP CDM definitions and PostgreSQL DDL | `OHDSI/CommonDataModel` tag `v5.4.3` | `docs/architecture.md` §2, `scripts/vendor/omop-cdm.sh`, `docs/specs/omop-cdm/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of every file it emits |
 | OHDSI Data Quality Dashboard | `OHDSI/DataQualityDashboard` tag `v2.9.0` | `docs/architecture.md` §2 and §11, `scripts/vendor/dqd.sh`, `docs/specs/dqd/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of the `dqd` module it emits, the `DQD_TAG` constant of `omop-cdm` |
-| openEHR ITS-REST OpenAPI | `openEHR/specifications-ITS-REST` tag `Release-1.1.0`, modules EHR, Query, Definition, and the Simplified Formats and Simplified Data Template sources | `docs/architecture.md` §2, `scripts/vendor/its-rest.sh`, `docs/specs/its-rest/PROVENANCE.md` |
+| openEHR ITS-REST OpenAPI | `openEHR/specifications-ITS-REST` tag `Release-1.1.0`, modules Overview, System, EHR, Query, Definition, and the Simplified Formats and Simplified Data Template sources | `docs/architecture.md` §2, `scripts/vendor/its-rest.sh`, `docs/specs/its-rest/PROVENANCE.md` |
 | KDS Diagnose operational template (fixture) | `openFHIR/openfhir` commit `5e4d68007518fcddae1907b333a86f495791aa53` path `core/src/test/resources/kds/diagnose/KDS_Diagnose.opt` sha256 `752483d90c4ba0f0d1e67baacceb67c1f6f698607823f2eebaa876f4f32bd870` | `scripts/vendor/kds-diagnose-opt.sh`, `tools/ferrobridge-testkit/fixtures/opt/kds/PROVENANCE.md` |
 | KDS Person operational template (fixture) | `openFHIR/openfhir` commit `5e4d68007518fcddae1907b333a86f495791aa53` path `core/src/test/resources/kds/person/KDS_Person.opt` sha256 `ef559dde455a36b6282a6f4b2e3ecd4f2e6130acd8be638ce73088739e0bf6c8` | `scripts/vendor/kds-person-opt.sh`, `tools/ferrobridge-testkit/fixtures/opt/kds-person/PROVENANCE.md` |
 | HL7 v2 definitions (v2ig source of truth, never committed) | `HL7/v2ig` commit `3adcdbfff654ccbff5cd33aa34bd909a087e8e19` path `input/sourceOfTruth` files `1694` digest `9a1fb2b974b69f575bcd9b30fa66d2ff7f13ef7869c1350eca7462067e974f93` | `scripts/vendor/v2ig.sh`, `tools/fhir-codegen/vendor/hl7-v2ig/PROVENANCE.md`, the `codegen-drift` job of `.github/workflows/ci.yml` (its cache key) |
@@ -235,7 +235,10 @@ rows are the five versions the set names. Every package depends on
 FHIR packages table above already vendors at
 `tools/fhir-codegen/vendor/hl7.fhir.r4.core/`. Each pin is the version, then
 the file count and tree digest of the unpacked tree, which the script checks
-a download or a cache-restored tree against. `--check` works offline: it reads
+a download or a cache-restored tree against. A tree it has verified is
+stamped under the ignored `target/profile-packages-verified/` with a
+fingerprint of its files' sizes and times, so a later run hashes it again only
+when a file changed. `--check` works offline: it reads
 every `PROVENANCE.md` against its row, verifies every tree on disk, refuses a
 tree with no row, and asserts the closure is complete: every `dependencies`
 entry of every package is itself pinned. It reads the dependencies from a
@@ -268,6 +271,27 @@ target the MII Kerndatensatz modules at 2025.0.0).
 | `hl7.terminology.r4` | 6.3.0 files `4389` digest `67c5e37eee889968f623290df576cf8a24a6de8936c0ad4b14e742b6faf9833f` | `docs/specs/fhir-packages/hl7.terminology.r4#6.3.0/PROVENANCE.md` |
 | `hl7.terminology.r4` | 6.2.0 files `4342` digest `6d074864dff5ce089248b6113b6049b0420b8db1ffbb2837bf4e39847d3e28fe` | `docs/specs/fhir-packages/hl7.terminology.r4#6.2.0/PROVENANCE.md` |
 
+## HL7 FHIR Validator (the agreement corpus's reference, regeneration only, never committed)
+
+The profile validator's agreement corpus (#442) compares it with the HL7 FHIR
+Validator, prior art and never the oracle. The reference outcomes under
+`crates/ferrobridge-validator/tests/agreement/reference/` are committed;
+`scripts/vendor/hl7-validator-agreement.sh` regenerates them, reading the pins
+below, fetching each into the ignored `target/hl7-validator/` and checking its
+sha256 before it runs. The jar comes from the `hapifhir/org.hl7.fhir.core`
+GitHub release of that version; each package is a tarball of the FHIR package
+registry that the validator loads for FHIR 4.0.1 beyond R4 core and the
+profile packages above. Nothing here is read by a build or a test.
+
+| Item | Pin | Repeated in |
+|---|---|---|
+| `validator_cli.jar` | 6.10.4 sha256 `1106b9d58f9e363e47bea7c4fc065841e5fc91fe9d062775c3bfdd212bd653cc` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.fhir.xver-extensions` | 0.1.0 sha256 `f3bb9fa2083402e88a02b41f433655274e8a1cca563211c8f7ba6fd0badf537a` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.terminology` | 7.4.0 sha256 `b321ad4ee1c18798abd8692f45bc86550cffac72ae97413125cfb82f0112c72d` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.fhir.uv.extensions` | 5.3.0 sha256 `6e3a3f9929e05d2b813a3f98fa1ad2f5122fb6b2819fa73e6c5520002fb2c5b0` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.terminology.r5` | 7.1.0 sha256 `473303108b5607aad7b910581739e8bbf3e61a625ed9e739c66e0ca597d4aefe` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.fhir.uv.extensions.r5` | 5.2.0 sha256 `e02fc6eff0f37c1611a35aa93ef9aaa3b55ab7371a5c96f4d2a5834106a13170` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+
 ## Crate line
 
 The library crates are published to crates.io on one crate version line,
@@ -284,7 +308,7 @@ at the line's current value.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `fhir-types` | 0.1.121 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
+| `fhir-types` | 0.1.122 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
 
 ## Language and runtime
 
@@ -306,11 +330,11 @@ toolchain.
 
 The product version is the workspace `version` in the root `Cargo.toml`, which
 every member inherits. The milestone line is 0.0.x, so the first product
-version is 0.0.7.
+version is 0.0.8.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| Product version | 0.0.7 | root `Cargo.toml` `[workspace.package]` `version` (#20), `CITATION.cff` `version` (#18), the `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml` (#22) |
+| Product version | 0.0.8 | root `Cargo.toml` `[workspace.package]` `version` (#20), `CITATION.cff` `version` (#18), the `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml` (#22) |
 
 `CITATION.cff` tracks this row exactly, and the guard compares the two whenever
 `CITATION.cff` exists. Once the root `Cargo.toml` lands, the guard also compares
@@ -429,7 +453,8 @@ Testing release, which `browser-actions/setup-chrome` installs in the
 `journeys (browser)` job of `ci.yml`, so the browser and its driver always
 match. `thirtyfour` 0.37.5 is the newest release older than two weeks on
 2026-10-18, and the Chrome for Testing release is the one FerroFED's journeys
-pin, the newest stable one on 2026-10-14.
+pin, the newest stable one on 2026-10-14. The weekly
+`scripts/checks/pin-freshness.sh` reports a newer Stable release.
 
 For a local run, `scripts/release/journey-tools.sh` installs the same
 release into `target/journey-tools`, where the journeys look first. It takes

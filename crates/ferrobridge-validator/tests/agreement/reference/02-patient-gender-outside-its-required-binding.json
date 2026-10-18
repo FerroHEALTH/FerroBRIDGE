@@ -1,0 +1,17 @@
+{
+  "validator": "HL7 FHIR Validator",
+  "issues": [
+    {
+      "severity": "error",
+      "location": "Patient.gender",
+      "rule": "Terminology_TX_NoValid_16",
+      "text": "The value provided ('unknown-to-the-code-system') was not found in the value set 'AdministrativeGender' (http://hl7.org/fhir/ValueSet/administrative-gender|4.0.1), and a code is required from this value set  (error message = The System URI could not be determined for the code 'unknown-to-the-code-system' in the ValueSet 'http://hl7.org/fhir/ValueSet/administrative-gender|4.0.1'; The provided code '#unknown-to-the-code-system' was not found in the value set 'http://hl7.org/fhir/ValueSet/administrative-gender|4.0.1')"
+    },
+    {
+      "severity": "error",
+      "location": "Patient.gender",
+      "rule": "UNABLE_TO_INFER_CODESYSTEM",
+      "text": "The System URI could not be determined for the code 'unknown-to-the-code-system' in the ValueSet 'http://hl7.org/fhir/ValueSet/administrative-gender|4.0.1'"
+    }
+  ]
+}

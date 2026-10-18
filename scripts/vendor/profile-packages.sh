@@ -15,7 +15,13 @@
 # and digest against the pin. At about 570 MB unpacked the trees are fetched at
 # build time and never committed; only each PROVENANCE.md beside them is. A
 # tree already on disk at its pinned count and digest is kept without a
-# download, so a re-run or a cache-restored tree changes nothing.
+# download, so a re-run or a cache-restored tree changes nothing. Its count and
+# digest are recorded in a stamp under the ignored target/ with a fingerprint
+# of every file's size and its modification and change times to the
+# nanosecond. A later run that finds the fingerprint unchanged reads the count
+# and digest from the stamp instead of hashing the tree again; any changed
+# file changes the fingerprint and the tree is hashed, and the pin is always
+# compared afresh.
 #
 # hl7.fhir.r4.core 4.0.1, a dependency of every package here, is the tree the
 # generator already vendors at tools/fhir-codegen/vendor/hl7.fhir.r4.core and
@@ -48,6 +54,12 @@ registry="https://packages.fhir.org"
 vendor_dir="docs/specs/fhir-packages"
 pins="docs/VERSIONS.md"
 ua="ferrobridge-vendor (scripts/vendor/profile-packages.sh)"
+stamp_dir="${PROFILE_PACKAGES_STAMPS:-target/profile-packages-verified}"
+
+# What stamped_state found: the count and digest, and whether the stamp
+# answered.
+stamped=""
+from_stamp=0
 
 # The packages a dependency may name that another tree of this repository
 # already vendors: `<package>#<version>` and the directory holding its
@@ -81,6 +93,39 @@ tree_state() {
   if [[ -d "$1" ]]; then
     printf '%s %s\n' "$(corpus_file_count "$1")" "$(corpus_tree_digest "$1")"
   fi
+}
+
+# The size, modification time and change time of every file of the tree $1
+# but PROVENANCE.md, hashed: what tells a tree its stamp still describes.
+tree_fingerprint() {
+  local format=(-f '%N %z %Fm %Fc')
+  if stat --version > /dev/null 2>&1; then
+    format=(-c '%n %s %y %z')
+  fi
+  (
+    cd "$1" || exit 1
+    find . -type f ! -name PROVENANCE.md -print0 | LC_ALL=C sort -z |
+      xargs -0 -r stat "${format[@]}" | shasum -a 256 | cut -d' ' -f1
+  )
+}
+
+# Sets stamped to the file count and tree digest of the tree $1, as tree_state
+# answers them: read from the stamp file $2 when its fingerprint still matches
+# the tree (from_stamp=1), computed and stamped otherwise (from_stamp=0).
+stamped_state() {
+  local dir="$1" stamp="$2" fingerprint files digest recorded
+  stamped=""
+  from_stamp=0
+  [[ -d "$dir" ]] || return 0
+  fingerprint="$(tree_fingerprint "$dir")"
+  if [[ -f "$stamp" ]] && read -r files digest recorded < "$stamp" && [[ "$recorded" = "$fingerprint" ]]; then
+    stamped="$files $digest"
+    from_stamp=1
+    return 0
+  fi
+  stamped="$(tree_state "$dir")"
+  mkdir -p "$(dirname "$stamp")"
+  printf '%s %s\n' "$stamped" "$fingerprint" > "$stamp"
 }
 
 # Refuses a reference that is not `<package>#<plain version>`.
@@ -294,7 +339,7 @@ closure_gaps() {
 # The offline check against the pins: every PROVENANCE.md, every fetched tree,
 # no unpinned tree, and the closure.
 check_all() {
-  local rows ref files digest gap failed=0 expected=0 fetched=0 vendored
+  local rows ref files digest gap failed=0 expected=0 fetched=0 stamps=0 vendored
   rows="$(pinned_rows "$pins")"
   [[ -n "$rows" ]] || die "$pins has no Profile packages rows"
   while read -r ref files digest; do
@@ -307,7 +352,9 @@ check_all() {
       failed=1
     elif [[ -d "$vendor_dir/$ref/package" ]]; then
       fetched=$((fetched + 1))
-      if [[ "$(tree_state "$vendor_dir/$ref")" != "$files $digest" ]]; then
+      stamped_state "$vendor_dir/$ref" "$stamp_dir/$ref"
+      [[ "$from_stamp" -eq 0 ]] || stamps=$((stamps + 1))
+      if [[ "$stamped" != "$files $digest" ]]; then
         echo "   $ref: the fetched tree is not at the pinned $files files and digest $digest"
         failed=1
       fi
@@ -323,7 +370,7 @@ check_all() {
   done <<< "$vendored"
   closure_gaps "$vendor_dir" "$reused" || failed=1
   [[ "$failed" -eq 0 ]] || die "the profile package set does not match its pins"
-  say "OK: $expected pins with their provenance, $fetched fetched trees at their count and digest, the closure complete"
+  say "OK: $expected pins with their provenance, $fetched fetched trees at their count and digest ($stamps read from a stamp, unchanged since verified), the closure complete"
 }
 
 # Writes a synthetic package.json for $2#$3 under the vendor directory $1, with
@@ -407,6 +454,25 @@ self_test() {
 PINS
   out="$(pinned_rows "$work/pins.md")"
   [[ "$out" = "example.dep#2.0.0 3 abc" ]] || die "self-test: the pin rows read as '$out'"
+
+  # A stamp answers an unchanged tree, and a changed file is hashed again.
+  mkdir -p "$work/stamped/package"
+  printf 'one\n' > "$work/stamped/package/a.json"
+  local first
+  stamped_state "$work/stamped" "$work/stamps/tree"
+  [[ "$from_stamp" -eq 0 ]] || die "self-test: a tree with no stamp is read from one"
+  first="$stamped"
+  [[ "$first" = "$(tree_state "$work/stamped")" ]] || die "self-test: the first stamped state is not the tree's"
+  stamped_state "$work/stamped" "$work/stamps/tree"
+  [[ "$from_stamp" -eq 1 && "$stamped" = "$first" ]] || die "self-test: an unchanged tree is hashed again"
+  printf 'two\n' >> "$work/stamped/package/a.json"
+  stamped_state "$work/stamped" "$work/stamps/tree"
+  [[ "$from_stamp" -eq 0 ]] || die "self-test: a changed file is read from the stamp"
+  [[ "$stamped" != "$first" && "$stamped" = "$(tree_state "$work/stamped")" ]] \
+    || die "self-test: a changed file keeps the old digest"
+  printf 'three\n' > "$work/stamped/package/b.json"
+  stamped_state "$work/stamped" "$work/stamps/tree"
+  [[ "$from_stamp" -eq 0 ]] || die "self-test: an added file is read from the stamp"
   say "self-test: OK"
 }
 
@@ -444,8 +510,13 @@ while read -r ref files digest; do
   if [[ "$stamp" -eq 0 ]]; then
     grep -qE '^[0-9]+$' <<< "$files" || die "the $ref pin names no file count"
     grep -qE '^[0-9a-f]{64}$' <<< "$digest" || die "the $ref pin names no tree digest"
-    if [[ "$(tree_state "$vendor_dir/$ref")" = "$files $digest" ]]; then
-      echo "   $ref: $files files at digest $digest, kept"
+    stamped_state "$vendor_dir/$ref" "$stamp_dir/$ref"
+    if [[ "$stamped" = "$files $digest" ]]; then
+      if [[ "$from_stamp" -eq 1 ]]; then
+        echo "   $ref: $files files at digest $digest, kept (verified before, unchanged since)"
+      else
+        echo "   $ref: $files files at digest $digest, kept"
+      fi
       continue
     fi
   fi

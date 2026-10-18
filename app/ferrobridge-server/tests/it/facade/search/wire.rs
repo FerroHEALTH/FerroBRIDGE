@@ -339,6 +339,27 @@ async fn a_cdr_failure_maps_through_the_status_table_and_never_to_an_empty_bundl
 }
 
 #[tokio::test]
+async fn a_row_the_outbound_mapping_refuses_is_a_500_naming_no_clinical_value()
+-> Result<(), Box<dyn StdError>> {
+    // NOTE: R4 http.html §3.1.0.4: a search sends no content, so a stored composition the
+    // engine refuses is the server's failure, a `500` with `processing` (#831).
+    let harness = searching().await;
+    mount_rows(
+        &harness.cdr,
+        &[row(VERSION_ONE, &harness.refused_composition())],
+    )
+    .await;
+    let (status, body) = get(&harness, "Condition?patient=p-1").await?;
+    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
+    assert_eq!(Some("processing"), first_issue(&body)["code"].as_str());
+    assert!(
+        !body.to_string().contains(super::super::REFUSED_UNITS),
+        "the outcome names no clinical value: {body}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_row_the_bridge_cannot_read_is_a_502_naming_the_column_alone()
 -> Result<(), Box<dyn StdError>> {
     let harness = searching().await;

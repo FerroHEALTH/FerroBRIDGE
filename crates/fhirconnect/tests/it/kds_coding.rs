@@ -18,6 +18,7 @@ use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::seam::Seams;
+use fhirconnect::engine::traverse::error::EngineError;
 use fhirconnect::engine::traverse::to_fhir;
 use fhirconnect::engine::traverse::to_openehr;
 use fhirconnect::resolve::program::Program;
@@ -28,6 +29,7 @@ use crate::laws;
 use crate::roundtrip::kds_condition;
 use crate::roundtrip::kds_flat;
 use crate::roundtrip::kds_program;
+use crate::roundtrip::kds_program_patched;
 
 /// The ICD-10-GM code system the KDS context names.
 const ICD_10_GM: &str = "http://fhir.de/CodeSystem/bfarm/icd-10-gm";
@@ -165,6 +167,39 @@ fn holds_ext_1(node: &serde_json::Value) -> bool {
         }
         _ => true,
     }
+}
+
+/// The certainty gate the KDS context carries since #629, removed again to
+/// reproduce the defect: the `extensionUrl` manual fires and its sibling
+/// `extensionValue` writes nothing.
+const CERTAINTY_GATE: &str = "                openehrCondition:
+                  targetRoot: \"$openehrRoot\"
+                  targetAttribute: \"data[at0001]/items[at0073]\"
+                  operator: \"not empty\"
+";
+
+#[test]
+fn a_read_that_would_carry_a_url_only_extension_is_refused_naming_ext_1()
+-> Result<(), Box<dyn Error>> {
+    let (program, index, _directory) =
+        kds_program_patched("ferrobridge_kds_problem_diagnose.yml", |text| {
+            text.replacen(CERTAINTY_GATE, "", 1)
+        })?;
+    let error = to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        &coded_in(&index, ICD_10_GM)?,
+        &Seams::default(),
+        &CallContext::new(),
+    )
+    .expect_err("an extension with a url and no value breaks ext-1");
+    let EngineError::Invariant { ref breach, .. } = error else {
+        return Err(format!("expected the ext-1 refusal, got {error}").into());
+    };
+    assert_eq!(breach.key(), "ext-1");
+    assert_eq!(breach.location(), "Condition.code.coding[0].extension[0]");
+    Ok(())
 }
 
 #[test]

@@ -1,0 +1,29 @@
+{
+  "validator": "HL7 FHIR Validator",
+  "issues": [
+    {
+      "severity": "error",
+      "location": "Bundle",
+      "rule": "Validation_VAL_Profile_Minimum_SLICE",
+      "text": "Slice 'Bundle.entry:composition': a matching slice is required, but not found (from http://hl7.eu/fhir/eps/StructureDefinition/bundle-eu-eps|1.0.0-ballot). Note that other slices are allowed in addition to this required slice"
+    },
+    {
+      "severity": "error",
+      "location": "Bundle",
+      "rule": "Validation_VAL_Profile_Minimum_SLICE",
+      "text": "Slice 'Bundle.entry:composition': a matching slice is required, but not found (from http://hl7.org/fhir/uv/ips/StructureDefinition/Bundle-uv-ips|2.0.0). Note that other slices are allowed in addition to this required slice"
+    },
+    {
+      "severity": "error",
+      "location": "Bundle",
+      "rule": "Validation_VAL_Profile_Minimum_SLICE",
+      "text": "Slice 'Bundle.entry:patient': a matching slice is required, but not found (from http://hl7.eu/fhir/eps/StructureDefinition/bundle-eu-eps|1.0.0-ballot). Note that other slices are allowed in addition to this required slice"
+    },
+    {
+      "severity": "error",
+      "location": "Bundle",
+      "rule": "Validation_VAL_Profile_Minimum_SLICE",
+      "text": "Slice 'Bundle.entry:patient': a matching slice is required, but not found (from http://hl7.org/fhir/uv/ips/StructureDefinition/Bundle-uv-ips|2.0.0). Note that other slices are allowed in addition to this required slice"
+    }
+  ]
+}

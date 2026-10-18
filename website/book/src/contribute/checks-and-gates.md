@@ -60,14 +60,14 @@ containers and stops them when it ends.
 ## The conformance pass lists
 
 Neither FHIRconnect nor OMOCL has an external conformance suite, so the corpus
-tests are the instrument. Fourteen corpora are measured, and each keeps a
+tests are the instrument. Fifteen corpora are measured, and each keeps a
 committed pass list under `conformance/<corpus>/pass-list.txt`: one passing
 case id per line, then a `total` line with the corpus size. The HL7 v2
 messages count twice: the vendored sets are the `hl7v2` corpus and the sets
 fetched at build time the `hl7v2-smoke` corpus. HL7's examples package of each
 FHIR version is fetched at build time too, and six corpora read it: one per
 version through the `fhir-types` model (`fhir-stu3`, `fhir-r4`, `fhir-r4b`,
-`fhir-r5`, `fhir-r6`) and the R4 package through the facade (`fhir-r4-facade`). HL7's FHIRPath test suite for R4 counts twice: the tests that call a function FHIRPath 3.0.0 adds as STU are the `fhirpath-r4-stu3` corpus, run with the evaluator's opt-in, and every other test is the `fhirpath-r4` corpus, run as N1 2.0.0.
+`fhir-r5`, `fhir-r6`) and the R4 package through the facade (`fhir-r4-facade`). HL7's FHIRPath test suite for R4 counts twice: the tests that call a function FHIRPath 3.0.0 adds as STU are the `fhirpath-r4-stu3` corpus, run with the evaluator's opt-in, and every other test is the `fhirpath-r4` corpus, run as N1 2.0.0. The R4 profile validator is held to the HL7 FHIR Validator 6.10.4 on a synthetic corpus as `validator-agreement`.
 
 | Corpus | A case passes when |
 |---|---|
@@ -78,6 +78,7 @@ version through the `fhir-types` model (`fhir-stu3`, `fhir-r4`, `fhir-r4b`,
 | HL7 v2 message corpora, HL7 v2 smoke corpora | the message is framed, decoded and parsed with no refusal, and the Bundle the map writes decodes as R4 and opens with its `MessageHeader` (`bdl-12`); an acknowledgment passes when it parses |
 | FHIR STU3, FHIR R4, FHIR R4B, FHIR R5, FHIR R6 | the example decodes through the strict JSON codec of its version, re-encodes to the same document, and goes through the XML codec and back unchanged, compared as the lexical document model (members by name, numbers in their written text); a refusal or the first difference is the failure reason |
 | FHIRPath R4 test suite, N1 and 3.0.0 STU functions | for a test expecting the expression refused (`invalid`), the expression fails to parse, fails the static check against the input's resource type, or fails to evaluate; for any other test, the evaluation answers the expected outputs, in order unless the test says `ordered="false"` (HL7 `tests-fhir-r4.xml`; FHIRPath N1, and the functions FHIRPath 3.0.0 adds as STU for `fhirpath-r4-stu3`) |
+| R4 profile validator, agreement with the HL7 FHIR Validator | the error and fatal findings of `ferrobridge-validator` on the synthetic case equal those the HL7 FHIR Validator 6.10.4 recorded for it, each compared as its location and its rule (an invariant key, a slice a slice cardinality names); a disagreement the owning test adjudicates against the specification is listed as failing with the adjudication as its reason. `scripts/vendor/hl7-validator-agreement.sh` regenerates the recorded outcomes |
 | FHIR R4 facade | for each context that maps the example's type (the suite's and the KDS diagnosis project), the create answers `201` and the read `200`; the read decodes as an R4 instance; no element the example carries comes back with another value (`PutGet`); and a second create and read of the answer gives it back unchanged. The identity, `meta` and the subject are the facade's and leave the comparison. An example of a type no context maps is counted by type under `set_aside` in the result file, never a case |
 
 A case the list records that no longer passes fails the corpus test itself, so
