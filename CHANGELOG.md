@@ -23,6 +23,8 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.8] - 2026-10-18
+
 ### Added
 
 - `fhirconnect` 0.1.136 holds every FHIR resource a run out of openEHR
@@ -3254,7 +3256,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.7...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.8...HEAD
+[0.0.8]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.4...v0.0.5
