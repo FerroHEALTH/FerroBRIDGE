@@ -73,3 +73,8 @@ construction.
   screenshot, captures hover and focus states in light and dark, and says per
   screen what was checked; the orchestrator looks at every screenshot before
   the tag.
+- **The orchestrator signs off the screenshots** (owner, 2026-10-18: "you
+  can decide okay because you can read and validate all the screenshots
+  yourself"). The orchestrator reads every image, has the defects fixed and
+  recaptured, and approves the tag or merge itself without waiting for the
+  owner, who still gets the final set shown.
