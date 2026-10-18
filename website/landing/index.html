@@ -11,7 +11,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>FerroBRIDGE: an openEHR bridge to HL7 FHIR and the OMOP Common Data Model</title>
-  <meta name="description" content="FerroBRIDGE is a pure-Rust, standalone bridge between openEHR and two targets: HL7 FHIR through the FHIRconnect specification, and the OMOP Common Data Model through OMOCL. Mappings are specification-conformant YAML, never hand-coded per resource or table. The project is in its design phase.">
+  <meta name="description" content="FerroBRIDGE is a pure-Rust, standalone bridge between openEHR and two targets: HL7 FHIR through the FHIRconnect specification, and the OMOP Common Data Model through OMOCL. Mappings are specification-conformant YAML, never hand-coded per resource or table. The latest release is v0.0.8.">
   <link rel="canonical" href="https://ferrobridge.eu/">
   <link rel="stylesheet" href="./style.css">
   <link rel="icon" href="./assets/brand/favicon.svg" type="image/svg+xml">
@@ -21,7 +21,7 @@
   <meta property="og:url" content="https://ferrobridge.eu/">
   <meta property="og:site_name" content="FerroBRIDGE">
   <meta property="og:title" content="FerroBRIDGE: an openEHR bridge to HL7 FHIR and the OMOP Common Data Model">
-  <meta property="og:description" content="A pure-Rust, standalone bridge between openEHR and two targets: HL7 FHIR through FHIRconnect, and the OMOP Common Data Model through OMOCL. Mappings are specification-conformant YAML. The project is in its design phase.">
+  <meta property="og:description" content="A pure-Rust, standalone bridge between openEHR and two targets: HL7 FHIR through FHIRconnect, and the OMOP Common Data Model through OMOCL. Mappings are specification-conformant YAML. The latest release is v0.0.8.">
   <meta property="og:image" content="https://ferrobridge.eu/assets/brand/ferrobridge-social.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
@@ -68,7 +68,7 @@
 
     <section class="hero">
       <div class="wrap">
-        <p class="status" role="note">Design phase. No release yet.</p>
+        <p class="status" role="note">Latest release: v0.0.8, 2026-10-18.</p>
         <h1>One bridge from openEHR to HL7 FHIR and to the OMOP Common Data Model.</h1>
         <p class="sub">
           FerroBRIDGE reads FHIRconnect and OMOCL mapping files and runs them
@@ -77,13 +77,15 @@
           nothing is hand-coded per FHIR resource or per OMOP table.
         </p>
         <div class="hero-cta">
-          <a class="btn btn-primary" href="./docs/evaluate/architecture.html">Read the architecture</a>
-          <a class="btn btn-ghost" href="./docs/evaluate/build-order.html">See the build order</a>
+          <a class="btn btn-primary" href="https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest" rel="noopener">Get the latest release</a>
+          <a class="btn btn-ghost" href="./docs/evaluate/architecture.html">Read the architecture</a>
         </div>
         <p class="note">
-          The research pass over the primary sources is done and the design is
-          written down. There is no Cargo workspace and no binary yet, and this
-          page says so rather than describing software you cannot download.
+          Each release ships the <code>ferrobridge</code> binary for Linux, the
+          container image <code>ghcr.io/ferrohealth/ferrobridge</code>, the
+          operator console image, and library crates on crates.io. The
+          repository's <code>compose.yaml</code> starts the bridge with one
+          command.
         </p>
       </div>
     </section>
@@ -171,7 +173,7 @@
 
           <article class="card audience">
             <span class="tag">Operate</span>
-            <h3>What will it need around it?</h3>
+            <h3>What does it need around it?</h3>
             <p>
               An openEHR CDR over ITS-REST, a FHIR terminology server, and for
               the OMOP side a CDM v5.4 database with the OHDSI vocabulary
@@ -204,8 +206,8 @@
             <h3>How is the work organised?</h3>
             <p>
               The tracker is the worklist and the checks are committed scripts
-              you can run yourself. While the project is in its design phase,
-              cited evidence is worth more than speculative code.
+              you can run yourself. Code against an open issue and cited
+              evidence are both welcome.
             </p>
             <ul>
               <li><a href="./docs/contribute/how-the-work-is-organised.html">How the work is organised</a></li>
@@ -226,10 +228,9 @@
         <div class="status-panel">
           <h2>Where the project is</h2>
           <p>
-            The design is written down and the first code milestone is one
-            verbatim round trip per target, on mapping files published upstream.
-            Every issue carries its acceptance criteria, and a release is cut
-            when its milestone has no open issue left.
+            FerroBRIDGE has shipped eight releases on the 0.0.x line, the latest
+            v0.0.8 on 2026-10-18. Every issue carries its acceptance criteria,
+            and a release is cut when its milestone has no open issue left.
           </p>
           <!-- roadmap:begin -->
           <!-- roadmap:end -->
