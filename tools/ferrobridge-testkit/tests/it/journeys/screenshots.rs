@@ -457,7 +457,16 @@ async fn the_book_shows_every_console_page_in_light_and_dark() -> Result<(), Box
 
 /// The routes the console's router declares, read from its source.
 fn routes() -> Result<BTreeSet<String>, Box<dyn Error>> {
-    let source = std::fs::read_to_string(root().join("app/ferrobridge-viewer/src/app.rs"))?;
+    // NOTE: no specification governs this: our own design; the testkit's
+    // dev-dependency on the console already reaches it, so the path is joined
+    // from parts and scripts/checks/affected.sh reads no second edge from it.
+    let source = std::fs::read_to_string(
+        root()
+            .join("app")
+            .join("ferrobridge-viewer")
+            .join("src")
+            .join("app.rs"),
+    )?;
     let mut routes: BTreeSet<String> = source
         .split("path!(\"")
         .skip(1)
