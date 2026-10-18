@@ -52,6 +52,17 @@ crates on crates.io.
   `slice-rejection` information beside the cardinality error (an EPS
   Bundle whose Patient lacks `birthDate` now names `birthDate`).
 
+- The profile validator holds a `Reference` or a `canonical` to its
+  element's `type.versioning` (#514, R4 elementdefinition.html
+  §2.30.0.4.4): under `specific` a REST reference without `_history/[vid]`
+  or a canonical without `|[version]` is a `versioning-mismatch` error,
+  under `independent` one with a version is, and under any rule a
+  `Reference` without a literal `reference` is. A reference that names no
+  FHIR REST server counts as version specific (references.html,
+  `Reference.reference`), so `independent` lists it as unevaluated.
+  `Constraint::Versioning` and the reasons `NotRestfulReference` and
+  `VersioningRule` are new.
+
 - The operator console ships as its own image,
   `ghcr.io/ferrohealth/ferrobridge-viewer` (#603). `docker/viewer/Dockerfile`
   builds it on the bridge image's distroless base, runs as `65532:65532`,
@@ -94,6 +105,19 @@ crates on crates.io.
   to the core definition of the type declaring it (#484), so the core
   bindings, invariants and fixed values of that child apply. Before, a
   partial snapshot left such a child with no element definition at all.
+- `fhir-types` 0.1.119 holds the logical id of every resource to the `id`
+  form, `[A-Za-z0-9\-\.]{1,64}`, in every version (#482). The published
+  definitions type `Resource.id` as `id`
+  (R4 resource-definitions.html#Resource.id), while the R4 4.0.1 package
+  and 123 resource snapshots of the R6 ballot5 package state `string`
+  (upstream report #798). The R4 and R6 element tables now list `id` for
+  every resource's `id`, the generated decoders refuse an R4 or R6 resource
+  whose id has a space, another character outside the form or more than
+  64 characters, and the profile validator reports it as `lexical-form`.
+  A consumer that decoded such a resource before gets a `BadValue` error
+  at `<Type>.id`. One R4 example leaves the `fhir-r4` pass list, a
+  `SearchParameter` whose 67-character id breaks the form.
+  `fhirconnect` moves to 0.1.133 with the requirement.
 
 ## [0.0.7] - 2026-10-17
 

@@ -89,6 +89,12 @@ pub enum Constraint {
         /// The aggregation modes, any of which the reference may take.
         modes: Vec<String>,
     },
+    /// Whether a reference names a version of its target
+    /// (`type.versioning`).
+    Versioning {
+        /// The rule: `either`, `independent` or `specific`.
+        rule: String,
+    },
     /// A profile the instance claims in `meta.profile`.
     ClaimedProfile {
         /// The profile canonical.
@@ -198,6 +204,12 @@ pub enum Reason {
     /// The target of a `canonical` is not resolved: the validator resolves
     /// references to resources only.
     CanonicalTarget,
+    /// The reference names no FHIR REST server, so whether it is version
+    /// specific is assumed rather than read
+    /// (<https://hl7.org/fhir/R4/references.html>, `Reference.reference`).
+    NotRestfulReference,
+    /// The versioning rule is none of the three R4 defines.
+    VersioningRule(String),
     /// The target profile constrains the abstract `Resource` or
     /// `DomainResource`, which the validator holds no resource to beyond
     /// the core definitions.
@@ -295,6 +307,12 @@ impl fmt::Display for Reason {
             }
             Self::NoBundle => f.write_str("no Bundle is around the resource"),
             Self::CanonicalTarget => f.write_str("the target of a canonical is not resolved"),
+            Self::NotRestfulReference => f.write_str(
+                "the reference names no FHIR REST server, so it is assumed version specific",
+            ),
+            Self::VersioningRule(rule) => {
+                write!(f, "the versioning rule {rule} is none R4 defines")
+            }
             Self::AbstractProfile => {
                 f.write_str("a profile on Resource or DomainResource is not validated against")
             }
@@ -607,6 +625,7 @@ fn describe(unevaluated: &Unevaluated) -> String {
         Constraint::Aggregation { modes } => {
             format!("the aggregation {}", modes.join(", "))
         }
+        Constraint::Versioning { rule } => format!("the versioning {rule}"),
         Constraint::ClaimedProfile { url } => format!("the claimed profile {url}"),
         Constraint::ExtensionContext => "the extension context".to_owned(),
         Constraint::ContextInvariant { expression } => {

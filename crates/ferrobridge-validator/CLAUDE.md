@@ -41,7 +41,8 @@ generated model cannot carry what a check needs, that is a generator change
   decides membership in a value set three-valued, `binding` holds a value to
   an element's binding), the resolution seam with its contained-resource and
   Bundle resolvers (`resolver`, bundle.html §2.36.4.1), the target profiles
-  and aggregation of a reference (`reference`), the document rules
+  and aggregation of a reference (`reference`), the versioning a reference
+  takes (`versioning`), the document rules
   (`document`, documents.html §3.3.1), and the invariants (`invariant`: the
   evaluation on each occurrence, the expression and check caches on the
   `Validator`, and `seams`, which fills `resolve()`, `memberOf()` and
@@ -89,7 +90,8 @@ to the latest version by Semantic Versioning precedence, within the
 dependency closure of the package whose definition names it and in the whole
 set when that closure does not carry it; one definition carried
 byte for byte by two packages is no conflict; one canonical carried by two
-versions of one package resolves to the higher package version; a leading byte-order mark is
+versions of one package resolves to the higher package version; a leading
+byte-order mark is
 stripped; a discriminator path may use `ofType()` or `as()` (#443); an item
 matching two slices is an error and counts in the first; an item in no slice
 may sit between ordered open slices; a `@default` slice under rules other
@@ -102,20 +104,29 @@ valueset.html §4.9.5 over the `include.valueSet` definition's "union"); a
 concept's display or a designation exactly and a mismatch is a warning; a
 `deprecated` status under `compose.inactive` false is undecided; an
 ambiguous Bundle reference is an error; a target failing every checked
-target profile is not refused while another is unknown; a target profile check under
+target profile is not refused while another is unknown; a target profile
+check under
 way further up the walk counts as passing (a reference cycle); every
 `meta.profile` claim is validated; the core `Resource` and
 `DomainResource` admit any target; the stylesheet `Binary` of a document is
 one whose `contentType` is `text/css`; an invariant whose expression answers
 empty is listed, neither passed nor failed; an invariant on a choice element
 is checked against every type the base choice admits and evaluated on the
-occurrence named as one of it; a Bundle entry is its own `%rootResource`; an invariant the
+occurrence named as one of it; a Bundle entry is its own `%rootResource`; an
+invariant the
 snapshot repeats is evaluated once per location, key and declaring
 canonical; `resolve()` from the Bundle element reaches entries by an
 absolute reference; an element context naming a type admits that type and
 its specializations, and `Element` admits a resource too; a `url#id` context
 on an element held to no definition deriving from `url`, or on an item in no
-slice of the entry it names a slice of, is undecided; a child a snapshot omits is held to the core definition of the type that declares it; a slice that falls short of its minimum after a validation kept an item out of it (a `profile` discriminator, or no discriminator) names that validation's errors for the rejected item with the fewest, as `slice-rejection` information. Change one only with a citation.
+slice of the entry it names a slice of, is undecided; a child a snapshot
+omits is held to the core definition of the type that declares it; a slice
+that falls short of its minimum after a validation kept an item out of it (a
+`profile` discriminator, or no discriminator) names that validation's errors
+for the rejected item with the fewest, as `slice-rejection` information; a
+reference that names no FHIR REST server (a contained `#id`, a `urn:`) is
+taken as version specific under `type.versioning`, so `specific` admits it
+and `independent` lists it. Change one only with a citation.
 
 ## Tests
 
