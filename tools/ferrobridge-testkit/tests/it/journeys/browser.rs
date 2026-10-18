@@ -6,7 +6,10 @@
 //!
 //! Each session runs through a chromedriver of its own, started on a port
 //! the system picks and stopped with the session, so no journey shares a
-//! driver's listen queue or its lifetime with another run. Only when
+//! driver's listen queue or its lifetime with another run. A chromedriver
+//! that exits because the port it picked is bound already is started again,
+//! and any other exit before it listens fails the session with what it
+//! wrote. Only when
 //! [`WEBDRIVER_ENV`] names an endpoint does a session use that driver
 //! instead.
 //!
@@ -22,6 +25,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
+use tempfile::NamedTempFile;
 use thirtyfour::LoggingPrefsLogLevel;
 use thirtyfour::prelude::*;
 use tokio::io::{AsyncBufReadExt, BufReader, Lines};
@@ -40,6 +44,13 @@ const CHROMEDRIVER: &str = "chromedriver";
 
 /// What chromedriver prints once it listens, before the port it chose.
 const LISTENING: &str = "ChromeDriver was started successfully on port ";
+
+/// What chromedriver logs when the port it picked is bound already.
+const PORT_TAKEN: &str = "Address already in use";
+
+/// How many times a chromedriver is started before a port bound already
+/// fails the session.
+const STARTS: u32 = 5;
 
 /// The environment variable naming the Chrome binary, when it is not the one
 /// in [`installed`], or else the one chromedriver finds itself.
@@ -97,6 +108,19 @@ struct Chromedriver {
     /// Its standard output, held open so a later line never meets a closed
     /// pipe.
     _stdout: Lines<BufReader<ChildStdout>>,
+    /// The file its standard error goes to, read when it exits before it
+    /// listens.
+    _stderr: NamedTempFile,
+}
+
+/// How one start of a chromedriver ended.
+#[derive(Debug)]
+enum Start {
+    /// It listens on the port.
+    Listening(Box<Chromedriver>, u16),
+    /// It exited because the port it picked was bound already, with what it
+    /// wrote.
+    PortTaken(String),
 }
 
 impl Chromedriver {
@@ -107,14 +131,39 @@ impl Chromedriver {
             .map(PathBuf::from)
             .or_else(|| installed().0)
             .unwrap_or_else(|| PathBuf::from(CHROMEDRIVER));
-        let mut command = Command::new(&binary);
+        Self::start_from(&binary).await
+    }
+
+    /// Starts the chromedriver `binary` as [`Chromedriver::start`] does,
+    /// starting it again, at most [`STARTS`] times in all, while it exits
+    /// because the port it picked for itself was bound already.
+    async fn start_from(binary: &Path) -> Result<(Self, String), Box<dyn Error>> {
+        let mut last = String::new();
+        for _ in 0..STARTS {
+            match Self::start_once(binary).await? {
+                Start::Listening(chromedriver, port) => {
+                    return Ok((*chromedriver, format!("http://127.0.0.1:{port}")));
+                }
+                // NOTE: no specification governs this: our own design; chromedriver picks the
+                // port of `--port=0` itself, and a port another process took meanwhile is retried.
+                Start::PortTaken(output) => last = output,
+            }
+        }
+        Err(format!("chromedriver found its port bound already {STARTS} times:\n{last}").into())
+    }
+
+    /// Starts the chromedriver `binary` once and waits until it says it
+    /// listens, or exits.
+    async fn start_once(binary: &Path) -> Result<Start, Box<dyn Error>> {
+        let stderr = NamedTempFile::new()?;
+        let mut command = Command::new(binary);
         #[cfg(unix)]
         command.process_group(0);
         let mut child = command
             .arg("--port=0")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(Stdio::from(stderr.reopen()?))
             .kill_on_drop(true)
             .spawn()
             .map_err(|error| {
@@ -128,21 +177,39 @@ impl Chromedriver {
             .take()
             .ok_or("chromedriver's standard output")?;
         let mut lines = BufReader::new(stdout).lines();
+        let mut written = Vec::new();
         let port = tokio::time::timeout(WAIT, async {
             while let Some(line) = lines.next_line().await? {
                 if let Some(port) = line.strip_prefix(LISTENING) {
-                    return Ok(port.trim_end_matches('.').parse::<u16>()?);
+                    return Ok::<Option<u16>, Box<dyn Error>>(Some(
+                        port.trim_end_matches('.').parse::<u16>()?,
+                    ));
                 }
+                written.push(line);
             }
-            Err::<u16, Box<dyn Error>>("chromedriver exited before it listened".into())
+            Ok(None)
         })
         .await
         .map_err(|_elapsed| format!("chromedriver never listened within {WAIT:?}"))??;
-        let chromedriver = Self {
-            child,
-            _stdout: lines,
-        };
-        Ok((chromedriver, format!("http://127.0.0.1:{port}")))
+        if let Some(port) = port {
+            let chromedriver = Self {
+                child,
+                _stdout: lines,
+                _stderr: stderr,
+            };
+            return Ok(Start::Listening(Box::new(chromedriver), port));
+        }
+        tokio::time::timeout(WAIT, child.wait())
+            .await
+            .map_err(|_elapsed| {
+                format!("chromedriver closed its output and never exited within {WAIT:?}")
+            })??;
+        written.push(std::fs::read_to_string(stderr.path())?);
+        let output = written.join("\n");
+        if output.contains(PORT_TAKEN) {
+            return Ok(Start::PortTaken(output));
+        }
+        Err(format!("chromedriver exited before it listened:\n{output}").into())
     }
 }
 
@@ -368,4 +435,98 @@ where
     };
     browser.quit().await?;
     outcome
+}
+
+/// Fake chromedrivers: shell scripts that answer `--port=0` the way
+/// chromedriver does, to hold the start to its retry rule without a browser.
+#[cfg(unix)]
+mod fake {
+    use std::error::Error;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::{Path, PathBuf};
+
+    use super::Chromedriver;
+    use super::STARTS;
+
+    /// Writes the script `body` as an executable `chromedriver` in `dir`.
+    fn script(dir: &Path, body: &str) -> Result<PathBuf, Box<dyn Error>> {
+        let path = dir.join("chromedriver");
+        std::fs::write(&path, format!("#!/bin/sh\n{body}"))?;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))?;
+        Ok(path)
+    }
+
+    /// How many times a script in `dir` ran, by the lines it appended to
+    /// `runs`.
+    fn runs(dir: &Path) -> Result<usize, Box<dyn Error>> {
+        Ok(std::fs::read_to_string(dir.join("runs"))?.lines().count())
+    }
+
+    /// A script that counts its runs, finds its port bound on the first
+    /// `taken` of them, and listens on port 4444 after.
+    fn taken_then_listening(dir: &Path, taken: u32) -> Result<PathBuf, Box<dyn Error>> {
+        let runs = dir.join("runs");
+        script(
+            dir,
+            &format!(
+                "echo run >> '{runs}'\n\
+                 if [ \"$(wc -l < '{runs}')\" -le {taken} ]; then\n\
+                 echo '[1.0][SEVERE]: bind() failed: Address already in use (98)' >&2\n\
+                 exit 1\n\
+                 fi\n\
+                 echo 'ChromeDriver was started successfully on port 4444.'\n\
+                 exec sleep 30\n",
+                runs = runs.display()
+            ),
+        )
+    }
+
+    #[tokio::test]
+    async fn a_port_bound_already_starts_chromedriver_again() -> Result<(), Box<dyn Error>> {
+        let dir = tempfile::tempdir()?;
+        let binary = taken_then_listening(dir.path(), 2)?;
+        let (chromedriver, endpoint) = Chromedriver::start_from(&binary).await?;
+        drop(chromedriver);
+        assert_eq!(endpoint, "http://127.0.0.1:4444");
+        assert_eq!(runs(dir.path())?, 3);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn a_port_bound_on_every_start_fails_after_the_last() -> Result<(), Box<dyn Error>> {
+        let dir = tempfile::tempdir()?;
+        let binary = taken_then_listening(dir.path(), STARTS)?;
+        let error = Chromedriver::start_from(&binary)
+            .await
+            .expect_err("every start finds its port bound");
+        assert!(
+            error.to_string().contains("Address already in use"),
+            "{error}"
+        );
+        assert_eq!(runs(dir.path())?, usize::try_from(STARTS)?);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn another_early_exit_fails_at_once_with_its_output() -> Result<(), Box<dyn Error>> {
+        let dir = tempfile::tempdir()?;
+        let runs_file = dir.path().join("runs");
+        let binary = script(
+            dir.path(),
+            &format!(
+                "echo run >> '{}'\necho 'no Chrome binary' >&2\nexit 1\n",
+                runs_file.display()
+            ),
+        )?;
+        let error = Chromedriver::start_from(&binary)
+            .await
+            .expect_err("chromedriver exits before it listens");
+        let message = error.to_string();
+        assert!(
+            message.contains("exited before it listened") && message.contains("no Chrome binary"),
+            "{message}"
+        );
+        assert_eq!(runs(dir.path())?, 1);
+        Ok(())
+    }
 }
