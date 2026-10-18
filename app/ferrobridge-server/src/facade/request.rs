@@ -14,6 +14,8 @@ use fhir_types::codec::Value;
 use crate::facade::identity::ExternalResourceId;
 use crate::facade::identity::IdError;
 use crate::facade::identity::PersonId;
+use crate::facade::subject::SubjectError;
+use crate::facade::subject::SubjectLink;
 
 /// The resource type that is the subject of its own EHR.
 const PATIENT: &str = "Patient";
@@ -99,6 +101,13 @@ pub enum RequestError {
         /// What the identifier's constructor reported.
         #[source]
         source: IdError,
+    },
+    /// The literal subject reference does not fit the configured subject link.
+    #[error("the subject reference does not fit the configured subject link")]
+    Link {
+        /// What the link reported.
+        #[source]
+        source: SubjectError,
     },
 }
 
@@ -237,8 +246,8 @@ impl Inbound {
     /// namespace, the pair the ITS-REST EHR lookup takes
     /// (`ehr-codegen.openapi.yaml`, `ehr_get_by_subject`). A
     /// `subject.identifier` carries both halves; a literal
-    /// `subject.reference` carries one, so `fallback` is the namespace a
-    /// deployment gives its own references. A `Patient` is the subject itself
+    /// `subject.reference` is read through `link`, which gives the namespace a
+    /// deployment gives its own references and the form of the id. A `Patient` is the subject itself
     /// and is keyed as `person_by_identifier` keys it. No specification
     /// fixes the mapping from a FHIR subject to an openEHR subject: our own
     /// design.
@@ -246,8 +255,10 @@ impl Inbound {
     /// # Errors
     ///
     /// Returns [`RequestError::NoSubject`] when the resource names none and
-    /// [`RequestError::Subject`] when the value cannot be a person key.
-    pub fn subject(&self, fallback: &str) -> Result<PersonId, RequestError> {
+    /// [`RequestError::Subject`] when the value cannot be a person key, and
+    /// [`RequestError::Link`] when a literal reference does not fit `link`.
+    pub fn subject(&self, link: &SubjectLink) -> Result<PersonId, RequestError> {
+        let fallback = link.namespace();
         let named = self
             .document
             .get("subject")
@@ -275,16 +286,30 @@ impl Inbound {
             .get("reference")
             .and_then(Value::as_str)
             .ok_or(RequestError::NoSubject)?;
-        PersonId::new(fallback, literal).map_err(|source| RequestError::Subject { source })
+        link.person_of_reference(literal)
+            .map_err(|source| RequestError::Link { source })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Inbound, RequestError};
+    use crate::facade::subject::IdForm;
+    use crate::facade::subject::SubjectError;
+    use crate::facade::subject::SubjectLink;
 
     /// The namespace a literal reference falls back to.
     const FALLBACK: &str = "http://example.org/fhir";
+
+    /// Returns the subject link in [`FALLBACK`] with the id form `form`.
+    fn link_in(form: IdForm) -> SubjectLink {
+        SubjectLink::new(FALLBACK, form, "PERSON").expect("a legal subject link")
+    }
+
+    /// Returns the subject link in [`FALLBACK`] with the reference form.
+    fn link() -> SubjectLink {
+        link_in(IdForm::Reference)
+    }
 
     /// Returns the bytes of `value`.
     fn body(value: &serde_json::Value) -> Vec<u8> {
@@ -357,7 +382,7 @@ mod tests {
             "Condition",
         )
         .expect("the resource reads");
-        let subject = identified.subject(FALLBACK).expect("a subject is named");
+        let subject = identified.subject(&link()).expect("a subject is named");
         assert_eq!("http://example.org/mrn", subject.namespace());
         assert_eq!("p-1", subject.id());
 
@@ -369,9 +394,31 @@ mod tests {
             "Condition",
         )
         .expect("the resource reads");
-        let subject = referenced.subject(FALLBACK).expect("a subject is named");
+        let subject = referenced.subject(&link()).expect("a subject is named");
         assert_eq!(FALLBACK, subject.namespace());
         assert_eq!("Patient/p-2", subject.id());
+    }
+
+    #[test]
+    fn a_literal_reference_is_read_in_the_configured_id_form() {
+        let referenced = Inbound::read(
+            &body(&serde_json::json!({
+                "resourceType": "Condition",
+                "subject": { "reference": "Patient/p-1" }
+            })),
+            "Condition",
+        )
+        .expect("a resource");
+        let subject = referenced
+            .subject(&link_in(IdForm::LogicalId))
+            .expect("a subject is named");
+        assert_eq!((FALLBACK, "p-1"), (subject.namespace(), subject.id()));
+        assert_eq!(
+            Err(RequestError::Link {
+                source: SubjectError::NotUuid
+            }),
+            referenced.subject(&link_in(IdForm::Uuid))
+        );
     }
 
     #[test]
@@ -388,7 +435,7 @@ mod tests {
             "Patient",
         )
         .expect("the resource reads");
-        let subject = patient.subject(FALLBACK).expect("the Patient names itself");
+        let subject = patient.subject(&link()).expect("the Patient names itself");
         assert_eq!("http://example.org/mrn", subject.namespace());
         assert_eq!("p-3", subject.id());
 
@@ -401,7 +448,7 @@ mod tests {
         )
         .expect("the resource reads");
         let subject = unsystemed
-            .subject(FALLBACK)
+            .subject(&link())
             .expect("the Patient names itself");
         assert_eq!(FALLBACK, subject.namespace());
         assert_eq!("p-5", subject.id());
@@ -415,7 +462,7 @@ mod tests {
         )
         .expect("the resource reads");
         assert!(matches!(
-            patient.subject(FALLBACK),
+            patient.subject(&link()),
             Err(RequestError::NoSubject)
         ));
     }
@@ -435,7 +482,7 @@ mod tests {
         )
         .expect("the resource reads");
         assert!(matches!(
-            read.subject(FALLBACK),
+            read.subject(&link()),
             Err(RequestError::NoSubject)
         ));
     }

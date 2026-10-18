@@ -33,6 +33,7 @@ pub mod reply;
 pub mod request;
 pub mod search;
 pub mod status;
+pub mod subject;
 
 use std::sync::Arc;
 
@@ -64,8 +65,9 @@ pub struct Settings {
     pub base_url: String,
     /// Whether an unknown subject gets an EHR on its first write.
     pub ehr_policy: ehr::Policy,
-    /// The namespace a literal subject reference is read in.
-    pub subject_namespace: String,
+    /// The link between a FHIR subject and its EHR: the namespace, the id
+    /// form and the `PARTY_REF.type`.
+    pub subject: subject::SubjectLink,
     /// The `AUDIT_DETAILS.system_id` every commit records.
     pub system_id: String,
     /// The `COMPOSITION.language` the facade writes, an ISO 639-1 code.

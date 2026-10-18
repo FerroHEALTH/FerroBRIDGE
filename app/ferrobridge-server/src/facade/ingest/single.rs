@@ -223,25 +223,29 @@ impl Ingest<'_> {
         {
             return Err(unclaimed());
         }
-        let subject = inbound
-            .subject(&self.settings.subject_namespace)
-            .map_err(|error| {
-                Refused::new(
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    Issue::error(IssueType::Required)
-                        .diagnosing(chain(&error))
-                        .at(format!("{}.subject", inbound.resource_type())),
-                )
-            })?;
+        let subject = inbound.subject(&self.settings.subject).map_err(|error| {
+            Refused::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                Issue::error(IssueType::Required)
+                    .diagnosing(chain(&error))
+                    .at(format!("{}.subject", inbound.resource_type())),
+            )
+        })?;
         if let Some(written) = self
             .reconcile_resource(inbound, program, provenance)
             .await?
         {
             return Ok(written);
         }
-        let ehr_id = ehr::resolve(&self.client, self.store, &subject, self.settings.ehr_policy)
-            .await
-            .map_err(|error| ehr_refusal(&error))?;
+        let ehr_id = ehr::resolve(
+            &self.client,
+            self.store,
+            &subject,
+            &self.settings.subject,
+            self.settings.ehr_policy,
+        )
+        .await
+        .map_err(|error| ehr_refusal(&error))?;
         let composition = self.build(program, inbound, provenance).await?;
         let rm = strict_read(&composition)?;
         let context = self.commit_context(commit::Change::Creation, &composition)?;

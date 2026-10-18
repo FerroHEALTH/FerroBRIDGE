@@ -49,7 +49,7 @@ async fn the_facade_round_trips_the_kds_patient_through_a_real_cdr() -> Result<(
         Settings {
             base_url: String::from("http://ferrobridge.invalid/fhir"),
             ehr_policy: Policy::CreateOnFirstWrite,
-            subject_namespace: String::from("http://example.org/fhir"),
+            subject: crate::support::subject_link("http://example.org/fhir"),
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("de"),
             territory: String::from("DE"),

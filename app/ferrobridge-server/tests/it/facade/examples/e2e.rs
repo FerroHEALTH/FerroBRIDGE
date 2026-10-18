@@ -78,7 +78,7 @@ async fn the_first_passing_facade_examples_round_trip_through_a_real_cdr()
             CdrClient::new(&CdrConfig::new(cdr.base_url().parse()?))?,
             Settings {
                 ehr_policy: Policy::CreateOnFirstWrite,
-                subject_namespace: String::from(SUBJECT_NAMESPACE),
+                subject: crate::support::subject_link(SUBJECT_NAMESPACE),
                 system_id: String::from("ferrobridge.e2e"),
                 ..context.settings()
             },

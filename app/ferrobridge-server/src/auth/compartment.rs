@@ -45,10 +45,10 @@ pub fn admit_person(
     match access.reach(permission, resource_type) {
         Some(Compartment::Any) => Ok(()),
         Some(Compartment::Patient(patient)) => {
-            let namespace = facade.settings().subject_namespace.as_str();
-            let reference = format!("Patient/{patient}");
-            let admitted = person
-                .is_some_and(|person| person.namespace() == namespace && person.id() == reference);
+            // NOTE: no specification governs this: our own design, a patient id the
+            // subject link cannot read is no person, so it admits nothing.
+            let launched = facade.settings().subject.person_of_patient(&patient).ok();
+            let admitted = person.is_some_and(|person| launched.as_ref() == Some(person));
             if admitted {
                 Ok(())
             } else {
@@ -78,7 +78,7 @@ pub fn admit_inbound(
     }
     // NOTE: a resource naming no usable subject is legitimately outside every
     // patient's compartment, so the failed lookup becomes the refusal below.
-    let person = inbound.subject(&facade.settings().subject_namespace).ok();
+    let person = inbound.subject(&facade.settings().subject).ok();
     admit_person(
         facade,
         access,

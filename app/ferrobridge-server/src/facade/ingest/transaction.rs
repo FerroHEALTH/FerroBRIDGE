@@ -335,9 +335,15 @@ impl Ingest<'_> {
         if seen.contains(&true) {
             return Err(partly_consumed(&partition.mapped, &seen));
         }
-        let ehr_id = ehr::resolve(&self.client, self.store, subject, self.settings.ehr_policy)
-            .await
-            .map_err(|error| ehr_refusal(&error))?;
+        let ehr_id = ehr::resolve(
+            &self.client,
+            self.store,
+            subject,
+            &self.settings.subject,
+            self.settings.ehr_policy,
+        )
+        .await
+        .map_err(|error| ehr_refusal(&error))?;
         let preceding = self.preceding(&ehr_id, &partition.mapped, &revised).await?;
         let (contribution, returned) = self
             .commit_all(&ehr_id, &partition.mapped, &preceding)

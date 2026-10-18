@@ -64,7 +64,7 @@ async fn the_facade_commits_a_condition_and_reads_it_back_from_a_real_cdr()
             // The CDR holds no EHR for the synthetic subject, so this case
             // exercises the policy that creates one on the first write.
             ehr_policy: Policy::CreateOnFirstWrite,
-            subject_namespace: String::from(SUBJECT_NAMESPACE),
+            subject: crate::support::subject_link(SUBJECT_NAMESPACE),
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("en"),
             territory: String::from("GB"),
@@ -143,7 +143,7 @@ async fn an_update_following_the_read_etag_commits_the_next_version_on_a_real_cd
         Settings {
             base_url: String::from("http://ferrobridge.invalid/fhir"),
             ehr_policy: Policy::CreateOnFirstWrite,
-            subject_namespace: String::from(SUBJECT_NAMESPACE),
+            subject: crate::support::subject_link(SUBJECT_NAMESPACE),
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("en"),
             territory: String::from("GB"),
@@ -428,7 +428,7 @@ async fn the_facade_round_trips_the_kds_condition_through_a_real_cdr()
         Settings {
             base_url: String::from("http://ferrobridge.invalid/fhir"),
             ehr_policy: Policy::CreateOnFirstWrite,
-            subject_namespace: String::from(SUBJECT_NAMESPACE),
+            subject: crate::support::subject_link(SUBJECT_NAMESPACE),
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("de"),
             territory: String::from("DE"),
@@ -580,7 +580,7 @@ async fn a_transaction_commits_once_and_reads_each_entry_back_from_a_real_cdr()
         Settings {
             base_url: String::from("http://ferrobridge.invalid/fhir"),
             ehr_policy: Policy::CreateOnFirstWrite,
-            subject_namespace: String::from(SUBJECT_NAMESPACE),
+            subject: crate::support::subject_link(SUBJECT_NAMESPACE),
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("en"),
             territory: String::from("GB"),

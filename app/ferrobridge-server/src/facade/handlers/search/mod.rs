@@ -47,7 +47,6 @@ use crate::facade::handlers::search::total::count_all;
 use crate::facade::handlers::search::total::total_of;
 use crate::facade::handlers::write;
 use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::PersonId;
 use crate::facade::identity::record::CompositionBinding;
 use crate::facade::ingest::Refused;
 use crate::facade::media;
@@ -312,10 +311,9 @@ fn start_of(
 /// and a patient the map does not know reaches no data (no specification
 /// governs the mapping from a compartment to an EHR: our own design).
 fn compartment_ehrs(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, Refusal> {
-    let namespace = facade.settings().subject_namespace.as_str();
     // NOTE: no specification governs this: our own design, a patient id no
     // person key can hold names no EHR the map binds, so the token reaches none.
-    let Ok(person) = PersonId::new(namespace, &format!("Patient/{patient}")) else {
+    let Ok(person) = facade.settings().subject.person_of_patient(patient) else {
         return Ok(Vec::new());
     };
     let found = facade
@@ -330,7 +328,7 @@ fn compartment_ehrs(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, Refusa
 /// A subject or an id the map does not know resolves to nothing, which the
 /// plan reads as a declaration that matches nothing.
 fn resolve(facade: &Facade, resource_type: &str, criteria: &Criteria) -> Result<Resolved, Refusal> {
-    let namespace = facade.settings().subject_namespace.as_str();
+    let link = &facade.settings().subject;
     let mut resolved = Resolved::default();
     for subjects in &criteria.subjects {
         let mut ehrs: Vec<EhrId> = Vec::new();
@@ -340,7 +338,7 @@ fn resolve(facade: &Facade, resource_type: &str, criteria: &Criteria) -> Result<
             };
             // NOTE: no specification governs this: our own design, a reference no
             // person key can hold names no subject the map binds, so it matches none.
-            let Ok(person) = PersonId::new(namespace, reference) else {
+            let Ok(person) = link.person_of_reference(reference) else {
                 continue;
             };
             let found = facade

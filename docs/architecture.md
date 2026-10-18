@@ -2137,7 +2137,12 @@ composition is re-read through the strict RM reader before it is sent, so a
 bad document never reaches the CDR; an EHR is resolved by subject id and
 namespace and created on first sight only under a configured policy, with the
 `EHR_STATUS.subject` shape (`PARTY_SELF` over a `PARTY_REF` whose `GENERIC_ID`
-scheme is the namespace) pinned by test; every declared `meta.profile` is
+scheme is the namespace) pinned by test, with the namespace, the id form and
+the `PARTY_REF.type` configured so the link matches the one the CDR's owner
+writes (`[facade] subject_namespace`, `subject_id_form`, `subject_type`;
+RM Common IM §4.2.1.1, the type checked against BASE `PARTY_REF`
+`Type_validity` through `openehr-base`, #467), and no subject id the CDR
+mints itself, such as a pseudonym, ever derived by the bridge; every declared `meta.profile` is
 considered, never only the first; `Prefer` is honoured and `Location` names
 the FHIR resource, with the openEHR version uid carried in `meta.source`; and
 a clinical resource is never emitted without a subject.

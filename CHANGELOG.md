@@ -25,6 +25,18 @@ crates on crates.io.
 
 ### Added
 
+- The facade's patient-to-EHR link is configured to match the CDR owner's own
+  link (#467). `[facade] subject_type` sets the `PARTY_REF.type` of the
+  subject of an EHR the facade creates (default `PERSON`, until now fixed),
+  and `[facade] subject_id_form` sets how the id of a literal subject
+  reference is written: `reference` (the default, `Patient/<id>` as before),
+  `logical_id` (the bare `<id>`) or `uuid` (the bare `<id>`, refused with a
+  diagnostic naming the key when it is no UUID). A `subject_type` outside
+  the BASE `PARTY_REF` `Type_validity` set, or a `subject_namespace` that
+  breaks the `OBJECT_REF` namespace rule, refuses the boot naming the key;
+  both are checked through `openehr-base`. The bridge never derives a
+  subject id the CDR mints itself, such as a pseudonym.
+
 - The ITS-REST 1.1.0 Overview and System OpenAPI documents are vendored
   beside EHR, Query and Definition (#478). All five are `x-status: STABLE`
   at tag `Release-1.1.0`. The Overview defines the common headers the CDR
