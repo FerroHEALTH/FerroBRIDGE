@@ -10,13 +10,16 @@ use fhirconnect::resolve::select::SelectError;
 use http::StatusCode;
 use openehr_rm::v1_2::composition::composition::Composition;
 
-use crate::facade::identity::IdError;
 use crate::facade::identity::PersonId;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::outcome::chain;
 use crate::facade::request::Inbound;
+use crate::facade::request::RequestError;
+use crate::facade::request::patient_person;
 use crate::facade::request::person_by_identifier;
+use crate::facade::subject::IdForm;
+use crate::facade::subject::SubjectLink;
 
 use super::Ingest;
 use super::Mapped;
@@ -29,21 +32,23 @@ use super::SkipReason;
 use super::Skipped;
 use super::UnmappedEntries;
 
-/// Returns the subject a Bundle-local reference of `inbound` names, read from
-/// the first `identifier` with a `value` of the entry it references.
+/// Returns the subject a Bundle-local reference of `inbound` names: the
+/// person the entry it references is, as [`patient_person`] keys a Patient
+/// under `link`, or by that entry's first `identifier` with a value when it
+/// carries no logical id.
 ///
 /// A reference whose value is another entry's `fullUrl` resolves to that
 /// entry (R4 `Bundle.entry.fullUrl`; <https://hl7.org/fhir/R4/bundle.html#references>),
 /// so a `urn:uuid` a message Bundle allocates per message never becomes a
 /// person key of its own. `None` when `inbound` names its subject by
 /// identifier, when the reference names no entry of the Bundle, or when that
-/// entry carries no identifier with a value; the reference is then read as
-/// [`Inbound::subject`] reads it.
+/// entry carries neither a logical id the link keys by nor an identifier with
+/// a value; the reference is then read as [`Inbound::subject`] reads it.
 fn local_subject(
     inbound: &Inbound,
     locals: &BTreeMap<&str, &Value>,
-    namespace: &str,
-) -> Option<Result<PersonId, IdError>> {
+    link: &SubjectLink,
+) -> Option<Result<PersonId, RequestError>> {
     let document = inbound.document();
     let reference = document
         .get("subject")
@@ -52,7 +57,13 @@ fn local_subject(
         return None;
     }
     let target = locals.get(reference.get("reference")?.as_str()?)?;
-    person_by_identifier(target, namespace)
+    // NOTE: no specification governs this: our own design; an entry with no logical id (an HL7 v2
+    // message's Patient) keeps the identifier key, so only an id the link can read changes it.
+    if link.form() == IdForm::Reference || target.get("id").is_none() {
+        return person_by_identifier(target, link.namespace())
+            .map(|person| person.map_err(|source| RequestError::Subject { source }));
+    }
+    patient_person(target, link)
 }
 
 /// Returns the refusal of a Bundle no entry of which mapped, naming every
@@ -201,7 +212,7 @@ impl Ingest<'_> {
             }
         };
         let link = &self.settings.subject;
-        let subject = match local_subject(&inbound, locals, link.namespace()) {
+        let subject = match local_subject(&inbound, locals, link) {
             Some(local) => local.map_err(|error| chain(&error)),
             None => inbound.subject(link).map_err(|error| chain(&error)),
         }
