@@ -100,6 +100,13 @@ crates on crates.io.
   release build; the matching rules of R4 bundle.html §2.36.4.1 are
   unchanged.
 
+- The profile validator checks an invariant a profile declares on a choice
+  element it narrows against the types the profile keeps (#573, R4
+  elementdefinition.html §2.30.0.4.2): an expression naming a member only
+  a removed type defines is listed as refused at the check stage. An
+  invariant the profile inherits is still checked against every type the
+  base choice admits.
+
 ### Fixed
 
 - The FHIRPath `is` operator and `is()` function test a FHIR primitive

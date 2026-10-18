@@ -101,6 +101,11 @@ fn source<'a>(constraint: &'a ElementDefinitionConstraint, structure: &'a Struct
         .unwrap_or_else(|| structure.url())
 }
 
+/// The canonical `url` without a `|version` suffix.
+fn versionless(url: &str) -> &str {
+    url.split_once('|').map_or(url, |(url, _)| url)
+}
+
 /// The listing entry of `constraint`.
 fn listed(constraint: &ElementDefinitionConstraint) -> Constraint {
     Constraint::Invariant {
@@ -168,6 +173,28 @@ impl Validator<'_> {
             return Ok(());
         };
         let key = (expression.source().to_owned(), context.to_owned());
+        let mut cache = self.checked.lock().unwrap_or_else(PoisonError::into_inner);
+        cache
+            .entry(key)
+            .or_insert_with(|| {
+                expression
+                    .check_any(&R4, &contexts)
+                    .map_err(|error| chain(&error))
+            })
+            .clone()
+    }
+
+    /// Checks `expression` once against the types `codes` name, answering
+    /// the first member or type name the R4 model refuses for all of them.
+    fn check_types(&self, expression: &Expression, codes: &[&str]) -> Result<(), String> {
+        let contexts: Vec<_> = codes
+            .iter()
+            .filter_map(|code| named_type(&R4, code))
+            .collect();
+        if contexts.len() != codes.len() {
+            return Ok(());
+        }
+        let key = (expression.source().to_owned(), codes.join("|"));
         let mut cache = self.checked.lock().unwrap_or_else(PoisonError::into_inner);
         cache
             .entry(key)
@@ -283,9 +310,23 @@ impl<'i> Walk<'_, '_, 'i> {
             .value
             .as_deref()
             .filter(|path| choice_element(&R4, path).is_some());
-        self.validator()
-            .check(&expression, choice.unwrap_or(subject.type_name))
-            .map_err(|error| refuse(InvariantStage::Check, error))?;
+        let narrowed: Vec<&str> = element
+            .r#type
+            .iter()
+            .filter_map(|kind| kind.code.value.as_deref())
+            .collect();
+        let declared = versionless(source(constraint, structure)) == structure.url();
+        let checked = match choice {
+            // NOTE: elementdefinition.html §2.30.0.4.2: a profile limits a choice's types on the
+            // [x] element, so an invariant it declares there is checked against those types.
+            Some(_) if declared && !narrowed.is_empty() => {
+                self.validator().check_types(&expression, &narrowed)
+            }
+            _ => self
+                .validator()
+                .check(&expression, choice.unwrap_or(subject.type_name)),
+        };
+        checked.map_err(|error| refuse(InvariantStage::Check, error))?;
         // NOTE: conformance-rules.html §2.1.0.6 asks for "true" and N1 §6.2 and §6.5 carry empty
         // as the unknown of three-valued logic, so an empty answer neither meets nor breaks it.
         self.evaluate(&expression, structure, subject, choice, None)
