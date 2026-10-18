@@ -25,6 +25,16 @@ crates on crates.io.
 
 ### Added
 
+- `fhirconnect` 0.1.136 holds every FHIR resource a run out of openEHR
+  produces or creates to R4 `ext-1` before it leaves the engine (#651). An
+  extension with a url and no value, or with a value and nested extensions,
+  refuses the run as the new `EngineError::Invariant`, naming the constraint
+  and the instance path, so a facade read or a `$tofhir` call refuses it
+  instead of answering a resource that breaks an error-severity constraint
+  (R4 conformance-rules.html §2.1.0.6). `engine::invariant` holds the checks,
+  one per constraint key; `docs/architecture.md` §4.4 records why they are
+  targeted checks and not FHIRPath evaluation. A consumer matching
+  `EngineError` exhaustively gains a variant.
 - The operator console has browser journeys, screenshots and a book page
   (#602). The journeys drive headless Chrome through chromedriver with the
   `thirtyfour` WebDriver client against a running bridge (`ferrobridge
