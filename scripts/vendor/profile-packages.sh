@@ -34,7 +34,7 @@
 #   scripts/vendor/profile-packages.sh --check     # offline: every PROVENANCE.md against its pin, every
 #                                                  # fetched tree at its count and digest, no unpinned
 #                                                  # tree, and the closure complete
-#   scripts/vendor/profile-packages.sh --self-test # the closure check against synthetic package sets
+#   scripts/vendor/profile-packages.sh --self-test # the closure check and the fetch retry, offline
 #   scripts/vendor/profile-packages.sh --cache-key # a CI cache key over the pins
 #
 # Requires: curl, jq, tar, shasum, and git.
@@ -55,6 +55,12 @@ vendor_dir="docs/specs/fhir-packages"
 pins="docs/VERSIONS.md"
 ua="ferrobridge-vendor (scripts/vendor/profile-packages.sh)"
 stamp_dir="${PROFILE_PACKAGES_STAMPS:-target/profile-packages-verified}"
+
+# The attempts one registry fetch gets, and the first pause between two of
+# them in seconds, doubled after every failure. A transient error from the
+# registry is retried; one that outlasts the last attempt still fails.
+fetch_attempts=4
+fetch_pause=2
 
 # What stamped_state found: the count and digest, and whether the stamp
 # answered.
@@ -152,6 +158,24 @@ provenance_gap() {
   fi
 }
 
+# Runs the command $2... up to $1 times, pausing with a doubling backoff
+# between attempts, and fails with the status of the last attempt.
+with_retries() {
+  local attempts="$1" pause="$fetch_pause" attempt=1 status
+  shift
+  while true; do
+    "$@" && return 0
+    status=$?
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      return "$status"
+    fi
+    echo "   attempt $attempt of $attempts failed with status $status; retrying in ${pause}s" >&2
+    sleep "$pause"
+    pause=$((pause * 2))
+    attempt=$((attempt + 1))
+  done
+}
+
 # Fetches the package reference $1 into $vendor_dir/$1. With $2 = 1 it takes
 # the registry's bytes as they are, rewrites the PROVENANCE.md and prints the
 # count and digest to record; otherwise the staged tree must match the pinned
@@ -162,7 +186,7 @@ fetch_one() {
   local meta_url meta shasum tarball_url tmp got sha256 license files digest gap
   echo "== $pkg $ver"
   meta_url="$registry/$pkg"
-  meta="$(curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" "$meta_url")" \
+  meta="$(with_retries "$fetch_attempts" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" "$meta_url")" \
     || die "cannot read registry metadata for $pkg"
   shasum="$(jq -r --arg v "$ver" '.versions[$v].dist.shasum // empty' <<< "$meta")"
   tarball_url="$(jq -r --arg v "$ver" '.versions[$v].dist.tarball // empty' <<< "$meta")"
@@ -170,7 +194,7 @@ fetch_one() {
   [[ -n "$tarball_url" ]] || die "the registry lists no tarball for $pkg $ver"
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"; trap - RETURN' RETURN
-  curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" -o "$tmp/pkg.tgz" "$tarball_url" \
+  with_retries "$fetch_attempts" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" -o "$tmp/pkg.tgz" "$tarball_url" \
     || die "download of $pkg $ver failed"
   got="$(shasum -a 1 "$tmp/pkg.tgz" | cut -d' ' -f1)"
   [[ "$got" = "$shasum" ]] || die "checksum mismatch for $pkg $ver: registry $shasum, downloaded $got"
@@ -390,6 +414,20 @@ fixture_provenance() {
     "$2" "$3" "$4" > "$1/$2#$3/PROVENANCE.md"
 }
 
+# Counts one attempt in the file $1 and fails while the count is at most $2,
+# standing in for a fetch that fails $2 times and then answers.
+flaky() {
+  local tries
+  tries=$(($(cat "$1") + 1))
+  printf '%s' "$tries" > "$1"
+  [[ "$tries" -gt "$2" ]]
+}
+
+# Fails with the status $1, standing in for a fetch that never answers.
+failing_with() {
+  return "$1"
+}
+
 self_test() {
   local work out
   work="$(mktemp -d)"
@@ -473,6 +511,22 @@ PINS
   printf 'three\n' > "$work/stamped/package/b.json"
   stamped_state "$work/stamped" "$work/stamps/tree"
   [[ "$from_stamp" -eq 0 ]] || die "self-test: an added file is read from the stamp"
+
+  # A fetch that fails twice and then answers is retried to success; one that
+  # never answers fails after the last attempt with its own status.
+  fetch_pause=0
+  printf '0' > "$work/tries"
+  with_retries 4 flaky "$work/tries" 2 2> "$work/out" \
+    || die "self-test: a fetch that answers on its third attempt fails: $(cat "$work/out")"
+  [[ "$(cat "$work/tries")" = "3" ]] || die "self-test: the flaky fetch ran $(cat "$work/tries") times, not 3"
+  printf '0' > "$work/tries"
+  if with_retries 4 flaky "$work/tries" 99 2> "$work/out"; then
+    die "self-test: a fetch that never answers passes"
+  fi
+  [[ "$(cat "$work/tries")" = "4" ]] || die "self-test: the failing fetch ran $(cat "$work/tries") times, not 4"
+  local status=0
+  with_retries 2 failing_with 7 2> "$work/out" || status=$?
+  [[ "$status" -eq 7 ]] || die "self-test: a persistent failure ends with status $status, not the fetch's 7"
   say "self-test: OK"
 }
 
