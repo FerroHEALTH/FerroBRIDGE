@@ -7,18 +7,20 @@
 
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
-use fhir_types::r4::element_definition::ElementDefinition;
+use fhir_types::definition::ElementDefinitionRead;
 use fhir_types::schema::FieldSchema;
 use fhir_types::schema::Kind;
 
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
+use crate::validate::Element;
 use crate::validate::walk::Form;
 use crate::validate::walk::Occurrence;
 use crate::validate::walk::Walk;
 
-impl Walk<'_, '_, '_> {
+impl<R: Release> Walk<'_, '_, '_, R> {
     /// Collects the occurrences of one form, refusing a wrong shape, an empty
     /// array, a stray `null` and misaligned primitive arrays.
     pub(super) fn occurrences<'o>(
@@ -147,19 +149,15 @@ impl Walk<'_, '_, '_> {
     pub(super) fn cardinality(
         &mut self,
         field: &FieldSchema,
-        profiled: Option<&ElementDefinition>,
+        profiled: Option<&Element<R>>,
         count: usize,
         id: &str,
         location: &str,
     ) {
         let base = (field.min, field.max);
         let profile = profiled.map(|element| {
-            let min = element
-                .min
-                .as_ref()
-                .and_then(|min| min.value)
-                .unwrap_or(field.min);
-            let max = match element.max.as_ref().and_then(|max| max.value.as_deref()) {
+            let min = element.min().unwrap_or(field.min);
+            let max = match element.max() {
                 Some("*") => None,
                 Some(max) => max.parse().ok().or(field.max),
                 None => field.max,

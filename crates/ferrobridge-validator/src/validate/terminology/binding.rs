@@ -7,14 +7,14 @@
 
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
-use fhir_types::r4::element_definition::ElementDefinition;
-use fhir_types::r4::element_definition::ElementDefinitionBinding;
-use fhir_types::r4::extension::ExtensionValue;
+use fhir_types::definition::ElementDefinitionRead;
+use fhir_types::schema::Schemas;
 
 use ferrobridge_term::concept::Concept;
 use ferrobridge_term::outcome::Validation;
 
 use crate::canonical::Canonical;
+use crate::release::Release;
 use crate::report::Constraint;
 use crate::report::Reason;
 use crate::set::PackageId;
@@ -22,6 +22,7 @@ use crate::terminology::PendingBinding;
 use crate::terminology::Strength;
 use crate::terminology::binding_issue;
 use crate::terminology::display_issue;
+use crate::validate::Element;
 use crate::validate::ValidateError;
 use crate::validate::structure::Structure;
 use crate::validate::terminology::Coded;
@@ -30,11 +31,9 @@ use crate::validate::terminology::Form;
 use crate::validate::terminology::Membership;
 use crate::validate::walk::Walk;
 
-/// The URL of the R4 extension that sets a binding's maximum value set.
-const MAX_VALUE_SET: &str = "http://hl7.org/fhir/StructureDefinition/elementdefinition-maxValueSet";
-
 /// The R4 types a `Quantity` binding constrains the unit of
-/// (datatypes.html#Quantity).
+/// (datatypes.html#Quantity); a type the element table makes a
+/// specialization of `Quantity` is one too.
 const QUANTITIES: [&str; 7] = [
     "Quantity",
     "SimpleQuantity",
@@ -77,34 +76,22 @@ enum Reading<'a> {
 
 /// Reads `value` of the type `code` as a coded value: a `code`, `string`
 /// or `uri` by its text (terminologies.html §4.1.6.1), a `Coding`, a
-/// `CodeableConcept`, or a quantity by its unit.
-fn reading<'a>(code: &str, value: Bound<'a>) -> Reading<'a> {
+/// `CodeableConcept`, or a quantity by its unit, its specializations read
+/// from the element table `schemas`.
+fn reading<'a>(schemas: &Schemas, code: &str, value: Bound<'a>) -> Reading<'a> {
+    let quantity = |kind: &str| QUANTITIES.contains(&kind) || schemas.specializes(kind, "Quantity");
     match (code, value) {
         ("code" | "string" | "uri", Bound::Text(text)) => Reading::Coded(Coded::code(text)),
         ("Coding", Bound::Object(object)) => Reading::Coded(Coded::coding(object)),
         ("CodeableConcept", Bound::Object(object)) => Reading::Coded(Coded::concept(object)),
-        (kind, Bound::Object(object)) if QUANTITIES.contains(&kind) => {
-            Reading::Coded(Coded::coding(object))
-        }
+        (kind, Bound::Object(object)) if quantity(kind) => Reading::Coded(Coded::coding(object)),
         ("code" | "string" | "uri" | "Coding" | "CodeableConcept", _) => Reading::Skip,
-        (kind, _) if QUANTITIES.contains(&kind) => Reading::Skip,
+        (kind, _) if quantity(kind) => Reading::Skip,
         _ => Reading::Unsupported,
     }
 }
 
-/// The value set of the `elementdefinition-maxValueSet` extension.
-fn max_value_set(binding: &ElementDefinitionBinding) -> Option<String> {
-    binding
-        .extension
-        .iter()
-        .filter(|extension| extension.url == MAX_VALUE_SET)
-        .find_map(|extension| match &extension.value {
-            Some(ExtensionValue::Canonical(canonical)) => canonical.value.clone(),
-            _ => None,
-        })
-}
-
-impl Walk<'_, '_, '_> {
+impl<R: Release> Walk<'_, '_, '_, R> {
     /// Holds `value`, of the type `code`, to the binding `element` declares.
     ///
     /// # Errors
@@ -113,17 +100,17 @@ impl Walk<'_, '_, '_> {
     /// set carries cannot be read.
     pub(crate) fn binding(
         &mut self,
-        structure: &Structure,
-        (id, element): (&str, &ElementDefinition),
+        structure: &Structure<R>,
+        (id, element): (&str, &Element<R>),
         code: &str,
         value: Bound<'_>,
         location: &str,
     ) -> Result<(), ValidateError> {
-        let Some(binding) = &element.binding else {
+        let Some(binding) = element.binding() else {
             return Ok(());
         };
-        let text = binding.strength.value.clone().unwrap_or_default();
-        let value_set = binding.value_set.as_ref().and_then(|set| set.value.clone());
+        let text = binding.strength.unwrap_or_default().to_owned();
+        let value_set = binding.value_set.map(str::to_owned);
         let constraint = Constraint::Binding {
             strength: text.clone(),
             value_set: value_set.clone(),
@@ -142,8 +129,8 @@ impl Walk<'_, '_, '_> {
                 return Ok(());
             }
         };
-        let max = max_value_set(binding);
-        let coded = match reading(code, value) {
+        let max = binding.max_value_set.map(str::to_owned);
+        let coded = match reading(R::schemas(), code, value) {
             Reading::Coded(coded) => coded,
             Reading::Skip => return Ok(()),
             Reading::Unsupported => {
@@ -199,7 +186,7 @@ impl Walk<'_, '_, '_> {
     /// check pending for a terminology server.
     fn bound(
         &mut self,
-        structure: &Structure,
+        structure: &Structure<R>,
         id: &str,
         (constraint, strength, value_set): (Constraint, Strength, &str),
         coded: &Coded<'_>,
@@ -296,7 +283,7 @@ impl Walk<'_, '_, '_> {
     /// by the set, gives its code.
     fn displays(
         &mut self,
-        structure: &Structure,
+        structure: &Structure<R>,
         coded: &Coded<'_>,
         location: &str,
     ) -> Result<(), ValidateError> {

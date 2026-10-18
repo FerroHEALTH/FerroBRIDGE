@@ -19,6 +19,7 @@ use fhir_types::codec::Value;
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::validate::reference::address;
 use crate::validate::reference::literal;
 use crate::validate::resolver::Resolution;
@@ -30,7 +31,7 @@ use crate::validate::walk::Walk;
 /// `Reference`.
 type Required<'i> = (String, String, &'i Value);
 
-impl<'i> Walk<'_, '_, 'i> {
+impl<'i, R: Release> Walk<'_, '_, 'i, R> {
     /// Applies the document rules to `bundle`, the Bundle at `location`,
     /// when its type is `document`.
     pub(crate) fn document(&mut self, bundle: &'i Value, location: &str) {

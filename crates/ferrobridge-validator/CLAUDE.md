@@ -3,8 +3,9 @@
 
 # ferrobridge-validator
 
-The FHIR R4 profile validator (#432), hand-written over `fhir-types`. The
-oracles are the FHIR R4 pages: validation.html (informative) for what a
+The FHIR R4 and STU3 profile validator (#432, STU3 #838), hand-written over
+`fhir-types`. The oracles are the FHIR R4 pages, and the STU3 pages for an
+STU3 set: validation.html (informative) for what a
 validator checks, profiling.html and elementdefinition.html for the profile
 rules, json.html for the shapes, datatypes.html for the primitives,
 extensibility.html for extensions, references.html#canonical for resolution,
@@ -13,11 +14,20 @@ Validator is prior art and the agreement target (#442), never the oracle.
 
 ## No second model
 
-A StructureDefinition decodes into `fhir_types::r4::structure_definition::
-StructureDefinition`, an instance stays a `fhir_types::codec::Value`, and the
-base structure comes from `fhir_types::r4::schema::SCHEMAS`. When the
-generated model cannot carry what a check needs, that is a generator change
-(`.claude/rules/codegen.md`), never a local struct.
+The release is a type parameter: `release::Release` is sealed to `R4` and
+`Stu3`, and names the generated `StructureDefinition` and
+`ElementDefinition`, the element table (`SCHEMAS`) and the FHIRPath model.
+`PackageSet<R>` and `Validator<'_, R>` default to R4 (`PackageSet::load`),
+and `PackageSet::<Stu3>::load_release` reads STU3. A StructureDefinition
+decodes into the release's generated model and every check reads it through
+`fhir_types::definition::{ElementDefinitionRead, StructureDefinitionRead}`;
+an instance stays a `fhir_types::codec::Value`. When the generated model
+cannot carry what a check needs, that is a generator change
+(`.claude/rules/codegen.md`), never a local struct. The `ValueSets` and
+`CodeSystems` decode into the R4 model and are indexed only for a release
+with `READS_TERMINOLOGY`; STU3 has no release-neutral read of them yet
+(#876), so an STU3 binding is never decided locally and is listed with
+`Reason::TerminologyNotRead`.
 
 ## Layout
 
@@ -135,13 +145,15 @@ that falls short of its minimum after a validation kept an item out of it (a
 for the rejected item with the fewest, as `slice-rejection` information; a
 reference that names no FHIR REST server (a contained `#id`, a `urn:`) is
 taken as version specific under `type.versioning`, so `specific` admits it
-and `independent` lists it. Change one only with a citation.
+and `independent` lists it; an STU3 `resource` context reads as an element
+context, and an STU3 `datatype` context naming a primitive admits that
+primitive and none of its specializations. Change one only with a citation.
 
 ## Tests
 
 `tests/it/` drives the public API over synthetic packages and profiles
 written into temporary directories, with the vendored R4 core package beside
-them. `eu.rs` validates against HL7 Europe `patient-eu-core` 2.0.1 when
+them; `tests/it/stu3/` does the same over the vendored STU3 core package. `eu.rs` validates against HL7 Europe `patient-eu-core` 2.0.1 when
 `scripts/vendor/profile-packages.sh` has fetched the profile packages, and
 returns early otherwise; so do the EPS slicing and binding suites and the
 scoped-resolution unit test in `set`. Under CI (`CI=true`) an absent tree

@@ -4,6 +4,8 @@
 //! The package set: the packages given to the validator, checked for a
 //! complete dependency closure, and the `StructureDefinitions`, `ValueSets`
 //! and `CodeSystems` they carry, resolved by canonical.
+//!
+//! Each resource decodes into the generated model of the set's [`Release`].
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -16,7 +18,6 @@ use fhir_types::codec::DecodeError;
 use fhir_types::codec::Json;
 use fhir_types::codec::Value;
 use fhir_types::r4::code_system::CodeSystem;
-use fhir_types::r4::structure_definition::StructureDefinition;
 use fhir_types::r4::value_set::ValueSet;
 
 use crate::canonical::Canonical;
@@ -24,12 +25,19 @@ use crate::canonical::compare_versions;
 use crate::package::Content;
 use crate::package::Package;
 use crate::package::PackageError;
+use crate::release::R4;
+use crate::release::Release;
 
-/// A set of packages with a complete dependency closure.
+/// A set of packages with a complete dependency closure, read as the release
+/// `R`.
+///
+/// The `ValueSets` and `CodeSystems` are indexed only for a release that
+/// reads them ([`Release::READS_TERMINOLOGY`]), so none is decoded into the
+/// model of another release.
 #[derive(Debug)]
-pub struct PackageSet {
+pub struct PackageSet<R: Release = R4> {
     packages: Vec<Package>,
-    structures: BTreeMap<String, Vec<Entry<StructureDefinition>>>,
+    structures: BTreeMap<String, Vec<Entry<R::StructureDefinition>>>,
     value_sets: BTreeMap<String, Vec<Entry<ValueSet>>>,
     code_systems: BTreeMap<String, Vec<Entry<CodeSystem>>>,
     /// The dependency closure of each package, by position.
@@ -139,8 +147,8 @@ pub enum ResolveError {
         #[source]
         source: serde_json::Error,
     },
-    /// The resource does not decode into the R4 model of its type.
-    #[error("{canonical} in {package} does not decode into the R4 model of its type")]
+    /// The resource does not decode into the set's release model of its type.
+    #[error("{canonical} in {package} does not decode into the release model of its type")]
     Decode {
         /// The canonical asked for.
         canonical: String,
@@ -152,23 +160,71 @@ pub enum ResolveError {
     },
 }
 
-impl PackageSet {
+impl PackageSet<R4> {
     /// Reads every package at `paths` (`.tgz` files or unpacked directories)
-    /// and builds the set.
+    /// and builds the set, read as R4.
     ///
     /// # Errors
     ///
     /// Returns [`LoadError`] when a package cannot be read, or as
     /// [`PackageSet::new`] does.
     pub fn load<P: AsRef<Path>>(paths: impl IntoIterator<Item = P>) -> Result<Self, LoadError> {
+        Self::load_release(paths)
+    }
+
+    /// Builds the set from packages already read, checking the closure, read
+    /// as R4.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LoadError`] as [`PackageSet::new_release`] does.
+    pub fn new(packages: Vec<Package>) -> Result<Self, LoadError> {
+        Self::new_release(packages)
+    }
+
+    /// Resolves `canonical` to the `ValueSet` it names, by the rules of
+    /// [`PackageSet::structure_definition`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ResolveError`] as [`PackageSet::structure_definition`] does.
+    pub fn value_set(&self, canonical: &str) -> Result<Arc<ValueSet>, ResolveError> {
+        self.value_set_in(canonical, None)
+            .map(|(value_set, _)| value_set)
+    }
+
+    /// Resolves `canonical` to the `CodeSystem` it names, by the rules of
+    /// [`PackageSet::structure_definition`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ResolveError`] as [`PackageSet::structure_definition`] does.
+    pub fn code_system(&self, canonical: &str) -> Result<Arc<CodeSystem>, ResolveError> {
+        self.code_system_in(canonical, None)
+            .map(|(code_system, _)| code_system)
+    }
+}
+
+impl<R: Release> PackageSet<R> {
+    /// Reads every package at `paths` (`.tgz` files or unpacked directories)
+    /// and builds the set, read as the release `R`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LoadError`] when a package cannot be read, or as
+    /// [`PackageSet::new_release`] does.
+    pub fn load_release<P: AsRef<Path>>(
+        paths: impl IntoIterator<Item = P>,
+    ) -> Result<Self, LoadError> {
         let packages = paths
             .into_iter()
             .map(|path| Package::read(path.as_ref()))
             .collect::<Result<Vec<_>, _>>()?;
-        Self::new(packages)
+        Self::new_release(packages)
     }
 
-    /// Builds the set from packages already read, checking the closure.
+    /// Builds the set from packages already read, checking the closure, read
+    /// as the release `R`.
     ///
     /// Every dependency a manifest names SHALL be listed, and a version
     /// whose patch is `x` accepts the highest patch present
@@ -179,7 +235,7 @@ impl PackageSet {
     /// Returns [`LoadError::DuplicatePackage`] for a name and version given
     /// twice, and [`LoadError::MissingDependency`] naming the first dependency
     /// the set does not hold.
-    pub fn new(mut packages: Vec<Package>) -> Result<Self, LoadError> {
+    pub fn new_release(mut packages: Vec<Package>) -> Result<Self, LoadError> {
         packages.sort_by(|a, b| {
             a.name()
                 .cmp(b.name())
@@ -211,7 +267,7 @@ impl PackageSet {
                 }
             }
         }
-        let mut structures: BTreeMap<String, Vec<Entry<StructureDefinition>>> = BTreeMap::new();
+        let mut structures: BTreeMap<String, Vec<Entry<R::StructureDefinition>>> = BTreeMap::new();
         let mut value_sets: BTreeMap<String, Vec<Entry<ValueSet>>> = BTreeMap::new();
         let mut code_systems: BTreeMap<String, Vec<Entry<CodeSystem>>> = BTreeMap::new();
         for (index, package) in packages.iter().enumerate() {
@@ -227,11 +283,11 @@ impl PackageSet {
                         .entry(url.clone())
                         .or_default()
                         .push(Entry::new(version, source, content, origin)),
-                    "ValueSet" => value_sets
+                    "ValueSet" if R::READS_TERMINOLOGY => value_sets
                         .entry(url.clone())
                         .or_default()
                         .push(Entry::new(version, source, content, origin)),
-                    "CodeSystem" => code_systems
+                    "CodeSystem" if R::READS_TERMINOLOGY => code_systems
                         .entry(url.clone())
                         .or_default()
                         .push(Entry::new(version, source, content, origin)),
@@ -273,31 +329,9 @@ impl PackageSet {
     pub fn structure_definition(
         &self,
         canonical: &str,
-    ) -> Result<Arc<StructureDefinition>, ResolveError> {
+    ) -> Result<Arc<R::StructureDefinition>, ResolveError> {
         self.structure_definition_in(canonical, None)
             .map(|(definition, _)| definition)
-    }
-
-    /// Resolves `canonical` to the `ValueSet` it names, by the rules of
-    /// [`PackageSet::structure_definition`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ResolveError`] as [`PackageSet::structure_definition`] does.
-    pub fn value_set(&self, canonical: &str) -> Result<Arc<ValueSet>, ResolveError> {
-        self.value_set_in(canonical, None)
-            .map(|(value_set, _)| value_set)
-    }
-
-    /// Resolves `canonical` to the `CodeSystem` it names, by the rules of
-    /// [`PackageSet::structure_definition`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ResolveError`] as [`PackageSet::structure_definition`] does.
-    pub fn code_system(&self, canonical: &str) -> Result<Arc<CodeSystem>, ResolveError> {
-        self.code_system_in(canonical, None)
-            .map(|(code_system, _)| code_system)
     }
 
     /// Resolves `canonical` as referenced from the package `scope`, and
@@ -306,7 +340,7 @@ impl PackageSet {
         &self,
         canonical: &str,
         scope: Option<PackageId>,
-    ) -> Result<(Arc<StructureDefinition>, PackageId), ResolveError> {
+    ) -> Result<(Arc<R::StructureDefinition>, PackageId), ResolveError> {
         resolve(
             &self.packages,
             &self.structures,

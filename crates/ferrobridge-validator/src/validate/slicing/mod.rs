@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use fhir_types::r4::element_definition::ElementDefinition;
+use fhir_types::definition::ElementDefinitionRead;
 use fhir_types::schema::FieldSchema;
 use fhir_types::schema::TypeSchema;
 
@@ -26,8 +26,10 @@ use crate::issue::Issue;
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::report::Constraint;
 use crate::report::Reason;
+use crate::validate::Element;
 use crate::validate::ValidateError;
 use crate::validate::slicing::instance::Node;
 use crate::validate::slicing::path::Step;
@@ -42,17 +44,17 @@ use crate::validate::walk::Walk;
 /// cursor of its parent, its element id and definition, and the parent's
 /// location.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Site<'a> {
+pub(crate) struct Site<'a, R: Release> {
     /// The parent's type.
     pub(crate) schema: &'static TypeSchema,
     /// The member's field.
     pub(crate) field: &'static FieldSchema,
     /// The cursor of the parent.
-    pub(crate) cursor: &'a Cursor,
+    pub(crate) cursor: &'a Cursor<R>,
     /// The member's element id, the slicing entry.
     pub(crate) id: &'a str,
     /// The member's element definition.
-    pub(crate) element: Option<&'a ElementDefinition>,
+    pub(crate) element: Option<&'a Element<R>>,
     /// The parent's location.
     pub(crate) location: &'a str,
 }
@@ -125,10 +127,10 @@ enum Placement {
 /// discriminators, the index of its `@default` slice and of the slice an
 /// item in no other slice falls to.
 #[derive(Debug)]
-struct Plan<'p> {
-    structure: &'p Arc<Structure>,
+struct Plan<'p, R: Release> {
+    structure: &'p Arc<Structure<R>>,
     entry_id: &'p str,
-    slices: &'p [(&'p str, &'p ElementDefinition)],
+    slices: &'p [(&'p str, &'p Element<R>)],
     discriminators: &'p [Discriminator],
     default: Option<usize>,
     fallback: Option<usize>,
@@ -144,13 +146,13 @@ type Selected<'i> = Result<Vec<Node<'i>>, Reason>;
 /// each item's index with the errors it raised.
 type Rejections = BTreeMap<usize, Vec<(usize, Vec<Issue>)>>;
 
-impl<'i> Walk<'_, '_, 'i> {
+impl<'i, R: Release> Walk<'_, '_, 'i, R> {
     /// Evaluates the slicing `entry` declares over `items`, and returns for
     /// each item the ids of the slices it belongs to, outermost first.
     pub(crate) fn slicing(
         &mut self,
-        site: &Site<'_>,
-        entry: &ElementDefinition,
+        site: &Site<'_, R>,
+        entry: &Element<R>,
         items: &[Item<'_, 'i>],
     ) -> Result<Vec<Vec<String>>, ValidateError> {
         let mut chains = vec![Vec::new(); items.len()];
@@ -162,31 +164,27 @@ impl<'i> Walk<'_, '_, 'i> {
     /// Evaluates one level of slicing over the items at `members`.
     fn level(
         &mut self,
-        site: &Site<'_>,
+        site: &Site<'_, R>,
         entry_id: &str,
-        entry: &ElementDefinition,
+        entry: &Element<R>,
         items: &[Item<'_, 'i>],
         members: &[usize],
         chains: &mut [Vec<String>],
     ) -> Result<(), ValidateError> {
-        let Some(slicing) = &entry.slicing else {
+        let Some(slicing) = entry.slicing() else {
             return Ok(());
         };
         let structure = Arc::clone(&site.cursor.structure);
         let slices = structure.slices(entry_id);
-        let rules = slicing.rules.value.as_deref().unwrap_or("open");
-        let ordered = slicing
-            .ordered
-            .as_ref()
-            .and_then(|flag| flag.value)
-            .unwrap_or(false);
+        let rules = slicing.rules.unwrap_or("open");
+        let ordered = slicing.ordered.unwrap_or(false);
         let discriminators: Vec<Discriminator> = slicing
-            .discriminator
+            .discriminators
             .iter()
             .map(|discriminator| {
-                let path = discriminator.path.value.clone().unwrap_or_default();
+                let path = discriminator.path.unwrap_or_default().to_owned();
                 Discriminator {
-                    kind: discriminator.r#type.value.clone().unwrap_or_default(),
+                    kind: discriminator.kind.unwrap_or_default().to_owned(),
                     steps: path::parse(&path),
                     path,
                 }
@@ -248,7 +246,7 @@ impl<'i> Walk<'_, '_, 'i> {
                     chain.push((*slice_id).to_owned());
                 }
             }
-            if slice.slicing.is_some() {
+            if slice.slicing().is_some() {
                 self.level(site, slice_id, slice, items, &inside, chains)?;
             }
         }
@@ -260,13 +258,13 @@ impl<'i> Walk<'_, '_, 'i> {
     /// could not be evaluated, with the slices that could not be decided.
     fn place(
         &mut self,
-        site: &Site<'_>,
-        plan: &Plan<'_>,
+        site: &Site<'_, R>,
+        plan: &Plan<'_, R>,
         item: Item<'_, 'i>,
         (member, rejections): (usize, &mut Rejections),
     ) -> Result<(Placement, Vec<usize>), ValidateError> {
         let location = &item.occurrence.location;
-        let node = Node::item(site.field, item.form, item.occurrence);
+        let node = Node::item(R::schemas(), site.field, item.form, item.occurrence);
         let selected: Vec<Option<Selected<'i>>> = plan
             .discriminators
             .iter()
@@ -337,7 +335,7 @@ impl<'i> Walk<'_, '_, 'i> {
     /// slicing refuse.
     fn rules(
         &mut self,
-        plan: &Plan<'_>,
+        plan: &Plan<'_, R>,
         items: &[Item<'_, 'i>],
         placements: &[(usize, Placement)],
     ) {
@@ -431,13 +429,13 @@ impl<'i> Walk<'_, '_, 'i> {
     /// minimum.
     fn slice_cardinality(
         &mut self,
-        site: &Site<'_>,
+        site: &Site<'_, R>,
         slice_id: &str,
-        slice: &ElementDefinition,
+        slice: &Element<R>,
         count: usize,
     ) -> bool {
-        let min = slice.min.as_ref().and_then(|min| min.value).unwrap_or(0);
-        let max = match slice.max.as_ref().and_then(|max| max.value.as_deref()) {
+        let min = slice.min().unwrap_or(0);
+        let max = match slice.max() {
             Some("*") | None => None,
             Some(max) => max.parse::<u32>().ok(),
         };
@@ -470,7 +468,7 @@ impl<'i> Walk<'_, '_, 'i> {
     /// the slicing names no discriminator.
     fn speculate(
         &mut self,
-        site: &Site<'_>,
+        site: &Site<'_, R>,
         slice_id: &str,
         item: Item<'_, 'i>,
     ) -> Result<Verdict, ValidateError> {
@@ -501,7 +499,7 @@ impl<'i> Walk<'_, '_, 'i> {
     /// matches ("composite values ... are unique", profiling.html §5.1.0.11).
     fn verdict(
         &mut self,
-        (structure, slice_id): (&Arc<Structure>, &str),
+        (structure, slice_id): (&Arc<Structure<R>>, &str),
         discriminators: &[Discriminator],
         selected: &[Option<Selected<'i>>],
         location: &str,

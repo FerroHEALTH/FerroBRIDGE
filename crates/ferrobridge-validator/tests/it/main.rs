@@ -29,6 +29,7 @@ mod resolve;
 mod scope;
 mod slicing;
 mod structure;
+mod stu3;
 mod support;
 mod values;
 mod versioning;

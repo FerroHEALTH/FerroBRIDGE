@@ -11,11 +11,12 @@
 use std::sync::Arc;
 
 use fhir_types::codec::Value;
-use fhir_types::r4::element_definition::ElementDefinition;
+use fhir_types::definition::ElementDefinitionRead;
 
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::report::Constraint;
 use crate::report::Reason;
 use crate::set::ResolveError;
@@ -58,7 +59,7 @@ pub(crate) fn address(value: &Value) -> usize {
     std::ptr::from_ref(value).addr()
 }
 
-impl<'i> Walk<'_, '_, 'i> {
+impl<'i, R: Release> Walk<'_, '_, 'i, R> {
     /// Resolves the reference `value` holds once per occurrence: an
     /// ambiguous match is an error, and an entry of the Bundle it resolves
     /// to is recorded for the document rules.
@@ -97,35 +98,28 @@ impl<'i> Walk<'_, '_, 'i> {
     /// instance.
     pub(crate) fn targets(
         &mut self,
-        structure: &Structure,
+        structure: &Structure<R>,
         id: &str,
-        element: &ElementDefinition,
+        element: &R::ElementDefinition,
         occurrence: &Occurrence<'i>,
         code: Option<&str>,
     ) -> Result<(), ValidateError> {
         let mut profiles = Vec::new();
         let mut modes = Vec::new();
         let mut versioning = None;
-        for kind in element
-            .r#type
+        let types = element.types();
+        for kind in types
             .iter()
-            .filter(|kind| code.is_some() && kind.code.value.as_deref() == code)
+            .filter(|kind| code.is_some() && kind.code == code)
         {
-            versioning = versioning.or(kind
-                .versioning
-                .as_ref()
-                .and_then(|rule| rule.value.as_deref()));
+            versioning = versioning.or(kind.versioning);
             let targets = kind
-                .target_profile
+                .target_profiles
                 .iter()
-                .filter_map(|profile| profile.value.clone());
+                .map(|profile| (*profile).to_owned());
             if code == Some("Reference") {
                 profiles.extend(targets);
-                modes.extend(
-                    kind.aggregation
-                        .iter()
-                        .filter_map(|mode| mode.value.clone()),
-                );
+                modes.extend(kind.aggregation.iter().map(|mode| (*mode).to_owned()));
             } else {
                 let listed: Vec<String> = targets.collect();
                 if !listed.is_empty() {
@@ -165,7 +159,7 @@ impl<'i> Walk<'_, '_, 'i> {
     /// them.
     fn aggregation(
         &mut self,
-        structure: &Structure,
+        structure: &Structure<R>,
         id: &str,
         modes: &[String],
         (local, resolution): (bool, Option<Resolution<'i>>),
@@ -233,7 +227,7 @@ impl<'i> Walk<'_, '_, 'i> {
     /// are listed as unevaluated.
     fn target_profiles(
         &mut self,
-        structure: &Structure,
+        structure: &Structure<R>,
         id: &str,
         profiles: &[String],
         resolution: Option<Resolution<'i>>,
@@ -310,7 +304,7 @@ impl<'i> Walk<'_, '_, 'i> {
         &mut self,
         target: &'i Value,
         profile: &str,
-        from: &Structure,
+        from: &Structure<R>,
         location: &str,
     ) -> Result<Verdict, ValidateError> {
         let structure = match self.validator().structure(profile, Some(from)) {

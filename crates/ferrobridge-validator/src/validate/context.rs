@@ -10,7 +10,10 @@
 //! `extension-context-type` defines them: a FHIRPath expression from the root
 //! of the resource, an element id (`[url]#[elementid]`, or an id of the base
 //! specification without a `#`), or the canonical of an extension with an
-//! optional `#code` for a child of a complex extension. A context the walk
+//! optional `#code` for a child of a complex extension. STU3 states its
+//! contexts with the code system `extension-context`: a resource element
+//! path, a data type element path or name, or an extension's canonical
+//! (<https://hl7.org/fhir/STU3/codesystem-extension-context.html>). A context the walk
 //! cannot decide is listed as unevaluated, and the extension is refused only
 //! when every context is decided and none admits it.
 
@@ -20,10 +23,9 @@ use std::sync::Arc;
 use ferrobridge_fhirpath::eval::Environment;
 use ferrobridge_fhirpath::eval::Focus;
 use ferrobridge_fhirpath::model::named_type;
-use ferrobridge_fhirpath::model::r4::R4;
 use fhir_types::codec::Value;
-use fhir_types::r4::schema::SCHEMAS;
-use fhir_types::r4::structure_definition::StructureDefinitionContext;
+use fhir_types::definition::ContextRead;
+use fhir_types::definition::StructureDefinitionRead;
 
 use super::CORE;
 use super::invariant::Subject;
@@ -31,6 +33,7 @@ use super::invariant::chain;
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::report::Constraint;
 use crate::report::InvariantStage;
 use crate::report::Reason;
@@ -66,18 +69,20 @@ fn url_of(value: Option<&Value>) -> Option<&str> {
     value?.get("url")?.as_str()
 }
 
-impl<'i> Walk<'_, '_, 'i> {
+impl<'i, R: Release> Walk<'_, '_, 'i, R> {
     /// Holds the extension `extension` at `location`, defined by
     /// `structure`, to the contexts and context invariants its definition
     /// declares.
     pub(crate) fn extension_context(
         &mut self,
-        structure: &Structure,
+        structure: &Structure<R>,
         extension: &'i Value,
         location: &str,
     ) -> Result<(), ValidateError> {
         let definition = structure.definition();
-        if definition.context.is_empty() && definition.context_invariant.is_empty() {
+        let contexts = definition.contexts();
+        let invariants = definition.context_invariants();
+        if contexts.is_empty() && invariants.is_empty() {
             return Ok(());
         }
         // The walk pushes the extension's own occurrence last, so its holder sits below it.
@@ -97,11 +102,10 @@ impl<'i> Walk<'_, '_, 'i> {
             );
             return Ok(());
         };
-        if !definition.context.is_empty() {
-            self.contexts(structure, &definition.context, (index, &host), location)?;
+        if !contexts.is_empty() {
+            self.contexts(structure, &contexts, (index, &host), location)?;
         }
-        for invariant in &definition.context_invariant {
-            let text = invariant.value.as_deref().unwrap_or_default();
+        for text in invariants {
             self.context_invariant(structure, text, &host, extension, location);
         }
         Ok(())
@@ -112,20 +116,27 @@ impl<'i> Walk<'_, '_, 'i> {
     /// it when one the walk cannot decide might.
     fn contexts(
         &mut self,
-        structure: &Structure,
-        contexts: &[StructureDefinitionContext],
-        (index, host): (usize, &Host<'i>),
+        structure: &Structure<R>,
+        contexts: &[ContextRead<'_>],
+        (index, host): (usize, &Host<'i, R>),
         location: &str,
     ) -> Result<(), ValidateError> {
         let mut unknown = Vec::new();
         for context in contexts {
-            let kind = context.r#type.value.as_deref().unwrap_or_default();
-            let expression = context.expression.value.as_deref().unwrap_or_default();
+            let kind = context.kind.unwrap_or_default();
+            let expression = context.expression.unwrap_or_default();
             let fit = match kind {
-                "element" => self.element_fits(expression, host)?,
+                _ if !R::CONTEXT_TYPES.contains(&kind) => Fit::Unknown(format!(
+                    "the context type {kind} is none {} defines",
+                    R::NAME
+                )),
+                // NOTE: STU3 extension-context `resource`: "all elements matching a particular
+                // resource element path", the element path R4's `element` context names too.
+                "element" | "resource" => self.element_fits(expression, host)?,
+                "datatype" => self.datatype_fits(expression, host)?,
                 "extension" => self.extension_fits(expression, index),
                 "fhirpath" => self.path_fits(expression, host),
-                other => Fit::Unknown(format!("the context type {other} is none R4 defines")),
+                other => Fit::Unknown(format!("the context type {other} is not evaluated")),
             };
             match fit {
                 Fit::Yes => return Ok(()),
@@ -136,7 +147,7 @@ impl<'i> Walk<'_, '_, 'i> {
         if unknown.is_empty() {
             let named: Vec<&str> = contexts
                 .iter()
-                .filter_map(|context| context.expression.value.as_deref())
+                .filter_map(|context| context.expression)
                 .collect();
             self.out().issue(
                 Severity::Error,
@@ -163,7 +174,7 @@ impl<'i> Walk<'_, '_, 'i> {
     }
 
     /// Answers whether the element context `expression` names `host`.
-    fn element_fits(&self, expression: &str, host: &Host<'i>) -> Result<Fit, ValidateError> {
+    fn element_fits(&self, expression: &str, host: &Host<'i, R>) -> Result<Fit, ValidateError> {
         if let Some((url, id)) = expression.split_once('#') {
             // NOTE: R4 extension-context-type `element`: "[url]#[elementid]" names an element of
             // that definition, slice ids included; a derived profile keeps the ids of its base.
@@ -205,12 +216,32 @@ impl<'i> Walk<'_, '_, 'i> {
         {
             return Ok(Fit::Yes);
         }
-        let known = SCHEMAS.element(expression).is_some() || named_type(&R4, expression).is_some();
+        let known = R::schemas().element(expression).is_some()
+            || named_type(R::model(), expression).is_some();
         Ok(if known {
             Fit::No
         } else {
-            Fit::Unknown(format!("R4 defines no element {expression}"))
+            Fit::Unknown(format!("{} defines no element {expression}", R::NAME))
         })
+    }
+
+    /// Answers whether the STU3 data type context `expression`, a data type
+    /// element path or a data type name, names `host`.
+    fn datatype_fits(&self, expression: &str, host: &Host<'i, R>) -> Result<Fit, ValidateError> {
+        // NOTE: STU3 StructureDefinition.context: "a context of 'string' doesn't mean that the
+        // extension can be used with one of the string patterns such as 'id'" (quotes ours).
+        let primitives = R::schemas().primitives;
+        if primitives
+            .binary_search_by(|primitive| primitive.name.cmp(expression))
+            .is_ok()
+        {
+            return Ok(if host.code == Some(expression) {
+                Fit::Yes
+            } else {
+                Fit::No
+            });
+        }
+        self.element_fits(expression, host)
     }
 
     /// Answers whether the extension context `expression`, a canonical with
@@ -240,7 +271,7 @@ impl<'i> Walk<'_, '_, 'i> {
 
     /// Answers whether the FHIRPath context `expression`, evaluated from the
     /// root of the resource, selects `host`.
-    fn path_fits(&self, expression: &str, host: &Host<'i>) -> Fit {
+    fn path_fits(&self, expression: &str, host: &Host<'i, R>) -> Fit {
         let scope = self.scope();
         let Some(resource) = scope.last().copied() else {
             return Fit::Unknown("the walk is inside no resource".to_owned());
@@ -250,7 +281,7 @@ impl<'i> Walk<'_, '_, 'i> {
             Err(error) => return Fit::Unknown(format!("{}: {error}", InvariantStage::Parse)),
         };
         let focus = Focus::resource(resource).within(Some(resource), container(scope));
-        let items = match compiled.evaluate(&Environment::new(&R4), focus) {
+        let items = match compiled.evaluate(&Environment::new(R::model()), focus) {
             Ok(items) => items,
             Err(error) => {
                 return Fit::Unknown(format!("{}: {}", InvariantStage::Evaluate, chain(&error)));
@@ -269,9 +300,9 @@ impl<'i> Walk<'_, '_, 'i> {
     /// element holding the extension at `location`.
     fn context_invariant(
         &mut self,
-        structure: &Structure,
+        structure: &Structure<R>,
         text: &str,
-        host: &Host<'i>,
+        host: &Host<'i, R>,
         extension: &'i Value,
         location: &str,
     ) {
@@ -288,13 +319,14 @@ impl<'i> Walk<'_, '_, 'i> {
                 .validator()
                 .expression(text)
                 .map_err(|error| refuse(InvariantStage::Parse, error))?;
-            let type_name = occurrence_type(host.value, host.code).ok_or_else(|| {
-                refuse(
-                    InvariantStage::Check,
-                    "the type of the element is not known".to_owned(),
-                )
-            })?;
-            let resource = SCHEMAS.is_resource(host.path) && host.code == Some(host.path);
+            let type_name =
+                occurrence_type(R::schemas(), host.value, host.code).ok_or_else(|| {
+                    refuse(
+                        InvariantStage::Check,
+                        "the type of the element is not known".to_owned(),
+                    )
+                })?;
+            let resource = R::schemas().is_resource(host.path) && host.code == Some(host.path);
             let subject = Subject {
                 value: host.value,
                 element: host.element,
@@ -331,14 +363,15 @@ impl<'i> Walk<'_, '_, 'i> {
     /// the element table for a complex type or a resource, by the core
     /// definitions' `baseDefinition` for a primitive.
     fn specializes(&self, code: &str, ancestor: &str) -> Result<bool, ValidateError> {
-        if let Some(schema) = SCHEMAS.type_named(code) {
+        let schemas = R::schemas();
+        if let Some(schema) = schemas.type_named(code) {
             // A backbone element is of the type its element names (BackboneElement or Element).
             let name = if schema.path.contains('.') {
                 schema.base.unwrap_or(code)
             } else {
                 code
             };
-            return Ok(SCHEMAS.specializes(name, ancestor));
+            return Ok(schemas.specializes(name, ancestor));
         }
         let mut current = code.to_owned();
         for _ in 0..DEPTH {
@@ -348,9 +381,7 @@ impl<'i> Walk<'_, '_, 'i> {
             let structure = self.validator().core(&current)?;
             let base = structure
                 .definition()
-                .base_definition
-                .as_ref()
-                .and_then(|base| base.value.as_deref())
+                .base_definition()
                 .and_then(|base| base.strip_prefix(CORE));
             match base {
                 Some(base) => base.clone_into(&mut current),
@@ -362,19 +393,14 @@ impl<'i> Walk<'_, '_, 'i> {
 
     /// Answers whether `structure` is the definition `url` names or derives
     /// from it through its `baseDefinition` chain.
-    fn derives(&self, structure: &Arc<Structure>, url: &str) -> Result<bool, ValidateError> {
+    fn derives(&self, structure: &Arc<Structure<R>>, url: &str) -> Result<bool, ValidateError> {
         let url = versionless(url);
         let mut current = Arc::clone(structure);
         for _ in 0..DEPTH {
             if current.url() == url {
                 return Ok(true);
             }
-            let Some(base) = current
-                .definition()
-                .base_definition
-                .as_ref()
-                .and_then(|base| base.value.clone())
-            else {
+            let Some(base) = current.definition().base_definition().map(str::to_owned) else {
                 return Ok(false);
             };
             current = match self.validator().structure(&base, Some(&current)) {

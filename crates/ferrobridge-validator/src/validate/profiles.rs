@@ -9,12 +9,14 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use fhir_types::codec::Value;
-use fhir_types::r4::element_definition::ElementDefinition;
+use fhir_types::definition::ElementDefinitionRead;
+use fhir_types::schema::Schemas;
 
 use crate::canonical::Canonical;
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::report::Collector;
 use crate::report::Constraint;
 use crate::report::Reason;
@@ -60,43 +62,48 @@ pub(crate) enum Conformance {
 }
 
 /// The profiles the types of `element` coded `code` name.
-pub(crate) fn profiles_for(element: Option<&ElementDefinition>, code: &str) -> Vec<String> {
+pub(crate) fn profiles_for<E: ElementDefinitionRead>(
+    element: Option<&E>,
+    code: &str,
+) -> Vec<String> {
     element
         .into_iter()
-        .flat_map(|element| &element.r#type)
-        .filter(|kind| kind.code.value.as_deref() == Some(code))
-        .flat_map(|kind| &kind.profile)
-        .filter_map(|profile| profile.value.clone())
+        .flat_map(ElementDefinitionRead::types)
+        .filter(|kind| kind.code == Some(code))
+        .flat_map(|kind| kind.profiles)
+        .map(str::to_owned)
         .collect()
 }
 
 /// The profiles the types of `element` name for a resource of type `kind`:
 /// the types coded `kind` or a type `kind` specializes, so `Resource` for
-/// any resource and `DomainResource` for one whose base chain reaches it.
-pub(crate) fn resource_profiles(element: Option<&ElementDefinition>, kind: &str) -> Vec<String> {
-    let schemas = &fhir_types::r4::schema::SCHEMAS;
+/// any resource and `DomainResource` for one whose base chain reaches it, by
+/// the element table `schemas`.
+pub(crate) fn resource_profiles<E: ElementDefinitionRead>(
+    schemas: &'static Schemas,
+    element: Option<&E>,
+    kind: &str,
+) -> Vec<String> {
     element
         .into_iter()
-        .flat_map(|element| &element.r#type)
+        .flat_map(ElementDefinitionRead::types)
         .filter(|entry| {
             entry
                 .code
-                .value
-                .as_deref()
                 .is_some_and(|code| schemas.specializes(kind, code))
         })
-        .flat_map(|entry| &entry.profile)
-        .filter_map(|profile| profile.value.clone())
+        .flat_map(|entry| entry.profiles)
+        .map(str::to_owned)
         .collect()
 }
 
-impl<'i> Walk<'_, '_, 'i> {
+impl<'i, R: Release> Walk<'_, '_, 'i, R> {
     /// Validates `subject` against `profile`, as the definition `from` names
     /// it, in a walk of its own.
     pub(crate) fn conformance(
         &self,
         subject: Subject<'_, 'i>,
-        (profile, from): (&str, &Structure),
+        (profile, from): (&str, &Structure<R>),
         location: &str,
     ) -> Result<Conformance, ValidateError> {
         let structure = match self.validator().structure(profile, Some(from)) {
@@ -155,8 +162,8 @@ impl<'i> Walk<'_, '_, 'i> {
     /// does not carry is listed as unevaluated.
     pub(crate) fn type_profiles(
         &mut self,
-        cursor: &Cursor,
-        target: Held<'_>,
+        cursor: &Cursor<R>,
+        target: Held<'_, R>,
         subject: Subject<'_, 'i>,
         profiles: &[String],
         location: &str,
@@ -216,7 +223,7 @@ impl<'i> Walk<'_, '_, 'i> {
     pub(crate) fn claims(
         &mut self,
         value: &'i Value,
-        structure: &Structure,
+        structure: &Structure<R>,
         name: &str,
         location: &str,
     ) -> Result<(), ValidateError> {
@@ -278,8 +285,8 @@ impl<'i> Walk<'_, '_, 'i> {
     /// walked against that definition already.
     pub(crate) fn extension_profiles(
         &mut self,
-        cursor: &Cursor,
-        target: Held<'_>,
+        cursor: &Cursor<R>,
+        target: Held<'_, R>,
         value: &'i Value,
         location: &str,
     ) -> Result<(), ValidateError> {
@@ -305,8 +312,8 @@ impl<'i> Walk<'_, '_, 'i> {
     /// elements on the `_` sibling.
     pub(crate) fn primitive_profiles(
         &mut self,
-        cursor: &Cursor,
-        target: Held<'_>,
+        cursor: &Cursor<R>,
+        target: Held<'_, R>,
         occurrence: &Occurrence<'i>,
         code: &str,
     ) -> Result<(), ValidateError> {

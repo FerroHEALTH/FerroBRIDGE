@@ -26,20 +26,20 @@ use ferrobridge_fhirpath::expression::Expression;
 use ferrobridge_fhirpath::model::choice_element;
 use ferrobridge_fhirpath::model::named_type;
 use ferrobridge_fhirpath::model::path_types;
-use ferrobridge_fhirpath::model::r4::R4;
 use fhir_types::codec::Value;
-use fhir_types::r4::element_definition::ElementDefinition;
-use fhir_types::r4::element_definition::ElementDefinitionConstraint;
-use fhir_types::r4::extension::ExtensionValue;
+use fhir_types::definition::ConstraintRead;
+use fhir_types::definition::ElementDefinitionRead;
 
 use crate::issue::Issue;
 use crate::issue::IssueType;
 use crate::issue::Rule;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::report::Constraint;
 use crate::report::InvariantStage;
 use crate::report::Reason;
 use crate::validate::BestPractice;
+use crate::validate::Element;
 use crate::validate::Validator;
 use crate::validate::resolver::container;
 use crate::validate::structure::Structure;
@@ -52,25 +52,23 @@ use seams::Terminology;
 /// error.
 pub(crate) type Compiled = Result<Arc<Expression>, String>;
 
-/// The R4 extension that marks a constraint as a best practice
-/// (conformance-rules.html §2.1.0.6).
-const BEST_PRACTICE: &str =
-    "http://hl7.org/fhir/StructureDefinition/elementdefinition-bestpractice";
-
 /// The upstream report of each published invariant whose expression is
-/// defective, by the canonical that declares it and its key.
-const DEFECTS: [(&str, &str, &str); 3] = [
+/// defective, by the release, the canonical that declares it and its key.
+const DEFECTS: [(&str, &str, &str, &str); 3] = [
     (
+        "R4",
         "http://hl7.org/fhir/StructureDefinition/ChargeItemDefinition",
         "cid-0",
         "https://github.com/FerroHEALTH/FerroBRIDGE/issues/460",
     ),
     (
+        "R4",
         "http://hl7.org/fhir/StructureDefinition/allergyintolerance-substanceExposureRisk",
         "inv-1",
         "https://github.com/FerroHEALTH/FerroBRIDGE/issues/460",
     ),
     (
+        "R4",
         "http://hl7.org/fhir/StructureDefinition/DomainResource",
         "dom-3",
         "https://github.com/FerroHEALTH/FerroBRIDGE/issues/444",
@@ -93,12 +91,8 @@ pub(crate) struct Subject<'s, 'i> {
 
 /// The canonical that declares `constraint`: its `source`, or the
 /// definition it sits in.
-fn source<'a>(constraint: &'a ElementDefinitionConstraint, structure: &'a Structure) -> &'a str {
-    constraint
-        .source
-        .as_ref()
-        .and_then(|source| source.value.as_deref())
-        .unwrap_or_else(|| structure.url())
+fn source<'a, R: Release>(constraint: &ConstraintRead<'a>, structure: &'a Structure<R>) -> &'a str {
+    constraint.source.unwrap_or_else(|| structure.url())
 }
 
 /// The canonical `url` without a `|version` suffix.
@@ -107,31 +101,29 @@ fn versionless(url: &str) -> &str {
 }
 
 /// The listing entry of `constraint`.
-fn listed(constraint: &ElementDefinitionConstraint) -> Constraint {
+fn listed(constraint: &ConstraintRead<'_>) -> Constraint {
     Constraint::Invariant {
-        key: constraint.key.value.clone().unwrap_or_default(),
-        severity: constraint.severity.value.clone().unwrap_or_default(),
+        key: constraint.key.unwrap_or_default().to_owned(),
+        severity: constraint.severity.unwrap_or_default().to_owned(),
     }
 }
 
-/// Answers whether `constraint` carries the best-practice extension set to
-/// true.
-fn best_practice(constraint: &ElementDefinitionConstraint) -> bool {
-    constraint.extension.iter().any(|extension| {
-        extension.url == BEST_PRACTICE
-            && matches!(
-                &extension.value,
-                Some(ExtensionValue::Boolean(flag)) if flag.value == Some(true)
-            )
-    })
+/// Answers whether `constraint` carries the best-practice extension
+/// (`elementdefinition-bestpractice`, conformance-rules.html §2.1.0.6) set
+/// to true.
+fn best_practice(constraint: &ConstraintRead<'_>) -> bool {
+    constraint.best_practice == Some(true)
 }
 
-/// The upstream report of the defect in the invariant `key` of `source`.
-fn upstream(source: &str, key: &str) -> Option<&'static str> {
+/// The upstream report of the defect in the invariant `key` of `source` in
+/// the release `release`.
+fn upstream(release: &str, source: &str, key: &str) -> Option<&'static str> {
     DEFECTS
         .iter()
-        .find(|(declared, defect, _)| *declared == source && *defect == key)
-        .map(|(_, _, report)| *report)
+        .find(|(named, declared, defect, _)| {
+            *named == release && *declared == source && *defect == key
+        })
+        .map(|(_, _, _, report)| *report)
 }
 
 /// The text of `error` followed by each of its causes.
@@ -146,7 +138,7 @@ pub(super) fn chain(error: &dyn Error) -> String {
     text
 }
 
-impl Validator<'_> {
+impl<R: Release> Validator<'_, R> {
     /// Returns the expression `text`, parsed on first use.
     pub(super) fn expression(&self, text: &str) -> Compiled {
         let mut cache = self
@@ -165,10 +157,11 @@ impl Validator<'_> {
 
     /// Checks `expression` once against `context`, a type name, the element
     /// path of a backbone element or of a choice element, answering the first
-    /// member or type name the R4 model refuses.
+    /// member or type name the release's model refuses.
     fn check(&self, expression: &Expression, context: &str) -> Result<(), String> {
+        let model = R::model();
         let Some(contexts) =
-            path_types(&R4, context).or_else(|| named_type(&R4, context).map(|ty| vec![ty]))
+            path_types(model, context).or_else(|| named_type(model, context).map(|ty| vec![ty]))
         else {
             return Ok(());
         };
@@ -178,18 +171,19 @@ impl Validator<'_> {
             .entry(key)
             .or_insert_with(|| {
                 expression
-                    .check_any(&R4, &contexts)
+                    .check_any(model, &contexts)
                     .map_err(|error| chain(&error))
             })
             .clone()
     }
 
     /// Checks `expression` once against the types `codes` name, answering
-    /// the first member or type name the R4 model refuses for all of them.
+    /// the first member or type name the release's model refuses for all of
+    /// them.
     fn check_types(&self, expression: &Expression, codes: &[&str]) -> Result<(), String> {
         let contexts: Vec<_> = codes
             .iter()
-            .filter_map(|code| named_type(&R4, code))
+            .filter_map(|code| named_type(R::model(), code))
             .collect();
         if contexts.len() != codes.len() {
             return Ok(());
@@ -200,23 +194,23 @@ impl Validator<'_> {
             .entry(key)
             .or_insert_with(|| {
                 expression
-                    .check_any(&R4, &contexts)
+                    .check_any(R::model(), &contexts)
                     .map_err(|error| chain(&error))
             })
             .clone()
     }
 }
 
-impl<'i> Walk<'_, '_, 'i> {
+impl<'i, R: Release> Walk<'_, '_, 'i, R> {
     /// Evaluates every invariant of `element` on `subject`, once per
     /// location, key and declaring canonical.
     pub(crate) fn invariants(
         &mut self,
-        structure: &Structure,
-        element: &ElementDefinition,
+        structure: &Structure<R>,
+        element: &Element<R>,
         subject: &Subject<'_, 'i>,
     ) {
-        for constraint in &element.constraint {
+        for constraint in &element.constraints() {
             self.invariant(structure, element, constraint, subject);
         }
     }
@@ -225,12 +219,12 @@ impl<'i> Walk<'_, '_, 'i> {
     /// know the type of the occurrence at `location`.
     pub(crate) fn untyped_invariants(
         &mut self,
-        structure: &Structure,
+        structure: &Structure<R>,
         id: &str,
-        element: &ElementDefinition,
+        element: &Element<R>,
         location: &str,
     ) {
-        for constraint in &element.constraint {
+        for constraint in &element.constraints() {
             let reason = Reason::InvariantRefused {
                 stage: InvariantStage::Check,
                 error: "the type of the element is not known".to_owned(),
@@ -244,12 +238,12 @@ impl<'i> Walk<'_, '_, 'i> {
     /// Evaluates one invariant on `subject`.
     fn invariant(
         &mut self,
-        structure: &Structure,
-        element: &ElementDefinition,
-        constraint: &ElementDefinitionConstraint,
+        structure: &Structure<R>,
+        element: &Element<R>,
+        constraint: &ConstraintRead<'_>,
         subject: &Subject<'_, 'i>,
     ) {
-        let key = constraint.key.value.as_deref().unwrap_or_default();
+        let key = constraint.key.unwrap_or_default();
         let source = source(constraint, structure);
         // NOTE: no specification governs this: our own design; a constraint a snapshot repeats
         // from its base, or two definitions in play share, is evaluated once per occurrence.
@@ -263,11 +257,7 @@ impl<'i> Walk<'_, '_, 'i> {
                 self.out().push(issue);
             }
             Err(reason) => {
-                let id = element
-                    .id
-                    .as_deref()
-                    .or(element.path.value.as_deref())
-                    .unwrap_or_default();
+                let id = element.element_id().or(element.path()).unwrap_or_default();
                 self.out().unevaluated(
                     structure.url(),
                     id,
@@ -283,22 +273,18 @@ impl<'i> Walk<'_, '_, 'i> {
     /// Boolean its expression evaluates to, or why it was not evaluated.
     fn answer(
         &self,
-        element: &ElementDefinition,
-        constraint: &ElementDefinitionConstraint,
-        structure: &Structure,
+        element: &Element<R>,
+        constraint: &ConstraintRead<'_>,
+        structure: &Structure<R>,
         subject: &Subject<'_, 'i>,
     ) -> Result<bool, Reason> {
-        let key = constraint.key.value.as_deref().unwrap_or_default();
+        let key = constraint.key.unwrap_or_default();
         let refuse = |stage, error| Reason::InvariantRefused {
             stage,
             error,
-            upstream: upstream(source(constraint, structure), key),
+            upstream: upstream(R::NAME, source(constraint, structure), key),
         };
-        let text = constraint
-            .expression
-            .as_ref()
-            .and_then(|expression| expression.value.as_deref())
-            .ok_or(Reason::NoExpression)?;
+        let text = constraint.expression.ok_or(Reason::NoExpression)?;
         let expression = self
             .validator()
             .expression(text)
@@ -306,15 +292,10 @@ impl<'i> Walk<'_, '_, 'i> {
         // NOTE: fhirpath.html §2.9.1.1 and N1 §11: an invariant on a choice element is written
         // against the choice, so it is checked against every type the choice admits.
         let choice = element
-            .path
-            .value
-            .as_deref()
-            .filter(|path| choice_element(&R4, path).is_some());
-        let narrowed: Vec<&str> = element
-            .r#type
-            .iter()
-            .filter_map(|kind| kind.code.value.as_deref())
-            .collect();
+            .path()
+            .filter(|path| choice_element(R::model(), path).is_some());
+        let types = element.types();
+        let narrowed: Vec<&str> = types.iter().filter_map(|kind| kind.code).collect();
         let declared = versionless(source(constraint, structure)) == structure.url();
         let checked = match choice {
             // NOTE: elementdefinition.html §2.30.0.4.2: a profile limits a choice's types on the
@@ -341,7 +322,7 @@ impl<'i> Walk<'_, '_, 'i> {
     pub(super) fn evaluate(
         &self,
         expression: &Expression,
-        structure: &Structure,
+        structure: &Structure<R>,
         subject: &Subject<'_, 'i>,
         choice: Option<&str>,
         extension: Option<&'i Value>,
@@ -366,7 +347,7 @@ impl<'i> Walk<'_, '_, 'i> {
         let references = References::new(self.validator(), scope, self.indexes());
         let terminology = Terminology::new(self.validator(), structure.origin());
         let conformance = Conformance::new(self.validator(), self.depth());
-        let mut environment = Environment::new(&R4)
+        let mut environment = Environment::new(R::model())
             .with_resolver(&references)
             .with_terminology(&terminology)
             .with_profiles(&conformance);
@@ -376,35 +357,30 @@ impl<'i> Walk<'_, '_, 'i> {
             let this = self.validator().expression("$this")?;
             let focus = Focus::element(extension, "Extension", anchor).within(resource, root);
             let items = this
-                .evaluate(&Environment::new(&R4), focus)
+                .evaluate(&Environment::new(R::model()), focus)
                 .map_err(|error| chain(&error))?;
             environment = environment.with_variable("extension", items);
         }
         expression
             .evaluate(&environment, focus)
-            .and_then(|result| convert::boolean(&R4, &result, "an invariant"))
+            .and_then(|result| convert::boolean(R::model(), &result, "an invariant"))
             .map_err(|error| chain(&error))
     }
 
     /// The issue a failed invariant raises at `location`.
-    fn failure(
-        &self,
-        constraint: &ElementDefinitionConstraint,
-        source: &str,
-        location: &str,
-    ) -> Issue {
-        let key = constraint.key.value.clone().unwrap_or_default();
+    fn failure(&self, constraint: &ConstraintRead<'_>, source: &str, location: &str) -> Issue {
+        let key = constraint.key.unwrap_or_default().to_owned();
         let severity = if best_practice(constraint) {
             match self.validator().best_practice {
                 BestPractice::Warning => Severity::Warning,
                 BestPractice::Error => Severity::Error,
             }
-        } else if constraint.severity.value.as_deref() == Some("warning") {
+        } else if constraint.severity == Some("warning") {
             Severity::Warning
         } else {
             Severity::Error
         };
-        let human = constraint.human.value.as_deref().unwrap_or_default();
+        let human = constraint.human.unwrap_or_default();
         let message = format!("{key}: {human}");
         Issue {
             severity,

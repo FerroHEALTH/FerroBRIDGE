@@ -14,7 +14,7 @@ use std::fmt;
 use std::rc::Rc;
 
 use fhir_types::codec::Value;
-use fhir_types::r4::schema::SCHEMAS;
+use fhir_types::schema::Schemas;
 
 /// What resolving one reference found.
 #[derive(Debug, Clone, Copy)]
@@ -155,9 +155,19 @@ impl Resolver for Contained {
 
 /// Resolves a local reference as [`Contained`] does, and every other
 /// reference against the entries of the Bundle around the resource that
-/// holds it, by the method of bundle.html §2.36.4.1.
-#[derive(Debug, Clone, Copy, Default)]
-pub(crate) struct Bundled;
+/// holds it, by the method of bundle.html §2.36.4.1, reading the resource
+/// types of a FHIR REST URL from its element table.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Bundled {
+    schemas: &'static Schemas,
+}
+
+impl Bundled {
+    /// Creates the resolver over the element table `schemas`.
+    pub(crate) const fn new(schemas: &'static Schemas) -> Self {
+        Self { schemas }
+    }
+}
 
 impl Resolver for Bundled {
     fn resolve<'i>(
@@ -176,7 +186,7 @@ impl Resolver for Bundled {
             return Resolution::OutOfScope;
         };
         let full_url = entry.get("fullUrl").and_then(Value::as_str);
-        let Some((url, version)) = absolute(reference, full_url) else {
+        let Some((url, version)) = absolute(self.schemas, reference, full_url) else {
             // NOTE: bundle.html §2.36.4.1: a relative reference from an entry whose fullUrl is
             // not RESTful "has no defined meaning within this specification".
             return Resolution::OutOfScope;
@@ -196,6 +206,7 @@ impl Resolver for Bundled {
 /// A relative reference has no entry `fullUrl` to resolve against here, so
 /// it is out of scope.
 pub(crate) fn from_bundle<'i>(
+    schemas: &Schemas,
     bundle: &'i Value,
     reference: &str,
     indexes: &Indexes<'i>,
@@ -203,7 +214,7 @@ pub(crate) fn from_bundle<'i>(
     if !has_scheme(reference) {
         return Resolution::OutOfScope;
     }
-    match absolute(reference, None) {
+    match absolute(schemas, reference, None) {
         Some((url, version)) => lookup((bundle, indexes), &url, version, bundle),
         None => Resolution::OutOfScope,
     }
@@ -301,15 +312,19 @@ fn version_id(resource: &Value) -> Option<&str> {
 /// The absolute URL `reference` names, without its version, and that
 /// version, from an entry whose fullUrl is `full_url`; `None` when the
 /// reference is relative and the `fullUrl` is no FHIR REST URL.
-fn absolute<'r>(reference: &'r str, full_url: Option<&str>) -> Option<(String, Option<&'r str>)> {
+fn absolute<'r>(
+    schemas: &Schemas,
+    reference: &'r str,
+    full_url: Option<&str>,
+) -> Option<(String, Option<&'r str>)> {
     if has_scheme(reference) {
-        return Some(match restful(reference) {
+        return Some(match restful(schemas, reference) {
             Some(parts) if parts.version.is_some() => (parts.unversioned(), parts.version),
             _ => (reference.to_owned(), None),
         });
     }
-    let relative = restful(reference).filter(|parts| parts.root.is_empty())?;
-    let root = restful(full_url?)?.root;
+    let relative = restful(schemas, reference).filter(|parts| parts.root.is_empty())?;
+    let root = restful(schemas, full_url?)?.root;
     Some((
         format!("{root}{}/{}", relative.kind, relative.id),
         relative.version,
@@ -349,9 +364,9 @@ impl Restful<'_> {
 }
 
 /// Reads `text` as a FHIR REST URL: `((http|https)://([A-Za-z0-9\-\\\.\:\%\$]*/)+)?`,
-/// an R4 resource type, `/[A-Za-z0-9\-\.]{1,64}` and an optional
-/// `/_history/[A-Za-z0-9\-\.]{1,64}`.
-fn restful(text: &str) -> Option<Restful<'_>> {
+/// a resource type of the element table `schemas`, `/[A-Za-z0-9\-\.]{1,64}`
+/// and an optional `/_history/[A-Za-z0-9\-\.]{1,64}`.
+fn restful<'t>(schemas: &Schemas, text: &'t str) -> Option<Restful<'t>> {
     let (path, version) = match text.rsplit_once("/_history/") {
         Some((path, version)) => (path, Some(version)),
         None => (text, None),
@@ -373,7 +388,7 @@ fn restful(text: &str) -> Option<Restful<'_>> {
                             || matches!(c, '-' | '\\' | '.' | ':' | '%' | '$' | '/')
                     })
             });
-    (base_ok && is_id(id) && SCHEMAS.is_resource(kind)).then_some(Restful {
+    (base_ok && is_id(id) && schemas.is_resource(kind)).then_some(Restful {
         root,
         kind,
         id,
@@ -400,6 +415,7 @@ fn contained(resource: &Value) -> &[Value] {
 #[cfg(test)]
 mod tests {
     use fhir_types::codec::Value;
+    use fhir_types::r4::schema::SCHEMAS;
 
     use super::Bundled;
     use super::Contained;
@@ -461,16 +477,17 @@ mod tests {
 
     #[test]
     fn a_restful_url_splits_into_its_root_type_id_and_version() {
-        let parts = restful("http://example.org/fhir/Patient/p1/_history/2").expect("RESTful");
+        let parts =
+            restful(&SCHEMAS, "http://example.org/fhir/Patient/p1/_history/2").expect("RESTful");
         assert_eq!(
             (parts.root, parts.kind, parts.id, parts.version),
             ("http://example.org/fhir/", "Patient", "p1", Some("2"))
         );
-        let relative = restful("Patient/p1").expect("RESTful");
+        let relative = restful(&SCHEMAS, "Patient/p1").expect("RESTful");
         assert_eq!((relative.root, relative.version), ("", None));
-        assert!(restful("urn:uuid:4a1e8f9e-0000-4000-8000-000000000001").is_none());
-        assert!(restful("http://example.org/fhir/NotAType/p1").is_none());
-        assert!(restful("ftp://example.org/Patient/p1").is_none());
+        assert!(restful(&SCHEMAS, "urn:uuid:4a1e8f9e-0000-4000-8000-000000000001").is_none());
+        assert!(restful(&SCHEMAS, "http://example.org/fhir/NotAType/p1").is_none());
+        assert!(restful(&SCHEMAS, "ftp://example.org/Patient/p1").is_none());
     }
 
     #[test]
@@ -494,7 +511,7 @@ mod tests {
             .and_then(Value::as_array)
             .and_then(|items| items.first())
             .expect("the device");
-        let found = Bundled.resolve(
+        let found = Bundled::new(&SCHEMAS).resolve(
             "Patient/p1",
             &[&bundle, observation, device],
             &Indexes::default(),

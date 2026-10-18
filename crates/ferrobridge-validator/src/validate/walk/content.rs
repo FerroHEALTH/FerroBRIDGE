@@ -9,6 +9,7 @@
 use std::sync::Arc;
 
 use fhir_types::codec::Value;
+use fhir_types::definition::ElementDefinitionRead;
 use fhir_types::schema::FieldSchema;
 use fhir_types::schema::Kind;
 use fhir_types::schema::TypeSchema;
@@ -17,6 +18,7 @@ use fhir_types::schema::ValueKind;
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::validate::ValidateError;
 use crate::validate::extension::Placement;
 use crate::validate::profiles::Subject;
@@ -29,7 +31,7 @@ use crate::validate::walk::Occurrence;
 use crate::validate::walk::Walk;
 use crate::validate::walk::type_named;
 
-impl<'i> Walk<'_, '_, 'i> {
+impl<'i, R: Release> Walk<'_, '_, 'i, R> {
     /// Walks the content of one occurrence by the kind its form carries.
     pub(super) fn occurrence(
         &mut self,
@@ -37,8 +39,8 @@ impl<'i> Walk<'_, '_, 'i> {
         field: &'static FieldSchema,
         form: &Form,
         occurrence: &Occurrence<'i>,
-        cursor: &Cursor,
-        target: Held<'_>,
+        cursor: &Cursor<R>,
+        target: Held<'_, R>,
     ) -> Result<(), ValidateError> {
         let id = target.id;
         let code = form.choice.or_else(|| field.types.first().copied());
@@ -89,7 +91,7 @@ impl<'i> Walk<'_, '_, 'i> {
                 }
                 let inline = field.content_reference.is_some()
                     || cursor.structure.has_children(id)
-                    || type_named(name)?.path.contains('.');
+                    || type_named(R::schemas(), name)?.path.contains('.');
                 let profiles = profiles_for(target.element, name);
                 let subject = Subject::Complex { value, name };
                 if !profiles.is_empty()
@@ -141,15 +143,17 @@ impl<'i> Walk<'_, '_, 'i> {
     fn inner_resource(
         &mut self,
         value: &'i Value,
-        cursor: &Cursor,
-        target: Held<'_>,
+        cursor: &Cursor<R>,
+        target: Held<'_, R>,
         location: &str,
     ) -> Result<(), ValidateError> {
         let kind = value.get("resourceType").and_then(Value::as_str);
         if let Some(kind) = kind {
             self.resource_type(target, kind, location);
         }
-        let profiles = kind.map_or_else(Vec::new, |kind| resource_profiles(target.element, kind));
+        let profiles = kind.map_or_else(Vec::new, |kind| {
+            resource_profiles(R::schemas(), target.element, kind)
+        });
         let subject = Subject::Resource { value };
         if profiles.is_empty()
             || self.type_profiles(cursor, target, subject, &profiles, location)?
@@ -167,16 +171,13 @@ impl<'i> Walk<'_, '_, 'i> {
     /// and `DomainResource` any resource whose base chain reaches it
     /// (<https://hl7.org/fhir/R4/domainresource.html>), as the element
     /// table's base types state.
-    fn resource_type(&mut self, target: Held<'_>, kind: &str, location: &str) {
+    fn resource_type(&mut self, target: Held<'_, R>, kind: &str, location: &str) {
         let Some(element) = target.element else {
             return;
         };
-        let codes: Vec<&str> = element
-            .r#type
-            .iter()
-            .filter_map(|entry| entry.code.value.as_deref())
-            .collect();
-        let schemas = &fhir_types::r4::schema::SCHEMAS;
+        let types = element.types();
+        let codes: Vec<&str> = types.iter().filter_map(|entry| entry.code).collect();
+        let schemas = R::schemas();
         let allowed = codes.is_empty() || codes.iter().any(|code| schemas.specializes(kind, code));
         if !allowed {
             self.out.issue(
@@ -200,8 +201,8 @@ impl<'i> Walk<'_, '_, 'i> {
         &mut self,
         value: &'i Value,
         placement: Placement,
-        cursor: &Cursor,
-        target: Held<'_>,
+        cursor: &Cursor<R>,
+        target: Held<'_, R>,
         location: &str,
     ) -> Result<(), ValidateError> {
         let resolved = match value.as_object() {

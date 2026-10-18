@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The walk over an instance: every object against its type in the R4
-//! element table, every member's occurrences counted per parent, and every
+//! The walk over an instance: every object against its type in the
+//! release's element table, every member's occurrences counted per parent, and every
 //! element definition in play applied to each occurrence.
 
 use std::cell::RefCell;
@@ -16,17 +16,19 @@ pub(crate) mod members;
 
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
-use fhir_types::r4::element_definition::ElementDefinition;
-use fhir_types::r4::schema::SCHEMAS;
+use fhir_types::definition::ElementDefinitionRead;
 use fhir_types::schema::FieldSchema;
 use fhir_types::schema::Kind;
+use fhir_types::schema::Schemas;
 use fhir_types::schema::TypeSchema;
 
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::report::Collector;
 use crate::report::Report;
+use crate::validate::Element;
 use crate::validate::ValidateError;
 use crate::validate::Validator;
 use crate::validate::invariant::Subject;
@@ -43,16 +45,16 @@ use members::forms;
 /// The definition an object is held to: a snapshot and the id of the
 /// object's own element in it.
 #[derive(Debug, Clone)]
-pub(crate) struct Cursor {
+pub(crate) struct Cursor<R: Release> {
     /// The snapshot.
-    pub(crate) structure: Arc<Structure>,
+    pub(crate) structure: Arc<Structure<R>>,
     /// The id of the object's own element.
     pub(crate) prefix: String,
 }
 
-impl Cursor {
+impl<R: Release> Cursor<R> {
     /// Creates a cursor at element `prefix` of `structure`.
-    pub(crate) fn new(structure: Arc<Structure>, prefix: &str) -> Self {
+    pub(crate) fn new(structure: Arc<Structure<R>>, prefix: &str) -> Self {
         Self {
             structure,
             prefix: prefix.to_owned(),
@@ -87,11 +89,11 @@ pub(crate) struct Form {
 /// The element one occurrence is held to: the element of its member, and
 /// the slices it was matched to, outermost first.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Held<'a> {
+pub(crate) struct Held<'a, R: Release> {
     /// The element id of the member.
     pub(crate) id: &'a str,
     /// The member's element definition, when the snapshot carries one.
-    pub(crate) element: Option<&'a ElementDefinition>,
+    pub(crate) element: Option<&'a Element<R>>,
     /// The ids of the slices the occurrence belongs to.
     pub(crate) slices: &'a [String],
 }
@@ -100,7 +102,7 @@ pub(crate) struct Held<'a> {
 /// extension it holds are matched against
 /// (<https://hl7.org/fhir/R4/defining-extensions.html#context>, §2.5.1.2).
 #[derive(Debug, Clone)]
-pub(crate) struct Host<'i> {
+pub(crate) struct Host<'i, R: Release> {
     /// The value, absent for a primitive written only as its `_` sibling.
     pub(crate) value: Option<&'i Value>,
     /// The `_` sibling of a primitive.
@@ -113,7 +115,7 @@ pub(crate) struct Host<'i> {
     /// The type code of the occurrence.
     pub(crate) code: Option<&'static str>,
     /// The snapshot the element is held to.
-    pub(crate) structure: Arc<Structure>,
+    pub(crate) structure: Arc<Structure<R>>,
     /// The ids of the element and of the slices it is held to.
     pub(crate) ids: Vec<String>,
 }
@@ -129,13 +131,13 @@ struct Shared {
 
 /// One validation in progress.
 #[derive(Debug)]
-pub(crate) struct Walk<'v, 'set, 'i> {
-    validator: &'v Validator<'set>,
+pub(crate) struct Walk<'v, 'set, 'i, R: Release> {
+    validator: &'v Validator<'set, R>,
     out: Collector,
     /// The resources the walk is inside, the outermost first.
     scope: Vec<&'i Value>,
     /// The elements the walk is inside, the outermost first.
-    hosts: Vec<Host<'i>>,
+    hosts: Vec<Host<'i, R>>,
     /// The locations whose coding display was already checked.
     displayed: BTreeSet<String>,
     /// The invariants already evaluated, by location, key and source.
@@ -150,14 +152,14 @@ pub(crate) struct Walk<'v, 'set, 'i> {
     indexes: Rc<Indexes<'i>>,
 }
 
-impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
+impl<'v, 'set, 'i, R: Release> Walk<'v, 'set, 'i, R> {
     /// Starts a validation.
-    pub(crate) fn new(validator: &'v Validator<'set>) -> Self {
+    pub(crate) fn new(validator: &'v Validator<'set, R>) -> Self {
         Self::nested(validator, 0)
     }
 
     /// Starts a validation `depth` `conformsTo()` calls deep.
-    pub(crate) fn nested(validator: &'v Validator<'set>, depth: u8) -> Self {
+    pub(crate) fn nested(validator: &'v Validator<'set, R>, depth: u8) -> Self {
         Self {
             validator,
             out: Collector::default(),
@@ -261,7 +263,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
     }
 
     /// Returns the validator.
-    pub(crate) const fn validator(&self) -> &'v Validator<'set> {
+    pub(crate) const fn validator(&self) -> &'v Validator<'set, R> {
         self.validator
     }
 
@@ -299,7 +301,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
     }
 
     /// Returns the elements the walk is inside, the outermost first.
-    pub(crate) fn hosts(&self) -> &[Host<'i>] {
+    pub(crate) fn hosts(&self) -> &[Host<'i, R>] {
         &self.hosts
     }
 
@@ -322,7 +324,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         &mut self,
         value: &'i Value,
         location: Option<&str>,
-        profile: Option<Arc<Structure>>,
+        profile: Option<Arc<Structure<R>>>,
     ) -> Result<(), ValidateError> {
         let severity = if location.is_none() {
             Severity::Fatal
@@ -339,17 +341,18 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             );
             return Ok(());
         };
+        let schemas = R::schemas();
         let resource_type = object.get("resourceType").and_then(Value::as_str);
         let Some((name, schema)) = resource_type
-            .filter(|name| SCHEMAS.is_resource(name))
-            .and_then(|name| Some((name, SCHEMAS.type_named(name)?)))
+            .filter(|name| schemas.is_resource(name))
+            .and_then(|name| Some((name, schemas.type_named(name)?)))
         else {
             self.out.issue(
                 severity,
                 IssueType::Structure,
                 MessageId::UnknownResourceType,
                 location.unwrap_or_default(),
-                "resourceType names no R4 resource".to_owned(),
+                format!("resourceType names no {} resource", R::NAME),
             );
             return Ok(());
         };
@@ -361,7 +364,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         // NOTE: StructureDefinition.type and baseDefinition (R4 structuredefinition.html): a
         // profile on the abstract Resource or DomainResource constrains every type specializing it.
         let inherited = matches!(structure.type_name(), "Resource" | "DomainResource")
-            && SCHEMAS.specializes(name, structure.type_name());
+            && schemas.specializes(name, structure.type_name());
         if structure.type_name() != name && !inherited {
             self.out.issue(
                 Severity::Error,
@@ -411,7 +414,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         value: &'i Value,
         object: &'i Object,
         schema: &'static TypeSchema,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         location: &str,
         resource: bool,
     ) -> Result<(), ValidateError> {
@@ -466,7 +469,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         object: &'i Object,
         schema: &'static TypeSchema,
         field: &'static FieldSchema,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         location: &str,
     ) -> Result<(), ValidateError> {
         if let Some(base) = self.base_cursor(schema, field, cursor)? {
@@ -509,7 +512,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             element: profiled,
             location,
         };
-        let mut chains = match profiled.filter(|element| element.slicing.is_some()) {
+        let mut chains = match profiled.filter(|element| element.slicing().is_some()) {
             Some(entry) => self.slicing(&site, entry, &items)?,
             None => Vec::new(),
         }
@@ -523,11 +526,8 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
                 _ => (element_id.clone(), profiled),
             };
             if let (Some(code), Some(element)) = (form.choice, element)
-                && !element.r#type.is_empty()
-                && !element
-                    .r#type
-                    .iter()
-                    .any(|kind| kind.code.value.as_deref() == Some(code))
+                && !element.types().is_empty()
+                && !element.types().iter().any(|kind| kind.code == Some(code))
             {
                 let at = occurrences
                     .first()
@@ -560,8 +560,8 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         &self,
         schema: &'static TypeSchema,
         field: &'static FieldSchema,
-        cursor: &Cursor,
-    ) -> Result<Option<Cursor>, ValidateError> {
+        cursor: &Cursor<R>,
+    ) -> Result<Option<Cursor<R>>, ValidateError> {
         if cursor.structure.mentions(
             &format!("{}.{}", cursor.prefix, field.name),
             matches!(field.kind, Kind::Choice(_)),
@@ -587,8 +587,8 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         field: &'static FieldSchema,
         form: &Form,
         occurrence: &Occurrence<'i>,
-        cursor: &Cursor,
-        held: Held<'_>,
+        cursor: &Cursor<R>,
+        held: Held<'_, R>,
     ) -> Result<(), ValidateError> {
         let structure = Arc::clone(&cursor.structure);
         let code = form.choice.or_else(|| match form.kind {
@@ -634,13 +634,13 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
     /// Applies one element definition's own constraints to an occurrence.
     pub(crate) fn checks(
         &mut self,
-        structure: &Structure,
+        structure: &Structure<R>,
         id: &str,
-        element: &ElementDefinition,
+        element: &Element<R>,
         occurrence: &Occurrence<'i>,
         code: Option<&str>,
     ) -> Result<(), ValidateError> {
-        let type_name = occurrence_type(occurrence.value, code);
+        let type_name = occurrence_type(R::schemas(), occurrence.value, code);
         if let Some(type_name) = &type_name {
             let subject = Subject {
                 value: occurrence.value,
@@ -664,8 +664,12 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             occurrence.value,
             &occurrence.location,
         )?;
-        let limit = element.max_length.as_ref().and_then(|length| length.value);
-        self.max_length(occurrence.value, limit, id, &occurrence.location);
+        self.max_length(
+            occurrence.value,
+            element.max_length(),
+            id,
+            &occurrence.location,
+        );
         Ok(())
     }
 
@@ -674,7 +678,7 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
         &mut self,
         value: &'i Value,
         name: &str,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         location: &str,
     ) -> Result<(), ValidateError> {
         let Some(object) = value.as_object() else {
@@ -687,34 +691,45 @@ impl<'v, 'set, 'i> Walk<'v, 'set, 'i> {
             );
             return Ok(());
         };
-        self.object(value, object, type_named(name)?, cursor, location, false)
+        self.object(
+            value,
+            object,
+            type_named(R::schemas(), name)?,
+            cursor,
+            location,
+            false,
+        )
     }
 }
 
-/// The FHIR type an occurrence is evaluated as: the type a resource in a
-/// resource-typed element names for itself, the element path of a backbone
-/// element, or the type `code`.
-pub(crate) fn occurrence_type(value: Option<&Value>, code: Option<&str>) -> Option<String> {
+/// The FHIR type an occurrence is evaluated as, by the element table
+/// `schemas`: the type a resource in a resource-typed element names for
+/// itself, the element path of a backbone element, or the type `code`.
+pub(crate) fn occurrence_type(
+    schemas: &'static Schemas,
+    value: Option<&Value>,
+    code: Option<&str>,
+) -> Option<String> {
     let code = code?;
     let named = value
-        .filter(|_| SCHEMAS.specializes(code, "Resource"))
+        .filter(|_| schemas.specializes(code, "Resource"))
         .and_then(|value| value.get("resourceType"))
         .and_then(Value::as_str)
-        .filter(|name| SCHEMAS.is_resource(name));
+        .filter(|name| schemas.is_resource(name));
     if let Some(name) = named {
         return Some(name.to_owned());
     }
     Some(
-        SCHEMAS
+        schemas
             .type_named(code)
             .map_or(code, |schema| schema.path)
             .to_owned(),
     )
 }
 
-/// Returns the element-table entry of the type `name`.
-fn type_named(name: &str) -> Result<&'static TypeSchema, ValidateError> {
-    SCHEMAS
+/// Returns the entry of the type `name` in the element table `schemas`.
+fn type_named(schemas: &'static Schemas, name: &str) -> Result<&'static TypeSchema, ValidateError> {
+    schemas
         .type_named(name)
         .ok_or_else(|| ValidateError::UnknownType {
             name: name.to_owned(),

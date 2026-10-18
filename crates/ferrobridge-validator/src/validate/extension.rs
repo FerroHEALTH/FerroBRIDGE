@@ -6,10 +6,12 @@
 
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
+use fhir_types::definition::ElementDefinitionRead;
 
 use crate::issue::IssueType;
 use crate::issue::MessageId;
 use crate::issue::Severity;
+use crate::release::Release;
 use crate::set::ResolveError;
 use crate::validate::ValidateError;
 use crate::validate::structure::Structure;
@@ -27,7 +29,7 @@ pub(crate) enum Placement {
     Child,
 }
 
-impl<'i> Walk<'_, '_, 'i> {
+impl<'i, R: Release> Walk<'_, '_, 'i, R> {
     /// Returns the cursor an extension is walked with: the definition its
     /// `url` names, resolved as the definition `from` the walk holds the
     /// extension's parent to, or the core `Extension` when the url does not
@@ -37,9 +39,9 @@ impl<'i> Walk<'_, '_, 'i> {
         &mut self,
         (value, object): (&'i Value, &Object),
         placement: Placement,
-        (location, from): (&str, &Structure),
-    ) -> Result<Cursor, ValidateError> {
-        let fallback = |walk: &Self| -> Result<Cursor, ValidateError> {
+        (location, from): (&str, &Structure<R>),
+    ) -> Result<Cursor<R>, ValidateError> {
+        let fallback = |walk: &Self| -> Result<Cursor<R>, ValidateError> {
             Ok(Cursor::new(
                 walk.validator().core("Extension")?,
                 "Extension",
@@ -113,8 +115,7 @@ impl<'i> Walk<'_, '_, 'i> {
         }
         let modifier = structure
             .element("Extension")
-            .and_then(|root| root.is_modifier.as_ref())
-            .and_then(|flag| flag.value)
+            .and_then(ElementDefinitionRead::is_modifier)
             .unwrap_or(false);
         if modifier != (placement == Placement::Modifier) {
             // NOTE: extensibility.html §2.5.0.2: a modifier extension is carried in

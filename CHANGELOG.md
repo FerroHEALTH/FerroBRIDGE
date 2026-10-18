@@ -25,6 +25,22 @@ crates on crates.io.
 
 ### Added
 
+- The profile validator validates STU3 resources against STU3 profiles
+  (#838). `PackageSet::<Stu3>::load_release` reads a package set as STU3, and
+  `Validator` over it walks the STU3 element table with the checks, refusals
+  and unevaluated listing of R4: cardinality, the types of a choice, the
+  single STU3 `type.profile` and `type.targetProfile`, slicing, the lexical
+  forms of the STU3 package, invariants as FHIRPath over the STU3 types, and
+  extension contexts in STU3's `resource`, `datatype` and `extension` codes.
+  The walk is generic over the sealed `release::Release` (`R4`, `Stu3`) and
+  reads every definition through the release-neutral `fhir_types::definition`
+  read. `PackageSet` and `Validator` take the release as a type parameter
+  defaulting to R4, and `PackageSet::load` and `PackageSet::new` still read
+  R4. An STU3 binding is never decided from the package set, since its
+  `ValueSets` and `CodeSystems` have no release-neutral read yet (#876): it is
+  listed with the new `Reason::TerminologyNotRead` and kept for a terminology
+  server.
+
 - The facade's patient-to-EHR link is configured to match the CDR owner's own
   link (#467). `[facade] subject_type` sets the `PARTY_REF.type` of the
   subject of an EHR the facade creates (default `PERSON`, until now fixed),

@@ -3,8 +3,8 @@
 
 # ferrobridge-validator
 
-A FHIR R4 profile validator over FHIR packages read offline, the generated
-model and element table of [`fhir-types`](https://docs.rs/fhir-types).
+A FHIR R4 and STU3 profile validator over FHIR packages read offline, the
+generated model and element table of [`fhir-types`](https://docs.rs/fhir-types).
 
 Part of [FerroBRIDGE](https://ferrobridge.eu), a pure-Rust bridge between
 openEHR and two interoperability targets: HL7 FHIR through the FHIRconnect
@@ -96,6 +96,22 @@ resources it holds, a value set it cannot evaluate, a profile the package set
 lacks). Each one the validator meets is listed in the report and in the
 `OperationOutcome` as a `warning` of type `not-supported`, never passed in
 silence.
+
+## STU3
+
+`PackageSet::<Stu3>::load_release` reads a package set as FHIR STU3, and a
+`Validator` over it walks STU3 resources over the STU3 element table. Each
+definition decodes into the generated `fhir_types::stu3` model, and the checks
+read it through the release-neutral `fhir_types::definition` read: STU3's
+single `type.profile` and `type.targetProfile`, its `valueSetReference` and
+`valueSetUri` bindings, and its `contextType` with a list of context strings
+(`resource`, `datatype`, `extension`; a `datatype` context naming a primitive
+admits that primitive only). Invariants are evaluated as FHIRPath over the
+STU3 types. The package set's `ValueSets` and `CodeSystems` are not read for
+STU3, so no STU3 binding is decided locally: a coded value with a system is
+listed with that reason and kept as a pending check for a terminology
+server, and a bare code, whose system no value set read can supply, is
+listed.
 
 ## Message ids
 
