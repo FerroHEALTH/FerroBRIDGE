@@ -78,3 +78,11 @@ construction.
   yourself"). The orchestrator reads every image, has the defects fixed and
   recaptured, and approves the tag or merge itself without waiting for the
   owner, who still gets the final set shown.
+- **All four consoles move in lockstep** (owner, 2026-10-18: "if you update
+  FerroUI from here then you also need to keep updating the others …
+  otherwise it will never be the same"). Every FerroUI release made from
+  here gets a pin-bump PR in FerroBRIDGE, FerroFED, FerroEHR and FerroTERM,
+  each with the visual loop and screenshots the orchestrator reviews, and
+  the four merge together. Only the FerroUI pin, its API changes and the
+  visual fixes it brings are changed in a sibling; anything else found there
+  is filed on its tracker.

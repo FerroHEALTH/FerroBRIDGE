@@ -27,7 +27,8 @@ checked out beside it on the owner's machine:
   issues. That is the fastest source of prior art for a decision here.
 - **Exception: the FerroUI migration.** The owner signed off on 2026-10-18 on
   moving every console onto FerroUI, sibling repositories included
-  ([[ferroui]]).
+  ([[ferroui]]). It is standing: every FerroUI release made from here is
+  rolled out to all four consoles from here too (owner, 2026-10-18).
 - **Never edit either from this repository on your own initiative.** A code
   change a sibling needs is made there, in its own session. Owner ruling
   2026-09-12: when the owner directs a sibling change from a FerroBRIDGE
