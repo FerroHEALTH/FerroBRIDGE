@@ -78,3 +78,4 @@
 - [Worker wait loops](worker-wait-loops.md) — worker briefs forbid self-matching pgrep waits; find and kill stuck shells by working directory; owner 2026-10-16
 - [PR backlog discipline](pr-backlog-discipline.md) — several open PRs are fine if each merges cleanly; no stacked PRs, overlapping work in sequence, every open PR tracked to its merge; owner 2026-10-17
 - [Autonomous loop](autonomous-loop.md) — never stop, never wait idle, never ask the owner; keep working the issues while PRs drain; owner 2026-10-17
+- [FerroUI](ferroui.md) — one shared UI component library for every console, pinned Cargo dependency, owner sign-off to migrate the siblings; owner 2026-10-18
