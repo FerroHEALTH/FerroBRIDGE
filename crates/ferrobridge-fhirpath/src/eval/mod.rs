@@ -16,6 +16,7 @@ pub mod error;
 mod functions;
 mod navigate;
 mod operators;
+mod order;
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -42,6 +43,7 @@ pub struct Environment<'a> {
     profiles: Option<&'a dyn Profiles>,
     definitions: Option<&'a dyn Definitions>,
     now: Option<jiff::Timestamp>,
+    strict_ordering: bool,
 }
 
 impl fmt::Debug for Environment<'_> {
@@ -54,6 +56,7 @@ impl fmt::Debug for Environment<'_> {
             .field("profiles", &self.profiles.is_some())
             .field("definitions", &self.definitions.is_some())
             .field("now", &self.now)
+            .field("strict_ordering", &self.strict_ordering)
             .finish()
     }
 }
@@ -70,6 +73,7 @@ impl<'a> Environment<'a> {
             profiles: None,
             definitions: None,
             now: None,
+            strict_ordering: false,
         }
     }
 
@@ -114,6 +118,21 @@ impl<'a> Environment<'a> {
     #[must_use]
     pub const fn with_now(mut self, now: jiff::Timestamp) -> Self {
         self.now = Some(now);
+        self
+    }
+
+    /// Refuses an order-dependent operation on a collection whose order is
+    /// undefined.
+    ///
+    /// N1 §3.1 leaves the order of `children()` and `descendants()`, and of
+    /// every collection derived from them, undefined, and lets an
+    /// implementation return an error when `first()`, `last()`, `tail()`,
+    /// `skip()`, `take()` or the indexer runs over such a collection. With
+    /// this mode on, that is [`EvalError::Unordered`]; without it, those
+    /// operations answer in the order the document holds.
+    #[must_use]
+    pub const fn with_strict_ordering(mut self) -> Self {
+        self.strict_ordering = true;
         self
     }
 
@@ -398,6 +417,9 @@ impl<'e, 'a> Engine<'e, 'a> {
                 self.navigate(&items, name, input.is_none())
             }
             Expr::Call { input, name, args } => {
+                if order::ORDERED_FUNCTIONS.contains(&name.as_str()) {
+                    self.require_order(name, input.as_deref())?;
+                }
                 let items = self.input(input.as_deref(), frame)?;
                 self.call(name, items, args, frame)
             }
@@ -406,6 +428,7 @@ impl<'e, 'a> Engine<'e, 'a> {
                 self.eval(variable, &Frame::top(items))
             }
             Expr::Indexer { input, index } => {
+                self.require_order("[]", Some(input))?;
                 let items = self.eval(input, frame)?;
                 let index =
                     convert::integer(self.model(), &self.eval(index, frame)?, "the indexer")?;
@@ -441,6 +464,17 @@ impl<'e, 'a> Engine<'e, 'a> {
                 }
             }
         }
+    }
+
+    /// Refuses the order-dependent `operation` on `input` in the strict
+    /// ordering mode when N1 §3.1 leaves the input's order undefined.
+    fn require_order(&self, operation: &str, input: Option<&Expr>) -> Result<(), EvalError> {
+        if self.env.strict_ordering && input.is_some_and(order::unordered) {
+            return Err(EvalError::Unordered {
+                operation: String::from(operation),
+            });
+        }
+        Ok(())
     }
 
     /// The input of a member or a call: the expression before the `.`, or

@@ -167,6 +167,7 @@ testDivide/testDivide5
 testDivide/testDivide6
 testDollar/testDollarOrderAllowed
 testDollar/testDollarOrderAllowedA
+testDollar/testDollarOrderNotAllowed
 testDollar/testDollarThis1
 testDollar/testDollarThis2
 testEndsWith/testEndsWith1
