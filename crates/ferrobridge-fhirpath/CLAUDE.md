@@ -36,7 +36,9 @@ A member no type of the input defines, a leading type name that is not the
 context's, a function N1 and R4 do not define, an unresolvable type
 specifier and every singleton breach of N1 §4.5 are typed errors. A function
 of a later FHIRPath release (`lowBoundary()`, `sort()`, `trim()`) is not
-defined here: N1 is the version R4 cites. Navigation over system values,
+defined by default: N1 is the version R4 cites. The thirteen FHIRPath 3.0.0
+STU functions are admitted only behind
+`Environment::with_fhirpath_stu3_functions` (`docs/architecture.md` §15). Navigation over system values,
 untyped nodes and the results of `children()`, `descendants()` and
 `resolve()` stays lenient, as N1 §11 says a compiler cannot type them.
 `Environment::with_strict_ordering` refuses `first()`, `last()`, `tail()`,
@@ -78,9 +80,12 @@ UTC; `trace()` logs shapes, never values; `iif()` keeps the surrounding
 
 ## Tests
 
-`tests/it/conformance.rs` runs the vendored HL7 FHIRPath test suite as the
-`fhirpath-r4` corpus (`docs/specs/fhirpath-tests/`), never special-casing a
-test by name. `tests/it/constraints.rs` parses every invariant of the vendored
+`tests/it/conformance.rs` runs the vendored HL7 FHIRPath test suite
+(`docs/specs/fhirpath-tests/`) as two corpora, never special-casing a test
+by name: `fhirpath-r4` in the default N1 environment, and `fhirpath-r4-stu3`
+for the cases that use a 3.0.0 STU function, routed by function name and run
+with the opt-in. `tests/it/constraints.rs` parses every invariant of the vendored
 packages and checks the R4 core ones against their elements; an invariant a
 package publishes with a defect is an expected refusal with the evidence.
+The same sweep checks the STU3 core invariants against `model::stu3::Stu3`.
 Fixtures are synthetic.
