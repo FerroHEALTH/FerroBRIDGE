@@ -39,8 +39,23 @@ const BEST_PRACTICE: &str =
 /// types that cannot carry the fact all read as absent.
 const SAME_ARMS: &str = "#[expect(\n    clippy::match_same_arms,\n    reason = \"an extension value is read by one arm per type the version admits, and every arm of a type that cannot carry the fact reads as absent\"\n)]\n";
 
-/// The extension stating a primitive type's lexical form.
-const REGEX: &str = "http://hl7.org/fhir/StructureDefinition/regex";
+/// The name of the generated constant listing the extensions that state a
+/// primitive type's lexical form.
+const LEXICAL_FORMS: &str = "LEXICAL_FORMS";
+
+/// The generated constant [`LEXICAL_FORMS`] names: `regex` from R4 and
+/// `structuredefinition-regex` in STU3, as the snapshot reader accepts both
+/// (<https://hl7.org/fhir/STU3/datatypes.html#primitive>).
+const LEXICAL_FORMS_ITEM: &str = "/// The extensions stating a primitive type's lexical form: `regex` from R4,\n/// `structuredefinition-regex` in STU3.\nconst LEXICAL_FORMS: [&str; 2] = [\n    \"http://hl7.org/fhir/StructureDefinition/regex\",\n    \"http://hl7.org/fhir/StructureDefinition/structuredefinition-regex\",\n];\n";
+
+/// Which extension urls an extension read accepts.
+#[derive(Debug, Clone, Copy)]
+enum Urls {
+    /// One url, written inline.
+    One(&'static str),
+    /// The urls a generated constant of this name lists.
+    Listed(&'static str),
+}
 
 /// The codec module from a version file.
 const C: &str = "super::super::codec";
@@ -91,6 +106,7 @@ pub fn render_definition(model: &VersionModule) -> Result<String, fmt::Error> {
     )?;
     let reader = Reader { model };
     let own = ELEMENT_DEFINITION;
+    writeln!(out, "{LEXICAL_FORMS_ITEM}")?;
     writeln!(
         out,
         "{SAME_ARMS}impl {D}::ElementDefinitionRead for super::element_definition::ElementDefinition {{"
@@ -220,7 +236,7 @@ fn render_structured(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
         reader.text_list(ty, "targetProfile", "item"),
         reader.text_list(ty, "aggregation", "item"),
         reader.text_opt(ty, "versioning", "item"),
-        reader.extension(ty, "item", REGEX, Read::Text),
+        reader.extension(ty, "item", Urls::Listed(LEXICAL_FORMS), Read::Text),
     );
     method(
         out,
@@ -233,7 +249,7 @@ fn render_structured(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
         "{D}::BindingRead {{ strength: {}, value_set: {}, max_value_set: {} }}",
         reader.text_opt(binding, "strength", "item"),
         reader.text_opt(binding, "valueSet", "item"),
-        reader.extension(binding, "item", MAX_VALUE_SET, Read::Text),
+        reader.extension(binding, "item", Urls::One(MAX_VALUE_SET), Read::Text),
     );
     method(
         out,
@@ -250,7 +266,7 @@ fn render_structured(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
         reader.text_opt(constraint, "expression", "item"),
         reader.text_opt(constraint, "xpath", "item"),
         reader.text_opt(constraint, "source", "item"),
-        reader.extension(constraint, "item", BEST_PRACTICE, Read::Bool),
+        reader.extension(constraint, "item", Urls::One(BEST_PRACTICE), Read::Bool),
     );
     method(
         out,
@@ -401,17 +417,21 @@ impl Reader<'_> {
         }
     }
 
-    /// The read of the value of the extension whose url is `url`, among the
-    /// extensions of the struct at `path` on `receiver`; absent where the
-    /// struct carries none with that url.
-    fn extension(&self, path: &str, receiver: &str, url: &str, read: Read) -> String {
+    /// The read of the value of the first extension whose url `urls` names,
+    /// among the extensions of the struct at `path` on `receiver`; absent
+    /// where the struct carries none with such a url.
+    fn extension(&self, path: &str, receiver: &str, urls: Urls, read: Read) -> String {
         let Some(field) = self.field(path, "extension") else {
             return String::from("None");
         };
         let url_read = self.text_opt("Extension", "url", "extension");
         let value = self.optional("Extension", "value", "extension", read);
+        let test = match urls {
+            Urls::One(url) => format!("{url_read} == Some({url:?})"),
+            Urls::Listed(list) => format!("{url_read}.is_some_and(|url| {list}.contains(&url))"),
+        };
         format!(
-            "{receiver}.{}.iter().filter(|extension| {url_read} == Some({url:?})).find_map(|extension| {value})",
+            "{receiver}.{}.iter().filter(|extension| {test}).find_map(|extension| {value})",
             field.name
         )
     }
