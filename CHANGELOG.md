@@ -34,6 +34,17 @@ crates on crates.io.
   test reads each.
 ### Changed
 
+- The openEHR RM is pinned (#476): the conformance target is RM Release
+  1.1.0, the newest published release, and the code compiles against the
+  `openehr_rm::v1_2` development generation, which `openehr-sdt` and
+  `openehr-its` build on. `docs/VERSIONS.md` and `docs/architecture.md` §2
+  carry the sixth specification row and what `v1_2` changes against Release
+  1.1.0 (`EHR.tags`, `GENERIC_ENTRY.data` widened to `ITEM`,
+  `PARTY.reverse_relationships` removed); §3 records the `1.2.0`
+  `ARCHETYPED.rm_version` stamp as a deviation (#844).
+  `scripts/checks/versions.sh` compares six specification pins and fails a
+  hand-written `openehr_rm::v1_N` path under `app/`, `crates/` or `tools/`
+  that names another generation.
 - `scripts/vendor/profile-packages.sh` hashes a profile package tree once
   (#840): the count and digest of a verified tree are stamped under the
   ignored `target/` with a fingerprint of its files' sizes and modification

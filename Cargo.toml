@@ -45,7 +45,8 @@ rust_decimal = { version = "1.43.0", default-features = false, features = ["std"
 # against it, and the generator compiles every form it writes. Verified against
 # crates.io on 2026-09-22.
 regex = "1.13.1"
-# The openEHR RM 1.1.0 model and the BASE path parser.
+# The openEHR RM model and the BASE path parser: the code conforms to RM
+# Release 1.1.0 and compiles against the `v1_2` generation (docs/VERSIONS.md).
 openehr-rm = "0.0.87"
 # The BASE identification types the RM leaves to it: TERMINOLOGY_ID is a
 # CODE_PHRASE field, so a lens that builds one names this crate.
