@@ -268,6 +268,27 @@ target the MII Kerndatensatz modules at 2025.0.0).
 | `hl7.terminology.r4` | 6.3.0 files `4389` digest `67c5e37eee889968f623290df576cf8a24a6de8936c0ad4b14e742b6faf9833f` | `docs/specs/fhir-packages/hl7.terminology.r4#6.3.0/PROVENANCE.md` |
 | `hl7.terminology.r4` | 6.2.0 files `4342` digest `6d074864dff5ce089248b6113b6049b0420b8db1ffbb2837bf4e39847d3e28fe` | `docs/specs/fhir-packages/hl7.terminology.r4#6.2.0/PROVENANCE.md` |
 
+## HL7 FHIR Validator (the agreement corpus's reference, regeneration only, never committed)
+
+The profile validator's agreement corpus (#442) compares it with the HL7 FHIR
+Validator, prior art and never the oracle. The reference outcomes under
+`crates/ferrobridge-validator/tests/agreement/reference/` are committed;
+`scripts/vendor/hl7-validator-agreement.sh` regenerates them, reading the pins
+below, fetching each into the ignored `target/hl7-validator/` and checking its
+sha256 before it runs. The jar comes from the `hapifhir/org.hl7.fhir.core`
+GitHub release of that version; each package is a tarball of the FHIR package
+registry that the validator loads for FHIR 4.0.1 beyond R4 core and the
+profile packages above. Nothing here is read by a build or a test.
+
+| Item | Pin | Repeated in |
+|---|---|---|
+| `validator_cli.jar` | 6.10.4 sha256 `1106b9d58f9e363e47bea7c4fc065841e5fc91fe9d062775c3bfdd212bd653cc` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.fhir.xver-extensions` | 0.1.0 sha256 `f3bb9fa2083402e88a02b41f433655274e8a1cca563211c8f7ba6fd0badf537a` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.terminology` | 7.4.0 sha256 `b321ad4ee1c18798abd8692f45bc86550cffac72ae97413125cfb82f0112c72d` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.fhir.uv.extensions` | 5.3.0 sha256 `6e3a3f9929e05d2b813a3f98fa1ad2f5122fb6b2819fa73e6c5520002fb2c5b0` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.terminology.r5` | 7.1.0 sha256 `473303108b5607aad7b910581739e8bbf3e61a625ed9e739c66e0ca597d4aefe` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.fhir.uv.extensions.r5` | 5.2.0 sha256 `e02fc6eff0f37c1611a35aa93ef9aaa3b55ab7371a5c96f4d2a5834106a13170` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+
 ## Crate line
 
 The library crates are published to crates.io on one crate version line,

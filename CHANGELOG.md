@@ -25,6 +25,18 @@ crates on crates.io.
 
 ### Added
 
+- The R4 profile validator is held to the HL7 FHIR Validator 6.10.4 on a
+  synthetic corpus, the `validator-agreement` conformance corpus (#442): ten
+  cases (conforming resources, and resources that break one invariant, one
+  required binding, one profile cardinality, one slice and one entry
+  profile, the EU ones against `patient-eu-core` and `bundle-eu-eps`), the
+  reference outcomes recorded beside them, and
+  `scripts/vendor/hl7-validator-agreement.sh`, which fetches the jar and the
+  packages it loads by sha256 from the new "HL7 FHIR Validator" table of
+  `docs/VERSIONS.md` and regenerates the outcomes offline. Nine of ten agree;
+  the tenth is adjudicated in the test (the reference indexes a Bundle entry
+  off by one, FHIRPath N1 §5.3.1).
+
 - The operator console has browser journeys, screenshots and a book page
   (#602). The journeys drive headless Chrome through chromedriver with the
   `thirtyfour` WebDriver client against a running bridge (`ferrobridge

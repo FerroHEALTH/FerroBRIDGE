@@ -1,0 +1,11 @@
+{
+  "validator": "HL7 FHIR Validator",
+  "issues": [
+    {
+      "severity": "error",
+      "location": "Patient.contact[0]",
+      "rule": "constraint:pat-1",
+      "text": "Constraint failed: pat-1: 'SHALL at least contain a contact's details or a reference to an organization'"
+    }
+  ]
+}
