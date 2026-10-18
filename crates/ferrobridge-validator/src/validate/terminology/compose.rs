@@ -277,7 +277,7 @@ impl<R: Release> Validator<'_, R> {
             return Ok(Membership::NotMember);
         }
         let listed = !include.concepts.is_empty();
-        if listed && !include.concepts.iter().any(|concept| *concept == text) {
+        if listed && !include.concepts.contains(&text) {
             return Ok(Membership::NotMember);
         }
         if listed && !active_only {
