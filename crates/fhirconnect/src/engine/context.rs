@@ -8,9 +8,9 @@
 //! `manual` `value`"
 //! (`docs/specs/fhirconnect/modules/ROOT/pages/basics/Variables.adoc`), so
 //! this is the one input a run takes that neither document carries. The
-//! members are the four the draft REST API chapter declares under the
-//! `context` parameter
-//! (`docs/specs/fhirconnect/draft-rest-api/rest/input/fsh/operations/ToFhir.fsh`).
+//! members are the four the REST API chapter declares under the `context`
+//! parameter, a fixed list (`engine/rest-api.adoc` §$tofhir Input,
+//! `docs/specs/fhirconnect/rest/input/fsh/operations/ToFhir.fsh`).
 //!
 //! A member the caller did not supply is a typed refusal
 //! ([`crate::engine::traverse::error::EngineError::ContextMember`]) rather than an
@@ -18,16 +18,16 @@
 
 use fhir_types::r4::reference::Reference;
 
-/// The `ehr_id` member, as the draft spells it.
+/// The `ehr_id` member, as the chapter spells it.
 pub const EHR_ID: &str = "ehr_id";
 
-/// The `patient` member, as the draft spells it.
+/// The `patient` member, as the chapter spells it.
 pub const PATIENT: &str = "patient";
 
-/// The `who` member, as the draft spells it.
+/// The `who` member, as the chapter spells it.
 pub const WHO: &str = "who";
 
-/// The `onBehalfOf` member, as the draft spells it.
+/// The `onBehalfOf` member, as the chapter spells it.
 pub const ON_BEHALF_OF: &str = "onBehalfOf";
 
 /// The per-call values one run resolves `$context` against.
@@ -110,7 +110,7 @@ impl CallContext {
     ///
     /// A reference member answers its literal reference, the form a
     /// `Reference` carries a resource in
-    /// (<https://hl7.org/fhir/R4/references.html#literal>); the draft names
+    /// (<https://hl7.org/fhir/R4/references.html#literal>); the chapter names
     /// no other rendering, so the choice is FerroBRIDGE's own.
     #[must_use]
     pub fn member(&self, name: &str) -> Option<&str> {
@@ -163,7 +163,7 @@ mod tests {
     }
 
     #[test]
-    fn a_member_the_draft_does_not_declare_answers_none() {
+    fn a_member_the_chapter_does_not_declare_answers_none() {
         let context = CallContext::new().with_ehr_id("an-ehr");
         assert_eq!(context.member("composer"), None);
     }

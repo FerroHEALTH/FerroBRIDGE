@@ -74,7 +74,7 @@ and a batch Bundle answers per entry, as FHIR R4 defines them. Bundles are
 split by the profiles in `meta.profile`, a resource that two mappings both need
 becomes a linked mapping, and unresolved references are fetched from the
 sending site with cycle protection. Beside the facade, the bridge serves the
-two operations the FHIRconnect specification is adding in its draft REST API
+two operations the FHIRconnect specification defines in its REST API
 chapter, `$tofhir` and `$toopenehr`, as the engine's own conformance surface;
 the facade is a client of the same in-process engine.
 

@@ -12,7 +12,7 @@
 //!
 //! A composition field the engine filled is `information`, because the run
 //! produced a value the source did not carry. Everything else is `warning`,
-//! because content the source carried did not reach the output. The draft
+//! because content the source carried did not reach the output. The chapter
 //! codes its own worked example `incomplete`, which is the type used here.
 //!
 //! Each issue says where its loss happened. The FHIRPath of the FHIR element
@@ -109,7 +109,7 @@ pub fn of_warning(warning: &Warning) -> OperationOutcomeIssue {
 
 /// Returns the outcome `warnings` render as, or `None` when there are none.
 ///
-/// A run that declared no loss answers no outcome at all: the draft's
+/// A run that declared no loss answers no outcome at all: the chapter's
 /// `outcome` parameter is "Present when mapping issues occurred".
 #[must_use]
 pub fn of_warnings(warnings: &[Warning]) -> Option<OperationOutcome> {

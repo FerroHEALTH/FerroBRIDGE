@@ -149,7 +149,7 @@ async fn the_direct_form_answers_the_requested_format() -> Result<(), Box<dyn St
 #[tokio::test]
 async fn the_body_takes_precedence_over_the_query() -> Result<(), Box<dyn StdError>> {
     // "Where the same field is supplied both in the body and as a query
-    // parameter, the body takes precedence" (rest-api.adoc, draft, section
+    // parameter, the body takes precedence" (rest-api.adoc, section
     // Query parameters).
     let root = mapping_tree()?;
     let built = composition(app(&root)?).await?;

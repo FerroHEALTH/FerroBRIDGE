@@ -3,7 +3,7 @@
 
 //! The bridge's operations the console's tools call.
 //!
-//! They are `$tofhir` and `$toopenehr` (the FHIRconnect draft REST API chapter, enveloped in the
+//! They are `$tofhir` and `$toopenehr` (the FHIRconnect REST API chapter, enveloped in the
 //! FHIR R4 operations framework), and `$validate` on a resource type (FHIR
 //! R4 `resource-operation-validate.html`).
 //!

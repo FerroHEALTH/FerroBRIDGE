@@ -8,7 +8,7 @@
 //! element table, the seams a run calls out to and the per-run [`Settings`].
 //! Neither reaches a CDR.
 //!
-//! FerroBRIDGE pins strictness where the draft leaves room: a refusal answers
+//! FerroBRIDGE pins strictness where the chapter leaves room: a refusal answers
 //! an `OperationOutcome` and nothing else, so a caller can never mistake a
 //! partial result for a complete one. What a successful run declares as lost
 //! travels as `information` and `warning` issues beside the result.
@@ -51,7 +51,7 @@ use crate::tree::element::Table;
 
 /// The Bundle type `$tofhir` answers with.
 ///
-/// The draft leaves the type open ("not constrained by this specification; an
+/// The chapter leaves the type open ("not constrained by this specification; an
 /// engine MAY select it according to how the resulting resources are used"),
 /// and a `$tofhir` answer is a set of resources with no search and no
 /// transaction semantics, which is what `collection` is for

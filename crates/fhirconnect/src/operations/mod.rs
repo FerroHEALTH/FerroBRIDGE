@@ -6,10 +6,10 @@
 //! The FHIRconnect REST API chapter defines one operation per mapping
 //! direction, both `POST` against the service base, both pure
 //! transformations, and both following the FHIR R4 operations framework
-//! (<https://hl7.org/fhir/R4/operations.html>). The chapter is an unmerged
-//! draft, pull request #93 of the specification, vendored at its pinned
-//! commit under `docs/specs/fhirconnect/draft-rest-api/`; every wire shape
-//! here is read from that text and is re-adjudicated when the chapter merges.
+//! (<https://hl7.org/fhir/R4/operations.html>). The chapter is
+//! `engine/rest-api.adoc` with its FSH operation definitions under `rest/`,
+//! vendored under `docs/specs/fhirconnect/` at the pinned specification
+//! commit; every wire shape here is read from that text.
 //!
 //! The parts are separate modules:
 //!
@@ -23,7 +23,7 @@
 //! - [`error`] is the typed refusal, with the R4 issue code each one renders
 //!   as.
 //!
-//! Where the draft leaves room, FerroBRIDGE pins its own answer and says so:
+//! Where the chapter leaves room, FerroBRIDGE pins its own answer and says so:
 //! strictness is the default, so a failed mapping answers an
 //! `OperationOutcome` and no Bundle or composition; the Bundle type is
 //! `collection`; and a Bundle that references more than one subject is a
@@ -51,7 +51,7 @@ pub const TO_FHIR: &str = "tofhir";
 /// `ToOpenEhr.fsh` declares `code = #toopenehr` at the system level.
 pub const TO_OPENEHR: &str = "toopenehr";
 
-/// The media type the draft defines for an openEHR payload.
+/// The media type the chapter defines for an openEHR payload.
 ///
 /// "This specification defines the media type `application/openehr+json` to
 /// identify a payload as openEHR canonical JSON", with the suffix ordering of

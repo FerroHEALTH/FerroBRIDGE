@@ -157,7 +157,7 @@ fn the_diagnosis_chain_maps_both_ways_through_the_operations() -> Result<(), Box
 #[test]
 fn every_tofhir_bundle_carries_one_provenance_covering_every_entry() -> Result<(), Box<dyn Error>> {
     // "The engine generates a Provenance resource as a side-effect of every
-    // run ... and includes it in the Bundle" (rest-api.adoc, draft, section
+    // run ... and includes it in the Bundle" (rest-api.adoc, section
     // $tofhir Output).
     let set = program_set(&[SUBJECT_CONTEXT])?;
     let committed = committed_composition()?;
@@ -256,7 +256,7 @@ fn the_call_context_overrides_the_provenance_agent() -> Result<(), Box<dyn Error
 fn the_context_patient_takes_precedence_over_the_mapped_subject() -> Result<(), Box<dyn Error>> {
     // "When the engine can resolve the subject itself and `context.patient` is
     // also supplied, the supplied value takes precedence" (rest-api.adoc,
-    // draft, section Resolving the patient).
+    // section Resolving the patient).
     let set = program_set(&[SUBJECT_CONTEXT])?;
     let committed = committed_composition()?;
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?)
@@ -284,7 +284,7 @@ fn the_context_patient_takes_precedence_over_the_mapped_subject() -> Result<(), 
 
 #[test]
 fn a_call_that_omits_the_context_patient_still_succeeds() -> Result<(), Box<dyn Error>> {
-    // "An engine MUST NOT require `context.patient`" (rest-api.adoc, draft,
+    // "An engine MUST NOT require `context.patient`" (rest-api.adoc,
     // section Resolving the patient).
     let set = program_set(&[SUBJECT_CONTEXT])?;
     let committed = committed_composition()?;
@@ -456,7 +456,7 @@ fn an_agreeing_template_pin_is_accepted() -> Result<(), Box<dyn Error>> {
 #[test]
 fn a_flat_composition_maps_in_and_a_flat_composition_maps_out() -> Result<(), Box<dyn Error>> {
     // "An engine MUST support both, and the returned Composition is the same
-    // content either way" (rest-api.adoc, draft, section $toopenehr Output).
+    // content either way" (rest-api.adoc, section $toopenehr Output).
     let set = program_set(&[SUBJECT_CONTEXT])?;
     let request =
         ToOpenehrRequest::new(bundle(vec![condition(SUBJECT_PROFILE)?])?).with_format(Format::Flat);
@@ -482,7 +482,7 @@ fn a_flat_composition_maps_in_and_a_flat_composition_maps_out() -> Result<(), Bo
 
 #[test]
 fn a_composition_with_no_identity_is_refused() -> Result<(), Box<dyn Error>> {
-    // The draft puts a Provenance in every $tofhir Bundle and
+    // The chapter puts a Provenance in every $tofhir Bundle and
     // Provenance.target is a reference, so a resource with no identity is a
     // refusal rather than a Bundle with an empty target.
     let set = program_set(&[SUBJECT_CONTEXT])?;
@@ -563,7 +563,7 @@ fn a_bundle_claiming_no_known_profile_is_refused() -> Result<(), Box<dyn Error>>
 #[test]
 fn a_template_pin_narrows_two_contexts_over_one_profile() -> Result<(), Box<dyn Error>> {
     // "supplying `templateId` pin-points exactly which context mapping to
-    // apply" (rest-api.adoc, draft, section Query parameters).
+    // apply" (rest-api.adoc, section Query parameters).
     let set = program_set(&[
         "ferrobridge_diagnose_minimal",
         "ferrobridge_diagnose_required",
@@ -622,7 +622,7 @@ fn assert_outcome_of(
 
 #[test]
 fn both_operations_answer_their_typed_losses_beside_the_outcome() -> Result<(), Box<dyn Error>> {
-    // rest-api.adoc (draft) §Reporting partial results: the gaps "MUST be made
+    // rest-api.adoc §Reporting partial results: the gaps "MUST be made
     // explicit through the OperationOutcome"; the typed losses are the same
     // set, in the same order, each located.
     let set = program_set(&["ferrobridge_split"])?;

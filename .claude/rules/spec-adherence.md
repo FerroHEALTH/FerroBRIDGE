@@ -34,8 +34,9 @@ verbatim with a `PROVENANCE.md` per tree (`vendored-inputs.md`):
 
 - `docs/specs/fhirconnect/`: the two published mapping schemas (under
   `build/site/FHIRconnect/v1.0.0/_attachments/`), the specification prose
-  (`modules/ROOT/pages/`), and the unmerged REST API chapter under
-  `draft-rest-api/`.
+  (`modules/ROOT/pages/`, the REST API chapter
+  `engine/rest-api.adoc` among them), and the chapter's FSH operation
+  definitions under `rest/`.
 - `docs/specs/fhirconnect-mapping-lib/`: the mapping library, the conformance
   corpus, never an oracle.
 - `docs/specs/omocl/`: the OMOCL corpus.

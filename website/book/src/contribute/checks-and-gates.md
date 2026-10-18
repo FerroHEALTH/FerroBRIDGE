@@ -74,7 +74,7 @@ version through the `fhir-types` model (`fhir-stu3`, `fhir-r4`, `fhir-r4b`,
 | FHIRconnect mapping library | the file parses; it validates against the published schemas (`modules/ROOT/attachments/`, `schema/schema.adoc`) or is in the pinned rejection set; it validates against FerroBRIDGE's strict schemas; it loads into the library set with no refusal naming it; and a program the suites compile against a template carrying its archetype reaches it (`types-of-mapping-files/context-mappings.adoc`) |
 | OMOCL mapping library | the file parses, validates against the authored schema, passes the rules of one file, and loads into the library set with every `Include` resolved |
 | FHIR round-trip laws | `PutGet` and `GetPut` both run on the chain and each declares exactly the set its reviewed snapshot pins |
-| FHIRconnect REST API (draft) | the wire contract reads every `in` parameter and part the FSH operation definition declares, and the operation answers only the `out` parameters it declares, each `min = 1` one present (`rest-api.adoc`, draft) |
+| FHIRconnect REST API | the wire contract reads every `in` parameter and part the FSH operation definition declares, and the operation answers only the `out` parameters it declares, each `min = 1` one present (`rest-api.adoc`) |
 | HL7 v2 message corpora, HL7 v2 smoke corpora | the message is framed, decoded and parsed with no refusal, and the Bundle the map writes decodes as R4 and opens with its `MessageHeader` (`bdl-12`); an acknowledgment passes when it parses |
 | FHIR STU3, FHIR R4, FHIR R4B, FHIR R5, FHIR R6 | the example decodes through the strict JSON codec of its version, re-encodes to the same document, and goes through the XML codec and back unchanged, compared as the lexical document model (members by name, numbers in their written text); a refusal or the first difference is the failure reason |
 | FHIRPath R4 test suite, N1 and 3.0.0 STU functions | for a test expecting the expression refused (`invalid`), the expression fails to parse, fails the static check against the input's resource type, or fails to evaluate; for any other test, the evaluation answers the expected outputs, in order unless the test says `ordered="false"` (HL7 `tests-fhir-r4.xml`; FHIRPath N1, and the functions FHIRPath 3.0.0 adds as STU for `fhirpath-r4-stu3`) |
@@ -119,7 +119,7 @@ and brightgreen when every case passes.
 The script also generates the README block between `<!-- badges:begin -->`
 and `<!-- badges:end -->` from those files, in a fixed order, so never edit
 it by hand: the build badges, a blank line, then one row per standard
-(FHIRconnect 1.0.0 with the mapping library and the draft REST API, OMOCL
+(FHIRconnect 1.0.0 with the mapping library and the REST API, OMOCL
 1.0.0, FHIR with the four model corpora, the round-trip laws and the R4
 facade, and HL7 v2 with its two corpora, its
 family badges and its version badges). Every badge links to its pass list,

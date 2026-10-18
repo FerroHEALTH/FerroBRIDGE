@@ -85,12 +85,12 @@ const SEARCH_INTERACTION: &str = "search-type";
 
 /// The canonical `OperationDefinition` of `$tofhir`.
 ///
-/// `ToFhir.fsh` of the draft REST API chapter (FHIRconnect pull request #93)
+/// `ToFhir.fsh` of the FHIRconnect REST API chapter
 /// assigns no `url`, so this is the IG convention of canonical base plus
 /// `/<ResourceType>/<id>` (<https://hl7.org/fhir/R4/references.html#canonical>,
 /// <https://fshschool.org/docs/sushi/configuration/>) over the instance id
 /// `ToFhir` and the `canonical: http://fhirconnect.org/fhir` of
-/// `docs/specs/fhirconnect/draft-rest-api/rest/sushi-config.yaml`.
+/// `docs/specs/fhirconnect/rest/sushi-config.yaml`.
 pub const TOFHIR_DEFINITION: &str = "http://fhirconnect.org/fhir/OperationDefinition/ToFhir";
 
 /// The canonical `OperationDefinition` of `$toopenehr`.
@@ -189,7 +189,7 @@ pub fn statement(programs: &Programs, base: &str, operations: Operations) -> Cap
 /// `base` is the absolute URL the facade is reachable at, which the statement
 /// records as its implementation description. With [`Operations::Served`],
 /// `rest.operation` names `$tofhir` and `$toopenehr`, the two operations the
-/// draft chapter defines with `system = true`
+/// REST API chapter defines with `system = true`
 /// (<https://hl7.org/fhir/R4/capabilitystatement.html>,
 /// `CapabilityStatement.rest.operation`). Their direct forms are never named:
 /// the chapter calls them "a deliberate deviation from the FHIR Operations
