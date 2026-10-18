@@ -32,6 +32,17 @@ crates on crates.io.
   `openehr-template-id`), and System defines the `OPTIONS /` capability call.
   `scripts/vendor/its-rest.sh` fetches and checks all five, and the corpus
   test reads each.
+### Changed
+
+- `scripts/vendor/profile-packages.sh` hashes a profile package tree once
+  (#840): the count and digest of a verified tree are stamped under the
+  ignored `target/` with a fingerprint of its files' sizes and modification
+  and change times, and a run that finds the fingerprint unchanged reads them
+  from the stamp and says so. A changed or added file changes the
+  fingerprint and the tree is hashed again; the pin is compared on every run.
+  A second run over the 17 trees takes about 2 seconds instead of about 3
+  minutes. `.gitignore` refuses the `*.pending-snap` and `*.snap.new` files
+  insta writes (#839).
 
 ## [0.0.8] - 2026-10-18
 

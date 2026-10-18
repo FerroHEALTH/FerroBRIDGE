@@ -85,3 +85,9 @@ fuzz/coverage/
 # are fetched instead, and only each PROVENANCE.md is committed.
 /docs/specs/fhir-packages/*/*
 !/docs/specs/fhir-packages/*/PROVENANCE.md
+
+# The pending and new snapshots insta writes while a snapshot test fails or
+# awaits review. Only the reviewed .snap files are committed
+# (<https://insta.rs/docs/cli/>).
+*.pending-snap
+*.snap.new

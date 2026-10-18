@@ -235,7 +235,10 @@ rows are the five versions the set names. Every package depends on
 FHIR packages table above already vendors at
 `tools/fhir-codegen/vendor/hl7.fhir.r4.core/`. Each pin is the version, then
 the file count and tree digest of the unpacked tree, which the script checks
-a download or a cache-restored tree against. `--check` works offline: it reads
+a download or a cache-restored tree against. A tree it has verified is
+stamped under the ignored `target/profile-packages-verified/` with a
+fingerprint of its files' sizes and times, so a later run hashes it again only
+when a file changed. `--check` works offline: it reads
 every `PROVENANCE.md` against its row, verifies every tree on disk, refuses a
 tree with no row, and asserts the closure is complete: every `dependencies`
 entry of every package is itself pinned. It reads the dependencies from a
