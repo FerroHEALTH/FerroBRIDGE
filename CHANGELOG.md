@@ -67,6 +67,9 @@ crates on crates.io.
 
 ### Changed
 
+- The README's generated badge block keeps the two HL7 v2 corpus badges in
+  view and folds the per-family and per-version badges into a collapsed
+  block, which `scripts/checks/conformance.sh --update` renders (#860).
 - The FHIRconnect specification source moves to upstream commit
   `e5871641`, which carries the merged REST API chapter (pull request #93) and
   the sub-contexts (pull request #100) (#477). The chapter is no longer a
