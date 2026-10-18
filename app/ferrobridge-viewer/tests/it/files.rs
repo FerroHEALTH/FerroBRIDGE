@@ -107,17 +107,18 @@ async fn drawn(
 /// entities read back.
 fn shown_lines(html: &str) -> Vec<String> {
     let list = html
-        .split_once("class=\"code-lines\">")
-        .and_then(|(_, rest)| rest.split_once("</ol>"))
+        .split_once("fui-code-panel-numbered")
+        .and_then(|(_, rest)| rest.split_once("<pre>"))
+        .and_then(|(_, rest)| rest.split_once("</pre>"))
         .map_or_else(|| panic!("the file's lines: {html}"), |(list, _)| list);
-    list.split("<li id=\"L")
+    list.split("<span class=\"fui-code-line\" id=\"L")
         .skip(1)
         .map(|item| {
             let content = item
                 .split_once("\">")
                 .map(|(_, content)| content)
-                .expect("an item's content");
-            let content = content.split_once("</li>").expect("a closed item").0;
+                .expect("a line's content");
+            let content = content.strip_suffix("</span>").expect("a closed line");
             let mut text = String::new();
             let mut inside = false;
             for character in content.chars() {
@@ -154,14 +155,17 @@ async fn the_bytes_shown_equal_the_bytes_the_operator_api_serves() -> Result<(),
     let mut shown = shown_lines(&html).join("\n");
     shown.push('\n');
     assert_eq!(MODEL, shown);
-    assert!(html.contains("<li id=\"L4\">"), "{html}");
+    assert!(
+        html.contains(r#"<span class="fui-code-line" id="L4">"#),
+        "{html}"
+    );
     assert!(html.contains("<code>abc123</code>"), "the digest: {html}");
     assert!(
-        html.contains(r#"<span class="tok-key">grammar</span>"#),
+        html.contains(r#"<span class="fui-tok-key">grammar</span>"#),
         "{html}"
     );
     assert!(
-        html.contains(r#"<span class="tok-comment"># naïve &lt;name&gt;</span>"#),
+        html.contains(r#"<span class="fui-tok-comment"># naïve &lt;name&gt;</span>"#),
         "{html}"
     );
     assert!(!html.contains("<b>"), "escaped: {html}");
@@ -184,7 +188,7 @@ async fn each_diagnostic_sits_beside_the_file_linked_to_its_line() -> Result<(),
     assert!(html.contains("invalid-mapping-name"), "{html}");
     assert!(html.contains("the synthetic name is refused"), "{html}");
     assert!(
-        html.contains(r#"<span class="badge tone-danger">error</span>"#),
+        html.contains(r#"<span class="fui-badge fui-tone-bad">error</span>"#),
         "{html}"
     );
     Ok(())
@@ -280,11 +284,11 @@ async fn the_file_page_carries_the_file_and_a_visitor_reads_the_sign_in()
     let (response, page) = send(&service, get_with(&format!("/files/{PATH}"), &cookie)?).await?;
     assert_eq!(StatusCode::OK, response.status());
     assert!(
-        page.contains(r#"<span class="tok-key">grammar</span>"#),
+        page.contains(r#"<span class="fui-tok-key">grammar</span>"#),
         "{page}"
     );
     let (_response, page) = send(&service, get_with("/files", &cookie)?).await?;
-    assert!(page.contains("<h1>Mapping files</h1>"), "{page}");
+    assert!(page.contains(">Mapping files</h1>"), "{page}");
     let (_state, visitor) = console("")?;
     let (_response, page) = send(&visitor, get(&format!("/files/{PATH}"))?).await?;
     assert!(page.contains(">Sign in</a>"), "{page}");

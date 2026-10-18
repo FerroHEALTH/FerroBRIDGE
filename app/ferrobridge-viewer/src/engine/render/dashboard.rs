@@ -12,6 +12,13 @@ use std::collections::BTreeSet;
 
 use ferrobridge_operator_api::health::{Info, Lane, Readiness, State};
 use ferrobridge_operator_api::operator::EngineState;
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::table::model::filled_columns;
+use ferrohealth_ui::table::view::Column;
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::layout::main_aside;
+use ferrohealth_ui::view::status::{badge, status};
+use ferrohealth_ui::view::surface::{Stat, card, facts_row, stack, stat_card, stat_grid};
 use http::StatusCode;
 use leptos::prelude::*;
 use openehr_mapping_core::diagnostic::Severity;
@@ -26,177 +33,42 @@ pub fn render(
     readiness: &Result<(StatusCode, Readiness), BridgeError>,
     state: &Result<EngineState, BridgeError>,
 ) -> String {
-    let info_sections = match info {
-        Ok(info) => facts(info),
-        Err(error) => parts::failed("Bridge", error),
+    let tiles = match state {
+        Ok(state) => stats(state),
+        Err(_) => ().into_any(),
+    };
+    let loaded = state.as_ref().ok();
+    let (built, lanes, pins) = match info {
+        Ok(info) => facts(info, loaded),
+        Err(error) => (parts::failed("Bridge", error), ().into_any(), ().into_any()),
+    };
+    // NOTE: no specification governs this: our own design; the counts the tiles
+    // do not show sit in the Bridge card, and a load the bridge refused says so.
+    let unloaded = match state {
+        Ok(_) => ().into_any(),
+        Err(error) => parts::failed("Mappings", error),
     };
     let ready = match readiness {
         Ok((status, report)) => indicators(*status, report)
             .unwrap_or_else(|shape| parts::unreadable("Readiness", &shape)),
         Err(error) => parts::failed("Readiness", error),
     };
-    let loaded = match state {
-        Ok(state) => counts(state),
-        Err(error) => parts::failed("Mappings", error),
-    };
-    view! { <div class="sections">{info_sections} {ready} {loaded}</div> }.to_html()
+    let health = stack(view! {
+        {lanes}
+        {ready}
+    });
+    stack(view! {
+        {tiles}
+        {built}
+        {unloaded}
+        {main_aside(health, pins)}
+    })
+    .to_html()
 }
 
-/// The build facts, the lanes and the pins of `info`.
-fn facts(info: &Info) -> AnyView {
-    let lanes = info.lanes.iter().map(lane).collect_view();
-    let pins = info
-        .pins
-        .iter()
-        .map(|pin| {
-            view! {
-                <tr>
-                    <th scope="row">{pin.name.clone()}</th>
-                    <td>{pin.version.clone()}</td>
-                </tr>
-            }
-        })
-        .collect_view();
-    view! {
-        <section class="card">
-            <h2>"Bridge"</h2>
-            <dl>
-                <dt>"Product"</dt>
-                <dd>{info.product.clone()}</dd>
-                <dt>"Version"</dt>
-                <dd>{info.version.clone()}</dd>
-                <dt>"Commit"</dt>
-                <dd>
-                    <code>{info.build.commit_short.clone()}</code>
-                </dd>
-                <dt>"Built"</dt>
-                <dd>{info.build.built_at.clone()}</dd>
-                <dt>"Compiler"</dt>
-                <dd>{info.build.rustc.clone()}</dd>
-            </dl>
-        </section>
-        <section class="card">
-            <h2>"Lanes and listeners"</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th scope="col">"Lane"</th>
-                        <th scope="col">"Configured"</th>
-                        <th scope="col">"Listener"</th>
-                        <th scope="col">"Listening"</th>
-                    </tr>
-                </thead>
-                <tbody>{lanes}</tbody>
-            </table>
-        </section>
-        <section class="card">
-            <h2>"Pins"</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th scope="col">"Specification or crate"</th>
-                        <th scope="col">"Version"</th>
-                    </tr>
-                </thead>
-                <tbody>{pins}</tbody>
-            </table>
-        </section>
-    }
-    .into_any()
-}
-
-/// One row of the lanes table.
-fn lane(lane: &Lane) -> AnyView {
-    let listen = lane
-        .listen
-        .clone()
-        .unwrap_or_else(|| String::from("none of its own"));
-    let up = match lane.up {
-        None => ("not applicable", "badge tone-neutral"),
-        Some(true) => ("up", "badge tone-ok"),
-        Some(false) => ("down", "badge tone-danger"),
-    };
-    let (configured, tone) = if lane.enabled {
-        ("on", "badge tone-ok")
-    } else {
-        ("off", "badge tone-neutral")
-    };
-    view! {
-        <tr>
-            <th scope="row">{lane.name.clone()}</th>
-            <td>
-                <span class=tone>{configured}</span>
-            </td>
-            <td>
-                <code>{listen}</code>
-            </td>
-            <td>
-                <span class=up.1>{up.0}</span>
-            </td>
-        </tr>
-    }
-    .into_any()
-}
-
-/// The readiness report the bridge answered with `status`, which must agree
-/// with the report's own state.
-fn indicators(status: StatusCode, report: &Readiness) -> Result<AnyView, Shape> {
-    let (word, tone) = match (report.state, status) {
-        (State::Up, StatusCode::OK) => ("Ready", "pill tone-ok"),
-        (State::Down, StatusCode::SERVICE_UNAVAILABLE) => ("Not ready", "pill tone-danger"),
-        _ => return Err(Shape { path: "state" }),
-    };
-    let rows = report
-        .indicators
-        .iter()
-        .map(|(name, outcome)| {
-            let (word, tone) = match outcome.state {
-                State::Up => ("up", "badge tone-ok"),
-                State::Down => ("down", "badge tone-danger"),
-            };
-            view! {
-                <tr>
-                    <th scope="row">{name.clone()}</th>
-                    <td>
-                        <span class=tone>{word}</span>
-                    </td>
-                    <td>{outcome.detail.clone().unwrap_or_default()}</td>
-                </tr>
-            }
-        })
-        .collect_view();
-    let table = if report.indicators.is_empty() {
-        view! { <p>"The bridge registers no readiness indicator."</p> }.into_any()
-    } else {
-        view! {
-            <table>
-                <thead>
-                    <tr>
-                        <th scope="col">"Indicator"</th>
-                        <th scope="col">"State"</th>
-                        <th scope="col">"Detail"</th>
-                    </tr>
-                </thead>
-                <tbody>{rows}</tbody>
-            </table>
-        }
-        .into_any()
-    };
-    Ok(view! {
-        <section class="card">
-            <h2>"Readiness"</h2>
-            <p>
-                <span class=tone>{word}</span>
-            </p>
-            {table}
-        </section>
-    }
-    .into_any())
-}
-
-/// The counts of what the running load compiled, from `state`.
-fn counts(state: &EngineState) -> AnyView {
-    let counts = state.counts;
+/// What the running load compiled, counted: the models, and the errors and
+/// warnings of its diagnostics.
+fn tally(state: &EngineState) -> (usize, usize, usize) {
     let models = state
         .contexts
         .iter()
@@ -209,29 +81,219 @@ fn counts(state: &EngineState) -> AnyView {
         .filter(|diagnostic| diagnostic.severity() == Severity::Error)
         .count();
     let warnings = state.diagnostics.len().saturating_sub(errors);
-    view! {
-        <section class="card">
-            <h2>"Mappings"</h2>
-            <dl class="counts">
-                <dt>"Contexts loaded"</dt>
-                <dd>{format!("{} of {}", counts.programs, counts.contexts)}</dd>
-                <dt>"Models"</dt>
-                <dd>{models.to_string()}</dd>
-                <dt>"Templates"</dt>
-                <dd>{counts.templates.to_string()}</dd>
-                <dt>"FHIRconnect files"</dt>
-                <dd>{counts.fhirconnect_files.to_string()}</dd>
-                <dt>"OMOCL files"</dt>
-                <dd>{counts.omocl_files.to_string()}</dd>
-                <dt>"Errors"</dt>
-                <dd>{errors.to_string()}</dd>
-                <dt>"Warnings"</dt>
-                <dd>{warnings.to_string()}</dd>
-            </dl>
+    (models, errors, warnings)
+}
+
+/// The four measures across the top, each leading to the page it counts.
+fn stats(state: &EngineState) -> AnyView {
+    let (models, errors, warnings) = tally(state);
+    let mappings = Some(String::from(crate::engine::MAPPINGS));
+    let cards = [
+        Stat {
+            glyph: Glyph::LAYERS,
+            value: format!("{} of {}", state.counts.programs, state.counts.contexts),
+            label: "Contexts loaded".into(),
+            href: mappings.clone(),
+        },
+        Stat {
+            glyph: Glyph::FILES,
+            value: models.to_string(),
+            label: "Models".into(),
+            href: mappings.clone(),
+        },
+        Stat {
+            glyph: Glyph::CIRCLE_X,
+            value: errors.to_string(),
+            label: "Errors".into(),
+            href: mappings.clone(),
+        },
+        Stat {
+            glyph: Glyph::TRIANGLE_ALERT,
+            value: warnings.to_string(),
+            label: "Warnings".into(),
+            href: mappings,
+        },
+    ]
+    .into_iter()
+    .map(stat_card)
+    .collect_view();
+    stat_grid(cards).into_any()
+}
+
+/// The cards of `info`: the build facts with the files the running load
+/// `loaded` read, the lanes, and the pins.
+fn facts(info: &Info, loaded: Option<&EngineState>) -> (AnyView, AnyView, AnyView) {
+    let pins = info
+        .pins
+        .iter()
+        .map(|pin| {
+            view! {
+                <tr>
+                    <th scope="row">{pin.name.clone()}</th>
+                    <td>{pin.version.clone()}</td>
+                </tr>
+            }
+        })
+        .collect_view()
+        .into_any();
+    let mut built = vec![
+        ("Product", info.product.clone().into_any()),
+        ("Version", info.version.clone().into_any()),
+        (
+            "Commit",
+            view! { <code>{info.build.commit_short.clone()}</code> }.into_any(),
+        ),
+        ("Built", info.build.built_at.clone().into_any()),
+        ("Compiler", info.build.rustc.clone().into_any()),
+    ];
+    if let Some(state) = loaded {
+        let counts = state.counts;
+        built.extend([
+            ("Templates", counts.templates.to_string().into_any()),
+            (
+                "FHIRconnect files",
+                counts.fhirconnect_files.to_string().into_any(),
+            ),
+            ("OMOCL files", counts.omocl_files.to_string().into_any()),
+        ]);
+    }
+    let overview = loaded.map(|_| {
+        view! {
             <p>
                 <a href=crate::engine::MAPPINGS>"The mappings overview"</a>
             </p>
-        </section>
+        }
+    });
+    (
+        card(
+            "Bridge",
+            view! {
+                {facts_row(built)}
+                {overview}
+            },
+        )
+        .into_any(),
+        card("Lanes and listeners", lanes(&info.lanes)).into_any(),
+        card(
+            "Pins",
+            parts::table_unstacked("Pins", &["Specification or crate", "Version"], pins),
+        )
+        .into_any(),
+    )
+}
+
+/// The columns of the lanes table.
+const LANE_COLUMNS: [Column; 3] = [
+    Column::text("lane", "Lane"),
+    Column::text("configured", "Configured"),
+    Column::text("listener", "Listener"),
+];
+
+/// The columns of the readiness indicators.
+const INDICATOR_COLUMNS: [Column; 3] = [
+    Column::text("indicator", "Indicator"),
+    Column::text("state", "State"),
+    Column::text("detail", "Detail"),
+];
+
+/// The lanes table; the listener column is drawn only when a lane has a
+/// listener of its own.
+fn lanes(lanes: &[Lane]) -> AnyView {
+    let columns = filled_columns(&LANE_COLUMNS, lanes, &[], |lane, key| {
+        key != "listener" || lane.listen.is_some()
+    });
+    let listening = columns.iter().any(|column| column.key == "listener");
+    let rows = lanes
+        .iter()
+        .map(|each| lane(each, listening))
+        .collect_view()
+        .into_any();
+    parts::columns_table("Lanes and listeners", &columns, rows)
+}
+
+/// One row of the lanes table: with `listening`, the listener of a lane that
+/// has one of its own, with whether it accepts connections now.
+fn lane(lane: &Lane, listening: bool) -> AnyView {
+    let configured = if lane.enabled {
+        badge(Tone::Ok, "on")
+    } else {
+        badge(Tone::Neutral, "off")
+    };
+    let listener = listening.then(|| {
+        let shown = match lane.listen.clone() {
+            Some(listen) => {
+                let state = match lane.up {
+                    Some(true) => badge(Tone::Ok, "up").into_any(),
+                    Some(false) => badge(Tone::Bad, "down").into_any(),
+                    None => ().into_any(),
+                };
+                view! {
+                    <code>{listen}</code>
+                    " "
+                    {state}
+                }
+                .into_any()
+            }
+            None => view! { <span class="fui-muted">"none of its own"</span> }.into_any(),
+        };
+        view! { <td data-label="Listener">{shown}</td> }
+    });
+    view! {
+        <tr>
+            <th scope="row">{lane.name.clone()}</th>
+            <td data-label="Configured">{configured}</td>
+            {listener}
+        </tr>
     }
     .into_any()
+}
+
+/// The readiness report the bridge answered with `status`, which must agree
+/// with the report's own state.
+fn indicators(status_code: StatusCode, report: &Readiness) -> Result<AnyView, Shape> {
+    let verdict = match (report.state, status_code) {
+        (State::Up, StatusCode::OK) => status(Tone::Ok, Glyph::CIRCLE_CHECK, "Ready", None),
+        (State::Down, StatusCode::SERVICE_UNAVAILABLE) => {
+            status(Tone::Bad, Glyph::CIRCLE_X, "Not ready", None)
+        }
+        _ => return Err(Shape { path: "state" }),
+    };
+    let outcomes: Vec<_> = report.indicators.values().collect();
+    let columns = filled_columns(&INDICATOR_COLUMNS, &outcomes, &[], |outcome, key| {
+        key != "detail" || outcome.detail.is_some()
+    });
+    let detailed = columns.iter().any(|column| column.key == "detail");
+    let rows = report
+        .indicators
+        .iter()
+        .map(|(name, outcome)| {
+            let state = match outcome.state {
+                State::Up => badge(Tone::Ok, "up"),
+                State::Down => badge(Tone::Bad, "down"),
+            };
+            let detail =
+                detailed.then(|| view! { <td data-label="Detail">{outcome.detail.clone()}</td> });
+            view! {
+                <tr>
+                    <th scope="row">{name.clone()}</th>
+                    <td data-label="State">{state}</td>
+                    {detail}
+                </tr>
+            }
+        })
+        .collect_view()
+        .into_any();
+    let table = if report.indicators.is_empty() {
+        view! { <p>"The bridge registers no readiness indicator."</p> }.into_any()
+    } else {
+        parts::columns_table("Indicators", &columns, rows)
+    };
+    Ok(card(
+        "Readiness",
+        view! {
+            <p>{verdict}</p>
+            {table}
+        },
+    )
+    .into_any())
 }

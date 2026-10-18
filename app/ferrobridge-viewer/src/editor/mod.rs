@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The mapping file editor: a text area, Check with the diagnostics inline,
-//! Save with a reason behind a confirmation the server checks again, the
-//! `If-Match` conflict, and the reload.
+//! The mapping file editor, with Check, Save and the reload.
+//!
+//! The text area sits over the draft highlighted as YAML with numbered
+//! lines, and a check's diagnostics link to the lines they name. A save
+//! carries a reason behind a confirmation the server checks again.
 //!
 //! The editor opens a file with the digest the operator API's `ETag` named
 //! and saves under `If-Match` with it, or `If-None-Match: *` for a new file,
@@ -13,6 +15,14 @@
 //! as they were. A save's result takes the focus. No specification governs
 //! the console: our own design.
 
+use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::view::button::{Variant, label};
+use ferrohealth_ui::view::empty::{Busy, busy};
+use ferrohealth_ui::view::form::{FORM, INPUT, help_id};
+use ferrohealth_ui::view::refusal::fault;
+use ferrohealth_ui::view::surface::{page_header, stack};
+use ferrohealth_ui::widget::editor::{Editor, LineMark, code_editor};
 use leptos::html::Div;
 use leptos::prelude::*;
 use leptos::server_fn::ServerFn as _;
@@ -28,6 +38,20 @@ pub mod render;
 /// The path of the editor; a file's editor is under it, and the bare path
 /// starts a new console file.
 pub const EDIT: &str = "/edit";
+
+/// The id of the editor's text area, under which a diagnostic links to a
+/// line of the draft.
+pub const DRAFT: &str = "edit-draft";
+
+/// What a check answered: its verdict drawn, and the lines of the draft its
+/// diagnostics name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CheckView {
+    /// The verdict and the diagnostics, drawn on the server.
+    pub html: String,
+    /// The lines of the draft a diagnostic names.
+    pub marks: Vec<LineMark>,
+}
 
 /// What the editor opens: a file's text, the digest it was read at, and
 /// whether the console may save it.
@@ -70,7 +94,7 @@ pub async fn check_draft(
     path: String,
     /// The draft, as the editor holds it.
     draft: String,
-) -> Result<String, ViewError> {
+) -> Result<CheckView, ViewError> {
     server::check(&path, draft).await
 }
 
@@ -120,7 +144,7 @@ pub mod server {
     use http::StatusCode;
 
     use crate::bridge::editing::Precondition;
-    use crate::editor::{SaveView, Source};
+    use crate::editor::{CheckView, SaveView, Source};
     use crate::model::{Outcome, Refusal, ViewError};
 
     /// Opens the file at `path`.
@@ -178,13 +202,13 @@ pub mod server {
     ///
     /// # Errors
     /// As [`crate::editor::check_draft`].
-    pub async fn check(path: &str, draft: String) -> Result<String, ViewError> {
+    pub async fn check(path: &str, draft: String) -> Result<CheckView, ViewError> {
         let (state, token) = crate::tools::server::admitted()?;
         let answer = state
             .bridge()
             .check_mapping(path, draft.into_bytes(), &token)
             .await;
-        Ok(super::render::checked(&answer))
+        Ok(super::render::checked(&answer, path))
     }
 
     /// Saves a draft once it is confirmed.
@@ -225,7 +249,7 @@ pub mod server {
             .filter(|answered| answered.status == StatusCode::OK)
             .and_then(|answered| answered.etag.clone());
         Ok(SaveView {
-            html: super::render::saved(&answer),
+            html: super::render::saved(&answer, path),
             etag,
         })
     }
@@ -247,7 +271,7 @@ fn drawn(value: Option<Result<String, ViewError>>) -> AnyView {
     match value {
         None => ().into_any(),
         Some(Ok(html)) => view! { <div inner_html=html></div> }.into_any(),
-        Some(Err(error)) => view! { <p role="alert">{error.to_string()}</p> }.into_any(),
+        Some(Err(error)) => fault(error.to_string()).into_any(),
     }
 }
 
@@ -330,18 +354,23 @@ fn save_form(editing: Editing) -> AnyView {
         });
     };
     view! {
-        <form method="post" action=SaveDraft::url() autocomplete="off" on:submit=on_save>
-            <label for="edit-reason">"Why you save it, one line"</label>
+        <form method="post" action=SaveDraft::url() autocomplete="off" class=FORM on:submit=on_save>
+            <div class="fui-field">
+            <label class="fui-label" for="edit-reason">"Why you save it, one line"</label>
             <input
                 id="edit-reason"
                 name="reason"
                 type="text"
+                class=INPUT
+                aria-describedby=help_id("edit-reason")
                 maxlength="200"
                 autocomplete="off"
                 prop:value=move || reason.get()
                 on:input:target=move |event| reason.set(event.target().value())
             />
-            <p>
+            <p id=help_id("edit-reason") class="fui-help">"Two hundred characters at most."</p>
+            </div>
+            <div class="fui-check">
                 <input
                     id="edit-confirm"
                     name="confirmed"
@@ -352,13 +381,16 @@ fn save_form(editing: Editing) -> AnyView {
                 <label for="edit-confirm">
                     "Save this draft and reload the set. The bridge refuses a draft that does not compile."
                 </label>
-            </p>
-            <button
-                type="submit"
-                disabled=move || !ready.get() || !confirmed.get() || save.pending().get()
-            >
-                {if fresh { "Create the file" } else { "Save" }}
-            </button>
+            </div>
+            <div class="fui-cluster">
+                <button
+                    type="submit"
+                    class=Variant::Primary.class()
+                    disabled=move || !ready.get() || !confirmed.get() || save.pending().get()
+                >
+                    {label(Some(Glyph::SAVE), if fresh { "Create the file" } else { "Save" })}
+                </button>
+            </div>
         </form>
     }
     .into_any()
@@ -374,6 +406,14 @@ fn check_section(editing: Editing) -> AnyView {
         fresh,
         ..
     } = editing;
+    // NOTE: no specification governs this: our own design; before a check, or
+    // after one the console could not draw, no line is marked.
+    let marks = Signal::derive(move || {
+        check.value().with(|answer| match answer {
+            Some(Ok(view)) => view.marks.clone(),
+            Some(Err(_)) | None => Vec::new(),
+        })
+    });
     let on_check = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
         check.dispatch(CheckDraft {
@@ -382,13 +422,16 @@ fn check_section(editing: Editing) -> AnyView {
         });
     };
     view! {
-        <section class="card">
-            <form method="post" action=CheckDraft::url() autocomplete="off" on:submit=on_check>
-                <label for="edit-path">"Path, below fhirconnect/ or omocl/"</label>
+        <section class="fui-card">
+            <h2 class="fui-card-title">"Check"</h2>
+            <form method="post" action=CheckDraft::url() autocomplete="off" class=FORM on:submit=on_check>
+                <div class="fui-field">
+                <label class="fui-label" for="edit-path">"Path, below fhirconnect/ or omocl/"</label>
                 <input
                     id="edit-path"
                     name="path"
                     type="text"
+                    class=INPUT
                     autocomplete="off"
                     spellcheck="false"
                     readonly=!fresh
@@ -396,22 +439,33 @@ fn check_section(editing: Editing) -> AnyView {
                     prop:value=move || path.get()
                     on:input:target=move |event| path.set(event.target().value())
                 />
-                <label for="edit-draft">"The file"</label>
-                <textarea
-                    id="edit-draft"
-                    name="draft"
-                    rows="24"
-                    class="editor"
-                    autocomplete="off"
-                    spellcheck="false"
-                    prop:value=move || draft.get()
-                    on:input:target=move |event| draft.set(event.target().value())
-                ></textarea>
-                <button type="submit" disabled=move || !ready.get() || check.pending().get()>
-                    "Check"
-                </button>
+                </div>
+                <div class="fui-field">
+                <label class="fui-label" for=DRAFT>"The file"</label>
+                {code_editor(
+                    Editor {
+                        id: DRAFT,
+                        language: Language::Yaml,
+                        text: draft.into(),
+                        marks,
+                        editable: ready.into(),
+                    },
+                    move |text| draft.set(text),
+                )}
+                </div>
+                <div class="fui-cluster">
+                    <button
+                        type="submit"
+                        class=Variant::Primary.class()
+                        disabled=move || !ready.get() || check.pending().get()
+                    >
+                        {label(Some(Glyph::CIRCLE_CHECK), "Check")}
+                    </button>
+                </div>
             </form>
-            <div aria-live="polite">{move || drawn(check.value().get())}</div>
+            <div aria-live="polite">
+                {move || drawn(check.value().get().map(|answer| answer.map(|view| view.html)))}
+            </div>
         </section>
     }
     .into_any()
@@ -425,13 +479,19 @@ fn reload_section(ready: RwSignal<bool>) -> AnyView {
         reload.dispatch(ReloadSet {});
     };
     view! {
-        <section class="card">
-            <h2>"Reload"</h2>
-            <form method="post" action=ReloadSet::url() on:submit=on_reload>
+        <section class="fui-card">
+            <h2 class="fui-card-title">"Reload"</h2>
+            <form method="post" action=ReloadSet::url() class=FORM on:submit=on_reload>
                 <p>"Compiles the files on disk and replaces the running set when they compile."</p>
-                <button type="submit" disabled=move || !ready.get() || reload.pending().get()>
-                    "Reload"
-                </button>
+                <div class="fui-cluster">
+                    <button
+                        type="submit"
+                        class=Variant::Secondary.class()
+                        disabled=move || !ready.get() || reload.pending().get()
+                    >
+                        {label(Some(Glyph::REFRESH_CW), "Reload")}
+                    </button>
+                </div>
             </form>
             <div aria-live="polite">{move || drawn(reload.value().get())}</div>
         </section>
@@ -460,16 +520,16 @@ fn editor(source: Source) -> AnyView {
         save_form(editing)
     } else {
         view! {
-            <p role="note">
+            <p role="note" class="fui-muted">
                 "This file is provisioned, so the console checks a draft of it but never saves over it."
             </p>
         }
         .into_any()
     };
-    view! {
+    stack(view! {
         {check_section(editing)}
-        <section class="card">
-            <h2>"Save"</h2>
+        <section class="fui-card">
+            <h2 class="fui-card-title">"Save"</h2>
             {saving}
             <div node_ref=result tabindex="-1" aria-live="polite">
                 {move || {
@@ -478,7 +538,7 @@ fn editor(source: Source) -> AnyView {
             </div>
         </section>
         {reload_section(ready)}
-    }
+    })
     .into_any()
 }
 
@@ -508,17 +568,17 @@ pub fn EditPage() -> impl IntoView {
     });
     view! {
         <Title text=format!("Edit a mapping file · {PRODUCT}") />
-        <h1>"Edit a mapping file"</h1>
-        <Suspense fallback=|| {
-            view! { <p>"Asking the bridge."</p> }
-        }>
+        {page_header(
+            "Edit a mapping file",
+            Some(String::from("Check a draft against the running set, save it beside the provisioned tree, and reload.")),
+            (),
+        )}
+        <Suspense fallback=|| busy("Asking the bridge for the file", Busy::Section)>
             {move || Suspend::new(async move {
                 match source.await {
                     Ok(Outcome::Shown(source)) => editor(source),
-                    Ok(Outcome::Refused(refusal)) => {
-                        view! { <p role="alert">{refusal.to_string()}</p> }.into_any()
-                    }
-                    Err(error) => view! { <p role="alert">{error.to_string()}</p> }.into_any(),
+                    Ok(Outcome::Refused(refusal)) => fault(refusal.to_string()).into_any(),
+                    Err(error) => fault(error.to_string()).into_any(),
                 }
             })}
         </Suspense>

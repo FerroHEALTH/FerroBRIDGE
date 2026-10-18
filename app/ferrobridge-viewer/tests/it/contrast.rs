@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The contrast of every text and ground pair of `style/tailwind.css`, in
-//! the light theme and the dark one, computed from the custom properties as
-//! WCAG 2.2 defines it: 4.5:1 for text (SC 1.4.3) and 3:1 for the edge of a
-//! control and the focus ring (SC 1.4.11).
+//! The contrast of every text and ground pair the console paints with: the
+//! roles of the `ferrohealth_ui` stylesheet with the console's brand theme
+//! `style/theme.css` laid over them, as the page loads them, in the light
+//! theme and the dark one, computed from the custom properties as WCAG 2.2
+//! defines it: 4.5:1 for text (SC 1.4.3) and 3:1 for the edge of a control
+//! and the focus ring (SC 1.4.11).
 //!
 //! A translucent ground is composited over each opaque ground and the worst
 //! of them counts, so a tint is measured wherever a view can place it.
@@ -13,8 +15,11 @@
 
 use std::collections::BTreeMap;
 
-/// The stylesheet the console ships.
-const STYLESHEET: &str = include_str!("../../style/tailwind.css");
+/// The roles the console paints with, from the library's stylesheet.
+const STYLESHEET: &str = ferrohealth_ui::style::STYLESHEET;
+
+/// The console's brand theme, which loads after the stylesheet.
+const BRAND: &str = include_str!("../../style/theme.css");
 
 /// The text minimum of WCAG 2.2 SC 1.4.3.
 const TEXT: f64 = 4.5;
@@ -23,59 +28,83 @@ const TEXT: f64 = 4.5;
 const EDGE: f64 = 3.0;
 
 /// The opaque grounds a view paints a region with.
-const OPAQUE: &[&str] = &["surface", "raised", "inset", "head", "neutral-bg"];
+const OPAQUE: &[&str] = &[
+    "surface",
+    "surface-raised",
+    "surface-sunken",
+    "surface-head",
+    "neutral-ground",
+];
 
 /// The translucent or tinted grounds, laid over an opaque one.
-const TINTED: &[&str] = &["accent-tint", "ok-bg", "warn-bg", "danger-bg"];
+const TINTED: &[&str] = &["accent-tint", "ok-ground", "warn-ground", "bad-ground"];
 
 /// Every ground a body text can sit on.
 const EVERY_GROUND: &[&str] = &[
     "surface",
-    "raised",
-    "inset",
-    "head",
-    "neutral-bg",
+    "surface-raised",
+    "surface-sunken",
+    "surface-head",
+    "neutral-ground",
     "accent-tint",
-    "ok-bg",
-    "warn-bg",
-    "danger-bg",
+    "ok-ground",
+    "warn-ground",
+    "bad-ground",
 ];
+
+/// The opaque grounds and the accent's tint, where the accent is drawn.
+const ACCENT_GROUNDS: &[&str] = &[
+    "surface",
+    "surface-raised",
+    "surface-sunken",
+    "surface-head",
+    "accent-tint",
+];
+
+/// The grounds a highlighted token is drawn on.
+const TOKEN_GROUNDS: &[&str] = &["surface-sunken", "accent-tint"];
 
 /// Each text role and the grounds it can sit on.
 const TEXT_PAIRS: &[(&str, &[&str])] = &[
     ("ink", EVERY_GROUND),
     ("muted", EVERY_GROUND),
+    ("accent", ACCENT_GROUNDS),
+    ("accent-hover", ACCENT_GROUNDS),
+    ("accent-ink", &["accent", "accent-hover"]),
     (
-        "accent",
-        &["surface", "raised", "inset", "head", "accent-tint"],
+        "neutral",
+        &[
+            "surface",
+            "surface-raised",
+            "surface-sunken",
+            "surface-head",
+            "neutral-ground",
+        ],
     ),
-    (
-        "accent-hover",
-        &["surface", "raised", "inset", "head", "accent-tint"],
-    ),
-    ("accent-fg", &["accent", "accent-hover"]),
-    (
-        "neutral-fg",
-        &["surface", "raised", "inset", "head", "neutral-bg"],
-    ),
-    ("ok-fg", &["ok-bg"]),
-    ("warn-fg", &["warn-bg"]),
-    ("danger-fg", &["danger-bg"]),
-    ("tok-keyword", &["inset", "accent-tint"]),
-    ("tok-string", &["inset", "accent-tint"]),
-    ("tok-number", &["inset", "accent-tint"]),
-    ("tok-comment", &["inset", "accent-tint"]),
-    ("tok-key", &["inset", "accent-tint"]),
+    ("ok", &["ok-ground"]),
+    ("warn", &["warn-ground"]),
+    ("bad", &["bad-ground"]),
+    ("syntax-keyword", TOKEN_GROUNDS),
+    ("syntax-string", TOKEN_GROUNDS),
+    ("syntax-number", TOKEN_GROUNDS),
+    ("syntax-comment", TOKEN_GROUNDS),
+    ("syntax-key", TOKEN_GROUNDS),
 ];
 
 /// Each control edge (a pressed segment's border, the focus ring) and the
 /// grounds it is drawn against.
 const EDGE_PAIRS: &[(&str, &[&str])] = &[
-    ("control", &["surface", "raised", "inset", "head"]),
     (
-        "accent",
-        &["surface", "raised", "inset", "head", "accent-tint"],
+        "edge-control",
+        &[
+            "surface",
+            "surface-raised",
+            "surface-sunken",
+            "surface-head",
+        ],
     ),
+    ("accent", ACCENT_GROUNDS),
+    ("focus", ACCENT_GROUNDS),
 ];
 
 /// An sRGB colour with its alpha, each channel in 0 to 255.
@@ -221,20 +250,26 @@ fn worst(theme: &BTreeMap<String, Rgba>, fg: &str, ground: &str) -> f64 {
         .fold(f64::INFINITY, f64::min)
 }
 
-/// The three theme blocks: light, the chosen dark, and the system's dark.
+/// The three theme blocks: light, the chosen dark, and the system's dark,
+/// each the stylesheet's roles with the brand's block laid over them.
 fn themes() -> Vec<(&'static str, BTreeMap<String, Rgba>)> {
     let css = strip_comments(STYLESHEET);
-    vec![
-        ("light", theme(&block(&css, ":root"))),
-        ("dark", theme(&block(&css, ":root[data-theme=\"dark\"]"))),
+    let brand = strip_comments(BRAND);
+    [
+        ("light", ":root"),
+        ("dark", ":root[data-theme=\"dark\"]"),
         (
             "system dark",
-            theme(&block(
-                &css,
-                ":root:not([data-theme=\"light\"], [data-theme=\"dark\"])",
-            )),
+            ":root:not([data-theme=\"light\"], [data-theme=\"dark\"])",
         ),
     ]
+    .into_iter()
+    .map(|(name, selector)| {
+        let mut colours = theme(&block(&css, selector));
+        colours.extend(theme(&block(&brand, selector)));
+        (name, colours)
+    })
+    .collect()
 }
 
 /// The two dark blocks, the chosen one and the system one, carry the same
@@ -246,8 +281,16 @@ fn the_system_dark_theme_is_the_chosen_dark_theme() {
         panic!("three theme blocks");
     };
     assert_eq!(dark, system);
-    let names = |t: &BTreeMap<String, Rgba>| t.keys().cloned().collect::<Vec<_>>();
-    assert_eq!(names(light), names(dark), "each theme defines every role");
+    for role in light.keys() {
+        assert!(
+            dark.contains_key(role)
+                || !TEXT_PAIRS
+                    .iter()
+                    .chain(EDGE_PAIRS)
+                    .any(|(fg, grounds)| fg == role || grounds.contains(&role.as_str())),
+            "the dark theme should define --{role}, which a pair measures"
+        );
+    }
 }
 
 /// WCAG 2.2 SC 1.4.3 and SC 1.4.11 over every pair, in every theme.
@@ -271,20 +314,24 @@ fn every_text_and_ground_pair_meets_wcag_aa() {
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
-/// The focus ring is the accent, which the pairs above hold to 3:1 on every
-/// ground, and the top bar that stays in view never covers what has the
-/// focus (WCAG 2.2 SC 2.4.11).
+/// The focus ring is the brand's \`--focus\`, the accent in every theme, which
+/// the pairs above hold to 3:1 on every ground, and the top bar that stays
+/// in view never covers what has the focus (WCAG 2.2 SC 2.4.11).
 #[test]
 fn the_focus_ring_is_the_accent_and_the_scroll_padding_clears_the_top_bar() {
     let css = strip_comments(STYLESHEET);
     let focus = block(&css, ":focus-visible");
-    assert!(
-        focus.contains("outline: 2px solid var(--accent)"),
-        "{focus}"
-    );
+    assert!(focus.contains("outline: 2px solid var(--focus)"), "{focus}");
+    for (name, theme) in themes() {
+        assert_eq!(
+            token(&theme, "accent"),
+            token(&theme, "focus"),
+            "{name}: the focus ring is the accent"
+        );
+    }
     let html = block(&css, "html");
     assert!(
-        html.contains("scroll-padding-top: calc(var(--bar) + 0.5rem)"),
+        html.contains("scroll-padding-top: calc(var(--bar) + var(--space-default))"),
         "{html}"
     );
     assert!(css.contains("--bar: 3.5rem"), "the top bar has its height");

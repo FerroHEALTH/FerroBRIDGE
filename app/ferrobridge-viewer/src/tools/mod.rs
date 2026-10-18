@@ -12,6 +12,14 @@
 //! that still arrives is refused before the bridge is asked anything. No
 //! specification governs the console: our own design.
 
+use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::view::button::{Variant, label};
+use ferrohealth_ui::view::empty::{Busy, busy};
+use ferrohealth_ui::view::form::{FORM, INPUT, MEDIUM, SELECT};
+use ferrohealth_ui::view::refusal::fault;
+use ferrohealth_ui::view::surface::{page_header, stack};
+use ferrohealth_ui::widget::editor::{Editor, code_editor};
 use leptos::prelude::*;
 use leptos::server_fn::ServerFn as _;
 use leptos_meta::Title;
@@ -101,40 +109,46 @@ fn answer(value: Option<Result<String, ViewError>>) -> AnyView {
     match value {
         None => ().into_any(),
         Some(Ok(html)) => view! { <div inner_html=html></div> }.into_any(),
-        Some(Err(error)) => view! { <p role="alert">{error.to_string()}</p> }.into_any(),
+        Some(Err(error)) => fault(error.to_string()).into_any(),
     }
 }
 
 /// A labelled text field bound to `value`.
 fn field(id: &'static str, label: &'static str, value: RwSignal<String>) -> impl IntoView {
-    view! {
-        <label for=id>{label}</label>
+    let control = view! {
         <input
             id=id
             name=id
             type="text"
+            class=INPUT
             autocomplete="off"
             spellcheck="false"
             prop:value=move || value.get()
             on:input:target=move |event| value.set(event.target().value())
         />
-    }
+    };
+    ferrohealth_ui::view::form::field(id, label, None, control)
 }
 
-/// A labelled text area bound to `value`.
-fn area(id: &'static str, label: &'static str, value: RwSignal<String>) -> impl IntoView {
-    view! {
-        <label for=id>{label}</label>
-        <textarea
-            id=id
-            name=id
-            rows="14"
-            autocomplete="off"
-            spellcheck="false"
-            prop:value=move || value.get()
-            on:input:target=move |event| value.set(event.target().value())
-        ></textarea>
-    }
+/// A labelled JSON editor bound to `value`, highlighted with numbered lines
+/// and editable once `ready`.
+fn area(
+    id: &'static str,
+    label: &'static str,
+    value: RwSignal<String>,
+    ready: RwSignal<bool>,
+) -> impl IntoView {
+    let control = code_editor(
+        Editor {
+            id,
+            language: Language::Json,
+            text: value.into(),
+            marks: Signal::stored(Vec::new()),
+            editable: ready.into(),
+        },
+        move |text| value.set(text),
+    );
+    ferrohealth_ui::view::form::field(id, label, None, control)
 }
 
 /// The `$tofhir` form and its answer.
@@ -153,15 +167,21 @@ fn to_fhir_form() -> AnyView {
         });
     };
     view! {
-        <section class="card">
-            <h2>"openEHR to FHIR: $tofhir"</h2>
-            <form method="post" action=RunToFhir::url() autocomplete="off" on:submit=submit>
-                {area("tofhir-composition", "Composition, canonical or FLAT JSON", composition)}
+        <section class="fui-card">
+            <h2 class="fui-card-title">"openEHR to FHIR: $tofhir"</h2>
+            <form method="post" action=RunToFhir::url() autocomplete="off" class=FORM on:submit=submit>
+                {area("tofhir-composition", "Composition, canonical or FLAT JSON", composition, ready)}
                 {field("tofhir-template", "Template id (required for FLAT)", template_id)}
                 {field("tofhir-patient", "context.patient, a reference such as Patient/123", patient)}
-                <button type="submit" disabled=move || !ready.get() || run.pending().get()>
-                    "Run $tofhir"
-                </button>
+                <div class="fui-cluster">
+                    <button
+                        type="submit"
+                        class=Variant::Primary.class()
+                        disabled=move || !ready.get() || run.pending().get()
+                    >
+                        {label(Some(Glyph::PLAY), "Run $tofhir")}
+                    </button>
+                </div>
             </form>
             <div aria-live="polite">{move || answer(run.value().get())}</div>
         </section>
@@ -185,25 +205,38 @@ fn to_openehr_form() -> AnyView {
         });
     };
     view! {
-        <section class="card">
-            <h2>"FHIR to openEHR: $toopenehr"</h2>
-            <form method="post" action=RunToOpenehr::url() autocomplete="off" on:submit=submit>
-                {area("toopenehr-bundle", "Bundle, JSON", bundle)}
+        <section class="fui-card">
+            <h2 class="fui-card-title">"FHIR to openEHR: $toopenehr"</h2>
+            <form method="post" action=RunToOpenehr::url() autocomplete="off" class=FORM on:submit=submit>
+                {area("toopenehr-bundle", "Bundle, JSON", bundle, ready)}
                 {field("toopenehr-template", "Template id", template_id)}
-                <label for="toopenehr-format">"Composition format"</label>
-                <select
-                    id="toopenehr-format"
-                    name="format"
-                    on:change:target=move |event| format.set(event.target().value())
-                >
-                    <option value="canonical" selected=true>
-                        "canonical"
-                    </option>
-                    <option value="flat">"flat"</option>
-                </select>
-                <button type="submit" disabled=move || !ready.get() || run.pending().get()>
-                    "Run $toopenehr"
-                </button>
+                {ferrohealth_ui::view::form::field(
+                    "toopenehr-format",
+                    "Composition format",
+                    None,
+                    view! {
+                        <select
+                            id="toopenehr-format"
+                            name="format"
+                            class=format!("{SELECT} {MEDIUM}")
+                            on:change:target=move |event| format.set(event.target().value())
+                        >
+                            <option value="canonical" selected=true>
+                                "canonical"
+                            </option>
+                            <option value="flat">"flat"</option>
+                        </select>
+                    },
+                )}
+                <div class="fui-cluster">
+                    <button
+                        type="submit"
+                        class=Variant::Primary.class()
+                        disabled=move || !ready.get() || run.pending().get()
+                    >
+                        {label(Some(Glyph::PLAY), "Run $toopenehr")}
+                    </button>
+                </div>
             </form>
             <div aria-live="polite">{move || answer(run.value().get())}</div>
         </section>
@@ -221,11 +254,15 @@ pub fn PlaygroundPage() -> impl IntoView {
     let forms = (to_fhir_form(), to_openehr_form());
     view! {
         <Title text=format!("Transform playground · {PRODUCT}") />
-        <h1>"Transform playground"</h1>
-        <p>
-            "Runs a transform against the bridge's running programs. Nothing you enter or the bridge answers is kept."
-        </p>
-        <div class="sections">{forms.0} {forms.1}</div>
+        {page_header(
+            "Transform playground",
+            Some(String::from("Runs a transform against the bridge's running programs. Nothing you enter or the bridge answers is kept.")),
+            (),
+        )}
+        {stack(view! {
+            {forms.0}
+            {forms.1}
+        })}
     }
 }
 
@@ -248,19 +285,32 @@ fn validate_form(types: Vec<String>) -> AnyView {
         .map(|kind| view! { <option value=kind.clone()>{kind.clone()}</option> })
         .collect_view();
     view! {
-        <form method="post" action=RunValidate::url() autocomplete="off" on:submit=submit>
-            <label for="validate-type">"Resource type"</label>
-            <select
-                id="validate-type"
-                name="resource_type"
-                on:change:target=move |event| resource_type.set(event.target().value())
-            >
-                {options}
-            </select>
-            {area("validate-resource", "Resource, JSON", resource)}
-            <button type="submit" disabled=move || !ready.get() || run.pending().get()>
-                "Run $validate"
-            </button>
+        <form method="post" action=RunValidate::url() autocomplete="off" class=FORM on:submit=submit>
+            {ferrohealth_ui::view::form::field(
+                "validate-type",
+                "Resource type",
+                None,
+                view! {
+                    <select
+                        id="validate-type"
+                        name="resource_type"
+                        class=format!("{SELECT} {MEDIUM}")
+                        on:change:target=move |event| resource_type.set(event.target().value())
+                    >
+                        {options}
+                    </select>
+                },
+            )}
+            {area("validate-resource", "Resource, JSON", resource, ready)}
+            <div class="fui-cluster">
+                <button
+                    type="submit"
+                    class=Variant::Primary.class()
+                    disabled=move || !ready.get() || run.pending().get()
+                >
+                    {label(Some(Glyph::PLAY), "Run $validate")}
+                </button>
+            </div>
         </form>
         <div aria-live="polite">{move || answer(run.value().get())}</div>
     }
@@ -278,29 +328,22 @@ pub fn ValidatePage() -> impl IntoView {
     let types = Resource::new_blocking(|| (), |()| validate_types());
     view! {
         <Title text=format!("Validation dry run · {PRODUCT}") />
-        <h1>"Validation dry run"</h1>
-        <p>
-            "Runs $validate, which commits nothing. Nothing you enter or the bridge answers is kept."
-        </p>
-        <section class="card">
-            <Suspense fallback=|| {
-                view! { <p>"Asking the bridge."</p> }
-            }>
+        {page_header(
+            "Validation dry run",
+            Some(String::from("Runs $validate, which commits nothing. Nothing you enter or the bridge answers is kept.")),
+            (),
+        )}
+        <section class="fui-card">
+            <h2 class="fui-card-title">"$validate"</h2>
+            <Suspense fallback=|| busy("Reading the resource types the bridge validates", Busy::Section)>
                 {move || Suspend::new(async move {
                     match types.await {
                         Ok(Outcome::Shown(types)) if types.is_empty() => {
-                            view! {
-                                <p role="alert">
-                                    "The bridge declares $validate on no resource type."
-                                </p>
-                            }
-                                .into_any()
+                            fault("The bridge declares $validate on no resource type.").into_any()
                         }
                         Ok(Outcome::Shown(types)) => validate_form(types),
-                        Ok(Outcome::Refused(refusal)) => {
-                            view! { <p role="alert">{refusal.to_string()}</p> }.into_any()
-                        }
-                        Err(error) => view! { <p role="alert">{error.to_string()}</p> }.into_any(),
+                        Ok(Outcome::Refused(refusal)) => fault(refusal.to_string()).into_any(),
+                        Err(error) => fault(error.to_string()).into_any(),
                     }
                 })}
             </Suspense>

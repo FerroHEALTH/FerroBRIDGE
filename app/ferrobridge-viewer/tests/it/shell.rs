@@ -3,7 +3,7 @@
 
 //! The shell around every page: the theme the server draws from its cookie,
 //! the top bar with the bridge's status and version, the grouped
-//! navigation and its drawer, the theme switch, the operator's menu, the
+//! navigation and its drawer, the theme toggle, the operator's menu, the
 //! About page naming the maker, and the page for a path the console does not
 //! serve.
 
@@ -13,7 +13,7 @@ use axum::body::Body;
 use ferrobridge_testkit::oidc::{Provider, TokenAnswer};
 use ferrobridge_viewer::model::{BridgeView, Outcome, Refusal, ViewError};
 use ferrobridge_viewer::shell::{NAVIGATION, bridge_status};
-use ferrobridge_viewer::styles::Tone;
+use ferrohealth_ui::tone::Tone;
 use http::{Request, StatusCode};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -93,9 +93,19 @@ async fn the_signed_in_shell_carries_the_bar_the_navigation_and_the_footer()
         page.contains(r#"<nav id="sidebar" popover="auto""#),
         "{page}"
     );
-    assert!(page.contains(r#"aria-label="Theme""#), "{page}");
+    assert!(
+        page.contains(r#"id="theme-to-dark""#),
+        "the toggle's moon: {page}"
+    );
+    assert!(
+        page.contains(r#"id="theme-to-light""#),
+        "the toggle's sun: {page}"
+    );
+    assert!(
+        page.contains("Switch to the dark theme"),
+        "a named toggle: {page}"
+    );
     assert!(page.contains(r#"action="/api/theme""#), "{page}");
-    assert!(page.contains(r#"aria-pressed="true""#), "{page}");
     assert!(page.contains("Cadasto B.V."), "the footer names the maker");
     assert!(page.contains(r#"href="/about""#), "{page}");
     assert!(!page.contains(OPERATOR_TOKEN), "{page}");
@@ -285,11 +295,11 @@ fn the_bridge_status_is_a_word_for_every_answer() {
         diagnostics: Vec::new(),
     }));
     assert_eq!(
-        (Tone::Danger, String::from("Bridge refused 403")),
+        (Tone::Bad, String::from("Bridge refused 403")),
         bridge_status(&refused)
     );
     assert_eq!(
-        (Tone::Danger, String::from("Bridge DOWN")),
+        (Tone::Bad, String::from("Bridge DOWN")),
         bridge_status(&Err(ViewError::Unreachable))
     );
     assert_eq!(

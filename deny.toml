@@ -71,6 +71,9 @@ exceptions = [
   # openehr-query is the AQL parser the ETL checks its configured queries with.
   { allow = ["BUSL-1.1"], crate = "openehr-query" },
   { allow = ["Apache-2.0", "CC-BY-SA-3.0"], crate = "openehr-term" },
+  # ferrohealth-ui is the FerroHEALTH component library the operator console
+  # draws with, the same Licensor's crate under the same licence.
+  { allow = ["BUSL-1.1"], crate = "ferrohealth-ui" },
   { allow = ["BUSL-1.1"], crate = "openehr-mapping-core" },
   { allow = ["BUSL-1.1"], crate = "fhirconnect" },
   { allow = ["BUSL-1.1"], crate = "omocl" },

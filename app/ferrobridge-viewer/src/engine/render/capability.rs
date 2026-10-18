@@ -10,6 +10,7 @@
 //! statement's JSON behind a disclosure, and the SMART discovery document
 //! (SMART App Launch 2.2.0, conformance).
 
+use ferrohealth_ui::view::surface::{or_none, stack};
 use fhir_types::r4::capability_statement::{
     CapabilityStatement, CapabilityStatementRest, CapabilityStatementRestResource,
 };
@@ -34,7 +35,11 @@ pub fn render(
         }
         Err(error) => parts::failed("SMART discovery", error),
     };
-    view! { <div class="sections">{capability} {discovery}</div> }.to_html()
+    stack(view! {
+        {capability}
+        {discovery}
+    })
+    .to_html()
 }
 
 /// The text a primitive holds, or an empty string.
@@ -59,9 +64,9 @@ fn cards(statement: &CapabilityStatement, raw: &serde_json::Value) -> AnyView {
         .join(", ");
     let rests = statement.rest.iter().map(rest).collect_view();
     view! {
-        <section class="card">
-            <h2>"CapabilityStatement"</h2>
-            <dl>
+        <section class="fui-card">
+            <h2 class="fui-card-title">"CapabilityStatement"</h2>
+            <dl class="fui-facts">
                 <dt>"Software"</dt>
                 <dd>{format!("{name} {version}")}</dd>
                 <dt>"FHIR version"</dt>
@@ -112,7 +117,7 @@ fn rest(rest: &CapabilityStatementRest) -> AnyView {
                     .and_then(|description| description.value.as_ref()),
             );
             view! {
-                <dl>
+                <dl class="fui-facts">
                     <dt>"Services"</dt>
                     <dd>{services}</dd>
                     <dt>"CORS"</dt>
@@ -146,17 +151,17 @@ fn rest(rest: &CapabilityStatementRest) -> AnyView {
         .collect_view();
     let resources = rest.resource.iter().map(resource).collect_view();
     view! {
-        <section class="card">
-            <h2>{format!("REST, {mode} mode: security")}</h2>
+        <section class="fui-card">
+            <h2 class="fui-card-title">{format!("REST, {mode} mode: security")}</h2>
             {security}
         </section>
-        <section class="card">
-            <h2>{format!("REST, {mode} mode: system")}</h2>
-            <dl>
+        <section class="fui-card">
+            <h2 class="fui-card-title">{format!("REST, {mode} mode: system")}</h2>
+            <dl class="fui-facts">
                 <dt>"Interactions"</dt>
                 <dd>{interactions}</dd>
             </dl>
-            <ul>{operations}</ul>
+            <ul class="fui-bullets">{operations}</ul>
         </section>
         {resources}
     }
@@ -166,12 +171,12 @@ fn rest(rest: &CapabilityStatementRest) -> AnyView {
 /// The card of one resource type.
 fn resource(resource: &CapabilityStatementRestResource) -> AnyView {
     let kind = value(resource.r#type.value.as_ref());
-    let profile = value(
+    let profile = or_none(value(
         resource
             .profile
             .as_ref()
             .and_then(|profile| profile.value.as_ref()),
-    );
+    ));
     let interactions = resource
         .interaction
         .iter()
@@ -191,7 +196,8 @@ fn resource(resource: &CapabilityStatementRestResource) -> AnyView {
                 </tr>
             }
         })
-        .collect_view();
+        .collect_view()
+        .into_any();
     let operations = resource
         .operation
         .iter()
@@ -206,29 +212,19 @@ fn resource(resource: &CapabilityStatementRestResource) -> AnyView {
         })
         .collect_view();
     let searches = (!resource.search_param.is_empty()).then(|| {
-        view! {
-            <table>
-                <thead>
-                    <tr>
-                        <th scope="col">"Search parameter"</th>
-                        <th scope="col">"Type"</th>
-                    </tr>
-                </thead>
-                <tbody>{search}</tbody>
-            </table>
-        }
+        parts::table_unstacked("Search parameters", &["Search parameter", "Type"], search)
     });
     view! {
-        <section class="card">
-            <h2>{kind}</h2>
-            <dl>
+        <section class="fui-card">
+            <h2 class="fui-card-title">{kind}</h2>
+            <dl class="fui-facts">
                 <dt>"Profile"</dt>
                 <dd>{profile}</dd>
                 <dt>"Interactions"</dt>
                 <dd>{interactions}</dd>
             </dl>
             {searches}
-            <ul>{operations}</ul>
+            <ul class="fui-bullets">{operations}</ul>
         </section>
     }
     .into_any()
@@ -256,9 +252,9 @@ fn discovery(document: &serde_json::Value) -> Result<AnyView, Shape> {
     let capabilities = words("capabilities")?;
     let scopes = words("scopes_supported")?;
     Ok(view! {
-        <section class="card">
-            <h2>"SMART discovery"</h2>
-            <dl>
+        <section class="fui-card">
+            <h2 class="fui-card-title">"SMART discovery"</h2>
+            <dl class="fui-facts">
                 <dt>"Issuer"</dt>
                 <dd>
                     <code>{issuer}</code>

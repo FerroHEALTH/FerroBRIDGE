@@ -35,12 +35,13 @@ crate.
 - **Every server function checks the session first**
   (`session::request::signed_in`) and is listed in
   `tests/it/server_functions.rs`, which fails on one it does not hold.
-- **A view paints with roles, never palette entries** (`styles`,
-  `style/tailwind.css`): the role layer derives from
-  `assets/brand/tokens.css`, both dark blocks stay identical, and
-  `tests/it/contrast.rs` holds every pair to WCAG 2.2 AA. The theme is the
-  server's, drawn from its cookie as `data-theme`; the browser keeps no
-  storage.
+- **A view draws with `ferrohealth-ui`**, the FerroHEALTH component
+  library, and keeps only its brand theme, `style/theme.css`: the role layer is the
+  library's, the theme sets the five accent properties, both dark blocks stay
+  identical, and `tests/it/contrast.rs` holds every pair to WCAG 2.2 AA. The
+  theme is the server's, drawn from its cookie as `data-theme`; the browser
+  keeps no storage. The server serves the library's stylesheet and the theme
+  itself (`server::stylesheet`, `server::theme`).
 - **A route has a journey and two screenshots.** The browser journeys and
   the book's screenshots live in the testkit
   (`tools/ferrobridge-testkit/tests/it/journeys/`); a new route joins the

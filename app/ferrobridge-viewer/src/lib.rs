@@ -11,7 +11,7 @@
 //! mapping itself. It holds the operator's sign-in session on the server
 //! ([`session`], [`oidc`]), so the browser carries an opaque cookie and never
 //! a token. [`app`] is the page tree both halves share, drawn in the
-//! [`shell`] with the class vocabulary of [`styles`] in the operator's
+//! [`shell`] with the components of `ferrohealth_ui` in the operator's
 //! [`theme`], with the maker named on the [`about`] page, and filled through
 //! the server functions of [`status`] with the view models of [`model`];
 //! [`server`] serves it with the health and sign-in routes under the browser
@@ -49,7 +49,7 @@ pub mod engine;
 pub mod editor;
 pub mod model;
 pub mod shell;
-pub mod styles;
+
 // The browser half of a server function, which the server macro writes, is a
 // network call that awaits nothing, and the lint names the macro alone.
 #[cfg_attr(

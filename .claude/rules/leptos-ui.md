@@ -15,6 +15,15 @@ targets Leptos 0.8), never memory. Citations below are book chapters
 discipline is the FerroHEALTH family's, carried from FerroFED's operator
 console and FerroEHR's viewer, and adapted to this crate.
 
+**The components, tokens, icons, accessibility bar and quality control are
+FerroUI's**: the console draws with `ferrohealth-ui`, pinned exactly in the
+root `[workspace.dependencies]`, and that library's own
+`.claude/rules/leptos-ui.md` (FerroHEALTH/FerroUI) is the rule set for
+every view. This file keeps what is particular to this console: the BFF, the
+session, the server functions, the bridge client, the boundary and the
+bundle budget. A component this console needs and the library lacks is added
+to the library, never written here.
+
 **The console is rendered on the server and hydrated in the browser**, with a
 backend-for-frontend (BFF) on the same server, built by cargo-leptos. The two
 halves are chosen by **compilation target, never by Cargo feature**: the host
@@ -34,7 +43,8 @@ made in a slice.
   JS-wrapping crates are banned; a chart is drawn in Rust as SVG. The only
   JavaScript in the product is the `wasm-bindgen` glue and the hydration
   bootstrap the toolchain generates. There is no npm and no Node in the
-  build: Tailwind runs as its standalone CLI.
+  build, and no CSS build either: the server serves the library's
+  stylesheet and the console's brand theme.
 - **The console is a client of the bridge and nothing else.** Its server
   reaches the bridge over HTTP, on the public surface any client uses,
   through `crate::bridge`, server to server. Of the workspace's own crates
@@ -278,10 +288,9 @@ tables carry real `<th scope=…>` headers; no meaning rides on colour alone,
 so a status is a word as well as a tint; contrast meets AA in the light and
 the dark theme, held by `tests/it/contrast.rs` over the stylesheet's role
 tokens (4.5:1 for text, 3:1 for a control edge and the focus ring); motion
-respects `prefers-reduced-motion`. A view names a role of
-`style/tailwind.css` (`surface`, `ink`, `muted`, `accent`, the status
-tints), never a palette entry, and a new role joins the contrast test's
-pairs in the change that adds it. The top bar stays in view from `md` up,
+respects `prefers-reduced-motion`. A view uses the components and the role
+classes of `ferrohealth-ui`, never a colour of its own, and the console's
+brand theme is measured over the library's roles by the contrast test. The top bar stays in view from `md` up,
 so the stylesheet's `scroll-padding-top` clears it for a focused control
 (SC 2.4.11).
 
@@ -357,6 +366,15 @@ changes here and nowhere else.
     more `ServerAction`s (check, save, reload), the confirmation checkbox,
     the save's digest carried between saves, and the `Effect` that moves the
     focus to the save's result. Every answer is still drawn on the server.
+  - Within 314 KiB, the move to `ferrohealth-ui` 0.1.1 (#850) measured
+    297091, and its highlighted editor 311080 (2026-10-18). The editor
+    draws the draft through the library's YAML tokenizer in the browser as
+    you type, so it costs about 14 KB. The file view uses the same
+    tokenizer and so always agrees with it.
+  - Within 314 KiB, `ferrohealth-ui` 0.1.2 measured 315175 and 0.1.3 315639
+    (2026-10-19): their stacked tables, chevron select and nested-reveal
+    rules are stylesheet, and the data table they stack is the one the
+    console already drew.
 
   The headroom is the quarter FerroFED's console started with, enough for
   toolchain drift and small growth and too little for a slice to pass
@@ -397,13 +415,13 @@ changes here and nowhere else.
   `RUSTFLAGS` set in the environment overrides the target variable, and the
   check then fails.
 - **The build tools are pinned and checked.** `scripts/release/viewer-tools.sh`
-  installs the Tailwind CSS standalone CLI and Binaryen's `wasm-opt` at the
-  releases `docs/VERSIONS.md` pins, each checked against its SHA-256, and
-  `viewer-site.sh` refuses to run cargo-leptos until the ones on `PATH` match,
-  so cargo-leptos never downloads either unchecked. The CI job installs
-  cargo-leptos and the wasm-bindgen CLI at their pinned versions; the CLI
-  equals the `wasm-bindgen` crate version, and `scripts/checks/versions.sh`
-  holds all four to the pin matrix.
+  installs Binaryen's `wasm-opt` at the release `docs/VERSIONS.md` pins,
+  checked against its SHA-256, and `viewer-site.sh` refuses to run
+  cargo-leptos until the one on `PATH` matches, so cargo-leptos never
+  downloads it unchecked. The CI job installs cargo-leptos and the
+  wasm-bindgen CLI at their pinned versions; the CLI equals the
+  `wasm-bindgen` crate version, and `scripts/checks/versions.sh` holds all
+  three to the pin matrix.
 - **`panic = "unwind"`, inherited from `release`, does not apply to
   `wasm32-unknown-unknown`.** The target's standard library is built to
   abort on a panic, so a panic in the browser prints its message and
@@ -414,10 +432,8 @@ changes here and nowhere else.
 
 ## 13. Icons
 
-- **Icons come from `leptos_icons` with the Lucide pack alone**:
-  `icondata_lu` for the icons and `icondata_core` for the `Icon` type a prop
-  names, never the `icondata` umbrella, which depends on every pack. They
-  join the root `[workspace.dependencies]` with the first view that draws an
-  icon, with the bytes that view adds to the bundle measured against §12.
+- **Icons are `ferrohealth_ui::icon::Glyph`**, the Lucide outlines the
+  library vendors; no icon crate of the console's own. A glyph the console
+  needs and the library lacks is added to the library.
 - An icon never carries meaning alone (§10): it sits beside the word it
   illustrates.

@@ -35,8 +35,8 @@
 #                          and the wasm-bindgen CLI of the ci.yml viewer job
 #                          and of release-viewer.yml,
 #                          the wasm-bindgen crate requirement, and the
-#                          Tailwind CSS and Binaryen releases of
-#                          scripts/release/viewer-{tools,site}.sh.
+#                          Binaryen release of
+#                          scripts/release/viewer-tools.sh.
 #                          The browser journeys: the thirtyfour requirement,
 #                          the chrome-version of the ci.yml journeys job, and
 #                          the release and SHA-256 digests of
@@ -445,10 +445,6 @@ if [ -f app/ferrobridge-viewer/Cargo.toml ]; then
     done
   done
   console_pin wasm-bindgen "$(manifest_req wasm-bindgen)" "the root Cargo.toml"
-  console_pin "Tailwind CSS" "$(shell_pin tailwind_version scripts/release/viewer-tools.sh)" \
-    scripts/release/viewer-tools.sh
-  tailwind="$(shell_pin "export LEPTOS_TAILWIND_VERSION" scripts/release/viewer-site.sh)"
-  console_pin "Tailwind CSS" "${tailwind#v}" scripts/release/viewer-site.sh
   console_pin Binaryen "$(shell_pin binaryen_version scripts/release/viewer-tools.sh)" \
     scripts/release/viewer-tools.sh
   # The browser journeys: the WebDriver client, the Chrome for Testing

@@ -41,7 +41,6 @@ mdBook	rust-lang/mdBook
 mdbook-toc	badboy/mdbook-toc
 mdbook-mermaid	badboy/mdbook-mermaid
 cargo-leptos	leptos-rs/cargo-leptos
-Tailwind CSS	tailwindlabs/tailwindcss
 Binaryen	WebAssembly/binaryen"
 
 # The second cell of the matrix row whose first cell is $1, with the backticks

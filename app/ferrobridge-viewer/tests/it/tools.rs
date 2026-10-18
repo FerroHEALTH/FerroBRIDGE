@@ -202,6 +202,50 @@ async fn toopenehr_draws_the_composition_and_its_issues_by_severity() -> Result<
 }
 
 #[tokio::test]
+async fn an_issue_that_speaks_through_its_details_draws_its_text_and_place()
+-> Result<(), Box<dyn Error>> {
+    let bridge = MockServer::start().await;
+    let answer = json!({"resourceType": "Parameters", "parameter": [
+        {"name": "composition", "valueString": "{\"_type\":\"COMPOSITION\"}"},
+        {"name": "outcome", "resource": {"resourceType": "OperationOutcome", "issue": [
+            {"severity": "information", "code": "informational", "details": {
+                "coding": [{"system": "https://example.org/synthetic-path", "code": "/content[openEHR-EHR-EVALUATION.synthetic.v1]"}],
+                "text": "a synthetic element the mapping does not carry"
+            }}
+        ]}}
+    ]});
+    Mock::given(method("POST"))
+        .and(path("/fhir/$toopenehr"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_raw(answer.to_string(), "application/fhir+json"),
+        )
+        .mount(&bridge)
+        .await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let bundle = bundle();
+    let html = ran(
+        &service,
+        "/api/toopenehr",
+        &[
+            ("bundle", bundle.as_str()),
+            ("template_id", ""),
+            ("format", "canonical"),
+        ],
+        &cookie,
+    )
+    .await?;
+    assert!(
+        html.contains("<div>a synthetic element the mapping does not carry</div>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<div><code>/content[openEHR-EHR-EVALUATION.synthetic.v1]</code></div>"),
+        "{html}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn input_the_console_does_not_send_is_named_and_the_bridge_never_asked()
 -> Result<(), Box<dyn Error>> {
     let bridge = MockServer::start().await;
@@ -317,7 +361,7 @@ async fn validate_offers_the_declared_types_and_draws_the_outcome() -> Result<()
         .ok_or("the information")?;
     assert!(error < information, "an error before information: {html}");
     assert!(
-        html.contains(r#"<span class="badge tone-danger">error</span>"#),
+        html.contains(r#"<span class="fui-badge fui-tone-bad">error</span>"#),
         "{html}"
     );
     Ok(())
@@ -404,7 +448,7 @@ async fn the_playground_forms_are_post_forms_with_autocomplete_off_disabled_unti
         );
     }
     assert!(
-        page.contains(r#"<label for="tofhir-composition">"#),
+        page.contains(r#"<label for="tofhir-composition" class="fui-label">"#),
         "{page}"
     );
     assert!(

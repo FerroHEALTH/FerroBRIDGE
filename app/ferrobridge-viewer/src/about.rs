@@ -30,12 +30,14 @@ pub fn AboutPage(
     });
     view! {
         <Title text=format!("About · {PRODUCT}") />
-        <h1>"About"</h1>
-        <p>
-            {PRODUCT}
-            " is the operator console of FerroBRIDGE, a bridge between openEHR, HL7 FHIR and the OMOP Common Data Model."
-        </p>
-        <dl>
+        {ferrohealth_ui::view::surface::page_header(
+            "About",
+            Some(format!("{PRODUCT} is the operator console of FerroBRIDGE, a bridge between openEHR, HL7 FHIR and the OMOP Common Data Model.")),
+            (),
+        )}
+        <section class="fui-card">
+        <h2 class="fui-card-title">{PRODUCT}</h2>
+        <dl class="fui-facts">
             <dt>"Version"</dt>
             <dd>{VERSION}</dd>
             <dt>"Made by"</dt>
@@ -47,5 +49,6 @@ pub fn AboutPage(
             <dd>"Business Source License 1.1"</dd>
             {bridge}
         </dl>
+        </section>
     }
 }

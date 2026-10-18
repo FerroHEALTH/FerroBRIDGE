@@ -1,10 +1,18 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! What every engine-state section shares: the reading of a field of the
-//! bridge's JSON, the section a refusal or a fault draws in place of its
-//! content, and the list of diagnostics.
+//! What every engine-state section shares.
+//!
+//! It is the reading of a field of the bridge's JSON, the section a refusal
+//! or a fault draws in place of its content, the table and the list of
+//! diagnostics, each drawn with the components of `ferrohealth_ui`.
 
+use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::table::view::{Body, Column, DataTable, data_table, data_table_unstacked};
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::code::code_panel;
+use ferrohealth_ui::view::refusal::fault;
+use ferrohealth_ui::view::surface::{card, disclosure};
 use leptos::prelude::*;
 use openehr_mapping_core::diagnostic::{Diagnostic, Severity};
 
@@ -64,73 +72,121 @@ pub fn optional_text<'a>(
 pub fn failed(heading: &'static str, error: &BridgeError) -> AnyView {
     let said = match crate::model::server::refusal(error) {
         Ok(refusal) => refused(&refusal),
-        Err(fault) => faulted(&fault),
+        Err(failure) => fault(failure.to_string()).into_any(),
     };
-    view! {
-        <section class="card">
-            <h2>{heading}</h2>
-            {said}
-        </section>
-    }
-    .into_any()
+    card(heading, said).into_any()
 }
 
 /// The section an answer this console cannot read draws.
 #[must_use]
 pub fn unreadable(heading: &'static str, shape: &Shape) -> AnyView {
     tracing::error!(%shape, "the bridge answered a document this console cannot read");
-    view! {
-        <section class="card">
-            <h2>{heading}</h2>
-            <p role="alert">{shape.to_string()}</p>
-        </section>
-    }
-    .into_any()
+    card(heading, fault(shape.to_string())).into_any()
 }
 
-/// The words of `refusal`.
-fn refused(refusal: &Refusal) -> AnyView {
+/// The words of `refusal`: its status and the diagnostics it carried.
+#[must_use]
+pub fn refused(refusal: &Refusal) -> AnyView {
     match refusal {
-        Refusal::NotAuthenticated => view! {
-            <p role="alert">"401: the bridge did not accept your sign-in. Sign in again."</p>
+        Refusal::NotAuthenticated => {
+            fault("401: the bridge did not accept your sign-in. Sign in again.").into_any()
         }
-        .into_any(),
         Refusal::Bridge {
             status,
             diagnostics,
         } => {
+            let alert = fault(format!("{status}: the bridge refused the request."));
             let items = diagnostics
                 .iter()
                 .map(|text| view! { <li>{text.clone()}</li> })
                 .collect_view();
+            let list =
+                (!diagnostics.is_empty()).then(|| view! { <ul class="fui-issues">{items}</ul> });
             view! {
-                <p role="alert">{format!("{status}: the bridge refused the request.")}</p>
-                <ul>{items}</ul>
+                {alert}
+                {list}
             }
             .into_any()
         }
-        Refusal::Invalid { reason } => view! { <p role="alert">{reason.clone()}</p> }.into_any(),
+        Refusal::Invalid { reason } => fault(reason.clone()).into_any(),
     }
 }
 
-/// The words of the console's fault `fault`.
-fn faulted(fault: &ViewError) -> AnyView {
-    view! { <p role="alert">{fault.to_string()}</p> }.into_any()
+/// The console's own fault `failure`, as an alert.
+#[must_use]
+pub fn faulted(failure: &ViewError) -> AnyView {
+    fault(failure.to_string()).into_any()
 }
 
-/// The word and tone class of `severity`.
+/// The word and the badge classes of `severity`.
 #[must_use]
 pub const fn severity(severity: Severity) -> (&'static str, &'static str) {
     match severity {
-        Severity::Error => ("error", "badge tone-danger"),
-        Severity::Warning => ("warning", "badge tone-warn"),
+        Severity::Error => ("error", Tone::Bad.badge()),
+        Severity::Warning => ("warning", Tone::Warn.badge()),
     }
+}
+
+/// The library's data table under `caption`, headed `columns`, over `rows`.
+///
+/// The rows stack as cards on a phone: every body cell but the row's name
+/// carries its column's `data-label`. The console's tables do not sort.
+#[must_use]
+pub fn table(caption: &'static str, columns: &[&'static str], rows: AnyView) -> AnyView {
+    columns_table(caption, &text_columns(columns), rows)
+}
+
+/// The data table [`table`] draws, headed by `columns`.
+#[must_use]
+pub fn columns_table(caption: &'static str, columns: &[Column], rows: AnyView) -> AnyView {
+    data_table(DataTable {
+        caption,
+        columns,
+        sort: None,
+        sort_href: &|_| String::new(),
+        body: Body::Rows(rows),
+    })
+    .into_any()
+}
+
+/// The data table [`table`] draws, as a grid at every width: for a table of
+/// two short columns, which fits a phone as it is.
+#[must_use]
+pub fn table_unstacked(caption: &'static str, columns: &[&'static str], rows: AnyView) -> AnyView {
+    data_table_unstacked(DataTable {
+        caption,
+        columns: &text_columns(columns),
+        sort: None,
+        sort_href: &|_| String::new(),
+        body: Body::Rows(rows),
+    })
+    .into_any()
+}
+
+/// A text column for each label of `labels`, keyed by its label.
+#[must_use]
+pub fn text_columns(labels: &[&'static str]) -> Vec<Column> {
+    labels
+        .iter()
+        .copied()
+        .map(|label| Column::text(label, label))
+        .collect()
 }
 
 /// The table of `diagnostics`, each with its severity as a word, its code,
 /// where it is, its message and its mapping; a sentence when there is none.
 #[must_use]
 pub fn diagnostics_table(diagnostics: &[Diagnostic]) -> AnyView {
+    linked_diagnostics_table(diagnostics, &|_| None)
+}
+
+/// The table of `diagnostics` as [`diagnostics_table`] draws it, where the
+/// place of a diagnostic that `href` names a target for links to it.
+#[must_use]
+pub fn linked_diagnostics_table(
+    diagnostics: &[Diagnostic],
+    href: &dyn Fn(&Diagnostic) -> Option<String>,
+) -> AnyView {
     if diagnostics.is_empty() {
         return view! { <p>"No diagnostics."</p> }.into_any();
     }
@@ -146,61 +202,74 @@ pub fn diagnostics_table(diagnostics: &[Diagnostic]) -> AnyView {
                 .mapping_name()
                 .map(|name| name.as_str().to_owned())
                 .unwrap_or_default();
+            let place = match href(diagnostic) {
+                Some(target) => view! {
+                    <a href=target>
+                        <code>{place}</code>
+                    </a>
+                }
+                .into_any(),
+                None => view! { <code>{place}</code> }.into_any(),
+            };
             view! {
                 <tr>
                     <td>
                         <span class=tone>{word}</span>
                     </td>
-                    <td>
+                    <td data-label="Code">
                         <code>{diagnostic.code().as_str().to_owned()}</code>
                     </td>
-                    <td>
-                        <code>{place}</code>
-                    </td>
-                    <td>{diagnostic.message().to_owned()}</td>
-                    <td>{mapping}</td>
+                    <td data-label="Where">{place}</td>
+                    <td data-label="Message">{diagnostic.message().to_owned()}</td>
+                    <td data-label="Mapping">{mapping}</td>
                 </tr>
             }
         })
-        .collect_view();
-    view! {
-        <div class="table-scroll" tabindex="0">
-            <table>
-                <caption>"Diagnostics"</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">"Severity"</th>
-                        <th scope="col">"Code"</th>
-                        <th scope="col">"Where"</th>
-                        <th scope="col">"Message"</th>
-                        <th scope="col">"Mapping"</th>
-                    </tr>
-                </thead>
-                <tbody>{rows}</tbody>
-            </table>
-        </div>
-    }
-    .into_any()
+        .collect_view()
+        .into_any();
+    table(
+        "Diagnostics",
+        &["Severity", "Code", "Where", "Message", "Mapping"],
+        rows,
+    )
 }
 
-/// A `<details>` holding `json` pretty-printed, under `summary`.
+/// A disclosure holding `json` pretty-printed and highlighted, under
+/// `summary`, in a bounded panel.
+///
+/// # Panics
+///
+/// Panics if `serde_json` cannot write a `serde_json::Value`, which it
+/// always can: its map keys are strings and its `Serialize` never fails
+/// (<https://docs.rs/serde_json/1/serde_json/fn.to_string_pretty.html>, Errors).
 #[must_use]
+#[expect(
+    clippy::expect_used,
+    reason = "to_string_pretty fails only for a Serialize that fails or a map with non-string keys, and a serde_json::Value has neither"
+)]
 pub fn raw_json(summary: &'static str, json: &serde_json::Value) -> AnyView {
-    // NOTE: no specification governs this: our own design; a value parsed from
-    // JSON always prints, so a failure here leaves the disclosure empty.
-    let text = serde_json::to_string_pretty(json).unwrap_or_default();
-    view! {
-        <details class="disclosure">
-            <summary>{summary}</summary>
-            <pre>{text}</pre>
-        </details>
-    }
-    .into_any()
+    let text =
+        serde_json::to_string_pretty(json).expect("a serde_json::Value should always serialize");
+    disclosure(summary, code_panel(summary, Language::Json, &text)).into_any()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Shape, field, optional_text, text};
+    use super::{Shape, field, optional_text, raw_json, text};
+
+    #[test]
+    fn raw_json_draws_every_member_of_the_value_pretty_printed() {
+        let value = serde_json::json!({
+            "resourceType": "Parameters",
+            "parameter": [{"name": "réponse", "valueInteger": 7}],
+        });
+        let html = leptos::prelude::Owner::new()
+            .with(|| leptos::prelude::RenderHtml::to_html(raw_json("The Parameters", &value)));
+        assert!(html.contains("The Parameters"), "{html}");
+        assert!(html.contains("resourceType"), "{html}");
+        assert!(html.contains("réponse"), "{html}");
+        assert!(html.contains("valueInteger"), "{html}");
+    }
 
     #[test]
     fn a_field_is_read_by_path_and_a_missing_one_is_named() {

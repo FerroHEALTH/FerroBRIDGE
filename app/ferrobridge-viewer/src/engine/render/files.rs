@@ -5,16 +5,21 @@
 //! /operator/mappings`, and one file from `GET /operator/mappings/{path}`.
 //!
 //! A file is shown verbatim, one numbered line per line of its bytes with
-//! its YAML highlighted ([`super::highlight`]), and the diagnostics the
+//! its YAML highlighted by `ferrohealth_ui`, and the diagnostics the
 //! running load raised about it beside it, each linked to its line. Bytes
 //! that are not UTF-8 are refused with a sentence, never shown altered.
 
 use ferrobridge_operator_api::operator::{Language, Listed, Owner};
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::code::code_lines;
+use ferrohealth_ui::view::empty::empty_quiet;
+use ferrohealth_ui::view::notice::{Announce, notice};
+use ferrohealth_ui::view::surface::{card, stack};
 use leptos::prelude::*;
 use openehr_mapping_core::diagnostic::Diagnostic;
 
 use crate::bridge::{BridgeError, MappingFile};
-use crate::engine::render::highlight;
 use crate::engine::render::parts;
 
 /// The path of the page that shows the file `path`.
@@ -36,18 +41,20 @@ pub fn list(listing: &Result<Vec<Listed>, BridgeError>) -> String {
         Ok(listing) => rows(listing),
         Err(error) => parts::failed("Mapping files", error),
     };
-    view! { <div class="sections">{section}</div> }.to_html()
+    stack(section).to_html()
 }
 
 /// The table of every listed file.
 fn rows(listing: &[Listed]) -> AnyView {
     if listing.is_empty() {
-        return view! {
-            <section class="card">
-                <h2>"Mapping files"</h2>
-                <p>"The bridge serves no mapping file."</p>
-            </section>
-        }
+        return card(
+            "Mapping files",
+            empty_quiet(
+                Glyph::FILES,
+                "No mapping file",
+                "The bridge serves no mapping file.",
+            ),
+        )
         .into_any();
     }
     let rows = listing
@@ -69,42 +76,42 @@ fn rows(listing: &[Listed]) -> AnyView {
                             <code>{entry.path.clone()}</code>
                         </a>
                     </th>
-                    <td>{language}</td>
-                    <td>{entry.kind.clone().unwrap_or_else(|| String::from("not read"))}</td>
-                    <td>{owner}</td>
-                    <td>{if entry.read_only { "read-only" } else { "editable" }}</td>
-                    <td>
-                        <span class=tone>{count}</span>
+                    <td data-label="Language">{language}</td>
+                    <td data-label="Kind">
+                        {entry.kind.clone().unwrap_or_else(|| String::from("not read"))}
+                    </td>
+                    <td data-label="Owner">{owner}</td>
+                    <td data-label="Writable">
+                        {if entry.read_only { "read-only" } else { "editable" }}
+                    </td>
+                    <td data-label="Diagnostics">
+                        <span class=tone.badge()>{count}</span>
                     </td>
                 </tr>
             }
         })
-        .collect_view();
-    view! {
-        <section class="card">
-            <h2>"Mapping files"</h2>
-            <div class="table-scroll" tabindex="0">
-                <table>
-                    <thead>
-                        <tr>
-                            <th scope="col">"File"</th>
-                            <th scope="col">"Language"</th>
-                            <th scope="col">"Kind"</th>
-                            <th scope="col">"Owner"</th>
-                            <th scope="col">"Writable"</th>
-                            <th scope="col">"Diagnostics"</th>
-                        </tr>
-                    </thead>
-                    <tbody>{rows}</tbody>
-                </table>
-            </div>
-        </section>
-    }
+        .collect_view()
+        .into_any();
+    card(
+        "Mapping files",
+        parts::table(
+            "Mapping files",
+            &[
+                "File",
+                "Language",
+                "Kind",
+                "Owner",
+                "Writable",
+                "Diagnostics",
+            ],
+            rows,
+        ),
+    )
     .into_any()
 }
 
 /// The words and tone of a file's diagnostics count.
-fn counted(diagnostics: &[Diagnostic]) -> (String, &'static str) {
+fn counted(diagnostics: &[Diagnostic]) -> (String, Tone) {
     let errors = diagnostics
         .iter()
         .filter(|diagnostic| {
@@ -113,12 +120,9 @@ fn counted(diagnostics: &[Diagnostic]) -> (String, &'static str) {
         .count();
     let warnings = diagnostics.len().saturating_sub(errors);
     match (errors, warnings) {
-        (0, 0) => (String::from("none"), "badge tone-ok"),
-        (0, warnings) => (format!("{warnings} warnings"), "badge tone-warn"),
-        (errors, warnings) => (
-            format!("{errors} errors, {warnings} warnings"),
-            "badge tone-danger",
-        ),
+        (0, 0) => (String::from("none"), Tone::Ok),
+        (0, warnings) => (format!("{warnings} warnings"), Tone::Warn),
+        (errors, warnings) => (format!("{errors} errors, {warnings} warnings"), Tone::Bad),
     }
 }
 
@@ -147,18 +151,24 @@ pub fn shown(
         Ok(file) => content(path, file),
         Err(error) => parts::failed("The file", error),
     };
-    view! { <div class="sections">{content} {diagnostics}</div> }.to_html()
+    stack(view! {
+        {content}
+        {diagnostics}
+    })
+    .to_html()
 }
 
 /// The diagnostics beside the file, each linked to its line.
 fn diagnostics_section(diagnostics: &[Diagnostic]) -> AnyView {
     if diagnostics.is_empty() {
-        return view! {
-            <section class="card">
-                <h2>"Diagnostics"</h2>
-                <p>"The running load raised no diagnostic about this file."</p>
-            </section>
-        }
+        return card(
+            "Diagnostics",
+            empty_quiet(
+                Glyph::CIRCLE_CHECK,
+                "No diagnostic",
+                "The running load raised no diagnostic about this file.",
+            ),
+        )
         .into_any();
     }
     let items = diagnostics
@@ -168,29 +178,24 @@ fn diagnostics_section(diagnostics: &[Diagnostic]) -> AnyView {
             let place = diagnostic.position().map(|position| {
                 let link = format!("#{}", line_id(position.line()));
                 view! {
+                    " at "
                     <a href=link>{format!("line {}, column {}", position.line(), position.column())}</a>
                 }
             });
             view! {
                 <li>
                     <span class=tone>{word}</span>
-                    " "
-                    <code>{diagnostic.code().as_str().to_owned()}</code>
-                    " "
-                    {place}
-                    ": "
-                    {diagnostic.message().to_owned()}
+                    <span class="fui-issue-head">
+                        <code>{diagnostic.code().as_str().to_owned()}</code>
+                        {place}
+                        ":"
+                    </span>
+                    <span class="fui-issue-text">{diagnostic.message().to_owned()}</span>
                 </li>
             }
         })
         .collect_view();
-    view! {
-        <section class="card">
-            <h2>"Diagnostics"</h2>
-            <ul>{items}</ul>
-        </section>
-    }
-    .into_any()
+    card("Diagnostics", view! { <ul class="fui-issues">{items}</ul> }).into_any()
 }
 
 /// The file's bytes as numbered, highlighted lines.
@@ -200,46 +205,28 @@ fn content(path: &str, file: &MappingFile) -> AnyView {
         .clone()
         .unwrap_or_else(|| String::from("not stated"));
     let Ok(text) = std::str::from_utf8(&file.bytes) else {
-        return view! {
-            <section class="card">
-                <h2>{path.to_owned()}</h2>
-                <p role="alert">
-                    "The file is not UTF-8, so the console does not show it: a YAML file is UTF-8 (YAML 1.2.2, character encodings)."
-                </p>
-            </section>
-        }
+        return card(
+            path.to_owned(),
+            notice(
+                Tone::Bad,
+                Announce::Alert,
+                None,
+                "The file is not UTF-8, so the console does not show it: a YAML file is UTF-8 (YAML 1.2.2, character encodings).",
+            ),
+        )
         .into_any();
     };
-    let lines = text_lines(text)
-        .into_iter()
-        .zip(1_u64..)
-        .map(|(line, number)| {
-            let tokens = highlight::line(line)
-                .into_iter()
-                .map(|token| match token.kind.class() {
-                    Some(class) => view! { <span class=class>{token.text}</span> }.into_any(),
-                    None => token.text.into_any(),
-                })
-                .collect_view();
-            view! { <li id=line_id(number)>{tokens}</li> }
-        })
-        .collect_view();
-    view! {
-        <section class="card">
-            <h2>
-                <code>{path.to_owned()}</code>
-            </h2>
-            <p class="text-muted">
-                "SHA-256 " <code>{digest}</code>
-            </p>
+    let label = format!("{path}, one numbered line per line");
+    card(
+        path.to_owned(),
+        view! {
+            <p class="fui-page-meta">"SHA-256 " <code>{digest}</code></p>
             <p>
                 <a href=format!("{}/{path}", crate::editor::EDIT)>"Open it in the editor"</a>
             </p>
-            <ol class="code-lines" aria-label="The file, one line per item">
-                {lines}
-            </ol>
-        </section>
-    }
+            {code_lines(&label, ferrohealth_ui::highlight::Language::Yaml, text, "L")}
+        },
+    )
     .into_any()
 }
 
