@@ -39,6 +39,11 @@ of a later FHIRPath release (`lowBoundary()`, `sort()`, `trim()`) is not
 defined here: N1 is the version R4 cites. Navigation over system values,
 untyped nodes and the results of `children()`, `descendants()` and
 `resolve()` stays lenient, as N1 §11 says a compiler cannot type them.
+`Environment::with_strict_ordering` refuses `first()`, `last()`, `tail()`,
+`skip()`, `take()` and the indexer over a collection derived from
+`children()` or `descendants()` (`EvalError::Unordered`, N1 §3.1); it is off
+by default, and `eval::order` decides from the syntax tree which input is
+unordered.
 
 A choice element is typed by every type it admits (R4 §2.9.1.1). The static
 check of a path from a choice element, or of an expression whose context is

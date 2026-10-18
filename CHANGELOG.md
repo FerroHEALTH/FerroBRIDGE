@@ -25,6 +25,13 @@ crates on crates.io.
 
 ### Added
 
+- The FHIRPath evaluator has a strict ordering mode,
+  `Environment::with_strict_ordering`, off by default (#636). It refuses
+  `first()`, `last()`, `tail()`, `skip()`, `take()` and the indexer over a
+  collection derived from `children()` or `descendants()` with
+  `EvalError::Unordered`, the error FHIRPath N1 §3.1 lets an implementation
+  return for an order-dependent operation on a list whose order is
+  undefined.
 - The profile validator holds every resolved extension to where its
   definition admits it (#481): each `StructureDefinition.context` of the
   types `element`, `extension` and `fhirpath`, read as R4
