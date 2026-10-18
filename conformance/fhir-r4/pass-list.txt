@@ -3204,11 +3204,6 @@ SearchParameter-clinical-encounter.json
 SearchParameter-clinical-identifier.json
 SearchParameter-clinical-patient.json
 SearchParameter-clinical-type.json
-SearchParameter-codesystem-extensions-CodeSystem-author.json
-SearchParameter-codesystem-extensions-CodeSystem-effective.json
-SearchParameter-codesystem-extensions-CodeSystem-end.json
-SearchParameter-codesystem-extensions-CodeSystem-keyword.json
-SearchParameter-codesystem-extensions-CodeSystem-workflow.json
 SearchParameter-conformance-context-quantity.json
 SearchParameter-conformance-context-type-quantity.json
 SearchParameter-conformance-context-type-value.json
@@ -3257,11 +3252,6 @@ SearchParameter-observation-genetic-Observation-gene-identifier.json
 SearchParameter-patient-extensions-Patient-age.json
 SearchParameter-patient-extensions-Patient-birthOrderBoolean.json
 SearchParameter-patient-extensions-Patient-mothersMaidenName.json
-SearchParameter-valueset-extensions-ValueSet-author.json
-SearchParameter-valueset-extensions-ValueSet-effective.json
-SearchParameter-valueset-extensions-ValueSet-end.json
-SearchParameter-valueset-extensions-ValueSet-keyword.json
-SearchParameter-valueset-extensions-ValueSet-workflow.json
 ServiceRequest-ambulation.json
 ServiceRequest-appendectomy-narrative.json
 ServiceRequest-benchpress.json

@@ -6437,11 +6437,6 @@ SearchParameter-clinical-encounter.json
 SearchParameter-clinical-identifier.json
 SearchParameter-clinical-patient.json
 SearchParameter-clinical-type.json
-SearchParameter-codesystem-extensions-CodeSystem-author.json
-SearchParameter-codesystem-extensions-CodeSystem-effective.json
-SearchParameter-codesystem-extensions-CodeSystem-end.json
-SearchParameter-codesystem-extensions-CodeSystem-keyword.json
-SearchParameter-codesystem-extensions-CodeSystem-workflow.json
 SearchParameter-condition-extensions-Condition-based-on.json
 SearchParameter-condition-extensions-Condition-definition.json
 SearchParameter-condition-extensions-Condition-part-of.json
@@ -6466,7 +6461,6 @@ SearchParameter-individual-given.json
 SearchParameter-individual-phone.json
 SearchParameter-individual-phonetic.json
 SearchParameter-individual-telecom.json
-SearchParameter-location-extensions-Location-alias.json
 SearchParameter-medications-code.json
 SearchParameter-medications-date.json
 SearchParameter-medications-identifier.json
@@ -6479,15 +6473,9 @@ SearchParameter-observation-genetic-Observation-dna-variant.json
 SearchParameter-observation-genetic-Observation-gene-amino-acid-change.json
 SearchParameter-observation-genetic-Observation-gene-dnavariant.json
 SearchParameter-observation-genetic-Observation-gene-identifier.json
-SearchParameter-organization-extensions-Organization-alias.json
 SearchParameter-patient-extensions-Patient-age.json
 SearchParameter-patient-extensions-Patient-birthOrderBoolean.json
 SearchParameter-patient-extensions-Patient-mothersMaidenName.json
-SearchParameter-valueset-extensions-ValueSet-author.json
-SearchParameter-valueset-extensions-ValueSet-effective.json
-SearchParameter-valueset-extensions-ValueSet-end.json
-SearchParameter-valueset-extensions-ValueSet-keyword.json
-SearchParameter-valueset-extensions-ValueSet-workflow.json
 Sequence-coord-0-base.json
 Sequence-coord-1-base.json
 Sequence-example-TPMT-one.json
