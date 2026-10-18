@@ -32,13 +32,13 @@ use crate::operations::program_set;
 use crate::operations::reference;
 use crate::operations::settings;
 
-/// The EHR the draft chapter's own examples name.
+/// The EHR the chapter's own examples name.
 const EHR_ID: &str = "53d89df2-5501-4455-9a65-565a5d1ddb7c";
 
-/// The vendored FSH operation definitions of the draft chapter.
-const DRAFT_FSH: &str = concat!(
+/// The vendored FSH operation definitions of the REST API chapter.
+const CHAPTER_FSH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../docs/specs/fhirconnect/draft-rest-api/rest/input/fsh/operations"
+    "/../../docs/specs/fhirconnect/rest/input/fsh/operations"
 );
 
 /// One parameter an FSH `OperationDefinition` declares.
@@ -62,7 +62,7 @@ struct Declared {
 /// `* parameter[+]` and its members are indented under it
 /// (<https://hl7.org/fhir/uv/shorthand/reference.html>).
 fn fsh(file: &str) -> Result<Vec<Declared>, Box<dyn Error>> {
-    let text = std::fs::read_to_string(format!("{DRAFT_FSH}/{file}"))?;
+    let text = std::fs::read_to_string(format!("{CHAPTER_FSH}/{file}"))?;
     let mut declared: Vec<Declared> = Vec::new();
     for line in text.lines() {
         let line = line.trim_end();
@@ -194,7 +194,7 @@ fn toopenehr_parameters(declared: &[Declared]) -> Result<Parameters, Box<dyn Err
 #[test]
 fn the_tofhir_contract_reads_the_parameter_set_the_vendored_fsh_declares()
 -> Result<(), Box<dyn Error>> {
-    // ToFhir.fsh (draft) at the pinned commit, its declared parameter set.
+    // ToFhir.fsh at the pinned commit, its declared parameter set.
     let declared = fsh("ToFhir.fsh")?;
     let outputs: Vec<&str> = declared
         .iter()
@@ -224,7 +224,7 @@ fn the_tofhir_contract_reads_the_parameter_set_the_vendored_fsh_declares()
 #[test]
 fn the_toopenehr_contract_reads_the_parameter_set_the_vendored_fsh_declares()
 -> Result<(), Box<dyn Error>> {
-    // ToOpenEhr.fsh (draft) at the pinned commit, its declared parameter set.
+    // ToOpenEhr.fsh at the pinned commit, its declared parameter set.
     let declared = fsh("ToOpenEhr.fsh")?;
     let outputs: Vec<&str> = declared
         .iter()
@@ -280,7 +280,7 @@ fn tofhir_verdict() -> Result<Option<String>, Box<dyn Error>> {
         .filter(|parameter| parameter.usage == "out")
         .map(|parameter| (parameter.name.as_str(), parameter.kind.as_str()))
         .collect();
-    // NOTE: rest-api.adoc (draft) $tofhir Output: "The response MUST be a FHIR `Bundle`
+    // NOTE: rest-api.adoc $tofhir Output: "The response MUST be a FHIR `Bundle`
     // containing the mapped resources", so the one declared `return` is that Bundle.
     if outs != [("return", "Bundle")] {
         return Ok(Some(format!(
@@ -324,12 +324,12 @@ fn toopenehr_verdict() -> Result<Option<String>, Box<dyn Error>> {
     )
 }
 
-/// The conformance verdict on every FSH operation definition of the draft
+/// The conformance verdict on every FSH operation definition of the
 /// REST API chapter: the wire contract reads every declared input, and the
-/// operation answers as the definition declares (rest-api.adoc, draft).
+/// operation answers as the definition declares (rest-api.adoc).
 #[test]
-fn conformance_the_draft_operation_definitions_hold_their_pass_list() -> Result<(), Box<dyn Error>>
-{
+fn conformance_the_rest_api_operation_definitions_hold_their_pass_list()
+-> Result<(), Box<dyn Error>> {
     let verdict = |id: &str, failure: Option<String>| match failure {
         Some(reason) => Case::fail(id, reason),
         None => Case::pass(id),
@@ -338,7 +338,7 @@ fn conformance_the_draft_operation_definitions_hold_their_pass_list() -> Result<
         verdict("ToFhir.fsh", tofhir_verdict()?),
         verdict("ToOpenEhr.fsh", toopenehr_verdict()?),
     ];
-    let outcome = record(Corpus::DraftRestApi, &cases)?;
+    let outcome = record(Corpus::RestApi, &cases)?;
     assert!(
         outcome.regressed.is_empty(),
         "cases the pass list records no longer pass: {:?}",

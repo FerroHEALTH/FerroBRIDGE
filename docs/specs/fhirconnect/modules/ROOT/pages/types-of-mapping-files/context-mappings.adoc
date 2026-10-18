@@ -7,6 +7,8 @@ On the other hand, context mappings act as imports.
 
 == Header
 The header is of the `type: context`. It does not contain an openEHR or FHIR-specific part.
+A context that is only entered from another context via `slotContext` sets `scope: sub` in its `context` block,
+see xref:types-of-mapping-files/sub-contexts.adoc[].
 
 [source,yaml]
 ----
@@ -30,11 +32,11 @@ The `template.sem_ver` defines what version of the template is mapped.
 ----
 context:
   profile:
-    url: "https://www.medizininformatik-initiative.de/fhir/core/modul-prozedur/StructureDefinition/Procedure"
-    version: "2025.0.0"
+    url: https://www.medizininformatik-initiative.de/fhir/core/modul-prozedur/StructureDefinition/Procedure
+    version: 2025.0.0
   template:
-    id: "KDS_Prozedur"
-    sem_ver: "10.0.0"
+    id: KDS_Prozedur
+    sem_ver: 10.0.0
 ----
 
 == Archetypes & Extensions
@@ -51,16 +53,35 @@ and B has an extension C, then extension C is applied.
 
 context:
   profile:
-    url: "https://www.medizininformatik-initiative.de/fhir/core/modul-prozedur/StructureDefinition/Procedure"
-    version: "2025.0.0"
+    url: https://www.medizininformatik-initiative.de/fhir/core/modul-prozedur/StructureDefinition/Procedure
+    version: 2025.0.0
   template:
-    id: "KDS_Prozedur"
-    sem_ver: "10.0.0"
+    id: KDS_Prozedur
+    sem_ver: 10.0.0
   archetypes:
-    - "ACTION.procedure.v1"
-    - "CLUSTER.case_identification.v0"
+    - ACTION.procedure.v1
+    - CLUSTER.case_identification.v0
   extensions:
-    - "KDS_procedure.v1"
+    - KDS_procedure.v1
+----
+
+== Contexts
+The `contexts` key lists sub-contexts that this context enters via `slotContext`, for example the entry
+profiles of a patient summary composition. A sub-context maps into the parent composition; its `template.id` is the section template embedded there. It uses its own extensions. See xref:types-of-mapping-files/sub-contexts.adoc[].
+
+[source,yaml]
+----
+context:
+  template:
+    id: International Patient Summary
+  archetypes:
+    - COMPOSITION.health_summary.v1
+  extensions:
+    - IPS_composition
+  contexts:
+    - IPS_problem.context
+    - IPS_allergy.context
+  start: COMPOSITION.health_summary.v1
 ----
 
 == Start
@@ -74,15 +95,15 @@ since this extends the `ACTION.procedure.v1`.
 ----
 context:
   profile:
-    url: "https://www.medizininformatik-initiative.de/fhir/core/modul-prozedur/StructureDefinition/Procedure"
-    version: "2025.0.0"
+    url: https://www.medizininformatik-initiative.de/fhir/core/modul-prozedur/StructureDefinition/Procedure
+    version: 2025.0.0
   template:
-    id: "KDS_Prozedur"
-    sem_ver: "10.0.0"
+    id: KDS_Prozedur
+    sem_ver: 10.0.0
   archetypes:
-    - "ACTION.procedure.v1"
-    - "CLUSTER.case_identification.v0"
+    - ACTION.procedure.v1
+    - CLUSTER.case_identification.v0
   extensions:
-    - "KDS_procedure.v1"
-  start: "ACTION.procedure.v1"
+    - KDS_procedure.v1
+  start: ACTION.procedure.v1
 ----

@@ -41,6 +41,22 @@ crates on crates.io.
 
 ### Changed
 
+- The FHIRconnect specification source moves to upstream commit
+  `e5871641`, which carries the merged REST API chapter (pull request #93) and
+  the sub-contexts (pull request #100) (#477). The chapter is no longer a
+  draft with a pin of its own: `scripts/vendor/fhirconnect.sh` vendors it and
+  its FSH operation definitions (`rest/`) from the one commit, and
+  `docs/specs/fhirconnect/draft-rest-api/` is gone. The conformance corpus,
+  its badge and the worked-example fixtures are renamed `rest-api`. Against
+  the head the bridge first implemented, the merged chapter changes no FSH
+  definition and no worked example; it adds that the `context` fields are a
+  fixed list an engine MUST refuse to extend, which `$tofhir` already
+  refused and a test now asserts by name. Upstream re-rendered both
+  published v1.0.0 schemas in place, adding `spec.unidirectional` and
+  `operational`; the bridge adopts the new render, re-records both sha256
+  values in `docs/architecture.md` §2, and reports the in-place change as
+  #856. No refusal of the strict schemas changes. The sub-contexts are filed
+  as #864. `fhirconnect` 0.1.139.
 - The openEHR RM is pinned (#476): the conformance target is RM Release
   1.1.0, the newest published release, and the code compiles against the
   `openehr_rm::v1_2` development generation, which `openehr-sdt` and

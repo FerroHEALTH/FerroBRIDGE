@@ -24,11 +24,11 @@ second, and changed seven things:
    its element table is an XML-codec input without cardinality. The decision
    to move stands; its scope is restated in section 4.1 and section 10, and
    the crate line floor is re-baselined.
-2. **FHIRconnect is growing a REST API.** A draft chapter (specification pull
-   request #93, open since 2026-08-20) defines `$tofhir` and `$toopenehr` as
-   FHIR operations, and the reference engine implements it (openFHIR 3.0.0,
-   2026-09-04). FerroBRIDGE adopts the draft as its engine surface beside the
-   facade (section 4.7), pinned by commit and labelled draft.
+2. **FHIRconnect has a REST API.** The REST API chapter (specification pull
+   request #93, merged 2026-10-06) defines `$tofhir` and `$toopenehr` as FHIR
+   operations, and the reference engine implements it (openFHIR 3.0.0,
+   2026-09-04). FerroBRIDGE adopts it as its engine surface beside the facade
+   (section 4.7), at the pinned specification commit.
 3. **The identity recommendation is changing upstream.** Pull request #94
    replaces "a hash of the Composition UID and the Entry Path" with
    `LOCATABLE.uid` of the entries. Section 9 takes the entry `uid` first and
@@ -193,8 +193,8 @@ default branch.
 
 | Component | Pin | Ground |
 |---|---|---|
-| FHIRconnect | v1.0.0 (specification source `SevKohler/FHIRconnect-spec` at `195b07fdb4c78da0432fdd1e9dbd127b81be6165` (2026-07-22); `model-mapping.schema.json` sha256 `6a925151c029e10ef11ccfc2eaafbbf441eea97ffec8ea9e0cd0b8493871d852`; `contextual-mapping.schema.json` sha256 `a96d600dfa7faacb1b2d8919a20554bed5699a636efd7f903d601b71cae15832`) | the only released version; both published draft-07 schemas are the machine-readable half of the authority and are vendored verbatim from the rendered v1.0.0 site (`build/site/FHIRconnect/v1.0.0/_attachments/`, the bytes the hashes name); the repository source at the same commit carries newer copies (a `unidirectional` and an `operational` property) that are vendored beside them as evidence of movement, never as the pin; the published schemas are defective in seven places (section 4.2), so they are exercised as evidence, never as the sole validator |
-| FHIRconnect REST API (draft) | specification pull request #93, head `2bf2a2fe91bae2ae659cda1665826567ea81b4af` (`engine/rest-api.adoc`, the `ToFhir` and `ToOpenEhr` FSH operation definitions) | an unmerged chapter the reference engine already implements (openFHIR 3.0.0); FerroBRIDGE implements it as a draft, pinned by commit, and re-adjudicates on merge (section 4.7) |
+| FHIRconnect | v1.0.0 (specification source `SevKohler/FHIRconnect-spec` at `e587164102921c73eea262a18f3457b18e4a2a40` (2026-10-08); `model-mapping.schema.json` sha256 `f92c4902e6b779eecfd40ca4ea774441609db8ffb7163832efc99b562cdfeba4`; `contextual-mapping.schema.json` sha256 `0402888b08a1ddfd457eb0e3c3f6c4bdac7f2339762b9553fce4c096c88f25d2`) | the only released version; both published draft-07 schemas are the machine-readable half of the authority and are vendored verbatim from the rendered v1.0.0 site (`build/site/FHIRconnect/v1.0.0/_attachments/`, the bytes the hashes name); upstream re-rendered both after the release, adding `spec.unidirectional` to the model schema and `operational` to the context schema, two keys the prose already defined; the bridge adopts the new render, because the published v1.0.0 is what the site now serves, and records the in-place change as #856; the repository source at the same commit carries newer copies with the sub-context keys (`slotContext`, `scope`, `contexts`) that are vendored beside them as evidence of movement, never as the pin; the published schemas are defective in seven places (section 4.2), so they are exercised as evidence, never as the sole validator |
+| FHIRconnect REST API | the REST API chapter (`engine/rest-api.adoc`) and the `ToFhir` and `ToOpenEhr` FSH operation definitions (`rest/`) at the specification source commit above, merged as specification pull request #93 on 2026-10-06 | part of the specification source, no longer a pin of its own; the reference engine implements it (openFHIR 3.0.0), and FerroBRIDGE implements both operations and the direct form (section 4.7) |
 | FHIRconnect mapping library | `SevKohler/FHIRconnect-mapping-lib` at `6bd4c19a2f96821c04fbeed3c6f6c190fd85825b` (2026-06-05), 107 YAML mapping files (52 `model`, 55 `projects`) | the conformance corpus, never an oracle: 24 files fail the published schema, 5 cross-references dangle, 6 files share one `metadata.name`; the 12 German KDS contexts pin profile version 2025.0.0 and every module has moved past it; the one EEHRxF context pins Laboratory 0.1.1 against a published 2.0.0 and declares a `sem_ver` its own OPT contradicts (section 4.8) |
 | FHIR | R4 (4.0.1), package `hl7.fhir.r4.core` 4.0.1 (CC0) | the only value the FHIRconnect schemas admit for `spec.version`; the mapping library targets R4; every EHDS-category HL7 Europe guide has an R4 line (section 4.8) |
 | FHIR STU3, the model only | 3.0.2, package `hl7.fhir.r3.core` 3.0.2 (CC0, registry shasum `173cc0eec749a68bff90cccae7631f2c72a4f2ac`) | the `stu3` module of `fhir-types` (section 4.1, #452); the facade and FHIRconnect stay on R4, because FHIRconnect v1.0.0 admits only R4 |
@@ -947,8 +947,9 @@ sequenceDiagram
 
 ### 4.7 The FHIRconnect REST API: `$tofhir` and `$toopenehr`
 
-The draft chapter (specification pull request #93, pinned in section 2)
-defines two FHIR operations against the service base, both `POST`, both pure
+The REST API chapter (`engine/rest-api.adoc` with the FSH operation
+definitions under `rest/`, merged as specification pull request #93 and read at
+the specification commit section 2 pins) defines two FHIR operations against the service base, both `POST`, both pure
 transformations that change no server state:
 
 - `POST [base]/$tofhir` takes a `Parameters` resource whose `composition`
@@ -970,25 +971,30 @@ the FHIR round-trip release ahead of the facade's own create and read
 for exactly the transformation the round trip proves, they need no CDR, and
 they are what an external facade or a test harness calls. The facade of
 section 4.6 is a client of the same in-process engine, so the two surfaces
-cannot disagree. Three pins on the draft, FerroBRIDGE's own where the draft
-leaves room:
+cannot disagree. Three pins on the chapter, two of them FerroBRIDGE's own
+where the chapter leaves room:
 
 - **Strictness is the default, and the `outcome` parameter is where the
-  declared set goes.** The draft says a partial result "MAY be returned
+  declared set goes.** The chapter says a partial result "MAY be returned
   together with issues" and points at the strictness chapter. FerroBRIDGE
   answers a failed mapping with an `OperationOutcome` and no composition (or
   no Bundle), and a successful one with the declared set of defaulted and
   skipped elements as `information` and `warning` issues, so a caller can
   never mistake a partial composition for a complete one.
-- **`context.patient` is honoured as the draft states it** (the caller's value
+- **`context.patient` is honoured as the chapter states it** (the caller's value
   takes precedence; the engine never requires it; a call that omits it
   resolves the subject through the identity map). A Bundle that references
   more than one subject is a refusal, not the reference engine's warning: one
   Bundle maps to one composition, and a mixed-subject Bundle cannot be one.
-- **The chapter is a draft.** Its FSH operation definitions are vendored at
-  the pinned commit; the wire tests are labelled draft; the pin moves to the
-  merged chapter when the specification releases it, and any difference is
-  re-adjudicated then, never silently absorbed.
+- **The `context` fields are a fixed list, and any other is refused.** The
+  merged chapter says so in as many words: "The `context` fields above are a
+  fixed list: this specification defines no others, and an engine MUST reject
+  a call that supplies one" (`engine/rest-api.adoc` §$tofhir Input). The
+  contract refuses an undeclared part with a `structure` issue, and a test
+  asserts it. The chapter merged with no change to its FSH operation
+  definitions or its worked examples against the head the bridge first
+  implemented (`2bf2a2fe`); its prose on resolving the patient was shortened
+  with its three normative bullets unchanged
 
 ```mermaid
 sequenceDiagram
@@ -1817,7 +1823,7 @@ draft upstream change.
       W --> V["meta.versionId = version_tree_id"]
       K --> V
   ```
-- **Patient identity.** The REST API draft names the arrangement to aim for:
+- **Patient identity.** The REST API chapter names the arrangement to aim for:
   the engine resolves an EHR id to a patient through whatever owns patient
   identity in the deployment, and `context.patient` is the caller's fallback.
   FerroBRIDGE's identity map is that local table; a configured external
@@ -1994,8 +2000,8 @@ facade, the operations and the ETL runner.
 
 **Vendored verbatim with provenance**, each by a committed
 `scripts/vendor/*.sh` and each read by a test or a generator: the two
-FHIRconnect schemas; the draft REST API chapter and its FSH operation
-definitions at the pinned pull-request commit; the FHIRconnect mapping
+FHIRconnect schemas; the REST API chapter and its FSH operation definitions
+at the same specification commit; the FHIRconnect mapping
 library; the OMOCL corpus; the CDM CSV definitions and PostgreSQL DDL; the
 five `STABLE` ITS-REST OpenAPI documents (Overview, System, EHR, Query
 and Definition, each checked `STABLE` by the corpus test); the seven HL7
@@ -2048,8 +2054,8 @@ targeting it is authored, the HL7 Europe and MII profile packages of section
   completeness checks that the bridge can run itself inside CI.
 - **There is no external conformance suite for either language** and no second
   implementation of OMOCL, so FerroBRIDGE's corpus tests are the conformance
-  instrument (issue #24) and a candidate outbound contribution. The draft REST
-  API's FSH operation definitions are the first upstream-authored conformance
+  instrument (issue #24) and a candidate outbound contribution. The REST API
+  chapter's FSH operation definitions are the first upstream-authored conformance
   artefact for FHIRconnect, and the bridge's wire tests read them.
 - The composed test stack runs an openEHR CDR, reached over ITS-REST only, a
   FHIR terminology server and a PostgreSQL CDM; all three are configured
@@ -2341,8 +2347,8 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | Non-percent `DV_PROPORTION` | refusal unless a mapping names a carrier | no specification defines the reference engine's extension URLs | invented extension URLs |
 | Partial results | refusal by default; the declared set as `information` and `warning` issues | the strictness chapter; a partial composition indistinguishable from a complete one is the failure class this project exists to prevent | the reference engine's warn-and-continue |
 | FHIR path handling | own bidirectional path model over the `Value` tree with the element table; every expression classified writable or read-only at load | `with.fhir` is written; `^` is not FHIRPath; no crate writes; the retired connector's reverse path silently wrote nothing | a FHIRPath evaluator (all read-only, heavy) |
-| Engine surface | `$tofhir` and `$toopenehr` per the draft chapter, pinned by commit, ahead of the facade | the specification's own conformance surface; no CDR needed; an external facade can call it | facade only |
-| openEHR wire | canonical JSON; Web Template built locally from the OPT; FLAT only at the operations edge | canonical is mandatory in ITS-REST; `WebTemplate` does not deserialise; node ids are server-specific; the draft API requires both serialisations | FLAT on the CDR wire; fetching `wt+json` |
+| Engine surface | `$tofhir` and `$toopenehr` per the REST API chapter, at the pinned specification commit, ahead of the facade | the specification's own conformance surface; no CDR needed; an external facade can call it | facade only |
+| openEHR wire | canonical JSON; Web Template built locally from the OPT; FLAT only at the operations edge | canonical is mandatory in ITS-REST; `WebTemplate` does not deserialise; node ids are server-specific; the REST API requires both serialisations | FLAT on the CDR wire; fetching `wt+json` |
 | Template generations | both ADL 1.4 and ADL 2, resolved `adl1.4` then `adl2` on one id, decoded into two OPT types, built into one `WebTemplate` (section 3) | owner requirement 2026-09-12; the Simplified Formats seam is generation-neutral; ITS-REST 1.1.0 serves both | ADL 1.4 only; a second pipeline per generation |
 | ADL 2 fetch form | `Accept: application/json`, AOM2 canonical JSON into `openehr-am`'s `OperationalTemplate` | the server already compiled the OPT2; ADL 2 source would cost the parser, the flattener and a repository | `text/plain` source through `openehr-adl` |
 | Node-id code space | at-coded templates only; an id-coded ADL 2 template is refused naming the code space | mapping paths are at-coded; ADL 2.4 requires at-codes for openEHR-RM systems; the builder reads no `alternative_ids` | silent non-resolution; a speculative at-to-id translation |
@@ -2405,7 +2411,9 @@ silence on the node-id code space of an ADL 2 template; the reference OMOP
 engine's concept resolution without validity filters; and, to HL7 Europe, the
 discharge-report snapshot unreachable through its version history.
 
-Tracked, not reported: the draft REST API chapter and the identity revision
-(specification pull requests #93 and #94), re-adjudicated on merge; OMOP CDM
+Tracked, not reported: the identity revision (specification pull request
+#94), re-adjudicated on merge; the sub-contexts the specification merged as
+pull request #100 (`slotContext`, `scope`, `contexts`), which the bridge does
+not yet read (#864); OMOP CDM
 v5.5.0; the HL7 Europe guides in ballot; the implementing act for the
 exchange format.

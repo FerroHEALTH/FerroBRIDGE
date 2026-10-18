@@ -644,7 +644,7 @@ jobs:
           cargo hack test --doc "${args[@]}" --locked
 
   # The conformance gate (#24): the corpus tests measure the vendored
-  # FHIRconnect and OMOCL libraries, the round-trip chains, the draft REST
+  # FHIRconnect and OMOCL libraries, the round-trip chains, the REST
   # API's operation definitions, the HL7 v2 message sets and the FHIR examples
   # packages (per version, and R4 through the facade) against the committed
   # pass lists under conformance/. A case a list records that no

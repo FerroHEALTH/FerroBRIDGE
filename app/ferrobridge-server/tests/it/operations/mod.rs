@@ -3,10 +3,10 @@
 
 //! The FHIRconnect operations on the wire, through the shipped run path.
 //!
-//! Every case here reads the DRAFT REST API chapter of the FHIRconnect
-//! specification (pull request #93, vendored at its pinned commit under
-//! `docs/specs/fhirconnect/draft-rest-api/`), so the expectations move with
-//! the chapter when it merges.
+//! Every case here reads the REST API chapter of the FHIRconnect
+//! specification (`engine/rest-api.adoc`, vendored at the pinned
+//! specification commit under `docs/specs/fhirconnect/`), so the expectations
+//! move with the pin.
 
 mod answers;
 mod lane;
@@ -32,7 +32,7 @@ use crate::support;
 /// The FHIR JSON media type both operations exchange.
 const FHIR_JSON: &str = "application/fhir+json";
 
-/// The media type the draft defines for an unwrapped openEHR payload.
+/// The media type the chapter defines for an unwrapped openEHR payload.
 const OPENEHR_JSON: &str = "application/openehr+json";
 
 /// The profile the synthetic context claims.

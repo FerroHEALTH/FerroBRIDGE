@@ -55,7 +55,7 @@ book.
 | `POST /fhir/tofhir` | The composition itself in, the Bundle out |
 | `POST /fhir/toopenehr` | A FHIR body in, the composition itself out |
 
-The two `$` routes are the FHIRconnect operations of the specification's draft
+The two `$` routes are the FHIRconnect operations of the specification's
 REST API chapter; the two bare routes are its direct form, which the chapter
 keeps outside the FHIR implementation guide. All four are served when
 `[mappings]` is configured and `[operations] enabled` is true, and answer `503`

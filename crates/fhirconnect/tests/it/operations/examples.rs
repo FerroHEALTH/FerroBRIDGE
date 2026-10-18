@@ -1,11 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The worked examples of the draft chapter and the refusals of a malformed
+//! The worked examples of the REST API chapter and the refusals of a malformed
 //! parameter set.
 
 use core::error::Error;
 
+use fhir_types::operation::ParametersError;
 use fhir_types::r4::parameters::Parameters;
 use fhir_types::r4::parameters::ParametersParameter;
 use fhir_types::r4::parameters::ParametersParameterValue;
@@ -16,15 +17,15 @@ use fhirconnect::operations::contract::ToFhirRequest;
 use fhirconnect::operations::contract::ToOpenehrResponse;
 use fhirconnect::operations::error::OperationError;
 
-use crate::operations::draft;
+use crate::operations::example;
 use crate::operations::normalized;
 use crate::operations::parameters;
 use crate::operations::rendered;
 
 #[test]
-fn the_draft_canonical_tofhir_example_round_trips() -> Result<(), Box<dyn Error>> {
-    // rest-api.adoc (draft) section $tofhir Input, `.Canonical Composition`.
-    let text = draft("tofhir-canonical.request.json")?;
+fn the_chapter_canonical_tofhir_example_round_trips() -> Result<(), Box<dyn Error>> {
+    // rest-api.adoc section $tofhir Input, `.Canonical Composition`.
+    let text = example("tofhir-canonical.request.json")?;
     let request = ToFhirRequest::from_parameters(&parameters(&text)?)?;
     assert_eq!(
         request
@@ -48,9 +49,9 @@ fn the_draft_canonical_tofhir_example_round_trips() -> Result<(), Box<dyn Error>
 }
 
 #[test]
-fn the_draft_flat_tofhir_example_round_trips() -> Result<(), Box<dyn Error>> {
-    // rest-api.adoc (draft) section $tofhir Input, `.Flat Composition`.
-    let text = draft("tofhir-flat.request.json")?;
+fn the_chapter_flat_tofhir_example_round_trips() -> Result<(), Box<dyn Error>> {
+    // rest-api.adoc section $tofhir Input, `.Flat Composition`.
+    let text = example("tofhir-flat.request.json")?;
     let request = ToFhirRequest::from_parameters(&parameters(&text)?)?;
     assert!(
         matches!(*request.composition(), CompositionPayload::Flat(_)),
@@ -72,15 +73,15 @@ fn the_draft_flat_tofhir_example_round_trips() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn the_draft_toopenehr_responses_round_trip() -> Result<(), Box<dyn Error>> {
-    // rest-api.adoc (draft) section $toopenehr Output: the two serializations
+fn the_chapter_toopenehr_responses_round_trip() -> Result<(), Box<dyn Error>> {
+    // rest-api.adoc section $toopenehr Output: the two serializations
     // and the partial-result shape.
     for name in [
         "toopenehr-canonical.response.json",
         "toopenehr-flat.response.json",
         "toopenehr-outcome.response.json",
     ] {
-        let text = draft(name)?;
+        let text = example(name)?;
         let answer = ToOpenehrResponse::from_parameters(&parameters(&text)?)?;
         let written = rendered(&answer.to_parameters())?;
         assert_eq!(
@@ -94,7 +95,7 @@ fn the_draft_toopenehr_responses_round_trip() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn the_partial_result_example_carries_its_outcome() -> Result<(), Box<dyn Error>> {
-    let text = draft("toopenehr-outcome.response.json")?;
+    let text = example("toopenehr-outcome.response.json")?;
     let answer = ToOpenehrResponse::from_parameters(&parameters(&text)?)?;
     let outcome = answer.outcome().ok_or("the example carries an outcome")?;
     assert_eq!(
@@ -110,8 +111,8 @@ fn the_partial_result_example_carries_its_outcome() -> Result<(), Box<dyn Error>
 #[test]
 fn a_flat_composition_without_a_template_is_required() -> Result<(), Box<dyn Error>> {
     // "`templateId` ... is also required when submitting a flat Composition to
-    // `$tofhir`" (rest-api.adoc, draft, section Query parameters).
-    let text = draft("tofhir-flat.request.json")?;
+    // `$tofhir`" (rest-api.adoc, section Query parameters).
+    let text = example("tofhir-flat.request.json")?;
     let mut carried = parameters(&text)?;
     carried
         .parameter
@@ -126,7 +127,7 @@ fn a_flat_composition_without_a_template_is_required() -> Result<(), Box<dyn Err
 
 #[test]
 fn an_undeclared_parameter_is_refused() -> Result<(), Box<dyn Error>> {
-    let text = draft("tofhir-canonical.request.json")?;
+    let text = example("tofhir-canonical.request.json")?;
     let mut carried = parameters(&text)?;
     carried.parameter.push(ParametersParameter {
         name: fhir_types::r4::primitives::String::from("subject"),
@@ -148,7 +149,7 @@ fn an_undeclared_parameter_is_refused() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn a_repeated_parameter_is_refused() -> Result<(), Box<dyn Error>> {
-    let text = draft("tofhir-canonical.request.json")?;
+    let text = example("tofhir-canonical.request.json")?;
     let mut carried = parameters(&text)?;
     let first = carried
         .parameter
@@ -180,7 +181,10 @@ fn a_wrongly_typed_parameter_is_refused() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn an_undeclared_context_part_is_refused() -> Result<(), Box<dyn Error>> {
-    let text = draft("tofhir-canonical.request.json")?;
+    // NOTE: rest-api.adoc §$tofhir Input: "The `context` fields above are a
+    // fixed list: this specification defines no others, and an engine MUST reject
+    // a call that supplies one."
+    let text = example("tofhir-canonical.request.json")?;
     let mut carried = parameters(&text)?;
     for parameter in &mut carried.parameter {
         if parameter.name.value.as_deref() == Some("context") {
@@ -195,8 +199,16 @@ fn an_undeclared_context_part_is_refused() -> Result<(), Box<dyn Error>> {
     }
     let error = ToFhirRequest::from_parameters(&carried)
         .err()
-        .ok_or("a context part the draft does not declare is refused")?;
+        .ok_or("a context part the chapter does not declare is refused")?;
     assert_eq!(error.issue_type(), "structure");
+    let OperationError::Parameters {
+        source: ParametersError::Undeclared { ref name, .. },
+        ..
+    } = error
+    else {
+        return Err(format!("an undeclared context part is refused as undeclared: {error}").into());
+    };
+    assert_eq!(name, "context.composer");
     Ok(())
 }
 

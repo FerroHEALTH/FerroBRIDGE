@@ -17,7 +17,7 @@ use leptos::context::use_context;
 use crate::model::ViewError;
 use crate::tools::render;
 
-/// The `$toopenehr` formats the draft chapter defines.
+/// The `$toopenehr` formats the REST API chapter defines.
 const FORMATS: [&str; 2] = ["canonical", "flat"];
 
 /// The console's state and the operator's token, for a request with a live
@@ -82,7 +82,7 @@ pub async fn to_fhir(
     }
     let patient = patient.trim();
     if !patient.is_empty() {
-        // NOTE: FHIRconnect draft REST API chapter, `ToFhir.fsh`: the patient
+        // NOTE: FHIRconnect REST API chapter, `ToFhir.fsh`: the patient
         // travels as `context.patient`, a `Reference`, in the request body.
         let reference = Reference {
             reference: Some(primitives::String::from(patient)),

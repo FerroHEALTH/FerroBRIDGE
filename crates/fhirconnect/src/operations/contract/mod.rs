@@ -74,7 +74,7 @@ impl CompositionPayload {
     ///
     /// A canonical composition is the Reference Model structure and carries
     /// `_type`; a flat one is a single-level object of template paths and
-    /// carries none. The draft names no discriminator, so reading `_type` is
+    /// carries none. The chapter names no discriminator, so reading `_type` is
     /// FerroBRIDGE's own design (recorded on FerroBRIDGE issue #192).
     ///
     /// # Errors
@@ -154,7 +154,7 @@ impl Format {
     /// # Errors
     ///
     /// Returns [`OperationError::Parameters`] when `code` is neither of the
-    /// two the draft declares.
+    /// two the chapter declares.
     pub fn parse(code: &str) -> Result<Self, OperationError> {
         match code {
             "canonical" => Ok(Self::Canonical),

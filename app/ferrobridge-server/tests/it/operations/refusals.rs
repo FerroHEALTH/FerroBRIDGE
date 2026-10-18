@@ -19,7 +19,7 @@ use super::mapping_tree;
 async fn a_flat_composition_without_a_template_is_four_hundred_required()
 -> Result<(), Box<dyn StdError>> {
     // "`templateId` ... is also required when submitting a flat Composition to
-    // `$tofhir`" (rest-api.adoc, draft, section Query parameters).
+    // `$tofhir`" (rest-api.adoc, section Query parameters).
     let root = mapping_tree()?;
     let request = serde_json::json!({
         "resourceType": "Parameters",
@@ -76,7 +76,7 @@ async fn an_openehr_body_on_the_enveloped_route_is_four_hundred_fifteen()
 -> Result<(), Box<dyn StdError>> {
     // "The `Content-Type` and `Accept` headers on the operation endpoints ...
     // refer to the FHIR envelope, not to the openEHR payload it carries"
-    // (rest-api.adoc, draft, section Media types).
+    // (rest-api.adoc, section Media types).
     let root = mapping_tree()?;
     let (status, _, _) = call(
         app(&root)?,

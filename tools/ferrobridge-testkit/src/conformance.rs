@@ -43,9 +43,9 @@ pub enum Corpus {
     Omocl,
     /// The FHIR round-trip fixtures, one case per chain.
     Roundtrip,
-    /// The draft FHIRconnect REST API chapter, one case per FSH operation
+    /// The FHIRconnect REST API chapter, one case per FSH operation
     /// definition.
-    DraftRestApi,
+    RestApi,
     /// The vendored HL7 v2 message sets, one case per message.
     Hl7v2,
     /// The HL7 v2 message sets fetched at build time, one case per message.
@@ -81,7 +81,7 @@ impl Corpus {
         Self::FhirconnectMappingLib,
         Self::Omocl,
         Self::Roundtrip,
-        Self::DraftRestApi,
+        Self::RestApi,
         Self::Hl7v2,
         Self::Hl7v2Smoke,
         Self::FhirStu3,
@@ -103,7 +103,7 @@ impl Corpus {
             Self::FhirconnectMappingLib => "fhirconnect-mapping-lib",
             Self::Omocl => "omocl",
             Self::Roundtrip => "roundtrip",
-            Self::DraftRestApi => "draft-rest-api",
+            Self::RestApi => "rest-api",
             Self::Hl7v2 => "hl7v2",
             Self::Hl7v2Smoke => "hl7v2-smoke",
             Self::FhirStu3 => "fhir-stu3",

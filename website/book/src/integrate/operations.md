@@ -11,13 +11,14 @@ you can call them from a facade, a test harness or a shell.
 
 <!-- toc -->
 
-## The chapter is a draft
+## The chapter and its pin
 
-The REST API chapter is pull request #93 of the FHIRconnect specification and
-is not part of any release. FerroBRIDGE implements it at the pinned commit
-recorded in `docs/VERSIONS.md`, vendors the chapter and its FSH operation
-definitions, and labels the wire tests draft. When the chapter merges, the pin
-moves and every difference is re-adjudicated.
+The REST API chapter merged into the FHIRconnect specification on 2026-10-06
+(pull request #93). FerroBRIDGE implements it at the specification commit
+recorded in `docs/VERSIONS.md` and vendors the chapter with its FSH operation
+definitions. The `context` fields are a fixed list: a call that supplies any
+other part under `context` is refused with a `structure` issue, as the
+chapter requires.
 
 ## Turning the lane on
 
