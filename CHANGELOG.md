@@ -213,6 +213,14 @@ crates on crates.io.
   http.html §3.1.0.4). The row is `facade::status::OUTBOUND_REFUSED`, with
   a wire test per path; a write whose content the engine refuses keeps its
   `422`.
+- `fhir-types` 0.1.122: the XML reader refuses an element or attribute under
+  a prefix with no namespace declaration in scope as `MalformedXml` naming
+  the prefix anywhere in a resource, not only inside the narrative, since
+  such a document is not namespace-well-formed (Namespaces in XML 1.0 §5,
+  Prefix Declared) (#830). Outside the narrative it answered
+  `UnknownProperty` for an attribute and `WrongRoot` for a root before; the
+  refusal stays a refusal and only its kind changes. `fhirconnect` moves to
+  0.1.137 with the requirement.
 - `/health/readiness` no longer answers `200` while the server is still
   handing the listener from the boot probe routes to the lanes (#796). When
   the CDR was not ready at boot, a successful retry marked the `startup`

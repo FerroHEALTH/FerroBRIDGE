@@ -236,8 +236,15 @@ fn the_schema_instance_namespace_is_refused_in_a_resource() {
         schemas,
         r#"<Parameters xmlns="http://hl7.org/fhir" xsi:schemaLocation="http://hl7.org/fhir fhir-single.xsd"/>"#,
     )
-    .expect_err("schemaLocation is no FHIR property");
-    assert_eq!(undeclared.kind, DecodeErrorKind::UnknownProperty);
+    .expect_err("schemaLocation under an undeclared xsi prefix");
+    // NOTE: Namespaces in XML 1.0 §5 (Prefix Declared): an undeclared prefix is malformed XML
+    // before R4 xml.html §2.6.1.1 applies, so the refusal names the prefix (#830).
+    assert_eq!(
+        undeclared.kind,
+        DecodeErrorKind::MalformedXml {
+            reason: String::from("the prefix xsi has no namespace declaration in scope")
+        }
+    );
     assert_eq!(undeclared.path, "Resource.schemaLocation");
 }
 
@@ -260,12 +267,23 @@ fn a_root_outside_the_fhir_namespace_is_refused() {
             r#"<x:Parameters xmlns:x="http://example.org/other"><x:id value="synthetic"/></x:Parameters>"#,
             r#"<Parameters xmlns="http://example.org/other"><id value="synthetic"/></Parameters>"#,
             r#"<Parameters><id value="synthetic"/></Parameters>"#,
-            r#"<f:Parameters xmlns="http://hl7.org/fhir"><id value="synthetic"/></f:Parameters>"#,
         ] {
             let refused = from_xml(schemas, xml).expect_err(xml);
             assert_eq!(refused.kind, DecodeErrorKind::WrongRoot, "{xml}");
             assert_eq!(refused.path, "Resource", "{xml}");
         }
+        // NOTE: Namespaces in XML 1.0 §5 (Prefix Declared): a root under an undeclared prefix
+        // is malformed XML before any namespace rule of FHIR applies (#830).
+        let unbound =
+            r#"<f:Parameters xmlns="http://hl7.org/fhir"><id value="synthetic"/></f:Parameters>"#;
+        let refused = from_xml(schemas, unbound).expect_err(unbound);
+        assert_eq!(
+            refused.kind,
+            DecodeErrorKind::MalformedXml {
+                reason: String::from("the prefix f has no namespace declaration in scope")
+            }
+        );
+        assert_eq!(refused.path, "Resource");
     }
 }
 
@@ -327,12 +345,54 @@ fn a_nested_element_outside_the_fhir_namespace_is_refused() {
     }
 }
 
+/// An element under a prefix with no declaration in scope, the resource root
+/// or a child, makes the document not namespace-well-formed (Namespaces in XML
+/// 1.0 §5, Prefix Declared), so it is malformed XML naming the prefix (#830).
+#[test]
+fn an_unbound_element_prefix_in_the_resource_is_malformed_xml() {
+    for schemas in namespace_versions() {
+        for (xml, path, prefix) in [
+            (
+                r#"<f:Parameters><f:parameter><f:name value="n"/></f:parameter></f:Parameters>"#,
+                "Resource",
+                "f",
+            ),
+            (
+                r#"<Parameters xmlns="http://hl7.org/fhir"><parameter><z:name value="n"/></parameter></Parameters>"#,
+                "Resource.parameter.name",
+                "z",
+            ),
+        ] {
+            let refused = from_xml(schemas, xml).expect_err(xml);
+            let DecodeErrorKind::MalformedXml { reason } = &refused.kind else {
+                panic!("{xml}: {:?}", refused.kind);
+            };
+            assert!(
+                reason.contains(&format!("prefix {prefix} ")),
+                "{xml}: {reason}"
+            );
+            assert_eq!(refused.path, path, "{xml}");
+        }
+    }
+}
+
 /// FHIR's attributes are unprefixed; "the only other namespace that occurs in
 /// FHIR resources is the XHTML namespace" (R4 xml.html §2.6.1), so a prefixed
-/// attribute in another namespace, or under an unbound prefix, is refused.
+/// attribute in another namespace is refused. An attribute under an unbound
+/// prefix is refused too, as malformed XML: "The namespace prefix, unless it
+/// is `xml` or `xmlns`, MUST have been declared in a namespace declaration
+/// attribute" (Namespaces in XML 1.0 §5, Prefix Declared), so the document is
+/// not namespace-well-formed before any FHIR rule applies (#830).
 #[test]
 fn a_prefixed_attribute_outside_the_fhir_namespace_is_refused() {
     for schemas in namespace_versions() {
+        let unbound = r#"<Parameters xmlns="http://hl7.org/fhir"><parameter y:id="p1"><name value="n"/></parameter></Parameters>"#;
+        let refused = from_xml(schemas, unbound).expect_err(unbound);
+        let DecodeErrorKind::MalformedXml { reason } = &refused.kind else {
+            panic!("{unbound}: {:?}", refused.kind);
+        };
+        assert!(reason.contains("prefix y "), "{reason}");
+        assert_eq!(refused.path, "Resource.parameter.id");
         for (xml, path) in [
             (
                 r#"<Parameters xmlns="http://hl7.org/fhir" xmlns:x="http://example.org/other"><parameter x:id="p1"><name value="n"/></parameter></Parameters>"#,
@@ -345,10 +405,6 @@ fn a_prefixed_attribute_outside_the_fhir_namespace_is_refused() {
             (
                 r#"<Parameters xmlns="http://hl7.org/fhir"><parameter><name xml:lang="en" value="n"/></parameter></Parameters>"#,
                 "Resource.parameter.name.lang",
-            ),
-            (
-                r#"<Parameters xmlns="http://hl7.org/fhir"><parameter y:id="p1"><name value="n"/></parameter></Parameters>"#,
-                "Resource.parameter.id",
             ),
         ] {
             let refused = from_xml(schemas, xml).expect_err(xml);
