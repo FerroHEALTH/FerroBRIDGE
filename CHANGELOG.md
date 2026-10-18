@@ -174,6 +174,15 @@ crates on crates.io.
   route, were still serving, so readiness reported ready a moment before
   the lanes did. The indicator now stays down, naming the handover, until
   the lanes serve their own readiness.
+- `fhir-types` 0.1.121: the XML reader refuses a narrative element or
+  attribute under a prefix with no namespace declaration in scope as
+  `MalformedXml`, naming the prefix, since such a document is not
+  namespace-well-formed (Namespaces in XML 1.0 §5, Prefix Declared) (#577).
+  It refused these before as `UnknownElement` or `UnknownProperty`. The
+  narrative content rules `txt-1` and `txt-2` stay invariants of
+  `Narrative.div` that the profile validator evaluates through
+  `htmlChecks()`, now with a test for each. `fhirconnect` moves to 0.1.135
+  with the requirement.
 - The FHIRPath `is` operator and `is()` function test a FHIR primitive
   against the types it specializes, so `Patient.gender is string` is true,
   as FHIRPath N1 §6.3.1 and the R4 `code` definition ask; `ofType()` and
