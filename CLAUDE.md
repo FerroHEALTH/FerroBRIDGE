@@ -73,8 +73,8 @@ the testkit tool crate. Beside it:
   `src/cdr/` reaches the CDR through the generated ITS-REST 1.1.0 client of
   `openehr-its` (`rest-client`, #285, #293): the handle built from `[cdr]`
   with its `SecretString` credentials or, under `[cdr.credentials.oauth]`, the
-  OAuth 2.0 client-credentials token `src/cdr/oauth/` fetches, caches and
-  renews once on a CDR `401` (#421), the commit headers filled into the
+  OAuth 2.0 client-credentials token renewed once on a CDR `401` (#421), the
+  commit headers filled into the
   generated parameters, the `X-Request-Id` echo, the error body each outcome
   carries read into a refusal's diagnostics, the typed ids an `ETag` names,
   the two-route template fetch and the AQL paging, with the `wiremock`
@@ -93,18 +93,25 @@ the testkit tool crate. Beside it:
   `[hl7v2]` and beside the facade: the MLLP listener under the same drain,
   each message mapped by `ferrobridge-hl7v2` and written through the facade's
   `ingest` service as one transaction, and the acknowledgment chosen from the
-  commit outcome (`hl7v2::answer`). `src/auth/` makes the facade a SMART App
-  Launch 2.x resource server behind `[auth]` (#400): the issuer's keys
-  discovered and cached, every access token checked, SMART v2 scopes per
-  interaction and the patient compartment, and one audit line per request;
-  every facade handler takes the caller's `Access`. `src/usage_report/`
+  commit outcome (`hl7v2::answer`). `src/smart.rs` makes the facade and the
+  operator API a SMART App Launch 2.x resource server behind `[auth]` (#400,
+  #981) over `ferrohealth-smart`, the family's resource-server crate: the
+  issuers' keys read and read again past their max age, every access token
+  and `[[auth.basic.users]]` credential checked, and one audit line per
+  request; `facade::guard` is the route table with the SMART v2 permission
+  each interaction needs and the `OperationOutcome` refusals, and
+  `facade::compartment` holds a `patient/` token to its EHR; every facade
+  handler takes the caller's `Access`. `src/credentials.rs` hands the
+  client-credentials token of `ferrohealth-smart` (cached, renewed once on a
+  `401`) to the CDR and terminology clients, the token both lanes take under
+  `[<lane>.credentials.oauth]`. `src/usage_report/`
   sends the installation report to FerroPULSE on its envelope v2 behind
   `[usage_report]` (#581): one `start` and one `daily` report from `serve`,
   the latency window the request log fills by route group, and the instance
   id under `state_dir`, validated against the vendored schema in the tests.
   `src/operator/` is the
   read-only operator API behind `[operator]` and `[auth]` (#596): the guard
-  that admits only a token carrying `auth.operator_scope`, the mapping roots
+  that admits only a token carrying `operator.scope`, the mapping roots
   with every wire path confined to its directory, and the running load as
   the `check` module reports it; with `[operator] mapping_dir` it checks a
   draft, saves it beside the provisioned tree and reloads (#597), swapping the

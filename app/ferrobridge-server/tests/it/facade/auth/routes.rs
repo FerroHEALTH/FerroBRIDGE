@@ -16,10 +16,10 @@ use std::path::Path;
 use axum::Router;
 use axum::body::Body;
 use axum::routing::post;
-use ferrobridge_server::auth::guard::CLASSIFIED;
-use ferrobridge_server::auth::guard::Gate;
-use ferrobridge_server::auth::guard::SMART_CONFIGURATION;
-use ferrobridge_server::auth::guard::guard;
+use ferrobridge_server::facade::guard::CLASSIFIED;
+use ferrobridge_server::facade::guard::layer;
+use ferrobridge_server::smart::Smart;
+use ferrohealth_smart::resource::configuration::SMART_CONFIGURATION;
 use http::Method;
 use http::Request;
 use http::StatusCode;
@@ -199,13 +199,13 @@ async fn an_unclassified_route_is_refused_under_auth_and_open_without_it()
     let issuer = Issuer::start(&[&key]).await;
     let authority = authority(issuer.settings()).await;
     let token = mint(&key, &issuer.claims("system/*.cruds"));
-    let probe = |gate: Gate| {
+    let probe = |smart: Option<&Smart>| {
         Router::new()
             .route("/fhir/$probe", post(|| async { "reached" }))
-            .layer(axum::middleware::from_fn_with_state(gate, guard))
+            .layer(layer(smart))
     };
     let request = || Request::post("/fhir/$probe").body(Body::empty());
-    let refused = raw(probe(Gate::new(authority)), bearing(request()?, &token)).await?;
+    let refused = raw(probe(Some(authority.as_ref())), bearing(request()?, &token)).await?;
     assert_eq!(StatusCode::FORBIDDEN, refused.status());
     let bytes = axum::body::to_bytes(refused.into_body(), 64 * 1024).await?;
     let body: serde_json::Value = serde_json::from_slice(&bytes)?;
@@ -213,7 +213,7 @@ async fn an_unclassified_route_is_refused_under_auth_and_open_without_it()
     assert_eq!(Some("forbidden"), body["issue"][0]["code"].as_str());
     assert!(!String::from_utf8_lossy(&bytes).contains("reached"));
 
-    let open = raw(probe(Gate::open()), request()?).await?;
+    let open = raw(probe(None), request()?).await?;
     assert_eq!(
         StatusCode::OK,
         open.status(),

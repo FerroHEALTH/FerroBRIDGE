@@ -7,13 +7,13 @@
 
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
-use ferrobridge_server::cdr::oauth::Endpoint;
-use ferrobridge_server::cdr::oauth::OAuthConfig;
 use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::programs;
 use ferrobridge_server::health::Registry;
 use ferrobridge_server::state::AppState;
+use ferrohealth_smart::client::ClientCredentials;
+use ferrohealth_smart::client::Endpoint;
 use http::StatusCode;
 use secrecy::SecretString;
 use std::error::Error as StdError;
@@ -59,7 +59,7 @@ async fn app_over(
     let set = programs::read_set(std::path::Path::new(FIXTURES))?;
     let templates = programs::fetch_templates(&set, &client(cdr)).await?;
     let compiled = programs::compile_set(&set, &templates)?;
-    let grant = OAuthConfig::new(
+    let grant = ClientCredentials::new(
         Endpoint::Token(format!("{authorization}{TOKEN_PATH}").parse()?),
         String::from("bridge"),
         SecretString::from(SECRET),

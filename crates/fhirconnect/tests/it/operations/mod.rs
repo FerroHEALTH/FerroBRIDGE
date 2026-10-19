@@ -9,6 +9,7 @@
 
 mod definitions;
 mod examples;
+mod identity;
 mod runs;
 mod subjects;
 

@@ -36,7 +36,7 @@ fn settings(text: &str) -> Result<ferrobridge_server::config::Settings, Box<dyn 
 /// Returns a configuration with a CDR at `cdr` and the fixture mapping set.
 fn cdr_text(cdr: &MockServer) -> String {
     format!(
-        "[cdr]\nbase_url = \"{}/\"\ntimeout_ms = 2000\n\n[cdr.retry]\nmax_attempts = 1\n\n[mappings]\ndirectory = \"{FIXTURES}\"\n",
+        "[cdr]\nbase_url = \"{}/\"\ntimeout_ms = 2000\n\n[cdr.retry]\nmax_attempts = 1\n\n[auth]\nenabled = false\n\n[mappings]\ndirectory = \"{FIXTURES}\"\n",
         cdr.uri()
     )
 }
@@ -208,7 +208,7 @@ async fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused()
 -> Result<(), Box<dyn StdError>> {
     // The refusal comes from resolving the configuration, before any client
     // is built or any CDR is called.
-    let text = format!("[mappings]\ndirectory = \"{FIXTURES}\"\n");
+    let text = format!("[mappings]\ndirectory = \"{FIXTURES}\"\n\n[auth]\nenabled = false\n");
     let error = Config::from_sources(Some(&text), &BTreeMap::new())?
         .resolve()
         .err()
