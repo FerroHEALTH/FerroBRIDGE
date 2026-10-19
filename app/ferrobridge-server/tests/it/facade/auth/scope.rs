@@ -11,8 +11,8 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 
 use axum::body::Body;
-use ferrobridge_server::auth::Authority;
 use ferrobridge_server::health::Registry;
+use ferrobridge_server::smart::Smart;
 use ferrobridge_server::state::AppState;
 use ferrobridge_server::state::OperationsLane;
 use fhirconnect::operations::programs::ProgramSet;
@@ -54,7 +54,7 @@ struct Case {
     /// The facade.
     harness: Harness,
     /// The resource server.
-    authority: Arc<Authority>,
+    authority: Arc<Smart>,
 }
 
 impl Case {
@@ -64,7 +64,7 @@ impl Case {
     }
 
     /// Returns a case whose resource server settings `adjust` changes.
-    async fn with(adjust: impl FnOnce(&mut ferrobridge_server::auth::AuthSettings)) -> Self {
+    async fn with(adjust: impl FnOnce(&mut ferrobridge_server::smart::SmartSettings)) -> Self {
         let key = ec_key("k1", Algorithm::ES256);
         let issuer = Issuer::start(&[&key]).await;
         let harness = harness().await;
@@ -203,17 +203,20 @@ async fn validate_admits_a_token_that_carries_only_the_operator_scope()
     // commits nothing, so the console's token needs no clinical write scope.
     let case = Case::new().await;
     let (status, _, body) = case
-        .send(validate_condition(), "ferrobridge.operator")
+        .send(validate_condition(), "__ferrobridge.operator")
         .await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     assert_forbidden(
         &case
-            .send(post_condition(&condition()), "ferrobridge.operator")
+            .send(post_condition(&condition()), "__ferrobridge.operator")
             .await?,
     );
     assert_forbidden(
         &case
-            .send(get("/fhir/Condition/never-written"), "ferrobridge.operator")
+            .send(
+                get("/fhir/Condition/never-written"),
+                "__ferrobridge.operator",
+            )
             .await?,
     );
     Ok(())
@@ -222,12 +225,12 @@ async fn validate_admits_a_token_that_carries_only_the_operator_scope()
 #[tokio::test]
 async fn a_renamed_operator_scope_is_the_one_validate_admits() -> Result<(), Box<dyn StdError>> {
     let case =
-        Case::with(|settings| settings.operator_scope = String::from("bridge:operator")).await;
-    let (status, _, body) = case.send(validate_condition(), "bridge:operator").await?;
+        Case::with(|settings| settings.operator_scope = String::from("__bridge.operator")).await;
+    let (status, _, body) = case.send(validate_condition(), "__bridge.operator").await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     assert_forbidden(
         &case
-            .send(validate_condition(), "ferrobridge.operator")
+            .send(validate_condition(), "__ferrobridge.operator")
             .await?,
     );
     Ok(())
@@ -250,7 +253,7 @@ async fn a_fhirconnect_operation_admits_a_token_with_only_the_operator_scope()
             .body(Body::from(condition().to_string()))?;
         let response = raw(
             app.clone(),
-            bearing(request, &case.token("ferrobridge.operator")),
+            bearing(request, &case.token("__ferrobridge.operator")),
         )
         .await?;
         assert_ne!(StatusCode::UNAUTHORIZED, response.status(), "{path}");
@@ -288,7 +291,7 @@ async fn a_scopeless_token_gets_system_rights_only_when_its_subject_is_listed()
     let unlisted = Case::new().await;
     assert_forbidden(&unlisted.send(post_condition(&condition()), "").await?);
     let listed = Case::with(|settings| {
-        settings
+        settings.issuers[0]
             .scopeless_subjects
             .insert(String::from("synthetic-client-sub"));
     })

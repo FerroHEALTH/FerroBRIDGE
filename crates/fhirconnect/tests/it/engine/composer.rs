@@ -3,7 +3,8 @@
 
 //! `Condition.recorder` written into `COMPOSITION.composer`, and the default
 //! composer of `engine/defaults-for-fields.adoc` when the recorder carries
-//! nothing a `PARTY_IDENTIFIED` holds.
+//! nothing a `PARTY_IDENTIFIED` holds, and a composer reference beside a
+//! participation that keeps its own reference.
 
 use core::error::Error;
 
@@ -142,6 +143,71 @@ fn no_recorder_leaves_the_default_composer() -> Result<(), Box<dyn Error>> {
     assert_eq!(
         composer(outcome).get("name"),
         Some(&serde_json::json!("FHIRconnect"))
+    );
+    Ok(())
+}
+/// The FHIR server base of a party reference the bridge did not mint.
+const OTHER_BASE: &str = "https://other.example/fhir";
+
+#[test]
+fn a_composer_reference_leaves_another_party_its_own_namespace_and_scheme()
+-> Result<(), Box<dyn Error>> {
+    // Simplified Formats master06 §ID Namespace and Scheme: `ctx/id_namespace`
+    // and `ctx/id_scheme` are the defaults for external references, so a
+    // participation that writes its own keeps them.
+    let demographics = IssuerDemographics::new(BASE)?;
+    let mut condition: serde_json::Value =
+        serde_json::from_str(ferrobridge_testkit::fixtures::R4_CONDITION)?;
+    if let Some(object) = condition.as_object_mut() {
+        object.insert(
+            String::from("recorder"),
+            serde_json::json!({"reference": "Practitioner/synthetic-practitioner-1"}),
+        );
+        object.insert(
+            String::from("asserter"),
+            serde_json::json!({
+                "reference": format!("{OTHER_BASE}/Practitioner/synthetic-practitioner-2")
+            }),
+        );
+    }
+    let index = template()?;
+    let outcome = to_openehr(
+        &*compiled("ferrobridge_composer_participation")?,
+        &SCHEMAS,
+        &index,
+        &Value::from_serde_json(condition),
+        &Seams::default().with_demographics(&demographics),
+        &Defaults::at("2026-10-16T08:00:00Z")
+            .with_language("en")
+            .with_territory("NL"),
+        &CallContext::new(),
+    )?;
+    let composition = outcome.into_value().into_value();
+    let composer = composition
+        .pointer("/composer/external_ref")
+        .cloned()
+        .ok_or("the composer carries its reference")?;
+    assert_eq!(composer.get("namespace"), Some(&serde_json::json!(BASE)));
+    assert_eq!(
+        composer.pointer("/id/scheme"),
+        Some(&serde_json::json!("fhir-reference"))
+    );
+    let performer = composition
+        .pointer("/context/participations/0/performer/external_ref")
+        .cloned()
+        .ok_or("the participation carries its performer's reference")?;
+    assert_eq!(
+        performer.get("namespace"),
+        Some(&serde_json::json!(OTHER_BASE)),
+        "the participation keeps its own namespace beside the composer's default"
+    );
+    assert_eq!(
+        performer.pointer("/id/value"),
+        Some(&serde_json::json!("Practitioner/synthetic-practitioner-2"))
+    );
+    assert_eq!(
+        performer.pointer("/id/scheme"),
+        Some(&serde_json::json!("fhir-reference"))
     );
     Ok(())
 }

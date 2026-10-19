@@ -11,6 +11,8 @@
 //! (<https://hl7.org/fhir/R4/http.html#history>). ITS-REST 1.1.0 Demographic
 //! API, DEVELOPMENT.
 
+use ferrohealth_smart::resource::Access;
+use ferrohealth_smart::scope::Permission;
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
 use http::HeaderMap;
@@ -20,8 +22,6 @@ use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVer
 use openehr_base::v1_3::base_types::identification::version_tree_id::VersionTreeId;
 use openehr_its::rest::generated::demographic::client::VersionedPartyRevisionHistoryOutcome;
 
-use crate::auth::Access;
-use crate::auth::scope::Permission;
 use crate::cdr::Answered;
 use crate::facade::Facade;
 use crate::facade::handlers::Body;

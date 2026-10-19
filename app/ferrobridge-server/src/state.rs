@@ -182,7 +182,7 @@ pub struct AppState {
     /// Whether the HL7 v2 listener accepts, when the face runs.
     hl7v2: Option<crate::hl7v2::Listening>,
     /// The resource server, when inbound authentication is on.
-    auth: Option<Arc<crate::auth::Authority>>,
+    auth: Option<Arc<crate::smart::Smart>>,
     /// The requests the usage report counts, recorded by the request log.
     usage: Arc<crate::usage_report::window::Window>,
     /// The operator API, when `[operator] enabled` mounts it.
@@ -323,11 +323,11 @@ impl AppState {
         self
     }
 
-    /// Returns this state with `authority` checking the token of every FHIR
+    /// Returns this state with `smart` checking the credential of every guarded
     /// request.
     #[must_use]
-    pub fn with_auth(mut self, authority: Arc<crate::auth::Authority>) -> Self {
-        self.auth = Some(authority);
+    pub fn with_auth(mut self, smart: Arc<crate::smart::Smart>) -> Self {
+        self.auth = Some(smart);
         self
     }
 
@@ -346,7 +346,7 @@ impl AppState {
 
     /// Returns the resource server, when inbound authentication is on.
     #[must_use]
-    pub const fn auth(&self) -> Option<&Arc<crate::auth::Authority>> {
+    pub const fn auth(&self) -> Option<&Arc<crate::smart::Smart>> {
         self.auth.as_ref()
     }
 
