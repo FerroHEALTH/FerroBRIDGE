@@ -19,7 +19,7 @@ use ferrohealth_ui::highlight::Language;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::button::{Variant, label};
 use ferrohealth_ui::view::empty::{Busy, busy};
-use ferrohealth_ui::view::form::{FORM, INPUT, help_id};
+use ferrohealth_ui::view::form::{FORM, INPUT, check, field, help_id};
 use ferrohealth_ui::view::refusal::fault;
 use ferrohealth_ui::view::surface::{page_header, stack};
 use ferrohealth_ui::widget::editor::{Editor, LineMark, code_editor};
@@ -355,33 +355,37 @@ fn save_form(editing: Editing) -> AnyView {
     };
     view! {
         <form method="post" action=SaveDraft::url() autocomplete="off" class=FORM on:submit=on_save>
-            <div class="fui-field">
-            <label class="fui-label" for="edit-reason">"Why you save it, one line"</label>
-            <input
-                id="edit-reason"
-                name="reason"
-                type="text"
-                class=INPUT
-                aria-describedby=help_id("edit-reason")
-                maxlength="200"
-                autocomplete="off"
-                prop:value=move || reason.get()
-                on:input:target=move |event| reason.set(event.target().value())
-            />
-            <p id=help_id("edit-reason") class="fui-help">"Two hundred characters at most."</p>
-            </div>
-            <div class="fui-check">
-                <input
-                    id="edit-confirm"
-                    name="confirmed"
-                    type="checkbox"
-                    prop:checked=move || confirmed.get()
-                    on:change:target=move |event| confirmed.set(event.target().checked())
-                />
-                <label for="edit-confirm">
-                    "Save this draft and reload the set. The bridge refuses a draft that does not compile."
-                </label>
-            </div>
+            {field(
+                "edit-reason",
+                "Why you save it, one line",
+                Some("Two hundred characters at most."),
+                view! {
+                    <input
+                        id="edit-reason"
+                        name="reason"
+                        type="text"
+                        class=INPUT
+                        aria-describedby=help_id("edit-reason")
+                        maxlength="200"
+                        autocomplete="off"
+                        prop:value=move || reason.get()
+                        on:input:target=move |event| reason.set(event.target().value())
+                    />
+                },
+            )}
+            {check(
+                "edit-confirm",
+                "Save this draft and reload the set. The bridge refuses a draft that does not compile.",
+                view! {
+                    <input
+                        id="edit-confirm"
+                        name="confirmed"
+                        type="checkbox"
+                        prop:checked=move || confirmed.get()
+                        on:change:target=move |event| confirmed.set(event.target().checked())
+                    />
+                },
+            )}
             <div class="fui-cluster">
                 <button
                     type="submit"
@@ -425,34 +429,40 @@ fn check_section(editing: Editing) -> AnyView {
         <section class="fui-card">
             <h2 class="fui-card-title">"Check"</h2>
             <form method="post" action=CheckDraft::url() autocomplete="off" class=FORM on:submit=on_check>
-                <div class="fui-field">
-                <label class="fui-label" for="edit-path">"Path, below fhirconnect/ or omocl/"</label>
-                <input
-                    id="edit-path"
-                    name="path"
-                    type="text"
-                    class=INPUT
-                    autocomplete="off"
-                    spellcheck="false"
-                    readonly=!fresh
-                    value=path.get_untracked()
-                    prop:value=move || path.get()
-                    on:input:target=move |event| path.set(event.target().value())
-                />
-                </div>
-                <div class="fui-field">
-                <label class="fui-label" for=DRAFT>"The file"</label>
-                {code_editor(
-                    Editor {
-                        id: DRAFT,
-                        language: Language::Yaml,
-                        text: draft.into(),
-                        marks,
-                        editable: ready.into(),
+                {field(
+                    "edit-path",
+                    "Path, below fhirconnect/ or omocl/",
+                    None,
+                    view! {
+                        <input
+                            id="edit-path"
+                            name="path"
+                            type="text"
+                            class=INPUT
+                            autocomplete="off"
+                            spellcheck="false"
+                            readonly=!fresh
+                            value=path.get_untracked()
+                            prop:value=move || path.get()
+                            on:input:target=move |event| path.set(event.target().value())
+                        />
                     },
-                    move |text| draft.set(text),
                 )}
-                </div>
+                {field(
+                    DRAFT,
+                    "The file",
+                    None,
+                    code_editor(
+                        Editor {
+                            id: DRAFT,
+                            language: Language::Yaml,
+                            text: draft.into(),
+                            marks,
+                            editable: ready.into(),
+                        },
+                        move |text| draft.set(text),
+                    ),
+                )}
                 <div class="fui-cluster">
                     <button
                         type="submit"
