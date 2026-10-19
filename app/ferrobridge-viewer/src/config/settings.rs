@@ -8,6 +8,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use ferrohealth_ui::i18n::Locale;
 use secrecy::SecretString;
 use url::Url;
 
@@ -21,6 +22,9 @@ pub struct Settings {
     pub listen: SocketAddr,
     /// The directory holding the site bundle.
     pub site_root: PathBuf,
+    /// The locale a page renders in when the request names none the
+    /// console's catalog holds.
+    pub locale: Locale,
     /// The bridge the console is a client of.
     pub bridge: BridgeSettings,
     /// The server-side sign-in sessions.
@@ -102,6 +106,7 @@ impl Config {
     ///
     /// # Errors
     /// Returns [`Error::Address`] for a listen address that does not parse,
+    /// [`Error::Locale`] for a `server.locale` that is no language tag,
     /// [`Error::Missing`], [`Error::Url`] and [`Error::UrlShape`] for a URL
     /// that is absent, does not parse or is not one its key admits,
     /// [`Error::Zero`] for a zero timeout or pool bound, [`Error::Scope`] for
@@ -117,6 +122,10 @@ impl Config {
                 key: String::from("server.listen"),
                 source,
             })?;
+        let locale = Locale::parse(&self.server.locale).map_err(|source| Error::Locale {
+            key: String::from("server.locale"),
+            source,
+        })?;
         let base = base_url("bridge.base_url", &self.bridge.base_url)?;
         let timeout =
             positive("bridge.timeout_ms", self.bridge.timeout_ms).map(Duration::from_millis)?;
@@ -145,6 +154,7 @@ impl Config {
         Ok(Settings {
             listen,
             site_root: self.server.site_root.clone(),
+            locale,
             bridge: BridgeSettings { base, timeout },
             session,
             oidc,

@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The stray literals each file may still hold while its strings move to
+# the catalogs; rewritten by scripts/checks/stray-literals.sh --update.
+9 app/ferrobridge-viewer/src/about.rs
+2 app/ferrobridge-viewer/src/app.rs
+1 app/ferrobridge-viewer/src/bridge/editing.rs
+8 app/ferrobridge-viewer/src/bridge/mod.rs
+5 app/ferrobridge-viewer/src/bridge/operations.rs
+1 app/ferrobridge-viewer/src/cli.rs
+9 app/ferrobridge-viewer/src/command.rs
+8 app/ferrobridge-viewer/src/config/error.rs
+1 app/ferrobridge-viewer/src/config/load.rs
+2 app/ferrobridge-viewer/src/config/mod.rs
+9 app/ferrobridge-viewer/src/config/settings.rs
+23 app/ferrobridge-viewer/src/editor/mod.rs
+21 app/ferrobridge-viewer/src/editor/render.rs
+6 app/ferrobridge-viewer/src/engine/mod.rs
+32 app/ferrobridge-viewer/src/engine/render/capability.rs
+41 app/ferrobridge-viewer/src/engine/render/dashboard.rs
+35 app/ferrobridge-viewer/src/engine/render/files.rs
+36 app/ferrobridge-viewer/src/engine/render/mappings.rs
+13 app/ferrobridge-viewer/src/engine/render/parts.rs
+8 app/ferrobridge-viewer/src/model.rs
+1 app/ferrobridge-viewer/src/oidc/exchange.rs
+3 app/ferrobridge-viewer/src/oidc/logout.rs
+15 app/ferrobridge-viewer/src/oidc/mod.rs
+2 app/ferrobridge-viewer/src/oidc/refresh.rs
+7 app/ferrobridge-viewer/src/server.rs
+1 app/ferrobridge-viewer/src/session/mod.rs
+22 app/ferrobridge-viewer/src/shell.rs
+1 app/ferrobridge-viewer/src/theme.rs
+24 app/ferrobridge-viewer/src/tools/mod.rs
+23 app/ferrobridge-viewer/src/tools/render.rs
+15 app/ferrobridge-viewer/src/tools/server.rs
