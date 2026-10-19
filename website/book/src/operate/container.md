@@ -59,13 +59,14 @@ mkdir -p secrets
 printf '%s' "$CDM_PASSWORD" > secrets/cdm_password
 printf 'postgresql://ferrobridge:%s@cdm:5432/omop?sslmode=disable' "$CDM_PASSWORD" > secrets/cdm_url
 printf '%s' "$CDR_PASSWORD" > secrets/cdr_password
+printf '%s' "$TX_PASSWORD" > secrets/terminology_password
 
 docker compose up
 curl http://127.0.0.1:8080/health/liveness
 ```
 
 Compose refuses to start a service whose secret source file is missing, so
-create all three even when a lane is off; a file nothing reads may be empty.
+create all four even when a lane is off; a file nothing reads may be empty.
 Never commit them.
 
 The published port binds `127.0.0.1` by default. A published port is DNAT'd
@@ -170,6 +171,8 @@ FERROBRIDGE__CDR__CREDENTIALS__USER=ferrobridge
 FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE=/run/secrets/cdr_password
 FERROBRIDGE__TERMINOLOGY__BASE_URL=https://tx.example.org/r4
 FERROBRIDGE__TERMINOLOGY__WIRE_VERSION=r4
+FERROBRIDGE__TERMINOLOGY__CREDENTIALS__USER=ferrobridge
+FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD_FILE=/run/secrets/terminology_password
 FERROBRIDGE__CDM__URL_FILE=/run/secrets/cdm_url
 ```
 
@@ -178,6 +181,17 @@ with the OAuth 2.0 client credentials grant: leave the two basic variables
 unset and set the `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__` variables
 ([`[cdr.credentials.oauth]`](configuration.md#cdrcredentialsoauth-and-terminologycredentialsoauth)), with the
 client secret in a compose secret of your own.
+
+The terminology server takes the same two modes under its own names:
+`FERROBRIDGE__TERMINOLOGY__CREDENTIALS__USER` and
+`FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD_FILE`, read from the
+`terminology_password` secret as above, or
+`FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__ISSUER` (or `__TOKEN_ENDPOINT`),
+`__CLIENT_ID`, `__CLIENT_SECRET_FILE` and `__AUDIENCE`
+([`[terminology.credentials.oauth]`](configuration.md#cdrcredentialsoauth-and-terminologycredentialsoauth)).
+The CDR takes the same five OAuth variables under
+`FERROBRIDGE__CDR__CREDENTIALS__OAUTH__`. Leave every credential variable of a
+server that checks no credentials unset.
 
 Every credential is reachable through a `_file` sibling read once at boot, and
 that is what the compose secrets are for: a secret mounts at

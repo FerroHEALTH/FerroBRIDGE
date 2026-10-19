@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 #
-# The FerroBRIDGE quickstart, a standalone file: download it, create the two
+# The FerroBRIDGE quickstart, a standalone file: download it, create the
 # secret files beside it, and run
 #
 #   docker compose up
@@ -28,16 +28,17 @@
 # reachable as FERROBRIDGE__<SECTION>__<KEY>, and every secret is read from the
 # file its `_file` sibling names rather than from the environment.
 #
-# SECRETS. The three files under ./secrets are yours to create before the first
+# SECRETS. The four files under ./secrets are yours to create before the first
 # `docker compose up`; compose refuses to start a service whose secret source
 # is missing. A file whose lane is off may be empty, because nothing reads it.
-# The `viewer` profile reads a fourth, the console's OIDC client secret. Never
+# The `viewer` profile reads a fifth, the console's OIDC client secret. Never
 # commit them.
 #
 #   mkdir -p secrets
 #   printf 'postgresql://ferrobridge:%s@cdm:5432/omop?sslmode=disable' "$PASSWORD" > secrets/cdm_url
 #   printf '%s' "$PASSWORD" > secrets/cdm_password
 #   printf '%s' "$CDR_PASSWORD" > secrets/cdr_password
+#   printf '%s' "$TX_PASSWORD" > secrets/terminology_password
 #   printf '%s' "$CLIENT_SECRET" > secrets/viewer_oidc_client_secret
 #
 # PORTS. The published port binds the loopback interface by default. A
@@ -89,6 +90,13 @@ services:
       FERROBRIDGE__CDR__CREDENTIALS__OAUTH__AUDIENCE:
       FERROBRIDGE__TERMINOLOGY__BASE_URL:
       FERROBRIDGE__TERMINOLOGY__WIRE_VERSION:
+      FERROBRIDGE__TERMINOLOGY__CREDENTIALS__USER:
+      FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD_FILE:
+      FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__ISSUER:
+      FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__TOKEN_ENDPOINT:
+      FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_ID:
+      FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE:
+      FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__AUDIENCE:
       FERROBRIDGE__CDM__URL_FILE:
       # The operator API (it needs [auth]) saves console mapping files under
       # this path, the writable volume below; it saves nothing while it is off.
@@ -108,6 +116,7 @@ services:
     secrets:
       - cdm_url
       - cdr_password
+      - terminology_password
     # The server writes two things, each to its own volume: the usage report's
     # state under the image's home directory (owned by its runtime user, uid
     # 65532, so a fresh named volume there is writable), and the console's
@@ -302,6 +311,15 @@ secrets:
   # FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE at it.
   cdr_password:
     file: ${FERROBRIDGE_CDR_PASSWORD_FILE:-./secrets/cdr_password}
+  # The terminology server password of RFC 7617 basic authentication, mounted
+  # at /run/secrets/terminology_password: set
+  # FERROBRIDGE__TERMINOLOGY__CREDENTIALS__USER and point
+  # FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD_FILE at it. The OAuth 2.0
+  # client credentials grant takes the same
+  # FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__ variables as the CDR above,
+  # with the client secret in a secret of your own.
+  terminology_password:
+    file: ${FERROBRIDGE_TERMINOLOGY_PASSWORD_FILE:-./secrets/terminology_password}
   # The password the CDM database is created with, read by the official image.
   cdm_password:
     file: ${FERROBRIDGE_CDM_PASSWORD_FILE:-./secrets/cdm_password}
