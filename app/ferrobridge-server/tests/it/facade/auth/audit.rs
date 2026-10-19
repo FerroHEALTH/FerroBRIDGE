@@ -171,3 +171,82 @@ fn a_batch_audits_each_entry_and_the_batch_without_any_content() {
     assert!(whole["entry"].is_null(), "{text}");
     assert!(!text.contains("SYNTHETIC-BATCH-NOTE"), "{text}");
 }
+
+/// The fields every audit line carries beside the log envelope (`timestamp`,
+/// `level`, `target` and `message`), in sorted order.
+const REQUEST_FIELDS: [&str; 10] = [
+    "at",
+    "client",
+    "duration_ms",
+    "interaction",
+    "method",
+    "request_id",
+    "resource_id",
+    "resource_type",
+    "status",
+    "subject",
+];
+
+/// Returns the keys of `line` outside the log envelope, sorted.
+fn fields_of(line: &serde_json::Value) -> Vec<String> {
+    let mut keys: Vec<String> = line
+        .as_object()
+        .expect("a log line is a JSON object")
+        .keys()
+        .filter(|key| !matches!(key.as_str(), "timestamp" | "level" | "target" | "message"))
+        .cloned()
+        .collect();
+    keys.sort();
+    keys
+}
+
+#[test]
+fn a_request_line_carries_exactly_the_access_record_fields() {
+    let text = logged(async {
+        let key = ec_key("k1", Algorithm::ES256);
+        let issuer = Issuer::start(&[&key]).await;
+        let harness = harness().await;
+        let app = secured(&harness, &authority(issuer.settings()).await);
+        let token = mint(&key, &issuer.claims("system/Condition.r"));
+        let response = raw(app, bearing(get("/fhir/Condition/c-audit-5"), &token))
+            .await
+            .expect("an answer");
+        assert_eq!(StatusCode::NOT_FOUND, response.status());
+    });
+    let lines = audit_lines(&text);
+    assert_eq!(1, lines.len(), "{text}");
+    assert_eq!(REQUEST_FIELDS.to_vec(), fields_of(&lines[0]), "{text}");
+}
+
+#[test]
+fn a_batch_entry_line_adds_only_its_position() {
+    let text = logged(async {
+        let harness = harness().await;
+        let bundle = crate::facade::batch::batch_of(&[crate::facade::batch::entry(
+            "GET",
+            "Condition/c-audit-6",
+            None,
+        )]);
+        let request = http::Request::post("/fhir")
+            .header(http::header::CONTENT_TYPE, "application/fhir+json")
+            .body(axum::body::Body::from(bundle.to_string()))
+            .expect("a legal request");
+        let response = raw(harness.app(), request).await.expect("an answer");
+        assert_eq!(StatusCode::OK, response.status());
+    });
+    let lines = audit_lines(&text);
+    assert_eq!(2, lines.len(), "{text}");
+    let mut entry_fields = REQUEST_FIELDS.to_vec();
+    entry_fields.push("entry");
+    entry_fields.sort_unstable();
+    let entry = lines
+        .iter()
+        .find(|line| line["entry"].as_u64() == Some(0))
+        .expect("the entry's line");
+    assert_eq!(entry_fields, fields_of(entry), "{text}");
+    let whole = lines
+        .iter()
+        .find(|line| line["entry"].is_null())
+        .expect("the batch line");
+    assert_eq!(REQUEST_FIELDS.to_vec(), fields_of(whole), "{text}");
+}
