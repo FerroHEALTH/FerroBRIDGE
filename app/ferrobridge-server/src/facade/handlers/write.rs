@@ -316,6 +316,7 @@ async fn answer(
                     subject: subject.as_ref(),
                     store: facade.store(),
                     usage: facade.usage(),
+                    demographics: facade.demographics(),
                 },
                 &facade.translator().session(),
             )

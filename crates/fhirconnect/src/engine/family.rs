@@ -22,6 +22,7 @@
 // makes `emit_rm_attrs` public (sibling request S1).
 
 use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
+
 use openehr_its::json::JsonParseError;
 use openehr_its::json::from_canonical_value;
 use openehr_mapping_core::composition::NodeValue;
@@ -34,6 +35,7 @@ use openehr_rm::v1_2::common::generic::party_proxy::PartyProxy;
 use openehr_rm::v1_2::data_types::text::dv_text::DvText;
 use openehr_sdt::flat::path::Segment;
 
+use crate::engine::demographics::PartyIdentity;
 use crate::engine::origin::Origin;
 use crate::engine::origin::UNKNOWN_SOURCE;
 
@@ -337,6 +339,9 @@ pub struct Participation {
     pub id: Option<String>,
     /// The performer's name, when it carries one.
     pub name: Option<String>,
+    /// The demographic identity the performer's `external_ref` carries, when
+    /// it carries one ([`crate::engine::demographics`]).
+    pub identity: Option<PartyIdentity>,
 }
 
 /// Returns the value of an object id, whichever subtype it is.
@@ -384,6 +389,7 @@ pub fn participations(
                 }
             };
             Participation {
+                identity: reference.as_ref().and_then(PartyIdentity::from_party_ref),
                 id: reference.map(|reference| id_value(&reference.id)),
                 name,
             }

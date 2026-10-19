@@ -102,6 +102,7 @@ pub(crate) async fn validate(
                 fhirconnect::engine::origin::SourceItem::of(inbound.document()),
                 &fhirconnect::engine::seam::Seams::default()
                     .with_terminology(terminology)
+                    .with_demographics(facade.demographics())
                     .with_references(&resolved),
             )
         })

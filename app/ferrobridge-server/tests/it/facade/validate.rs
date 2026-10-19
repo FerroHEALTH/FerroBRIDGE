@@ -202,6 +202,8 @@ async fn validate_carries_the_validators_message_verbatim_and_writes_nothing()
         "2026-09-15T09:00:00Z",
         &settings(),
         &fhirconnect::engine::terminology::NoTerminology,
+        &fhirconnect::engine::demographics::IssuerDemographics::new(crate::facade::BASE_URL)
+            .expect("the test base issues identities"),
     )
     .err()
     .ok_or("the synthetic template requires the diagnosis name")?;

@@ -85,6 +85,7 @@ pub(crate) async fn read(
             subject: subject.as_ref(),
             store: facade.store(),
             usage: facade.usage(),
+            demographics: facade.demographics(),
         },
     )
     .await?;
@@ -176,6 +177,7 @@ pub(crate) async fn vread(
             subject: subject.as_ref(),
             store: facade.store(),
             usage: facade.usage(),
+            demographics: facade.demographics(),
         },
     )
     .await?;
@@ -228,6 +230,7 @@ pub(crate) async fn current(
             subject: subject.as_ref(),
             store: facade.store(),
             usage: facade.usage(),
+            demographics: facade.demographics(),
         },
     )
     .await?;

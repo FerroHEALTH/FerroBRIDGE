@@ -102,6 +102,8 @@ fn person_composition(
         "2026-09-15T09:00:00Z",
         &settings(),
         &fhirconnect::engine::terminology::NoTerminology,
+        &fhirconnect::engine::demographics::IssuerDemographics::new(crate::facade::BASE_URL)
+            .expect("the test base issues identities"),
     )?;
     Ok(built.into_value().into_value())
 }

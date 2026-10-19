@@ -152,6 +152,8 @@ impl Harness {
             "2026-09-15T09:00:00Z",
             &settings(),
             &fhirconnect::engine::terminology::NoTerminology,
+            &fhirconnect::engine::demographics::IssuerDemographics::new(BASE_URL)
+                .expect("the test base issues identities"),
         )
         .expect("the synthetic Condition maps");
         built.into_value().into_value()

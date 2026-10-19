@@ -4,6 +4,7 @@
 //! The data-type cell of one mapping, run over its input values.
 
 use fhir_types::codec::Value;
+use fhir_types::r4::primitives::String as FhirString;
 use openehr_mapping_core::composition::RmPosition;
 
 use crate::engine::cell;
@@ -27,6 +28,8 @@ use crate::engine::traverse::Binding;
 use crate::engine::traverse::Leaf;
 use crate::engine::traverse::Run;
 use crate::engine::traverse::Written;
+use crate::engine::traverse::build::COMPOSER;
+use crate::engine::traverse::demographic::Shape;
 use crate::engine::traverse::error::EngineError;
 use crate::engine::traverse::functions::MappingCodeError;
 use crate::engine::traverse::place::rm_positions;
@@ -165,7 +168,13 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     self.warnings
                         .push(Warning::fallback(taken, self.locate(mapping, input)));
                 }
-                self.put_openehr(mapping, binding, produced.value);
+                let shape = if node.aql_path().as_str() == COMPOSER {
+                    Shape::ExternalRef
+                } else {
+                    Shape::Identifier
+                };
+                let value = self.identified(mapping, &view, produced.value, shape)?;
+                self.put_openehr(mapping, binding, value);
                 Ok(())
             }
             Direction::OpenehrToFhir => {
@@ -189,8 +198,16 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 let view = match source {
                     Leaf::Value(ref value) => {
                         let terminology = self.binding_of(openehr.node());
-                        withheld = cell::withheld(value, kind, terminology.as_deref());
-                        cell::get(value, kind, terminology.as_deref()).map_err(refuse)?
+                        let (value, reference) = self.minted(value);
+                        withheld = cell::withheld(&value, kind, terminology.as_deref());
+                        let mut view =
+                            cell::get(&value, kind, terminology.as_deref()).map_err(refuse)?;
+                        if let (Some(reference), FhirValue::Reference(held)) =
+                            (reference, &mut view)
+                        {
+                            held.reference = Some(FhirString::from(reference));
+                        }
+                        view
                     }
                     // NOTE: a scalar leaf carries text, so only an element that
                     // travels as text takes it; no specification governs this:

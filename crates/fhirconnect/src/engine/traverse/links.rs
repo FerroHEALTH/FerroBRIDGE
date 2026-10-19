@@ -8,9 +8,9 @@ use fhir_types::codec::Value;
 use openehr_mapping_core::composition::RmPosition;
 use openehr_rm::v1_2::paths::EhrUri;
 
+use crate::engine::demographics::MARKER;
 use crate::engine::family;
 use crate::engine::fhir::FhirKind;
-use crate::engine::origin::UNKNOWN_SOURCE;
 use crate::engine::outcome::Loss;
 use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
@@ -23,7 +23,6 @@ use crate::tree::Occurrence;
 use crate::tree::element::Table;
 
 use crate::engine::traverse::Binding;
-use crate::engine::traverse::PARTICIPATION_SCHEME;
 use crate::engine::traverse::Run;
 use crate::engine::traverse::error::EngineError;
 use crate::engine::traverse::place::openehr_occurrence;
@@ -132,9 +131,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
     /// the `Reference` of the participant, the openEHR side the
     /// `other_participations` of an `ENTRY` or the `participations` of the
     /// `EVENT_CONTEXT` (`family::participation_list`), and the function is
-    /// the method's. The performer carries the reference as its
-    /// `external_ref` and the reference's `display` as its name; the
-    /// allocation is our own design.
+    /// the method's. The performer carries the identity the demographics
+    /// endpoint gives the reference as its `external_ref`, the one party
+    /// reference the master05 `PARTICIPATION` table inlines
+    /// ([`crate::engine::demographics`]), and the reference's `display` as
+    /// its name; the allocation is our own design.
     pub(super) fn participation(
         &mut self,
         mapping: &Mapping,
@@ -179,7 +180,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         bindings.push(binding);
                         continue;
                     };
-                    let namespace = self.reference_type(literal);
+                    let identity = self.identity_of(mapping, literal)?;
                     let positions = self.family_positions(openehr, &binding.openehr);
                     let index = self.next_family(openehr, &positions, list.family);
                     self.families.extend(family::participation(
@@ -190,9 +191,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         &family::ParticipationParts {
                             function,
                             name: display,
-                            id: literal,
-                            id_scheme: PARTICIPATION_SCHEME,
-                            id_namespace: namespace.unwrap_or(UNKNOWN_SOURCE),
+                            id: identity.value(),
+                            id_scheme: MARKER,
+                            id_namespace: identity.issuer(),
                         },
                     ));
                     bindings.push(binding);
@@ -214,13 +215,30 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     vec![openehr_occurrence(mapping.name(), &positions)?; found.len()];
                 let bindings = self.bindings(mapping, parent, &occurrences)?;
                 for (binding, participant) in bindings.iter().zip(found.iter()) {
-                    let Some(ref literal) = participant.id else {
+                    let Some(literal) = self.participant_reference(participant) else {
                         continue;
                     };
-                    self.write_reference(mapping, binding, literal, participant.name.as_deref())?;
+                    self.write_reference(mapping, binding, &literal, participant.name.as_deref())?;
                 }
                 Ok(bindings)
             }
+        }
+    }
+
+    /// Returns the reference a participant's performer names.
+    ///
+    /// A performer this endpoint identified reads back as the reference it
+    /// minted, one identified on another server as that server's absolute
+    /// reference, and any other performer as its `external_ref.id.value`.
+    fn participant_reference(&self, participant: &family::Participation) -> Option<String> {
+        match participant.identity {
+            Some(ref identity) => Some(
+                self.seams
+                    .demographics()
+                    .reference_of(identity)
+                    .unwrap_or_else(|| format!("{}/{}", identity.issuer(), identity.value())),
+            ),
+            None => participant.id.clone(),
         }
     }
 
@@ -282,21 +300,5 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let taken = *next;
         *next = next.saturating_add(1);
         taken
-    }
-
-    /// Returns the resource type a literal reference names, when it names one
-    /// this FHIR version defines.
-    ///
-    /// A literal reference is `<type>/<id>`, relative or at the end of an
-    /// absolute URL, optionally followed by `/_history/<version>`
-    /// (<https://hl7.org/fhir/R4/references.html#literal>).
-    fn reference_type<'text>(&self, literal: &'text str) -> Option<&'text str> {
-        let segments: Vec<&str> = literal.split('/').collect();
-        let end = segments
-            .iter()
-            .rposition(|segment| *segment == "_history")
-            .unwrap_or(segments.len());
-        let kind = end.checked_sub(2).and_then(|at| segments.get(at))?;
-        self.table.is_resource(kind).then_some(*kind)
     }
 }

@@ -26,6 +26,8 @@ mod single;
 mod transaction;
 
 use fhir_types::codec::Value;
+use fhirconnect::engine::demographics::Demographics;
+use fhirconnect::engine::demographics::NoDemographics;
 use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::seam::NoReferences;
 use fhirconnect::engine::seam::ReferenceSource;
@@ -406,6 +408,8 @@ pub struct Ingest<'a> {
     references: &'a dyn ReferenceSource,
     /// The usage report's window every engine refusal is counted in.
     usage: Option<&'a Window>,
+    /// The demographics endpoint every party reference resolves through.
+    demographics: &'a dyn Demographics,
 }
 
 /// The translator of an ingest built with none: no server, so a
@@ -560,6 +564,7 @@ impl<'a> Ingest<'a> {
             translator: &NO_TRANSLATOR,
             references: &NoReferences,
             usage: None,
+            demographics: &NoDemographics,
         }
     }
 
@@ -584,6 +589,16 @@ impl<'a> Ingest<'a> {
     #[must_use]
     pub fn with_references(mut self, references: &'a dyn ReferenceSource) -> Self {
         self.references = references;
+        self
+    }
+
+    /// Returns this ingest resolving every party reference through
+    /// `demographics`.
+    ///
+    /// The default resolves none, so a party reference refuses the unit.
+    #[must_use]
+    pub fn with_demographics(mut self, demographics: &'a dyn Demographics) -> Self {
+        self.demographics = demographics;
         self
     }
 

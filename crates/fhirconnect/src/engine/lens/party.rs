@@ -11,9 +11,10 @@
 //!
 //! `reference` is the demographics row: the page sends it to the demographics
 //! server and puts the resolved resource's identifier in `identifiers`. That
-//! resolution is a call the facade makes, so the lens neither invents an
-//! identifier for it nor drops it: it reports the reference through
-//! [`PartyLens::deferred`] and the engine records it in its outcome.
+//! resolution is a call, so the lens neither invents an identifier for it nor
+//! drops it: [`PartyLens::deferred`] hands the reference to the run, which
+//! resolves it through the demographics endpoint
+//! ([`crate::engine::demographics`]).
 
 use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::primitives::String as FhirString;
@@ -47,11 +48,11 @@ pub const SEPARATOR: &str = "::";
 pub struct PartyLens;
 
 impl PartyLens {
-    /// Returns the reference string the facade resolves against demographics.
+    /// Returns the reference string the run resolves through the
+    /// demographics endpoint.
     ///
     /// A `Reference` that names a resource carries no identifier of its own
-    /// until that resource is fetched, so the engine records the string and
-    /// the facade performs the lookup.
+    /// until the endpoint resolves it, so the lens leaves it to the run.
     #[must_use]
     pub fn deferred(view: &Reference) -> Option<&str> {
         text_of(view.reference.as_ref().map(|reference| &reference.value))
