@@ -10,6 +10,7 @@ use ferrobridge_term::error::Error;
 use ferrobridge_term::outcome::ValidateOutcome;
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
+use http::StatusCode;
 use std::error::Error as StdError;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -144,31 +145,63 @@ async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dy
 #[tokio::test]
 async fn an_unknown_value_set_is_a_typed_error_and_never_an_invalid_code()
 -> Result<(), Box<dyn StdError>> {
-    let server = MockServer::start().await;
-    mount(
-        &server,
-        WireVersion::R4,
-        terminology::outcome(
-            404,
-            "not-found",
-            Some("not-found"),
-            "no ValueSet with that canonical",
-        ),
-    )
-    .await;
+    // The testkit stubs write one `OperationOutcome` shape for R4 and R4B,
+    // so each release is refused from the same body.
+    for version in RELEASES {
+        let server = MockServer::start().await;
+        mount(
+            &server,
+            version,
+            terminology::outcome(
+                404,
+                "not-found",
+                Some("not-found"),
+                "no ValueSet with that canonical",
+            ),
+        )
+        .await;
 
-    let error = validate(&server, WireVersion::R4, fixtures::TERM_MEMBER_CODE)
-        .await
-        .expect_err("an unknown value set is a refusal");
-    let Error::Refused {
-        operation,
-        upstream,
-        ..
-    } = &error
-    else {
-        return Err(format!("expected a refusal, got {error:?}").into());
-    };
-    assert_eq!(ferrobridge_term::VALIDATE_CODE, *operation);
-    assert!(upstream.has_tx_issue("not-found"));
+        let error = validate(&server, version, fixtures::TERM_MEMBER_CODE)
+            .await
+            .expect_err("an unknown value set is a refusal");
+        let Error::Refused {
+            operation,
+            upstream,
+            ..
+        } = &error
+        else {
+            return Err(format!("expected a refusal in {version:?}, got {error:?}").into());
+        };
+        assert_eq!(ferrobridge_term::VALIDATE_CODE, *operation);
+        assert_eq!(StatusCode::NOT_FOUND, upstream.status());
+        assert!(upstream.has_tx_issue("not-found"));
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_server_failure_is_a_typed_error_carrying_the_upstream_status_in_both_releases()
+-> Result<(), Box<dyn StdError>> {
+    for version in RELEASES {
+        let server = MockServer::start().await;
+        mount(
+            &server,
+            version,
+            terminology::outcome(503, "transient", None, "the server is down"),
+        )
+        .await;
+
+        let error = validate(&server, version, fixtures::TERM_MEMBER_CODE)
+            .await
+            .expect_err("a 503 is never an answer");
+        assert!(
+            matches!(error, Error::ServerFailure { .. }),
+            "{version:?}: {error:?}"
+        );
+        assert_eq!(
+            Some(StatusCode::SERVICE_UNAVAILABLE),
+            error.upstream_status()
+        );
+    }
     Ok(())
 }
