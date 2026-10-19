@@ -23,6 +23,13 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Changed
+
+- The release workflow refuses a tag whose milestone, titled exactly as the
+  tag, is missing or still holds an open issue or pull request, and names
+  each one; once every leg has succeeded, crates.io included, it closes that
+  milestone (#983).
+
 ### Fixed
 
 - A `TERM_MAPPING` that a `DV_TEXT` or `DV_CODED_TEXT` value carries out to a
@@ -185,11 +192,6 @@ static bearer token is gone from both upstreams.
   new arms.
 
 ### Changed
-
-- The release workflow refuses a tag whose milestone, titled exactly as the
-  tag, is missing or still holds an open issue or pull request, and names
-  each one; once every leg has succeeded, crates.io included, it closes that
-  milestone (#983).
 
 - Only the newest release is supported (#979). `SECURITY.md` says that every
   earlier release stops receiving fixes when a new one is published, with no
