@@ -137,7 +137,7 @@ crates on crates.io.
   builder option that names `ARCHETYPED.rm_version`, and the BASE 1.3.0
   `ARCHETYPE_ID` grammar in `openehr_base::v1_3`, which now admits the
   namespaced ADL 2 form and a full version. `openehr-mapping-core` 0.1.119
-  and `fhirconnect` 0.1.159 render the new requirements.
+  and `fhirconnect` 0.1.160 render the new requirements.
 - A composition the bridge builds names each structure the FLAT form leaves
   out (an `ITEM_TREE` under an entry, for example) by its term definition in
   the template, where it named it by its node id before (RM Common IM,
