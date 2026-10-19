@@ -443,3 +443,98 @@ async fn the_guides_mdm_t02_sample_maps_to_the_reviewed_bundle() {
         (inventory(mapped.bundle()), inventory(&expected))
     );
 }
+
+/// The `identifier[0].assigner` of every `Location`, by its identifier value.
+fn location_assigners(bundle: &Value) -> Vec<(String, Option<String>)> {
+    let mut found: Vec<(String, Option<String>)> = resources(bundle, "Location")
+        .into_iter()
+        .filter_map(|location| {
+            let identifier = location
+                .get("identifier")
+                .and_then(Value::as_array)
+                .and_then(<[Value]>::first)?;
+            let value = identifier.get("value").and_then(Value::as_str)?;
+            let assigner = identifier
+                .get("assigner")
+                .and_then(|assigner| assigner.get("reference"))
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+            Some((value.to_owned(), assigner))
+        })
+        .collect();
+    found.sort();
+    found
+}
+
+/// An ADT^A01 whose PV1-3 is `location`.
+fn admission_with_location(location: &str) -> Vec<u8> {
+    let pv1 = format!("PV1|1|I|{location}");
+    fixtures::message(&[
+        b"MSH|^~\\&|ADMIT|NORTHHOSP|EHR|SOUTHCLINIC|20261019090000+0200||ADT^A01^ADT_A01|MSG00345|P|2.5.1",
+        b"EVN||20261019085900+0200",
+        b"PID|1||PAT-0345^^^NORTHHOSP^MR||Doe^Sam^^^^^L||19800101|M",
+        pv1.as_bytes(),
+    ])
+}
+
+// NOTE: mapping_guidelines.md §[n] Notation defines no `[a-b].` prefix, so the guide's PL.11
+// rows stay refused; the supplement spells them per level under the level's own condition.
+#[tokio::test]
+async fn pl_11_is_the_assigner_of_each_valued_level_s_identifier() {
+    let message = admission_with_location("WARD1^101^A^^^^^^^^NORTHHOSP");
+    let guide = run(&message, &support::corpus()).await;
+    let refused = guide
+        .outcomes()
+        .iter()
+        .filter(|outcome| {
+            matches!(
+                outcome,
+                Outcome::UnsupportedTarget { row, error, .. }
+                    if row.source == "PL.11"
+                        && *error == ferrobridge_hl7v2::map::notation::NotationError::Spread
+            )
+        })
+        .count();
+    assert_eq!(
+        refused,
+        2,
+        "both guide rows are refused: {:?}",
+        guide.outcomes()
+    );
+    let shipped = run(&message, &support::shipped()).await;
+    let assigners = location_assigners(shipped.bundle());
+    assert_eq!(
+        assigners
+            .iter()
+            .map(|(value, _)| value.as_str())
+            .collect::<Vec<_>>(),
+        ["101", "A", "WARD1"]
+    );
+    let organizations: Vec<&str> = entries(shipped.bundle())
+        .iter()
+        .filter(|entry| {
+            entry
+                .get("resource")
+                .and_then(|resource| resource.get("resourceType"))
+                .and_then(Value::as_str)
+                == Some("Organization")
+        })
+        .filter_map(|entry| entry.get("fullUrl").and_then(Value::as_str))
+        .collect();
+    for (value, assigner) in &assigners {
+        let assigner = assigner.as_deref().unwrap_or_default();
+        assert!(
+            organizations.contains(&assigner),
+            "the identifier {value} names an Organization of the Bundle as its assigner: {}",
+            pretty(shipped.bundle())
+        );
+    }
+    assert!(
+        !shipped.outcomes().iter().any(|outcome| matches!(
+            outcome,
+            Outcome::UnsupportedTarget { row, .. } if row.source == "PL.11"
+        )),
+        "{:?}",
+        shipped.outcomes()
+    );
+}
