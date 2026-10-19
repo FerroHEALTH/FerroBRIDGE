@@ -25,6 +25,14 @@ crates on crates.io.
 
 ### Added
 
+- The HL7 v2 parser counts a valued repetition past a field's cardinality,
+  a valued component past its data type's components and a valued
+  subcomponent past its component's data type, as the new
+  `extra-repetition`, `extra-component` and `extra-subcomponent` outcomes
+  (#295). HL7 v2 chapter 2 §2.6 tells a receiver to ignore such
+  constituents, so none refuses the message and each value stays in the
+  parsed message. Components are checked against the v2.9.1 data types
+  only, since the tables of earlier versions carry no component tables.
 - A FHIRconnect mapping with no `type` onto an `ELEMENT` whose value admits
   several data types converts the `ELEMENT`'s own value, then runs its
   `followedBy` children (#544), as FHIRconnect `FollowedBy.adoc` orders them
