@@ -51,8 +51,6 @@ impl WireVersion {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum Credentials {
-    /// An RFC 6750 bearer token.
-    Bearer(SecretString),
     /// RFC 7617 basic authentication.
     Basic {
         /// The user name, which is not a secret.
@@ -157,13 +155,6 @@ mod tests {
             "http://tx.invalid/r4".parse().expect("a valid URL"),
             WireVersion::R4,
         )
-    }
-
-    #[test]
-    fn a_bearer_token_is_not_in_the_debug_rendering() {
-        let config =
-            config().with_credentials(Credentials::Bearer(SecretString::from("s3cr3t-token")));
-        assert!(!format!("{config:?}").contains("s3cr3t-token"));
     }
 
     #[test]

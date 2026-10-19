@@ -12,7 +12,7 @@ use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::cdr::error::CdrError;
 use ferrobridge_server::cdr::ids::{EhrId, RequestId};
 use ferrobridge_testkit::net::closed_http_url;
-use openehr_its::rest::client::{ClientError, Credentials, RetryPolicy, TransportError};
+use openehr_its::rest::client::{ClientError, RetryPolicy, TransportError};
 use openehr_its::rest::generated::ehr::client::EhrGetByIdOutcome;
 use secrecy::SecretString;
 use std::error::Error;
@@ -173,8 +173,8 @@ async fn a_slow_answer_past_the_timeout_is_a_typed_timeout() -> Result<(), Box<d
 }
 
 #[tokio::test]
-async fn a_bearer_token_travels_and_never_reaches_the_debug_rendering() -> Result<(), Box<dyn Error>>
-{
+async fn the_credential_travels_beside_the_request_id_and_never_reaches_the_debug_rendering()
+-> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path(format!("/v1/ehr/{EHR}")))
@@ -184,13 +184,14 @@ async fn a_bearer_token_travels_and_never_reaches_the_debug_rendering() -> Resul
 
     let client = CdrClient::new(
         &CdrConfig::new(format!("{}/v1", server.uri()).parse()?)
-            .with_credentials(Credentials::Bearer(SecretString::from("synthetic-token"))),
+            .with_basic("bridge", SecretString::from("synthetic-token")),
     )?;
     let client = client.with_request_id(RequestId::new("corr-42")?);
     let _answered = client.ehr(&EhrId::new(EHR)?).await?;
 
+    // NOTE: RFC 7617 §2; `YnJpZGdlOnN5bnRoZXRpYy10b2tlbg==` is `bridge:synthetic-token`.
     assert_eq!(
-        vec!["Bearer synthetic-token".to_owned()],
+        vec!["Basic YnJpZGdlOnN5bnRoZXRpYy10b2tlbg==".to_owned()],
         support::request_header(&server, 0, "authorization").await?
     );
     assert_eq!(
@@ -211,12 +212,8 @@ async fn basic_credentials_travel_as_rfc_7617() -> Result<(), Box<dyn Error>> {
         .await;
 
     let client = CdrClient::new(
-        &CdrConfig::new(format!("{}/v1", server.uri()).parse()?).with_credentials(
-            Credentials::Basic {
-                user: String::from("bridge"),
-                password: SecretString::from("synthetic-password"),
-            },
-        ),
+        &CdrConfig::new(format!("{}/v1", server.uri()).parse()?)
+            .with_basic("bridge", SecretString::from("synthetic-password")),
     )?;
     let _answered = client.ehr(&EhrId::new(EHR)?).await?;
 
@@ -321,7 +318,7 @@ async fn a_reachability_probe_lists_templates_with_the_configured_credential()
         ))
         .and(wiremock::matchers::header(
             "authorization",
-            "Bearer synthetic-token",
+            "Basic YnJpZGdlOnN5bnRoZXRpYy10b2tlbg==",
         ))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
         .expect(1)
@@ -329,7 +326,7 @@ async fn a_reachability_probe_lists_templates_with_the_configured_credential()
         .await;
     let client = CdrClient::new(
         &CdrConfig::new(format!("{}/v1", server.uri()).parse()?)
-            .with_credentials(Credentials::Bearer(SecretString::from("synthetic-token"))),
+            .with_basic("bridge", SecretString::from("synthetic-token")),
     )?;
 
     assert_eq!(http::StatusCode::OK, client.reachability().await?);

@@ -14,7 +14,7 @@ use super::CdmSettings;
 use super::FacadeSettings;
 use super::Hl7v2Settings;
 use super::MappingSettings;
-use super::credentials::Scheme;
+use super::credentials::Basic;
 use super::credentials::cdm_connection_key;
 use super::credentials::resolve_credentials;
 use super::credentials::resolve_oauth;
@@ -391,20 +391,15 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
             initial_backoff: Duration::from_millis(cdr.retry.initial_backoff_ms),
             max_backoff: Duration::from_millis(cdr.retry.max_backoff_ms),
         });
-    let scheme = resolve_credentials("cdr.credentials", &cdr.credentials)?;
-    match (scheme, cdr.credentials.oauth.as_ref()) {
+    let basic = resolve_credentials("cdr.credentials", &cdr.credentials)?;
+    match (basic, cdr.credentials.oauth.as_ref()) {
         (Some(_), Some(_)) => {
             return Err(Error::OAuthScheme {
                 section: String::from("cdr.credentials"),
             });
         }
-        (Some(scheme), None) => {
-            config = config.with_credentials(match scheme {
-                Scheme::Bearer(token) => openehr_its::rest::client::Credentials::bearer(token),
-                Scheme::Basic { user, password } => {
-                    openehr_its::rest::client::Credentials::basic(user, password)
-                }
-            });
+        (Some(Basic { user, password }), None) => {
+            config = config.with_basic(user, password);
         }
         (None, Some(oauth)) => {
             config = config.with_oauth(resolve_oauth("cdr.credentials.oauth", oauth)?);
@@ -437,14 +432,11 @@ pub(super) fn resolve_terminology(
             initial_backoff: Duration::from_millis(terminology.retry.initial_backoff_ms),
             max_backoff: Duration::from_millis(terminology.retry.max_backoff_ms),
         });
-    if let Some(scheme) = resolve_credentials("terminology.credentials", &terminology.credentials)?
+    if let Some(Basic { user, password }) =
+        resolve_credentials("terminology.credentials", &terminology.credentials)?
     {
-        config = config.with_credentials(match scheme {
-            Scheme::Bearer(token) => ferrobridge_term::config::Credentials::Bearer(token),
-            Scheme::Basic { user, password } => {
-                ferrobridge_term::config::Credentials::Basic { user, password }
-            }
-        });
+        config = config
+            .with_credentials(ferrobridge_term::config::Credentials::Basic { user, password });
     }
     Ok(config)
 }

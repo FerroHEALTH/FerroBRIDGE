@@ -161,7 +161,9 @@ impl CdrClient {
             .map_err(|source| CdrError::Build { source })?;
         let auth = match config.credentials.clone() {
             None => None,
-            Some(CdrCredentials::Static(credentials)) => Some(Auth::Static(credentials)),
+            Some(CdrCredentials::Basic { user, password }) => {
+                Some(Auth::Static(Credentials::basic(user, password)))
+            }
             Some(CdrCredentials::OAuth(oauth)) => Some(Auth::OAuth(
                 TokenSource::new(*oauth, config.timeout)
                     .map_err(|source| CdrError::TokenClient { source })?,

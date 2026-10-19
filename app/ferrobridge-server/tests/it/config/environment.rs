@@ -45,13 +45,20 @@ fn an_environment_override_turns_a_lane_on_with_no_file_at_all() -> Result<(), B
             String::from("http://cdr.invalid/v1"),
         ),
         (
-            String::from("FERROBRIDGE__CDR__CREDENTIALS__BEARER_TOKEN"),
-            String::from("synthetic-token"),
+            String::from("FERROBRIDGE__CDR__CREDENTIALS__USER"),
+            String::from("bridge"),
+        ),
+        (
+            String::from("FERROBRIDGE__CDR__CREDENTIALS__PASSWORD"),
+            String::from("synthetic-password"),
         ),
     ]);
     let settings = Config::from_sources(None, &environment)?.resolve()?;
     let cdr = settings.cdr.as_ref().ok_or("the CDR lane is on")?;
-    assert!(cdr.credentials.is_some(), "the token reached the client");
+    assert!(
+        cdr.credentials.is_some(),
+        "the credentials reached the client"
+    );
     assert!(
         settings.terminology.is_none(),
         "a lane with no section stays off"
@@ -143,9 +150,7 @@ fn cdr_user(user: &str) -> Result<String, Box<dyn StdError>> {
     let settings = Config::from_sources(None, &environment)?.resolve()?;
     let cdr = settings.cdr.ok_or("the CDR lane is on")?;
     match cdr.credentials {
-        Some(ferrobridge_server::cdr::config::CdrCredentials::Static(
-            openehr_its::rest::client::Credentials::Basic { user, .. },
-        )) => Ok(user),
+        Some(ferrobridge_server::cdr::config::CdrCredentials::Basic { user, .. }) => Ok(user),
         other => Err(format!("expected basic authentication, got {other:?}").into()),
     }
 }

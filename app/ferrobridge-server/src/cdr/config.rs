@@ -4,14 +4,14 @@
 //! How the CDR client is pointed at one CDR: its base URL, its budget, and its
 //! credentials, as `[cdr]` resolves them.
 //!
-//! No specification governs the timeout, the retry budget or the static
-//! credential form: our own design. ITS-REST 1.1.0 declares `security: []` on every
-//! document and leaves authentication to the deployment.
+//! No specification governs the timeout, the retry budget or the two
+//! credential modes: our own design. ITS-REST 1.1.0 declares `security: []` on
+//! every document and leaves authentication to the deployment.
 
 use std::time::Duration;
 
-use openehr_its::rest::client::Credentials;
 use openehr_its::rest::client::RetryPolicy;
+use secrecy::SecretString;
 use url::Url;
 
 use crate::cdr::oauth::OAuthConfig;
@@ -19,9 +19,13 @@ use crate::cdr::oauth::OAuthConfig;
 /// How the bridge authenticates to the CDR.
 #[derive(Debug, Clone)]
 pub enum CdrCredentials {
-    /// One credential presented on every call: a bearer token, or a user and a
-    /// password.
-    Static(Credentials),
+    /// RFC 7617 basic authentication, presented on every call.
+    Basic {
+        /// The user name, which is not a secret.
+        user: String,
+        /// The password.
+        password: SecretString,
+    },
     /// A token the bridge obtains with the OAuth 2.0 client credentials grant
     /// (RFC 6749 §4.4) and renews before it expires.
     OAuth(Box<OAuthConfig>),
@@ -87,10 +91,18 @@ impl CdrConfig {
         self
     }
 
-    /// Returns this configuration with `credentials` presented on every call.
+    /// Returns this configuration presenting `user` and `password` with RFC
+    /// 7617 basic authentication on every call.
     #[must_use]
-    pub fn with_credentials(mut self, credentials: Credentials) -> Self {
-        self.credentials = Some(CdrCredentials::Static(credentials));
+    pub fn with_basic(
+        mut self,
+        user: impl Into<String>,
+        password: impl Into<SecretString>,
+    ) -> Self {
+        self.credentials = Some(CdrCredentials::Basic {
+            user: user.into(),
+            password: password.into(),
+        });
         self
     }
 
@@ -106,28 +118,20 @@ impl CdrConfig {
 #[cfg(test)]
 mod tests {
     use super::CdrConfig;
-    use openehr_its::rest::client::Credentials;
     use std::time::Duration;
-
-    #[test]
-    fn a_bearer_token_is_not_in_the_debug_rendering() {
-        let config = CdrConfig::new("http://cdr.invalid/v1".parse().expect("a valid URL"))
-            .with_credentials(Credentials::bearer("s3cr3t-token"));
-        assert!(!format!("{config:?}").contains("s3cr3t-token"));
-        let credentials = config
-            .credentials
-            .as_ref()
-            .expect("the credentials are set");
-        assert!(!format!("{credentials:?}").contains("s3cr3t-token"));
-    }
 
     #[test]
     fn a_basic_password_is_not_in_the_debug_rendering() {
         let config = CdrConfig::new("http://cdr.invalid/v1".parse().expect("a valid URL"))
-            .with_credentials(Credentials::basic("bridge", "s3cr3t-password"));
+            .with_basic("bridge", "s3cr3t-password");
         let rendered = format!("{config:?}");
         assert!(!rendered.contains("s3cr3t-password"));
         assert!(rendered.contains("bridge"));
+        let credentials = config
+            .credentials
+            .as_ref()
+            .expect("the credentials are set");
+        assert!(!format!("{credentials:?}").contains("s3cr3t-password"));
     }
 
     #[test]

@@ -58,7 +58,7 @@ release asset. Download it, create the secret files beside it, and start:
 mkdir -p secrets
 printf '%s' "$CDM_PASSWORD" > secrets/cdm_password
 printf 'postgresql://ferrobridge:%s@cdm:5432/omop?sslmode=disable' "$CDM_PASSWORD" > secrets/cdm_url
-: > secrets/cdr_bearer_token
+printf '%s' "$CDR_PASSWORD" > secrets/cdr_password
 
 docker compose up
 curl http://127.0.0.1:8080/health/liveness
@@ -166,11 +166,18 @@ use:
 
 ```sh
 FERROBRIDGE__CDR__BASE_URL=https://cdr.example.org/openehr/v1
-FERROBRIDGE__CDR__CREDENTIALS__BEARER_TOKEN_FILE=/run/secrets/cdr_bearer_token
+FERROBRIDGE__CDR__CREDENTIALS__USER=ferrobridge
+FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE=/run/secrets/cdr_password
 FERROBRIDGE__TERMINOLOGY__BASE_URL=https://tx.example.org/r4
 FERROBRIDGE__TERMINOLOGY__WIRE_VERSION=r4
 FERROBRIDGE__CDM__URL_FILE=/run/secrets/cdm_url
 ```
+
+The CDR takes basic authentication, as above, or a token the bridge obtains
+with the OAuth 2.0 client credentials grant: leave the two basic variables
+unset and set the `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__` variables
+([`[cdr.credentials.oauth]`](configuration.md#cdrcredentialsoauth)), with the
+client secret in a compose secret of your own.
 
 Every credential is reachable through a `_file` sibling read once at boot, and
 that is what the compose secrets are for: a secret mounts at

@@ -22,7 +22,6 @@ use http::Request;
 use http::StatusCode;
 use http::header;
 use jsonwebtoken::Algorithm;
-use openehr_its::rest::client::Credentials;
 use wiremock::Mock;
 use wiremock::MockServer;
 use wiremock::ResponseTemplate;
@@ -51,8 +50,13 @@ use crate::facade::settings;
 use crate::facade::stub::mount_ehr;
 use crate::facade::stub::mount_read;
 
-/// The bearer credential the bridge is configured to reach the CDR with.
+/// The basic authentication password the bridge is configured to reach the
+/// CDR with, as user `bridge`.
 const BRIDGE_CREDENTIAL: &str = "synthetic-bridge-credential";
+
+/// The `Authorization` value [`BRIDGE_CREDENTIAL`] travels as: RFC 7617 §2,
+/// base64 of `bridge:synthetic-bridge-credential`.
+const BRIDGE_AUTHORIZATION: &str = "Basic YnJpZGdlOnN5bnRoZXRpYy1icmlkZ2UtY3JlZGVudGlhbA==";
 
 /// Returns a harness whose facade reaches its CDR with [`BRIDGE_CREDENTIAL`]
 /// and answers search as the fixture declarations state.
@@ -73,8 +77,7 @@ async fn credentialed() -> Result<Harness, Box<dyn StdError>> {
     let templates = programs::fetch_templates(&set, &client(&cdr)).await?;
     let compiled = programs::compile_set(&set, &templates)?;
     let bridge = CdrClient::new(
-        &CdrConfig::new(format!("{}/", cdr.uri()).parse()?)
-            .with_credentials(Credentials::bearer(BRIDGE_CREDENTIAL)),
+        &CdrConfig::new(format!("{}/", cdr.uri()).parse()?).with_basic("bridge", BRIDGE_CREDENTIAL),
     )?;
     let store = Arc::new(MemoryStore::new());
     let built = Facade::new(compiled, handle(&store), bridge, settings());
@@ -122,10 +125,9 @@ fn assert_bridge_credential_only(
             "no {wanted} reached the CDR: {calls:?}"
         );
     }
-    let bridge = format!("Bearer {BRIDGE_CREDENTIAL}");
     for (call, credential) in calls {
         assert_eq!(
-            Some(bridge.as_str()),
+            Some(BRIDGE_AUTHORIZATION),
             credential.as_deref(),
             "{call} carries the bridge's credential"
         );

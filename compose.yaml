@@ -19,7 +19,8 @@
 # your shell or in a .env file beside this one:
 #
 #   FERROBRIDGE__CDR__BASE_URL=https://cdr.example.org/openehr/v1
-#   FERROBRIDGE__CDR__CREDENTIALS__BEARER_TOKEN_FILE=/run/secrets/cdr_bearer_token
+#   FERROBRIDGE__CDR__CREDENTIALS__USER=ferrobridge
+#   FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE=/run/secrets/cdr_password
 #   FERROBRIDGE__TERMINOLOGY__BASE_URL=https://tx.example.org/r4
 #   FERROBRIDGE__CDM__URL_FILE=/run/secrets/cdm_url
 #
@@ -36,7 +37,7 @@
 #   mkdir -p secrets
 #   printf 'postgresql://ferrobridge:%s@cdm:5432/omop?sslmode=disable' "$PASSWORD" > secrets/cdm_url
 #   printf '%s' "$PASSWORD" > secrets/cdm_password
-#   : > secrets/cdr_bearer_token
+#   printf '%s' "$CDR_PASSWORD" > secrets/cdr_password
 #   printf '%s' "$CLIENT_SECRET" > secrets/viewer_oidc_client_secret
 #
 # PORTS. The published port binds the loopback interface by default. A
@@ -79,7 +80,13 @@ services:
       # unconfigured lane off: an empty base URL would be a boot error, an
       # absent one is a lane the server never starts.
       FERROBRIDGE__CDR__BASE_URL:
-      FERROBRIDGE__CDR__CREDENTIALS__BEARER_TOKEN_FILE:
+      FERROBRIDGE__CDR__CREDENTIALS__USER:
+      FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE:
+      FERROBRIDGE__CDR__CREDENTIALS__OAUTH__ISSUER:
+      FERROBRIDGE__CDR__CREDENTIALS__OAUTH__TOKEN_ENDPOINT:
+      FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_ID:
+      FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE:
+      FERROBRIDGE__CDR__CREDENTIALS__OAUTH__AUDIENCE:
       FERROBRIDGE__TERMINOLOGY__BASE_URL:
       FERROBRIDGE__TERMINOLOGY__WIRE_VERSION:
       FERROBRIDGE__CDM__URL_FILE:
@@ -100,7 +107,7 @@ services:
       FERROBRIDGE__USAGE_REPORT__STATE_DIR: /home/nonroot/state
     secrets:
       - cdm_url
-      - cdr_bearer_token
+      - cdr_password
     # The server writes two things, each to its own volume: the usage report's
     # state under the image's home directory (owned by its runtime user, uid
     # 65532, so a fresh named volume there is writable), and the console's
@@ -285,17 +292,16 @@ secrets:
   # included. Read once at boot and never logged.
   cdm_url:
     file: ${FERROBRIDGE_CDM_URL_FILE:-./secrets/cdm_url}
-  # The CDR credential, for a CDR that takes an RFC 6750 bearer token. For RFC
-  # 7617 basic authentication set FERROBRIDGE__CDR__CREDENTIALS__USER and point
-  # FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE at a secret of your own. For
-  # a token the bridge obtains itself with the OAuth 2.0 client credentials
-  # grant, leave FERROBRIDGE__CDR__CREDENTIALS__BEARER_TOKEN_FILE unset, set
+  # The CDR password of RFC 7617 basic authentication, mounted at
+  # /run/secrets/cdr_password: set FERROBRIDGE__CDR__CREDENTIALS__USER and
+  # point FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE at it. The bridge takes
+  # one other mode: a token it obtains itself with the OAuth 2.0 client
+  # credentials grant. For that, leave both basic variables unset, set
   # FERROBRIDGE__CDR__CREDENTIALS__OAUTH__ISSUER (or __TOKEN_ENDPOINT) and
-  # __CLIENT_ID, and point
-  # FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE at a secret of
-  # your own.
-  cdr_bearer_token:
-    file: ${FERROBRIDGE_CDR_BEARER_TOKEN_FILE:-./secrets/cdr_bearer_token}
+  # __CLIENT_ID, add a secret of your own beside this one, and point
+  # FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE at it.
+  cdr_password:
+    file: ${FERROBRIDGE_CDR_PASSWORD_FILE:-./secrets/cdr_password}
   # The password the CDM database is created with, read by the official image.
   cdm_password:
     file: ${FERROBRIDGE_CDM_PASSWORD_FILE:-./secrets/cdm_password}

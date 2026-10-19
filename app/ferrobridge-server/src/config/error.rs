@@ -140,14 +140,9 @@ pub enum Error {
         /// The value it holds.
         value: String,
     },
-    /// A credentials section names both a bearer token and a user.
-    #[error("{section} names both a bearer token and a user; set one scheme")]
-    Scheme {
-        /// The credentials section.
-        section: String,
-    },
-    /// A credentials section names the OAuth grant beside a static scheme.
-    #[error("{section} names the oauth grant beside a bearer token or a user; set one scheme")]
+    /// A credentials section names the OAuth grant beside basic
+    /// authentication.
+    #[error("{section} names the oauth grant beside a user; set one scheme")]
     OAuthScheme {
         /// The credentials section.
         section: String,

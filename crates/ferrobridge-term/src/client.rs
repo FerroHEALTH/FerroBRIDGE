@@ -150,7 +150,6 @@ impl Client {
     fn authorize(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         match self.config.credentials.as_ref() {
             None => request,
-            Some(Credentials::Bearer(token)) => request.bearer_auth(token.expose_secret()),
             Some(Credentials::Basic { user, password }) => {
                 request.basic_auth(user, Some(password.expose_secret()))
             }

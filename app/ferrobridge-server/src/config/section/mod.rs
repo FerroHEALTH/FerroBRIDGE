@@ -535,11 +535,12 @@ impl Default for Retry {
     }
 }
 
-/// The credentials one upstream expects: the static schemes every upstream
-/// takes, and the token grant `Grant` names for the lanes that take one.
+/// The credentials one upstream expects: RFC 7617 basic authentication, which
+/// every upstream takes, and the token grant `Grant` names for the lanes that
+/// take one.
 ///
 /// Every secret is reachable inline or through its `_file` sibling; setting
-/// both is a boot error, and so is a static scheme beside `oauth`. The CDR
+/// both is a boot error, and so is a user beside `oauth`. The CDR
 /// takes an [`OAuthClient`]; the terminology lane takes [`NoGrant`], so an
 /// `oauth` table under it is refused when the file is read. One shape serves
 /// both because `deny_unknown_fields` cannot be combined with
@@ -547,10 +548,6 @@ impl Default for Retry {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Credentials<Grant> {
-    /// An RFC 6750 bearer token.
-    pub bearer_token: Option<Secret>,
-    /// A file holding the bearer token, read at boot.
-    pub bearer_token_file: Option<PathBuf>,
     /// The user name of RFC 7617 basic authentication.
     pub user: Option<String>,
     /// A file holding the user name, read at boot.
@@ -567,8 +564,6 @@ pub struct Credentials<Grant> {
 impl<Grant> Default for Credentials<Grant> {
     fn default() -> Self {
         Self {
-            bearer_token: None,
-            bearer_token_file: None,
             user: None,
             user_file: None,
             password: None,

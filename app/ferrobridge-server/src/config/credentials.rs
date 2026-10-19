@@ -94,29 +94,20 @@ pub(super) fn is_scope(scope: &str) -> bool {
     })
 }
 
-/// The authentication scheme a credentials section resolves to.
-pub(super) enum Scheme {
-    /// An RFC 6750 bearer token.
-    Bearer(SecretString),
-    /// RFC 7617 basic authentication.
-    Basic {
-        /// The user name, which is not a secret.
-        user: String,
-        /// The password.
-        password: SecretString,
-    },
+/// The RFC 7617 basic authentication a credentials section resolves to.
+pub(super) struct Basic {
+    /// The user name, which is not a secret.
+    pub(super) user: String,
+    /// The password.
+    pub(super) password: SecretString,
 }
 
-/// Returns the scheme `credentials` describes, or `None` when it names none.
+/// Returns the basic authentication `credentials` describes, or `None` when
+/// it names none.
 pub(super) fn resolve_credentials<Grant>(
     section: &str,
     credentials: &Credentials<Grant>,
-) -> Result<Option<Scheme>, Error> {
-    let token = secret(
-        &format!("{section}.bearer_token"),
-        credentials.bearer_token.as_ref(),
-        credentials.bearer_token_file.as_deref(),
-    )?;
+) -> Result<Option<Basic>, Error> {
     let password = secret(
         &format!("{section}.password"),
         credentials.password.as_ref(),
@@ -129,19 +120,15 @@ pub(super) fn resolve_credentials<Grant>(
         credentials.user_file.as_deref(),
     )?
     .map(|user| user.expose_secret().to_owned());
-    match (token, user, password) {
-        (Some(_), Some(_), _) | (Some(_), None, Some(_)) => Err(Error::Scheme {
-            section: section.to_owned(),
-        }),
-        (Some(token), None, None) => Ok(Some(Scheme::Bearer(token))),
-        (None, Some(user), Some(password)) => Ok(Some(Scheme::Basic { user, password })),
-        (None, Some(_), None) => Err(Error::Missing {
+    match (user, password) {
+        (Some(user), Some(password)) => Ok(Some(Basic { user, password })),
+        (Some(_), None) => Err(Error::Missing {
             key: format!("{section}.password"),
         }),
-        (None, None, Some(_)) => Err(Error::Missing {
+        (None, Some(_)) => Err(Error::Missing {
             key: format!("{section}.user"),
         }),
-        (None, None, None) => Ok(None),
+        (None, None) => Ok(None),
     }
 }
 
