@@ -13,6 +13,12 @@
 # placeholder (docs/VERSIONS.md).
 #
 #   crate-version-guard.sh <base-ref> [head-ref]
+#   crate-version-guard.sh --self-test
+#
+# The diff runs from the merge base of the base ref and the head, never from
+# the base ref itself, so a crate change the base gained after the head forked
+# is not counted against the head (#969). CI passes the current tip of the
+# pull request's target branch as the base ref.
 #
 # The head ref may be the literal WORKTREE, which compares the base with the
 # tree as it stands rather than with a commit. That is what the pre-commit hook
@@ -23,12 +29,103 @@
 # content changed also moved its version, with the root requirement and
 # Cargo.lock following. Exit 1 otherwise. The `no-crate-bump` pull-request label
 # is the CI escape for a diff that provably does not alter packaged bytes; this
-# script does not read labels.
+# script does not read labels. `--self-test` runs the guard over synthetic
+# histories in a scratch repository.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-base="${1:?usage: crate-version-guard.sh <base-ref> [head-ref|WORKTREE]}"
+# Each case builds a one-crate workspace in a scratch repository, forks a
+# branch from it, moves main on, and runs a copy of this script there.
+self_test() {
+  local guard tmp failures=0
+  guard="$PWD/scripts/checks/crate-version-guard.sh"
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' RETURN
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+  t_git() { git -C "$tmp/repo" -c user.name=self-test -c user.email=self-test@example.invalid -c commit.gpgsign=false "$@"; }
+  set_version() {
+    printf '[package]\nname = "demo"\nversion = "%s"\n' "$1" > "$tmp/repo/crates/demo/Cargo.toml"
+    printf '[[package]]\nname = "demo"\nversion = "%s"\n' "$1" > "$tmp/repo/Cargo.lock"
+  }
+  expect() {
+    local want="$1" label="$2" got=0
+    shift 2
+    (cd "$tmp/repo" && bash scripts/checks/crate-version-guard.sh "$@" > /dev/null 2>&1) || got=1
+    if [[ "$got" -ne "$want" ]]; then
+      echo "crate-version-guard: self-test: $label: exit $got, wanted $want" >&2
+      failures=$((failures + 1))
+    fi
+  }
+
+  mkdir -p "$tmp/repo/crates/demo/src" "$tmp/repo/scripts/checks" "$tmp/repo/docs"
+  git init -q -b main "$tmp/repo"
+  cp "$guard" "$tmp/repo/scripts/checks/"
+  printf '[workspace]\nmembers = ["crates/demo"]\n' > "$tmp/repo/Cargo.toml"
+  echo 'pub fn a() {}' > "$tmp/repo/crates/demo/src/lib.rs"
+  set_version 0.1.0
+  t_git add -A
+  t_git commit -qm base
+  t_git branch pr
+
+  # Main gains a bumped crate change after the branch forked.
+  echo 'pub fn b() {}' >> "$tmp/repo/crates/demo/src/lib.rs"
+  set_version 0.1.1
+  t_git commit -qam 'main moves'
+
+  # The #963 case: the branch touches no crate, and CI checks out the merge of
+  # the branch into main while naming the branch head.
+  t_git checkout -q pr
+  echo 'notes' > "$tmp/repo/docs/notes.md"
+  t_git add -A
+  t_git commit -qm 'docs only'
+  expect 0 "the branch head alone" main pr
+  expect 0 "the same, against the worktree" main WORKTREE
+  t_git checkout -q --detach main
+  t_git merge -q --no-ff -m 'pull request merge' pr > /dev/null 2>&1
+  expect 0 "a crate change main gained after the fork" main pr
+  t_git checkout -q pr
+
+  # The branch with main merged in, as watch-prs merges it, before and after
+  # the merge commit.
+  t_git merge -q --no-commit --no-ff main > /dev/null 2>&1
+  expect 0 "an uncommitted merge of main" main WORKTREE
+  t_git commit -qm merge
+  expect 0 "a committed merge of main" main HEAD
+
+  # The guard still bites: the branch changes the crate without a bump.
+  echo 'pub fn c() {}' >> "$tmp/repo/crates/demo/src/lib.rs"
+  t_git commit -qam 'unbumped change'
+  expect 1 "a crate change without a bump" main HEAD
+  set_version 0.1.2
+  t_git commit -qam bump
+  expect 0 "a crate change with its bump" main HEAD
+
+  if [[ "$failures" -ne 0 ]]; then
+    echo "crate-version-guard: self-test: $failures case(s) failed" >&2
+    return 1
+  fi
+  echo "crate-version-guard: self-test passed"
+}
+
+if [[ "${1:-}" = "--self-test" ]]; then
+  self_test
+  exit
+fi
+
+base_ref="${1:?usage: crate-version-guard.sh <base-ref> [head-ref|WORKTREE] | --self-test}"
 head="${2:-HEAD}"
+
+# During an uncommitted merge the worktree already holds MERGE_HEAD, so the
+# merge base is taken against both parents.
+head_commits=("$head")
+if [[ "$head" = "WORKTREE" ]]; then
+  head_commits=(HEAD)
+  if merge_head="$(git rev-parse -q --verify MERGE_HEAD)"; then head_commits+=("$merge_head"); fi
+fi
+base="$(git merge-base "$base_ref" "${head_commits[@]}")" || {
+  echo "::error::crate-version-guard: no merge base between $base_ref and ${head_commits[*]}." >&2
+  exit 1
+}
 
 # `git diff <base> -- …` with no second ref reads the working tree, which is
 # the WORKTREE head; everything else names two commits.

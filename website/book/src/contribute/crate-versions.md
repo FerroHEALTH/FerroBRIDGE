@@ -35,8 +35,8 @@ A half-done bump fails the same way a missing one does.
 
 | Where | What it does |
 |---|---|
-| `scripts/checks/crate-version-guard.sh` | compares a base ref with a head ref, and fails naming the member whose packaged content moved without its version |
-| the `crate-version-guard` CI job | runs that script over the pull request's base and head; it is one of the jobs the `conclusion` check reads |
+| `scripts/checks/crate-version-guard.sh` | compares a head ref with its merge base with a base ref, and fails naming the member whose packaged content moved without its version |
+| the `crate-version-guard` CI job | runs that script over the pull request's target branch as fetched now and its head; it is one of the jobs the `conclusion` check reads |
 | `.claude/hooks/crate_version_bump_guard.sh` | runs the same script before a `git commit` or a `git push`, against the merge base with `origin/main`, and refuses the command with the findings |
 
 The hook checks a commit against the working tree, because the change it is

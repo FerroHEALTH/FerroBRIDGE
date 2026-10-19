@@ -273,6 +273,9 @@ jobs:
       # The weekly freshness read's own reader of the Chrome for Testing
       # feed, over fixtures and with no network.
       - run: bash scripts/checks/pin-freshness.sh --self-test
+      # The crate bump guard over synthetic histories, on every run, because
+      # its own job runs on pull requests only and skips under its label.
+      - run: bash scripts/checks/crate-version-guard.sh --self-test
 
   # The profile validator's package set (#435), fetched at build time and
   # never committed (docs/specs/fhir-packages/hl7.fhir.eu.eps#1.0.0-ballot/
@@ -1175,11 +1178,14 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      # The base is the target branch as fetched now, never the event's
+      # `base.sha`, and the guard diffs from its merge base with the head, so a
+      # crate change main gained after the fork is not counted (#969).
       - name: Packaged crate content moved with its version
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
-        run: bash scripts/checks/crate-version-guard.sh "$BASE" "$HEAD"
+        run: bash scripts/checks/crate-version-guard.sh "origin/$BASE_REF" "$HEAD"
 
   # Every publishable crate packages and verifies as crates.io would build it,
   # so a release's crates leg finds no surprise. No cache: the dry run checks

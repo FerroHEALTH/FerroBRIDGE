@@ -201,6 +201,11 @@ crates on crates.io.
 
 ### Fixed
 
+- `scripts/checks/crate-version-guard.sh` diffs from the merge base of its base
+  ref and the head, and the CI job passes the target branch as fetched now, so
+  a crate change `main` gained after a pull request forked is no longer counted
+  against that pull request (#969). `--self-test` reproduces that case over a
+  scratch repository, and the CI `versions` job runs it.
 - `scripts/gh/watch-prs.sh` judges only the newest run of each workflow on a
   pull request's head, so the failed jobs of a run a later push superseded or
   cancelled no longer stop it as red (#955). `--self-test` checks the
