@@ -15,9 +15,11 @@
 # and link references are kept byte for byte.
 #
 # It refuses (exit 1, nothing written) a branch that changed anything outside
-# [Unreleased], such as a release bump, and an [Unreleased] section whose
-# layout it cannot read back exactly. No specification governs this: our own
-# design over the Keep a Changelog 1.1.0 layout.
+# [Unreleased], such as a release bump, and an [Unreleased] section whose text
+# lines it cannot read back in order, naming the first such line. Blank lines
+# are layout: one between bullets is kept, and a heading gets one above it.
+# No specification governs this: our own design over the Keep a Changelog
+# 1.1.0 layout.
 #
 # Usage:
 #   scripts/gh/changelog-merge.sh BASE BRANCH MAIN   the merged file on stdout
@@ -57,7 +59,7 @@ sub split_file {
 }
 
 # The body as ([heading, [entry, ...]], ...), an entry being one bullet
-# with its continuation lines, blank lines inside it kept.
+# with its continuation lines and the blank lines inside and after it.
 sub parse_body {
   my ($body) = @_;
   my @sections;
@@ -75,7 +77,7 @@ sub parse_body {
       push(@{ $sections[-1][1] }, $entry);
     } elsif ($line eq "") {
       my $next = $i + 1 < @lines ? $lines[$i + 1] : "";
-      push(@$entry, $line) if $entry && $next =~ /^  /;
+      push(@$entry, $line) if $entry && $next =~ /^(  |- )/;
     } elsif ($line =~ /^  / && $entry) {
       push(@$entry, $line);
     } else {
@@ -89,14 +91,41 @@ sub render_body {
   my ($sections) = @_;
   my $out = "";
   for my $s (@$sections) {
-    next unless @{ $s->[1] };
+    my @entries = @{ $s->[1] };
+    next unless @entries;
     $out .= "\n$s->[0]\n\n";
-    $out .= join("\n", @$_) . "\n" for @{ $s->[1] };
+    for my $i (0 .. $#entries) {
+      my @lines = @{ $entries[$i] };
+      if ($i == $#entries) {
+        pop(@lines) while @lines > 1 && $lines[-1] eq "";
+      }
+      $out .= join("\n", @lines) . "\n";
+    }
   }
   return $out . "\n";
 }
 
-sub key_of { return join("\n", @{ $_[0] }); }
+# An entry by its text, the blank lines after it left out.
+sub key_of {
+  my @lines = @{ $_[0] };
+  pop(@lines) while @lines > 1 && $lines[-1] eq "";
+  return join("\n", @lines);
+}
+
+# The first text line a reading loses, reorders or invents, or the empty
+# string when the two carry the same text lines in the same order. Blank
+# lines are layout, which the rendering normalizes.
+sub first_difference {
+  my ($want, $got) = @_;
+  my @w = grep { $_ ne "" } split(/\n/, $want);
+  my @g = grep { $_ ne "" } split(/\n/, $got);
+  for my $i (0 .. ($#w > $#g ? $#w : $#g)) {
+    my $a = $i <= $#w ? $w[$i] : "(end)";
+    my $b = $i <= $#g ? $g[$i] : "(end)";
+    return sprintf("text line %d reads \"%s\", rendered as \"%s\"", $i + 1, $a, $b) if $a ne $b;
+  }
+  return "";
+}
 
 sub entry_set {
   my ($sections) = @_;
@@ -121,8 +150,11 @@ die "the branch changed a released section or a link reference\n" if $ours_rest 
 my $base = parse_body($base_body);
 my $ours = parse_body($ours_body);
 my $main = parse_body($main_body);
-die "main'"'"'s [Unreleased] does not read back exactly\n"
-  if render_body($main) ne $main_body && !($main_body eq "\n" && !@$main);
+for my $side (["main", $main, $main_body], ["the branch", $ours, $ours_body], ["the merge base", $base, $base_body]) {
+  my ($name, $parsed, $body) = @$side;
+  my $lost = first_difference($body, render_body($parsed));
+  die "$name" . "'"'"'s [Unreleased] does not read back: $lost\n" if $lost ne "";
+}
 
 my $base_set = entry_set($base);
 my $ours_set = entry_set($ours);
@@ -133,13 +165,22 @@ for my $s (@$main) {
 }
 
 # The bullets the branch added, each after its predecessor on the branch.
+# The subsections of main keep their order; a heading main lacks goes before
+# the first subsection of main that the Keep a Changelog order puts after it.
 my @order = ("### Added", "### Changed", "### Deprecated", "### Removed", "### Fixed", "### Security");
+my %rank;
+@rank{@order} = (0 .. $#order);
+sub rank_of { return exists $rank{ $_[0] } ? $rank{ $_[0] } : scalar(@order); }
 for my $s (@$ours) {
   my ($heading, $entries) = @$s;
   my ($target) = grep { $_->[0] eq $heading } @$main;
   unless ($target) {
     $target = [$heading, []];
-    push(@$main, $target);
+    my $at = scalar(@$main);
+    for my $i (reverse 0 .. $#{$main}) {
+      $at = $i if rank_of($main->[$i][0]) > rank_of($heading);
+    }
+    splice(@$main, $at, 0, $target);
   }
   my $previous;
   for my $e (@$entries) {
@@ -158,11 +199,7 @@ for my $s (@$ours) {
     $previous = $key;
   }
 }
-my %rank;
-@rank{@order} = (0 .. $#order);
-my @sorted = map { $_->[1] } sort { $a->[0] <=> $b->[0] }
-  map { [ exists $rank{ $main->[$_][0] } ? $rank{ $main->[$_][0] } : @order + $_, $main->[$_] ] } 0 .. $#{$main};
-print $main_pre, render_body(\@sorted), $main_rest;
+print $main_pre, render_body($main), $main_rest;
 ' "$@"
 }
 
@@ -235,6 +272,36 @@ self_test() {
   printf '%s\nA stray paragraph.\n\n%s' "$head_text" "$links" >"$work/odd"
   if engine merge "$work/base" "$work/base" "$work/odd" >/dev/null 2>&1; then
     echo "self-test: an [Unreleased] it cannot read was merged instead of refused" >&2
+    failures=$((failures + 1))
+  fi
+
+  # #942, from its real merge base, head and main: main's [Unreleased] keeps
+  # a blank line between two bullets, which a reading that dropped it refused.
+  local data
+  data="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/testdata/changelog-merge"
+  if ! engine merge "$data/942-base.md" "$data/942-branch.md" "$data/942-main.md" >"$work/got942" ||
+    ! cmp -s "$work/got942" "$data/942-merged.md"; then
+    echo "self-test: the #942 merge did not give 942-merged.md" >&2
+    diff "$data/942-merged.md" "$work/got942" >&2 || true
+    failures=$((failures + 1))
+  fi
+
+  # A heading with no blank line above it reads, and renders with one.
+  printf '%s\n### Added\n\n%s\n### Fixed\n\n- A fix.\n\n## [0.0.8] - 2026-10-18\n\n### Added\n\n- Old.\n\n%s' \
+    "$head_text" "$e1" "$links" >"$work/tight"
+  printf '%s\n### Added\n\n%s\n\n### Fixed\n\n- A fix.\n\n## [0.0.8] - 2026-10-18\n\n### Added\n\n- Old.\n\n%s' \
+    "$head_text" "$e1" "$links" >"$work/tight-want"
+  if ! engine merge "$work/tight" "$work/tight" "$work/tight" >"$work/tight-got" ||
+    ! cmp -s "$work/tight-got" "$work/tight-want"; then
+    echo "self-test: a heading with no blank line above it did not read" >&2
+    failures=$((failures + 1))
+  fi
+
+  # A heading with no bullet would be lost: refused, naming the line.
+  printf '%s\n### Removed\n\n%s' "$head_text" "$links" >"$work/empty"
+  if engine merge "$work/base" "$work/base" "$work/empty" >/dev/null 2>"$work/empty-err" ||
+    ! grep -q 'reads "### Removed"' "$work/empty-err"; then
+    echo "self-test: an empty subsection was not refused by name" >&2
     failures=$((failures + 1))
   fi
 

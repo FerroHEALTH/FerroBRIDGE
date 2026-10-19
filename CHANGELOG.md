@@ -149,6 +149,11 @@ crates on crates.io.
 
 ### Fixed
 
+- `scripts/gh/watch-prs.sh` no longer stops on a changelog conflict whose
+  `[Unreleased]` keeps a blank line between two bullets or a heading with no
+  blank line above it (#946). The entry merge keeps the blank line between
+  bullets, renders a heading with one above it, and refuses only when the
+  text lines would not read back in order, naming the first such line.
 - A pull request merged after a release no longer files its changelog
   entries under that release (#913). `scripts/gh/watch-prs.sh` merges
   `CHANGELOG.md` by entry through the new `scripts/gh/changelog-merge.sh`,
