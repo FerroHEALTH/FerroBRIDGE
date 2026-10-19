@@ -49,7 +49,10 @@ Twelve workflows:
   `CHANGELOG.md` section, creates the release as a draft, calls the two lanes
   below, and publishes only after the expected asset set is complete. Its
   `crates` leg uploads the library crates to crates.io after the release is
-  public. The checklist a cut follows is `docs/release.md` (#63).
+  public. Its `plan` job refuses a tag whose milestone still holds an open
+  item, and its last job closes the milestone once every leg succeeded
+  (`scripts/release/milestone.sh`). The checklist a cut follows is
+  `docs/release.md` (#63).
 - `.github/workflows/release-build.yml`: the reusable per-target binary lane
   (#23). `cargo auditable` build with no cache, the tarball and its checksum,
   a CycloneDX source SBOM and a syft build SBOM, three attestations, and the
