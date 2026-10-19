@@ -245,17 +245,25 @@ before a real cut.
    `scripts/checks/versions.sh` fails on any file left behind, and the `plan`
    job checks the first three against the tag and refuses the release when one
    of them is missing.
-3. **The changelog names the release.** `[Unreleased]` becomes the version and
+3. **The release pages name the release.** `README.md` (the latest release,
+   its date, what it shipped and the image tag), the landing page
+   `website/landing/index.html` (the two meta descriptions, the hero status
+   and the status panel) and the book's `website/book/src/evaluate/build-order.md`
+   (a row under Released, and the release gone from Next). The versions guard
+   compares each claim with the workspace version and the date of its
+   `CHANGELOG.md` section, so it fails until the pages and the changelog move
+   with the version.
+4. **The changelog names the release.** `[Unreleased]` becomes the version and
    the date, with a fresh empty `[Unreleased]` above it and a new link
    reference. What sits under the version heading is what the release notes
    say, so read it as the release notes before you tag.
-4. **The gates pass on the release commit.** The tier-1 set is
+5. **The gates pass on the release commit.** The tier-1 set is
    `zizmor --min-severity=low .github/`, `actionlint`, `shellcheck
    --severity=style` over every tracked shell program, `hadolint` over every
    tracked Dockerfile, `scripts/checks/comment-style.sh --all`,
    `scripts/checks/versions.sh`, and `mdbook build website/book`, beside the
    Rust lanes (`docs/ci-cd.md`).
-5. **A pre-release has rehearsed any change to the lane itself.** Tag
+6. **A pre-release has rehearsed any change to the lane itself.** Tag
    `vX.Y.Z-rc.1`, watch the whole graph run, and read what it produced. A
    pre-release takes the same path and is never marked latest.
 
