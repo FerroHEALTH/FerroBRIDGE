@@ -11,6 +11,7 @@
 
 mod extensions;
 mod methods;
+mod party;
 mod paths;
 mod program;
 mod sub_contexts;

@@ -28,6 +28,7 @@ use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::paths::FlatId;
 
 use crate::resolve::program::binding::ModelBinding;
+use crate::resolve::program::binding::PartyClass;
 use crate::resolve::program::binding::ProfileBinding;
 use crate::resolve::program::binding::ResourceType;
 use crate::resolve::program::binding::TemplateBinding;
@@ -56,6 +57,7 @@ pub struct Program {
     mappings: Vec<Mapping>,
     warnings: Vec<Diagnostic>,
     root_axes: Vec<FlatId>,
+    party: Option<PartyClass>,
 }
 
 /// Everything a program carries, as the compiler assembles it.
@@ -98,6 +100,7 @@ impl Program {
             mappings: parts.mappings,
             warnings: Vec::new(),
             root_axes: Vec::new(),
+            party: None,
         }
     }
 
@@ -121,6 +124,23 @@ impl Program {
     #[must_use]
     pub fn root_axes(&self) -> &[FlatId] {
         &self.root_axes
+    }
+
+    /// Returns this program as a party context rooted at `party`.
+    #[must_use]
+    pub(crate) const fn with_party(mut self, party: Option<PartyClass>) -> Self {
+        self.party = party;
+        self
+    }
+
+    /// Returns the demographic class the program is rooted at, when it
+    /// compiled a party context, and `None` for a composition context.
+    ///
+    /// The class is the RM type of the operational template's root. No
+    /// specification governs a party context: our own design.
+    #[must_use]
+    pub const fn party(&self) -> Option<PartyClass> {
+        self.party
     }
 
     /// Returns this program with the warnings its compilation raised.
@@ -262,6 +282,9 @@ impl fmt::Display for Program {
         writeln!(f, "  template {}", self.template)?;
         writeln!(f, "  resource {}", self.resource)?;
         writeln!(f, "  start {}", self.start)?;
+        if let Some(party) = self.party {
+            writeln!(f, "  party {party}")?;
+        }
         if !self.root_axes.is_empty() {
             let axes: Vec<&str> = self.root_axes.iter().map(FlatId::as_str).collect();
             writeln!(f, "  root axes [{}]", axes.join(", "))?;

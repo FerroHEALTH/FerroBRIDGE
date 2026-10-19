@@ -28,6 +28,7 @@ use crate::resolve::program::target::OpenehrTarget;
 
 use crate::resolve::compile::Compiler;
 use crate::resolve::compile::Scope;
+use crate::resolve::compile::party;
 
 impl<'a> Compiler<'a> {
     /// Compiles the openEHR side of a `with`.
@@ -100,6 +101,15 @@ impl<'a> Compiler<'a> {
             ));
             return None;
         }
+        let site = party::Site {
+            file,
+            owner,
+            position: written.position(),
+            path,
+        };
+        if self.party_refuses_field(&site, &resolved) {
+            return None;
+        }
         match self.locate(&resolved) {
             Ok((node, tail, leaf)) => {
                 let occurrences = match occurrences(self.template, node) {
@@ -169,10 +179,21 @@ impl<'a> Compiler<'a> {
         match Variable::from_str(name) {
             Ok(Variable::Archetype) => Some(scope.archetype.clone()),
             Ok(Variable::OpenehrRoot) => Some(scope.openehr.clone()),
-            Ok(Variable::Composition) => Some(RmPath {
-                absolute: true,
-                segments: Vec::new(),
-            }),
+            Ok(Variable::Composition) => {
+                let site = party::Site {
+                    file,
+                    owner,
+                    position: written.position(),
+                    path,
+                };
+                if self.party_refuses_composition(&site, written.value()) {
+                    return None;
+                }
+                Some(RmPath {
+                    absolute: true,
+                    segments: Vec::new(),
+                })
+            }
             // NOTE: `$reference` "indicates that there is no direct mapping
             // to openEHR" (`basics/Variables.adoc`), so the mapping
             // legitimately has no openEHR side rather than a broken one.

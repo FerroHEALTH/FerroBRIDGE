@@ -18,6 +18,7 @@ use crate::engine::lens::LensError;
 use crate::engine::rm::RmError;
 use crate::engine::seam::ReferenceError;
 use crate::engine::terminology::TerminologyError;
+use crate::resolve::program::binding::PartyClass;
 use crate::resolve::program::hierarchy::Create;
 
 use crate::tree::error::ReadError;
@@ -36,6 +37,17 @@ pub enum EngineError {
     NotApplicable {
         /// The context mapping the program compiled from.
         context: String,
+    },
+    /// A party program reached an entry point that runs over a composition.
+    #[error(
+        "the context {context} is a party context rooted at a {party}, and this entry point runs \
+         over a composition"
+    )]
+    PartyProgram {
+        /// The context mapping the program compiled from.
+        context: String,
+        /// The demographic class the program is rooted at.
+        party: PartyClass,
     },
     /// A `manual` path writes a `$context` member and the run carries no call
     /// context.

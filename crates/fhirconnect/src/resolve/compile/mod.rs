@@ -23,6 +23,7 @@ pub mod hierarchy;
 pub mod mapping;
 pub mod method;
 pub mod openehr;
+pub mod party;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -47,6 +48,7 @@ use crate::resolve::extensions::diagnostic;
 use crate::resolve::program::Program;
 use crate::resolve::program::ProgramParts;
 use crate::resolve::program::binding::ModelBinding;
+use crate::resolve::program::binding::PartyClass;
 use crate::resolve::program::binding::ResourceType;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
@@ -192,6 +194,9 @@ struct Compiler<'a> {
     entered: Vec<&'a ContextMappingFile>,
     /// Every context a `slotContext` entered, in first-entry order.
     subs: Vec<&'a ContextMappingFile>,
+    /// The demographic class the template is rooted at, when the context is a
+    /// party context.
+    party: Option<PartyClass>,
 }
 
 impl<'a> Compiler<'a> {
@@ -214,6 +219,7 @@ impl<'a> Compiler<'a> {
             models: Vec::new(),
             entered: Vec::new(),
             subs: Vec::new(),
+            party: PartyClass::from_rm_type(template.root().rm_type()),
         }
     }
 
@@ -336,7 +342,8 @@ impl<'a> Compiler<'a> {
                 preprocessors,
                 mappings,
             })
-            .with_root_axes(root_axes),
+            .with_root_axes(root_axes)
+            .with_party(self.party),
         )
     }
 }

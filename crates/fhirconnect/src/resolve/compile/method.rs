@@ -34,6 +34,7 @@ use crate::resolve::compile::Scope;
 use crate::resolve::compile::Site;
 use crate::resolve::compile::fhir::root_expression;
 use crate::resolve::compile::header::archetype_of;
+use crate::resolve::compile::party;
 
 impl<'a> Compiler<'a> {
     /// Decides what a mapping method does beyond mapping its two paths.
@@ -99,13 +100,18 @@ impl<'a> Compiler<'a> {
                 mappings: self.mappings(&node.reference, &inner),
             };
         }
-        if let Some(ref slot) = method.slot_archetype {
+        if let Some(ref slot) = method.slot_archetype
+            && !(self.party.is_some() && slots_composition(method))
+        {
             return self.slot(file, slot, scope, &path.field("slotArchetype"));
         }
         if let Some(ref entered) = method.slot_context {
             return self.slot_context(file, entered, scope, &path.field("slotContext"));
         }
         if let Some(ref link) = method.link {
+            if self.party_refuses_link(file.file(), owner, method, path) {
+                return Method::Value;
+            }
             return Method::Link {
                 meaning: link.meaning.as_ref().map(|value| value.value().clone()),
                 link_type: link.link_type.as_ref().map(|value| value.value().clone()),
@@ -127,6 +133,9 @@ impl<'a> Compiler<'a> {
             };
         }
         if let Some(ref function) = method.participations_function {
+            if self.party_refuses_participation(file.file(), owner, method, path) {
+                return Method::Value;
+            }
             return Method::Participation {
                 function: function.value().clone(),
             };
@@ -413,6 +422,19 @@ impl<'a> Compiler<'a> {
         }
         let declaration = sub.context();
         let start = declaration.start.value();
+        let site = party::Site {
+            file: file.file(),
+            owner,
+            position: entered.position(),
+            path,
+        };
+        let slots = self
+            .set
+            .model(start)
+            .is_some_and(|model| model.mappings().iter().any(slots_composition));
+        if self.party_refuses_entry(&site, name, start, slots) {
+            return false;
+        }
         if declaration.scope() == ContextScope::Sub
             && let Some(model) = self.set.model(start)
             && let Some(composition) = model

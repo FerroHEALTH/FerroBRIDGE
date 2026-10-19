@@ -27,6 +27,20 @@ crates on crates.io.
 
 ### Added
 
+- FHIRconnect party contexts compile (#898). A context whose operational
+  template is rooted at a `PERSON`, `ORGANISATION` or `ROLE` is a party
+  context, read from the RM type of the template root, and `Program::party`
+  names the class. A party context refuses at load, each with a code of its
+  own: `$composition` (`fc-party-composition-variable`), a path naming a
+  composition attribute the defaults or `ctx/` set
+  (`fc-party-composition-field`), `participationsFunction`
+  (`fc-party-participation`), `link` (`fc-party-link`) and entering a context
+  whose `start` slots a composition (`fc-party-sub-context-composition`).
+  `to_openehr` and `to_fhir` refuse a party program with
+  `EngineError::PartyProgram` until the party build lands (#897). No
+  specification governs a party context: our own design. Breaking for a
+  consumer that matches `ResolveCode` or `EngineError` exhaustively: add the
+  new arms.
 - The ITS-REST 1.1.0 Demographic API, DEVELOPMENT, behind `[cdr] demographic`
   (off by default; #894). The Demographic OpenAPI document is vendored beside
   the other ITS-REST documents, its `x-status: DEVELOPMENT` checked, and a test

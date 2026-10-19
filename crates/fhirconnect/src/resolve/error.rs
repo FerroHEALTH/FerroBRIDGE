@@ -112,6 +112,20 @@ pub enum ResolveCode {
     /// The parent's operational template states no embedded template at the
     /// slot node, so a sub-context's `template.id` cannot be checked.
     SubContextTemplateUndecided,
+    /// A path in a party context opens with `$composition`, which names the
+    /// root composition, and a party context has none.
+    PartyCompositionVariable,
+    /// A path in a party context names a composition attribute the
+    /// composition defaults or the `ctx/` vocabulary set.
+    PartyCompositionField,
+    /// A party context carries a `participationsFunction`, and a party holds
+    /// no `PARTICIPATION` list.
+    PartyParticipation,
+    /// A party context carries a `link`.
+    PartyLink,
+    /// A party context enters a context whose `start` slots a composition
+    /// model.
+    PartySubContextComposition,
 }
 
 impl ResolveCode {
@@ -160,6 +174,11 @@ impl ResolveCode {
             Self::CyclicSubContext => "fc-cyclic-sub-context",
             Self::SubContextTemplateMismatch => "fc-sub-context-template-mismatch",
             Self::SubContextTemplateUndecided => "fc-sub-context-template-undecided",
+            Self::PartyCompositionVariable => "fc-party-composition-variable",
+            Self::PartyCompositionField => "fc-party-composition-field",
+            Self::PartyParticipation => "fc-party-participation",
+            Self::PartyLink => "fc-party-link",
+            Self::PartySubContextComposition => "fc-party-sub-context-composition",
         }
     }
 
@@ -208,6 +227,11 @@ impl ResolveCode {
             Self::CyclicSubContext,
             Self::SubContextTemplateMismatch,
             Self::SubContextTemplateUndecided,
+            Self::PartyCompositionVariable,
+            Self::PartyCompositionField,
+            Self::PartyParticipation,
+            Self::PartyLink,
+            Self::PartySubContextComposition,
         ]
     }
 }
