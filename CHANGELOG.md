@@ -23,6 +23,22 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Added
+
+- A FHIRconnect mapping with no `type` onto an `ELEMENT` whose value admits
+  several data types converts the `ELEMENT`'s own value, then runs its
+  `followedBy` children (#544), as FHIRconnect `FollowedBy.adoc` orders them
+  ("after the parent mapping method has been executed"). The compiler picks
+  the value alternative whose class lists the FHIR type earliest in
+  `resolve::derive::PAIRS`, the first in template order on a tie (our own
+  design), and the program carries it as `Derived::Value`; such a mapping was
+  an anchor that wrote nothing. The statutory insurance identifier of the
+  library's `versicherungsinformationen.v0` now round-trips in the KDS person
+  chain as a `DV_IDENTIFIER`, and the two `collected` mappings of
+  `specimen.v1` no longer warn `fc-anchor-without-children`. `Derived` gains
+  a variant, so a consumer that matches it exhaustively adds the arm.
+  `fhirconnect` 0.1.155.
+
 ## [0.0.10] - 2026-10-19
 
 The openEHR demographics release. The FHIR facade serves `Patient`,

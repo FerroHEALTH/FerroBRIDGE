@@ -155,7 +155,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 let Some(target) = mapping.fhir() else {
                     return Ok(());
                 };
-                let Some(openehr) = mapping.openehr() else {
+                let Some(openehr) = converted(mapping) else {
                     return Ok(());
                 };
                 let Some(view) = self.input_value(mapping, target, openehr, input)? else {
@@ -186,14 +186,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         .push(Warning::fallback(taken, self.locate(mapping, input)));
                 }
                 let value = self.identified(mapping, &view, produced.value, Shape::at(node))?;
-                self.put_openehr(mapping, binding, value);
+                self.put_openehr_at(openehr, binding, value);
                 Ok(())
             }
             Direction::OpenehrToFhir => {
                 let Some(target) = mapping.fhir() else {
                     return Ok(());
                 };
-                let Some(openehr) = mapping.openehr() else {
+                let Some(openehr) = converted(mapping) else {
                     return Ok(());
                 };
                 let positions = Self::positions_of(mapping, input, openehr)?;
@@ -293,7 +293,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 let kind = Self::kind(mapping, declared.target())?;
                 self.element_at(mapping, declared.target(), input, kind)
             }
-            Some(Derived::Element(_) | Derived::Anchor) | None => {
+            Some(Derived::Element(_) | Derived::Anchor | Derived::Value { .. }) | None => {
                 let kind = Self::kind(mapping, target)?;
                 self.element_at(mapping, target, input, kind)
             }
@@ -326,7 +326,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 mapping: String::from(mapping.name()),
                 element: String::from(target.resolved().leaf()),
             }),
-            Some(Derived::Element(_) | Derived::Anchor) | None => {
+            Some(Derived::Element(_) | Derived::Anchor | Derived::Value { .. }) | None => {
                 Ok((target, Self::kind(mapping, target)?))
             }
         }
@@ -356,5 +356,16 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let mut positions = rm_positions(mapping.name(), taken)?;
         positions.resize(depth, RmPosition::first());
         Ok(positions)
+    }
+}
+
+/// Returns the openEHR node a mapping's data-type cell reads and writes.
+///
+/// A polymorphic `ELEMENT` converts into the value alternative the compiler
+/// chose (`Derived::Value`); every other mapping converts at its own node.
+fn converted(mapping: &Mapping) -> Option<&OpenehrTarget> {
+    match mapping.derived() {
+        Some(Derived::Value { target, .. }) => Some(target),
+        _ => mapping.openehr(),
     }
 }

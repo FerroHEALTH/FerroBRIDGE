@@ -140,6 +140,15 @@ pub enum Derived {
     /// The node holds other nodes, so the mapping anchors its children and
     /// converts nothing, as `type: NONE` does.
     Anchor,
+    /// The node is an `ELEMENT` whose value admits several data types, so
+    /// the mapping converts into the value alternative whose class pairs
+    /// with the FHIR element, and anchors its children at the `ELEMENT`.
+    Value {
+        /// The FHIR type code the cell converts through.
+        code: &'static str,
+        /// The value alternative the cell reads and writes.
+        target: OpenehrTarget,
+    },
     /// A choice element the `type` key resolves, read and written as the
     /// alternative of that type.
     Declared(Alternative),
@@ -160,6 +169,9 @@ impl fmt::Display for Derived {
                 Ok(())
             }
             Self::Anchor => f.write_str("anchor"),
+            Self::Value { code, ref target } => {
+                write!(f, "{code} into {}", target.node().rm_type())
+            }
             Self::Declared(ref written) => {
                 write!(f, "{} as {}", written.code, written.target)
             }
