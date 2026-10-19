@@ -18,7 +18,7 @@ use crate::config::{self, ServerSettings, Settings};
 use crate::serve_until;
 use crate::state::{self, AppState};
 use crate::terminology::Translator;
-use crate::{auth, cdr, check, facade, hl7v2, operator, startup};
+use crate::{cdr, check, facade, hl7v2, operator, smart, startup};
 use std::collections::BTreeMap;
 
 /// Every lane of one start, built and ready to serve.
@@ -54,10 +54,10 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         .await
         .context("building the upstream clients")?;
     if let Some(auth) = settings.auth.clone() {
-        let authority = auth::Authority::discover(auth)
+        let smart = smart::Smart::discover(auth)
             .await
             .context("reading the authorization server")?;
-        state = state.with_auth(Arc::new(authority));
+        state = state.with_auth(Arc::new(smart));
     } else {
         tracing::warn!(
             "[auth] is off: the FHIR facade authenticates no caller and serves every request"

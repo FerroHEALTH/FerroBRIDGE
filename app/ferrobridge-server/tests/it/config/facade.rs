@@ -26,7 +26,7 @@ fn the_facade_is_off_until_its_section_turns_it_on() -> Result<(), Box<dyn StdEr
 fn an_enabled_facade_resolves_its_policy_and_its_store() -> Result<(), Box<dyn StdError>> {
     let text = concat!(
         "[mappings]\ndirectory = \"/srv/mappings\"\ntemplates = \"/srv/templates\"\n\n",
-        "[facade]\nenabled = true\n",
+        "[auth]\nenabled = false\n\n[facade]\nenabled = true\n",
         "base_url = \"https://bridge.invalid/fhir\"\n",
         "ehr_policy = \"create_on_first_write\"\n",
         "identity_store = \"/var/lib/ferrobridge/identity.redb\"\n",
@@ -56,7 +56,7 @@ fn an_enabled_facade_resolves_its_policy_and_its_store() -> Result<(), Box<dyn S
 #[test]
 fn an_ehr_policy_the_facade_does_not_know_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
     let text = concat!(
-        "[facade]\nenabled = true\nehr_policy = \"whatever\"\n",
+        "[auth]\nenabled = false\n\n[facade]\nenabled = true\nehr_policy = \"whatever\"\n",
         "composition_language = \"en\"\ncomposition_territory = \"GB\"\n",
     );
 
@@ -76,7 +76,8 @@ fn an_ehr_policy_the_facade_does_not_know_refuses_to_boot() -> Result<(), Box<dy
 #[test]
 fn an_enabled_facade_without_a_composition_language_refuses_to_boot()
 -> Result<(), Box<dyn StdError>> {
-    let text = "[facade]\nenabled = true\ncomposition_territory = \"GB\"\n";
+    let text =
+        "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_territory = \"GB\"\n";
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
         .resolve()
@@ -89,8 +90,7 @@ fn an_enabled_facade_without_a_composition_language_refuses_to_boot()
 }
 
 /// The smallest enabled facade section.
-const ENABLED: &str =
-    "[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n";
+const ENABLED: &str = "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n";
 
 #[test]
 fn the_search_page_sizes_default_and_resolve_as_configured() -> Result<(), Box<dyn StdError>> {
@@ -397,7 +397,7 @@ fn an_unknown_party_search_key_refuses_to_boot() {
 /// The `[facade]` section `extra` adds to, with the two required fields set.
 fn facade_with(extra: &str) -> String {
     format!(
-        "[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n{extra}"
+        "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n{extra}"
     )
 }
 

@@ -12,11 +12,11 @@
 //! at a call site. Create, update and transaction write through
 //! [`crate::facade::ingest`], so the handlers keep only the HTTP half.
 //!
-//! Every handler but metadata reads the [`Access`] the guard of
-//! [`crate::auth::guard`] left on the request and holds a `patient/` token to
-//! its patient's compartment ([`crate::auth::compartment`]). A request that
-//! reaches a handler without one never passed the guard, and axum refuses it
-//! with `500`.
+//! Every handler but metadata reads the [`Access`] the layer of
+//! [`crate::facade::guard`] left on the request and holds a `patient/` token to
+//! its patient's compartment ([`crate::facade::compartment`]). A request that
+//! reaches a handler without one never passed the layer, and the extractor
+//! refuses it with `500`.
 
 mod batch;
 mod complete;
@@ -35,16 +35,17 @@ use axum::body::Bytes;
 use axum::extract::Path;
 use axum::extract::State;
 use axum::response::Response;
+use ferrohealth_smart::resource::Access;
+use ferrohealth_smart::scope::Permission;
 use fhir_types::codec::Json;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
 
-use crate::auth::Access;
-use crate::auth::compartment;
-use crate::auth::scope::Permission;
 use crate::facade::Facade;
 use crate::facade::capability;
+use crate::facade::compartment;
+use crate::facade::guard::OperatorScope;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
@@ -72,7 +73,7 @@ pub fn metadata_route(
 /// identity.
 pub async fn create_route(
     State(facade): State<Arc<Facade>>,
-    Extension(access): Extension<Access>,
+    access: Access,
     Path(resource_type): Path<String>,
     headers: HeaderMap,
     uri: Uri,
@@ -99,7 +100,7 @@ pub async fn create_route(
 /// `GET [base]/{type}?…`: search the type over its declared AQL projections.
 pub async fn search_route(
     State(facade): State<Arc<Facade>>,
-    Extension(access): Extension<Access>,
+    access: Access,
     Path(resource_type): Path<String>,
     headers: HeaderMap,
     uri: Uri,
@@ -113,7 +114,7 @@ pub async fn search_route(
 /// body.
 pub async fn search_form_route(
     State(facade): State<Arc<Facade>>,
-    Extension(access): Extension<Access>,
+    access: Access,
     Path(resource_type): Path<String>,
     headers: HeaderMap,
     uri: Uri,
@@ -127,7 +128,7 @@ pub async fn search_form_route(
 /// `GET [base]/{type}/{id}`: read one mapped resource back out of the CDR.
 pub async fn read_route(
     State(facade): State<Arc<Facade>>,
-    Extension(access): Extension<Access>,
+    access: Access,
     Path((resource_type, id)): Path<(String, String)>,
     headers: HeaderMap,
     uri: Uri,
@@ -141,7 +142,7 @@ pub async fn read_route(
 /// resource back out of the CDR.
 pub async fn vread_route(
     State(facade): State<Arc<Facade>>,
-    Extension(access): Extension<Access>,
+    access: Access,
     Path((resource_type, id, vid)): Path<(String, String, String)>,
     headers: HeaderMap,
     uri: Uri,
@@ -160,7 +161,7 @@ pub async fn vread_route(
 /// `PUT [base]/{type}/{id}`: update a resource the identity map knows.
 pub async fn update_route(
     State(facade): State<Arc<Facade>>,
-    Extension(access): Extension<Access>,
+    access: Access,
     Path((resource_type, id)): Path<(String, String)>,
     headers: HeaderMap,
     uri: Uri,
@@ -186,7 +187,7 @@ pub async fn update_route(
 /// own design).
 pub async fn delete_route(
     State(facade): State<Arc<Facade>>,
-    Extension(access): Extension<Access>,
+    access: Access,
     Path((resource_type, id)): Path<(String, String)>,
     headers: HeaderMap,
     uri: Uri,
@@ -213,7 +214,7 @@ pub async fn delete_route(
 /// A type no party program serves is `not-supported`, as for [`delete_route`].
 pub async fn history_route(
     State(facade): State<Arc<Facade>>,
-    Extension(access): Extension<Access>,
+    access: Access,
     Path((resource_type, id)): Path<(String, String)>,
     headers: HeaderMap,
     uri: Uri,
@@ -237,13 +238,18 @@ pub async fn history_route(
 /// `POST [base]/{type}/$validate`: the dry run that commits nothing.
 pub async fn validate_route(
     State(facade): State<Arc<Facade>>,
-    Extension(access): Extension<Access>,
+    access: Access,
+    Extension(operator): Extension<OperatorScope>,
     Path(resource_type): Path<String>,
     headers: HeaderMap,
     uri: Uri,
     body: Bytes,
 ) -> Response {
-    validate::validate(&facade, &access, &resource_type, &headers, &uri, &body)
+    let admission = validate::Admission {
+        access: &access,
+        operator: operator.0.as_deref(),
+    };
+    validate::validate(&facade, admission, &resource_type, &headers, &uri, &body)
         .await
         .unwrap_or_else(Refusal::into_response)
 }
@@ -252,7 +258,7 @@ pub async fn validate_route(
 /// Bundle, each entry on its own.
 pub async fn transaction_route(
     State(facade): State<Arc<Facade>>,
-    Extension(access): Extension<Access>,
+    access: Access,
     headers: HeaderMap,
     uri: Uri,
     body: Bytes,

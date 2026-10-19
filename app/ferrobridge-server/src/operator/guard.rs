@@ -1,118 +1,103 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The middleware in front of every operator route: the token, the operator
-//! scope and the audit line.
+//! What every operator route requires, for the `ferrohealth-smart` layer in
+//! front of it, and the JSON body a refusal answers with.
 //!
-//! A request without a valid bearer token answers `401` and one whose token
-//! does not carry `auth.operator_scope` answers `403` (RFC 6750 §3.1). The
-//! audit line names the caller and the matched route, never a path value or
-//! a body. No specification governs the operator surface: our own design.
-
-use std::sync::Arc;
-use std::time::Instant;
+//! A request without a valid credential answers `401` and one whose token
+//! does not carry the operator scope answers `403` (RFC 6750 §3.1). The
+//! layer's audit line names the caller and the matched route, never a path
+//! value or a body. No specification governs the operator surface: our own
+//! design.
 
 use axum::extract::MatchedPath;
-use axum::extract::Request;
-use axum::extract::State;
-use axum::middleware::Next;
 use axum::response::IntoResponse;
 use axum::response::Response;
+use ferrohealth_smart::guard::AuthLayer;
+use ferrohealth_smart::guard::Classify;
+use ferrohealth_smart::guard::Render;
+use ferrohealth_smart::guard::Requirement;
+use ferrohealth_smart::guard::Target;
+use ferrohealth_smart::refusal::Refusal;
+use http::Extensions;
+use http::Method;
 use http::StatusCode;
+use http::Uri;
 use http::header;
 
-use crate::auth::Authority;
-use crate::auth::Caller;
-use crate::auth::Rejection;
-use crate::auth::guard::AUDIT_TARGET;
+use crate::smart::Smart;
 
-/// The caller an operator request was admitted with, left on the request
-/// for a handler that records who changed what.
+/// The `tracing` target of the change record a save or a reload writes
+/// beside the layer's audit line, so a deployment can route it apart.
+pub const AUDIT_TARGET: &str = "ferrobridge::audit";
+
+/// The interaction the audit line records for every operator route.
+const OPERATOR: &str = "operator";
+
+/// How the layer reads an operator request: every route the operator router
+/// matched requires the operator scope.
 #[derive(Debug, Clone)]
-pub struct Operator(pub Arc<Caller>);
+pub struct Classifier {
+    /// The operator scope.
+    scope: String,
+}
 
-/// Checks the token and the operator scope of `request`, and writes the audit
-/// line once the response is ready.
-pub async fn guard(
-    State(authority): State<Arc<Authority>>,
-    mut request: Request,
-    next: Next,
-) -> Response {
-    let started = Instant::now();
-    let method = request.method().clone();
-    let route = request
-        .extensions()
-        .get::<MatchedPath>()
-        .map_or_else(String::new, |matched| matched.as_str().to_owned());
-    let request_id = crate::request_id::of(request.headers())
-        .unwrap_or_default()
-        .to_owned();
-    let token = crate::auth::guard::bearer(request.headers()).map(str::to_owned);
-    let caller = match token {
-        None => Err(Rejection::Missing),
-        Some(token) => authority.authenticate(&token).await,
-    };
-    let (subject, response) = match caller {
-        Err(rejection) => (None, rejected(&rejection)),
-        Ok(caller) if !caller.is_operator() => (
-            Some(caller.subject().to_owned()),
-            refusal(
-                StatusCode::FORBIDDEN,
-                Some("Bearer error=\"insufficient_scope\""),
+impl Classify for Classifier {
+    fn classify(&self, _method: &Method, _uri: &Uri, extensions: &Extensions) -> Option<Target> {
+        let template = extensions.get::<MatchedPath>()?.as_str();
+        Some(Target::new(OPERATOR, Requirement::Scope(self.scope.clone())).route(template))
+    }
+}
+
+/// The JSON body every refusal of the layer answers with.
+#[derive(Debug, Clone)]
+pub struct Body {
+    /// The realm every challenge names.
+    realm: Option<String>,
+}
+
+impl Render for Body {
+    fn render(&self, refused: &Refusal) -> Response {
+        let (error, message) = match refused {
+            Refusal::Missing(_) | Refusal::InvalidToken | Refusal::InvalidBasic => (
+                "unauthorized",
+                "the request carries no valid access token for this server",
+            ),
+            Refusal::InvalidRequest => (
+                "invalid_request",
+                "the Authorization header carries no single credential",
+            ),
+            Refusal::Forbidden | Refusal::Unclassified => (
                 "forbidden",
                 "the access token does not carry the operator scope",
             ),
-        ),
-        Ok(caller) => {
-            let subject = caller.subject().to_owned();
-            request.extensions_mut().insert(Operator(Arc::new(caller)));
-            (Some(subject), next.run(request).await)
-        }
-    };
-    tracing::info!(
-        target: AUDIT_TARGET,
-        subject = subject.as_deref().unwrap_or("unauthenticated"),
-        method = method.as_str(),
-        route = route.as_str(),
-        status = response.status().as_u16(),
-        duration_ms = started.elapsed().as_secs_f64() * 1000.0,
-        request_id = request_id.as_str(),
-        "operator"
-    );
-    response
-}
-
-/// Returns the answer `rejection` gets.
-fn rejected(rejection: &Rejection) -> Response {
-    match rejection {
-        Rejection::Missing => refusal(
-            StatusCode::UNAUTHORIZED,
-            Some("Bearer"),
-            "unauthorized",
-            "the request carries no valid access token for this server",
-        ),
-        Rejection::Invalid { reason } => {
-            tracing::debug!(reason, "an operator access token was refused");
-            refusal(
-                StatusCode::UNAUTHORIZED,
-                Some("Bearer error=\"invalid_token\""),
-                "unauthorized",
-                "the request carries no valid access token for this server",
-            )
-        }
-        Rejection::Unavailable { source } => {
-            tracing::error!(
-                error = crate::facade::outcome::chain(source.as_ref()),
-                "the authorization server's key set could not be read"
-            );
-            refusal(
-                StatusCode::SERVICE_UNAVAILABLE,
-                None,
+            Refusal::Unavailable => (
                 "unavailable",
                 "the access token could not be checked: the authorization server's keys could not be read",
-            )
-        }
+            ),
+            _ => ("refused", "the request was refused at the gate"),
+        };
+        refusal(
+            refused.status(),
+            refused.challenge(self.realm.as_deref()).as_deref(),
+            error,
+            message,
+        )
     }
+}
+
+/// Returns the layer that guards the operator routes with the gate of
+/// `smart` and the operator scope.
+#[must_use]
+pub fn layer(smart: &Smart) -> AuthLayer<Classifier> {
+    let gate = smart.gate().clone();
+    let body = Body {
+        realm: gate.realm().map(str::to_owned),
+    };
+    let classifier = Classifier {
+        scope: smart.operator_scope().to_owned(),
+    };
+    AuthLayer::new(gate, classifier).with_render(body)
 }
 
 /// Returns an operator refusal: `status`, an optional challenge and a JSON

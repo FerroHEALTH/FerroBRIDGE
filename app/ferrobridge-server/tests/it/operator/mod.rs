@@ -11,12 +11,12 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Body;
-use ferrobridge_server::auth::Authority;
 use ferrobridge_server::check::{self, Inputs, Templates};
 use ferrobridge_server::health::Registry;
 use ferrobridge_server::operator::Operator;
 use ferrobridge_server::operator::files::{Language, Root};
 use ferrobridge_server::operator::snapshot::Snapshot;
+use ferrobridge_server::smart::Smart;
 use ferrobridge_server::state::AppState;
 use http::{Request, StatusCode, header};
 use jsonwebtoken::Algorithm;
@@ -36,7 +36,7 @@ const OMOCL_FILE: &str = concat!(
 );
 
 /// The operator scope every admitted token carries.
-const OPERATOR: &str = "ferrobridge.operator";
+const OPERATOR: &str = "__ferrobridge.operator";
 
 /// One case: a mapping tree, an issuer, its key and the router.
 struct Case {
@@ -74,7 +74,7 @@ impl Case {
         std::fs::copy(OMOCL_FILE, omocl.join("Specimen_v1.yml"))?;
         let key = ec_key("k1", Algorithm::ES256);
         let issuer = Issuer::start(&[&key]).await;
-        let authority: Arc<Authority> = authority(issuer.settings()).await;
+        let authority: Arc<Smart> = authority(issuer.settings()).await;
         let report = check::check(Inputs {
             fhirconnect: Some(&mappings),
             templates: Some(Templates::Directory(&templates)),
@@ -351,10 +351,11 @@ fn the_audit_line_names_the_caller_and_the_route_and_never_the_content()
     let audit: Vec<serde_json::Value> = text
         .lines()
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-        .filter(|line| line["target"] == "ferrobridge::audit")
+        .filter(|line| line["target"] == ferrohealth_smart::audit::AUDIT_TARGET)
         .collect();
     assert_eq!(1, audit.len(), "{text}");
-    assert_eq!("synthetic-client-sub", audit[0]["subject"], "{text}");
+    assert_eq!("synthetic-client-sub", audit[0]["principal"], "{text}");
+    assert_eq!("operator", audit[0]["interaction"], "{text}");
     assert_eq!("/operator/mappings/{*path}", audit[0]["route"], "{text}");
     assert_eq!(200, audit[0]["status"], "{text}");
     let content = String::from_utf8(served)?;

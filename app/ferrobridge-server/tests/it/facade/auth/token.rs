@@ -8,7 +8,7 @@
 use std::error::Error as StdError;
 use std::time::Duration;
 
-use ferrobridge_server::auth::TokenProfile;
+use ferrohealth_smart::resource::TokenProfile;
 use http::StatusCode;
 use jsonwebtoken::Algorithm;
 use jsonwebtoken::EncodingKey;
@@ -189,7 +189,9 @@ async fn an_algorithm_outside_the_configured_set_is_refused() -> Result<(), Box<
     let key = ec_key("k384", Algorithm::ES384);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
-    let app = secured(&harness, &authority(issuer.settings()).await);
+    let mut settings = issuer.settings();
+    settings.issuers[0].algorithms = vec![Algorithm::RS256, Algorithm::ES256];
+    let app = secured(&harness, &authority(settings).await);
     let token = mint(&key, &issuer.claims("system/Condition.r"));
     assert_refused(&read_with(app, Some(&token)).await?);
     Ok(())
@@ -201,7 +203,7 @@ async fn a_symmetric_token_is_refused() -> Result<(), Box<dyn StdError>> {
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
     let mut settings = issuer.settings();
-    settings.algorithms = vec![Algorithm::ES256];
+    settings.issuers[0].algorithms = vec![Algorithm::ES256];
     let app = secured(&harness, &authority(settings).await);
     let mut header = Header::new(Algorithm::HS256);
     header.kid = Some(String::from("k1"));
@@ -242,7 +244,7 @@ async fn the_rfc_9068_profile_refuses_a_plain_jwt_and_the_jwt_profile_takes_it()
     let strict = secured(&harness, &authority(issuer.settings()).await);
     assert_refused(&read_with(strict, Some(&token)).await?);
     let mut settings = issuer.settings();
-    settings.profile = TokenProfile::Jwt;
+    settings.issuers[0].profile = TokenProfile::Jwt;
     let lenient = secured(&harness, &authority(settings).await);
     let (status, _, body) = read_with(lenient, Some(&token)).await?;
     assert_eq!(StatusCode::NOT_FOUND, status, "{body}");
@@ -276,7 +278,7 @@ async fn an_unknown_kid_within_the_interval_reads_nothing_and_is_refused()
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
     let mut settings = issuer.settings();
-    settings.jwks_refresh_interval = Duration::from_secs(3600);
+    settings.issuers[0].jwks_refresh_interval = Duration::from_secs(3600);
     let authority = authority(settings).await;
     for _ in 0..3 {
         let token = mint(&stranger, &issuer.claims("system/Condition.r"));
@@ -302,6 +304,48 @@ async fn a_key_set_that_cannot_be_read_again_answers_503() -> Result<(), Box<dyn
     let (status, _, body) = read_with(app, Some(&token)).await?;
     assert_eq!(StatusCode::SERVICE_UNAVAILABLE, status, "{body}");
     assert_eq!(Some("transient"), body["issue"][0]["code"].as_str());
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_key_the_issuer_withdrew_stops_verifying_once_the_set_is_past_its_max_age()
+-> Result<(), Box<dyn StdError>> {
+    // NOTE: RFC 7517 §5 has a resource server read the issuer's current key
+    // set, so a key withdrawn from it verifies nothing after the next read.
+    let withdrawn = ec_key("withdrawn", Algorithm::ES256);
+    let kept = ec_key("kept", Algorithm::ES256);
+    let issuer = Issuer::bare().await;
+    issuer
+        .mount_metadata("/.well-known/oauth-authorization-server")
+        .await;
+    issuer.mount_keys(&[&withdrawn, &kept], Some(1)).await;
+    issuer.mount_keys(&[&kept], None).await;
+    let harness = harness().await;
+    let mut settings = issuer.settings();
+    settings.issuers[0].jwks_max_age = Duration::from_millis(300);
+    settings.issuers[0].jwks_refresh_interval = Duration::from_secs(3600);
+    let authority = authority(settings).await;
+    let old = mint(&withdrawn, &issuer.claims("system/Condition.r"));
+    let (status, _, body) = read_with(secured(&harness, &authority), Some(&old)).await?;
+    assert_eq!(
+        StatusCode::NOT_FOUND,
+        status,
+        "the key still verifies: {body}"
+    );
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    assert_refused(&read_with(secured(&harness, &authority), Some(&old)).await?);
+    assert_eq!(
+        2,
+        issuer.key_reads().await,
+        "the boot read and the max-age read"
+    );
+    let current = mint(&kept, &issuer.claims("system/Condition.r"));
+    let (status, _, body) = read_with(secured(&harness, &authority), Some(&current)).await?;
+    assert_eq!(
+        StatusCode::NOT_FOUND,
+        status,
+        "the kept key verifies: {body}"
+    );
     Ok(())
 }
 
