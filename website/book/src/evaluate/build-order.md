@@ -24,25 +24,24 @@ has every change of every release.
 | [v0.0.7](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.7) | 2026-10-17 | Facade hardening: search answers the entry that matched, every error answers an `OperationOutcome`, and the identity store gains its repair paths. |
 | [v0.0.8](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.8) | 2026-10-18 | The operator console and its image, the operator API and `ferrobridge mapping check`; and most of the profile validator work planned for v0.0.9: the agreement corpus against the HL7 FHIR Validator, and the extension context and reference versioning checks. |
 | [v0.0.9](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.9) | 2026-10-19 | The profile validator finished: STU3 profiles validating STU3 resources over the release-neutral definition read, and the validator, terminology client and FHIRPath crates on the crate line at 0.1.126. FHIRconnect sub-contexts, and the openEHR RM pinned to Release 1.1.0. And the first of the openEHR demographics work planned for v0.0.10: the Demographic API behind `[cdr] demographic`, the configured patient-to-EHR link, and demographic references resolved on the way into openEHR. |
+| [v0.0.10](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.10) | 2026-10-19 | openEHR demographics: FHIRconnect party contexts that build a `PERSON`, `ORGANISATION` or `ROLE`, and `Patient`, `Practitioner`, `PractitionerRole` and `Organization` on the facade over the Demographic API, searched by identifier and name through the Cadasto AQL demographic extension. Clinical searches chained through the patient identifier, a created `Patient` given its EHR, OAuth 2.0 client credentials toward the terminology server, and the static bearer token removed. |
 
 ## Next
 
-The milestones after v0.0.9, each one theme:
+The milestones after v0.0.10, each one theme:
 
-1. **v0.0.10, openEHR demographics.** Party contexts that build a `PARTY`,
-   and Patient, Practitioner and Organization over the Demographic API.
-2. **v0.0.11, FHIRconnect breadth.** The full data-type matrix, the remaining
+1. **v0.0.11, FHIRconnect breadth.** The full data-type matrix, the remaining
    concept types and `mappingCode` functions, and the open outcomes of the
    HL7 v2 face.
-3. **v0.0.12, OMOP breadth.** The remaining OMOCL targets, the Athena
+2. **v0.0.12, OMOP breadth.** The remaining OMOCL targets, the Athena
    vocabulary loader, and the data quality checks.
-4. **v0.0.13, security.** The caller's identity reaching the CDR, token
+3. **v0.0.13, security.** The caller's identity reaching the CDR, token
    introspection, and `private_key_jwt` client authentication.
-5. **v0.0.14, the EU profile targets.** HL7 Europe Base and Core, then the
+4. **v0.0.14, the EU profile targets.** HL7 Europe Base and Core, then the
    Laboratory Report, then Medication Prescription and Dispense.
-6. **v0.0.15, the change feed.** The change-feed adapter driving the
+5. **v0.0.15, the change feed.** The change-feed adapter driving the
    incremental OMOP load and an outbound FHIR lane.
-7. **v0.0.16, console breadth.** Mapping-set revisions with history and
+6. **v0.0.16, console breadth.** Mapping-set revisions with history and
    rollback, and more of the console.
 
 ## How correctness is measured

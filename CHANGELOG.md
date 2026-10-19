@@ -23,6 +23,71 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** the facade, the operator API and the CDR and terminology
+  lanes authenticate through `ferrohealth-smart` 0.1.0, the FerroHEALTH
+  family's SMART and OAuth 2.0 resource-server crate (#981). Its sections
+  replace the bridge's own, so a deployment changes these keys:
+  - `[auth]` is on by default (`enabled = true`). `serve` refuses to start a
+    facade, an operator API or a FHIRconnect operations lane until `[auth]`
+    names `issuer` and `audience`, or until `enabled = false`
+    (`FERROBRIDGE__AUTH__ENABLED=false`) serves them open. A server that
+    serves only `/` and the health routes, and the jobs, read no `[auth]`.
+  - `auth.audience` is a list (`audience = ["https://…/fhir"]`, and
+    `FERROBRIDGE__AUTH__AUDIENCE='["https://…/fhir"]'`); a token's `aud`
+    must contain one of them.
+  - `auth.jwks_refresh_interval_ms` becomes `auth.jwks_refresh_interval_seconds`
+    (default `60`), and `auth.jwks_max_age_seconds` (default `600`) is new:
+    a key set older than that is read again before a token is checked, so a
+    key the issuer withdrew stops verifying (#972).
+  - `auth.algorithms` defaults to `RS256`, `RS384`, `PS256`, `PS384`,
+    `ES256` and `ES384`, where it was `RS256` and `ES256`.
+  - `auth.issuer` may be plain `http` on a loopback host; elsewhere it stays
+    `https`.
+  - `auth.operator_scope` becomes `operator.scope`, and its default
+    `ferrobridge.operator` becomes `__ferrobridge.operator`, the extension
+    form SMART App Launch 2.2.0 gives a scope (a string starting with `__`
+    or a full URI); any other value refuses the start. Grant the new scope
+    in the authorization server before you upgrade.
+  - New in `[auth]`: `[[auth.issuer]]` tables for several trusted issuers,
+    `[[auth.basic.users]]` for HTTP Basic callers with an Argon2id
+    `password_hash` (or `password_hash_file`) and their `scopes`,
+    `jwks_file`, and `realm`.
+  - `[cdr.credentials]` and `[terminology.credentials]` lose `user_file`;
+    the user-id is read inline from `user`.
+  - `[cdr.credentials.oauth]` and `[terminology.credentials.oauth]` take
+    `client_auth = "private_key_jwt"` with `private_key_file`, `kid` and
+    `assertion_alg`, and `timeout_ms` (default `10000`), which bounds a call
+    to the token endpoint in place of the lane's own timeout; an empty
+    `scope` sends no `scope` parameter.
+
+  The facade's refusals keep their `OperationOutcome` bodies and challenges;
+  two `Authorization` values, or a value that is no credential (a scheme
+  with nothing after it), answer `400` with `invalid_request` (RFC 6750
+  §3.1), and a route the guard does not classify answers its `403` without
+  a challenge. The discovery
+  document no longer claims `permission-v2`, which SMART App Launch 2.2.0
+  defines as granular scope support the facade does not evaluate. The audit
+  line moves to the `ferrohealth_smart::audit` target with the family's
+  field set: `principal` replaces `subject`, `target` (`Condition/c-1`)
+  replaces `resource_type` and `resource_id`, and `via`, `issuer` and
+  `route` are new. The operator API's request line moves there too; a save
+  or a reload still writes its change record on `ferrobridge::audit`.
+  `src/auth/` and `src/cdr/oauth/` are gone from the server (#977), and
+  `ferrobridge_server::credentials::UpstreamToken` hands the crate's token to
+  both upstream clients.
+
+## [0.0.10] - 2026-10-19
+
+The openEHR demographics release. The FHIR facade serves `Patient`,
+`Practitioner`, `PractitionerRole` and `Organization` from FHIRconnect party
+contexts over the ITS-REST 1.1.0 Demographic API, searches them through the
+Cadasto experimental AQL demographic extension, chains clinical searches
+through the patient identifier, and gives a created `Patient` its EHR. The
+terminology lane authenticates with OAuth 2.0 client credentials, and the
+static bearer token is gone from both upstreams.
+
 ### Added
 
 - The terminology lane authenticates with the OAuth 2.0 client credentials
@@ -160,59 +225,6 @@ crates on crates.io.
 
 ### Changed
 
-- **Breaking:** the facade, the operator API and the CDR and terminology
-  lanes authenticate through `ferrohealth-smart` 0.1.0, the FerroHEALTH
-  family's SMART and OAuth 2.0 resource-server crate (#981). Its sections
-  replace the bridge's own, so a deployment changes these keys:
-  - `[auth]` is on by default (`enabled = true`). `serve` refuses to start a
-    facade, an operator API or a FHIRconnect operations lane until `[auth]`
-    names `issuer` and `audience`, or until `enabled = false`
-    (`FERROBRIDGE__AUTH__ENABLED=false`) serves them open. A server that
-    serves only `/` and the health routes, and the jobs, read no `[auth]`.
-  - `auth.audience` is a list (`audience = ["https://…/fhir"]`, and
-    `FERROBRIDGE__AUTH__AUDIENCE='["https://…/fhir"]'`); a token's `aud`
-    must contain one of them.
-  - `auth.jwks_refresh_interval_ms` becomes `auth.jwks_refresh_interval_seconds`
-    (default `60`), and `auth.jwks_max_age_seconds` (default `600`) is new:
-    a key set older than that is read again before a token is checked, so a
-    key the issuer withdrew stops verifying (#972).
-  - `auth.algorithms` defaults to `RS256`, `RS384`, `PS256`, `PS384`,
-    `ES256` and `ES384`, where it was `RS256` and `ES256`.
-  - `auth.issuer` may be plain `http` on a loopback host; elsewhere it stays
-    `https`.
-  - `auth.operator_scope` becomes `operator.scope`, and its default
-    `ferrobridge.operator` becomes `__ferrobridge.operator`, the extension
-    form SMART App Launch 2.2.0 gives a scope (a string starting with `__`
-    or a full URI); any other value refuses the start. Grant the new scope
-    in the authorization server before you upgrade.
-  - New in `[auth]`: `[[auth.issuer]]` tables for several trusted issuers,
-    `[[auth.basic.users]]` for HTTP Basic callers with an Argon2id
-    `password_hash` (or `password_hash_file`) and their `scopes`,
-    `jwks_file`, and `realm`.
-  - `[cdr.credentials]` and `[terminology.credentials]` lose `user_file`;
-    the user-id is read inline from `user`.
-  - `[cdr.credentials.oauth]` and `[terminology.credentials.oauth]` take
-    `client_auth = "private_key_jwt"` with `private_key_file`, `kid` and
-    `assertion_alg`, and `timeout_ms` (default `10000`), which bounds a call
-    to the token endpoint in place of the lane's own timeout; an empty
-    `scope` sends no `scope` parameter.
-
-  The facade's refusals keep their `OperationOutcome` bodies and challenges;
-  two `Authorization` values, or a value that is no credential (a scheme
-  with nothing after it), answer `400` with `invalid_request` (RFC 6750
-  §3.1), and a route the guard does not classify answers its `403` without
-  a challenge. The discovery
-  document no longer claims `permission-v2`, which SMART App Launch 2.2.0
-  defines as granular scope support the facade does not evaluate. The audit
-  line moves to the `ferrohealth_smart::audit` target with the family's
-  field set: `principal` replaces `subject`, `target` (`Condition/c-1`)
-  replaces `resource_type` and `resource_id`, and `via`, `issuer` and
-  `route` are new. The operator API's request line moves there too; a save
-  or a reload still writes its change record on `ferrobridge::audit`.
-  `src/auth/` and `src/cdr/oauth/` are gone from the server (#977), and
-  `ferrobridge_server::credentials::UpstreamToken` hands the crate's token to
-  both upstream clients.
-
 - Only the newest release is supported (#979). `SECURITY.md` says that every
   earlier release stops receiving fixes when a new one is published, with no
   maintenance branches, no long-term-support line and no backports, and that
@@ -244,6 +256,16 @@ crates on crates.io.
   FerroUI release every FerroHEALTH console moves to together. The console
   looks the same: 0.1.6 adds the shared field shapes the other consoles
   needed, and the console's fields already draw through the library.
+- The operator console draws with `ferrohealth-ui` 0.1.7 and is ready for
+  more languages, English the one that ships (#956). The library's words and
+  the console's come from Fluent catalogs, the console's under
+  `app/ferrobridge-viewer/locales/`, so a language joins as a catalog file
+  with no code change. The locale is chosen once per request, the best
+  language of `Accept-Language` the console's catalog holds or else the new
+  `[server] locale` (default `en`), and the page writes it as `<html lang>`.
+  `scripts/checks/stray-literals.sh` fails CI on a console string outside
+  the catalog beyond the per-file baseline the remaining strings hold while
+  they move.
 - The README, the landing page and the build-order page name v0.0.9 as the
   latest release, and `scripts/checks/versions.sh` compares the release each
   names with the workspace version and its changelog date, so the next cut
@@ -3822,7 +3844,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.9...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.10...HEAD
+[0.0.10]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.9...v0.0.10
 [0.0.9]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.6...v0.0.7

@@ -12,7 +12,8 @@
 //! ([`session`], [`oidc`]), so the browser carries an opaque cookie and never
 //! a token. [`app`] is the page tree both halves share, drawn in the
 //! [`shell`] with the components of `ferrohealth_ui` in the operator's
-//! [`theme`], with the maker named on the [`about`] page, and filled through
+//! [`theme`] and the request's [`locale`], with the maker named on the
+//! [`about`] page, and filled through
 //! the server functions of [`status`] with the view models of [`model`];
 //! [`server`] serves it with the health and sign-in routes under the browser
 //! security headers, [`config`] reads the TOML configuration, [`cli`] and
@@ -27,6 +28,7 @@
 
 pub mod about;
 pub mod app;
+pub mod locale;
 // The browser half of a server function, which the server macro writes, is a
 // network call that awaits nothing, and the lint names the macro alone.
 #[cfg_attr(

@@ -86,11 +86,13 @@ and value sets. FerroEHR is the reference CDR and FerroTERM the reference
 terminology server; neither is a compile-time dependency.
 
 The latest release is
-[v0.0.9](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.9),
-cut on 2026-10-19. It finishes the profile validator, which now validates STU3
-resources against STU3 profiles, and adds FHIRconnect sub-contexts and the
-first openEHR demographics work: the Demographic API behind `[cdr]
-demographic` and the configured patient-to-EHR link.
+[v0.0.10](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.10),
+cut on 2026-10-19. It brings openEHR demographics to the FHIR facade:
+`Patient`, `Practitioner`, `PractitionerRole` and `Organization` from
+FHIRconnect party contexts over the Demographic API, their search by
+identifier and name, and clinical searches chained through the patient
+identifier. The terminology lane gains OAuth 2.0 client credentials, and the
+static bearer token is gone.
 [`CHANGELOG.md`](CHANGELOG.md) lists what every release added, changed and
 fixed.
 
@@ -156,7 +158,7 @@ docker compose --profile viewer up
 ```
 
 To run the image without compose, pull
-`ghcr.io/ferrohealth/ferrobridge:0.0.9`. To run the binary, download the
+`ghcr.io/ferrohealth/ferrobridge:0.0.10`. To run the binary, download the
 archive for your architecture from the
 [release](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest). The
 binary's subcommands are `serve`, `cdm init`, `etl run`, `mapping check` and
