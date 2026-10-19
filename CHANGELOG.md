@@ -23,6 +23,16 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.10] - 2026-10-19
+
+The openEHR demographics release. The FHIR facade serves `Patient`,
+`Practitioner`, `PractitionerRole` and `Organization` from FHIRconnect party
+contexts over the ITS-REST 1.1.0 Demographic API, searches them through the
+Cadasto experimental AQL demographic extension, chains clinical searches
+through the patient identifier, and gives a created `Patient` its EHR. The
+terminology lane authenticates with OAuth 2.0 client credentials, and the
+static bearer token is gone from both upstreams.
+
 ### Added
 
 - The terminology lane authenticates with the OAuth 2.0 client credentials
@@ -3779,7 +3789,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.9...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.10...HEAD
+[0.0.10]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.9...v0.0.10
 [0.0.9]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.6...v0.0.7
