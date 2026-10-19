@@ -14,7 +14,7 @@ Arming auto-merge does not finish a PR. Every PR I open, and every open PR the o
 **Why:** on 2026-10-15 the owner found PRs sitting red or blocked for an hour while I reported them as "armed": a `rustdoc` failure that came from `main` blocked four PRs at once, PRs merged before their own CI proved the fix, and changelog conflicts waited for the owner to notice. Their words: "you are not merging them always check it", "it should never get stuck".
 
 **How to apply:**
-- After `gh pr create` and `gh pr merge --auto --squash --delete-branch`, start a background watcher (run_in_background) on the PR: poll `gh pr view <n> --json state,mergeStateStatus,mergeable` and `gh pr checks <n>` every 60 s until `MERGED`. Act on each state:
+- After `gh pr create` and `gh pr merge --auto --squash`, start a background watcher (run_in_background) on the PR: poll `gh pr view <n> --json state,mergeStateStatus,mergeable` and `gh pr checks <n>` every 60 s until `MERGED`. Act on each state:
   - `DIRTY` or `CONFLICTING`: merge `origin/main` into the branch, resolve (a `CHANGELOG.md` `[Unreleased]` conflict keeps both entries), re-run the affected gates, push.
   - `BEHIND`: `gh pr update-branch <n>`.
   - A failing required check (`conclusion`): read the failing job's log at once (`gh api repos/FerroHEALTH/FerroBRIDGE/actions/jobs/<id>/logs --allow-escape-sequences`, grep `^error`), fix it on the branch or, when the cause is on `main`, fix `main` first and then update every blocked PR.
