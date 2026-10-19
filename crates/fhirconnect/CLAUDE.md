@@ -229,7 +229,10 @@ no `|raw` there, so the engine writes them as `ctx/composer_name`,
 `ctx/language` and `ctx/territory` and refuses the run
 (`EngineError::ContextAttribute`) when the built value differs from the one
 written. The composition defaults travel as `ctx/` keys the same way; which
-fields default stays `engine/defaults-for-fields.adoc`'s. The FLAT spellings
+fields default stays `engine/defaults-for-fields.adoc`'s. The one fill the
+builder makes beside them, the mandatory `INSTRUCTION.narrative` no mapping
+wrote, is declared as a `Loss::Defaulted` per instruction instance
+(`Run::declare_narratives`, our own design), never left silent. The FLAT spellings
 are Simplified Formats, vendored at
 `docs/specs/its-rest/docs/simplified_formats/`.
 
