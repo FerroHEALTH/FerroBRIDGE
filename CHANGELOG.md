@@ -175,6 +175,10 @@ crates on crates.io.
 
 ### Fixed
 
+- `scripts/gh/watch-prs.sh` judges only the newest run of each workflow on a
+  pull request's head, so the failed jobs of a run a later push superseded or
+  cancelled no longer stop it as red (#955). `--self-test` checks the
+  verdict against fixture checks, and the CI `tracker-helpers` job runs it.
 - A chained `patient.identifier`, `subject.identifier` or
   `subject:Patient.identifier` value that more than one patient carries now
   matches the clinical resources of every one of them (#944). The facade
