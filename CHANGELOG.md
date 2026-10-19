@@ -37,6 +37,15 @@ crates on crates.io.
   the element's types in definition order, in all five versions (#926), so a
   consumer reads which resource types a `Reference` admits from the element
   table. A consumer that builds a `FieldSchema` literal adds the field.
+- The facade's subject search parameters take the `:identifier` modifier
+  (#923): `Condition?patient:identifier=[system]|[value]` matches the
+  `Reference.identifier` of a resource's subject (R4 search.html
+  §3.1.1.4.12). That identifier is the subject the identity map keys by
+  system and value, which the facade renders as an identifier. A subject
+  rendered as a literal reference carries none and matches nothing, and so
+  does `|[value]`. `[value]` alone and `[system]|` answer `400 not-supported`,
+  because the map keys a subject by system and value. No specification
+  governs the identity map: our own design.
 - The FHIR facade serves `Patient`, `Practitioner`, `PractitionerRole` and
   `Organization` from party contexts over the ITS-REST 1.1.0 Demographic API,
   DEVELOPMENT, behind `[cdr] demographic` (#470). Read, vread,
@@ -147,6 +156,11 @@ crates on crates.io.
   warning per instruction instance, and in the composition's `FEEDER_AUDIT`
   when the run carries an origin, so the stored composition names the value
   no mapping wrote.
+- `scripts/gh/watch-prs.sh` no longer stops on a changelog conflict whose
+  `[Unreleased]` keeps a blank line between two bullets or a heading with no
+  blank line above it (#946). The entry merge keeps the blank line between
+  bullets, renders a heading with one above it, and refuses only when the
+  text lines would not read back in order, naming the first such line.
 - A pull request merged after a release no longer files its changelog
   entries under that release (#913). `scripts/gh/watch-prs.sh` merges
   `CHANGELOG.md` by entry through the new `scripts/gh/changelog-merge.sh`,
