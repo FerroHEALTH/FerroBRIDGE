@@ -385,7 +385,7 @@ program ferrobridge_kds_person.context
           mapping versicherungsId from ADMIN_ENTRY.versicherungsinformationen.v0
             fhir $resource.identifier -> Patient.identifier complex writable
             openehr /content[openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0]/data[at0001]/items[at0006] -> /content[openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0]/data[at0001]/items[at0006] ELEMENT
-            derived anchor
+            derived Identifier into DV_IDENTIFIER
             fhirCondition one of [http://fhir.de/sid/gkv/kvid-10] on fhir $resource.identifier -> Patient.identifier complex writable (element)
               attribute fhir $resource.identifier.system -> Identifier.system primitive writable
             mapping versicherungsId.staticUrl from ADMIN_ENTRY.versicherungsinformationen.v0

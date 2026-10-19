@@ -44,7 +44,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
     pub(super) fn kind(mapping: &Mapping, target: &FhirTarget) -> Result<FhirKind, EngineError> {
         let kind = match (mapping.data_type(), mapping.derived()) {
             (Some(data_type), _) => FhirKind::of(data_type),
-            (None, Some(Derived::Element(code))) => FhirKind::of_code(code),
+            (None, Some(Derived::Element(code) | Derived::Value { code, .. })) => {
+                FhirKind::of_code(code)
+            }
             (None, _) => FhirKind::at(target.resolved().location()),
         };
         kind.ok_or_else(|| EngineError::UnknownElement {
@@ -159,6 +161,17 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let Some(target) = mapping.openehr() else {
             return;
         };
+        self.put_openehr_at(target, binding, value);
+    }
+
+    /// Writes one openEHR value at `target`, overwriting what the same place
+    /// holds.
+    pub(super) fn put_openehr_at(
+        &mut self,
+        target: &OpenehrTarget,
+        binding: &Binding,
+        value: RmValue,
+    ) {
         self.store(Written {
             flat_id: target.node().flat_id().clone(),
             positions: binding.openehr.clone(),
