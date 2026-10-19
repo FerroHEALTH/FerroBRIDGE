@@ -31,7 +31,7 @@
 - [Milestones 0.0.x](milestones-0-0-x.md): milestones start at v0.0.1 and step
   by a patch number, never a v0.1.0 opener; owner 2026-09-04
 - [PR auto-merge](pr-auto-merge.md): enable auto-merge on every pull request
-  the moment it is opened (`gh pr merge <n> --auto --squash --delete-branch`);
+  the moment it is opened (`gh pr merge <n> --auto --squash`);
   owner 2026-09-04
 - [Memory lives in the repo](memory-lives-in-repo.md): every learning is a
   tracked file in `.claude/memory/`, never a per-user note; owner 2026-09-04
