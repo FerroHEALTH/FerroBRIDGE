@@ -376,7 +376,8 @@ changes here and nowhere else.
     rules are stylesheet, and the data table they stack is the one the
     console already drew. 0.1.4 measured 315522 (2026-10-19): its
     timestamp is drawn on the server, and its compact tile and stacking
-    rules are stylesheet.
+    rules are stylesheet. 0.1.5 measured 315756 (2026-10-19): its per-row
+    field and header title are thin wrappers the console does not call.
 
   The headroom is the quarter FerroFED's console started with, enough for
   toolchain drift and small growth and too little for a slice to pass
