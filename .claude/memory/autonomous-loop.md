@@ -22,7 +22,7 @@ specs ... you need to autonalsy keep going with all those 148 issues!!".
 
 - A watcher or a worker in the background is never a reason to stop. Act on
   each notice at once, then start the next unit.
-- Keep up to four workers busy on issues whose files do not overlap an open
+- Keep up to five workers busy (owner, 2026-10-19) on issues whose files do not overlap an open
   PR or another worker ([[pr-backlog-discipline]]). Same-module issues queue
   behind each other on one worker.
 - A choice nobody has made gets the decision the specs support, recorded on
