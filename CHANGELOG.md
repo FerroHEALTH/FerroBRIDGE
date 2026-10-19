@@ -140,6 +140,13 @@ crates on crates.io.
 
 ### Fixed
 
+- A FHIRconnect run into openEHR declares every `INSTRUCTION.narrative` it
+  leaves to the FLAT builder (#919). The narrative is a mandatory `DV_TEXT`
+  (RM EHR IM §INSTRUCTION), and the builder fills one no mapping writes with
+  a placeholder text. The run now records it as one more `Loss::Defaulted`
+  warning per instruction instance, and in the composition's `FEEDER_AUDIT`
+  when the run carries an origin, so the stored composition names the value
+  no mapping wrote.
 - A pull request merged after a release no longer files its changelog
   entries under that release (#913). `scripts/gh/watch-prs.sh` merges
   `CHANGELOG.md` by entry through the new `scripts/gh/changelog-merge.sh`,

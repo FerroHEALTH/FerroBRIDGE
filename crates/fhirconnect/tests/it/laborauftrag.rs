@@ -21,6 +21,8 @@ use std::sync::Arc;
 use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::origin::Origin;
+use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::seam::BundleReferences;
 use fhirconnect::engine::seam::NoReferences;
 use fhirconnect::engine::seam::Seams;
@@ -371,6 +373,51 @@ fn putget_holds_on_the_requester_organization() -> Result<(), Box<dyn Error>> {
 #[test]
 fn getput_holds_on_the_kds_laborauftrag_composition() -> Result<(), Box<dyn Error>> {
     insta::assert_json_snapshot!("kds_laborauftrag_getput", laborauftrag_getput()?);
+    Ok(())
+}
+
+/// `INSTRUCTION.narrative` is a mandatory `DV_TEXT` (RM EHR IM §INSTRUCTION)
+/// that no mapping of the request writes, so the FLAT builder fills it; the
+/// run declares the fill once, as a warning and in the composition's
+/// `FEEDER_AUDIT` (RM common IM, the `FEEDER_AUDIT` class).
+#[test]
+fn an_instruction_narrative_left_to_the_builder_is_declared() -> Result<(), Box<dyn Error>> {
+    let (program, index) = kds_laborauftrag_program()?;
+    let into = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &Value::from_serde_json(kds_service_request()?),
+        &Seams::default(),
+        &laws::defaults().with_origin(Origin::new("ferrobridge.test")),
+        &CallContext::new(),
+    )?;
+    let narratives: Vec<&str> = into
+        .warnings()
+        .iter()
+        .filter_map(|warning| match *warning.loss() {
+            Loss::Defaulted { ref field } if field.ends_with("/narrative") => Some(field.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        narratives,
+        ["/content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/narrative"],
+        "the one instruction's narrative is declared once"
+    );
+    let audited: Vec<&str> = into
+        .value()
+        .value()
+        .pointer("/feeder_audit/feeder_system_item_ids")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("the composition carries the defaulted fields in its FEEDER_AUDIT")?
+        .iter()
+        .filter_map(|item| item.get("id").and_then(serde_json::Value::as_str))
+        .collect();
+    assert!(
+        audited.contains(&narratives[0]),
+        "the FEEDER_AUDIT names the narrative: {audited:?}"
+    );
     Ok(())
 }
 

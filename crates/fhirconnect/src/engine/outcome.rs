@@ -283,7 +283,10 @@ pub enum Loss {
     /// A composition field the engine filled because no mapping did.
     ///
     /// The defaults are the ones `engine/defaults-for-fields.adoc` names, and
-    /// they apply going into openEHR only.
+    /// they apply going into openEHR only. The `INSTRUCTION.narrative` the
+    /// composition builder fills when no mapping writes it is declared the
+    /// same way, once per instruction (no specification governs this: our own
+    /// design).
     Defaulted {
         /// The openEHR path of the field.
         field: String,
