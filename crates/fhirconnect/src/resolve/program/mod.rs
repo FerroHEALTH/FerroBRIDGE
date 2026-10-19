@@ -28,7 +28,6 @@ use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::paths::FlatId;
 
 use crate::resolve::program::binding::ModelBinding;
-use crate::resolve::program::binding::PartyClass;
 use crate::resolve::program::binding::ProfileBinding;
 use crate::resolve::program::binding::ResourceType;
 use crate::resolve::program::binding::TemplateBinding;
@@ -38,6 +37,7 @@ use crate::resolve::program::hierarchy::Preprocessor;
 use crate::resolve::program::mapping::Mapping;
 use crate::resolve::program::mapping::Method;
 use crate::resolve::program::mapping::render_preprocessor;
+use openehr_mapping_core::party::PartyClass;
 
 /// One compiled context: the immutable program the interpreter runs.
 ///

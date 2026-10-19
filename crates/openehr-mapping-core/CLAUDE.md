@@ -37,6 +37,13 @@ the language crate applies its own grammar to them.
   builder runs. A `ctx/` value is `NodeValue::context`; a whole value is the
   `raw` suffix (Simplified Formats master04 §Raw canonical JSON).
 
+- **A party is built here, never through FLAT.** `party::build_party` builds
+  a canonical `PARTY` through the `openehr-rm` types: the OPT 1.4 constraints
+  (`index::structure`) give the class, node id and rubric of every object a
+  Web Template compacted away, the `openehr_rm::v1_2::model` table says which
+  attribute is a list, and the result decodes strictly as the root's class.
+  It moves to `openehr-sdt` when that crate carries a party builder (#906).
+
 The Web Template index, relative path derivation, and composition build and
 read (the other half of this crate's role in `docs/architecture.md` §7) are
 #75.
