@@ -411,6 +411,28 @@ async fn a_patient_deletes_its_latest_version() -> Result<(), Box<dyn StdError>>
     )
     .await?;
     assert_eq!(StatusCode::NO_CONTENT, status, "{body}");
+    // RM Common IM, Logical Deletion: a delete commits a version whose lifecycle state is
+    // `deleted` (523), and its audit's change type is `deleted` (523).
+    let requests = cdr.received_requests().await.unwrap_or_default();
+    let sent = requests
+        .iter()
+        .find(|request| request.method.as_str() == "DELETE")
+        .ok_or("the CDR received the delete")?;
+    let version = sent
+        .headers
+        .get("openehr-version")
+        .and_then(|value| value.to_str().ok())
+        .ok_or("the delete carries openehr-version")?;
+    assert!(
+        version.contains("lifecycle_state.code_string=\"523\""),
+        "{version}"
+    );
+    let audit = sent
+        .headers
+        .get("openehr-audit-details")
+        .and_then(|value| value.to_str().ok())
+        .ok_or("the delete carries openehr-audit-details")?;
+    assert!(audit.contains("change_type.code_string=\"523\""), "{audit}");
     Ok(())
 }
 
