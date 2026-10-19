@@ -17,16 +17,21 @@ the authorities under the Cyber Resilience Act.
 
 ## Supported versions
 
-Security fixes apply to the latest released version only; there is no
-back-port line.
+Only the newest release is supported. When a new release is published, every
+earlier release stops receiving fixes: there are no maintenance branches, no
+long-term-support line and no backports. If you are not on the newest
+release, upgrade; upgrading is free. Under the Cyber Resilience Act, Cadasto
+B.V. commits to keep publishing security fixes for at least five years after
+each release (Regulation (EU) 2024/2847 Art 13(8)) and ships them only in the
+newest release (Art 13(10)).
 
-| Version             | Supported          |
-| ------------------- | ------------------ |
-| Latest release      | :white_check_mark: |
-| Older releases      | :x:                |
-| `main` (unreleased) | best effort        |
+| Artifact | Supported version | Where fixes ship |
+| --- | --- | --- |
+| The `ferrobridge` binary (release tarballs) | the newest published release | the newest release |
+| The bridge and operator console container images | the newest published release | the newest release |
+| The library crates on crates.io | the newest published release | the newest release |
 
-Once the project reaches 1.0 this table will name a supported minor line.
+`main` is unreleased and best effort.
 
 ## Reporting a vulnerability
 
