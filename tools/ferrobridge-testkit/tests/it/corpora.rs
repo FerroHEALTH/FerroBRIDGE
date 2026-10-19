@@ -291,13 +291,20 @@ fn the_cdm_corpus_carries_the_four_postgresql_ddl_files() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn the_its_rest_corpus_carries_the_five_stable_documents() -> Result<(), Box<dyn Error>> {
+fn the_its_rest_corpus_carries_the_five_stable_documents_and_the_development_demographic()
+-> Result<(), Box<dyn Error>> {
     let oas = repo_root().join("docs/specs/its-rest/computable/OAS");
     let files = files_under(&oas)?;
     assert_eq!(
         count_with_extension(&files, &["yaml"]),
-        5,
-        "the corpus is the Overview, System, EHR, Query and Definition documents, and no other"
+        6,
+        "the corpus is the Overview, System, EHR, Query, Definition and Demographic documents, \
+         and no other"
+    );
+    let demographic = std::fs::read_to_string(oas.join("demographic-codegen.openapi.yaml"))?;
+    assert!(
+        demographic.contains("x-status: DEVELOPMENT"),
+        "demographic-codegen.openapi.yaml is not the DEVELOPMENT document"
     );
     for module in ["overview", "system", "ehr", "query", "definition"] {
         let path = oas.join(format!("{module}-codegen.openapi.yaml"));

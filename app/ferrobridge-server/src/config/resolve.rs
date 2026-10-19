@@ -293,6 +293,7 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
     let base_url = url_of("cdr.base_url", &cdr.base_url)?;
     let mut config = crate::cdr::config::CdrConfig::new(base_url)
         .with_timeout(Duration::from_millis(cdr.timeout_ms))
+        .with_demographic(cdr.demographic)
         .with_retry(openehr_its::rest::client::RetryPolicy {
             // NOTE: no specification governs this: our own design; a u32 fits a
             // usize on every target the server builds for, so the clamp never bites.

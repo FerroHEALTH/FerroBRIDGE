@@ -25,6 +25,17 @@ crates on crates.io.
 
 ### Added
 
+- The ITS-REST 1.1.0 Demographic API, DEVELOPMENT, behind `[cdr] demographic`
+  (off by default; #894). The Demographic OpenAPI document is vendored beside
+  the other ITS-REST documents, its `x-status: DEVELOPMENT` checked, and a test
+  holds the generated `openehr-its` client to every operation it declares.
+  `CdrClient::demographic` reads, creates, updates and deletes `PERSON`,
+  `ORGANISATION` and `ROLE`; a `400`, `404`, `409`, `412` or `422` maps to a
+  facade answer through `facade::status::demographic`. A Release 1.1.0
+  `PARTY` that carries `reverse_relationships` reads: the member is dropped
+  before the decode and the dropped entries are counted, because each one
+  restates a relationship the repository holds (RM Demographic IM Release
+  1.1.0 §2.2.1; #845). No FHIR resource is served from it yet.
 - A FHIRconnect sub-context's `template.id` is checked against the template
   the parent's OPT 1.4 states at the slot node (`C_ARCHETYPE_ROOT.template_id`,
   read by the new `WebTemplateIndex::embedded_template`). A different template

@@ -19,6 +19,7 @@ pub mod commit;
 mod composition;
 pub mod config;
 mod contribution;
+pub mod demographic;
 mod ehr;
 pub mod error;
 pub mod ids;
@@ -143,6 +144,8 @@ pub struct CdrClient {
     auth: Option<Auth>,
     /// The correlation identifier to echo, when the caller set one.
     request_id: Option<RequestId>,
+    /// Whether `[cdr] demographic` lets the client reach the Demographic API.
+    demographic: bool,
 }
 
 impl CdrClient {
@@ -171,6 +174,7 @@ impl CdrClient {
             client: authenticated(client, auth.as_ref()),
             auth,
             request_id: None,
+            demographic: config.demographic,
         })
     }
 
@@ -181,6 +185,7 @@ impl CdrClient {
             client: self.client.clone(),
             auth: self.auth.clone(),
             request_id: Some(request_id),
+            demographic: self.demographic,
         }
     }
 
@@ -208,6 +213,7 @@ impl CdrClient {
         &self,
         headers: HeaderMap,
         retry: RetryPolicy,
+        parties: bool,
     ) -> Result<Client<Scoped<'_>>, CdrError> {
         let mut extra = headers;
         if let Some(request_id) = self.request_id.as_ref() {
@@ -224,6 +230,11 @@ impl CdrClient {
             Some(Auth::Static(_)) | None => None,
         };
         let transport = Scoped::new(self.client.transport(), extra, renewal);
+        let transport = if parties {
+            transport.reading_parties()
+        } else {
+            transport
+        };
         let client = Client::new(transport, self.client.base().clone())
             .map_err(|source| CdrError::client(source, None))?
             .with_retry(retry);
@@ -232,7 +243,13 @@ impl CdrClient {
 
     /// Returns a runtime for one call under the configured retry budget.
     fn call(&self, headers: HeaderMap) -> Result<Client<Scoped<'_>>, CdrError> {
-        self.scoped(headers, self.client.retry())
+        self.scoped(headers, self.client.retry(), false)
+    }
+
+    /// Returns a runtime for one Demographic API call under the configured
+    /// retry budget, reading every `2xx` body as a Release 1.1.0 `PARTY`.
+    fn party_call(&self, headers: HeaderMap) -> Result<Client<Scoped<'_>>, CdrError> {
+        self.scoped(headers, self.client.retry(), true)
     }
 
     /// Returns the status the service answers an authenticated probe with.
@@ -254,7 +271,7 @@ impl CdrClient {
             max_attempts: 1,
             ..self.client.retry()
         };
-        let client = self.scoped(HeaderMap::new(), once)?;
+        let client = self.scoped(HeaderMap::new(), once, false)?;
         let params = DefinitionTemplateAdl14ListParams {
             accept: None,
             template_id: Some(String::from(PROBE_TEMPLATE)),

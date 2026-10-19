@@ -238,3 +238,25 @@ fn a_numeric_key_given_a_number_out_of_its_range_is_refused() {
     .expect_err("max_attempts is unsigned");
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
 }
+#[test]
+fn the_demographic_api_is_off_unless_the_cdr_section_turns_it_on() -> Result<(), Box<dyn StdError>>
+{
+    let settings = Config::from_sources(Some(FULL), &BTreeMap::new())?.resolve()?;
+    assert!(
+        !settings
+            .cdr
+            .as_ref()
+            .ok_or("the CDR lane is on")?
+            .demographic
+    );
+    let settings = Config::from_sources(Some(FULL), &env("FERROBRIDGE__CDR__DEMOGRAPHIC", "true"))?
+        .resolve()?;
+    assert!(
+        settings
+            .cdr
+            .as_ref()
+            .ok_or("the CDR lane is on")?
+            .demographic
+    );
+    Ok(())
+}

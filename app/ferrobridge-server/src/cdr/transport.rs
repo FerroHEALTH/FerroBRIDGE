@@ -26,6 +26,7 @@ use openehr_its::rest::client::ReqwestTransport;
 use openehr_its::rest::client::Transport;
 use openehr_its::rest::client::TransportError;
 
+use crate::cdr::demographic::party::without_reverse_relationships;
 use crate::cdr::error::Upstream;
 use crate::cdr::oauth::RenewalError;
 use crate::cdr::oauth::TokenError;
@@ -44,6 +45,11 @@ pub(crate) struct Scoped<'t> {
     answered: Mutex<Option<Upstream>>,
     /// Why the renewal of a refused token failed, when it did.
     refused: Mutex<Option<Arc<TokenError>>>,
+    /// Whether a `2xx` body is read as a Release 1.1.0 `PARTY`.
+    parties: bool,
+    /// How many `reverse_relationships` entries the last answer's `PARTY`
+    /// carried before they were dropped.
+    dropped: Mutex<usize>,
 }
 
 impl<'t> Scoped<'t> {
@@ -60,7 +66,26 @@ impl<'t> Scoped<'t> {
             renewal,
             answered: Mutex::new(None),
             refused: Mutex::new(None),
+            parties: false,
+            dropped: Mutex::new(0),
         }
+    }
+
+    /// Returns this engine reading every `2xx` body as a Release 1.1.0
+    /// `PARTY`, whose `reverse_relationships` it drops before the generated
+    /// client decodes the body
+    /// ([`without_reverse_relationships`]).
+    pub(crate) const fn reading_parties(mut self) -> Self {
+        self.parties = true;
+        self
+    }
+
+    /// Returns how many `reverse_relationships` entries the `PARTY` of the
+    /// last answer carried before they were dropped.
+    pub(crate) fn dropped(&self) -> usize {
+        // NOTE: no specification governs this: our own design; a poisoned slot
+        // still holds the last count written, so it is taken as it stands.
+        *self.dropped.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     /// Returns the last answer an attempt read, when one was read.
@@ -143,6 +168,16 @@ impl Transport for Scoped<'_> {
             String::from_utf8_lossy(response.body()).into_owned(),
         );
         *self.answered.lock().unwrap_or_else(PoisonError::into_inner) = Some(upstream);
+        if self.parties && response.status().is_success() {
+            let (body, dropped) = match without_reverse_relationships(response.body()) {
+                Some((body, dropped)) => (Some(body), dropped),
+                None => (None, 0),
+            };
+            if let Some(body) = body {
+                *response.body_mut() = body;
+            }
+            *self.dropped.lock().unwrap_or_else(PoisonError::into_inner) = dropped;
+        }
         Ok(response)
     }
 }

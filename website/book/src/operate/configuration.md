@@ -137,6 +137,7 @@ server says so once at start-up, naming the section and never a value.
 |---|---|---|---|
 | `base_url` | none, required | | The openEHR REST API root, usually ending in `/v1` |
 | `timeout_ms` | `30000` | | How long one call may take, connection included |
+| `demographic` | `false` | | Whether the bridge reaches the CDR's ITS-REST 1.1.0 Demographic API, which the release marks `x-status: DEVELOPMENT` |
 
 ### `[cdr.retry]` and `[terminology.retry]`
 
@@ -152,6 +153,14 @@ For the CDR, the bridge calls through the generated ITS-REST client of the
 timeout, or a `5xx` other than `501`; a `POST` is sent once. A `401`, a `403`
 and a status the operation does not document are never retried.
 `[cdr] timeout_ms` is the per-request timeout of the client's HTTP engine.
+
+`[cdr] demographic` turns on the client of the ITS-REST 1.1.0 Demographic API,
+DEVELOPMENT: the reads, creates, updates and deletes of `PERSON`,
+`ORGANISATION` and `ROLE`. No FHIR resource is served from it yet. A Release
+1.1.0 `PARTY` may carry `reverse_relationships`, which the development line
+removed; the bridge drops the member before it reads the party and counts the
+entries it dropped. Each entry restates a relationship the demographic
+repository already holds (RM Demographic IM Release 1.1.0 §2.2.1).
 
 ### `[cdr.credentials]` and `[terminology.credentials]`
 

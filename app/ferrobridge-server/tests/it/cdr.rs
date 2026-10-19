@@ -8,6 +8,7 @@
 
 mod composition;
 mod contribution;
+mod demographic;
 mod ehr;
 mod end_to_end;
 mod oauth;

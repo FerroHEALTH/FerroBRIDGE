@@ -63,6 +63,12 @@ the real run path; a binary-only crate cannot be imported from `tests/`
 - **The commit headers carry the 1.1.0 value form** (`openehr-version`,
   `openehr-audit-details`, `openehr-template-id`) and never the deprecated
   1.0.3 spelling.
+- **The Demographic API is DEVELOPMENT and gated.** `CdrClient::demographic`
+  answers `None` unless `[cdr] demographic` is set; the party calls go through
+  the generated `demographic` client like every other call, and their engine
+  drops a Release 1.1.0 `PARTY.reverse_relationships` before the decode
+  (`cdr::demographic::party`). A refusal becomes a facade answer through
+  `facade::status::demographic`.
 - **Tests are `wiremock` contract tests under `tests/it/cdr/`**, one case per
   documented status plus the request-side assertions; every body is synthetic.
 
