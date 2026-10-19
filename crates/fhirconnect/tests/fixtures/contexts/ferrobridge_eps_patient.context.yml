@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The context that runs a document claiming HL7 Europe's EPS Patient profile
+# through the synthetic ferrobridge.diagnose.v1 template of the testkit, so the
+# published EPS example documents reach $toopenehr. The mapping beside it is
+# synthetic: it carries the administrative gender into the problem name and
+# nothing else.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_eps_patient.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/eps/StructureDefinition/patient-eu-eps"
+  template:
+    id: "ferrobridge.diagnose.v1"
+  archetypes:
+    - "ferrobridge_eps_patient"
+  start: "ferrobridge_eps_patient"

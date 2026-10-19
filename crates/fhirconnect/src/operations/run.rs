@@ -43,6 +43,7 @@ use crate::operations::issues;
 use crate::operations::programs::ProgramSet;
 use crate::operations::provenance;
 use crate::operations::provenance::CompositionSource;
+use crate::operations::subjects;
 use crate::resolve::program::Program;
 use crate::resolve::program::binding::TemplateId;
 use crate::resolve::select::select_by_profile_pinned;
@@ -287,8 +288,9 @@ pub fn to_openehr_with_warnings<T: Table + ?Sized>(
     settings: &Settings,
     request: &ToOpenehrRequest,
 ) -> Result<Transformed<ToOpenehrResponse>, OperationError> {
+    let addressed = bundle_entries(request.bundle())?;
+    subjects::refuse_several(&addressed)?;
     let entries = entry_objects(request.bundle())?;
-    refuse_several_subjects(&entries)?;
     let program = select(programs, &entries, request.template_id())?;
     let template = program.template().id().clone();
     let index = programs
@@ -302,7 +304,7 @@ pub fn to_openehr_with_warnings<T: Table + ?Sized>(
         origin = origin.with_source(source);
     }
     let defaults = settings.defaults().clone().with_origin(origin);
-    let references = BundleReferences::new(bundle_entries(request.bundle())?, seams.references());
+    let references = BundleReferences::new(addressed, seams.references());
     let seams = seams.with_references(&references);
     let outcome = traverse::to_openehr(
         program,
@@ -518,34 +520,6 @@ fn entry_objects(bundle: &Bundle) -> Result<Vec<Object>, OperationError> {
         objects.push(object);
     }
     Ok(objects)
-}
-
-/// Refuses a Bundle that references more than one subject.
-///
-/// One Bundle maps to one composition and a composition belongs to one EHR, so
-/// a mixed-subject Bundle cannot be one composition. FHIRconnect governs no
-/// part of this: our own design.
-fn refuse_several_subjects(entries: &[Object]) -> Result<(), OperationError> {
-    let mut subjects: Vec<String> = Vec::new();
-    for object in entries {
-        if let Some(Value::String(resource_type)) = object.get("resourceType")
-            && resource_type == "Patient"
-            && let Some(Value::String(id)) = object.get("id")
-        {
-            record(&mut subjects, format!("Patient/{id}"));
-        }
-        for key in ["subject", "patient"] {
-            if let Some(reference) = object.get(key).and_then(|value| value.get("reference"))
-                && let Value::String(ref text) = *reference
-            {
-                record(&mut subjects, text.clone());
-            }
-        }
-    }
-    if subjects.len() > 1 {
-        return Err(OperationError::SeveralSubjects { subjects });
-    }
-    Ok(())
 }
 
 /// Records `value` in `seen` when it is not there already.
