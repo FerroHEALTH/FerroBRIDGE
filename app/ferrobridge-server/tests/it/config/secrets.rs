@@ -13,25 +13,23 @@ use std::io::Write;
 #[test]
 fn a_secret_file_sibling_is_read_at_boot() -> Result<(), Box<dyn StdError>> {
     let mut file = tempfile::NamedTempFile::new()?;
-    writeln!(file, "synthetic-token")?;
+    writeln!(file, "synthetic-password")?;
     let text = format!(
-        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n[cdr.credentials]\nbearer_token_file = {:?}\n",
+        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n[cdr.credentials]\nuser = \"bridge\"\npassword_file = {:?}\n",
         file.path()
     );
 
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let cdr = settings.cdr.as_ref().ok_or("the CDR lane is on")?;
     match cdr.credentials.as_ref() {
-        Some(ferrobridge_server::cdr::config::CdrCredentials::Static(
-            openehr_its::rest::client::Credentials::Bearer(token),
-        )) => {
+        Some(ferrobridge_server::cdr::config::CdrCredentials::Basic { password, .. }) => {
             assert_eq!(
-                "synthetic-token",
-                token.expose_secret(),
+                "synthetic-password",
+                password.expose_secret(),
                 "the trailing newline of the file is not part of the secret"
             );
         }
-        other => return Err(format!("expected a bearer token, got {other:?}").into()),
+        other => return Err(format!("expected basic authentication, got {other:?}").into()),
     }
     Ok(())
 }
@@ -74,14 +72,14 @@ fn a_cdm_tls_ca_file_is_read_through_its_environment_name() -> Result<(), Box<dy
 fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn StdError>> {
     let text = concat!(
         "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
-        "[cdr.credentials]\nbearer_token = \"inline\"\nbearer_token_file = \"/run/secrets/token\"\n",
+        "[cdr.credentials]\nuser = \"bridge\"\npassword = \"inline\"\npassword_file = \"/run/secrets/password\"\n",
     );
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
         .resolve()
         .expect_err("a secret set twice is a boot error");
     match &error {
-        Error::Conflict { key } => assert_eq!("cdr.credentials.bearer_token", key),
+        Error::Conflict { key } => assert_eq!("cdr.credentials.password", key),
         other => return Err(format!("expected a conflict, got {other:?}").into()),
     }
     Ok(())
@@ -91,7 +89,7 @@ fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn 
 fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
     let text = concat!(
         "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
-        "[cdr.credentials]\nbearer_token_file = \"/nonexistent/token\"\n",
+        "[cdr.credentials]\nuser = \"bridge\"\npassword_file = \"/nonexistent/password\"\n",
     );
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
@@ -99,30 +97,13 @@ fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn Std
         .expect_err("an unreadable secret is a boot error");
     match &error {
         Error::Secret { key, .. } => {
-            assert_eq!("cdr.credentials.bearer_token_file", key);
+            assert_eq!("cdr.credentials.password_file", key);
             assert!(
                 StdError::source(&error).is_some(),
                 "the refusal keeps the file system's own cause"
             );
         }
         other => return Err(format!("expected a secret error, got {other:?}").into()),
-    }
-    Ok(())
-}
-
-#[test]
-fn a_credentials_section_naming_two_schemes_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
-    let text = concat!(
-        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
-        "[cdr.credentials]\nbearer_token = \"t\"\nuser = \"bridge\"\npassword = \"p\"\n",
-    );
-
-    let error = Config::from_sources(Some(text), &BTreeMap::new())?
-        .resolve()
-        .expect_err("one scheme at a time");
-    match &error {
-        Error::Scheme { section } => assert_eq!("cdr.credentials", section),
-        other => return Err(format!("expected a scheme error, got {other:?}").into()),
     }
     Ok(())
 }
@@ -156,9 +137,7 @@ fn a_user_file_sibling_is_read_at_boot() -> Result<(), Box<dyn StdError>> {
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let cdr = settings.cdr.as_ref().ok_or("the CDR lane is on")?;
     match cdr.credentials.as_ref() {
-        Some(ferrobridge_server::cdr::config::CdrCredentials::Static(
-            openehr_its::rest::client::Credentials::Basic { user, .. },
-        )) => {
+        Some(ferrobridge_server::cdr::config::CdrCredentials::Basic { user, .. }) => {
             assert_eq!(
                 "12345", user,
                 "the trailing newline is not part of the user"
@@ -193,7 +172,7 @@ fn no_inline_secret_reaches_the_debug_rendering_of_the_tree_or_the_settings()
         "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
         "[cdr.credentials]\nuser = \"bridge\"\npassword = \"synthetic-cdr-password\"\n\n",
         "[terminology]\nbase_url = \"http://tx.invalid/fhir\"\n\n",
-        "[terminology.credentials]\nbearer_token = \"synthetic-tx-token\"\n\n",
+        "[terminology.credentials]\nuser = \"bridge\"\npassword = \"synthetic-tx-password\"\n\n",
         "[cdm]\nurl = \"postgres://bridge:synthetic-db-password@db.invalid/cdm?sslmode=disable\"\n",
     );
     let config = Config::from_sources(Some(text), &BTreeMap::new())?;
@@ -202,7 +181,7 @@ fn no_inline_secret_reaches_the_debug_rendering_of_the_tree_or_the_settings()
     for rendered in [&tree, &settings] {
         for secret in [
             "synthetic-cdr-password",
-            "synthetic-tx-token",
+            "synthetic-tx-password",
             "synthetic-db-password",
         ] {
             assert!(

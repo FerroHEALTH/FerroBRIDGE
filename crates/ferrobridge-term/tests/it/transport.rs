@@ -146,10 +146,12 @@ async fn a_401_keeps_the_www_authenticate_challenge() -> Result<(), Box<dyn StdE
         .mount(&server)
         .await;
 
-    let client = Client::new(
-        config(&server, WireVersion::R4)?
-            .with_credentials(Credentials::Bearer(SecretString::from("s3cr3t-token"))),
-    )?;
+    let client = Client::new(config(&server, WireVersion::R4)?.with_credentials(
+        Credentials::Basic {
+            user: String::from("bridge"),
+            password: SecretString::from("s3cr3t-password"),
+        },
+    ))?;
     let error = lookup(&client)
         .await
         .expect_err("the credentials were refused");
@@ -165,7 +167,7 @@ async fn a_401_keeps_the_www_authenticate_challenge() -> Result<(), Box<dyn StdE
 }
 
 #[tokio::test]
-async fn the_bearer_token_travels_and_never_reaches_a_debug_rendering()
+async fn basic_credentials_travel_and_never_reach_a_debug_rendering()
 -> Result<(), Box<dyn StdError>> {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
@@ -178,23 +180,27 @@ async fn the_bearer_token_travels_and_never_reaches_a_debug_rendering()
         .mount(&server)
         .await;
 
-    let client = Client::new(
-        config(&server, WireVersion::R4)?
-            .with_credentials(Credentials::Bearer(SecretString::from("s3cr3t-token"))),
-    )?;
+    let client = Client::new(config(&server, WireVersion::R4)?.with_credentials(
+        Credentials::Basic {
+            user: String::from("bridge"),
+            password: SecretString::from("s3cr3t-password"),
+        },
+    ))?;
     lookup(&client).await?;
 
+    // NOTE: RFC 7617 §2, the credentials are base64 of `user:password`;
+    // `YnJpZGdlOnMzY3IzdC1wYXNzd29yZA==` is `bridge:s3cr3t-password`.
     assert_eq!(
-        vec!["Bearer s3cr3t-token".to_owned()],
+        vec!["Basic YnJpZGdlOnMzY3IzdC1wYXNzd29yZA==".to_owned()],
         crate::support::request_header(&server, 0, "authorization").await?
     );
     assert!(
-        !format!("{client:?}").contains("s3cr3t-token"),
-        "the token is in the client's Debug rendering"
+        !format!("{client:?}").contains("s3cr3t-password"),
+        "the password is in the client's Debug rendering"
     );
     assert!(
-        !format!("{:?}", client.config()).contains("s3cr3t-token"),
-        "the token is in the configuration's Debug rendering"
+        !format!("{:?}", client.config()).contains("s3cr3t-password"),
+        "the password is in the configuration's Debug rendering"
     );
     Ok(())
 }

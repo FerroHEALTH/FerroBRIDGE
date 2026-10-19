@@ -208,7 +208,7 @@ jobs:
           mkdir -p secrets
           : > secrets/cdm_url
           : > secrets/cdm_password
-          : > secrets/cdr_bearer_token
+          : > secrets/cdr_password
           : > secrets/viewer_oidc_client_secret
           docker compose --profile viewer config
           docker compose --profile cdm --profile vocab --profile viewer config --quiet

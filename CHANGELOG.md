@@ -160,6 +160,27 @@ crates on crates.io.
   names with the workspace version and its changelog date, so the next cut
   fails the guard until they move with it (#908).
 
+### Removed
+
+- **Breaking:** the static bearer token is gone from `[cdr.credentials]` and
+  `[terminology.credentials]` (#961). The bridge authenticates to an upstream
+  with RFC 7617 basic authentication, or to the CDR with a token it obtains
+  through the OAuth 2.0 client credentials grant (`[cdr.credentials.oauth]`).
+  A configuration that still sets `bearer_token` or `bearer_token_file`, or
+  the `FERROBRIDGE__CDR__CREDENTIALS__BEARER_TOKEN[_FILE]` and
+  `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__BEARER_TOKEN[_FILE]` variables,
+  refuses to start on an unknown key. Replace it with `user` and
+  `password_file`, or for the CDR with `[cdr.credentials.oauth]`. The compose
+  quickstart's `cdr_bearer_token` secret is now `cdr_password`, read through
+  `FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE` beside
+  `FERROBRIDGE__CDR__CREDENTIALS__USER`, and the quickstart passes the
+  `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__` variables through. The Operate
+  page recommends the OAuth path when the FHIR facade and the CDR are separate
+  audiences of one authorization server (#952). `ferrobridge-term` 0.1.128
+  drops `config::Credentials::Bearer`, and the server's
+  `CdrConfig::with_credentials` becomes `with_basic`; a consumer passes a
+  user and a password.
+
 ### Fixed
 
 - A FHIRconnect run into openEHR declares every `INSTRUCTION.narrative` it

@@ -294,7 +294,7 @@ fn a_resource_with_a_fragment_refuses_to_boot() -> Result<(), Box<dyn StdError>>
 #[test]
 fn a_grant_beside_a_static_scheme_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
     let error = refusal(&text(
-        "bearer_token = \"t\"\n",
+        "user = \"bridge\"\npassword = \"p\"\n",
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\n",
     ))?;
     assert!(

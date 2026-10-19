@@ -183,7 +183,7 @@ impl Config {
     /// Returns [`Error::Conflict`] when a value and its `_file` sibling are
     /// both set, [`Error::Secret`] when a `_file` cannot be read, and the
     /// value errors ([`Error::Listen`], [`Error::Url`],
-    /// [`Error::WireVersion`], [`Error::Missing`], [`Error::Scheme`],
+    /// [`Error::WireVersion`], [`Error::Missing`], [`Error::OAuthScheme`],
     /// [`Error::Client`]) each naming the key that carries the fault. Returns
     /// [`Error::Mappings`] over [`crate::mappings::Error::NoTemplateSource`]
     /// when the operations are enabled and `[mappings] directory` is set with

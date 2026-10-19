@@ -166,18 +166,20 @@ repository already holds (RM Demographic IM Release 1.1.0 §2.2.1).
 
 ### `[cdr.credentials]` and `[terminology.credentials]`
 
-Set one scheme. A bearer token and a user together is a boot error, and so is
-an inline value beside its `_file` sibling.
+The bridge authenticates to an upstream in one of two modes: RFC 7617 basic
+authentication with `user` and `password`, or, for the CDR only, a token it
+obtains itself with the OAuth 2.0 client credentials grant
+([`[cdr.credentials.oauth]`](#cdrcredentialsoauth)). It takes no static
+bearer token: a `bearer_token` key is an unknown key and refuses the start.
+An inline value beside its `_file` sibling is a boot error too.
 
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
-| `bearer_token` | none | yes | An RFC 6750 bearer token |
 | `user` | none | | The user name of RFC 7617 basic authentication; a `user_file` sibling names a file holding it, read at boot like a secret |
 | `password` | none | yes | The password of RFC 7617 basic authentication |
 
-For the CDR, the scheme becomes the `Authorization` header of every call the
-generated client sends: `Bearer <token>` for a token, and `Basic` over
-`user:password` for a user and a password.
+The user and the password become the `Authorization` header of every call,
+`Basic` over `user:password`.
 
 ### `[cdr.credentials.oauth]`
 
@@ -185,9 +187,14 @@ The bridge can obtain its CDR token itself with the OAuth 2.0 client
 credentials grant (RFC 6749 §4.4) and renew it before it expires. The bridge
 always reaches the CDR under its own token for the CDR's audience and never
 forwards a caller's token, because an access token names the resource server
-it is for (RFC 9068 §4). The section replaces the static schemes: setting it
-beside `bearer_token` or `user` is a boot error. Only the CDR takes it; under
-`[terminology.credentials]` it is an unknown key.
+it is for (RFC 9068 §4). Setting the section beside `user` is a boot error.
+Only the CDR takes it; under `[terminology.credentials]` it is an unknown key.
+
+Use this section when the FHIR facade and the CDR are separate audiences of
+one authorization server. Callers then hold tokens for the FHIR audience, and
+the bridge obtains and renews its own for the CDR's. Set `audience` or
+`resource` to whichever parameter that authorization server reads to select
+the CDR.
 
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
@@ -707,9 +714,8 @@ it carries.
 
 | Variable | File sibling |
 |---|---|
-| `FERROBRIDGE__CDR__CREDENTIALS__BEARER_TOKEN` | `FERROBRIDGE__CDR__CREDENTIALS__BEARER_TOKEN_FILE` |
 | `FERROBRIDGE__CDR__CREDENTIALS__PASSWORD` | `FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE` |
-| `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__BEARER_TOKEN` | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__BEARER_TOKEN_FILE` |
+| `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD` | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD_FILE` |
 | `FERROBRIDGE__CDM__URL` | `FERROBRIDGE__CDM__URL_FILE` |
 
@@ -724,8 +730,8 @@ exits 78, `EX_CONFIG`. Seven things are refused:
 - an unknown key or an unknown section;
 - a value of the wrong type, or one that is not a socket address, a URL, or a
   release name;
-- two credential schemes in one section, an OAuth section with both an
-  `issuer` and a `token_endpoint`, an `issuer` that is not an `https` URL
+- a `[cdr.credentials]` user beside its OAuth section, an OAuth section with
+  both an `issuer` and a `token_endpoint`, an `issuer` that is not an `https` URL
   free of a query and a fragment, a `scope` that is not scope tokens, and a
   `resource` with a fragment;
 - an `[auth]` algorithm that is symmetric or unknown, a `token_profile`
@@ -751,7 +757,8 @@ format = "json"
 base_url = "https://cdr.example.org/ehrbase/rest/openehr/v1"
 
 [cdr.credentials]
-bearer_token_file = "/run/secrets/cdr-token"
+user = "ferrobridge"
+password_file = "/run/secrets/cdr-password"
 
 [terminology]
 base_url = "https://tx.example.org/r4"
