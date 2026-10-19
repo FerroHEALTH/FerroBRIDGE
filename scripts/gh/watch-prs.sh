@@ -41,7 +41,7 @@ resolve_merge() {
     if ! git diff --quiet "$mb" HEAD -- CHANGELOG.md; then
       "$merge_changelog" <(git show "$mb:CHANGELOG.md") <(git show HEAD:CHANGELOG.md) \
         <(git show origin/main:CHANGELOG.md) >CHANGELOG.md.merged ||
-        { rm -f CHANGELOG.md.merged; git merge --abort; exit 1; }
+        { rm -f CHANGELOG.md.merged; git merge --abort 2>/dev/null; exit 1; }
       mv CHANGELOG.md.merged CHANGELOG.md
       git add CHANGELOG.md
     fi
@@ -71,6 +71,8 @@ changelog_leaks() {
   gh pr view "$p" --json files --jq '.files[].path' | grep -qx CHANGELOG.md || return 1
   b=$(gh pr view "$p" --json headRefName --jq .headRefName)
   git -C "$repo" fetch -q origin main "$b" || return 1
+  # A branch that already holds main has nothing left to merge.
+  git -C "$repo" merge-base --is-ancestor origin/main "origin/$b" && return 1
   tree=$(git -C "$repo" merge-tree --write-tree origin/main "origin/$b" 2>/dev/null | head -n1) || return 1
   ! cmp -s <("$merge_changelog" --released <(git -C "$repo" show "$tree:CHANGELOG.md")) \
     <("$merge_changelog" --released <(git -C "$repo" show origin/main:CHANGELOG.md))
