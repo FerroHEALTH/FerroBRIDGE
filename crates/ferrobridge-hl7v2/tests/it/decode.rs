@@ -110,15 +110,76 @@ fn a_character_set_this_crate_does_not_decode_is_refused() {
     );
 }
 
+// HL7 v2.9.1 chapter 2, MSH-18: "The first occurrence, if supplied, of the
+// MSH-18 SHALL indicate the default encoding of the message."
 #[test]
-fn a_repeating_msh_18_is_refused() {
+fn a_repeating_msh_18_decodes_with_its_first_repetition_when_msh_20_is_empty() {
     let bytes = fixtures::message(&[
         b"MSH|^~\\&|A|B|C|D|20260925||ADT^A01^ADT_A01|MSG1|P|2.5.1||||||8859/1~ISO IR87",
+        b"PID|1||X||J\xF6rg",
+    ]);
+    let decoded = decode(&bytes, Charset::Utf8).expect("the first repetition decodes");
+    assert_eq!(decoded.charset, Charset::Iso8859(1));
+    assert!(decoded.declared, "MSH-18 named the set");
+    assert!(decoded.text.contains("J\u{F6}rg"), "{}", decoded.text);
+}
+
+// HL7 table 0356: `<null>` is "no character set switching occurring in this
+// message".
+#[test]
+fn a_repeating_msh_18_decodes_with_its_first_repetition_when_msh_20_is_the_null_scheme() {
+    let bytes = fixtures::message(&[
+        b"MSH|^~\\&|A|B|C|D|20260925||ADT^A01^ADT_A01|MSG1|P|2.5.1||||||UNICODE UTF-8~ISO IR87||<null>",
+    ]);
+    let decoded = decode(&bytes, Charset::Ascii).expect("the first repetition decodes");
+    assert_eq!(decoded.charset, Charset::Utf8);
+}
+
+// HL7 v2.9.1 chapter 2, MSH-18 rule b): an empty first repetition leaves the
+// default set in force.
+#[test]
+fn a_repeating_msh_18_with_an_empty_first_repetition_takes_the_default() {
+    let bytes = fixtures::message(&[
+        b"MSH|^~\\&|A|B|C|D|20260925||ADT^A01^ADT_A01|MSG1|P|2.5.1||||||~ISO IR87",
+    ]);
+    let decoded = decode(&bytes, Charset::Ascii).expect("the default decodes");
+    assert_eq!(decoded.charset, Charset::Ascii);
+    assert!(!decoded.declared, "MSH-18 named no default set");
+}
+
+#[test]
+fn a_first_repetition_outside_table_0211_is_refused() {
+    let bytes = fixtures::message(&[
+        b"MSH|^~\\&|A|B|C|D|20260925||ADT^A01^ADT_A01|MSG1|P|2.5.1||||||UTF-8~UNICODE",
     ]);
     assert_eq!(
         decode(&bytes, Charset::Utf8),
-        Err(DecodeError::AlternateCharsets)
+        Err(DecodeError::UnsupportedCharset {
+            code: String::from("UTF-8"),
+        })
     );
+}
+
+#[test]
+fn a_repeating_msh_18_with_a_switching_scheme_in_msh_20_is_refused() {
+    let bytes = fixtures::message(&[
+        b"MSH|^~\\&|A|B|C|D|20260925||ADT^A01^ADT_A01|MSG1|P|2.5.1||||||8859/1~ISO IR87||ISO 2022-1994",
+    ]);
+    assert_eq!(
+        decode(&bytes, Charset::Utf8),
+        Err(DecodeError::SwitchingScheme {
+            scheme: String::from("ISO 2022-1994"),
+        })
+    );
+}
+
+#[test]
+fn a_switching_scheme_with_a_single_msh_18_is_read_as_no_switch() {
+    let bytes = fixtures::message(&[
+        b"MSH|^~\\&|A|B|C|D|20260925||ADT^A01^ADT_A01|MSG1|P|2.5.1||||||8859/1||ISO 2022-1994",
+    ]);
+    let decoded = decode(&bytes, Charset::Utf8).expect("one set needs no switching");
+    assert_eq!(decoded.charset, Charset::Iso8859(1));
 }
 
 #[test]

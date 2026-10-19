@@ -11,6 +11,13 @@
 //! the MLLP ends of a connection "mutually agree" on the encoding (MLLP
 //! Release 1, §Block format).
 //!
+//! A repeated MSH-18 is read by its first repetition, which "SHALL indicate
+//! the default encoding of the message" (HL7 v2.9.1 chapter 2, MSH-18); an
+//! empty first repetition is the empty field. The later repetitions name
+//! alternate sets reached through the escape sequences of chapter 2 §2.6.3,
+//! which the lexer refuses, so a value written in one fails loud. When
+//! MSH-20 names a switching scheme from table 0356 the message is refused.
+//!
 //! A byte sequence the declared set does not define is a typed refusal, never
 //! a replacement character. Table 0211 names "the printable characters" of
 //! each ISO 8859 part, so the C1 control range `0x80` to `0x9F` is refused for
@@ -108,9 +115,13 @@ pub enum DecodeError {
         /// The code as the message wrote it.
         code: String,
     },
-    /// MSH-18 repeats, which names alternate character sets (MSH-20).
-    #[error("MSH-18 repeats; alternate character set handling is not supported")]
-    AlternateCharsets,
+    /// MSH-18 repeats and MSH-20 names a scheme for switching to the
+    /// alternate character sets, which this crate does not implement.
+    #[error("MSH-20 names the character set switching scheme {scheme:?}, which is not supported")]
+    SwitchingScheme {
+        /// The table 0356 code as the message wrote it.
+        scheme: String,
+    },
     /// A byte sequence the declared character set does not define.
     #[error("the byte at offset {offset} is outside the character set {charset}")]
     Undeclared {
@@ -138,7 +149,8 @@ pub struct Decoded {
 /// # Errors
 ///
 /// Returns [`DecodeError`] when the message opens with no MSH segment, when
-/// MSH-18 names a set this crate does not decode or repeats, and when a byte
+/// MSH-18 names a set this crate does not decode, when MSH-18 repeats and
+/// MSH-20 names a switching scheme, and when a byte
 /// sequence falls outside the set.
 pub fn decode(message: &[u8], default: Charset) -> Result<Decoded, DecodeError> {
     let (charset, declared) = match declared_charset(message)? {
@@ -212,16 +224,28 @@ fn declared_charset(message: &[u8]) -> Result<Option<String>, DecodeError> {
     let Some(field) = header.split(|byte| *byte == separator).nth(17) else {
         return Ok(None);
     };
-    if field.is_empty() {
+    let mut repetitions = field.split(|byte| *byte == repetition);
+    let first = repetitions.next().unwrap_or_default();
+    if repetitions.next().is_some() {
+        let scheme = header
+            .split(|byte| *byte == separator)
+            .nth(19)
+            .unwrap_or_default();
+        // NOTE: HL7 table 0356: `<null>` is the default, "no character set
+        // switching occurring in this message", the same as an empty MSH-20.
+        if !scheme.is_empty() && scheme != b"<null>" {
+            return Err(DecodeError::SwitchingScheme {
+                scheme: String::from_utf8_lossy(scheme).into_owned(),
+            });
+        }
+    }
+    if first.is_empty() {
         return Ok(None);
     }
-    if field.contains(&repetition) {
-        return Err(DecodeError::AlternateCharsets);
-    }
-    match core::str::from_utf8(field) {
-        Ok(code) if field.is_ascii() => Ok(Some(String::from(code))),
+    match core::str::from_utf8(first) {
+        Ok(code) if first.is_ascii() => Ok(Some(String::from(code))),
         _ => Err(DecodeError::UnsupportedCharset {
-            code: String::from_utf8_lossy(field).into_owned(),
+            code: String::from_utf8_lossy(first).into_owned(),
         }),
     }
 }

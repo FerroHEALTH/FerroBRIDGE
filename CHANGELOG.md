@@ -84,6 +84,12 @@ crates on crates.io.
 
 ### Fixed
 
+- The HL7 v2 face decodes a message whose MSH-18 repeats with its first
+  repetition, the default character set by HL7 v2.9.1 chapter 2 (#641). It
+  still refuses one whose MSH-20 names a switching scheme from table 0356.
+  In `ferrobridge-hl7v2`, `DecodeError::AlternateCharsets` is replaced by
+  `DecodeError::SwitchingScheme { scheme }`; a caller matching the old variant
+  matches the new one.
 - `$toopenehr` compares the subjects of a Bundle as the entries their
   references resolve to (#399), by the R4 rules for resolving a reference in
   a Bundle (bundle.html §2.36.4.1): an absolute reference (`urn:uuid`,
