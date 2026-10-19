@@ -17,13 +17,14 @@ use leptos::prelude::*;
 
 use crate::bridge::BridgeError;
 use crate::engine::render::parts;
+use crate::locale::{Msg, tr};
 
 /// The overview for the answer `state`.
 #[must_use]
 pub fn render(state: &Result<EngineState, BridgeError>) -> String {
     let sections = match state {
         Ok(state) => overview(state),
-        Err(error) => parts::failed("Mappings", error),
+        Err(error) => parts::failed(&tr(Msg::Mappings), error),
     };
     stack(sections).to_html()
 }
@@ -32,7 +33,7 @@ pub fn render(state: &Result<EngineState, BridgeError>) -> String {
 fn file(path: Option<&str>) -> AnyView {
     match path {
         Some(path) => view! { <code>{path.to_owned()}</code> }.into_any(),
-        None => view! { <span class="fui-muted">"no file"</span> }.into_any(),
+        None => view! { <span class="fui-muted">{tr(Msg::NoFile)}</span> }.into_any(),
     }
 }
 
@@ -41,20 +42,20 @@ fn overview(state: &EngineState) -> AnyView {
     let context_table = if state.contexts.is_empty() {
         empty_quiet(
             Glyph::LAYERS,
-            "No context",
-            "The running load compiled no context.",
+            tr(Msg::NoContext),
+            tr(Msg::RunningLoadCompiledNoContext),
         )
         .into_any()
     } else {
         parts::table(
-            "Contexts",
+            &tr(Msg::Contexts),
             &[
-                "Context",
-                "Template",
-                "Profile",
-                "Resource",
-                "Models and extensions",
-                "Search",
+                &tr(Msg::Context),
+                &tr(Msg::Template),
+                &tr(Msg::Profile),
+                &tr(Msg::Resource),
+                &tr(Msg::ModelsAndExtensions),
+                &tr(Msg::Search),
             ],
             state.contexts.iter().map(context).collect_view().into_any(),
         )
@@ -62,14 +63,14 @@ fn overview(state: &EngineState) -> AnyView {
     let template_table = if state.templates.is_empty() {
         empty_quiet(
             Glyph::FILES,
-            "No template",
-            "The running load reads no template.",
+            tr(Msg::NoTemplate),
+            tr(Msg::RunningLoadReadsNoTemplate),
         )
         .into_any()
     } else {
         parts::table(
-            "Templates",
-            &["Template", "Source", "File"],
+            &tr(Msg::Templates),
+            &[&tr(Msg::Template), &tr(Msg::Source), &tr(Msg::File)],
             state
                 .templates
                 .iter()
@@ -91,15 +92,15 @@ fn overview(state: &EngineState) -> AnyView {
     };
     let omocl = view! {
         <p>
-            "The OMOCL files are " <span class=tone.badge()>{verdict}</span> "."
+            {tr(Msg::TheOmoclFilesAre)} <span class=tone.badge()>{verdict}</span> "."
         </p>
         {(!omocl_files.is_empty()).then(|| bullet_list(omocl_files))}
     };
     view! {
-        {card("Contexts", context_table)}
-        {card("Templates", template_table)}
-        {card("OMOCL", omocl)}
-        {card("Diagnostics", parts::diagnostics_table(&state.diagnostics))}
+        {card(tr(Msg::Contexts), context_table)}
+        {card(tr(Msg::Templates), template_table)}
+        {card(tr(Msg::Omocl), omocl)}
+        {card(tr(Msg::Diagnostics), parts::diagnostics_table(&state.diagnostics))}
     }
     .into_any()
 }
@@ -107,16 +108,16 @@ fn overview(state: &EngineState) -> AnyView {
 /// One template's row: its id, where it came from, and its file.
 fn template(template: &Template) -> AnyView {
     let (id, source, at) = match template {
-        Template::Directory { id, file } => (id, "template directory", Some(file.as_str())),
-        Template::Cdr { id } => (id, "the CDR", None),
+        Template::Directory { id, file } => (id, tr(Msg::TemplateDirectory), Some(file.as_str())),
+        Template::Cdr { id } => (id, tr(Msg::TheCdr), None),
     };
     view! {
         <tr>
             <th scope="row">
                 <code>{id.clone()}</code>
             </th>
-            <td data-label="Source">{source}</td>
-            <td data-label="File">{file(at)}</td>
+            <td data-label=tr(Msg::Source)>{source}</td>
+            <td data-label=tr(Msg::File)>{file(at)}</td>
         </tr>
     }
     .into_any()
@@ -134,7 +135,7 @@ fn context(program: &Program) -> AnyView {
                 .map(|extension| {
                     view! {
                         <li class="fui-muted">
-                            "extended by " <code>{extension.name.clone()}</code> " in "
+                            {tr(Msg::ExtendedBy)} <code>{extension.name.clone()}</code> {tr(Msg::In)}
                             {file(extension.file.as_deref())}
                         </li>
                     }
@@ -143,7 +144,7 @@ fn context(program: &Program) -> AnyView {
             view! {
                 <li>
                     <code>{model.name.clone()}</code>
-                    " in "
+                    {tr(Msg::In)}
                     {file(model.file.as_deref())}
                     <ul class="fui-bullets">{extensions}</ul>
                 </li>
@@ -152,10 +153,10 @@ fn context(program: &Program) -> AnyView {
         .collect_view();
     let search = match &program.search {
         Some(path) => view! { <code>{path.clone()}</code> }.into_any(),
-        None => view! { <span class="fui-muted">"none"</span> }.into_any(),
+        None => view! { <span class="fui-muted">{tr(Msg::None)}</span> }.into_any(),
     };
     let profile = if program.profile.is_empty() {
-        view! { <span class="fui-muted">"none"</span> }.into_any()
+        view! { <span class="fui-muted">{tr(Msg::None)}</span> }.into_any()
     } else {
         view! { <code>{format!("{} | {}", program.profile, program.profile_version)}</code> }
             .into_any()
@@ -167,15 +168,15 @@ fn context(program: &Program) -> AnyView {
                 <br />
                 {file(program.file.as_deref())}
             </th>
-            <td data-label="Template">
+            <td data-label=tr(Msg::Template)>
                 <code>{program.template.clone()}</code>
             </td>
-            <td data-label="Profile">{profile}</td>
-            <td data-label="Resource">{program.resource_type.clone()}</td>
-            <td data-label="Models and extensions">
+            <td data-label=tr(Msg::Profile)>{profile}</td>
+            <td data-label=tr(Msg::Resource)>{program.resource_type.clone()}</td>
+            <td data-label=tr(Msg::ModelsAndExtensions)>
                 <ul class="fui-bullets">{models}</ul>
             </td>
-            <td data-label="Search">{search}</td>
+            <td data-label=tr(Msg::Search)>{search}</td>
         </tr>
     }
     .into_any()

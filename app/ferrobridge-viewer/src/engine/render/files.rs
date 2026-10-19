@@ -21,6 +21,7 @@ use openehr_mapping_core::diagnostic::Diagnostic;
 
 use crate::bridge::{BridgeError, MappingFile};
 use crate::engine::render::parts;
+use crate::locale::{Msg, tr, tr_with};
 
 /// The path of the page that shows the file `path`.
 #[must_use]
@@ -39,7 +40,7 @@ pub fn line_id(number: u64) -> String {
 pub fn list(listing: &Result<Vec<Listed>, BridgeError>) -> String {
     let section = match listing {
         Ok(listing) => rows(listing),
-        Err(error) => parts::failed("Mapping files", error),
+        Err(error) => parts::failed(&tr(Msg::MappingFiles), error),
     };
     stack(section).to_html()
 }
@@ -48,11 +49,11 @@ pub fn list(listing: &Result<Vec<Listed>, BridgeError>) -> String {
 fn rows(listing: &[Listed]) -> AnyView {
     if listing.is_empty() {
         return card(
-            "Mapping files",
+            tr(Msg::MappingFiles),
             empty_quiet(
                 Glyph::FILES,
-                "No mapping file",
-                "The bridge serves no mapping file.",
+                tr(Msg::NoMappingFile),
+                tr(Msg::BridgeServesNoMappingFile),
             ),
         )
         .into_any();
@@ -76,15 +77,15 @@ fn rows(listing: &[Listed]) -> AnyView {
                             <code>{entry.path.clone()}</code>
                         </a>
                     </th>
-                    <td data-label="Language">{language}</td>
-                    <td data-label="Kind">
-                        {entry.kind.clone().unwrap_or_else(|| String::from("not read"))}
+                    <td data-label=tr(Msg::Language)>{language}</td>
+                    <td data-label=tr(Msg::Kind)>
+                        {entry.kind.clone().unwrap_or_else(|| tr(Msg::NotRead))}
                     </td>
-                    <td data-label="Owner">{owner}</td>
-                    <td data-label="Writable">
+                    <td data-label=tr(Msg::Owner)>{owner}</td>
+                    <td data-label=tr(Msg::Writable)>
                         {if entry.read_only { "read-only" } else { "editable" }}
                     </td>
-                    <td data-label="Diagnostics">
+                    <td data-label=tr(Msg::Diagnostics)>
                         <span class=tone.badge()>{count}</span>
                     </td>
                 </tr>
@@ -93,16 +94,16 @@ fn rows(listing: &[Listed]) -> AnyView {
         .collect_view()
         .into_any();
     card(
-        "Mapping files",
+        tr(Msg::MappingFiles),
         parts::table(
-            "Mapping files",
+            &tr(Msg::MappingFiles),
             &[
-                "File",
-                "Language",
-                "Kind",
-                "Owner",
-                "Writable",
-                "Diagnostics",
+                &tr(Msg::File),
+                &tr(Msg::Language),
+                &tr(Msg::Kind),
+                &tr(Msg::Owner),
+                &tr(Msg::Writable),
+                &tr(Msg::Diagnostics),
             ],
             rows,
         ),
@@ -120,9 +121,18 @@ fn counted(diagnostics: &[Diagnostic]) -> (String, Tone) {
         .count();
     let warnings = diagnostics.len().saturating_sub(errors);
     match (errors, warnings) {
-        (0, 0) => (String::from("none"), Tone::Ok),
-        (0, warnings) => (format!("{warnings} warnings"), Tone::Warn),
-        (errors, warnings) => (format!("{errors} errors, {warnings} warnings"), Tone::Bad),
+        (0, 0) => (tr(Msg::None), Tone::Ok),
+        (0, warnings) => (
+            tr_with(Msg::WarningsCount, &[("warnings", warnings.into())]),
+            Tone::Warn,
+        ),
+        (errors, warnings) => (
+            tr_with(
+                Msg::ErrorsWarningsCount,
+                &[("errors", errors.into()), ("warnings", warnings.into())],
+            ),
+            Tone::Bad,
+        ),
     }
 }
 
@@ -145,11 +155,11 @@ pub fn shown(
                 .unwrap_or_default();
             diagnostics_section(of_file)
         }
-        Err(error) => parts::failed("Diagnostics", error),
+        Err(error) => parts::failed(&tr(Msg::Diagnostics), error),
     };
     let content = match file {
         Ok(file) => content(path, file),
-        Err(error) => parts::failed("The file", error),
+        Err(error) => parts::failed(&tr(Msg::TheFile), error),
     };
     stack(view! {
         {content}
@@ -162,11 +172,11 @@ pub fn shown(
 fn diagnostics_section(diagnostics: &[Diagnostic]) -> AnyView {
     if diagnostics.is_empty() {
         return card(
-            "Diagnostics",
+            tr(Msg::Diagnostics),
             empty_quiet(
                 Glyph::CIRCLE_CHECK,
-                "No diagnostic",
-                "The running load raised no diagnostic about this file.",
+                tr(Msg::NoDiagnostic),
+                tr(Msg::RunningLoadRaisedNoDiagnosticAbout),
             ),
         )
         .into_any();
@@ -178,8 +188,11 @@ fn diagnostics_section(diagnostics: &[Diagnostic]) -> AnyView {
             let place = diagnostic.position().map(|position| {
                 let link = format!("#{}", line_id(position.line()));
                 view! {
-                    " at "
-                    <a href=link>{format!("line {}, column {}", position.line(), position.column())}</a>
+                    {tr(Msg::At)}
+                    <a href=link>{tr_with(
+                        Msg::LineColumn,
+                        &[("line", position.line().into()), ("column", position.column().into())],
+                    )}</a>
                 }
             });
             view! {
@@ -195,15 +208,16 @@ fn diagnostics_section(diagnostics: &[Diagnostic]) -> AnyView {
             }
         })
         .collect_view();
-    card("Diagnostics", view! { <ul class="fui-issues">{items}</ul> }).into_any()
+    card(
+        tr(Msg::Diagnostics),
+        view! { <ul class="fui-issues">{items}</ul> },
+    )
+    .into_any()
 }
 
 /// The file's bytes as numbered, highlighted lines.
 fn content(path: &str, file: &MappingFile) -> AnyView {
-    let digest = file
-        .etag
-        .clone()
-        .unwrap_or_else(|| String::from("not stated"));
+    let digest = file.etag.clone().unwrap_or_else(|| tr(Msg::NotStated));
     let Ok(text) = std::str::from_utf8(&file.bytes) else {
         return card(
             path.to_owned(),
@@ -211,18 +225,18 @@ fn content(path: &str, file: &MappingFile) -> AnyView {
                 Tone::Bad,
                 Announce::Alert,
                 None,
-                "The file is not UTF-8, so the console does not show it: a YAML file is UTF-8 (YAML 1.2.2, character encodings).",
+                tr(Msg::FileNotUtf8SoConsole2),
             ),
         )
         .into_any();
     };
-    let label = format!("{path}, one numbered line per line");
+    let label = tr_with(Msg::NumberedLines, &[("path", path.into())]);
     card(
         path.to_owned(),
         view! {
-            <p class="fui-page-meta">"SHA-256 " <code>{digest}</code></p>
+            <p class="fui-page-meta">{tr(Msg::Sha256)} <code>{digest}</code></p>
             <p>
-                <a href=format!("{}/{path}", crate::editor::EDIT)>"Open it in the editor"</a>
+                <a href=format!("{}/{path}", crate::editor::EDIT)>{tr(Msg::OpenEditor)}</a>
             </p>
             {code_lines(&label, ferrohealth_ui::highlight::Language::Yaml, text, "L")}
         },

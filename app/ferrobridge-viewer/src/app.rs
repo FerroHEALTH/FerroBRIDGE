@@ -52,7 +52,9 @@ pub const SIGN_OUT: &str = "/logout";
 pub const ABOUT: &str = "/about";
 
 /// The word the page shows for an operator the provider gave no name.
-const OPERATOR: &str = "Operator";
+fn unnamed_operator() -> String {
+    tr(Msg::Operator)
+}
 
 /// The whole HTML document the server renders around [`App`], in the theme
 /// the request's cookie names, so the page arrives in it before any script
@@ -125,7 +127,7 @@ fn signed_in(operator: String, bar: Bar, routes: AnyView) -> AnyView {
         banner: None,
         sidebar: crate::shell::sidebar(),
         content: routes,
-        footer: crate::shell::FOOTER,
+        footer: crate::shell::footer_names(),
     })
 }
 
@@ -315,17 +317,17 @@ fn session_state() -> SessionState {
 }
 
 /// The name the page shows for a signed-in operator: the provider's name for
-/// them, or [`OPERATOR`] when it gave none.
+/// them, or [`unnamed_operator`] when it gave none.
 fn operator_name() -> String {
     #[cfg(not(target_arch = "wasm32"))]
     {
-        crate::session::request::operator().unwrap_or_else(|| String::from(OPERATOR))
+        crate::session::request::operator().unwrap_or_else(unnamed_operator)
     }
     // NOTE: the browser reads the value the server decided; this runs only if
     // that value is missing, and then shows the word a nameless sign-in shows.
     #[cfg(target_arch = "wasm32")]
     {
-        String::from(OPERATOR)
+        unnamed_operator()
     }
 }
 

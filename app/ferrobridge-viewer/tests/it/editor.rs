@@ -144,6 +144,34 @@ async fn the_editor_opens_a_console_file_with_its_text_and_the_save() -> Result<
 }
 
 #[tokio::test]
+async fn the_editor_says_new_when_it_creates_and_edit_when_it_edits() -> Result<(), Box<dyn Error>>
+{
+    let bridge = bridge("console").await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(&service, get_with("/edit", &cookie)?).await?;
+    assert!(
+        page.contains("<title>New mapping file · FerroBRIDGE Console</title>"),
+        "{page}"
+    );
+    assert!(page.contains("<h1>New mapping file</h1>"), "{page}");
+    assert!(
+        page.contains(r#"<li aria-current="page">New mapping file</li>"#),
+        "the trail's last crumb: {page}"
+    );
+    let (_response, page) = send(&service, get_with(&format!("/edit/{PATH}"), &cookie)?).await?;
+    assert!(
+        page.contains(&format!("<title>Edit {PATH} · FerroBRIDGE Console</title>")),
+        "{page}"
+    );
+    assert!(page.contains(&format!("<h1>Edit {PATH}</h1>")), "{page}");
+    assert!(
+        page.contains(&format!(r#"<li aria-current="page">Edit {PATH}</li>"#)),
+        "{page}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_provisioned_file_opens_for_a_check_and_offers_no_save() -> Result<(), Box<dyn Error>> {
     let bridge = bridge("provisioned").await;
     let (service, cookie) = signed_in(&bridge).await?;

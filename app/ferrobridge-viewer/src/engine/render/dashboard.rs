@@ -26,6 +26,7 @@ use openehr_mapping_core::diagnostic::Severity;
 
 use crate::bridge::BridgeError;
 use crate::engine::render::parts::{self, Shape};
+use crate::locale::{Msg, tr, tr_with};
 
 /// The dashboard's sections for the three answers.
 #[must_use]
@@ -41,18 +42,22 @@ pub fn render(
     let loaded = state.as_ref().ok();
     let (built, lanes, pins) = match info {
         Ok(info) => facts(info, loaded),
-        Err(error) => (parts::failed("Bridge", error), ().into_any(), ().into_any()),
+        Err(error) => (
+            parts::failed(&tr(Msg::Bridge), error),
+            ().into_any(),
+            ().into_any(),
+        ),
     };
     // NOTE: no specification governs this: our own design; the counts the tiles
     // do not show sit in the Bridge card, and a load the bridge refused says so.
     let unloaded = match state {
         Ok(_) => ().into_any(),
-        Err(error) => parts::failed("Mappings", error),
+        Err(error) => parts::failed(&tr(Msg::Mappings), error),
     };
     let ready = match readiness {
         Ok((status, report)) => indicators(*status, report)
-            .unwrap_or_else(|shape| parts::unreadable("Readiness", &shape)),
-        Err(error) => parts::failed("Readiness", error),
+            .unwrap_or_else(|shape| parts::unreadable(&tr(Msg::Readiness), &shape)),
+        Err(error) => parts::failed(&tr(Msg::Readiness), error),
     };
     let health = stack(view! {
         {lanes}
@@ -92,26 +97,32 @@ fn stats(state: &EngineState) -> AnyView {
     let cards = [
         Stat {
             glyph: Glyph::LAYERS,
-            value: format!("{} of {}", state.counts.programs, state.counts.contexts),
-            label: "Contexts loaded".into(),
+            value: tr_with(
+                Msg::LoadedOf,
+                &[
+                    ("loaded", state.counts.programs.into()),
+                    ("total", state.counts.contexts.into()),
+                ],
+            ),
+            label: tr(Msg::ContextsLoaded).into(),
             href: mappings.clone(),
         },
         Stat {
             glyph: Glyph::FILES,
             value: models.to_string(),
-            label: "Models".into(),
+            label: tr(Msg::Models).into(),
             href: mappings.clone(),
         },
         Stat {
             glyph: Glyph::CIRCLE_X,
             value: errors.to_string(),
-            label: "Errors".into(),
+            label: tr(Msg::Errors).into(),
             href: mappings.clone(),
         },
         Stat {
             glyph: Glyph::TRIANGLE_ALERT,
             value: warnings.to_string(),
-            label: "Warnings".into(),
+            label: tr(Msg::Warnings).into(),
             href: mappings,
         },
     ]
@@ -138,69 +149,80 @@ fn facts(info: &Info, loaded: Option<&EngineState>) -> (AnyView, AnyView, AnyVie
         .collect_view()
         .into_any();
     let mut built = vec![
-        ("Product", info.product.clone().into_any()),
-        ("Version", info.version.clone().into_any()),
+        (tr(Msg::Product), info.product.clone().into_any()),
+        (tr(Msg::Version), info.version.clone().into_any()),
         (
-            "Commit",
+            tr(Msg::Commit),
             view! { <code>{info.build.commit_short.clone()}</code> }.into_any(),
         ),
-        ("Built", timestamp(&info.build.built_at).into_any()),
-        ("Compiler", info.build.rustc.clone().into_any()),
+        (tr(Msg::Built), timestamp(&info.build.built_at).into_any()),
+        (tr(Msg::Compiler), info.build.rustc.clone().into_any()),
     ];
     if let Some(state) = loaded {
         let counts = state.counts;
         built.extend([
-            ("Templates", counts.templates.to_string().into_any()),
+            (tr(Msg::Templates), counts.templates.to_string().into_any()),
             (
-                "FHIRconnect files",
+                tr(Msg::FhirconnectFiles),
                 counts.fhirconnect_files.to_string().into_any(),
             ),
-            ("OMOCL files", counts.omocl_files.to_string().into_any()),
+            (
+                tr(Msg::OmoclFiles),
+                counts.omocl_files.to_string().into_any(),
+            ),
         ]);
     }
     let overview = loaded.map(|_| {
         view! {
             <p>
-                <a href=crate::engine::MAPPINGS>"The mappings overview"</a>
+                <a href=crate::engine::MAPPINGS>{tr(Msg::TheMappingsOverview)}</a>
             </p>
         }
     });
     (
         card(
-            "Bridge",
+            tr(Msg::Bridge),
             view! {
                 {facts_row(built)}
                 {overview}
             },
         )
         .into_any(),
-        card("Lanes and listeners", lanes(&info.lanes)).into_any(),
+        card(tr(Msg::LanesAndListeners), lanes(&info.lanes)).into_any(),
         card(
-            "Pins",
-            parts::table_unstacked("Pins", &["Specification or crate", "Version"], pins),
+            tr(Msg::Pins),
+            parts::table_unstacked(
+                &tr(Msg::Pins),
+                &[&tr(Msg::SpecificationOrCrate), &tr(Msg::Version)],
+                pins,
+            ),
         )
         .into_any(),
     )
 }
 
 /// The columns of the lanes table.
-const LANE_COLUMNS: [Column; 3] = [
-    Column::text("lane", "Lane"),
-    Column::text("configured", "Configured"),
-    Column::text("listener", "Listener"),
-];
+fn lane_columns() -> [Column; 3] {
+    [
+        Column::text("lane", tr(Msg::Lane)),
+        Column::text("configured", tr(Msg::Configured)),
+        Column::text("listener", tr(Msg::Listener)),
+    ]
+}
 
 /// The columns of the readiness indicators.
-const INDICATOR_COLUMNS: [Column; 3] = [
-    Column::text("indicator", "Indicator"),
-    Column::text("state", "State"),
-    Column::text("detail", "Detail"),
-];
+fn indicator_columns() -> [Column; 3] {
+    [
+        Column::text("indicator", tr(Msg::Indicator)),
+        Column::text("state", tr(Msg::State)),
+        Column::text("detail", tr(Msg::Detail)),
+    ]
+}
 
 /// The lanes table; the listener column is drawn only when a lane has a
 /// listener of its own.
 fn lanes(lanes: &[Lane]) -> AnyView {
-    let columns = filled_columns(&LANE_COLUMNS, lanes, &[], |lane, key| {
+    let columns = filled_columns(&lane_columns(), lanes, &[], |lane, key| {
         key != "listener" || lane.listen.is_some()
     });
     let listening = columns.iter().any(|column| column.key == "listener");
@@ -209,7 +231,7 @@ fn lanes(lanes: &[Lane]) -> AnyView {
         .map(|each| lane(each, listening))
         .collect_view()
         .into_any();
-    parts::columns_table("Lanes and listeners", &columns, rows)
+    parts::columns_table(&tr(Msg::LanesAndListeners), &columns, rows)
 }
 
 /// One row of the lanes table: with `listening`, the listener of a lane that
@@ -235,14 +257,14 @@ fn lane(lane: &Lane, listening: bool) -> AnyView {
                 }
                 .into_any()
             }
-            None => view! { <span class="fui-muted">"none of its own"</span> }.into_any(),
+            None => view! { <span class="fui-muted">{tr(Msg::NoneOfItsOwn)}</span> }.into_any(),
         };
-        view! { <td data-label="Listener">{shown}</td> }
+        view! { <td data-label=tr(Msg::Listener)>{shown}</td> }
     });
     view! {
         <tr>
             <th scope="row">{lane.name.clone()}</th>
-            <td data-label="Configured">{configured}</td>
+            <td data-label=tr(Msg::Configured)>{configured}</td>
             {listener}
         </tr>
     }
@@ -253,14 +275,14 @@ fn lane(lane: &Lane, listening: bool) -> AnyView {
 /// with the report's own state.
 fn indicators(status_code: StatusCode, report: &Readiness) -> Result<AnyView, Shape> {
     let verdict = match (report.state, status_code) {
-        (State::Up, StatusCode::OK) => status(Tone::Ok, Glyph::CIRCLE_CHECK, "Ready", None),
+        (State::Up, StatusCode::OK) => status(Tone::Ok, Glyph::CIRCLE_CHECK, &tr(Msg::Ready), None),
         (State::Down, StatusCode::SERVICE_UNAVAILABLE) => {
-            status(Tone::Bad, Glyph::CIRCLE_X, "Not ready", None)
+            status(Tone::Bad, Glyph::CIRCLE_X, &tr(Msg::NotReady), None)
         }
         _ => return Err(Shape { path: "state" }),
     };
     let outcomes: Vec<_> = report.indicators.values().collect();
-    let columns = filled_columns(&INDICATOR_COLUMNS, &outcomes, &[], |outcome, key| {
+    let columns = filled_columns(&indicator_columns(), &outcomes, &[], |outcome, key| {
         key != "detail" || outcome.detail.is_some()
     });
     let detailed = columns.iter().any(|column| column.key == "detail");
@@ -272,12 +294,12 @@ fn indicators(status_code: StatusCode, report: &Readiness) -> Result<AnyView, Sh
                 State::Up => badge(Tone::Ok, "up"),
                 State::Down => badge(Tone::Bad, "down"),
             };
-            let detail =
-                detailed.then(|| view! { <td data-label="Detail">{outcome.detail.clone()}</td> });
+            let detail = detailed
+                .then(|| view! { <td data-label=tr(Msg::Detail)>{outcome.detail.clone()}</td> });
             view! {
                 <tr>
                     <th scope="row">{name.clone()}</th>
-                    <td data-label="State">{state}</td>
+                    <td data-label=tr(Msg::State)>{state}</td>
                     {detail}
                 </tr>
             }
@@ -285,12 +307,12 @@ fn indicators(status_code: StatusCode, report: &Readiness) -> Result<AnyView, Sh
         .collect_view()
         .into_any();
     let table = if report.indicators.is_empty() {
-        view! { <p>"The bridge registers no readiness indicator."</p> }.into_any()
+        view! { <p>{tr(Msg::BridgeRegistersNoReadinessIndicator)}</p> }.into_any()
     } else {
-        parts::columns_table("Indicators", &columns, rows)
+        parts::columns_table(&tr(Msg::Indicators), &columns, rows)
     };
     Ok(card(
-        "Readiness",
+        tr(Msg::Readiness),
         view! {
             <p>{verdict}</p>
             {table}

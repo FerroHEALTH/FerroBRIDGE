@@ -107,7 +107,7 @@ async fn tofhir_sends_the_payload_in_the_body_and_draws_each_resource() -> Resul
     let (service, cookie) = signed_in(&bridge).await?;
     let html = to_fhir(&service, &cookie).await?;
     assert!(html.contains("<code>Observation/obs-1</code>"), "{html}");
-    assert!(html.contains("The Bundle holds 1 resources."), "{html}");
+    assert!(html.contains("The Bundle holds 1 resource."), "{html}");
     assert!(html.contains("The Bundle as JSON"), "{html}");
     let asked = bridge.received_requests().await.ok_or("recorded")?;
     let request = asked.first().ok_or("one request")?;

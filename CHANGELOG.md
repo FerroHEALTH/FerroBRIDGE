@@ -55,6 +55,12 @@ crates on crates.io.
 
 ### Changed
 
+- The operator console takes FerroUI 0.2.0 and reads every word it hands
+  FerroUI from its catalog at run time (#956): table captions, column
+  headers, pager nouns with their plurals, navigation, fields, dialogs and
+  page titles come from `locales/en/ferrobridge-viewer.ftl`, and the
+  stray-literal baseline drops from 384 to 78 literals. English remains the
+  only locale.
 - **Breaking:** the facade, the operator API and the CDR and terminology
   lanes authenticate through `ferrohealth-smart` 0.1.0, the FerroHEALTH
   family's SMART and OAuth 2.0 resource-server crate (#981). Its sections
@@ -114,6 +120,9 @@ crates on crates.io.
 
 ### Fixed
 
+- The console's file editor names its mode in its header (#982): the New
+  file route reads "New mapping file" and an existing file reads "Edit
+  <file>", with the matching page title.
 - The HL7 v2 parser judges a segment group by placing every following
   segment with the same choice rule it applies to the segment itself, so a
   repeated `ORDER`'s ORC in an OML^O21 opens a new `ORDER` instead of an

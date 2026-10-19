@@ -17,6 +17,7 @@ use leptos::prelude::*;
 use openehr_mapping_core::diagnostic::{Diagnostic, Severity};
 
 use crate::bridge::BridgeError;
+use crate::locale::{Msg, tr, tr_with};
 use crate::model::{Refusal, ViewError};
 
 /// A field the bridge's answer lacks or carries in another shape, named by
@@ -69,33 +70,34 @@ pub fn optional_text<'a>(
 /// refusal with the bridge's status and diagnostics, or the console's fault,
 /// never nothing.
 #[must_use]
-pub fn failed(heading: &'static str, error: &BridgeError) -> AnyView {
+pub fn failed(heading: &str, error: &BridgeError) -> AnyView {
     let said = match crate::model::server::refusal(error) {
         Ok(refusal) => refused(&refusal),
         Err(failure) => fault(failure.to_string()).into_any(),
     };
-    card(heading, said).into_any()
+    card(heading.to_owned(), said).into_any()
 }
 
 /// The section an answer this console cannot read draws.
 #[must_use]
-pub fn unreadable(heading: &'static str, shape: &Shape) -> AnyView {
+pub fn unreadable(heading: &str, shape: &Shape) -> AnyView {
     tracing::error!(%shape, "the bridge answered a document this console cannot read");
-    card(heading, fault(shape.to_string())).into_any()
+    card(heading.to_owned(), fault(shape.to_string())).into_any()
 }
 
 /// The words of `refusal`: its status and the diagnostics it carried.
 #[must_use]
 pub fn refused(refusal: &Refusal) -> AnyView {
     match refusal {
-        Refusal::NotAuthenticated => {
-            fault("401: the bridge did not accept your sign-in. Sign in again.").into_any()
-        }
+        Refusal::NotAuthenticated => fault(tr(Msg::N401BridgeDidNotAcceptYour)).into_any(),
         Refusal::Bridge {
             status,
             diagnostics,
         } => {
-            let alert = fault(format!("{status}: the bridge refused the request."));
+            let alert = fault(tr_with(
+                Msg::BridgeRefusedStatus,
+                &[("status", status.to_string().into())],
+            ));
             let items = diagnostics
                 .iter()
                 .map(|text| view! { <li>{text.clone()}</li> })
@@ -132,13 +134,13 @@ pub const fn severity(severity: Severity) -> (&'static str, &'static str) {
 /// The rows stack as cards on a phone: every body cell but the row's name
 /// carries its column's `data-label`. The console's tables do not sort.
 #[must_use]
-pub fn table(caption: &'static str, columns: &[&'static str], rows: AnyView) -> AnyView {
+pub fn table(caption: &str, columns: &[&str], rows: AnyView) -> AnyView {
     columns_table(caption, &text_columns(columns), rows)
 }
 
 /// The data table [`table`] draws, headed by `columns`.
 #[must_use]
-pub fn columns_table(caption: &'static str, columns: &[Column], rows: AnyView) -> AnyView {
+pub fn columns_table(caption: &str, columns: &[Column], rows: AnyView) -> AnyView {
     data_table(DataTable {
         caption,
         columns,
@@ -152,7 +154,7 @@ pub fn columns_table(caption: &'static str, columns: &[Column], rows: AnyView) -
 /// The data table [`table`] draws, as a grid at every width: for a table of
 /// two short columns, which fits a phone as it is.
 #[must_use]
-pub fn table_unstacked(caption: &'static str, columns: &[&'static str], rows: AnyView) -> AnyView {
+pub fn table_unstacked(caption: &str, columns: &[&str], rows: AnyView) -> AnyView {
     data_table_unstacked(DataTable {
         caption,
         columns: &text_columns(columns),
@@ -165,11 +167,11 @@ pub fn table_unstacked(caption: &'static str, columns: &[&'static str], rows: An
 
 /// A text column for each label of `labels`, keyed by its label.
 #[must_use]
-pub fn text_columns(labels: &[&'static str]) -> Vec<Column> {
+pub fn text_columns(labels: &[&str]) -> Vec<Column> {
     labels
         .iter()
         .copied()
-        .map(|label| Column::text(label, label))
+        .map(|label| Column::owned(label, label))
         .collect()
 }
 
@@ -188,7 +190,7 @@ pub fn linked_diagnostics_table(
     href: &dyn Fn(&Diagnostic) -> Option<String>,
 ) -> AnyView {
     if diagnostics.is_empty() {
-        return view! { <p>"No diagnostics."</p> }.into_any();
+        return view! { <p>{tr(Msg::NoDiagnostics)}</p> }.into_any();
     }
     let rows = diagnostics
         .iter()
@@ -216,20 +218,26 @@ pub fn linked_diagnostics_table(
                     <td>
                         <span class=tone>{word}</span>
                     </td>
-                    <td data-label="Code">
+                    <td data-label=tr(Msg::Code)>
                         <code>{diagnostic.code().as_str().to_owned()}</code>
                     </td>
-                    <td data-label="Where">{place}</td>
-                    <td data-label="Message">{diagnostic.message().to_owned()}</td>
-                    <td data-label="Mapping">{mapping}</td>
+                    <td data-label=tr(Msg::Where)>{place}</td>
+                    <td data-label=tr(Msg::Message)>{diagnostic.message().to_owned()}</td>
+                    <td data-label=tr(Msg::Mapping)>{mapping}</td>
                 </tr>
             }
         })
         .collect_view()
         .into_any();
     table(
-        "Diagnostics",
-        &["Severity", "Code", "Where", "Message", "Mapping"],
+        &tr(Msg::Diagnostics),
+        &[
+            &tr(Msg::Severity),
+            &tr(Msg::Code),
+            &tr(Msg::Where),
+            &tr(Msg::Message),
+            &tr(Msg::Mapping),
+        ],
         rows,
     )
 }
@@ -247,10 +255,14 @@ pub fn linked_diagnostics_table(
     clippy::expect_used,
     reason = "to_string_pretty fails only for a Serialize that fails or a map with non-string keys, and a serde_json::Value has neither"
 )]
-pub fn raw_json(summary: &'static str, json: &serde_json::Value) -> AnyView {
+pub fn raw_json(summary: &str, json: &serde_json::Value) -> AnyView {
     let text =
         serde_json::to_string_pretty(json).expect("a serde_json::Value should always serialize");
-    disclosure(summary, code_panel(summary, Language::Json, &text)).into_any()
+    disclosure(
+        summary.to_owned(),
+        code_panel(summary, Language::Json, &text),
+    )
+    .into_any()
 }
 
 #[cfg(test)]
