@@ -26,10 +26,10 @@ use fhirconnect::model::load::MappingSet;
 use fhirconnect::model::semantic::StaticMappingCodes;
 use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
-use fhirconnect::resolve::program::binding::PartyClass;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::WebTemplateIndex;
+use openehr_mapping_core::party::PartyClass;
 use openehr_mapping_core::template::TemplateSource;
 
 use crate::resolve::codes;
@@ -42,11 +42,11 @@ use crate::resolve::set_of;
 const PERSON_ARCHETYPE: &str = "openEHR-DEMOGRAPHIC-PERSON.ferrobridge_person.v1";
 
 /// The mapping onto the name element of the one identity.
-const NAME: &str = "  - name: \"name\"\n    with:\n      fhir: \"$resource.name.text\"\n      \
+pub(crate) const NAME: &str = "  - name: \"name\"\n    with:\n      fhir: \"$resource.name.text\"\n      \
                     openehr: \"$archetype/identities[at0003]/details[at0004]/items[at0005]\"\n";
 
 /// Builds the index over the testkit's synthetic `PERSON` template.
-fn person() -> Result<WebTemplateIndex, Box<dyn Error>> {
+pub(crate) fn person() -> Result<WebTemplateIndex, Box<dyn Error>> {
     let opt = openehr_its::opt14::from_xml(ferrobridge_testkit::fixtures::PERSON_OPT)?;
     Ok(WebTemplateIndex::build(&TemplateSource::Opt14(Box::new(
         opt,
@@ -54,7 +54,10 @@ fn person() -> Result<WebTemplateIndex, Box<dyn Error>> {
 }
 
 /// Compiles `context` out of `set` against the synthetic `PERSON` template.
-fn party_program(set: &MappingSet, context: &str) -> Result<Arc<Program>, Vec<Diagnostic>> {
+pub(crate) fn party_program(
+    set: &MappingSet,
+    context: &str,
+) -> Result<Arc<Program>, Vec<Diagnostic>> {
     let index = person().map_err(|error| {
         vec![Diagnostic::error(
             "tests",
@@ -74,7 +77,7 @@ fn party_program(set: &MappingSet, context: &str) -> Result<Arc<Program>, Vec<Di
 
 /// A model mapping rooted at the synthetic party archetype, mapping a
 /// `Patient`.
-fn person_model(name: &str, mappings: &str) -> String {
+pub(crate) fn person_model(name: &str, mappings: &str) -> String {
     format!(
         "grammar: FHIRConnect/v1.0.0\ntype: model\nmetadata:\n  name: {name}\n  version: \
          1.0.0\nspec:\n  system: FHIR\n  version: R4\n  openEhrConfig:\n    archetype: \
@@ -85,7 +88,7 @@ fn person_model(name: &str, mappings: &str) -> String {
 
 /// The party context over the synthetic `PERSON` template, starting at
 /// `PERSON.synthetic.v1` and listing `contexts`.
-fn person_context(contexts: &[&str]) -> String {
+pub(crate) fn person_context(contexts: &[&str]) -> String {
     let mut listed = String::new();
     if !contexts.is_empty() {
         listed.push_str("  contexts:\n");

@@ -144,18 +144,18 @@ pub enum PositionError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeValue {
     /// Where the key starts: a template node or the `ctx/` namespace.
-    place: Place,
+    pub(crate) place: Place,
     /// The segments below the place, outermost first.
-    sub_path: Vec<Segment>,
+    pub(crate) sub_path: Vec<Segment>,
     /// The attribute suffix chain on the last segment.
-    suffixes: Vec<Suffix>,
+    pub(crate) suffixes: Vec<Suffix>,
     /// The value itself.
-    value: Value,
+    pub(crate) value: Value,
 }
 
 /// Where the FLAT key of a [`NodeValue`] starts.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Place {
+pub(crate) enum Place {
     /// A node of the template, at one instance of each repeating node on the
     /// way to it.
     Node {
@@ -304,6 +304,29 @@ impl CanonicalComposition {
     #[must_use]
     pub const fn generation(&self) -> Generation {
         self.generation
+    }
+}
+
+/// A canonical document an index reads node values out of.
+///
+/// A composition and a demographic party are both read through
+/// [`WebTemplateIndex::read`], because both are archetyped trees whose paths
+/// the template names.
+pub trait CanonicalDocument {
+    /// Returns the canonical JSON of the document.
+    fn document(&self) -> &Value;
+
+    /// Returns the template the document was built against.
+    fn document_template_id(&self) -> &str;
+}
+
+impl CanonicalDocument for CanonicalComposition {
+    fn document(&self) -> &Value {
+        &self.value
+    }
+
+    fn document_template_id(&self) -> &str {
+        &self.template_id
     }
 }
 
@@ -462,10 +485,10 @@ impl WebTemplateIndex {
         &self,
         composition: &CanonicalComposition,
     ) -> Result<serde_json::Map<String, Value>, PathError> {
-        if composition.template_id != self.template_id() {
+        if composition.document_template_id() != self.template_id() {
             return Err(PathError::TemplateMismatch {
                 expected: self.template_id().to_owned(),
-                found: composition.template_id.clone(),
+                found: composition.document_template_id().to_owned(),
             });
         }
         let document = openehr_sdt::flat::flatten::flatten_composition(
@@ -491,23 +514,23 @@ impl WebTemplateIndex {
     /// against another template, [`PathError::UnknownNode`] when the node
     /// belongs to another template, and [`PathError::OccurrenceCount`] when
     /// the occurrences do not match the repeating nodes above it.
-    pub fn read(
+    pub fn read<D: CanonicalDocument + ?Sized>(
         &self,
-        composition: &CanonicalComposition,
+        composition: &D,
         node: &ResolvedNode,
         occurrences: &[RmPosition],
     ) -> Result<Option<Value>, PathError> {
-        if composition.template_id != self.template_id() {
+        if composition.document_template_id() != self.template_id() {
             return Err(PathError::TemplateMismatch {
                 expected: self.template_id().to_owned(),
-                found: composition.template_id.clone(),
+                found: composition.document_template_id().to_owned(),
             });
         }
         let path = self.instance_path(node, occurrences)?;
         // NOTE: no specification governs this: our own design, an absent
         // optional node is a legitimate absence and never a defect, so it
         // reads as `None` rather than as an error.
-        let mut current = &composition.value;
+        let mut current = composition.document();
         for segment in &path.segments {
             // An RM positional predicate counts every element of the container
             // (BASE Release 1.2.0 §Paths and Locators, positional parameters),
@@ -596,7 +619,7 @@ impl WebTemplateIndex {
     }
 
     /// Returns the path of one instance of `node`, with its positions set.
-    fn instance_path(
+    pub(crate) fn instance_path(
         &self,
         node: &ResolvedNode,
         occurrences: &[RmPosition],

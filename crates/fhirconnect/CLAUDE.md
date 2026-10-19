@@ -73,13 +73,16 @@ refuses, and a slot node whose OPT states none is a warning.
 
 A party context is recognised from the RM type of the template root
 (`PERSON`, `ORGANISATION`, `ROLE`), never from a key in the file, and the
-program carries it as `Program::party`. `resolve::compile::party` holds what
-it refuses at load, one code each: what names a composition (`$composition`,
-the composition attributes the defaults and `ctx/` set, the `PARTICIPATION`
-lists, `link`, an entered context whose `start` slots a composition). The
-engine's composition entry points refuse a party program
-(`EngineError::PartyProgram`). No specification governs a party context: our
-own design.
+program carries it as `Program::party`
+(`openehr_mapping_core::party::PartyClass`). `resolve::compile::party` holds
+what it refuses at load, one code each: what names a composition
+(`$composition`, the composition attributes the defaults and `ctx/` set, the
+`PARTICIPATION` lists, `link`, an entered context whose `start` slots a
+composition). The engine's composition entry points refuse a party program
+(`EngineError::PartyProgram`); it runs through `engine::traverse::party`
+(`to_party`, `from_party`), which builds through
+`WebTemplateIndex::build_party` and reads through the same `read`. No
+specification governs a party context: our own design.
 
 Every diagnostic the compiler raises is collected. A run reports every
 disagreement it found, because a mapping author fixing one refusal at a time is

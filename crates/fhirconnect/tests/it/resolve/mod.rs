@@ -11,7 +11,7 @@
 
 mod extensions;
 mod methods;
-mod party;
+pub(crate) mod party;
 mod paths;
 mod program;
 mod sub_contexts;

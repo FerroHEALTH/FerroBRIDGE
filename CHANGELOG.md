@@ -23,6 +23,28 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Added
+
+- A party program runs through the engine (#905). `WebTemplateIndex::
+  build_party` builds a canonical `PERSON`, `ORGANISATION` or `ROLE` from the
+  node values a party context writes, through the `openehr-rm` types: the
+  objects between two template nodes are the ones the OPT 1.4 constrains
+  there, named by their rubric, every list attribute is an array, no
+  composition attribute is written, and the result decodes strictly as the
+  root's class (`PartyError::Invalid` otherwise). `openehr-sdt` 0.0.87 builds
+  no correct party (#897, FerroHEALTH/FerroEHR#3810). `fhirconnect`'s
+  `engine::traverse::party::to_party` and `from_party` map a FHIR resource to a
+  party and back; `WebTemplateIndex::read` reads any `CanonicalDocument`. No
+  specification governs a party build: our own design.
+
+### Changed
+
+- **Breaking for a library consumer** of `fhirconnect` 0.1.148:
+  `fhirconnect::resolve::program::binding::PartyClass` is gone, and
+  `Program::party` answers `openehr_mapping_core::party::PartyClass`; a
+  consumer imports it from there. `EngineError` gains `CompositionProgram` and
+  `PartyBuild`, and a consumer that matches it exhaustively adds the arms.
+
 ## [0.0.9] - 2026-10-19
 
 ### Added

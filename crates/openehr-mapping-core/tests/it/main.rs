@@ -13,6 +13,7 @@ mod embedded;
 mod header;
 mod malformed;
 mod party;
+mod party_build;
 mod paths;
 mod pins;
 mod registry;
