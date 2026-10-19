@@ -108,6 +108,8 @@ pub struct Facade {
     pub search_count_max: u32,
     /// How a reference the request does not carry is resolved.
     pub references: FacadeReferences,
+    /// How a chained `patient.identifier` finds its patient.
+    pub identifier_search: FacadeIdentifierSearch,
 }
 
 impl Default for Facade {
@@ -126,6 +128,7 @@ impl Default for Facade {
             search_count: crate::facade::search::Limits::default().default_count,
             search_count_max: crate::facade::search::Limits::default().max_count,
             references: FacadeReferences::default(),
+            identifier_search: FacadeIdentifierSearch::default(),
         }
     }
 }
@@ -154,6 +157,37 @@ impl Default for FacadeReferences {
             fetch_bases: Vec::new(),
             max_depth: crate::facade::references::DEFAULT_MAX_DEPTH,
             timeout_ms: crate::facade::references::DEFAULT_TIMEOUT_MS,
+        }
+    }
+}
+
+/// The chained search through a patient's identifier,
+/// `Observation?patient.identifier=[system|]value`, resolved with demographic
+/// AQL as Cadasto's experimental AQL demographic extension documents it.
+///
+/// Off, no chained parameter is supported. The default `query` is the resolve
+/// observed on Cadasto's platform (no specification governs it: our own design).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeIdentifierSearch {
+    /// Whether `patient.identifier` and `subject.identifier` are supported.
+    pub enabled: bool,
+    /// The AQL a value with no system runs, binding `$identifier`; its first
+    /// column is the party's `uid/value`.
+    pub query: String,
+    /// The AQL a `[system]|[value]` value runs, binding `$identifier` and
+    /// `$system`; empty refuses a value naming a system.
+    pub system_query: String,
+}
+
+impl Default for FacadeIdentifierSearch {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            query: String::from(
+                "SELECT p/uid/value FROM PERSON p WHERE p/details[openEHR-DEMOGRAPHIC-ITEM_TREE.person_details.v2]/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]/items[at0001]/value/id = $identifier ORDER BY p/uid/value ASC LIMIT 2",
+            ),
+            system_query: String::new(),
         }
     }
 }

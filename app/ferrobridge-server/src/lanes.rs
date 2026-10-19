@@ -376,7 +376,8 @@ async fn build_facade(
     Ok((
         built
             .with_search(search, lane.search)
-            .with_references(lane.references.clone()),
+            .with_references(lane.references.clone())
+            .with_identifier_search(lane.identifier.clone()),
         counts,
     ))
 }

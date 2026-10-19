@@ -23,6 +23,7 @@ pub mod bundle;
 pub mod criteria;
 pub mod cursor;
 pub mod declaration;
+pub mod identifier;
 pub mod plan;
 pub mod template;
 pub mod value;

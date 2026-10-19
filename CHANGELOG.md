@@ -38,6 +38,18 @@ crates on crates.io.
   type. A `PractitionerRole` is not created or updated yet (#911). No
   specification governs a party context: our own design.
 
+- The facade's search chains through the patient identifier (#492):
+  `Observation?patient.identifier=MRN-1`, `subject.identifier` and
+  `subject:Patient.identifier`, on every type a search declaration answers.
+  With `[facade.identifier_search] enabled`, a configured demographic AQL
+  query in Cadasto's experimental extension resolves the identifier to one
+  party, the party's uid names the patient, and the EHR comes from the
+  identity map or `GET /ehr?subject_id=`. An unknown identifier answers an
+  empty searchset with no clinical query, two parties answer `400
+  multiple-matches` asking for a system, and `_count=0` answers the total
+  alone. A value naming a system needs `system_query`. The
+  `CapabilityStatement` documents the chain on each subject parameter while
+  it is on. No specification governs the resolution: our own design.
 - A party program runs through the engine (#905). `WebTemplateIndex::
   build_party` builds a canonical `PERSON`, `ORGANISATION` or `ROLE` from the
   node values a party context writes, through the `openehr-rm` types: the

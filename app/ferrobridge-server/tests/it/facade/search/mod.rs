@@ -4,6 +4,7 @@
 //! The search interaction over a `wiremock` CDR: the declared parameters,
 //! the AQL they write, the searchset Bundle, and every refusal.
 
+mod chain;
 mod correlation;
 mod created;
 mod entries;

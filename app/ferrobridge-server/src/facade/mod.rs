@@ -126,6 +126,9 @@ pub struct Facade {
     settings: Settings,
     /// The page sizes a search answers with.
     limits: search::Limits,
+    /// The identifier resolve a chained `patient.identifier` runs, when one is
+    /// configured.
+    identifier: Option<search::identifier::IdentifierSearch>,
     /// The terminology server every `conceptmap` code translates through.
     translator: Translator,
     /// What may be fetched to resolve a reference the request does not carry.
@@ -170,6 +173,7 @@ impl Facade {
             demographics: demographics_of(&settings),
             settings,
             limits: search::Limits::default(),
+            identifier: None,
             translator: Translator::default(),
             references: references::Policy::default(),
             usage: Arc::default(),
@@ -287,6 +291,27 @@ impl Facade {
     #[must_use]
     pub const fn search_limits(&self) -> search::Limits {
         self.limits
+    }
+
+    /// Returns this facade resolving a chained `patient.identifier` or
+    /// `subject.identifier` through `identifier`, the configured query of
+    /// Cadasto's experimental AQL demographic extension.
+    ///
+    /// A facade built without it supports no chained parameter.
+    #[must_use]
+    pub fn with_identifier_search(
+        mut self,
+        identifier: Option<search::identifier::IdentifierSearch>,
+    ) -> Self {
+        self.identifier = identifier;
+        self
+    }
+
+    /// Returns the identifier resolve a chained search runs, when one is
+    /// configured.
+    #[must_use]
+    pub const fn identifier_search(&self) -> Option<&search::identifier::IdentifierSearch> {
+        self.identifier.as_ref()
     }
 
     /// Returns the compiled programs of the current set.
