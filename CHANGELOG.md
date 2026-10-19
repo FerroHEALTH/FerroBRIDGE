@@ -23,6 +23,15 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Fixed
+
+- The HL7 v2 face decodes a message whose MSH-18 repeats with its first
+  repetition, the default character set by HL7 v2.9.1 chapter 2 (#641). It
+  still refuses one whose MSH-20 names a switching scheme from table 0356.
+  In `ferrobridge-hl7v2`, `DecodeError::AlternateCharsets` is replaced by
+  `DecodeError::SwitchingScheme { scheme }`; a caller matching the old variant
+  matches the new one.
+
 ## [0.0.10] - 2026-10-19
 
 The openEHR demographics release. The FHIR facade serves `Patient`,
