@@ -392,6 +392,7 @@ fn metadata(
         } else {
             capability::Chains::None
         },
+        facade.party_search(),
     );
     let encoded = statement.to_json().map_err(|error| {
         reply::refusal(

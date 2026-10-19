@@ -41,7 +41,6 @@ use section::Auth;
 use section::Cdm;
 use section::Cdr;
 use section::Etl;
-use section::Facade;
 use section::Hl7v2;
 use section::Mappings;
 use section::Operations;
@@ -49,6 +48,7 @@ use section::Operator;
 use section::Server;
 use section::Telemetry;
 use section::Terminology;
+use section::facade::Facade;
 
 /// The prefix of every environment override.
 ///
@@ -273,6 +273,8 @@ pub struct FacadeSettings {
     pub references: crate::facade::references::Policy,
     /// The identifier resolve a chained `patient.identifier` runs, when on.
     pub identifier: Option<crate::facade::search::identifier::IdentifierSearch>,
+    /// The queries the party types are searched with, when on.
+    pub party_search: Option<crate::facade::search::party::PartySearch>,
 }
 
 /// The HL7 v2 face, resolved.

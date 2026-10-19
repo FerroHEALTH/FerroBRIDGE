@@ -353,6 +353,8 @@ async fn build_facade(
         facade::programs::compile_set(&set, &templates).context("compiling the mapping set")?;
     facade::programs::check_parties(&programs, client.demographic().is_some())
         .context("checking the party contexts against [cdr] demographic")?;
+    facade::programs::check_party_search(&programs, lane.party_search.as_ref())
+        .context("checking [facade.party_search] against the party contexts")?;
     tracing::info!(
         lane = "facade",
         types = programs
@@ -377,7 +379,8 @@ async fn build_facade(
         built
             .with_search(search, lane.search)
             .with_references(lane.references.clone())
-            .with_identifier_search(lane.identifier.clone()),
+            .with_identifier_search(lane.identifier.clone())
+            .with_party_search(lane.party_search.clone()),
         counts,
     ))
 }

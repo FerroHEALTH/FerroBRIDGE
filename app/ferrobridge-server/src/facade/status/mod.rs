@@ -185,6 +185,22 @@ pub const QUERY_REFUSED: Row = Row {
     fhir: "hl7.org/fhir/R4/http.html, 500 Internal Server Error",
 };
 
+/// A CDR `400` on a query of Cadasto's experimental AQL demographic
+/// extension: the CDR does not serve the extension, or the configured query
+/// is outside the part of it the CDR serves.
+///
+/// Neither ITS-REST nor the extension's guide defines how a CDR without the
+/// extension answers, so the two cannot be told apart, and both are a fact of
+/// the deployment: the server "does not support the functionality required
+/// to fulfill the request" (RFC 9110 §15.6.2). No specification governs the
+/// extension: our own design.
+pub const EXTENSION_REFUSED: Row = Row {
+    status: StatusCode::NOT_IMPLEMENTED,
+    issue: IssueType::NotSupported,
+    openehr: "query-codegen.openapi.yaml, query_execute_adhoc_query_body 400",
+    fhir: "hl7.org/fhir/R4/operationoutcome.html, issue-type not-supported; RFC 9110 §15.6.2, 501",
+};
+
 /// A CDR `408` on a search query: the query did not finish in the CDR's time.
 pub const QUERY_TIMEOUT: Row = Row {
     status: StatusCode::BAD_GATEWAY,
@@ -427,9 +443,9 @@ fn renewal_answer(renewal: &RenewalError) -> Answer {
 #[cfg(test)]
 mod tests {
     use super::{
-        BAD_REQUEST, CREDENTIALS, GONE, NOT_FOUND, PRECONDITION_FAILED, QUERY_REFUSED,
-        QUERY_TIMEOUT, UNAUTHORIZED, UNDOCUMENTED, UNPROCESSABLE, UPSTREAM, diagnostics,
-        of_client_error, of_query_refusal,
+        BAD_REQUEST, CREDENTIALS, EXTENSION_REFUSED, GONE, NOT_FOUND, PRECONDITION_FAILED,
+        QUERY_REFUSED, QUERY_TIMEOUT, UNAUTHORIZED, UNDOCUMENTED, UNPROCESSABLE, UPSTREAM,
+        diagnostics, of_client_error, of_query_refusal,
     };
     use crate::cdr::error::CdrError;
     use http::{Method, StatusCode};
@@ -451,6 +467,7 @@ mod tests {
             UNDOCUMENTED,
             UPSTREAM,
             QUERY_REFUSED,
+            EXTENSION_REFUSED,
             QUERY_TIMEOUT,
             CREDENTIALS,
         ] {

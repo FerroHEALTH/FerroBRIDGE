@@ -14,7 +14,9 @@
 //! search never answers an empty Bundle for a failed call
 //! (no specification governs this: our own design).
 
+mod form;
 mod identifier;
+mod party;
 mod total;
 
 use std::collections::BTreeSet;
@@ -23,7 +25,6 @@ use axum::response::Response;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
-use http::header;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::query::ResultSetRow;
 use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
@@ -73,12 +74,6 @@ use crate::facade::search::plan::Resolved;
 use crate::facade::status;
 use crate::terminology::Session;
 
-/// The media type of a `POST _search` body.
-///
-/// The parameters travel "as an application/x-www-form-urlencoded submission
-/// for a POST" (<https://hl7.org/fhir/R4/search.html>, §3.1.1.2).
-const FORM: &str = "application/x-www-form-urlencoded";
-
 /// `GET [base]/{type}?…`.
 pub(crate) async fn search_get(
     facade: &Facade,
@@ -102,34 +97,10 @@ pub(crate) async fn search_post(
     body: &[u8],
 ) -> Result<Response, Refusal> {
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    check_form(headers)?;
+    form::check_form(headers)?;
     let mut pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
     pairs.extend(media::query_pairs(body));
     search(facade, access, resource_type, headers, &pairs).await
-}
-
-/// Checks that a `POST _search` body is a form.
-fn check_form(headers: &HeaderMap) -> Result<(), Refusal> {
-    let found = headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .map(|text| {
-            text.split(';')
-                .next()
-                .unwrap_or(text)
-                .trim()
-                .to_ascii_lowercase()
-        });
-    if found.as_deref() == Some(FORM) {
-        return Ok(());
-    }
-    Err(reply::refusal(
-        StatusCode::UNSUPPORTED_MEDIA_TYPE,
-        Issue::error(IssueType::NotSupported).diagnosing(format!(
-            "a POST _search carries its parameters as {FORM}, and this request sent {}",
-            found.as_deref().unwrap_or("no Content-Type")
-        )),
-    ))
 }
 
 /// Runs one search.
@@ -140,6 +111,9 @@ async fn search(
     headers: &HeaderMap,
     pairs: &[(String, String)],
 ) -> Result<Response, Refusal> {
+    if let Some(loaded) = facade.programs().party(resource_type) {
+        return party::search(facade, access, loaded, resource_type, headers, pairs).await;
+    }
     crate::facade::handlers::supported(facade, resource_type)?;
     let compartment = access
         .reach(Permission::Search, resource_type)

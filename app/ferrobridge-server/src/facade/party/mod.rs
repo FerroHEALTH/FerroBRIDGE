@@ -21,7 +21,9 @@
 //! context or the correspondences: our own design.
 //!
 //! The Demographic API has no search or list operation, so a party type
-//! offers no search, and the `CapabilityStatement` says so.
+//! offers no search unless `[facade.party_search]` configures one through
+//! Cadasto's experimental AQL demographic extension
+//! (`crate::facade::search::party`), and the `CapabilityStatement` says so.
 
 pub(crate) mod provision;
 pub(crate) mod read;
@@ -58,6 +60,10 @@ pub const LABEL: &str = "ITS-REST 1.1.0 Demographic API, DEVELOPMENT";
 
 /// The `RESOURCE` of the `CapabilityStatement` documentation of a party type.
 pub const DOCUMENTATION: &str = "Served from a demographic PARTY over the ITS-REST 1.1.0 Demographic API, DEVELOPMENT. The id is the party's versioned_object_uid and meta.versionId its version tree id. The Demographic API has no search or list operation, so this type offers no search.";
+
+/// The `RESOURCE` of the `CapabilityStatement` documentation of a party type
+/// `[facade.party_search]` searches.
+pub const SEARCHED_DOCUMENTATION: &str = "Served from a demographic PARTY over the ITS-REST 1.1.0 Demographic API, DEVELOPMENT. The id is the party's versioned_object_uid and meta.versionId its version tree id. The Demographic API has no search or list operation, so this type is searched by identifier only, through the Cadasto experimental AQL demographic extension.";
 
 /// One party as the CDR holds it: its canonical JSON and its version.
 #[derive(Debug)]
