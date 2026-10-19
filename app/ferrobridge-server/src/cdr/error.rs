@@ -158,7 +158,7 @@ pub enum CdrError {
     TokenClient {
         /// What the token client reported.
         #[source]
-        source: crate::cdr::oauth::TokenError,
+        source: ferrohealth_smart::client::TokenError,
     },
     /// The generated client refused the call, or the call reached no
     /// documented answer.
@@ -179,7 +179,7 @@ pub enum CdrError {
     Renewal {
         /// Why the new token could not be obtained.
         #[source]
-        source: crate::cdr::oauth::RenewalError,
+        source: ferrohealth_smart::client::RenewalError,
         /// The `401` the service sent.
         upstream: Option<Box<Upstream>>,
     },

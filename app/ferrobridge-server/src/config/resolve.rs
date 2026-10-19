@@ -15,13 +15,11 @@ use super::CdmSettings;
 use super::FacadeSettings;
 use super::Hl7v2Settings;
 use super::MappingSettings;
-use super::credentials::Basic;
+use super::credentials::Upstream;
 use super::credentials::cdm_connection_key;
 use super::credentials::resolve_credentials;
-use super::credentials::resolve_oauth;
 use super::credentials::secret;
 use super::error::Error;
-use super::section::Auth;
 use super::section::Cdm;
 use super::section::Cdr;
 use super::section::Etl;
@@ -31,7 +29,7 @@ use super::section::Mappings;
 use super::section::Operator;
 use super::section::Terminology;
 use super::section::facade::Facade;
-use crate::cdr::oauth::cache::TokenSource;
+use crate::credentials::UpstreamToken;
 
 /// Returns the mapping-set paths `mappings` names, when it names both.
 ///
@@ -393,20 +391,14 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
             initial_backoff: Duration::from_millis(cdr.retry.initial_backoff_ms),
             max_backoff: Duration::from_millis(cdr.retry.max_backoff_ms),
         });
-    let basic = resolve_credentials("cdr.credentials", &cdr.credentials)?;
-    match (basic, cdr.credentials.oauth.as_ref()) {
-        (Some(_), Some(_)) => {
-            return Err(Error::OAuthScheme {
-                section: String::from("cdr.credentials"),
-            });
-        }
-        (Some(Basic { user, password }), None) => {
+    match resolve_credentials("cdr.credentials", &cdr.credentials)? {
+        Some(Upstream::Basic { user, password }) => {
             config = config.with_basic(user, password);
         }
-        (None, Some(oauth)) => {
-            config = config.with_oauth(resolve_oauth("cdr.credentials.oauth", oauth)?);
+        Some(Upstream::OAuth(grant)) => {
+            config = config.with_oauth(*grant);
         }
-        (None, None) => {}
+        None => {}
     }
     Ok(config)
 }
@@ -434,29 +426,21 @@ pub(super) fn resolve_terminology(
             initial_backoff: Duration::from_millis(terminology.retry.initial_backoff_ms),
             max_backoff: Duration::from_millis(terminology.retry.max_backoff_ms),
         });
-    let basic = resolve_credentials("terminology.credentials", &terminology.credentials)?;
-    match (basic, terminology.credentials.oauth.as_ref()) {
-        (Some(_), Some(_)) => {
-            return Err(Error::OAuthScheme {
-                section: String::from("terminology.credentials"),
-            });
-        }
-        (Some(Basic { user, password }), None) => {
+    match resolve_credentials("terminology.credentials", &terminology.credentials)? {
+        Some(Upstream::Basic { user, password }) => {
             config = config
                 .with_credentials(ferrobridge_term::config::Credentials::Basic { user, password });
         }
-        (None, Some(oauth)) => {
-            let grant = resolve_oauth("terminology.credentials.oauth", oauth)?;
-            let source =
-                TokenSource::new(grant, config.timeout).map_err(|source| Error::Client {
-                    upstream: "terminology",
-                    source: Box::new(source),
-                })?;
+        Some(Upstream::OAuth(grant)) => {
+            let source = UpstreamToken::new(*grant).map_err(|source| Error::Client {
+                upstream: "terminology",
+                source: Box::new(source),
+            })?;
             config = config.with_credentials(ferrobridge_term::config::Credentials::OAuth(
                 Arc::new(source),
             ));
         }
-        (None, None) => {}
+        None => {}
     }
     Ok(config)
 }
@@ -642,7 +626,7 @@ pub(super) fn url_of(key: &str, value: &str) -> Result<url::Url, Error> {
 /// is never served to an unauthenticated caller.
 pub(super) fn resolve_operator(
     operator: &Operator,
-    auth: &Auth,
+    auth: &ferrohealth_smart::config::AuthSection,
 ) -> Result<Option<crate::operator::OperatorSettings>, Error> {
     if operator.enabled && !auth.enabled {
         return Err(Error::Needs {

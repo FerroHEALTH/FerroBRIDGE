@@ -8,10 +8,12 @@
 //! memory: no key, real or synthetic, is committed.
 
 mod audit;
+mod basic;
 mod batch;
 mod compartment;
 mod discovery;
 mod forwarding;
+mod grants;
 mod routes;
 mod scope;
 mod search;
@@ -26,10 +28,11 @@ use aws_lc_rs::signature::ECDSA_P384_SHA384_FIXED_SIGNING;
 use aws_lc_rs::signature::EcdsaKeyPair;
 use axum::Router;
 use axum::body::Body;
-use ferrobridge_server::auth::AuthSettings;
-use ferrobridge_server::auth::Authority;
 use ferrobridge_server::health::Registry;
+use ferrobridge_server::smart::Smart;
+use ferrobridge_server::smart::SmartSettings;
 use ferrobridge_server::state::AppState;
+use ferrohealth_smart::resource::Settings;
 use http::Request;
 use http::header;
 use jsonwebtoken::Algorithm;
@@ -182,8 +185,14 @@ impl Issuer {
 
     /// Returns the settings of a resource server for this issuer, reading
     /// the key set again on every unknown `kid`.
-    pub(crate) fn settings(&self) -> AuthSettings {
-        let mut settings = AuthSettings::new(self.uri(), AUDIENCE);
+    pub(crate) fn settings(&self) -> SmartSettings {
+        SmartSettings::new(self.issuer_settings())
+    }
+
+    /// Returns the resource-server settings of this issuer alone, reading the
+    /// key set again on every unknown `kid`.
+    pub(crate) fn issuer_settings(&self) -> Settings {
+        let mut settings = Settings::new(self.uri(), AUDIENCE);
         settings.jwks_refresh_interval = Duration::ZERO;
         settings
     }
@@ -223,16 +232,16 @@ pub(super) fn mint_with(key: &SigningKey, header: &Header, claims: &serde_json::
 }
 
 /// Returns the resource server `settings` describe.
-pub(crate) async fn authority(settings: AuthSettings) -> Arc<Authority> {
+pub(crate) async fn authority(settings: SmartSettings) -> Arc<Smart> {
     Arc::new(
-        Authority::discover(settings)
+        Smart::discover(settings)
             .await
             .expect("the authorization server is discovered"),
     )
 }
 
 /// Returns the shipped router over `harness` with `authority` guarding it.
-pub(super) fn secured(harness: &Harness, authority: &Arc<Authority>) -> Router {
+pub(super) fn secured(harness: &Harness, authority: &Arc<Smart>) -> Router {
     let state = AppState::with_health(Registry::default())
         .with_facade(Arc::clone(&harness.facade))
         .with_auth(Arc::clone(authority));

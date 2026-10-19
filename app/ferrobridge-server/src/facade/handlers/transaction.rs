@@ -18,6 +18,8 @@
 //! resource the identity map knows commits a later version of its
 //! composition inside the same CONTRIBUTION.
 
+use ferrohealth_smart::resource::Access;
+use ferrohealth_smart::scope::Permission;
 use fhir_types::codec::Json as _;
 use fhir_types::codec::Value;
 use fhir_types::r4::bundle::Bundle;
@@ -27,11 +29,9 @@ use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
 
-use crate::auth::Access;
-use crate::auth::compartment;
-use crate::auth::scope::Permission;
 use crate::facade::Facade;
 use crate::facade::commit::Change;
+use crate::facade::compartment;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::Refusal;
 use crate::facade::handlers::read;

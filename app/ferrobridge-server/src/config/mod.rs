@@ -37,7 +37,6 @@ use resolve::resolve_facade;
 use resolve::resolve_hl7v2;
 use resolve::resolve_mappings;
 use resolve::resolve_terminology;
-use section::Auth;
 use section::Cdm;
 use section::Cdr;
 use section::Etl;
@@ -60,7 +59,7 @@ pub const ENV_PREFIX: &str = "FERROBRIDGE__";
 pub const CONFIG_PATH_ENV: &str = "FERROBRIDGE_CONFIG";
 
 /// The whole configuration tree, as a file and the environment state it.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     /// The HTTP surface.
@@ -79,8 +78,9 @@ pub struct Config {
     pub mappings: Mappings,
     /// The FHIR facade, off until its section turns it on.
     pub facade: Facade,
-    /// Inbound authentication, off until its section turns it on.
-    pub auth: Auth,
+    /// Inbound authentication, on unless its section turns it off: the
+    /// section `ferrohealth-smart` defines, with `deny_unknown_fields`.
+    pub auth: ferrohealth_smart::config::AuthSection,
     /// The FHIRconnect operations.
     pub operations: Operations,
     /// The HL7 v2 face, off until its section turns it on.
@@ -174,22 +174,52 @@ impl Config {
         }
     }
 
-    /// Resolves this tree into the settings the run path holds.
+    /// Returns whether the tree serves a surface `[auth]` guards: the facade,
+    /// the operator API, or the FHIRconnect operations over a mapping set.
+    ///
+    /// `[auth]` is on by default, so `serve` refuses to start a server that
+    /// serves one of them until it names an issuer or turns `[auth]` off; a
+    /// server that serves only `/` and the health routes needs neither (no
+    /// specification governs this: our own design).
+    fn guards_a_surface(&self) -> bool {
+        self.facade.enabled
+            || self.operator.enabled
+            || (self.operations.enabled && self.mappings.directory.is_some())
+    }
+
+    /// Resolves this tree into the settings `serve` holds.
     ///
     /// Every `_file` sibling is read here, so a secret reaches the process
     /// once, at boot, and never sits in the configuration tree.
     ///
     /// # Errors
     /// Returns [`Error::Conflict`] when a value and its `_file` sibling are
-    /// both set, [`Error::Secret`] when a `_file` cannot be read, and the
-    /// value errors ([`Error::Listen`], [`Error::Url`],
-    /// [`Error::WireVersion`], [`Error::Missing`], [`Error::OAuthScheme`],
-    /// [`Error::Client`]) each naming the key that carries the fault. Returns
-    /// [`Error::Mappings`] over [`crate::mappings::Error::NoTemplateSource`]
-    /// when the operations are enabled and `[mappings] directory` is set with
-    /// neither `[mappings] templates` nor `[cdr]`, so the refusal comes
-    /// before any network call.
+    /// both set, [`Error::Secret`] when a `_file` cannot be read, the value
+    /// errors ([`Error::Listen`], [`Error::Url`], [`Error::WireVersion`],
+    /// [`Error::Missing`], [`Error::Client`]) each naming the key that carries
+    /// the fault, and [`Error::Auth`] and [`Error::Credentials`] naming the rule
+    /// of `ferrohealth-smart` a section breaks. Returns [`Error::Mappings`]
+    /// over [`crate::mappings::Error::NoTemplateSource`] when the operations
+    /// are enabled and `[mappings] directory` is set with neither
+    /// `[mappings] templates` nor `[cdr]`, so the refusal comes before any
+    /// network call.
     pub fn resolve(&self) -> Result<Settings, Error> {
+        self.resolve_serving(true)
+    }
+
+    /// Resolves this tree into the settings of a job that serves no HTTP
+    /// surface (`cdm init`, `etl run`, `mapping check`), which holds no
+    /// resource server, so `[auth]` is neither read nor required.
+    ///
+    /// # Errors
+    /// Returns every [`Error`] [`Config::resolve`] returns but [`Error::Auth`].
+    pub fn resolve_job(&self) -> Result<Settings, Error> {
+        self.resolve_serving(false)
+    }
+
+    /// Resolves this tree, reading `[auth]` when `serves` and a surface it
+    /// guards is served.
+    fn resolve_serving(&self, serves: bool) -> Result<Settings, Error> {
         if let Some(directory) = self.mappings.directory.as_ref()
             && self.operations.enabled
             && self.mappings.templates.is_none()
@@ -237,8 +267,8 @@ impl Config {
             } else {
                 None
             },
-            auth: if self.auth.enabled {
-                Some(auth::resolve_auth(&self.auth)?)
+            auth: if serves && self.guards_a_surface() {
+                auth::resolve_auth(&self.auth, &self.operator)?
             } else {
                 None
             },
@@ -333,8 +363,9 @@ pub struct Settings {
     pub mappings: Option<MappingSettings>,
     /// The facade lane, when it is on.
     pub facade: Option<FacadeSettings>,
-    /// The resource server, when inbound authentication is on.
-    pub auth: Option<crate::auth::AuthSettings>,
+    /// The resource server, when inbound authentication is on and a surface
+    /// it guards is served.
+    pub auth: Option<crate::smart::SmartSettings>,
     /// The HL7 v2 face, when it is on.
     pub hl7v2: Option<Hl7v2Settings>,
     /// The FHIRconnect operations lane.
@@ -417,7 +448,7 @@ mod tests {
     #[test]
     fn an_absent_file_and_an_empty_environment_leave_the_defaults() {
         let config = Config::from_sources(None, &BTreeMap::new()).expect("the defaults parse");
-        assert_eq!(Config::default(), config);
+        assert_eq!(format!("{:?}", Config::default()), format!("{config:?}"));
         assert_eq!("127.0.0.1:8080", config.server.listen);
         assert_eq!(1024 * 1024, config.server.body_limit_bytes);
         assert_eq!(10_000, config.server.shutdown_timeout_ms);
