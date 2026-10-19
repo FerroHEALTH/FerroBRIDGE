@@ -138,7 +138,11 @@ nextest filtersets: the two longest tests (four and three full emits of
 `hl7v2-types`) each alone, and every other test in the third, whose filter
 is the complement of the first two, so a test runs in exactly one shard.
 
-**The local gate.** `scripts/checks/fast.sh` reads the same reach, measured
+**The local gate.** Each checkout, a worktree included, builds into its own
+`target/`. A `CARGO_TARGET_DIR` shared with another checkout at a different
+commit makes cargo reuse that checkout's output, so a build fails on two
+versions of one crate or a test runs a binary built from the other tree.
+`scripts/checks/fast.sh` reads the same reach, measured
 from the merge base with `origin/main` to the working tree, and runs
 rustfmt, clippy, nextest and the doctests on the reached packages, each as
 one cargo invocation over the whole set with cargo's default job count, the

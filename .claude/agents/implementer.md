@@ -80,7 +80,10 @@ Non-negotiables (violations are rejected at review):
   `crates/hl7v2-types` or a vendored input). `--dry-run` prints the plan,
   `--no-emit` leaves out the ten-minute emit tests while you iterate. CI is
   the full gate: do not rerun the whole workspace or the emit tests by hand
-  when `fast.sh` did not select them.
+  when `fast.sh` did not select them. Build in your worktree's own `target/`
+  and never point `CARGO_TARGET_DIR` at another checkout's: cargo then mixes
+  the two checkouts' builds, which fails as two versions of one crate or as
+  a test running an older binary (`.claude/memory/worktree-target-dir.md`).
 - Deferred work is ALWAYS `// TODO(#NNNN): <what is missing>`, never a prose
   "later phase" note and never a phase or plan marker. `// NOTE:` is only for a
   settled decision, as a citation plus one sentence.
