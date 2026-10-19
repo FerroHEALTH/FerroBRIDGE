@@ -271,6 +271,8 @@ pub struct FacadeSettings {
     pub search: crate::facade::search::Limits,
     /// What may be fetched to resolve a reference the request does not carry.
     pub references: crate::facade::references::Policy,
+    /// The identifier resolve a chained `patient.identifier` runs, when on.
+    pub identifier: Option<crate::facade::search::identifier::IdentifierSearch>,
 }
 
 /// The HL7 v2 face, resolved.

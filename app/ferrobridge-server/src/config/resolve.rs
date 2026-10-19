@@ -91,7 +91,38 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
         identity_store: facade.identity_store.clone(),
         search: search_limits(facade)?,
         references: reference_policy(facade)?,
+        identifier: identifier_search(facade)?,
     })
+}
+
+/// Returns the identifier resolve `facade` configures, `None` when it is off.
+fn identifier_search(
+    facade: &Facade,
+) -> Result<Option<crate::facade::search::identifier::IdentifierSearch>, Error> {
+    let section = &facade.identifier_search;
+    if !section.enabled {
+        return Ok(None);
+    }
+    if section.query.is_empty() {
+        return Err(Error::Missing {
+            key: String::from("facade.identifier_search.query"),
+        });
+    }
+    let refused = |key: &str| {
+        let key = key.to_owned();
+        move |source| Error::IdentifierQuery { key, source }
+    };
+    let alone = crate::facade::search::identifier::IdentifierSearch::new(&section.query, None)
+        .map_err(refused("facade.identifier_search.query"))?;
+    if section.system_query.is_empty() {
+        return Ok(Some(alone));
+    }
+    crate::facade::search::identifier::IdentifierSearch::new(
+        &section.query,
+        Some(&section.system_query),
+    )
+    .map(Some)
+    .map_err(refused("facade.identifier_search.system_query"))
 }
 
 /// Returns the subject link `facade` configures.

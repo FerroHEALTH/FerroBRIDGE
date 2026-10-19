@@ -124,6 +124,20 @@ pub enum Hl7v2 {
     Absent,
 }
 
+/// The chains the subject search parameters support.
+///
+/// A `CapabilityStatement.rest.resource.searchParam` has no element naming
+/// its chains, and the standard `SearchParameter` it names lists every chain
+/// R4 allows, so a supported chain is stated in the entry's `documentation`
+/// (no specification governs this: our own design).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Chains {
+    /// No chained parameter is supported.
+    None,
+    /// `<subject parameter>.identifier` is supported.
+    Identifier,
+}
+
 /// The authorization server that guards the facade, as `rest.security`
 /// states it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -214,6 +228,7 @@ pub fn statement_with(
             hl7v2,
             security: None,
         },
+        Chains::None,
     )
 }
 
@@ -231,6 +246,7 @@ pub fn statement_of(
     search: &Catalog,
     base: &str,
     shape: &Shape,
+    chains: Chains,
 ) -> CapabilityStatement {
     let (operations, hl7v2) = (shape.operations, shape.hl7v2);
     let description = match hl7v2 {
@@ -263,7 +279,7 @@ pub fn statement_of(
         ),
         rest: vec![CapabilityStatementRest {
             mode: "server".into(),
-            resource: resources(programs, search),
+            resource: resources(programs, search, chains),
             // NOTE: `transaction` and `batch` are the system-level interactions of
             // `http://hl7.org/fhir/ValueSet/system-restful-interaction` this route answers.
             interaction: ["transaction", "batch"]
@@ -355,10 +371,13 @@ fn system_operations(operations: Operations) -> Vec<CapabilityStatementRestResou
 /// is one of the "additional ones defined for/by the implementation" and
 /// carries none
 /// (<https://hl7.org/fhir/R4/capabilitystatement-definitions.html#CapabilityStatement.rest.resource.searchParam>).
-/// The search loader refuses a declared standard code of another type.
+/// The search loader refuses a declared standard code of another type. Under
+/// [`Chains::Identifier`] every subject parameter, the one reference type a
+/// declaration states, documents the `identifier` chain.
 fn search_params(
     name: &str,
     surface: &std::collections::BTreeMap<String, ParameterType>,
+    chains: Chains,
 ) -> Vec<CapabilityStatementRestResourceSearchParam> {
     std::iter::once(("_id", ParameterType::Token))
         .chain(surface.iter().map(|(code, kind)| (code.as_str(), *kind)))
@@ -366,6 +385,16 @@ fn search_params(
             name: code.into(),
             definition: declaration::standard(name, code).map(|standard| standard.url.into()),
             r#type: kind.as_str().into(),
+            documentation: match (chains, kind) {
+                (Chains::Identifier, ParameterType::Reference) => Some(
+                    format!(
+                        "Chains: {code}.identifier, the patient's identifier resolved through the {}",
+                        crate::facade::search::identifier::EXTENSION
+                    )
+                    .into(),
+                ),
+                _ => None,
+            },
             ..CapabilityStatementRestResourceSearchParam::default()
         })
         .collect()
@@ -373,12 +402,16 @@ fn search_params(
 
 /// Returns the `rest.resource` entries, in type order: every type a program
 /// maps, and every type only a `reference` mapping creates.
-fn resources(programs: &Programs, search: &Catalog) -> Vec<CapabilityStatementRestResource> {
+fn resources(
+    programs: &Programs,
+    search: &Catalog,
+    chains: Chains,
+) -> Vec<CapabilityStatementRestResource> {
     let mut entries: std::collections::BTreeMap<String, CapabilityStatementRestResource> = programs
         .resource_types()
         .into_iter()
         .map(|name| {
-            let entry = resource(&name, search);
+            let entry = resource(&name, search, chains);
             (name, entry)
         })
         .collect();
@@ -451,7 +484,7 @@ fn created_resource(name: &str) -> CapabilityStatementRestResource {
 }
 
 /// Returns the `rest.resource` entry of one supported type.
-fn resource(name: &str, search: &Catalog) -> CapabilityStatementRestResource {
+fn resource(name: &str, search: &Catalog, chains: Chains) -> CapabilityStatementRestResource {
     let surface = search.surface(name);
     let searched = surface.as_ref().map(|_surface| SEARCH_INTERACTION);
     CapabilityStatementRestResource {
@@ -466,7 +499,7 @@ fn resource(name: &str, search: &Catalog) -> CapabilityStatementRestResource {
             })
             .collect(),
         search_param: surface
-            .map(|surface| search_params(name, &surface))
+            .map(|surface| search_params(name, &surface, chains))
             .unwrap_or_default(),
         versioning: Some(VERSIONING.into()),
         read_history: Some(true.into()),

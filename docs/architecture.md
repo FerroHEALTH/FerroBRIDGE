@@ -914,7 +914,14 @@ expression is a load error: the reference CDR's connector let `where()` and
   template are refused at load. A parameter outside the set is refused unless the client
   sends `Prefer: handling=lenient` (R4 search §3.1.1.3); an unsupported
   modifier is always refused (§3.1.1.4.4); `_count=0` answers the total
-  alone, as R4 treats it as `_summary=count` (§3.1.1.5.3).
+  alone, as R4 treats it as `_summary=count` (§3.1.1.5.3). The one chain
+  (#492) is `<subject parameter>.identifier` (§3.1.1.4.15), behind
+  `[facade.identifier_search]`: a configured demographic AQL query, the
+  Cadasto experimental AQL demographic extension (#480), resolves the
+  identifier to one party, whose uid is the patient's logical id and whose
+  EHR the subject link finds. No party matches nothing, two answer `400
+  multiple-matches`, and the `CapabilityStatement` documents the chain on
+  each subject parameter while it is on (our own design).
 - **Status codes are mapped as types**, from the ITS-REST outcome to the FHIR
   outcome, in a table that is FerroBRIDGE's own design with both sides cited
   and every row pinned by a wire test: a CDR `422` (template validation) is a

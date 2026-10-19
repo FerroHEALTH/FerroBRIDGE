@@ -87,6 +87,8 @@ pub enum IssueType {
     Exception,
     /// The processing failed for a reason with no better code.
     Processing,
+    /// More than one record matched where the operation needs one.
+    MultipleMatches,
     /// The operation ran and a note is worth recording.
     Informational,
 }
@@ -113,6 +115,7 @@ impl IssueType {
             Self::Timeout => "timeout",
             Self::Exception => "exception",
             Self::Processing => "processing",
+            Self::MultipleMatches => "multiple-matches",
             Self::Informational => "informational",
         }
     }

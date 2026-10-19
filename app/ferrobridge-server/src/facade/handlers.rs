@@ -387,6 +387,11 @@ fn metadata(
         mappings.search(),
         &facade.settings().base_url,
         shape,
+        if facade.identifier_search().is_some() {
+            capability::Chains::Identifier
+        } else {
+            capability::Chains::None
+        },
     );
     let encoded = statement.to_json().map_err(|error| {
         reply::refusal(

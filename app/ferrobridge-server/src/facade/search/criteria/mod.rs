@@ -15,6 +15,8 @@
 //! parameters the search used are kept in their received order, so the
 //! `self` link names exactly those (§3.1.1.6).
 
+mod chain;
+
 use http::HeaderMap;
 
 use crate::facade::media;
@@ -22,6 +24,7 @@ use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::search::Declared;
 use crate::facade::search::declaration::ParameterType;
+use crate::facade::search::identifier::IdentifierSearch;
 use crate::facade::search::value;
 use crate::facade::search::value::DateValue;
 use crate::facade::search::value::StringMatch;
@@ -89,6 +92,15 @@ pub enum Subject {
     Literal(String),
     /// A reference to a type no EHR subject is, which matches nothing.
     Never,
+    /// A patient named by one identifier value through the chain
+    /// `<subject parameter>.identifier`
+    /// (<https://hl7.org/fhir/R4/search.html>, §3.1.1.4.15).
+    Identifier {
+        /// The chained parameter as sent, which a refusal locates.
+        parameter: String,
+        /// The identifier, a token value.
+        token: Token,
+    },
 }
 
 /// The comparison one declared parameter asks for.
@@ -214,6 +226,8 @@ impl CriteriaError {
 ///
 /// `base` is the FHIR service base, so a subject written as an absolute URL
 /// on this server reads as the relative reference the identity map keys.
+/// `identifier` is the configured identifier resolve, without which no
+/// chained parameter is supported.
 ///
 /// # Errors
 ///
@@ -223,11 +237,13 @@ pub fn read(
     declared: &Declared,
     handling: Handling,
     base: &str,
+    identifier: Option<&IdentifierSearch>,
 ) -> Result<Criteria, Vec<CriteriaError>> {
     let mut reader = Reader {
         declared,
         handling,
         base,
+        identifier,
         criteria: Criteria::default(),
         errors: Vec::new(),
         seen: Vec::new(),
@@ -251,6 +267,8 @@ struct Reader<'a> {
     handling: Handling,
     /// The FHIR service base.
     base: &'a str,
+    /// The configured identifier resolve, when chains are supported.
+    identifier: Option<&'a IdentifierSearch>,
     /// What has been read so far.
     criteria: Criteria,
     /// What has been refused so far.
@@ -418,9 +436,15 @@ impl Reader<'_> {
 
     /// Reads a parameter the declaration names, or refuses an unknown one.
     fn declared_parameter(&mut self, name: &str, base: &str, modifier: Option<&str>, text: &str) {
+        if modifier.is_some_and(|modifier| modifier.contains('.'))
+            && self.chained(name, base, modifier, text)
+        {
+            return;
+        }
         let Some(kind) = self.declared.surface().get(base).copied() else {
-            // TODO(#492): chained parameters such as `patient.identifier` read here.
-            self.unknown(name);
+            if !self.chained(name, base, modifier, text) {
+                self.unknown(name);
+            }
             return;
         };
         let read = match kind {
@@ -480,7 +504,7 @@ impl Reader<'_> {
     fn subject(&mut self, modifier: Option<&str>, text: &str) -> Result<(), Refused> {
         let typed = match modifier {
             None => None,
-            // TODO(#492): the `:identifier` modifier resolves a subject by its identifier.
+            // TODO(#923): the `:identifier` modifier matches the subject reference's identifier.
             Some(kind) if is_type_name(kind) => Some(kind),
             Some(other) => return Err(Refused::Modifier(other.to_owned())),
         };

@@ -292,6 +292,15 @@ pub enum Error {
         #[source]
         source: Box<crate::etl::aql::AqlError>,
     },
+    /// A configured identifier query that binds no parameter it is handed.
+    #[error("{key} is refused")]
+    IdentifierQuery {
+        /// The key that holds it.
+        key: String,
+        /// Why the query is refused.
+        #[source]
+        source: crate::facade::search::identifier::IdentifierQueryError,
+    },
     /// A lane is switched on and a lane it needs is not.
     #[error("{key} is set, and it needs {needs}")]
     Needs {

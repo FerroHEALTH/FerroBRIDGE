@@ -14,6 +14,7 @@
 //! search never answers an empty Bundle for a failed call
 //! (no specification governs this: our own design).
 
+mod identifier;
 mod total;
 
 use std::collections::BTreeSet;
@@ -154,20 +155,27 @@ async fn search(
         ));
     };
     let base = facade.settings().base_url.as_str();
-    let criteria = criteria::read(pairs, first, Handling::of(headers), base).map_err(|errors| {
+    let criteria = criteria::read(
+        pairs,
+        first,
+        Handling::of(headers),
+        base,
+        facade.identifier_search(),
+    )
+    .map_err(|errors| {
         let issues: Vec<Issue> = errors.iter().map(criteria::CriteriaError::issue).collect();
         reply::refusals(StatusCode::BAD_REQUEST, &issues, &[])
     })?;
     let fingerprint = cursor::fingerprint(resource_type, &criteria.used);
     let start = start_of(&criteria, &fingerprint, declarations.len())?;
-    let mut resolved = resolve(facade, resource_type, &criteria)?;
+    let client = facade.client_for(headers);
+    let mut resolved = resolve(facade, &client, resource_type, &criteria).await?;
     if let Compartment::Patient(patient) = compartment {
         resolved.ehrs.push(compartment_ehrs(facade, &patient)?);
     }
     let session = facade.translator().session();
     let plans = plans_of(facade, declarations, &criteria, &resolved, &session)?;
     let limits = facade.search_limits();
-    let client = facade.client_for(headers);
     let page_size = criteria
         .count
         .unwrap_or(limits.default_count)
@@ -323,28 +331,40 @@ fn compartment_ehrs(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, Refusa
     Ok(found.into_iter().collect())
 }
 
-/// Resolves the subject parameters and `_id` through the identity map.
+/// Resolves the subject parameters and `_id` through the identity map, and a
+/// chained identifier through the CDR as well.
 ///
 /// A subject or an id the map does not know resolves to nothing, which the
 /// plan reads as a declaration that matches nothing.
-fn resolve(facade: &Facade, resource_type: &str, criteria: &Criteria) -> Result<Resolved, Refusal> {
+async fn resolve(
+    facade: &Facade,
+    client: &CdrClient,
+    resource_type: &str,
+    criteria: &Criteria,
+) -> Result<Resolved, Refusal> {
     let link = &facade.settings().subject;
     let mut resolved = Resolved::default();
     for subjects in &criteria.subjects {
         let mut ehrs: Vec<EhrId> = Vec::new();
         for subject in subjects {
-            let Subject::Literal(reference) = subject else {
-                continue;
+            let found = match *subject {
+                Subject::Literal(ref reference) => {
+                    // NOTE: no specification governs this: our own design, a reference no
+                    // person key can hold names no subject the map binds, so it matches none.
+                    let Ok(person) = link.person_of_reference(reference) else {
+                        continue;
+                    };
+                    facade
+                        .store()
+                        .ehr_of(&person)
+                        .map_err(|error| write::store_refusal(&error))?
+                }
+                Subject::Identifier {
+                    ref parameter,
+                    ref token,
+                } => identifier::ehr_of(facade, client, parameter, token).await?,
+                Subject::Never => None,
             };
-            // NOTE: no specification governs this: our own design, a reference no
-            // person key can hold names no subject the map binds, so it matches none.
-            let Ok(person) = link.person_of_reference(reference) else {
-                continue;
-            };
-            let found = facade
-                .store()
-                .ehr_of(&person)
-                .map_err(|error| write::store_refusal(&error))?;
             if let Some(ehr) = found
                 && !ehrs.contains(&ehr)
             {

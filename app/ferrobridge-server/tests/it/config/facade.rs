@@ -200,6 +200,84 @@ fn an_unknown_reference_key_refuses_to_boot() {
     let text = format!("{ENABLED}\n[facade.references]\nfetch_everything = true\n");
     assert!(Config::from_sources(Some(&text), &BTreeMap::new()).is_err());
 }
+
+#[test]
+fn the_identifier_search_is_off_by_default() -> Result<(), Box<dyn StdError>> {
+    let settings = Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve()?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    assert!(facade.identifier.is_none());
+    Ok(())
+}
+
+#[test]
+fn the_identifier_search_takes_the_observed_query_when_on() -> Result<(), Box<dyn StdError>> {
+    let text = format!("{ENABLED}\n[facade.identifier_search]\nenabled = true\n");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let identifier = settings
+        .facade
+        .ok_or("the facade lane is on")?
+        .identifier
+        .ok_or("the identifier search is on")?;
+    assert!(!identifier.resolves_systems());
+    Ok(())
+}
+
+#[test]
+fn the_identifier_search_is_set_from_the_environment() -> Result<(), Box<dyn StdError>> {
+    let environment = BTreeMap::from([
+        (
+            String::from("FERROBRIDGE__FACADE__IDENTIFIER_SEARCH__ENABLED"),
+            String::from("true"),
+        ),
+        (
+            String::from("FERROBRIDGE__FACADE__IDENTIFIER_SEARCH__SYSTEM_QUERY"),
+            String::from(
+                "SELECT p/uid/value FROM PERSON p WHERE p/a = $identifier AND p/b = $system",
+            ),
+        ),
+    ]);
+    let settings = Config::from_sources(Some(ENABLED), &environment)?.resolve()?;
+    let identifier = settings
+        .facade
+        .ok_or("the facade lane is on")?
+        .identifier
+        .ok_or("the identifier search is on")?;
+    assert!(identifier.resolves_systems());
+    Ok(())
+}
+
+#[test]
+fn an_identifier_query_binding_no_parameter_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    for (extra, refused) in [
+        (
+            "query = \"SELECT p/uid/value FROM PERSON p\"\n",
+            "facade.identifier_search.query",
+        ),
+        (
+            "system_query = \"SELECT p/uid/value FROM PERSON p WHERE p/a = $identifier\"\n",
+            "facade.identifier_search.system_query",
+        ),
+    ] {
+        let text = format!("{ENABLED}\n[facade.identifier_search]\nenabled = true\n{extra}");
+        let error = Config::from_sources(Some(&text), &BTreeMap::new())?
+            .resolve()
+            .expect_err("a query must bind what the facade hands it");
+        match &error {
+            Error::IdentifierQuery { key, .. } => assert_eq!(refused, key, "{extra}"),
+            other => {
+                return Err(format!("expected an identifier query error, got {other:?}").into());
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn an_unknown_identifier_search_key_refuses_to_boot() {
+    let text =
+        format!("{ENABLED}\n[facade.identifier_search]\nenabled = true\nname_query = \"x\"\n");
+    assert!(Config::from_sources(Some(&text), &BTreeMap::new()).is_err());
+}
 /// The `[facade]` section `extra` adds to, with the two required fields set.
 fn facade_with(extra: &str) -> String {
     format!(

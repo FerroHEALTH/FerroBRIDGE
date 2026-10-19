@@ -497,6 +497,38 @@ design.
 | `max_depth` | `2` | How many levels of references are followed: the request's own, then those of each resolved resource; `0` resolves none |
 | `timeout_ms` | `10000` | How long one fetch from a listed base may take, connection included |
 
+### `[facade.identifier_search]`
+
+The chained search through a patient's identifier:
+`Condition?patient.identifier=MRN-1` and `subject.identifier`. A client
+usually holds a patient number, not an EHR id. The facade looks the
+identifier up in the CDR's demographic data with an AQL query rooted at a
+demographic class, the way Cadasto's experimental AQL demographic extension
+documents it. AQL 1.1.0 defines no demographic semantics, so both queries
+are configuration, and the CDR must serve the extension. The reference CDR
+refuses demographic sources today.
+
+A query's first column is the party's `uid/value`, and a versioned uid
+counts as its party. When one party carries the identifier, the facade
+treats that party's uid as the patient's logical id and finds its EHR the
+way every subject is found: through the identity map, then
+`GET /ehr?subject_id=&subject_namespace=` under the `[facade] subject_` keys.
+So the CDR's owner links each EHR to its party's uid. An identifier no party
+carries, or a party with no EHR, matches nothing. An identifier that more than
+one party carries is a `400` with `multiple-matches`, asking for a system.
+Keep a `LIMIT` in the query: the facade needs at most two rows to tell one
+party from many.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether `patient.identifier` and `subject.identifier` are supported; off, both are unknown parameters |
+| `query` | the resolve observed on Cadasto's platform: `SELECT p/uid/value FROM PERSON p WHERE p/details[openEHR-DEMOGRAPHIC-ITEM_TREE.person_details.v2]/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]/items[at0001]/value/id = $identifier ORDER BY p/uid/value ASC LIMIT 2` | The AQL a value with no system runs, binding the value as `$identifier` |
+| `system_query` | empty | The AQL a `[system]\|[value]` value runs, binding `$identifier` and `$system`. Empty refuses a value that names a system with `400 not-supported`, because FHIRconnect maps no FHIR identifier system to a `DV_IDENTIFIER` attribute |
+
+A query that does not bind the parameters it is handed is a boot error naming
+the key. A CDR that refuses the query answers a `500` whose diagnostics name
+the extension.
+
 Each key is settable as `FERROBRIDGE__FACADE__REFERENCES__<KEY>`, and
 `fetch_bases` takes a TOML array:
 `FERROBRIDGE__FACADE__REFERENCES__FETCH_BASES='["https://sender.example/fhir"]'`.
