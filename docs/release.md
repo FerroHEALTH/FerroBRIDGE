@@ -32,10 +32,13 @@ flowchart LR
   image --> publish
   viewer --> publish
   publish --> crates["crates.io<br/>approval-gated"]
+  crates --> milestone["milestone<br/>closed"]
 ```
 
 - **plan** validates the tag shape, refuses a dispatch that is not at the tag
-  it names, checks the tag against every file that declares the product
+  it names, refuses the tag when no milestone is titled exactly as it or that
+  milestone still holds an open issue or pull request (naming each one),
+  checks the tag against every file that declares the product
   version, and extracts the `## [X.Y.Z]` section of `CHANGELOG.md` as the
   release notes. A missing or empty section fails the release, so a cut can
   never ship with notes generated from the commit range standing in for the
@@ -68,6 +71,14 @@ flowchart LR
   path for the same script is `.github/workflows/publish-crates.yml`, a manual
   dispatch that is a dry run unless `publish` is set. The rules are
   `.claude/rules/crates-publishing.md`.
+- **milestone** closes the milestone titled as the tag once every other job
+  has succeeded, the approval-gated crates leg included, with the workflow
+  token and job-level `issues: write`. When a leg fails or the owner refuses
+  the crates approval, the job still runs, names the leg in its log, and
+  leaves the milestone open; re-running the failed jobs closes it. An
+  already-closed milestone counts as done. Both milestone steps call
+  `scripts/release/milestone.sh`, and a pre-release finishes no milestone,
+  so neither step reads or changes one for an `-rc.N` tag.
 
 Concurrency is `cancel-in-progress: false`. A second tag push queues behind the
 first, because a release cancelled part-way through publishing is worse than a
@@ -236,7 +247,9 @@ before a real cut.
 
 1. **The milestone is empty.** `gh issue list --milestone vX.Y.Z --state open`
    answers nothing, or the cut is called and the stragglers move to the
-   next milestone.
+   next milestone. The `plan` job refuses the tag otherwise, and
+   `GITHUB_REPOSITORY=FerroHEALTH/FerroBRIDGE bash scripts/release/milestone.sh
+   check vX.Y.Z` asks the same question before you tag.
 2. **The version moves in every file the pin matrix names:** the root
    `Cargo.toml` `[workspace.package]` `version`, `CITATION.cff`, the
    product-version row of `docs/VERSIONS.md`, and the
@@ -304,9 +317,12 @@ unsigned tag is refused at push time. `release.yml` takes it from there.
    that carries the console.
 4. **Post the board status update** with what shipped and what the next
    milestone targets (`.claude/rules/project-board.md`).
-5. **Close the milestone.** It is empty by step 1 of the cut, and a released
-   milestone left open still reads as pending work on the board:
-   `gh api -X PATCH repos/:owner/:repo/milestones/<number> -f state=closed`.
+5. **The milestone is closed.** The `milestone` job closes it at the end of
+   the run, because a released milestone left open still reads as pending
+   work on the board. After a manual or recovery release (a re-run, a
+   `publish-crates.yml` dispatch), check that it is closed, and close it with
+   `GITHUB_REPOSITORY=FerroHEALTH/FerroBRIDGE bash scripts/release/milestone.sh
+   close vX.Y.Z` when it is not.
 
 ## What a published release is protected against
 
