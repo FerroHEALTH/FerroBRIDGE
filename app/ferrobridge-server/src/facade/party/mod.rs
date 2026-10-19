@@ -14,6 +14,8 @@
 //! `OBJECT_VERSION_ID`, which only stays stable across versions (RM Common IM
 //! §`OBJECT_VERSION_ID`), and `meta.versionId` is the version tree id. An R4
 //! `Resource.id` "never changes" (<https://hl7.org/fhir/R4/resource.html>).
+//! A `Patient` create also gives the new party its EHR when the facade
+//! creates EHRs (`provision`), which records only the subject's `ehr_id`.
 //! Every CDR refusal reaches the wire through
 //! [`crate::facade::status::demographic`]. No specification governs a party
 //! context or the correspondences: our own design.
@@ -21,6 +23,7 @@
 //! The Demographic API has no search or list operation, so a party type
 //! offers no search, and the `CapabilityStatement` says so.
 
+pub(crate) mod provision;
 pub(crate) mod read;
 pub(crate) mod write;
 

@@ -21,7 +21,7 @@ mod claim;
 mod entries;
 mod pairing;
 mod reconcile;
-mod refusal;
+pub(crate) mod refusal;
 mod single;
 mod transaction;
 
@@ -143,6 +143,13 @@ impl Refused {
             entity_tag: answer.entity_tag().map(str::to_owned),
             challenge: answer.challenge().map(str::to_owned),
         }
+    }
+
+    /// Returns this refusal with `issue` rendered after its own.
+    #[must_use]
+    pub fn with_issue(mut self, issue: Issue) -> Self {
+        self.issues.push(issue);
+        self
     }
 
     /// Returns the status the refusal answers with.

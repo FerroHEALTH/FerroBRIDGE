@@ -481,6 +481,14 @@ onto a `ROLE`, and `Organization` onto an `ORGANISATION`.
   version). The Demographic API has no search or list operation, so a party
   type offers no search, and the `CapabilityStatement` documents that on the
   type.
+- **The patient's EHR.** With `ehr_policy = "create_on_first_write"`, a
+  `Patient` create also gives the new party its EHR: the facade looks the
+  party's id up through the subject link (`subject_namespace`,
+  `subject_id_form`, `subject_type`) and creates the EHR when the CDR holds
+  none, so the clinical resources that name `Patient/<id>` find it. Under
+  `existing` the create sends no EHR call, and a `Practitioner` never gets
+  one. When the EHR call fails after the party committed, the answer is the
+  EHR refusal with a warning that names the stored `Patient`.
 - **Template.** A party built against another template than the context's
   answers `404`.
 - **Status.** A Demographic API `400` is a `500`; `404`, `409`, `412` and

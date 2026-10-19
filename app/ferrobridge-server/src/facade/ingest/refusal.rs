@@ -58,7 +58,7 @@ pub(super) fn refuse_all(mapped: &[Mapped], row: &status::Row, detail: &str) -> 
 }
 
 /// Returns the refusal an EHR resolution of a single write renders as.
-pub(super) fn ehr_refusal(error: &ehr::EhrError) -> Refused {
+pub(crate) fn ehr_refusal(error: &ehr::EhrError) -> Refused {
     match *error {
         ehr::EhrError::Absent { .. } => Refused::new(
             StatusCode::UNPROCESSABLE_ENTITY,

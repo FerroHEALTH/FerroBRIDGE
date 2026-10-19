@@ -63,6 +63,7 @@ pub(crate) async fn create(
     let demographic = party::demographic(&client)?;
     let commit = commit(facade, loaded, Change::Creation)?;
     let version = commit_party(demographic, class_of(loaded)?, &built, &commit, None).await?;
+    party::provision::provision(facade, &client, resource_type, &version).await?;
     respond(
         facade,
         loaded,
