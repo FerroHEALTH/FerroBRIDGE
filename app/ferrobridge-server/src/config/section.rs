@@ -417,6 +417,9 @@ pub struct Cdr {
     pub retry: Retry,
     /// The credentials the CDR expects.
     pub credentials: Credentials<OAuthClient>,
+    /// Whether the bridge reaches the ITS-REST 1.1.0 Demographic API of the
+    /// CDR, a module the release marks `x-status: DEVELOPMENT`.
+    pub demographic: bool,
 }
 
 impl Default for Cdr {
@@ -426,6 +429,7 @@ impl Default for Cdr {
             timeout_ms: 30_000,
             retry: Retry::default(),
             credentials: Credentials::default(),
+            demographic: false,
         }
     }
 }

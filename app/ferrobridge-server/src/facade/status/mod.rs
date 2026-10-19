@@ -27,6 +27,10 @@
 //! - a connect failure or a timeout is a `502`;
 //! - a composition the engine refuses to render on a read, vread or search is
 //!   a `500` with `processing`, because the client sent no content.
+//!
+//! The Demographic API rows, ITS-REST 1.1.0 DEVELOPMENT, are [`demographic`].
+
+pub mod demographic;
 
 use http::StatusCode;
 use openehr_its::rest::client::ClientError;

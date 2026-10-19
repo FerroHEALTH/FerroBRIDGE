@@ -9,15 +9,15 @@ docs/VERSIONS.md and re-run the script.
 
 - Source: <https://github.com/openEHR/specifications-ITS-REST>
 - Pin: tag `Release-1.1.0`, which resolves to commit `24058992d5fa96e8dfbd855d9c133f328387fc09`
-- Fetched: 2026-10-18
+- Fetched: 2026-10-19
 - Upstream licence: the specification content declares `Creative Commons Attribution-NoDerivs 3.0 Unported` in each
   document's `info.license`. The repository's own `LICENSE` file is the
   Apache License 2.0 and is vendored beside this file, so both statements are
   here and neither is assumed.
 - Layout: the upstream paths, unchanged
-- Files: 19
+- Files: 20
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `82ec7e41eae60182db9b3189da1a05805b38ab7585318c48ce126ec720dece71`
+  `PROVENANCE.md` excluded): `8bdbafcb65c8ed927ae5e14fb9f4da9641594d1c4d2e87c3a8ab32292f22f8d2`
 
 ## Why a blob id per file
 
@@ -27,9 +27,10 @@ the git blob id of each file are what identify these bytes
 (docs/architecture.md section 2).
 
 Each of the five (Overview, System, EHR, Query and Definition) is
-`x-status: STABLE`, which the script checks. The Admin and
-Demographic documents of the same release are `x-status: DEVELOPMENT` and are
-not vendored.
+`x-status: STABLE`, which the script checks. The Demographic document is
+`x-status: DEVELOPMENT`, which the script checks too: the bridge reaches it
+only behind `[cdr] demographic`, labelled DEVELOPMENT. The Admin document of
+the same release is `x-status: DEVELOPMENT` and is not vendored.
 
 `docs/simplified_formats/` and `docs/simplified_data_template/` are the
 AsciiDoc sources of the Simplified Formats and Simplified Data Template
@@ -41,6 +42,7 @@ families (`master05-rm_mapping.adoc`) are specified there.
 |---|---|---|
 | `LICENSE` | `c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4` | `261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64` |
 | `computable/OAS/definition-codegen.openapi.yaml` | `6c30fe7552ee7fea57ae97e00137f863a0b28a733c27dc4ed97c5ea9bacae930` | `28fec040ff586e0e425bf6c1303716b4c638bb7f` |
+| `computable/OAS/demographic-codegen.openapi.yaml` | `7c61717aaa68ad1dc93f0cf37ec4ced239ef61ab2a64e1f0ce71e88248e2c641` | `373bea36611dc279b48e40e35621f388e8f659bd` |
 | `computable/OAS/ehr-codegen.openapi.yaml` | `a0e37a217524c5a2c6351d128041c88d1c137fcde106badda05dde8c0269cd5c` | `d18ba6bbb0ac503a62840c0e83d8fdfbb72bf415` |
 | `computable/OAS/overview-codegen.openapi.yaml` | `67761b4b06d6439a146ae04857520dad4bf1bacf448380d265dfff282a7788b9` | `79bd302402949f1b364e0d0f3b3adb3b2ace96ec` |
 | `computable/OAS/query-codegen.openapi.yaml` | `d92e82c9cd6c9c8f6543ea425ea88b11e2fd0b133a1003347d470625d1d19bec` | `0a56228f763f1306a85a1edf4258a3a8a1d07757` |

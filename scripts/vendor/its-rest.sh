@@ -5,12 +5,14 @@
 #
 # Vendors the openEHR ITS-REST OpenAPI documents into docs/specs/its-rest/
 # (.claude/rules/vendored-inputs.md): the five STABLE code-generation documents
-# for the Overview, System, EHR, Query and Definition modules, the AsciiDoc sources of the
+# for the Overview, System, EHR, Query and Definition modules, the DEVELOPMENT
+# Demographic document the bridge reaches behind `[cdr] demographic`, the
+# AsciiDoc sources of the
 # Simplified Formats and Simplified Data Template sub-specifications (the FLAT
 # format the composition seam reads and writes), plus the repository's licence
 # file.
-# Admin and Demographic are `x-status: DEVELOPMENT` in the same release and the
-# bridge does not depend on them (docs/architecture.md section 2).
+# Admin is `x-status: DEVELOPMENT` in the same release and the bridge does not
+# depend on it (docs/architecture.md section 2).
 #
 # The "openEHR ITS-REST OpenAPI" row of docs/VERSIONS.md pins a tag. A tag is
 # mutable and every file in it says `info.version: latest`, so the script
@@ -42,6 +44,7 @@ paths=(
   "$oas/ehr-codegen.openapi.yaml"
   "$oas/query-codegen.openapi.yaml"
   "$oas/definition-codegen.openapi.yaml"
+  "$oas/demographic-codegen.openapi.yaml"
   "docs/simplified_formats"
   "docs/simplified_data_template"
   "LICENSE"
@@ -66,6 +69,12 @@ corpus_take "$tree_root" "$dest" "${paths[@]}"
 # which is why this provenance records a blob id per file rather than a version.
 for path in "${paths[@]}"; do
   case "$path" in
+    */demographic-codegen.openapi.yaml)
+      # The Demographic API is DEVELOPMENT at this tag; the bridge labels every
+      # use of it so, and a promotion is a change this check reports.
+      grep -qE '^[[:space:]]+x-status:[[:space:]]*DEVELOPMENT$' "$dest/$path" ||
+        die "$path is not x-status: DEVELOPMENT at $tag"
+      ;;
     *.openapi.yaml)
       grep -qE '^[[:space:]]+x-status:[[:space:]]*STABLE$' "$dest/$path" ||
         die "$path is not x-status: STABLE at $tag"
@@ -118,9 +127,10 @@ the git blob id of each file are what identify these bytes
 (docs/architecture.md section 2).
 
 Each of the five (Overview, System, EHR, Query and Definition) is
-\`x-status: STABLE\`, which the script checks. The Admin and
-Demographic documents of the same release are \`x-status: DEVELOPMENT\` and are
-not vendored.
+\`x-status: STABLE\`, which the script checks. The Demographic document is
+\`x-status: DEVELOPMENT\`, which the script checks too: the bridge reaches it
+only behind \`[cdr] demographic\`, labelled DEVELOPMENT. The Admin document of
+the same release is \`x-status: DEVELOPMENT\` and is not vendored.
 
 \`docs/simplified_formats/\` and \`docs/simplified_data_template/\` are the
 AsciiDoc sources of the Simplified Formats and Simplified Data Template

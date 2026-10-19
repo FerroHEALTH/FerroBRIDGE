@@ -44,13 +44,16 @@ pub struct CdrConfig {
     /// `SecretString`, so neither a `Debug` rendering of the settings nor a log
     /// line can carry it.
     pub credentials: Option<CdrCredentials>,
+    /// Whether the client reaches the ITS-REST 1.1.0 Demographic API, which
+    /// the release marks `x-status: DEVELOPMENT`.
+    pub demographic: bool,
 }
 
 impl CdrConfig {
     /// Returns a configuration for the CDR whose REST API root is `base_url`.
     ///
     /// The timeout is 30 seconds, the retry budget is the runtime's default,
-    /// and no credentials are set.
+    /// no credentials are set, and the Demographic API is not reached.
     #[must_use]
     pub fn new(base_url: Url) -> Self {
         Self {
@@ -58,6 +61,7 @@ impl CdrConfig {
             timeout: Duration::from_secs(30),
             retry: RetryPolicy::default(),
             credentials: None,
+            demographic: false,
         }
     }
 
@@ -72,6 +76,14 @@ impl CdrConfig {
     #[must_use]
     pub const fn with_retry(mut self, retry: RetryPolicy) -> Self {
         self.retry = retry;
+        self
+    }
+
+    /// Returns this configuration reaching the Demographic API when
+    /// `demographic` is set.
+    #[must_use]
+    pub const fn with_demographic(mut self, demographic: bool) -> Self {
+        self.demographic = demographic;
         self
     }
 
