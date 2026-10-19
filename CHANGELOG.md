@@ -23,6 +23,20 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Fixed
+
+- The HL7 v2 interpreter removes every reference a kept resource holds to a
+  resource it left out of the Bundle and counts each as a
+  `dangling-reference` outcome naming the element and the resource left out
+  (#313). FHIR R4 resolves a Bundle reference against the entries'
+  `fullUrl`, so such a reference pointed at nothing. The referring resource
+  stays unless the removal leaves it without a required element, and the
+  corpus test asserts no Bundle keeps one. The vendored `hl7v2` corpus
+  carries 29 of them in 27 messages.
+- A Bundle entry member the HL7 v2 interpreter cannot write is a counted
+  `entry-unwritable` outcome naming the resource and the path, where it was
+  only a warning in the log (#316).
+
 ## [0.0.10] - 2026-10-19
 
 The openEHR demographics release. The FHIR facade serves `Patient`,

@@ -54,6 +54,58 @@ const UNDECODABLE: &str = "the Bundle does not decode as R4";
 /// `MessageHeader` (<https://hl7.org/fhir/R4/bundle.html#invs>, `bdl-12`).
 const HEADERLESS: &str = "the message Bundle breaks bdl-12";
 
+/// The reason a case fails when a resource of the Bundle references a
+/// `urn:uuid` no entry carries as its `fullUrl`
+/// (<https://hl7.org/fhir/R4/bundle.html#references>).
+const DANGLING: &str = "a Bundle reference names no entry";
+
+/// Every `reference` under `value` that is a `urn:uuid` not in `entries`.
+fn dangling<'a>(value: &'a Value, entries: &[&str], found: &mut Vec<&'a str>) {
+    match value {
+        Value::Object(object) => {
+            for (key, child) in object {
+                match child {
+                    Value::String(target)
+                        if key == "reference"
+                            && target.starts_with("urn:uuid:")
+                            && !entries.contains(&target.as_str()) =>
+                    {
+                        found.push(target);
+                    }
+                    _ => dangling(child, entries, found),
+                }
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                dangling(item, entries, found);
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+    }
+}
+
+/// Whether every `urn:uuid` reference in `bundle` names one of its entries.
+fn resolves(bundle: &Value) -> bool {
+    let entries: Vec<&Value> = bundle
+        .get("entry")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .collect();
+    let urls: Vec<&str> = entries
+        .iter()
+        .filter_map(|entry| entry.get("fullUrl").and_then(Value::as_str))
+        .collect();
+    let mut found = Vec::new();
+    for entry in entries {
+        if let Some(resource) = entry.get("resource") {
+            dangling(resource, &urls, &mut found);
+        }
+    }
+    found.is_empty()
+}
+
 /// Whether `bundle` keeps `bdl-12`: when `Bundle.type` is `message`, the
 /// first entry's resource is a `MessageHeader`.
 fn keeps_bdl_12(bundle: &Value) -> bool {
@@ -238,6 +290,9 @@ async fn verdict(
     if !keeps_bdl_12(mapped.bundle()) {
         return Case::fail(&message.id, HEADERLESS).with_outcomes(outcomes);
     }
+    if !resolves(mapped.bundle()) {
+        return Case::fail(&message.id, DANGLING).with_outcomes(outcomes);
+    }
     Case::pass(&message.id).with_outcomes(outcomes)
 }
 
@@ -281,6 +336,16 @@ async fn measure(corpus: Corpus, messages: &[Message]) -> Result<(), Box<dyn Err
         headerless,
         Vec::<&str>::new(),
         "every message Bundle the {corpus} corpus maps opens with its MessageHeader (bdl-12)"
+    );
+    let unresolved: Vec<&str> = cases
+        .iter()
+        .filter(|case| case.failure() == Some(DANGLING))
+        .map(Case::id)
+        .collect();
+    assert_eq!(
+        unresolved,
+        Vec::<&str>::new(),
+        "no reference in a Bundle the {corpus} corpus maps names a resource left out of it"
     );
     let left_out: usize = cases
         .iter()
