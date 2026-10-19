@@ -23,6 +23,22 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Fixed
+
+- A `TERM_MAPPING` that a `DV_TEXT` or `DV_CODED_TEXT` value carries out to a
+  FHIR `string`, or a `DV_CODED_TEXT` value carries out to a single `Coding`,
+  is a declared loss (#623). Those pairs give `mappings` no FHIR row
+  (FHIRconnect `DV_TEXT.adoc` §String, `DV_CODED_TEXT.adoc` §Coding), so the
+  engine writes none of them, as before, and now reports each one as a
+  `Loss::Skipped` with the new `SkipReason::TermMappingUncarried`, located at
+  the element and the value's `mappings`; `term_mapping::Withheld` gains
+  `cause()`. A consumer that matches `SkipReason` exhaustively adds the arm.
+  The facade's loss log labels it `skipped-term-mapping-uncarried`.
+- `SkipReason::EmptyReference` documents what the engine does (#511): a
+  `Reference` with no literal reference is skipped whatever else it carries,
+  because a `display` or an `identifier` alone names no resource to fetch
+  (R4 references.html §2.3.0.3 and §2.3.0.4). `fhirconnect` 0.1.154.
+
 ## [0.0.10] - 2026-10-19
 
 The openEHR demographics release. The FHIR facade serves `Patient`,

@@ -31,6 +31,7 @@ use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::lens::term_mapping::coding_of;
 use crate::engine::lens::term_mapping::equivalents;
 use crate::engine::lens::term_mapping::mappings_of;
+use crate::engine::lens::term_mapping::uncarried;
 use crate::engine::lens::term_mapping::withheld;
 use crate::model::ast::keyword::Direction;
 
@@ -195,6 +196,12 @@ impl Lens<DvCodedText, Coding> for CodedTextLens {
             return Vec::new();
         }
         vec![Fallback::new(CODING_CELL, "DV_TEXT.value")]
+    }
+
+    // NOTE: DV_CODED_TEXT.adoc §Coding gives `mappings` no FHIRpath row, so a
+    // single Coding carries none of them and each is a declared loss.
+    fn withheld(&self, source: &DvCodedText) -> Vec<Withheld> {
+        uncarried(source.mappings.iter().flatten())
     }
 }
 
