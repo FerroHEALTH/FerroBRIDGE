@@ -1,0 +1,19 @@
+---
+source: crates/fhirconnect/tests/it/laborauftrag.rs
+expression: laborauftrag_getput()?
+---
+{
+  "first_leg": [],
+  "second_leg": [
+    "the engine filled /composer",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "lost": [],
+  "added": [],
+  "changed": [
+    "ctx/composer_name: \"FerroBRIDGE synthetic composer\" became \"FHIRconnect\"",
+    "leistungsanforderung/laborleistung/narrative: \"A synthetic laboratory request.\" became \"<narrative>\""
+  ]
+}

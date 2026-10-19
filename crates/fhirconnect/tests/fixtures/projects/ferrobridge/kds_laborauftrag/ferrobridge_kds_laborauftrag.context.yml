@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.context.yaml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name and version are FerroBRIDGE's; the profile, the
+# template and the start are the published file's. CLUSTER.specimen.v1 is
+# not listed, because specimen.v1.yml does not compile against
+# KDS_Laborauftrag. The extension list names FerroBRIDGE's stand-in for
+# KDS_laborauftrag and KDS_composition. The
+# round-trip test records each published refusal by line.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_kds_laborauftrag.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "https://www.medizininformatik-initiative.de/fhir/core/modul-labor/StructureDefinition/ServiceRequestLab"
+    version: "2025.0.0"
+  template:
+    id: "KDS_Laborauftrag"
+  archetypes:
+    - "INSTRUCTION.service_request.v1"
+    - "CLUSTER.organisation.v1"
+    - "COMPOSITION.request.v1.ServiceRequest"
+  extensions:
+    - "ferrobridge_kds_laborauftrag"
+  start: "INSTRUCTION.service_request.v1"

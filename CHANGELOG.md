@@ -36,6 +36,17 @@ crates on crates.io.
   `engine::traverse::party::to_party` and `from_party` map a FHIR resource to a
   party and back; `WebTemplateIndex::read` reads any `CanonicalDocument`. No
   specification governs a party build: our own design.
+- FHIR `Organization` round-trips through the KDS laboratory request chain
+  (#543). The published `KDS_Laborauftrag` template is vendored by
+  `scripts/vendor/kds-laborauftrag-opt.sh` at the openFHIR commit
+  `docs/VERSIONS.md` pins, and a FerroBRIDGE project context compiles the
+  library's `organisation.v1.yml` verbatim, reached through the service
+  request's `reference` to its requester: a contained `Organization` maps into
+  the `Einsender` cluster and comes back as a created `Organization` the
+  request references, and both lens laws hold. `organisation.v1.yml` joins the
+  mapping-library pass list and `kds_laborauftrag` the round-trip list; every
+  published file of the chain that does not compile is pinned by file and
+  line.
 - FHIRconnect party contexts compile (#898). A context whose operational
   template is rooted at a `PERSON`, `ORGANISATION` or `ROLE` is a party
   context, read from the RM type of the template root, and `Program::party`

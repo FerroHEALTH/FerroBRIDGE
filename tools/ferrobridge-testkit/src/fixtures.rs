@@ -8,8 +8,9 @@
 //! under `http://example.org`, which RFC 6761 §6.5 reserves for documentation
 //! and examples, except where a FHIR required binding fixes the system.
 //!
-//! Some fixtures name systems outside that domain. [`KDS_DIAGNOSE_OPT`] and
-//! [`KDS_PERSON_OPT`] are published operational templates vendored verbatim
+//! Some fixtures name systems outside that domain. [`KDS_DIAGNOSE_OPT`],
+//! [`KDS_PERSON_OPT`] and [`KDS_LABORAUFTRAG_OPT`] are published operational
+//! templates vendored verbatim
 //! with their provenance beside them: a template carries constraints, never
 //! patient content.
 //! [`KDS_DIAGNOSE_CONDITION`] is synthetic, and names the profile and the
@@ -92,6 +93,20 @@ pub const KDS_PERSON_OPT: &str = include_str!("../fixtures/opt/kds-person/KDS_Pe
 /// The template identifier [`KDS_PERSON_OPT`] declares.
 pub const KDS_PERSON_TEMPLATE_ID: &str = "KDS_Person";
 
+/// The published `KDS_Laborauftrag` operational template, vendored verbatim.
+///
+/// One `COMPOSITION.request.v1` holding `INSTRUCTION.service_request.v1` with
+/// its slotted specimen, case identification and requester organisation
+/// clusters, the template the FHIR `ServiceRequest` and `Organization` round
+/// trip runs against. `scripts/vendor/kds-laborauftrag-opt.sh` fetches it at
+/// the commit `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside it records
+/// its source and licence.
+pub const KDS_LABORAUFTRAG_OPT: &str =
+    include_str!("../fixtures/opt/kds-laborauftrag/KDS_Laborauftrag.opt");
+
+/// The template identifier [`KDS_LABORAUFTRAG_OPT`] declares.
+pub const KDS_LABORAUFTRAG_TEMPLATE_ID: &str = "KDS_Laborauftrag";
+
 /// A synthetic FLAT composition of [`KDS_PERSON_OPT`]: one person with a
 /// name, the birth date `1984-03-17` and the administrative gender
 /// `SYN-GENDER-F` of the synthetic `FB-GENDER` code system.
@@ -172,6 +187,16 @@ pub const KDS_DIAGNOSE_CONDITION: &str =
 /// gender, a birth date, a deceased flag and a managing organization by
 /// display. Every name and number is invented.
 pub const KDS_PERSON_PATIENT: &str = include_str!("../fixtures/fhir/r4/kds_person_patient.json");
+
+/// A synthetic FHIR R4 `ServiceRequest` shaped like the MII laboratory
+/// request profile, whose requester is a contained `Organization`.
+///
+/// It claims the profile the `KDS_Laborauftrag` mappings compile against and
+/// the `laboratory` category and `completed` status their conditions match
+/// on; the order code, the identifiers and the organisation's name are
+/// invented under `http://example.org`.
+pub const KDS_LABORAUFTRAG_SERVICE_REQUEST: &str =
+    include_str!("../fixtures/fhir/r4/kds_laborauftrag_service_request.json");
 
 /// A synthetic FHIR R4 `Observation`.
 pub const R4_OBSERVATION: &str = include_str!("../fixtures/fhir/r4/observation.json");

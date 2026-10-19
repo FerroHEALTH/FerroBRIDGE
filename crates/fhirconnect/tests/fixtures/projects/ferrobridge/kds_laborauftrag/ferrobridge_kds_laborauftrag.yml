@@ -1,0 +1,122 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name and version are FerroBRIDGE's. The published
+# lines 23 to 44 slot CLUSTER.specimen.v1, whose model does not compile
+# against KDS_Laborauftrag, so the method is left out. The manual paths of
+# lines 54, 83 and 116 write a string onto TERMINOLOGY_ID, so they name its
+# `value` here, as manual.adoc writes `defining_code/terminology_id/value`.
+# The `status` overwrite (lines 108 to 135) is the published one, over the
+# top-level `status` of the FerroBRIDGE service request stand-in.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_kds_laborauftrag
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: INSTRUCTION.service_request.v1
+
+mappings:
+  - name: "compositionMapping"
+    extension: "add"
+    with:
+      fhir: "$resource"
+      openehr: "$composition"
+    slotArchetype: "COMPOSITION.request.v1.ServiceRequest"
+
+  - name: "intent"
+    extension: "overwrite"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/activities[at0001]/description[at0009]/items[at0065]"
+    manual:
+      - name: "intentStatic"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/request-intent"
+          - path: "defining_code/code_string"
+            value: "order"
+          - path: "value"
+            value: "Order"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "category.coding.code"
+          operator: "one of"
+          criteria: "laboratory"
+
+        fhir:
+          - path: "intent"
+            value: "order"
+        openehrCondition:
+          targetRoot: "$archetype"
+          targetAttribute: "activities[at0001]/description[at0009]/items[at0065]/defining_code/code_string"
+          operator: "one of"
+          criteria: "order"
+
+  - name: "category"
+    extension: "overwrite"
+    with:
+      fhir: "$resource.category.coding"
+      openehr: "$archetype/activities[at0001]/description[at0009]/items[at0148]"
+    manual:
+      - name: "categoryStatic"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://terminology.hl7.org/ValueSet/observation-category"
+          - path: "defining_code/code_string"
+            value: "laboratory"
+          - path: "value"
+            value: "Laboratory"
+        fhirCondition:
+          targetRoot: "$resource"
+          targetAttribute: "category.coding.code"
+          operator: "one of"
+          criteria: "laboratory"
+
+        fhir:
+          - path: "system"
+            value: "http://terminology.hl7.org/CodeSystem/observation-category"
+          - path: "code"
+            value: "laboratory"
+          - path: "display"
+            value: "Laboratory"
+        openehrCondition:
+          targetRoot: "$archetype"
+          targetAttribute: "activities[at0001]/description[at0009]/items[at0148]/defining_code/code_string"
+          operator: "one of"
+          criteria: "laboratory"
+
+  - name: "status"
+    extension: "overwrite"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/protocol[at0008]/items[at0127]"
+    manual:
+      - name: "categoryStatic"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/ValueSet/request-status"
+          - path: "defining_code/code_string"
+            value: "completed"
+          - path: "value"
+            value: "Completed"
+        fhirCondition:
+          targetRoot: "$resource"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "completed"
+
+        fhir:
+          - path: "status"
+            value: "completed"
+        openehrCondition:
+          targetRoot: "$archetype"
+          targetAttribute: "protocol[at0008]/items[at0127]/defining_code/code_string"
+          operator: "one of"
+          criteria: "completed"
