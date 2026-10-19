@@ -674,6 +674,10 @@ is silent:**
   `scope: sub` context is never compiled as a program and its template is
   never fetched; the facade passes over, as a root, a Bundle entry a
   `slotContext` consumed through a `reference`.
+  The entered context's `template.id` must be the template the parent's OPT
+  1.4 states at the slot node (`C_ARCHETYPE_ROOT.template_id`); a different
+  one is refused as a template mismatch, and a slot node that states none is a
+  warning, because the rule cannot be decided there (#886).
 - The version selectors the specification lacks (which `metadata.version` of a
   name loads; `spec.openEhrConfig.revision` against the OPT; `profile.version`
   against the instance; `template.sem_ver` against the OPT) are a refusal at

@@ -16,6 +16,7 @@
 //! id, which the Simplified Formats specification carries in its interface
 //! form for an archetype root.
 
+mod embedded;
 pub mod matching;
 pub mod paths;
 
@@ -192,6 +193,9 @@ pub struct WebTemplateIndex {
     by_aql_path: BTreeMap<AqlPath, Vec<usize>>,
     /// The node carrying each flat id.
     by_flat_id: BTreeMap<FlatId, usize>,
+    /// The template an operational template states it embeds at an archetype
+    /// root, keyed by the root's `aqlPath`.
+    embedded: BTreeMap<AqlPath, String>,
 }
 
 impl WebTemplateIndex {
@@ -212,7 +216,11 @@ impl WebTemplateIndex {
     /// read.
     pub fn build(source: &TemplateSource) -> Result<Self, PathError> {
         let web_template = web_template(source)?;
-        Self::over(web_template, source.generation())
+        let mut index = Self::over(web_template, source.generation())?;
+        if let TemplateSource::Opt14(ref template) = *source {
+            index.embedded = embedded::embedded_templates(template);
+        }
+        Ok(index)
     }
 
     /// Indexes an already-built Web Template of the given generation.
@@ -286,6 +294,7 @@ impl WebTemplateIndex {
             root,
             by_aql_path,
             by_flat_id,
+            embedded: BTreeMap::new(),
         })
     }
 
@@ -316,6 +325,19 @@ impl WebTemplateIndex {
     #[must_use]
     pub const fn generation(&self) -> Generation {
         self.generation
+    }
+
+    /// Returns the template the operational template states it embeds at
+    /// `node`, an archetype root.
+    ///
+    /// An OPT 1.4 `C_ARCHETYPE_ROOT` may carry the `template_id` of the
+    /// template it was included from. This answers `None` when the template
+    /// states none there, when the node is no archetype root, when the template
+    /// is an OPT2, and when the index was built by [`WebTemplateIndex::over`],
+    /// which has no operational template to read.
+    #[must_use]
+    pub fn embedded_template(&self, node: &ResolvedNode) -> Option<&str> {
+        self.embedded.get(node.aql_path()).map(String::as_str)
     }
 
     /// Returns the root node of the template.

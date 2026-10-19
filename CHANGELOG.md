@@ -25,6 +25,13 @@ crates on crates.io.
 
 ### Added
 
+- A FHIRconnect sub-context's `template.id` is checked against the template
+  the parent's OPT 1.4 states at the slot node (`C_ARCHETYPE_ROOT.template_id`,
+  read by the new `WebTemplateIndex::embedded_template`). A different template
+  is refused as `fc-sub-context-template-mismatch`, and a slot node that states
+  none leaves the warning `fc-sub-context-template-undecided`
+  (`sub-contexts.adoc` §Validation errors; `openehr-mapping-core` 0.1.115,
+  `fhirconnect` 0.1.145; #886).
 - FHIRconnect sub-contexts (#864, `types-of-mapping-files/sub-contexts.adoc`).
   `fhirconnect` 0.1.143 reads `slotContext` on a mapping, and `scope` (`root`
   or `sub`) and `contexts` on a context. The strict schemas carry all three,
@@ -50,8 +57,6 @@ crates on crates.io.
     another entry's `slotContext` consumed, and answers it `200 OK` with no
     location of its own. An entry nothing consumes is still processed as a
     root.
-  - The check of a sub-context's `template.id` against the template embedded
-    at its slot node is #886.
 
 - `fhir-types` 0.1.126 reads `ValueSet` and `CodeSystem` release-neutrally
   (#876). `definition::ValueSetRead` covers the composition (includes,

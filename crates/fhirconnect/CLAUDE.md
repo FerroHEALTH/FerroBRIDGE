@@ -66,7 +66,10 @@ A `slotContext` is compiled where it stands: the entered context's `start`
 is slotted as a `slotArchetype` would slot it, with the compiler's extension
 set swapped for the entered context's for the duration, and the composition
 slot of a root context entered this way skipped (`Method::SlotContext`). A
-`scope: sub` context is refused as a root; a caller loads only roots.
+`scope: sub` context is refused as a root; a caller loads only roots. The
+entered context's `template.id` is compared with
+`WebTemplateIndex::embedded_template` at the slot node: a different template
+refuses, and a slot node whose OPT states none is a warning.
 
 Every diagnostic the compiler raises is collected. A run reports every
 disagreement it found, because a mapping author fixing one refusal at a time is

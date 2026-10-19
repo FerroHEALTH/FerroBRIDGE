@@ -45,8 +45,10 @@ FerroBRIDGE's own strict schema runs, which admits exactly what the prose
 defines. Then the constraints no schema can express are checked: `targetRoot`
 alignment, `appendTo`, `slotArchetype` and `slotContext` resolution, the
 sub-context rules (a `scope: sub` context is listed under some context's
-`contexts`, the `contexts` are acyclic, and a `slotContext` never writes
-`openehr: $reference`), unique mapping names,
+`contexts`, the `contexts` are acyclic, a `slotContext` never writes
+`openehr: $reference`, and a sub-context's `template.id` is the template the
+parent's operational template embeds at the slot node, a warning where that
+template states none), unique mapping names,
 the presence of `criteria` where the grammar requires it, and every path
 resolving against the template and the FHIR element table. Every OMOCL file is
 validated against the schema FerroBRIDGE authors from the grammar tables.
