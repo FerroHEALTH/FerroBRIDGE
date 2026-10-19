@@ -10,6 +10,7 @@
 mod definitions;
 mod examples;
 mod runs;
+mod subjects;
 
 use core::error::Error;
 
