@@ -5,6 +5,7 @@
 
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::error::Error;
+use ferrohealth_smart::config::ConfigError;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
@@ -79,7 +80,13 @@ fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn 
         .resolve()
         .expect_err("a secret set twice is a boot error");
     match &error {
-        Error::Conflict { key } => assert_eq!("cdr.credentials.password", key),
+        Error::Credentials {
+            section,
+            source: ConfigError::Secret { key },
+        } => {
+            assert_eq!("cdr.credentials", section);
+            assert_eq!(&"credentials.password", key);
+        }
         other => return Err(format!("expected a conflict, got {other:?}").into()),
     }
     Ok(())
@@ -96,8 +103,12 @@ fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn Std
         .resolve()
         .expect_err("an unreadable secret is a boot error");
     match &error {
-        Error::Secret { key, .. } => {
-            assert_eq!("cdr.credentials.password_file", key);
+        Error::Credentials {
+            section,
+            source: ConfigError::SecretFile { path, .. },
+        } => {
+            assert_eq!("cdr.credentials", section);
+            assert_eq!(std::path::Path::new("/nonexistent/password"), path);
             assert!(
                 StdError::source(&error).is_some(),
                 "the refusal keeps the file system's own cause"
@@ -119,49 +130,60 @@ fn a_user_without_a_password_refuses_to_boot() -> Result<(), Box<dyn StdError>> 
         .resolve()
         .expect_err("basic authentication needs both halves");
     match &error {
-        Error::Missing { key } => assert_eq!("cdr.credentials.password", key),
-        other => return Err(format!("expected a missing key, got {other:?}").into()),
-    }
-    Ok(())
-}
-
-#[test]
-fn a_user_file_sibling_is_read_at_boot() -> Result<(), Box<dyn StdError>> {
-    let mut file = tempfile::NamedTempFile::new()?;
-    writeln!(file, "12345")?;
-    let text = format!(
-        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n[cdr.credentials]\nuser_file = {:?}\npassword = \"p\"\n",
-        file.path()
-    );
-
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
-    let cdr = settings.cdr.as_ref().ok_or("the CDR lane is on")?;
-    match cdr.credentials.as_ref() {
-        Some(ferrobridge_server::cdr::config::CdrCredentials::Basic { user, .. }) => {
-            assert_eq!(
-                "12345", user,
-                "the trailing newline is not part of the user"
-            );
+        Error::Credentials {
+            section,
+            source: ConfigError::Secret { key },
+        } => {
+            assert_eq!("cdr.credentials", section);
+            assert_eq!(&"credentials.password", key);
         }
-        other => return Err(format!("expected basic authentication, got {other:?}").into()),
+        other => return Err(format!("expected a missing password, got {other:?}").into()),
     }
     Ok(())
 }
 
 #[test]
-fn a_user_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_user_file_sibling_is_an_unknown_key() {
+    // NOTE: no specification governs this: our own design, the shared
+    // credentials table reads the user-id inline, since it is no secret.
+    for credentials in [
+        "user_file = \"/run/secrets/user\"\npassword = \"p\"\n",
+        "user = \"bridge\"\nuser_file = \"/run/secrets/user\"\npassword = \"p\"\n",
+    ] {
+        let text = format!(
+            "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n[cdr.credentials]\n{credentials}"
+        );
+        let error = Config::from_sources(Some(&text), &BTreeMap::new())
+            .expect_err("user_file is no key of the table");
+        assert!(matches!(error, Error::Parse { .. }), "{error:?}");
+        assert!(
+            format!("{:?}", StdError::source(&error)).contains("user_file"),
+            "the refusal names the key: {error:?}"
+        );
+    }
+}
+
+#[test]
+fn a_password_without_a_user_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
     let text = concat!(
         "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
-        "[cdr.credentials]\nuser = \"bridge\"\nuser_file = \"/run/secrets/user\"\npassword = \"p\"\n",
+        "[cdr.credentials]\npassword = \"p\"\n",
     );
-
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
         .resolve()
-        .expect_err("a user set twice is a boot error");
-    match &error {
-        Error::Conflict { key } => assert_eq!("cdr.credentials.user", key),
-        other => return Err(format!("expected a conflict, got {other:?}").into()),
-    }
+        .expect_err("basic authentication needs both halves");
+    assert!(
+        matches!(
+            &error,
+            Error::Credentials {
+                source: ConfigError::Missing {
+                    key: "credentials.user"
+                },
+                ..
+            }
+        ),
+        "{error:?}"
+    );
     Ok(())
 }
 

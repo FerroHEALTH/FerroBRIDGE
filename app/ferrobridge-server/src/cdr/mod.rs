@@ -23,7 +23,6 @@ pub mod demographic;
 mod ehr;
 pub mod error;
 pub mod ids;
-pub mod oauth;
 pub mod query;
 pub mod template;
 mod transport;
@@ -53,8 +52,8 @@ use crate::cdr::ids::ContributionUid;
 use crate::cdr::ids::EhrId;
 use crate::cdr::ids::IdError;
 use crate::cdr::ids::RequestId;
-use crate::cdr::oauth::cache::TokenSource;
 use crate::cdr::transport::Scoped;
+use crate::credentials::UpstreamToken;
 
 /// The openEHR ITS-REST release the bridge speaks.
 ///
@@ -165,8 +164,7 @@ impl CdrClient {
                 Some(Auth::Static(Credentials::basic(user, password)))
             }
             Some(CdrCredentials::OAuth(oauth)) => Some(Auth::OAuth(
-                TokenSource::new(*oauth, config.timeout)
-                    .map_err(|source| CdrError::TokenClient { source })?,
+                UpstreamToken::new(*oauth).map_err(|source| CdrError::TokenClient { source })?,
             )),
         };
         let client = Client::new(transport, config.base_url.clone())
@@ -228,7 +226,7 @@ impl CdrClient {
             extra.insert(HeaderName::from_static(REQUEST_ID), value);
         }
         let renewal = match self.auth.as_ref() {
-            Some(Auth::OAuth(source)) => Some(source.clone()),
+            Some(Auth::OAuth(token)) => Some(token.source().clone()),
             Some(Auth::Static(_)) | None => None,
         };
         let transport = Scoped::new(self.client.transport(), extra, renewal);
@@ -311,7 +309,7 @@ enum Auth {
     /// One credential presented on every call.
     Static(Credentials),
     /// The token cache the client credentials grant fills.
-    OAuth(TokenSource),
+    OAuth(UpstreamToken),
 }
 
 /// Returns `client` presenting what `auth` describes on every attempt.
@@ -319,7 +317,7 @@ fn authenticated<T: Transport>(client: Client<T>, auth: Option<&Auth>) -> Client
     match auth {
         None => client,
         Some(Auth::Static(credentials)) => client.with_credentials(credentials.clone()),
-        Some(Auth::OAuth(source)) => client.with_credentials_provider(source.clone()),
+        Some(Auth::OAuth(token)) => client.with_credentials_provider(token.clone()),
     }
 }
 

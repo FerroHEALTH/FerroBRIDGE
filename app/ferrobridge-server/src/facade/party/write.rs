@@ -12,6 +12,8 @@
 //! ITS-REST 1.1.0 Demographic API, DEVELOPMENT. No specification governs the
 //! missing-`If-Match` rule: our own design.
 
+use ferrohealth_smart::resource::Access;
+use ferrohealth_smart::scope::Permission;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
@@ -24,8 +26,6 @@ use openehr_rm::v1_2::demographic::organisation::Organisation;
 use openehr_rm::v1_2::demographic::person::Person;
 use openehr_rm::v1_2::demographic::role::Role;
 
-use crate::auth::Access;
-use crate::auth::scope::Permission;
 use crate::cdr::Answered;
 use crate::cdr::Prefer;
 use crate::cdr::commit::CommitContext;

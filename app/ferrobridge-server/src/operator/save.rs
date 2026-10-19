@@ -16,20 +16,19 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use axum::Extension;
 use axum::body::Bytes;
 use axum::extract::Query;
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::response::Response;
+use ferrohealth_smart::resource::Access;
 use http::HeaderMap;
 use http::StatusCode;
 use http::header;
 
-use crate::auth::guard::AUDIT_TARGET;
 use crate::operator::Operator;
 use crate::operator::files;
-use crate::operator::guard::Operator as Caller;
+use crate::operator::guard::AUDIT_TARGET;
 use crate::operator::guard::refusal;
 use crate::operator::reload::Draft;
 use crate::operator::reload::Prepared;
@@ -102,12 +101,12 @@ pub async fn check(
 /// `path` when it compiles with the set, and reloads.
 pub async fn save(
     State(operator): State<Arc<Operator>>,
-    Extension(Caller(caller)): Extension<Caller>,
+    access: Access,
     axum::extract::Path(wire): axum::extract::Path<String>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    let subject = caller.subject().to_owned();
+    let subject = subject_of(&access).to_owned();
     let Some(mapping_dir) = operator.mapping_dir.clone() else {
         return unconfigured();
     };
@@ -175,10 +174,7 @@ pub async fn save(
 }
 
 /// `POST /operator/reload`: compiles the files on disk and swaps them in.
-pub async fn reload(
-    State(operator): State<Arc<Operator>>,
-    Extension(Caller(caller)): Extension<Caller>,
-) -> Response {
+pub async fn reload(State(operator): State<Arc<Operator>>, access: Access) -> Response {
     let reloaded = blocking(Arc::clone(&operator), |operator| {
         Ok(operator
             .prepare(None)
@@ -197,12 +193,20 @@ pub async fn reload(
     };
     tracing::info!(
         target: AUDIT_TARGET,
-        subject = caller.subject(),
+        subject = subject_of(&access),
         action = "reload",
         status = response.status().as_u16(),
         "operator"
     );
     response
+}
+
+/// Returns who the change record names: the caller's subject, or `-` on an
+/// open surface, which the configuration never mounts the operator API on.
+fn subject_of(access: &Access) -> &str {
+    access
+        .caller()
+        .map_or("-", ferrohealth_smart::resource::Caller::subject)
 }
 
 /// What a save's precondition headers ask for.

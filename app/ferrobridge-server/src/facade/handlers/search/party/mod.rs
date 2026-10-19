@@ -21,15 +21,15 @@
 mod request;
 
 use axum::response::Response;
+use ferrohealth_smart::resource::Access;
+use ferrohealth_smart::resource::Compartment;
+use ferrohealth_smart::scope::Permission;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_its::rest::generated::query::AdhocQueryExecute;
 use openehr_its::rest::generated::query::ResultSetRow;
 use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
 
-use crate::auth::Access;
-use crate::auth::Compartment;
-use crate::auth::scope::Permission;
 use crate::cdr::CdrClient;
 use crate::facade::Facade;
 use crate::facade::handlers::Refusal;
@@ -77,7 +77,7 @@ pub(super) async fn search(
 ) -> Result<Response, Refusal> {
     let compartment = access
         .reach(Permission::Search, resource_type)
-        .ok_or_else(crate::auth::guard::forbidden)?;
+        .ok_or_else(crate::facade::guard::forbidden)?;
     let queries = facade
         .party_search()
         .and_then(|search| search.of_type(resource_type))
@@ -99,7 +99,7 @@ pub(super) async fn search(
         Compartment::Patient(ref patient) => resource_type == "Patient" && uid == patient.as_str(),
     };
     if matches!(compartment, Compartment::Patient(_)) && resource_type != "Patient" {
-        return Err(crate::auth::guard::forbidden());
+        return Err(crate::facade::guard::forbidden());
     }
     let found = match request.criterion {
         Criterion::Id(ref id) => {

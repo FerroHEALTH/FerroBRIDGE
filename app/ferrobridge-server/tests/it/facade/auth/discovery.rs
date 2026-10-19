@@ -7,16 +7,20 @@
 
 use std::error::Error as StdError;
 
-use ferrobridge_server::auth::AuthError;
-use ferrobridge_server::auth::Authority;
+use ferrobridge_server::smart::Smart;
+use ferrobridge_server::smart::SmartError;
+use ferrohealth_smart::metadata::DiscoveryError;
+use ferrohealth_smart::resource::ResourceError;
 use http::StatusCode;
 use http::header;
 use jsonwebtoken::Algorithm;
 
 use super::Issuer;
 use super::authority;
+use super::bearing;
 use super::ec_key;
 use super::get;
+use super::mint;
 use super::secured;
 use crate::facade::harness;
 use crate::facade::raw;
@@ -73,12 +77,18 @@ async fn the_smart_configuration_names_the_authorization_server_without_a_token(
             "plain SHALL NOT be listed: {body}"
         );
         let capabilities = body["capabilities"].as_array().ok_or("capabilities")?;
-        for expected in ["permission-v2", "permission-v1", "permission-patient"] {
+        for expected in ["permission-v1", "permission-patient", "permission-user"] {
             assert!(
                 capabilities.contains(&serde_json::json!(expected)),
                 "{expected}: {body}"
             );
         }
+        // NOTE: SMART App Launch 2.2.0 conformance.html, `permission-v2` is
+        // "support for SMARTv2 granular scope syntax", which grants nothing here.
+        assert!(
+            !capabilities.contains(&serde_json::json!("permission-v2")),
+            "{body}"
+        );
         assert!(body["grant_types_supported"].is_array(), "{body}");
     }
     Ok(())
@@ -147,7 +157,7 @@ async fn the_openid_connect_location_answers_when_rfc_8414_has_none()
         .mount_metadata("/.well-known/openid-configuration")
         .await;
     issuer.mount_keys(&[&key], None).await;
-    assert!(Authority::discover(issuer.settings()).await.is_ok());
+    assert!(Smart::discover(issuer.settings()).await.is_ok());
     Ok(())
 }
 
@@ -159,11 +169,11 @@ async fn metadata_naming_another_issuer_refuses_the_start() -> Result<(), Box<dy
     issuer
         .mount_document("/.well-known/oauth-authorization-server", metadata)
         .await;
-    let error = Authority::discover(issuer.settings())
+    let error = Smart::discover(issuer.settings())
         .await
         .expect_err("RFC 8414 §3.3 refuses another issuer");
     assert!(
-        matches!(error, AuthError::IssuerMismatch { .. }),
+        matches!(&error, SmartError::Issuer { source, .. } if matches!(source.as_ref(), ResourceError::Discovery(DiscoveryError::IssuerMismatch { .. }))),
         "{error:?}"
     );
     Ok(())
@@ -180,11 +190,11 @@ async fn metadata_without_a_key_set_refuses_the_start() -> Result<(), Box<dyn St
     issuer
         .mount_document("/.well-known/oauth-authorization-server", metadata)
         .await;
-    let error = Authority::discover(issuer.settings())
+    let error = Smart::discover(issuer.settings())
         .await
         .expect_err("a key set is needed");
     assert!(
-        matches!(error, AuthError::MissingMember { member: "jwks_uri" }),
+        matches!(&error, SmartError::Issuer { source, .. } if matches!(source.as_ref(), ResourceError::MissingMember { member: "jwks_uri" })),
         "{error:?}"
     );
     Ok(())
@@ -197,12 +207,71 @@ async fn an_unreachable_key_set_refuses_the_start() -> Result<(), Box<dyn StdErr
         .mount_metadata("/.well-known/oauth-authorization-server")
         .await;
     issuer.mount_failing_keys().await;
-    let error = Authority::discover(issuer.settings())
+    let error = Smart::discover(issuer.settings())
         .await
         .expect_err("the key set is read at boot");
     assert!(
-        matches!(error, AuthError::KeySetStatus { status, .. } if status == StatusCode::INTERNAL_SERVER_ERROR),
+        matches!(&error, SmartError::Issuer { source, .. } if matches!(source.as_ref(), ResourceError::KeySetStatus { status, .. } if *status == StatusCode::INTERNAL_SERVER_ERROR)),
         "{error:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn metadata_without_a_token_endpoint_refuses_the_start() -> Result<(), Box<dyn StdError>> {
+    // NOTE: SMART App Launch 2.2.0 conformance.html, `token_endpoint` is
+    // REQUIRED in the discovery document the bridge serves.
+    let key = ec_key("k1", Algorithm::ES256);
+    let issuer = Issuer::bare().await;
+    let mut metadata = issuer.metadata();
+    metadata
+        .as_object_mut()
+        .ok_or("metadata is an object")?
+        .remove("token_endpoint");
+    issuer
+        .mount_document("/.well-known/oauth-authorization-server", metadata)
+        .await;
+    issuer.mount_keys(&[&key], None).await;
+    let error = Smart::discover(issuer.settings())
+        .await
+        .expect_err("the discovery document needs a token endpoint");
+    assert!(
+        matches!(&error, SmartError::NoTokenEndpoint { issuer: named } if *named == issuer.uri()),
+        "{error:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_second_trusted_issuer_is_admitted_beside_the_first() -> Result<(), Box<dyn StdError>> {
+    let first_key = ec_key("k1", Algorithm::ES256);
+    let second_key = ec_key("k2", Algorithm::ES256);
+    let first = Issuer::start(&[&first_key]).await;
+    let second = Issuer::start(&[&second_key]).await;
+    let harness = harness().await;
+    let mut settings = first.settings();
+    settings.issuers.push(second.issuer_settings());
+    let authority = authority(settings).await;
+    for (issuer, key) in [(&first, &first_key), (&second, &second_key)] {
+        let token = mint(key, &issuer.claims("system/Condition.r"));
+        let request = bearing(get("/fhir/Condition/never-written"), &token);
+        let response = raw(secured(&harness, &authority), request).await?;
+        assert_eq!(StatusCode::NOT_FOUND, response.status(), "{}", issuer.uri());
+    }
+    let crossed = mint(&second_key, &first.claims("system/Condition.r"));
+    let request = bearing(get("/fhir/Condition/never-written"), &crossed);
+    let response = raw(secured(&harness, &authority), request).await?;
+    assert_eq!(
+        StatusCode::UNAUTHORIZED,
+        response.status(),
+        "a key of one issuer signs nothing for the other"
+    );
+    let path = "/fhir/.well-known/smart-configuration";
+    let (_, _, body) = read_open(secured(&harness, &authority), path).await?;
+    assert_eq!(
+        Some(first.uri().as_str()),
+        body["issuer"].as_str(),
+        "the first issuer is the one the document names"
     );
     Ok(())
 }

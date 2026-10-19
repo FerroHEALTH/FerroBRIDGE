@@ -19,6 +19,9 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::PoisonError;
 
+use ferrohealth_smart::client::RenewalError;
+use ferrohealth_smart::client::TokenError;
+use ferrohealth_smart::client::cache::TokenSource;
 use http::HeaderMap;
 use http::StatusCode;
 use http::header::AUTHORIZATION;
@@ -28,9 +31,6 @@ use openehr_its::rest::client::TransportError;
 
 use crate::cdr::demographic::party::without_reverse_relationships;
 use crate::cdr::error::Upstream;
-use crate::cdr::oauth::RenewalError;
-use crate::cdr::oauth::TokenError;
-use crate::cdr::oauth::cache::TokenSource;
 
 /// The engine of one call.
 #[derive(Debug)]

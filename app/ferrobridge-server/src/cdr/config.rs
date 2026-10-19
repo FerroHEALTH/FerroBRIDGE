@@ -10,11 +10,10 @@
 
 use std::time::Duration;
 
+use ferrohealth_smart::client::ClientCredentials;
 use openehr_its::rest::client::RetryPolicy;
 use secrecy::SecretString;
 use url::Url;
-
-use crate::cdr::oauth::OAuthConfig;
 
 /// How the bridge authenticates to the CDR.
 #[derive(Debug, Clone)]
@@ -28,7 +27,7 @@ pub enum CdrCredentials {
     },
     /// A token the bridge obtains with the OAuth 2.0 client credentials grant
     /// (RFC 6749 §4.4) and renews before it expires.
-    OAuth(Box<OAuthConfig>),
+    OAuth(Box<ClientCredentials>),
 }
 
 /// Everything one [`CdrClient`](crate::cdr::CdrClient) needs about one CDR.
@@ -109,7 +108,7 @@ impl CdrConfig {
     /// Returns this configuration obtaining its token with the client
     /// credentials grant `oauth` describes.
     #[must_use]
-    pub fn with_oauth(mut self, oauth: OAuthConfig) -> Self {
+    pub fn with_oauth(mut self, oauth: ClientCredentials) -> Self {
         self.credentials = Some(CdrCredentials::OAuth(Box::new(oauth)));
         self
     }

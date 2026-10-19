@@ -6,13 +6,13 @@
 //! fetch, the cache across calls, and the one renewal after a terminology
 //! `401`, from `[terminology.credentials.oauth]` to the wire.
 
-use ferrobridge_server::cdr::oauth::TokenError;
 use ferrobridge_server::config::Config;
 use ferrobridge_term::client::Client;
 use ferrobridge_term::error::Error;
 use ferrobridge_term::outcome::LookupOutcome;
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
+use ferrohealth_smart::client::TokenError;
 use http::StatusCode;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
