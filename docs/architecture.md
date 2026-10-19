@@ -275,11 +275,15 @@ of `v1_2` differs where a composition can reach in one place only:
 admits it. The facade's `EHR_STATUS` carries no changed attribute and names
 1.1.0 (#844).
 
-**What the bridge writes itself.** Three things the crates do not export: an
-`aqlPath` index over the Web Template with leaf RM type resolution, the
+**What the bridge writes itself.** Two things the crates do not export: an
+`aqlPath` index over the Web Template with leaf RM type resolution, and the
 parent-to-child relative path derivation (the crate keeps its own copy
-private), and the HTTP client (the crates generate data types and server
-traits, no client).
+private). The CDR client is built over the client `openehr-its` generates
+from the ITS-REST 1.1.0 OpenAPI (its `rest-client` feature, #285): every
+operation, its parameters, its outcome per status and its retry are the
+generated ones, and the bridge adds only what they lack (the `X-Request-Id`
+echo, the ids an `ETag` names, the two-route template fetch, the AQL paging
+and the OAuth 2.0 token).
 
 **Both template generations are supported: ADL 1.4 (OPT 1.4) and ADL 2 (the
 AM 2.4 line: AOM2, OPT2).** Owner requirement, 2026-09-12. The ITS-REST 1.1.0
