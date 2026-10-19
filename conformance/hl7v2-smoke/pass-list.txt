@@ -187,8 +187,11 @@ nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/1-GU/5-Culture%20and%20Susce
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/1-GU/6-Reflex%20Hepatitis/1-LOI_5.0_1.1-GU/Message.txt
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/1-GU/6-Reflex%20Hepatitis/2-LOI_5.1_1.1-GU_PH/Message.txt
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/1-GU/7-Pap%20Smear/1-LOI_6.0_1.1-GU/Message.txt
+nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/1-GU/8-GHP/1-PRU/1-LOI_7.0_1.1-GU_PRU/Message.txt
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/1-GU/8-GHP/1-PRU/2-LOI_7.0_2.1-GU_PRU/Message.txt
+nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/1-GU/8-GHP/2-PRN/1-LOI_7.0_1.1-GU_PRN/Message.txt
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/1-GU/8-GHP/2-PRN/2-LOI_7.0_2.1-GU_PRN/Message.txt
+nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/1-GU/9-Diabetic%20Profile/1-LOI_8.0_1.1-GU/Message.txt
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/2-NG/1-PT/1-LOI_0.0_1.1-NG/Message.txt
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/2-NG/1-PT/2-ACK_0.0_1.1-NG/Message.txt
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/2-NG/1-PT/3-ORL_0.0_1.1-NG/Message.txt
@@ -206,8 +209,11 @@ nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/2-NG/5-Culture%20and%20Susce
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/2-NG/6-Reflex%20Hepatitis/1-LOI_5.0_1.1-NG/Message.txt
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/2-NG/6-Reflex%20Hepatitis/2-LOI_5.1_1.1-NG_PH/Message.txt
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/2-NG/7-Pap%20Smear/1-LOI_6.0_1.1-NG/Message.txt
+nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/2-NG/8-GHP/1-PRU/1-LOI_7.0_1.1-NG_PRU/Message.txt
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/2-NG/8-GHP/1-PRU/2-LOI_7.0_2.1-NG_PRU/Message.txt
+nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/2-NG/8-GHP/2-PRN/1-LOI_7.0_1.1-NG_PRN/Message.txt
 nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/2-NG/8-GHP/2-PRN/2-LOI_7.0_2.1-NG_PRN/Message.txt
+nist/loi-r1/src/main/resources/Contextbased/LOI-EHR/2-NG/9-Diabetic%20Profile/1-LOI_8.0_1.1-NG/Message.txt
 nist/loi-r1/src/main/resources/Contextfree/ACK/GU/Message.txt
 nist/loi-r1/src/main/resources/Contextfree/ACK/NG/Message.txt
 nist/loi-r1/src/main/resources/Contextfree/OML%20-%20base/OML%20-%20Cancel%20Order/GU_PRN/Message.txt
