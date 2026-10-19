@@ -16,6 +16,7 @@
 mod batch;
 mod end_to_end;
 mod lookup;
+mod oauth;
 mod pins;
 mod stu3;
 mod support;

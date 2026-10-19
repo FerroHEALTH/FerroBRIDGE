@@ -9,6 +9,8 @@
 //! (<https://hl7.org/fhir/R4/security.html>), so the credentials are optional.
 
 use secrecy::SecretString;
+use std::fmt;
+use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
@@ -46,7 +48,7 @@ impl WireVersion {
 
 /// The credentials the client presents on every request.
 ///
-/// The secret half is a [`SecretString`], so neither a `Debug` rendering nor a
+/// Every secret is a [`SecretString`], so neither a `Debug` rendering nor a
 /// log line can carry it.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -58,6 +60,57 @@ pub enum Credentials {
         /// The password.
         password: SecretString,
     },
+    /// An RFC 6750 bearer token the provider obtains with the OAuth 2.0
+    /// client credentials grant (RFC 6749 §4.4), renewed once when the server
+    /// answers `401`.
+    OAuth(Arc<dyn TokenProvider>),
+}
+
+/// Why a [`TokenProvider`] obtained no token.
+///
+/// The provider's own error is its [`source`](std::error::Error::source), so
+/// a caller walking the chain reaches that error's type.
+#[derive(Debug, Clone)]
+pub struct TokenFailure(Arc<dyn std::error::Error + Send + Sync>);
+
+impl TokenFailure {
+    /// Returns the failure the provider's error `cause` describes.
+    #[must_use]
+    pub fn new(cause: Arc<dyn std::error::Error + Send + Sync>) -> Self {
+        Self(cause)
+    }
+}
+
+impl fmt::Display for TokenFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("the token provider obtained no token")
+    }
+}
+
+impl std::error::Error for TokenFailure {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&*self.0)
+    }
+}
+
+/// The source of the tokens a [`Credentials::OAuth`] client sends.
+///
+/// The client asks for a token before every attempt. When the server answers
+/// `401`, it hands the refused token back through
+/// [`TokenProvider::invalidate`], asks once more, and re-sends the request
+/// once, since a `401` means the server applied nothing (RFC 9110 §15.5.2).
+#[async_trait::async_trait]
+pub trait TokenProvider: fmt::Debug + Send + Sync {
+    /// Returns the token to send.
+    ///
+    /// # Errors
+    /// Returns the provider's own failure when no token can be obtained.
+    async fn token(&self) -> Result<SecretString, TokenFailure>;
+
+    /// Drops `stale`, a token the server refused, so the next
+    /// [`TokenProvider::token`] obtains a new one. A token the provider has
+    /// already replaced stays.
+    fn invalidate(&self, stale: &SecretString);
 }
 
 /// How often, and how far apart, a call is retried.

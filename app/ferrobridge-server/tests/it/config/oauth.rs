@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The `[cdr.credentials.oauth]` section: the client credentials grant the
-//! bridge obtains its CDR token with, and every refusal of it.
+//! The `[cdr.credentials.oauth]` and `[terminology.credentials.oauth]`
+//! sections: the client credentials grant the bridge obtains its token for
+//! each upstream with, and every refusal of it.
 
 use ferrobridge_server::cdr::config::CdrCredentials;
 use ferrobridge_server::cdr::oauth::{ClientAuth, Endpoint, OAuthConfig};
@@ -304,27 +305,112 @@ fn a_grant_beside_a_static_scheme_refuses_to_boot() -> Result<(), Box<dyn StdErr
     Ok(())
 }
 
+/// Returns the configuration text of a terminology lane whose credentials
+/// section holds `credentials` and whose OAuth section holds `oauth`.
+fn terminology_text(credentials: &str, oauth: &str) -> String {
+    format!(
+        "[terminology]\nbase_url = \"http://tx.invalid/r4\"\n\n[terminology.credentials]\n{credentials}\n[terminology.credentials.oauth]\n{oauth}"
+    )
+}
+
 #[test]
-fn the_terminology_lane_takes_no_oauth_section() -> Result<(), Box<dyn StdError>> {
-    let text = concat!(
-        "[terminology]\nbase_url = \"http://tx.invalid/r4\"\n\n",
-        "[terminology.credentials.oauth]\nclient_id = \"c\"\n",
+fn the_terminology_lane_obtains_its_token_with_the_grant() -> Result<(), Box<dyn StdError>> {
+    let mut file = tempfile::NamedTempFile::new()?;
+    writeln!(file, "synthetic-tx-secret")?;
+    let text = terminology_text(
+        "",
+        &format!(
+            concat!(
+                "token_endpoint = \"https://as.example.org/token\"\n",
+                "client_id = \"ferrobridge\"\n",
+                "client_secret_file = {:?}\n",
+                "client_auth = \"client_secret_post\"\n",
+                "scope = \"system/CodeSystem.rs\"\n",
+                "audience = \"ferroterm\"\n",
+                "resource = \"https://tx.example.org/r4\"\n",
+                "refresh_margin_ms = 60000\n",
+            ),
+            file.path()
+        ),
     );
-    let error = refusal(text)?;
-    assert!(matches!(error, Error::Parse { .. }), "{error:?}");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let terminology = settings.terminology.ok_or("the terminology lane is on")?;
+    assert!(
+        matches!(
+            terminology.credentials,
+            Some(ferrobridge_term::config::Credentials::OAuth(_))
+        ),
+        "{:?}",
+        terminology.credentials
+    );
+    assert!(
+        !format!("{terminology:?}").contains("synthetic-tx-secret"),
+        "the client secret stays out of the Debug rendering"
+    );
     Ok(())
 }
 
 #[test]
-fn the_terminology_oauth_refusal_names_the_table() -> Result<(), Box<dyn StdError>> {
-    let text = concat!(
-        "[terminology]\nbase_url = \"http://tx.invalid/r4\"\n\n",
-        "[terminology.credentials.oauth]\nclient_id = \"c\"\n",
+fn the_terminology_grant_is_reachable_through_the_environment() -> Result<(), Box<dyn StdError>> {
+    let environment = BTreeMap::from([
+        (
+            String::from("FERROBRIDGE__TERMINOLOGY__BASE_URL"),
+            String::from("http://tx.invalid/r4"),
+        ),
+        (
+            String::from("FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__ISSUER"),
+            String::from("https://as.example.org/realms/ferro"),
+        ),
+        (
+            String::from("FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_ID"),
+            String::from("ferrobridge"),
+        ),
+        (
+            String::from("FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET"),
+            String::from("synthetic-tx-secret"),
+        ),
+    ]);
+    let settings = Config::from_sources(None, &environment)?.resolve()?;
+    let terminology = settings.terminology.ok_or("the terminology lane is on")?;
+    assert!(matches!(
+        terminology.credentials,
+        Some(ferrobridge_term::config::Credentials::OAuth(_))
+    ));
+    Ok(())
+}
+
+#[test]
+fn a_terminology_grant_beside_a_user_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    let error = refusal(&terminology_text(
+        "user = \"bridge\"\npassword = \"p\"\n",
+        "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\n",
+    ))?;
+    assert!(
+        matches!(&error, Error::OAuthScheme { section } if section == "terminology.credentials"),
+        "{error:?}"
     );
-    let error = refusal(text)?;
-    let cause = StdError::source(&error)
-        .map(ToString::to_string)
-        .unwrap_or_default();
-    assert!(cause.contains("oauth"), "{cause}");
+    Ok(())
+}
+
+#[test]
+fn a_terminology_grant_refusal_names_the_terminology_key() -> Result<(), Box<dyn StdError>> {
+    let error = refusal(&terminology_text(
+        "",
+        "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\n",
+    ))?;
+    assert!(
+        matches!(&error, Error::Missing { key } if key == "terminology.credentials.oauth.client_secret"),
+        "{error:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_unknown_terminology_oauth_key_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    let error = refusal(&terminology_text(
+        "",
+        "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\ngrant_type = \"password\"\n",
+    ))?;
+    assert!(matches!(error, Error::Parse { .. }), "{error:?}");
     Ok(())
 }

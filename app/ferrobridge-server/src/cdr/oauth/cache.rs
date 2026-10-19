@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The token cache: one token shared by every CDR call, fetched on first use,
+//! The token cache: one token shared by every call to one upstream, fetched on first use,
 //! reused until a margin before it expires, and refreshed by one fetch that
 //! concurrent callers share.
 //!
@@ -19,10 +19,14 @@ use std::sync::PoisonError;
 use std::time::Duration;
 use std::time::Instant;
 
+use ferrobridge_term::config::TokenFailure;
+use ferrobridge_term::config::TokenProvider;
 use http::HeaderValue;
 use openehr_its::rest::client::Credentials;
 use openehr_its::rest::client::CredentialsError;
 use openehr_its::rest::client::CredentialsProvider;
+use secrecy::ExposeSecret;
+use secrecy::SecretString;
 use tokio::sync::watch;
 use url::Url;
 
@@ -53,7 +57,9 @@ impl Clock for SystemClock {
 /// and the header value is marked sensitive.
 #[derive(Debug)]
 pub struct Token {
-    /// The bearer credential the generated client sends.
+    /// The access token, as the terminology client sends it.
+    secret: SecretString,
+    /// The bearer credential the generated ITS-REST client sends.
     credentials: Credentials,
     /// The `Authorization` field value the credential renders to.
     header: HeaderValue,
@@ -109,8 +115,8 @@ struct Inner {
     slot: Mutex<Slot>,
 }
 
-/// The bridge's CDR token, obtained with the client credentials grant and
-/// renewed before it expires.
+/// The bridge's token for one upstream, the CDR or the terminology server,
+/// obtained with the client credentials grant and renewed before it expires.
 ///
 /// The source is cheap to clone: clones share one cache.
 #[derive(Debug, Clone)]
@@ -231,15 +237,17 @@ impl Inner {
                 found: response.token_type,
             });
         }
+        let secret = SecretString::from(response.access_token.clone());
         let credentials = Credentials::bearer(response.access_token);
         let header = credentials
             .header_value()
             .map_err(|source| TokenError::Unusable { source })?;
         tracing::debug!(
             expires_in = response.expires_in,
-            "obtained a CDR token with the client credentials grant"
+            "obtained a token with the client credentials grant"
         );
         Ok(Token {
+            secret,
             credentials,
             header,
             renew_at: renew_at(issued, response.expires_in, self.config.refresh_margin),
@@ -254,6 +262,25 @@ impl CredentialsProvider for TokenSource {
             .await
             .map(|token| token.credentials.clone())
             .map_err(CredentialsError::new)
+    }
+}
+
+#[async_trait::async_trait]
+impl TokenProvider for TokenSource {
+    async fn token(&self) -> Result<SecretString, TokenFailure> {
+        match Self::token(self).await {
+            Ok(token) => Ok(token.secret.clone()),
+            Err(error) => Err(TokenFailure::new(error)),
+        }
+    }
+
+    fn invalidate(&self, stale: &SecretString) {
+        let mut slot = lock(&self.inner.slot);
+        if matches!(&*slot, Slot::Ready(token)
+            if token.secret.expose_secret() == stale.expose_secret())
+        {
+            *slot = Slot::Empty;
+        }
     }
 }
 

@@ -1,16 +1,18 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The CDR credential the bridge obtains for itself with the OAuth 2.0 client
-//! credentials grant (RFC 6749 §4.4), cached and renewed before it expires.
+//! The upstream credential the bridge obtains for itself with the OAuth 2.0
+//! client credentials grant (RFC 6749 §4.4), cached and renewed before it
+//! expires, for the CDR and for the terminology server.
 //!
-//! The bridge reaches the CDR under its own token for the CDR's audience and
-//! never forwards a caller's token, because an access token names the resource
-//! server it is for (RFC 9068 §4). The token endpoint is configured outright
-//! or discovered from the issuer's metadata (RFC 8414 §3, with the `OpenID`
-//! Connect Discovery 1.0 §4 location as the fallback). [`cache::TokenSource`]
-//! fetches on first use, shares one fetch among concurrent callers, and hands
-//! the generated ITS-REST client a bearer credential per attempt.
+//! The bridge reaches each upstream under its own token for that upstream's
+//! audience and never forwards a caller's token, because an access token names
+//! the resource server it is for (RFC 9068 §4). The token endpoint is
+//! configured outright or discovered from the issuer's metadata (RFC 8414 §3,
+//! with the `OpenID` Connect Discovery 1.0 §4 location as the fallback).
+//! [`cache::TokenSource`] fetches on first use, shares one fetch among
+//! concurrent callers, and hands the generated ITS-REST client or the
+//! terminology client a bearer credential per attempt.
 
 pub mod cache;
 pub(crate) mod endpoint;
@@ -47,7 +49,7 @@ pub enum ClientAuth {
     ClientSecretPost,
 }
 
-/// Everything the bridge needs to obtain its CDR token.
+/// Everything the bridge needs to obtain its token for one upstream.
 ///
 /// The secret is a [`SecretString`], so a `Debug` rendering never carries it.
 #[derive(Debug, Clone)]

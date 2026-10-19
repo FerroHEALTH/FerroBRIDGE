@@ -8,6 +8,7 @@
 //! is the other half, and every one of these carries the upstream status and
 //! body rather than an empty value.
 
+use crate::config::TokenFailure;
 use crate::config::WireVersion;
 use http::StatusCode;
 use url::Url;
@@ -264,6 +265,27 @@ pub enum Error {
         /// The upstream status and body.
         upstream: Box<UpstreamError>,
     },
+    /// The token provider obtained no token, so nothing was sent.
+    #[error("no token could be obtained for the request to {url}")]
+    Token {
+        /// The URL the request was for.
+        url: Url,
+        /// The provider's failure.
+        #[source]
+        source: TokenFailure,
+    },
+    /// The server refused the token (`401`) and no new one could be
+    /// obtained, so the request was not sent again.
+    #[error("the terminology server refused the token for {url} and no new one could be obtained")]
+    Renewal {
+        /// The URL that was called.
+        url: Url,
+        /// The upstream status and body of the refusal.
+        upstream: Box<UpstreamError>,
+        /// The provider's failure.
+        #[source]
+        source: TokenFailure,
+    },
     /// The server refused the operation.
     #[error("the terminology server refused {operation} with {upstream}")]
     Refused {
@@ -309,6 +331,8 @@ impl Error {
             Self::Timeout { .. } => "timeout",
             Self::ServerFailure { .. } => "server-failure",
             Self::Unauthorized { .. } => "unauthorized",
+            Self::Token { .. } => "token",
+            Self::Renewal { .. } => "token-renewal",
             Self::Refused { .. } => "refused",
             Self::Body { .. } => "body",
             Self::BatchArity { .. } => "batch-arity",
@@ -323,6 +347,7 @@ impl Error {
         match self {
             Self::ServerFailure { upstream, .. }
             | Self::Unauthorized { upstream, .. }
+            | Self::Renewal { upstream, .. }
             | Self::Refused { upstream, .. } => Some(upstream.status()),
             _ => None,
         }

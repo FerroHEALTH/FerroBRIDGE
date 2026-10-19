@@ -104,9 +104,9 @@ pub(super) struct Basic {
 
 /// Returns the basic authentication `credentials` describes, or `None` when
 /// it names none.
-pub(super) fn resolve_credentials<Grant>(
+pub(super) fn resolve_credentials(
     section: &str,
-    credentials: &Credentials<Grant>,
+    credentials: &Credentials,
 ) -> Result<Option<Basic>, Error> {
     let password = secret(
         &format!("{section}.password"),
