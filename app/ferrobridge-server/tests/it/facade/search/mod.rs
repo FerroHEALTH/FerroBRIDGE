@@ -12,6 +12,7 @@ mod entry_update;
 mod load;
 mod paging;
 mod parameters;
+mod reference_identifier;
 mod wire;
 
 use axum::body::Body;

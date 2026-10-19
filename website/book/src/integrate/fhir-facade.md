@@ -672,6 +672,7 @@ key that is unique per composition.
 | a declared `string` | starts-with by default, `:contains` and `:exact` |
 | a declared `date` | the range of the value's precision, with the prefixes `eq`, `ne`, `gt`, `lt`, `ge`, `le`, `sa` and `eb` |
 | `patient`, `subject` (as declared) | `[id]`, `Patient/[id]`, an absolute URL on this server, or the `:Patient` modifier, resolved through the identity map to the EHR |
+| `patient:identifier`, `subject:identifier` | `[system]\|[value]`, the identifier a resource's subject reference carries: the identity map's subject keyed by that system and value, which the facade renders with that `identifier`; a subject rendered as a literal reference carries none and matches nothing, `\|[value]` matches nothing, and `[value]` alone or `[system]\|` is a `400` |
 | `patient.identifier`, `subject.identifier`, `subject:Patient.identifier` | with [`[facade.identifier_search]`](../operate/configuration.md#facadeidentifier_search) on: `[value]`, or `[system]\|[value]` where a system query is configured; the identifier is resolved to one demographic party and that party's EHR, and two parties answer `400 multiple-matches` |
 | `_id` | a logical id, resolved through the identity map to its composition |
 | `_count` | the page size, capped at `[facade] search_count_max`; `0` answers the total alone |
@@ -695,10 +696,8 @@ as wildcards with no escape (search it with `:exact`). The one supported
 chain is `identifier` on a subject parameter: any other chain is a parameter
 this server does not support. A modifier on the chain is a `400`, and a
 `subject:Group.identifier` names a target that is never an EHR subject, so it
-matches nothing. The `:identifier` modifier is not supported yet
-([issue #923](https://github.com/FerroHEALTH/FerroBRIDGE/issues/923)). The
-`CapabilityStatement` states the chain in the `documentation` of each subject
-parameter, and only while it is on.
+matches nothing. The `CapabilityStatement` states the chain in the
+`documentation` of each subject parameter, and only while it is on.
 
 ### The searchset
 
