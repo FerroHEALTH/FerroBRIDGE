@@ -32,6 +32,19 @@ crates on crates.io.
   interpreter still refuses them as `unsupported-target`; the supplement
   spells them as one row per level under that level's condition. The
   vendored `hl7v2` corpus loses 22 `unsupported-target` outcomes.
+- A FHIRconnect mapping with no `type` onto an `ELEMENT` whose value admits
+  several data types converts the `ELEMENT`'s own value, then runs its
+  `followedBy` children (#544), as FHIRconnect `FollowedBy.adoc` orders them
+  ("after the parent mapping method has been executed"). The compiler picks
+  the value alternative whose class lists the FHIR type earliest in
+  `resolve::derive::PAIRS`, the first in template order on a tie (our own
+  design), and the program carries it as `Derived::Value`; such a mapping was
+  an anchor that wrote nothing. The statutory insurance identifier of the
+  library's `versicherungsinformationen.v0` now round-trips in the KDS person
+  chain as a `DV_IDENTIFIER`, and the two `collected` mappings of
+  `specimen.v1` no longer warn `fc-anchor-without-children`. `Derived` gains
+  a variant, so a consumer that matches it exhaustively adds the arm.
+  `fhirconnect` 0.1.158.
 - `fhirconnect::operations::run::to_fhir` takes the id of the mapped
   resource from a caller-supplied identity seam when the seams carry one
   (#619): `Seams::with_resource_identity` over the new
@@ -108,6 +121,13 @@ crates on crates.io.
 
 ### Fixed
 
+- The HL7 v2 parser judges a segment group by placing every following
+  segment with the same choice rule it applies to the segment itself, so a
+  repeated `ORDER`'s ORC in an OML^O21 opens a new `ORDER` instead of an
+  optional-led `PRIOR_RESULT.ORDER_PRIOR` it cannot complete (#638). The six
+  NIST LOI OML_O21 messages refused for it now parse and map. The nested
+  trial walks share a budget of 4096 placements per segment, our own bound
+  on the work an ambiguous message can cost.
 - The HL7 v2 face decodes a message whose MSH-18 repeats with its first
   repetition, the default character set by HL7 v2.9.1 chapter 2 (#641). It
   still refuses one whose MSH-20 names a switching scheme from table 0356.

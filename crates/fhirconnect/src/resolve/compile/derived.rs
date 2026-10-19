@@ -9,6 +9,7 @@ use fhir_types::schema::Kind;
 use fhir_types::schema::ValueKind;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::ModelPath;
+use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::position::Position;
 
 use crate::model::ast::ModelMappingFile;
@@ -43,6 +44,10 @@ const EXTENSION_TYPE: &str = "Extension";
 
 /// The element of an extension that carries its value, `Extension.value[x]`.
 const EXTENSION_VALUE: &str = "value";
+
+/// The reference-model class of a leaf of an item structure, whose `value`
+/// holds one data value (openEHR RM, the data structures `ELEMENT` class).
+const ELEMENT: &str = "ELEMENT";
 
 impl<'a> Compiler<'a> {
     /// Derives what the data-type cell of a mapping converts, when the
@@ -108,6 +113,9 @@ impl<'a> Compiler<'a> {
         } = sides;
         let class = openehr.leaf_class().unwrap_or(openehr.node().rm_type());
         if derive::is_structural(class) {
+            if let Some(value) = self.element_value(fhir, openehr) {
+                return Some(value);
+            }
             if children {
                 return Some(Derived::Anchor);
             }
@@ -181,6 +189,58 @@ impl<'a> Compiler<'a> {
             read,
             write: Some(Alternative::new(code, written)),
         })
+    }
+
+    /// Returns the value alternative of a polymorphic `ELEMENT` the FHIR
+    /// element converts into, when the node is one and an alternative pairs.
+    ///
+    /// The Web Template gives each data type an `ELEMENT` admits a child node
+    /// of its own, so the node holds other nodes; `FollowedBy.adoc` runs the
+    /// children after the parent "has been executed", so the parent converts
+    /// its own value first. The alternative is the one whose class pairs with
+    /// the FHIR type earliest in [`derive::PAIRS`], the first in template
+    /// order on a tie (no specification governs the tie-break: our own design).
+    fn element_value(&self, fhir: &FhirTarget, openehr: &OpenehrTarget) -> Option<Derived> {
+        if openehr.node().rm_type() != ELEMENT || !openehr.tail().segments.is_empty() {
+            return None;
+        }
+        let location = fhir.resolved().location();
+        let text = match *location {
+            Location::Primitive(ValueKind::Text) | Location::Attribute => true,
+            Location::Complex(_) | Location::Primitive(_) => false,
+            Location::Choice(_)
+            | Location::PrimitiveElement
+            | Location::Resource
+            | Location::Deferred => return None,
+        };
+        let code = fhir.resolved().type_code()?;
+        let mut chosen: Option<(usize, &ResolvedNode, &'static str)> = None;
+        for flat_id in openehr.node().children() {
+            let Ok(child) = self.template.node_by_flat_id(flat_id) else {
+                continue;
+            };
+            let class = child.rm_type();
+            let pair = derive::element(class, code, text);
+            let Some(rank) = derive::pairs(class)
+                .iter()
+                .position(|&paired| paired == pair)
+            else {
+                continue;
+            };
+            if chosen.is_none_or(|(best, _, _)| rank < best) {
+                chosen = Some((rank, child, pair));
+            }
+        }
+        let (_, child, pair) = chosen?;
+        // NOTE: openEHR RM data_structures §ELEMENT: `value` holds one data value, so the
+        // alternative repeats exactly where the `ELEMENT` does and takes its axes.
+        let target = OpenehrTarget::new(
+            child.rm_path().clone(),
+            child.clone(),
+            openehr.tail().clone(),
+            openehr.occurrences().to_vec(),
+        );
+        Some(Derived::Value { code: pair, target })
     }
 
     /// Resolves the alternative of a choice element the `type` key names.
