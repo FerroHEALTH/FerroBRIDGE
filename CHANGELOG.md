@@ -37,7 +37,7 @@ crates on crates.io.
   chain as a `DV_IDENTIFIER`, and the two `collected` mappings of
   `specimen.v1` no longer warn `fc-anchor-without-children`. `Derived` gains
   a variant, so a consumer that matches it exhaustively adds the arm.
-  `fhirconnect` 0.1.155.
+  `fhirconnect` 0.1.158.
 
 ### Changed
 
