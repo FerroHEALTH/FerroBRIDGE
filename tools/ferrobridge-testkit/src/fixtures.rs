@@ -39,6 +39,27 @@ pub const PERSON_OPT: &str = include_str!("../fixtures/opt/person.opt");
 /// The template identifier [`PERSON_OPT`] declares.
 pub const PERSON_TEMPLATE_ID: &str = "ferrobridge.person.v1";
 
+/// A synthetic party operational template rooted at one `ORGANISATION`.
+///
+/// The root is the synthetic archetype
+/// `openEHR-DEMOGRAPHIC-ORGANISATION.ferrobridge_organisation.v1`, shaped as
+/// [`PERSON_OPT`] is. The template identifier is
+/// `ferrobridge.organisation.v1`.
+pub const ORGANISATION_OPT: &str = include_str!("../fixtures/opt/organisation.opt");
+
+/// The template identifier [`ORGANISATION_OPT`] declares.
+pub const ORGANISATION_TEMPLATE_ID: &str = "ferrobridge.organisation.v1";
+
+/// A synthetic party operational template rooted at one `ROLE`.
+///
+/// The root is the synthetic archetype
+/// `openEHR-DEMOGRAPHIC-ROLE.ferrobridge_role.v1`, shaped as [`PERSON_OPT`]
+/// is. The template identifier is `ferrobridge.role.v1`.
+pub const ROLE_OPT: &str = include_str!("../fixtures/opt/role.opt");
+
+/// The template identifier [`ROLE_OPT`] declares.
+pub const ROLE_TEMPLATE_ID: &str = "ferrobridge.role.v1";
+
 /// A synthetic operational template shaped like a diagnosis mapping chain.
 ///
 /// One `COMPOSITION` holds one `EVALUATION` with the at-codes and the two

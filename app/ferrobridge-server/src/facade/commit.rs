@@ -39,8 +39,14 @@ const CREATION_CODE: &str = "249";
 /// The `change_type` code of a later commit, "modification".
 const MODIFICATION_CODE: &str = "251";
 
+/// The `change_type` code of a delete, "deleted".
+const DELETED_CODE: &str = "523";
+
 /// The `lifecycle_state` code of a committed version, "complete".
 const COMPLETE_CODE: &str = "532";
+
+/// The `lifecycle_state` code of a deleted version, "deleted".
+const DELETED_LIFECYCLE_CODE: &str = "523";
 
 /// Whether a write adds a version container or a version to one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,6 +55,8 @@ pub enum Change {
     Creation,
     /// A later version of a composition.
     Modification,
+    /// The deletion of the latest version.
+    Deleted,
 }
 
 impl Change {
@@ -58,6 +66,7 @@ impl Change {
         match self {
             Self::Creation => CREATION_CODE,
             Self::Modification => MODIFICATION_CODE,
+            Self::Deleted => DELETED_CODE,
         }
     }
 
@@ -67,6 +76,7 @@ impl Change {
         match self {
             Self::Creation => "creation",
             Self::Modification => "modification",
+            Self::Deleted => "deleted",
         }
     }
 }
@@ -101,7 +111,12 @@ pub fn context(
     template: &str,
 ) -> Result<CommitContext, CommitError> {
     Ok(CommitContext {
-        lifecycle_state: Some(lifecycle()),
+        lifecycle_state: Some(match change {
+            // NOTE: RM Common IM, Logical Deletion: a delete commits a version in the `deleted`
+            // lifecycle state (`version_lifecycle_state` 523 of the openEHR terminology).
+            Change::Deleted => coded(DELETED_LIFECYCLE_CODE, "deleted"),
+            Change::Creation | Change::Modification => lifecycle(),
+        }),
         audit: Some(audit_data(change, system_id)),
         template_id: Some(
             template_id(template).map_err(|source| CommitError::Template {

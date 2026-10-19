@@ -41,6 +41,8 @@ for `spec.version`. The service base is `/fhir`.
 | `GET /fhir/{type}/{id}/_history/{vid}` | Vread: read the version a write's `Location` named |
 | `PUT /fhir/{type}/{id}` | Update, with `If-Match` |
 | `POST /fhir` | A `transaction` Bundle, all or nothing, or a `batch` Bundle, each entry on its own |
+| `GET /fhir/{type}/{id}/_history` | The history of a party resource |
+| `DELETE /fhir/{type}/{id}` | Delete a party resource |
 | `GET /fhir/.well-known/smart-configuration` | The SMART discovery document, with `[auth]` on |
 
 A type no loaded program maps is absent from the `CapabilityStatement` and
@@ -61,6 +63,9 @@ declaration answers also names `search-type` and, in `searchParam`, exactly
 search parameter. A type no program maps and a `reference` mapping of a
 loaded program creates is listed with `read` and `vread` alone (see
 [Resources the mapping creates](#resources-the-mapping-creates)).
+A type a party context serves is listed with `read`, `vread`,
+`history-instance`, `create`, `update` and `delete` and no search (see
+[Party resources](#party-resources)).
 When the FHIRconnect operations lane is served under the same base,
 `rest.operation` also names `$tofhir` and `$toopenehr`; their direct forms are
 never declared ([The FHIRconnect operations](operations.md) says why).
@@ -112,7 +117,8 @@ on the resource type in the path or in the entry:
 | Interaction | Needs |
 |---|---|
 | create | `c`, and `u` too when the create revises a resource the facade already holds (a new `meta.versionId` of a known `id`); a replay that changes nothing needs `c` only |
-| read, vread | `r` |
+| read, vread, history (a party resource) | `r` |
+| delete (a party resource) | `d` |
 | search (`GET [base]/{type}`, `POST [base]/{type}/_search`) | `s` |
 | update | `u` |
 | `$validate` | `c` or `u`, or the operator scope (`auth.operator_scope`): the dry run commits nothing, so an operator console needs no clinical write scope |
@@ -451,6 +457,39 @@ another server keeps that server as its issuer, and a `urn:` reference to an
 entry of the request is refused. The identity shapes are FerroBRIDGE's own
 design. A CDR that refuses identified parties in clinical content answers
 `422`, and the facade passes its words through in `issue.diagnostics`.
+
+## Party resources
+
+A party context (a FHIRconnect context whose template is rooted at a `PERSON`,
+`ORGANISATION` or `ROLE`) serves its resource type from the CDR's demographic
+store over the ITS-REST 1.1.0 Demographic API, DEVELOPMENT, which the release
+marks `x-status: DEVELOPMENT`. It loads only with `[cdr] demographic` on: a
+party context with the gate off is a boot refusal, and one resource type is
+served by one party context. The correspondences live in the mapping files,
+for example `Patient` and `Practitioner` onto a `PERSON`, `PractitionerRole`
+onto a `ROLE`, and `Organization` onto an `ORGANISATION`.
+
+- **Identity.** The id is the party's `versioned_object_uid` and
+  `meta.versionId` its version tree id; the identity map holds no entry for
+  it. One `PERSON` reads as a `Patient` and as a `Practitioner` under the same
+  id, because FHIR scopes an id to its type.
+- **Interactions.** `read`, `vread`, `history-instance`, `create`, `update`
+  (over the version `If-Match` names, or the latest) and `delete` (the latest
+  version). The Demographic API has no search or list operation, so a party
+  type offers no search, and the `CapabilityStatement` documents that on the
+  type.
+- **Template.** A party built against another template than the context's
+  answers `404`.
+- **Status.** A Demographic API `400` is a `500`; `404`, `409`, `412` and
+  `422` reach the caller as themselves, with the CDR's words in
+  `issue.diagnostics`.
+- **Authorization.** A `patient/` token reaches the one `Patient` its launch
+  context names and no other party resource.
+
+A `PractitionerRole` reads, vreads, lists its history and deletes; it cannot
+be created or updated yet, because a party context cannot map the `ROLE`'s
+mandatory `performer` (#911). These rules are FerroBRIDGE's own design: no
+specification defines a FHIRconnect mapping rooted at a party.
 
 ## `$validate` is a dry run of this server
 

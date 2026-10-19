@@ -351,6 +351,8 @@ async fn build_facade(
         .context("fetching the templates the mappings name")?;
     let programs =
         facade::programs::compile_set(&set, &templates).context("compiling the mapping set")?;
+    facade::programs::check_parties(&programs, client.demographic().is_some())
+        .context("checking the party contexts against [cdr] demographic")?;
     tracing::info!(
         lane = "facade",
         types = programs

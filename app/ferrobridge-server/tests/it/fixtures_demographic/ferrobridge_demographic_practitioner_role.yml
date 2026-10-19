@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The model mapping the demographic suite runs: a PractitionerRole onto the synthetic
+# ROLE template ferrobridge.role.v1 of the testkit, the code text onto the identity name and
+# the identifier onto the details identifier.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_demographic_practitioner_role
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-DEMOGRAPHIC-ROLE.ferrobridge_role.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/PractitionerRole
+
+mappings:
+  - name: "name"
+    with:
+      fhir: "$resource.code.text"
+      openehr: "$archetype/identities[at0003]/details[at0004]/items[at0005]"
+  - name: "identifier"
+    with:
+      fhir: "$resource.identifier"
+      openehr: "$archetype/details[at0001]/items[at0002]"

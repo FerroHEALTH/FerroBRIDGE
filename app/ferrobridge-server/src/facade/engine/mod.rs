@@ -23,11 +23,14 @@ use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::terminology::Terminology;
 use fhirconnect::engine::traverse::Defaults;
 use fhirconnect::engine::traverse::error::EngineError;
+use fhirconnect::engine::traverse::party::from_party;
+use fhirconnect::engine::traverse::party::to_party;
 use fhirconnect::engine::traverse::to_fhir;
 use fhirconnect::engine::traverse::to_openehr;
 use fhirconnect::resolve::program::Program;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::index::WebTemplateIndex;
+use openehr_mapping_core::party::CanonicalParty;
 
 /// The composer the facade records when no mapping sets one.
 ///
@@ -149,6 +152,57 @@ pub fn outbound(
         composition,
         &Seams::default()
             .with_identities(identities)
+            .with_terminology(terminology)
+            .with_demographics(demographics),
+        &CallContext::new(),
+    )
+}
+
+/// Runs a party program over one inbound resource, building its party.
+///
+/// A party carries no composition default (no specification governs a party
+/// context: our own design).
+///
+/// # Errors
+///
+/// Returns the engine's refusal, a party the values do not build included.
+pub fn party_inbound(
+    program: &Program,
+    index: &WebTemplateIndex,
+    document: &Value,
+    terminology: &dyn Terminology,
+    demographics: &dyn Demographics,
+) -> Result<Outcome<CanonicalParty>, EngineError> {
+    to_party(
+        program,
+        &fhir_types::r4::schema::SCHEMAS,
+        index,
+        document,
+        &Seams::default()
+            .with_terminology(terminology)
+            .with_demographics(demographics),
+        &CallContext::new(),
+    )
+}
+
+/// Runs a party program over a party, producing its resource.
+///
+/// # Errors
+///
+/// Returns the engine's refusal.
+pub fn party_outbound(
+    program: &Program,
+    index: &WebTemplateIndex,
+    party: &CanonicalParty,
+    terminology: &dyn Terminology,
+    demographics: &dyn Demographics,
+) -> Result<Outcome<Value>, EngineError> {
+    from_party(
+        program,
+        &fhir_types::r4::schema::SCHEMAS,
+        index,
+        party,
+        &Seams::default()
             .with_terminology(terminology)
             .with_demographics(demographics),
         &CallContext::new(),

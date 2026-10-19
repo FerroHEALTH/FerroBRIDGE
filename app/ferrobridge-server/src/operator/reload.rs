@@ -194,6 +194,11 @@ impl Reloader {
                     crate::facade::programs::compile_set(set, &indexes)
                         .map_err(ReloadError::Facade)?
                 };
+                crate::facade::programs::check_parties(
+                    &programs,
+                    facade.client().demographic().is_some(),
+                )
+                .map_err(ReloadError::Facade)?;
                 let catalog = bind(&report, declarations, &programs)?;
                 Some((programs, catalog))
             }

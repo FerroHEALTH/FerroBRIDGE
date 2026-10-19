@@ -26,7 +26,7 @@ mod render;
 mod search;
 mod transaction;
 mod validate;
-mod write;
+pub(crate) mod write;
 
 use std::sync::Arc;
 
@@ -78,6 +78,19 @@ pub async fn create_route(
     uri: Uri,
     body: Bytes,
 ) -> Response {
+    if let Some(loaded) = facade.programs().party(&resource_type) {
+        return crate::facade::party::write::create(
+            &facade,
+            &access,
+            loaded,
+            &resource_type,
+            &headers,
+            &uri,
+            &body,
+        )
+        .await
+        .unwrap_or_else(Refusal::into_response);
+    }
     write::create(&facade, &access, &resource_type, &headers, &uri, &body)
         .await
         .unwrap_or_else(Refusal::into_response)
@@ -165,6 +178,62 @@ pub async fn update_route(
     .unwrap_or_else(Refusal::into_response)
 }
 
+/// `DELETE [base]/{type}/{id}`: delete a party resource, ITS-REST 1.1.0
+/// Demographic API, DEVELOPMENT.
+///
+/// A type no party program serves is `not-supported`, and a party program
+/// loads only with `[cdr] demographic` on (no specification governs this: our
+/// own design).
+pub async fn delete_route(
+    State(facade): State<Arc<Facade>>,
+    Extension(access): Extension<Access>,
+    Path((resource_type, id)): Path<(String, String)>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> Response {
+    let programs = facade.programs();
+    let Some(loaded) = programs.party(&resource_type) else {
+        return not_supported(&resource_type).into_response();
+    };
+    crate::facade::party::write::delete(
+        &facade,
+        &access,
+        loaded,
+        (&resource_type, &id),
+        &headers,
+        &uri,
+    )
+    .await
+    .unwrap_or_else(Refusal::into_response)
+}
+
+/// `GET [base]/{type}/{id}/_history`: the history of a party resource,
+/// ITS-REST 1.1.0 Demographic API, DEVELOPMENT.
+///
+/// A type no party program serves is `not-supported`, as for [`delete_route`].
+pub async fn history_route(
+    State(facade): State<Arc<Facade>>,
+    Extension(access): Extension<Access>,
+    Path((resource_type, id)): Path<(String, String)>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> Response {
+    let programs = facade.programs();
+    let Some(loaded) = programs.party(&resource_type) else {
+        return not_supported(&resource_type).into_response();
+    };
+    crate::facade::party::read::history(
+        &facade,
+        &access,
+        loaded,
+        (&resource_type, &id),
+        &headers,
+        &uri,
+    )
+    .await
+    .unwrap_or_else(Refusal::into_response)
+}
+
 /// `POST [base]/{type}/$validate`: the dry run that commits nothing.
 pub async fn validate_route(
     State(facade): State<Arc<Facade>>,
@@ -202,6 +271,17 @@ pub(crate) async fn read(
     headers: &HeaderMap,
     uri: &Uri,
 ) -> Result<Response, Refusal> {
+    if let Some(loaded) = facade.programs().party(resource_type) {
+        return crate::facade::party::read::read(
+            facade,
+            access,
+            loaded,
+            (resource_type, id),
+            headers,
+            uri,
+        )
+        .await;
+    }
     admit_existing(facade, access, Permission::Read, resource_type, id)?;
     read::read(
         facade,
@@ -222,6 +302,17 @@ pub(crate) async fn vread(
     headers: &HeaderMap,
     uri: &Uri,
 ) -> Result<Response, Refusal> {
+    if let Some(loaded) = facade.programs().party(resource_type) {
+        return crate::facade::party::read::vread(
+            facade,
+            access,
+            loaded,
+            (resource_type, id, vid),
+            headers,
+            uri,
+        )
+        .await;
+    }
     admit_existing(facade, access, Permission::Read, resource_type, id)?;
     read::vread(
         facade,
@@ -242,6 +333,18 @@ pub(crate) async fn update(
     uri: &Uri,
     body: &[u8],
 ) -> Result<Response, Refusal> {
+    if let Some(loaded) = facade.programs().party(resource_type) {
+        return crate::facade::party::write::update(
+            facade,
+            access,
+            loaded,
+            (resource_type, id),
+            headers,
+            uri,
+            body,
+        )
+        .await;
+    }
     admit_existing(facade, access, Permission::Update, resource_type, id)?;
     write::update(facade, access, (resource_type, id), headers, uri, body).await
 }

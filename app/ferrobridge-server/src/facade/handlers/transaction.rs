@@ -196,6 +196,7 @@ fn committed_entry(base: &str, entry: &Committed) -> BundleEntry {
             status: match entry.change {
                 Some(Change::Creation) => "201 Created",
                 Some(Change::Modification) | None => "200 OK",
+                Some(Change::Deleted) => "204 No Content",
             }
             .into(),
             location: Some(

@@ -156,7 +156,9 @@ and a status the operation does not document are never retried.
 
 `[cdr] demographic` turns on the client of the ITS-REST 1.1.0 Demographic API,
 DEVELOPMENT: the reads, creates, updates and deletes of `PERSON`,
-`ORGANISATION` and `ROLE`. No FHIR resource is served from it yet. A Release
+`ORGANISATION` and `ROLE`, and the facade serves every party context's
+resource type from it ([Party resources](../integrate/fhir-facade.md#party-resources)).
+A party context with the key off is a boot refusal. A Release
 1.1.0 `PARTY` may carry `reverse_relationships`, which the development line
 removed; the bridge drops the member before it reads the party and counts the
 entries it dropped. Each entry restates a relationship the demographic
