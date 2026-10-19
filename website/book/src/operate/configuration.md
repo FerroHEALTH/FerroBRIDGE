@@ -508,6 +508,12 @@ design.
 | `max_depth` | `2` | How many levels of references are followed: the request's own, then those of each resolved resource; `0` resolves none |
 | `timeout_ms` | `10000` | How long one fetch from a listed base may take, connection included |
 
+Each key is settable as `FERROBRIDGE__FACADE__REFERENCES__<KEY>`, and
+`fetch_bases` takes a TOML array:
+`FERROBRIDGE__FACADE__REFERENCES__FETCH_BASES='["https://sender.example/fhir"]'`.
+A base that is no `http` or `https` URL, or that carries a query or a
+fragment, is a boot error naming `facade.references.fetch_bases`.
+
 ### `[facade.identifier_search]`
 
 The chained search through a patient's identifier:
@@ -604,12 +610,6 @@ parameters, and a type no party context serves are boot errors naming the
 key. `enabled` is settable as `FERROBRIDGE__FACADE__PARTY_SEARCH__ENABLED`;
 write the `types` tables in the file, because an environment key is read in
 lower case and a resource type name does not survive it.
-
-Each key is settable as `FERROBRIDGE__FACADE__REFERENCES__<KEY>`, and
-`fetch_bases` takes a TOML array:
-`FERROBRIDGE__FACADE__REFERENCES__FETCH_BASES='["https://sender.example/fhir"]'`.
-A base that is no `http` or `https` URL, or that carries a query or a
-fragment, is a boot error naming `facade.references.fetch_bases`.
 
 ### `[auth]`
 
