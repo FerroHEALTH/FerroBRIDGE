@@ -34,6 +34,14 @@ crates on crates.io.
   its description names the map it composes. A supplement for ADT_A06 names
   the guide's `ADT_A01.PD1` row `ADT_A06.PD1`, so ADT_A06 messages map too.
   The `hl7v2` corpus goes from 290 to 346 passing messages.
+- The HL7 v2 parser counts a valued repetition past a field's cardinality,
+  a valued component past its data type's components and a valued
+  subcomponent past its component's data type, as the new
+  `extra-repetition`, `extra-component` and `extra-subcomponent` outcomes
+  (#295). HL7 v2 chapter 2 §2.6 tells a receiver to ignore such
+  constituents, so none refuses the message and each value stays in the
+  parsed message. Components are checked against the v2.9.1 data types
+  only, since the tables of earlier versions carry no component tables.
 - A FHIRconnect mapping with no `type` onto an `ELEMENT` whose value admits
   several data types converts the `ELEMENT`'s own value, then runs its
   `followedBy` children (#544), as FHIRconnect `FollowedBy.adoc` orders them
@@ -116,6 +124,18 @@ crates on crates.io.
   `src/auth/` and `src/cdr/oauth/` are gone from the server (#977), and
   `ferrobridge_server::credentials::UpstreamToken` hands the crate's token to
   both upstream clients.
+
+- The HL7 v2 corpora count a message the face refuses correctly as a pass
+  (#639). `crates/ferrobridge-hl7v2/tests/it/corpus/expected-refusals.txt`
+  lists 167 messages with the acknowledgment code and the HL7 table 0357
+  error HL7 v2 chapter 2 owes them: 152 ReportStream mapping-inventory
+  fragments, 6 FHIR-Converter samples that break their declared structure,
+  4 AIRA examples built to omit the RXA, and 5 messages whose bytes leave
+  the declared character set or whose MSH-18 names no table 0211 code. A
+  listed case fails when the face takes the message or answers it
+  otherwise. The `hl7v2` badge moves from 290 to 453 of 511 and the
+  `hl7v2-smoke` badge from 375 to 379 of 379.
+
 - The release workflow refuses a tag whose milestone, titled exactly as the
   tag, is missing or still holds an open issue or pull request, and names
   each one; once every leg has succeeded, crates.io included, it closes that
