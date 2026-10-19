@@ -91,13 +91,18 @@ jobs:
           for p in ferrobridge-testkit ferrobridge-server ferrobridge-validator; do
             if [ "$(has "$p")" = true ]; then examples=true; fi
           done
+          # fhirconnect maps the HL7 Europe EPS example documents of one of them.
+          profiles=false
+          for p in ferrobridge-validator fhirconnect; do
+            if [ "$(has "$p")" = true ]; then profiles=true; fi
+          done
           {
             echo "packages=$packages"
             echo "coverage=$coverage"
             echo "v2=$(has fhir-codegen)"
             echo "hl7v2-samples=$(has ferrobridge-hl7v2)"
             echo "fhir-examples=$examples"
-            echo "profile-packages=$(has ferrobridge-validator)"
+            echo "profile-packages=$profiles"
           } | tee -a "$GITHUB_OUTPUT"
 
       - name: Install the Rust toolchain
@@ -186,7 +191,7 @@ jobs:
         if: steps.affected.outputs.fhir-examples == 'true'
         run: bash scripts/vendor/fhir-packages.sh --build-time
 
-      # The profile validator's package-gated tests read the profile packages,
+      # The profile validator's and fhirconnect's package-gated tests read the profile packages,
       # fetched at build time and never committed, and fail under CI when
       # they are absent (ci.yml test).
       - name: Read the pinned profile packages
