@@ -120,7 +120,7 @@ impl IdentifierSearch {
 }
 
 /// Checks that `text` names `$<parameter>`.
-fn require(
+pub(crate) fn require(
     text: &str,
     parameter: &'static str,
     part: &'static str,

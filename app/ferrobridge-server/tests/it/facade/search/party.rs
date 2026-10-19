@@ -23,6 +23,8 @@ use ferrobridge_server::facade::programs;
 use ferrobridge_server::facade::programs::LoadError;
 use ferrobridge_server::facade::search::identifier::EXTENSION;
 use ferrobridge_server::facade::search::identifier::IdentifierSearch;
+use ferrobridge_server::facade::search::party::NameSearch;
+use ferrobridge_server::facade::search::party::PartyQueries;
 use ferrobridge_server::facade::search::party::PartySearch;
 use http::Request;
 use http::StatusCode;
@@ -90,6 +92,25 @@ fn query_of(class: &str) -> String {
     )
 }
 
+/// Returns the name query of `class`, comparing the three case variants of
+/// the value as prefix patterns.
+fn name_query_of(class: &str) -> String {
+    format!(
+        "SELECT p/uid/value FROM {class} p WHERE \
+         p/identities[at0003]/details[at0004]/items[at0005]/value/value LIKE $name OR \
+         p/identities[at0003]/details[at0004]/items[at0005]/value/value LIKE $name_lower OR \
+         p/identities[at0003]/details[at0004]/items[at0005]/value/value LIKE $name_capitalised \
+         ORDER BY p/uid/value ASC"
+    )
+}
+
+/// Whether the suite configures a `name` query for `resource_type`: the two
+/// R4 types of this search that define `name` over a person
+/// (<https://hl7.org/fhir/R4/patient.html#search>).
+fn named(resource_type: &str) -> bool {
+    matches!(resource_type, "Patient" | "Practitioner")
+}
+
 /// Returns the search of every type in `types`.
 fn searching(types: &[&str]) -> PartySearch {
     PartySearch::new(
@@ -99,8 +120,16 @@ fn searching(types: &[&str]) -> PartySearch {
             .map(|&(resource_type, class, ..)| {
                 (
                     String::from(resource_type),
-                    IdentifierSearch::new(&query_of(class), None)
-                        .expect("the query binds the identifier"),
+                    PartyQueries::new(
+                        Some(
+                            IdentifierSearch::new(&query_of(class), None)
+                                .expect("the query binds the identifier"),
+                        ),
+                        named(resource_type).then(|| {
+                            NameSearch::new(&name_query_of(class))
+                                .expect("the query binds the name")
+                        }),
+                    ),
                 )
             })
             .collect::<BTreeMap<_, _>>(),
@@ -328,18 +357,31 @@ async fn a_type_no_query_is_configured_for_offers_no_search() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn a_parameter_other_than_identifier_is_refused() -> Result<(), Box<dyn StdError>> {
-    let (_cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
+async fn an_unsupported_parameter_or_combination_is_refused() -> Result<(), Box<dyn StdError>> {
+    let (_cdr, facade) = harness(Some(searching(&["Patient", "Organization"]))).await?;
     for path in [
-        "Patient?name=Synthetic",
+        "Patient?birthdate=1990-01-01",
         "Patient",
         "Patient?identifier=SYN-0001,SYN-0002",
         "Patient?identifier=SYN-0001&identifier=SYN-0002",
+        "Patient?identifier=SYN-0001&name=Synthetic",
+        "Patient?name:exact=Synthetic",
+        "Patient?name=Syn*",
+        "Organization?name=Synthetic",
     ] {
         let (status, body) = get(&facade, path).await?;
         assert_eq!(StatusCode::BAD_REQUEST, status, "{path}: {body}");
         assert_eq!(first_issue(&body)["code"], "not-supported", "{path}");
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_count_that_is_no_number_is_invalid() -> Result<(), Box<dyn StdError>> {
+    let (_cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
+    let (status, body) = get(&facade, "Patient?identifier=SYN-0001&_count=many").await?;
+    assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");
+    assert_eq!(first_issue(&body)["code"], "invalid", "{body}");
     Ok(())
 }
 
@@ -392,14 +434,30 @@ async fn the_statement_declares_search_on_the_configured_types_only()
         let wanted = matches!(resource_type, "Patient" | "Organization");
         assert_eq!(searched, wanted, "{resource_type}: {entry}");
         if wanted {
-            assert_eq!(
-                entry["searchParam"],
-                serde_json::json!([{
+            let mut declared = vec![
+                serde_json::json!({
+                    "name": "_id",
+                    "definition": "http://hl7.org/fhir/SearchParameter/Resource-id",
+                    "type": "token"
+                }),
+                serde_json::json!({
                     "name": "identifier",
                     "definition": format!("http://hl7.org/fhir/SearchParameter/{resource_type}-identifier"),
                     "type": "token",
                     "documentation": format!("Resolved through the {EXTENSION}")
-                }]),
+                }),
+            ];
+            if named(resource_type) {
+                declared.push(serde_json::json!({
+                    "name": "name",
+                    "definition": format!("http://hl7.org/fhir/SearchParameter/{resource_type}-name"),
+                    "type": "string",
+                    "documentation": format!("Resolved through the {EXTENSION}")
+                }));
+            }
+            assert_eq!(
+                entry["searchParam"],
+                serde_json::Value::Array(declared),
                 "{entry}"
             );
         } else {
@@ -414,7 +472,7 @@ async fn a_search_of_a_type_no_party_context_serves_does_not_boot() -> Result<()
 {
     let search = PartySearch::new(BTreeMap::from([(
         String::from("Group"),
-        IdentifierSearch::new(&query_of("GROUP"), None)?,
+        PartyQueries::new(Some(IdentifierSearch::new(&query_of("GROUP"), None)?), None),
     )]));
     let refused = harness(Some(search)).await;
     let error = refused
@@ -427,5 +485,186 @@ async fn a_search_of_a_type_no_party_context_serves_does_not_boot() -> Result<()
         ),
         "{error}"
     );
+    Ok(())
+}
+
+/// The canonical `PERSON` the CDR holds under `uid`.
+fn person(uid: &str) -> serde_json::Value {
+    party("PERSON", "ferrobridge_person", "ferrobridge.person.v1", uid)
+}
+
+/// Returns the parties the CDR was asked for over the Demographic API.
+async fn party_reads(cdr: &MockServer) -> usize {
+    cdr.received_requests()
+        .await
+        .unwrap_or_default()
+        .iter()
+        .filter(|request| request.url.path().starts_with("/demographic/"))
+        .count()
+}
+
+/// R4 search.html §3.1.1.4.8: a string matches a field that "equals or
+/// starts with the supplied parameter value, after both have been normalized
+/// by case"; the dialect's `LIKE` is case-sensitive, so three case variants
+/// are bound.
+#[tokio::test]
+async fn a_name_search_binds_three_case_variants_of_a_prefix() -> Result<(), Box<dyn StdError>> {
+    for resource_type in ["Patient", "Practitioner"] {
+        let (cdr, facade) = harness(Some(searching(&[resource_type]))).await?;
+        mount_rows(&cdr, &[UID]).await;
+        mount_party(&cdr, "person", &person(UID), UID).await;
+        let (status, body) = get(&facade, &format!("{resource_type}?name=syn")).await?;
+        assert_eq!(StatusCode::OK, status, "{resource_type}: {body}");
+        assert_eq!(body["entry"].as_array().map(Vec::len), Some(1), "{body}");
+        let sent = queries(&cdr).await;
+        assert_eq!(sent[0]["q"], name_query_of("PERSON"));
+        assert_eq!(sent[0]["query_parameters"]["name"], "syn*");
+        assert_eq!(sent[0]["query_parameters"]["name_lower"], "syn*");
+        assert_eq!(sent[0]["query_parameters"]["name_capitalised"], "Syn*");
+    }
+    Ok(())
+}
+
+/// R4 search.html §3.1.1.4.10: `[parameter]=[code]` matches "irrespective
+/// of the value of the system property", so two parties are two entries.
+#[tokio::test]
+async fn a_bare_identifier_two_parties_carry_answers_both() -> Result<(), Box<dyn StdError>> {
+    let (cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
+    mount_rows(&cdr, &[UID, OTHER]).await;
+    mount_party(&cdr, "person", &person(UID), UID).await;
+    mount_party(&cdr, "person", &person(OTHER), OTHER).await;
+    let (status, body) = get(&facade, "Patient?identifier=SYN-0001").await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let ids: Vec<&str> = body["entry"]
+        .as_array()
+        .ok_or("entries")?
+        .iter()
+        .filter_map(|entry| entry["resource"]["id"].as_str())
+        .collect();
+    assert_eq!(ids, [UID, OTHER], "{body}");
+    Ok(())
+}
+
+/// R4 search.html §3.1.1.4.10: `[system]|[code]` matches the system too.
+#[tokio::test]
+async fn an_identifier_with_a_system_runs_the_system_query() -> Result<(), Box<dyn StdError>> {
+    let system_query = "SELECT p/uid/value FROM PERSON p WHERE \
+                        p/details[at0001]/items[at0002]/value/id = $identifier AND \
+                        p/details[at0001]/items[at0002]/value/issuer = $system";
+    let search = PartySearch::new(BTreeMap::from([(
+        String::from("Patient"),
+        PartyQueries::new(
+            Some(IdentifierSearch::new(
+                &query_of("PERSON"),
+                Some(system_query),
+            )?),
+            None,
+        ),
+    )]));
+    let (cdr, facade) = harness(Some(search)).await?;
+    mount_rows(&cdr, &[UID]).await;
+    mount_party(&cdr, "person", &person(UID), UID).await;
+    let (status, body) = get(
+        &facade,
+        "Patient?identifier=http%3A%2F%2Fexample.org%2Fsid%7CSYN-0001",
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let sent = queries(&cdr).await;
+    assert_eq!(sent[0]["q"], system_query);
+    assert_eq!(
+        sent[0]["query_parameters"]["system"],
+        "http://example.org/sid"
+    );
+    assert_eq!(sent[0]["query_parameters"]["identifier"], "SYN-0001");
+    Ok(())
+}
+
+/// R4 search.html §3.1.1.4.1: `_id` names the one resource with that id.
+#[tokio::test]
+async fn an_id_reads_the_one_party_it_names_and_runs_no_query() -> Result<(), Box<dyn StdError>> {
+    let (cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
+    mount_party(&cdr, "person", &person(UID), UID).await;
+    let (status, body) = get(&facade, &format!("Patient?_id={UID}")).await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let entries = body["entry"].as_array().ok_or("entries")?;
+    assert_eq!(entries.len(), 1, "{body}");
+    assert_eq!(entries[0]["resource"]["id"], UID);
+    assert!(queries(&cdr).await.is_empty(), "_id ran a query");
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_id_naming_no_party_of_the_type_matches_nothing() -> Result<(), Box<dyn StdError>> {
+    let (cdr, facade) = harness(Some(searching(&["Patient", "Organization"]))).await?;
+    mount_party(
+        &cdr,
+        "organisation",
+        &party(
+            "ORGANISATION",
+            "ferrobridge_organisation",
+            "another.template.v1",
+            UID,
+        ),
+        UID,
+    )
+    .await;
+    for path in [
+        format!("Patient?_id={OTHER}"),
+        format!("Organization?_id={UID}"),
+        String::from("Patient?_id=not%20a%20uid"),
+    ] {
+        let (status, body) = get(&facade, &path).await?;
+        assert_eq!(StatusCode::OK, status, "{path}: {body}");
+        assert!(
+            body["entry"].as_array().is_none_or(Vec::is_empty),
+            "{path}: {body}"
+        );
+    }
+    Ok(())
+}
+
+/// R4 search.html §3.1.1.5.3: "if `_count` has the value 0, this shall be
+/// treated the same as `_summary=count`: the server returns a bundle that
+/// reports the total number of resources that match in Bundle.total, but
+/// with no entries, and no prev/next/last links."
+#[tokio::test]
+async fn a_count_of_zero_answers_the_total_and_no_entry() -> Result<(), Box<dyn StdError>> {
+    let (cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
+    mount_rows(&cdr, &[UID, OTHER]).await;
+    mount_party(&cdr, "person", &person(UID), UID).await;
+    let (status, body) = get(&facade, "Patient?identifier=SYN-0001&_count=0").await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(body["total"], 2, "{body}");
+    assert!(body.get("entry").is_none(), "{body}");
+    let relations: Vec<&str> = body["link"]
+        .as_array()
+        .ok_or("links")?
+        .iter()
+        .filter_map(|link| link["relation"].as_str())
+        .collect();
+    assert_eq!(relations, ["self"], "{body}");
+    let sent = queries(&cdr).await;
+    assert!(
+        sent[0].get("fetch").is_none_or(serde_json::Value::is_null),
+        "{sent:?}"
+    );
+    assert_eq!(party_reads(&cdr).await, 0, "a count reads no party");
+    let (status, body) = get(&facade, &format!("Patient?_id={UID}&_count=0")).await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(body["total"], 1, "{body}");
+    Ok(())
+}
+
+/// R4 search.html §3.1.1.5.3: "Servers SHALL NOT return more resources than
+/// requested", and the facade answers no more than its largest page.
+#[tokio::test]
+async fn a_count_above_the_largest_page_is_capped() -> Result<(), Box<dyn StdError>> {
+    let (cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
+    mount_rows(&cdr, &[]).await;
+    let (status, body) = get(&facade, "Patient?identifier=SYN-0001&_count=100000").await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let largest = ferrobridge_server::facade::search::Limits::default().max_count;
+    assert_eq!(queries(&cdr).await[0]["fetch"], largest + 1);
     Ok(())
 }

@@ -532,29 +532,50 @@ the extension.
 ### `[facade.party_search]`
 
 The search on the types a party context serves: `Patient`, `Practitioner`,
-`PractitionerRole` and `Organization`, by `identifier`
-(`Patient?identifier=MRN-1`). The ITS-REST Demographic API has no search, so
-the facade runs an AQL query rooted at a demographic class, the Cadasto
-experimental AQL demographic extension, and reads each party it names over
-the Demographic API. The reference CDR refuses demographic sources today.
+`PractitionerRole` and `Organization`, by `identifier`, `name` or `_id`
+(`Patient?identifier=MRN-1`, `Patient?name=jans`). The ITS-REST Demographic
+API has no search, so for `identifier` and `name` the facade runs an AQL
+query rooted at a demographic class, the Cadasto experimental AQL
+demographic extension, and reads each party it names over the Demographic
+API. `_id` needs no query: the facade reads the party the id names. The
+reference CDR refuses demographic sources today.
 
-Each type has its own query and none has a default, because the archetypes a
-tenant stores and the dialect both move. A query's first column is the
+Each type has its own queries and none has a default, because the archetypes
+a tenant stores and the dialect both move. A query's first column is the
 party's `uid/value`, and a versioned uid counts as its party. Leave `LIMIT`
 and `OFFSET` out: the facade pages the query with the query API's `offset`
 and `fetch`. Keep to the forms the extension documents or Cadasto observed as
-stable: a demographic root, `WHERE` over the parameters, `ORDER BY` and the
-`person_identifier` `CLUSTER`. A search takes `identifier`, `_count` and the
-paging cursor; any other parameter is a `400`, unless the client sends
-`Prefer: handling=lenient`. A CDR that answers `400` to the query does not
-serve the extension, or not this query of it: the search answers `501` with
-`not-supported`, naming the extension and carrying the CDR's words.
+stable: a demographic root, `WHERE` and `LIKE` over the parameters,
+`ORDER BY` and the `person_identifier` `CLUSTER`.
+
+- **`identifier`** matches a bare value whatever its system, so two parties
+  that carry it are two entries, and `[system]|[value]` runs `system_query`.
+- **`name`** matches a name that starts with the value, ignoring case, as R4
+  string search asks. The extension's `LIKE` is case-sensitive, so the value
+  is bound three times as a prefix pattern (`jans*`): `$name` as typed,
+  `$name_lower` in lower case and `$name_capitalised` with its first letter
+  in upper case. Write the query to compare the name with each. A name in
+  another case (`JANSEN` for `jans`) and an accent difference are not
+  matched until the dialect can fold them. A value carrying `*` or `?` is a
+  `400`.
+- **`_id`** matches the one party with that id, and a party of another
+  template matches nothing.
+- **`_count`** is capped at `search_count_max`, and `_count=0` answers the
+  number of matches in `total` with no entries.
+
+A search takes one of these parameters, plus `_count` and the paging cursor.
+A second one, or any other parameter, is a `400`, unless the client sends
+`Prefer: handling=lenient`, which ignores it and reports it. A CDR that
+answers `400` to a query does not serve the extension, or not this query of
+it: the search answers `501` with `not-supported`, naming the extension and
+carrying the CDR's words.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether the types under `types` are searched; off, no party type offers search |
-| `types.<Type>.query` | none | The AQL a value with no system runs for `<Type>`, binding the value as `$identifier` |
+| `types.<Type>.query` | empty | The AQL an `identifier` value with no system runs for `<Type>`, binding the value as `$identifier`; empty, the type takes no `identifier` |
 | `types.<Type>.system_query` | empty | The AQL a `[system]\|[value]` value runs, binding `$identifier` and `$system`; empty refuses a value naming a system with `400 not-supported` |
+| `types.<Type>.name_query` | empty | The AQL a `name` value runs, binding `$name` and, to compare them, `$name_lower` and `$name_capitalised`; empty, the type takes no `name` |
 
 ```toml
 [facade.party_search]
@@ -562,9 +583,11 @@ enabled = true
 
 [facade.party_search.types.Patient]
 query = "SELECT p/uid/value FROM PERSON p WHERE p/details[openEHR-DEMOGRAPHIC-ITEM_TREE.person_details.v2]/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]/items[at0001]/value/id = $identifier ORDER BY p/uid/value ASC"
+name_query = "SELECT p/uid/value FROM PERSON p WHERE p/identities/details/items[at0010]/value/value LIKE $name OR p/identities/details/items[at0010]/value/value LIKE $name_lower OR p/identities/details/items[at0010]/value/value LIKE $name_capitalised ORDER BY p/uid/value ASC"
 ```
 
-On with no type, a type with no `query`, a query that does not bind its
+A type with only `_id` needs no query: write its table empty. On with no
+type, a `system_query` with no `query`, a query that does not bind its
 parameters, and a type no party context serves are boot errors naming the
 key. `enabled` is settable as `FERROBRIDGE__FACADE__PARTY_SEARCH__ENABLED`;
 write the `types` tables in the file, because an environment key is read in

@@ -99,12 +99,17 @@ pub struct FacadePartySearch {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct FacadePartySearchType {
-    /// The AQL a value with no system runs, binding `$identifier`; its first
-    /// column is the party's `uid/value`, and the facade pages it.
+    /// The AQL an `identifier` value with no system runs, binding
+    /// `$identifier`; its first column is the party's `uid/value`, and the
+    /// facade pages it. Empty, the type takes no `identifier`.
     pub query: String,
     /// The AQL a `[system]|[value]` value runs, binding `$identifier` and
     /// `$system`; empty refuses a value naming a system.
     pub system_query: String,
+    /// The AQL a `name` value runs, binding `$name` and, when it compares
+    /// them, `$name_lower` and `$name_capitalised`, each a prefix pattern.
+    /// Empty, the type takes no `name`.
+    pub name_query: String,
 }
 
 /// How the facade resolves a reference a request names and does not carry.

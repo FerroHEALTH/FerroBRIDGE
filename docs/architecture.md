@@ -1315,8 +1315,8 @@ mapping rooted at a party: a context binds a composition template, and
   and `Organization` from party contexts over the Demographic API client
   behind `[cdr] demographic` (#470, #894): read, vread, the instance history,
   create, update over `If-Match` or the latest version, and delete of the
-  latest version. The API has no search, so a party type is searched only by
-  `identifier` through `[facade.party_search]` (section 4.12). A party context
+  latest version. The API has no search, so a party type is searched only
+  through `[facade.party_search]` (section 4.12). A party context
   with the gate off is a boot refusal, and one resource type is served by one
   party context. The id of each is the party's `versioned_object_uid`
   (section 9).
@@ -1395,15 +1395,34 @@ a versioned uid names its party.
 
 - **`[facade.identifier_search]`** (#492) resolves the chained
   `patient.identifier` to one party.
-- **`[facade.party_search]`** (#480) searches `Patient`, `Practitioner`,
-  `PractitionerRole` and `Organization` by `identifier`, one configured query
-  per type, which has no default. A configured type no party context serves
+- **`[facade.party_search]`** (#480, #931) searches `Patient`,
+  `Practitioner`, `PractitionerRole` and `Organization`, with configured
+  queries per type and no default. A configured type no party context serves
   refuses to boot. Each page runs the query with `offset` and one row more
   than the page in `fetch`, reads each party over the Demographic API and
-  maps it back as a read does. Only `identifier`, `_count` and the cursor are
-  taken. The `CapabilityStatement` declares `search-type` and the
-  `identifier` parameter, with the standard R4 canonical, on exactly the
-  configured types.
+  maps it back as a read does. The parameters, each with its R4 rule
+  (<https://hl7.org/fhir/R4/search.html>):
+  - `identifier` (token): a bare value matches "irrespective of the value of
+    the system property" (§3.1.1.4.10), so two parties are two entries;
+    `[system]|[value]` runs the system query.
+  - `name` (string): a field matches when it "equals or starts with the
+    supplied parameter value, after both have been normalized by case and
+    combining characters" (§3.1.1.4.8). `LIKE` is case-sensitive (observed),
+    so the value is bound as three prefix patterns: as typed, lower case and
+    capitalised. Any other case and every accent difference is a stated gap.
+  - `_id`: no query; the Demographic API reads the party, compared
+    case-sensitively (§3.1.1.4.1), and a party of another template matches
+    nothing.
+  - `_count`: capped at the largest page, since "Servers SHALL NOT return
+    more resources than requested", and `_count=0` "shall be treated the
+    same as `_summary=count`" (§3.1.1.5.3): the query runs unpaged, its
+    parties are counted, and the searchset carries `total` and no entry.
+
+  One configured query answers one parameter, and R4 ANDs parameters
+  (§3.1.1.4.17), so a second search parameter is unsupported for that search:
+  refused, or ignored and reported under `Prefer: handling=lenient`
+  (§3.1.1.3). The `CapabilityStatement` declares `search-type` and exactly the
+  parameters each configured type takes, with the standard R4 canonicals.
 - **A CDR that does not serve the extension.** Question 7 has no documented
   answer, so a CDR `400` on a query of the extension cannot tell an absent
   extension from a query outside the part the CDR serves. Both are a fact of

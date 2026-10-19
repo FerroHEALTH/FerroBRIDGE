@@ -447,31 +447,23 @@ const PARTY_INTERACTIONS: [&str; 6] = [
 
 /// Returns the `rest.resource` entry of a type a party program serves.
 ///
-/// A type `parties` searches also takes `search-type` with the one
-/// `identifier` parameter, carrying the standard R4 parameter's canonical,
-/// and its documentation names the extension the search runs through.
+/// A type `parties` searches also takes `search-type` with exactly the
+/// parameters its queries answer (`_id` always, `identifier` and `name` when
+/// configured), each carrying the standard R4 parameter's canonical; the two
+/// a query answers name the extension the search runs through.
 fn party_resource(name: &str, parties: Option<&PartySearch>) -> CapabilityStatementRestResource {
-    let searched = parties.and_then(|search| search.of_type(name)).is_some();
-    let (documentation, search_param) = if searched {
-        (
+    let queries = parties.and_then(|search| search.of_type(name));
+    let searched = queries.is_some();
+    let (documentation, search_param) = match queries {
+        Some(queries) => (
             crate::facade::party::SEARCHED_DOCUMENTATION,
-            vec![CapabilityStatementRestResourceSearchParam {
-                name: crate::facade::search::party::PARAMETER.into(),
-                definition: declaration::standard(name, crate::facade::search::party::PARAMETER)
-                    .map(|standard| standard.url.into()),
-                r#type: ParameterType::Token.as_str().into(),
-                documentation: Some(
-                    format!(
-                        "Resolved through the {}",
-                        crate::facade::search::identifier::EXTENSION
-                    )
-                    .into(),
-                ),
-                ..CapabilityStatementRestResourceSearchParam::default()
-            }],
-        )
-    } else {
-        (crate::facade::party::DOCUMENTATION, Vec::new())
+            queries
+                .parameters()
+                .into_iter()
+                .map(|code| party_parameter(name, code))
+                .collect(),
+        ),
+        None => (crate::facade::party::DOCUMENTATION, Vec::new()),
     };
     CapabilityStatementRestResource {
         r#type: name.into(),
@@ -490,6 +482,29 @@ fn party_resource(name: &str, parties: Option<&PartySearch>) -> CapabilityStatem
         read_history: Some(true.into()),
         update_create: Some(false.into()),
         ..CapabilityStatementRestResource::default()
+    }
+}
+
+/// Returns the `searchParam` entry of the party search parameter `code` on
+/// the type `name`.
+fn party_parameter(name: &str, code: &'static str) -> CapabilityStatementRestResourceSearchParam {
+    let kind = if code == crate::facade::search::party::NAME {
+        ParameterType::String
+    } else {
+        ParameterType::Token
+    };
+    let documentation = (code != crate::facade::search::party::ID).then(|| {
+        format!(
+            "Resolved through the {}",
+            crate::facade::search::identifier::EXTENSION
+        )
+    });
+    CapabilityStatementRestResourceSearchParam {
+        name: code.into(),
+        definition: declaration::standard(name, code).map(|standard| standard.url.into()),
+        r#type: kind.as_str().into(),
+        documentation: documentation.map(Into::into),
+        ..CapabilityStatementRestResourceSearchParam::default()
     }
 }
 
