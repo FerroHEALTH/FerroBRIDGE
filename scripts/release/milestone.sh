@@ -92,6 +92,10 @@ check() {
 close() {
   local tag="$1" repository failed leg found number state
   valid_tag "$tag"
+  if [[ "$tag" == *-* ]]; then
+    echo "milestone: $tag is a pre-release, which finishes no milestone."
+    return 0
+  fi
   if [[ -n "${NEEDS_JSON:-}" ]]; then
     failed="$(jq -r 'to_entries[] | select(.value.result != "success") | "\(.key) (\(.value.result))"' <<<"$NEEDS_JSON")"
     if [[ -n "$failed" ]]; then
@@ -100,10 +104,6 @@ close() {
       done <<<"$failed"
       die "the release of $tag is incomplete, so milestone $tag stays open. Re-run the failed jobs and this job closes it"
     fi
-  fi
-  if [[ "$tag" == *-* ]]; then
-    echo "milestone: $tag is a pre-release, which finishes no milestone."
-    return 0
   fi
   repository="$(repo)"
   found="$(find_milestone "$repository" "$tag")"
@@ -163,6 +163,8 @@ self_test() {
   NEEDS_JSON='{"plan":{"result":"success"},"crates":{"result":"success"}}' \
     expect "close closes after every leg succeeded" 0 "closed v1.0.0" yes -- close v1.0.0
   expect "close refuses a missing milestone" 1 "nothing to close" no -- close v9.9.9
+  NEEDS_JSON='{"crates":{"result":"skipped"}}' \
+    expect "close leaves a pre-release alone" 0 "pre-release" no -- close v1.0.0-rc.1
   STUB_ISSUES='[{"number":7,"title":"A straggler"}][{"number":8,"title":"A fix","pull_request":{}}]'
   expect "check names each open issue" 1 "v1.0.0 still holds #7 A straggler" no -- check v1.0.0
   expect "check names each open pull request" 1 "#8 (pull request) A fix" no -- check v1.0.0
