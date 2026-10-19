@@ -25,6 +25,19 @@ pub const MINIMAL_EVALUATION_OPT: &str = include_str!("../fixtures/opt/minimal_e
 /// The template identifier [`MINIMAL_EVALUATION_OPT`] declares.
 pub const MINIMAL_EVALUATION_TEMPLATE_ID: &str = "ferrobridge.minimal_evaluation.v1";
 
+/// A synthetic party operational template rooted at one `PERSON`.
+///
+/// The root is the synthetic archetype
+/// `openEHR-DEMOGRAPHIC-PERSON.ferrobridge_person.v1`, with one
+/// `PARTY_IDENTITY` holding a `DV_TEXT` name element and a `details` tree
+/// holding a `DV_IDENTIFIER` element. Every `openEHR-DEMOGRAPHIC-*` archetype in the international CKM is a v0
+/// draft, so the party tests run against this synthetic template. The
+/// template identifier is `ferrobridge.person.v1`.
+pub const PERSON_OPT: &str = include_str!("../fixtures/opt/person.opt");
+
+/// The template identifier [`PERSON_OPT`] declares.
+pub const PERSON_TEMPLATE_ID: &str = "ferrobridge.person.v1";
+
 /// A synthetic operational template shaped like a diagnosis mapping chain.
 ///
 /// One `COMPOSITION` holds one `EVALUATION` with the at-codes and the two

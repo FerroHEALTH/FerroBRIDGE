@@ -252,6 +252,7 @@ pub fn to_openehr<T: Table + ?Sized>(
     defaults: &Defaults,
     context: &CallContext,
 ) -> Result<Outcome<CanonicalComposition>, EngineError> {
+    composition_program(program)?;
     let mut run = Run::new(
         program,
         table,
@@ -317,6 +318,7 @@ pub fn to_fhir<T: Table + ?Sized>(
     seams: &Seams<'_>,
     context: &CallContext,
 ) -> Result<Outcome<Value>, EngineError> {
+    composition_program(program)?;
     let mut run = Run::new(
         program,
         table,
@@ -342,6 +344,22 @@ pub fn to_fhir<T: Table + ?Sized>(
         })?;
     }
     Ok(Outcome::new(run.fhir, run.warnings).with_created(created))
+}
+
+/// Refuses a party program at an entry point that runs over a composition.
+///
+/// A party program reads and builds a `PARTY`, and the composition builder
+/// applies the composition defaults and the `ctx/` vocabulary, so a party
+/// program never reaches it. No specification governs this: our own design.
+fn composition_program(program: &Program) -> Result<(), EngineError> {
+    // TODO(#897): a party program runs through the canonical PARTY build #897 settles.
+    match program.party() {
+        Some(party) => Err(EngineError::PartyProgram {
+            context: String::from(program.context().as_str()),
+            party,
+        }),
+        None => Ok(()),
+    }
 }
 
 /// Returns a resource of `resource_type` that holds nothing else yet.
