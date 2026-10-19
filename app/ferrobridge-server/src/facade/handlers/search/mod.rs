@@ -22,6 +22,9 @@ mod total;
 use std::collections::BTreeSet;
 
 use axum::response::Response;
+use ferrohealth_smart::resource::Access;
+use ferrohealth_smart::resource::Compartment;
+use ferrohealth_smart::scope::Permission;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
@@ -31,9 +34,6 @@ use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutco
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_rm::v1_2::composition::composition::Composition;
 
-use crate::auth::Access;
-use crate::auth::Compartment;
-use crate::auth::scope::Permission;
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::cdr::ids::versioned_object_uid;
@@ -117,7 +117,7 @@ async fn search(
     crate::facade::handlers::supported(facade, resource_type)?;
     let compartment = access
         .reach(Permission::Search, resource_type)
-        .ok_or_else(crate::auth::guard::forbidden)?;
+        .ok_or_else(crate::facade::guard::forbidden)?;
     let catalog = facade.search();
     let declarations = catalog.of_type(resource_type);
     let Some(first) = declarations.first() else {

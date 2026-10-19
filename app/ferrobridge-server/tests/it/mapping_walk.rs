@@ -110,7 +110,7 @@ async fn a_configmap_volume_mapping_directory_boots_the_operations_lane()
         ferrobridge_testkit::fixtures::DIAGNOSE_OPT,
     )?;
     let text = format!(
-        "[mappings]\ndirectory = \"{}\"\ntemplates = \"{}\"\n",
+        "[auth]\nenabled = false\n\n[mappings]\ndirectory = \"{}\"\ntemplates = \"{}\"\n",
         volume.path().display(),
         templates.path().display()
     );

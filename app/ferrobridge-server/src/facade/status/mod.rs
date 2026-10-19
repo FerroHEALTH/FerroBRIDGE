@@ -32,12 +32,12 @@
 
 pub mod demographic;
 
+use ferrohealth_smart::client::RenewalError;
 use http::StatusCode;
 use openehr_its::rest::client::ClientError;
 use openehr_its::rest::client::ErrorBody;
 
 use crate::cdr::error::CdrError;
-use crate::cdr::oauth::RenewalError;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 
@@ -587,17 +587,15 @@ mod tests {
 
     #[test]
     fn a_failed_renewal_after_a_cdr_401_is_the_credentials_row() {
-        let refused = crate::cdr::oauth::TokenError::Refused {
+        let oauth = serde_json::from_value(serde_json::json!({ "error": "invalid_grant" }))
+            .expect("an RFC 6749 §5.2 error body");
+        let refused = ferrohealth_smart::client::TokenError::Refused {
             status: StatusCode::BAD_REQUEST,
-            error: Some(crate::cdr::oauth::OAuthError {
-                error: String::from("invalid_grant"),
-                error_description: None,
-                error_uri: None,
-            }),
+            error: Some(oauth),
             body: String::new(),
         };
         let error = CdrError::Renewal {
-            source: crate::cdr::oauth::RenewalError::new(std::sync::Arc::new(refused)),
+            source: ferrohealth_smart::client::RenewalError::new(std::sync::Arc::new(refused)),
             upstream: None,
         };
         let answer = of_client_error(&error);

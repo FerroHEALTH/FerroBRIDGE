@@ -15,7 +15,7 @@ use super::refusal;
 /// A facade the HL7 v2 face can write through, with `face` as its section.
 fn with_face(face: &str) -> String {
     format!(
-        "[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[hl7v2]\nenabled = true\n{face}"
+        "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[hl7v2]\nenabled = true\n{face}"
     )
 }
 
