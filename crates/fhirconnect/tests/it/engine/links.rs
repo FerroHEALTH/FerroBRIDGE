@@ -29,6 +29,7 @@ const BASE: &str = "https://bridge.example/fhir";
 
 /// The demographics endpoint every run resolves a participant through: the
 /// ids of the FHIR server at [`BASE`].
+#[expect(clippy::expect_used, reason = "test plumbing over a literal base")]
 static DEMOGRAPHICS: LazyLock<IssuerDemographics> =
     LazyLock::new(|| IssuerDemographics::new(BASE).expect("a legal base"));
 

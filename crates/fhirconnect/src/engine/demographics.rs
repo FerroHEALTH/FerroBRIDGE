@@ -227,21 +227,18 @@ impl Demographics for IssuerDemographics {
         if reference.starts_with("urn:") || reference.starts_with('#') {
             return Err(unresolvable(Unresolvable::NotOnAServer));
         }
-        let (issuer, path) = match reference.find("://") {
-            None => (self.base.as_str(), reference),
-            Some(_) => {
-                let (resource_type, id, prefix) = split_absolute(reference)
-                    .ok_or_else(|| unresolvable(Unresolvable::NotALiteral))?;
-                let issuer = prefix.trim_end_matches('/');
-                if !namespace(issuer) {
-                    return Err(unresolvable(Unresolvable::Issuer));
-                }
-                return Ok(PartyIdentity::new(issuer, resource_type, id));
+        if reference.contains("://") {
+            let (resource_type, id, prefix) =
+                split_absolute(reference).ok_or_else(|| unresolvable(Unresolvable::NotALiteral))?;
+            let issuer = prefix.trim_end_matches('/');
+            if !namespace(issuer) {
+                return Err(unresolvable(Unresolvable::Issuer));
             }
-        };
+            return Ok(PartyIdentity::new(issuer, resource_type, id));
+        }
         let (resource_type, id) =
-            split_relative(path).ok_or_else(|| unresolvable(Unresolvable::NotALiteral))?;
-        Ok(PartyIdentity::new(issuer, resource_type, id))
+            split_relative(reference).ok_or_else(|| unresolvable(Unresolvable::NotALiteral))?;
+        Ok(PartyIdentity::new(&self.base, resource_type, id))
     }
 
     fn reference_of(&self, identity: &PartyIdentity) -> Option<String> {

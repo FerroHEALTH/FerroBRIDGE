@@ -28,7 +28,7 @@ use crate::support::template;
 const BASE: &str = "https://bridge.example/fhir";
 
 /// A synthetic `Condition` whose `recorder` is `recorder`.
-fn condition(recorder: serde_json::Value) -> Value {
+fn condition(recorder: &serde_json::Value) -> Value {
     Value::from_serde_json(serde_json::json!({
         "resourceType": "Condition",
         "code": {
@@ -39,7 +39,7 @@ fn condition(recorder: serde_json::Value) -> Value {
             }],
             "text": "Synthetic problem one"
         },
-        "recorder": recorder
+        "recorder": recorder.clone()
     }))
 }
 
@@ -65,7 +65,7 @@ fn a_provider_reference_travels_as_an_identifier_and_reads_back_as_the_reference
         &program,
         &SCHEMAS,
         &index,
-        &condition(recorder.clone()),
+        &condition(&recorder),
         &seams,
         &defaults(),
         &CallContext::new(),
@@ -113,7 +113,7 @@ fn a_provider_reference_is_never_dropped_without_an_endpoint() -> Result<(), Box
         &program,
         &SCHEMAS,
         &index,
-        &condition(serde_json::json!({"reference": "Practitioner/synthetic-practitioner-1"})),
+        &condition(&serde_json::json!({"reference": "Practitioner/synthetic-practitioner-1"})),
         &Seams::default(),
         &defaults(),
         &CallContext::new(),
@@ -134,7 +134,7 @@ fn a_request_local_reference_is_refused_by_the_bridge_endpoint() -> Result<(), B
         &program,
         &SCHEMAS,
         &index,
-        &condition(serde_json::json!({
+        &condition(&serde_json::json!({
             "reference": "urn:uuid:5b0e0c9c-0000-4000-8000-000000000001"
         })),
         &Seams::default().with_demographics(&demographics),

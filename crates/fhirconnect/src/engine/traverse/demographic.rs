@@ -12,6 +12,7 @@
 //! identifier.
 
 use openehr_base::containers::NonEmptyVec;
+use openehr_mapping_core::index::ResolvedNode;
 use openehr_rm::v1_2::common::generic::party_identified::PartyIdentifiedData;
 
 use crate::engine::demographics::PartyIdentity;
@@ -19,6 +20,7 @@ use crate::engine::fhir::FhirValue;
 use crate::engine::lens::party::PartyLens;
 use crate::engine::rm::RmValue;
 use crate::engine::traverse::Run;
+use crate::engine::traverse::build::COMPOSER;
 use crate::engine::traverse::error::EngineError;
 use crate::resolve::program::mapping::Mapping;
 use crate::tree::element::Table;
@@ -31,6 +33,19 @@ pub(super) enum Shape {
     /// In `PARTY_PROXY.external_ref`, where the FLAT format carries only the
     /// party reference: the composer's `ctx/` keys (master06).
     ExternalRef,
+}
+
+impl Shape {
+    /// Returns the shape a party at `node` is written in: `external_ref` on
+    /// the composer, whose `ctx/` keys carry no identifiers, `identifiers`
+    /// everywhere else.
+    pub(super) fn at(node: &ResolvedNode) -> Self {
+        if node.aql_path().as_str() == COMPOSER {
+            Self::ExternalRef
+        } else {
+            Self::Identifier
+        }
+    }
 }
 
 impl<T: Table + ?Sized> Run<'_, T> {
