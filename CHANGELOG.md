@@ -33,7 +33,7 @@ crates on crates.io.
   it shares, at its own group paths, so the guide's segment maps apply, and
   its description names the map it composes. A supplement for ADT_A06 names
   the guide's `ADT_A01.PD1` row `ADT_A06.PD1`, so ADT_A06 messages map too.
-  The `hl7v2` corpus goes from 290 to 346 passing messages.
+  The `hl7v2` corpus gains the 56 messages, to 509 of 511.
 - The HL7 v2 parser counts a valued repetition past a field's cardinality,
   a valued component past its data type's components and a valued
   subcomponent past its component's data type, as the new
