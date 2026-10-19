@@ -219,6 +219,15 @@ crates on crates.io.
 
 ### Fixed
 
+- The compose quickstart passes the terminology server's credential
+  variables through to the bridge, `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__USER`
+  and `__PASSWORD_FILE` for basic authentication and the five `__OAUTH__`
+  variables for the client credentials grant, as it does for the CDR, and
+  mounts a new `terminology_password` secret (#976). Create
+  `secrets/terminology_password` before the next `docker compose up`; it may
+  be empty when the terminology server checks no credentials. The CI compose
+  check asserts every CDR and terminology credential variable reaches the
+  bridge.
 - `scripts/checks/crate-version-guard.sh` diffs from the merge base of its base
   ref and the head, and the CI job passes the target branch as fetched now, so
   a crate change `main` gained after a pull request forked is no longer counted

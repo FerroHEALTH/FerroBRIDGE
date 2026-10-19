@@ -209,9 +209,32 @@ jobs:
           : > secrets/cdm_url
           : > secrets/cdm_password
           : > secrets/cdr_password
+          : > secrets/terminology_password
           : > secrets/viewer_oidc_client_secret
           docker compose --profile viewer config
           docker compose --profile cdm --profile vocab --profile viewer config --quiet
+      # Every upstream credential variable set in the shell reaches the bridge,
+      # and its password is mounted as a secret.
+      - name: compose.yaml passes the upstream credentials through
+        run: |
+          set -euo pipefail
+          names=()
+          for lane in CDR TERMINOLOGY; do
+            for key in USER PASSWORD_FILE OAUTH__ISSUER OAUTH__TOKEN_ENDPOINT \
+              OAUTH__CLIENT_ID OAUTH__CLIENT_SECRET_FILE OAUTH__AUDIENCE; do
+              names+=("FERROBRIDGE__${lane}__CREDENTIALS__${key}")
+            done
+          done
+          for name in "${names[@]}"; do export "${name}=set-${name}"; done
+          rendered="$(docker compose config --format json)"
+          for name in "${names[@]}"; do
+            jq -e --arg n "$name" '.services.ferrobridge.environment[$n] == "set-" + $n' <<<"$rendered" > /dev/null ||
+              { echo "compose.yaml does not pass ${name} through to the bridge" >&2; exit 1; }
+          done
+          for secret in cdr_password terminology_password; do
+            jq -e --arg s "$secret" 'any(.services.ferrobridge.secrets[]; .source == $s)' <<<"$rendered" > /dev/null ||
+              { echo "compose.yaml does not mount the ${secret} secret on the bridge" >&2; exit 1; }
+          done
       - name: docker/viewer/Dockerfile builds from a staged tree
         run: |
           set -euo pipefail
