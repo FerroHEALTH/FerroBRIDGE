@@ -244,6 +244,35 @@ pub fn of_outbound_refusal(error: &fhirconnect::engine::traverse::error::EngineE
     Answer::new(OUTBOUND_REFUSED, crate::facade::outcome::chain(error))
 }
 
+/// Returns the answer a CDR refusal of an extension query renders as.
+///
+/// The query is one of Cadasto's experimental AQL demographic extension,
+/// whichever search issued it: the [`EXTENSION_REFUSED`] row for a `400`, the
+/// [`QUERY_TIMEOUT`] row for a `408`.
+///
+/// The diagnostics name the extension and `query`, the search that issued
+/// it, and carry the CDR's words. One deployment fact gets one answer (no
+/// specification governs the extension: our own design).
+#[must_use]
+pub fn of_extension_refusal(upstream: &crate::cdr::error::Upstream, query: &str) -> Answer {
+    let body = ErrorBody::from_bytes(upstream.body().as_bytes().to_vec());
+    let words = diagnostics(upstream.status(), &body);
+    let extension = crate::facade::search::identifier::EXTENSION;
+    if upstream.status() == StatusCode::REQUEST_TIMEOUT {
+        return Answer::new(
+            QUERY_TIMEOUT,
+            format!("the {extension} {query} query did not finish: {words}"),
+        );
+    }
+    Answer::new(
+        EXTENSION_REFUSED,
+        format!(
+            "the CDR refused the {extension} {query} query, so it does not serve the extension \
+             or this query of it: {words}"
+        ),
+    )
+}
+
 /// What the facade answers, with the row that decided it.
 #[derive(Debug, Clone)]
 pub struct Answer {
@@ -677,6 +706,36 @@ mod tests {
         let answer = of_query_refusal(&timed_out);
         assert_eq!(QUERY_TIMEOUT, answer.row());
         assert_eq!(StatusCode::BAD_GATEWAY, answer.status());
+    }
+
+    #[test]
+    fn an_extension_query_refused_is_a_501_and_timed_out_a_502_whatever_the_search() {
+        let refused = crate::cdr::error::Upstream::new(
+            StatusCode::BAD_REQUEST,
+            http::HeaderMap::new(),
+            String::from(r#"{"message":"FROM source class `PERSON` is not in scope"}"#),
+        );
+        for query in ["identifier", "party"] {
+            let answer = super::of_extension_refusal(&refused, query);
+            assert_eq!(EXTENSION_REFUSED, answer.row());
+            assert_eq!(StatusCode::NOT_IMPLEMENTED, answer.status());
+            assert!(
+                answer.issue().diagnostics().is_some_and(|text| text
+                    .contains(crate::facade::search::identifier::EXTENSION)
+                    && text.contains(query)
+                    && text.contains("not in scope")),
+                "{query}: the 501 does not name the extension and carry the CDR's words"
+            );
+        }
+        let timed_out = crate::cdr::error::Upstream::new(
+            StatusCode::REQUEST_TIMEOUT,
+            http::HeaderMap::new(),
+            String::new(),
+        );
+        assert_eq!(
+            QUERY_TIMEOUT,
+            super::of_extension_refusal(&timed_out, "party").row()
+        );
     }
 
     #[test]

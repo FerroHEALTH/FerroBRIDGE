@@ -149,6 +149,11 @@ crates on crates.io.
 
 ### Changed
 
+- A CDR that refuses the chained `patient.identifier` query of the Cadasto
+  experimental AQL demographic extension now answers `501` with
+  `not-supported`, the answer the party search gives, where it answered
+  `500` (#954). Both paths go through one status function, naming the
+  extension and carrying the CDR's words.
 - **Breaking for a library consumer** of `fhirconnect` 0.1.148:
   `fhirconnect::resolve::program::binding::PartyClass` is gone, and
   `Program::party` answers `openehr_mapping_core::party::PartyClass`; a

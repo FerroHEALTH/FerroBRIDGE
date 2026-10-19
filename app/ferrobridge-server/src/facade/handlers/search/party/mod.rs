@@ -23,7 +23,6 @@ mod request;
 use axum::response::Response;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
-use openehr_its::rest::client::ErrorBody;
 use openehr_its::rest::generated::query::AdhocQueryExecute;
 use openehr_its::rest::generated::query::ResultSetRow;
 use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
@@ -322,35 +321,10 @@ async fn run(client: &CdrClient, aql: &AdhocQueryExecute) -> Result<Vec<ResultSe
     match answered.outcome {
         QueryExecuteAdhocQueryBodyOutcome::Ok { body, .. } => Ok(body.rows),
         QueryExecuteAdhocQueryBodyOutcome::BadRequest { .. }
-        | QueryExecuteAdhocQueryBodyOutcome::RequestTimeout { .. } => {
-            Err(write::refuse(&refused(&answered.upstream)))
-        }
+        | QueryExecuteAdhocQueryBodyOutcome::RequestTimeout { .. } => Err(write::refuse(
+            &status::of_extension_refusal(&answered.upstream, "party"),
+        )),
     }
-}
-
-/// Returns the answer a CDR refusal of a party query renders as: the
-/// extension's row for a `400`, the query timeout row for a `408`, the
-/// diagnostics naming the extension and carrying the CDR's words.
-fn refused(upstream: &crate::cdr::error::Upstream) -> status::Answer {
-    let body = ErrorBody::from_bytes(upstream.body().as_bytes().to_vec());
-    let words = status::diagnostics(upstream.status(), &body);
-    if upstream.status() == StatusCode::REQUEST_TIMEOUT {
-        return status::Answer::new(
-            status::QUERY_TIMEOUT,
-            format!(
-                "the {} party query did not finish: {words}",
-                identifier::EXTENSION
-            ),
-        );
-    }
-    status::Answer::new(
-        status::EXTENSION_REFUSED,
-        format!(
-            "the CDR refused the {} party query, so it does not serve the extension or this \
-             query of it: {words}",
-            identifier::EXTENSION
-        ),
-    )
 }
 
 /// Returns a `400` with `not-supported` diagnosing `text`.

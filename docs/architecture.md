@@ -1428,7 +1428,8 @@ a versioned uid names its party.
 - **A CDR that does not serve the extension.** Question 7 has no documented
   answer, so a CDR `400` on a query of the extension cannot tell an absent
   extension from a query outside the part the CDR serves. Both are a fact of
-  the deployment. The party search answers `501` with `not-supported`,
+  the deployment. The party search and the chained identifier search both
+  answer `501` with `not-supported` (#954),
   naming the extension and carrying the CDR's words (RFC 9110 §15.6.2), never
   an empty searchset.
 - **#911 and F3.** The bridge keeps `ROLE` RM-conformant: a `ROLE` with no

@@ -16,7 +16,6 @@
 //! identifier-to-EHR resolution: our own design.
 
 use http::StatusCode;
-use openehr_its::rest::client::ErrorBody;
 use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
 
 use crate::cdr::CdrClient;
@@ -64,7 +63,10 @@ pub(super) async fn ehrs_of(
         QueryExecuteAdhocQueryBodyOutcome::Ok { body, .. } => body.rows,
         QueryExecuteAdhocQueryBodyOutcome::BadRequest { .. }
         | QueryExecuteAdhocQueryBodyOutcome::RequestTimeout { .. } => {
-            return Err(write::refuse(&refused(&answered.upstream)));
+            return Err(write::refuse(&status::of_extension_refusal(
+                &answered.upstream,
+                "identifier",
+            )));
         }
     };
     let parties = identifier::uids(&rows).map_err(|error| {
@@ -105,23 +107,4 @@ async fn ehr_of_party(
             Issue::error(IssueType::Exception).diagnosing(crate::facade::outcome::chain(&error)),
         )),
     }
-}
-
-/// Returns the answer a CDR refusal of the identifier query renders as: the
-/// query rows of the status table, the diagnostics naming the extension.
-fn refused(upstream: &crate::cdr::error::Upstream) -> status::Answer {
-    let row = if upstream.status() == StatusCode::REQUEST_TIMEOUT {
-        status::QUERY_TIMEOUT
-    } else {
-        status::QUERY_REFUSED
-    };
-    let body = ErrorBody::from_bytes(upstream.body().as_bytes().to_vec());
-    status::Answer::new(
-        row,
-        format!(
-            "the CDR refused the {} identifier query: {}",
-            identifier::EXTENSION,
-            status::diagnostics(upstream.status(), &body)
-        ),
-    )
 }
