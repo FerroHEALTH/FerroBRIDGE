@@ -38,6 +38,20 @@ crates on crates.io.
   `specimen.v1` no longer warn `fc-anchor-without-children`. `Derived` gains
   a variant, so a consumer that matches it exhaustively adds the arm.
   `fhirconnect` 0.1.158.
+- `fhirconnect::operations::run::to_fhir` takes the id of the mapped
+  resource from a caller-supplied identity seam when the seams carry one
+  (#619): `Seams::with_resource_identity` over the new
+  `engine::seam::ResourceIdentity` trait, which answers a
+  `ResourceRequest` (the resource type, the template, the composition's
+  `OBJECT_VERSION_ID` and the `id` the mapping wrote). A seam that refuses
+  ends the run with `OperationError::Identity`, and an id outside the R4
+  `id` grammar with `OperationError::InvalidId`. Without a seam the id still
+  derives from the written `id` or the composition's `versioned_object_uid`.
+  FHIRconnect `engine/id-management.adoc` has the engine maintain its own
+  resource ids and keep an export's ids the same every time; the seam is
+  where a caller's identity store does that. `OperationError` gains two
+  variants, so a consumer that matches it exhaustively adds the arms.
+  `fhirconnect` 0.1.156.
 
 ### Changed
 
