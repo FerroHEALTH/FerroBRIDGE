@@ -22,7 +22,12 @@ The list is written by
 `scripts/checks/conformance.sh --update`. A case passes when its message is
 framed, decoded, parsed with no refusal, mapped through the v2-to-FHIR guide
 with the crate's shipped supplements over it,
-and the Bundle decodes as R4; an acknowledgment passes when it parses. The
+and the Bundle decodes as R4; an acknowledgment passes when it parses. A
+message `crates/ferrobridge-hl7v2/tests/it/corpus/expected-refusals.txt`
+names passes when the face refuses it as listed, with the HL7 v2 chapter 2
+acknowledgment code and the HL7 table 0357 error in ERR-3 the list gives, and
+fails when the face takes it or answers otherwise; its outcomes count it as
+`expected-refusal:<reason>`. The
 counted outcomes and the differences from an expected Bundle are in the result
 the test writes, `target/conformance/hl7v2.json`, and never decide a verdict.
 Never edit the list by hand.
