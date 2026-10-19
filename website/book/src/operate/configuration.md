@@ -189,6 +189,14 @@ it is for (RFC 9068 §4). The section replaces the static schemes: setting it
 beside `bearer_token` or `user` is a boot error. Only the CDR takes it; under
 `[terminology.credentials]` it is an unknown key.
 
+When the FHIR facade and the CDR are separate audiences of one authorization
+server, use this section rather than a static `bearer_token`. Callers then
+hold tokens for the FHIR audience and the bridge holds its own for the CDR's.
+The bridge renews its token on its own, where a static token stops working
+when it expires. Set
+`audience` or `resource` to whichever parameter that authorization server
+reads for the CDR.
+
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
 | `token_endpoint` | none | | The token endpoint URL (RFC 6749 §3.2) |
