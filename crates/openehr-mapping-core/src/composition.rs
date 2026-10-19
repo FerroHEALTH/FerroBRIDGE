@@ -350,6 +350,7 @@ impl WebTemplateIndex {
                     template_id: self.template_id().to_owned(),
                     source: Box::new(source),
                 })?;
+        // TODO(#901): pass the chosen release to the builder once openehr-sdt takes it.
         crate::release::stamp(&mut built);
         let messages = openehr_sdt::rm_instance::validate_composition(&built, self.web_template());
         if !messages.is_empty() {
@@ -398,6 +399,7 @@ impl WebTemplateIndex {
                     template_id: self.template_id().to_owned(),
                     source: Box::new(source),
                 })?;
+        // TODO(#901): pass the chosen release to the builder once openehr-sdt takes it.
         crate::release::stamp(&mut built);
         let messages = openehr_sdt::rm_instance::validate_composition(&built, self.web_template());
         if !messages.is_empty() {
