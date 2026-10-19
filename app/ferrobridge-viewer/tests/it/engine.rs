@@ -172,6 +172,10 @@ async fn the_dashboard_draws_build_facts_lanes_pins_readiness_and_counts()
         html.contains(r#"<span class="fui-badge fui-tone-bad">down</span>"#),
         "{html}"
     );
+    assert!(
+        html.contains(r#"<time datetime="2026-10-17T00:00:00Z" title="2026-10-17T00:00:00Z" class="fui-time">2026-10-17 00:00:00 UTC</time>"#),
+        "the build instant reads in UTC, the raw value in its title: {html}"
+    );
     assert!(!html.contains(OPERATOR_TOKEN));
     Ok(())
 }

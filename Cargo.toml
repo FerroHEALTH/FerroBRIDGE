@@ -190,7 +190,7 @@ console_error_panic_hook = "0.1.7"
 # role tokens, shared by every FerroHEALTH console. Pinned exactly, so the
 # console moves to a new version deliberately. Verified against crates.io on
 # 2026-10-18.
-ferrohealth-ui = "=0.1.3"
+ferrohealth-ui = "=0.1.4"
 # The console's operator sign-in (#600): the `__Host-` session cookies it
 # writes and reads, and the base64url of its random ids and PKCE challenge
 # (RFC 7636 §4.2) and of a confidential client's Basic credentials. base64
