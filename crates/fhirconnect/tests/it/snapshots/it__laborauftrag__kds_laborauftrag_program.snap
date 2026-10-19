@@ -1,0 +1,90 @@
+---
+source: crates/fhirconnect/tests/it/laborauftrag.rs
+expression: program.to_string()
+---
+program ferrobridge_kds_laborauftrag.context
+  profile https://www.medizininformatik-initiative.de/fhir/core/modul-labor/StructureDefinition/ServiceRequestLab version 2025.0.0
+  template KDS_Laborauftrag sem_ver unpinned generation adl1.4
+  resource ServiceRequest
+  start INSTRUCTION.service_request.v1
+  model INSTRUCTION.service_request.v1 version 0.0.1-alpha archetype openEHR-EHR-INSTRUCTION.service_request.v1 revision 1.1.3-alpha
+    extension ferrobridge_kds_laborauftrag
+  model CLUSTER.organisation.v1 version 0.0.1-alpha archetype openEHR-EHR-CLUSTER.organisation.v1 revision 1.0.1
+  model COMPOSITION.request.v1.ServiceRequest version 0.0.1-alpha archetype openEHR-EHR-COMPOSITION.request.v1 revision 1.0.6
+  mapping authoredOn from INSTRUCTION.service_request.v1
+    fhir $resource.authoredOn -> ServiceRequest.authoredOn primitive writable
+    openehr /context/start_time -> /context/start_time DV_DATE_TIME
+    derived dateTime
+  mapping status from ferrobridge_kds_laborauftrag
+    fhir $resource -> ServiceRequest complex writable
+    openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[at0127] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[at0127]/value DV_CODED_TEXT
+    manual categoryStatic
+      fhir $resource.status -> ServiceRequest.status primitive writable = completed
+      openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[at0127]/defining_code/terminology_id/value -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[at0127]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/ValueSet/request-status
+      openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[at0127]/defining_code/code_string -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[at0127]/value DV_CODED_TEXT tail defining_code/code_string = completed
+      openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[at0127]/value -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[at0127]/value DV_CODED_TEXT = Completed
+      fhirCondition one of [completed] on fhir $resource -> ServiceRequest complex writable (element)
+        attribute fhir $resource.status -> ServiceRequest.status primitive writable
+      openehrCondition one of [completed] on openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung'] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung'] INSTRUCTION (ancestor)
+        attribute openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[at0127]/defining_code/code_string -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[at0127]/value DV_CODED_TEXT tail defining_code/code_string
+  mapping protocol0008Parent from INSTRUCTION.service_request.v1
+    fhir $resource -> ServiceRequest complex writable
+    openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung'] INSTRUCTION tail protocol[at0008]
+    derived anchor
+    mapping protocol0008Parent.identifier from INSTRUCTION.service_request.v1
+      fhir $resource.identifier -> ServiceRequest.identifier complex writable
+      openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[at0010] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[at0010,'Auftrags-ID des anfordernden/einsendenden Systems (PLAC)']/value DV_IDENTIFIER
+      derived Identifier
+    mapping protocol0008Parent.organisation from INSTRUCTION.service_request.v1
+      fhir $resource.requester -> ServiceRequest.requester complex writable
+      reference Organization
+        mapping protocol0008Parent.organisation.organization from INSTRUCTION.service_request.v1
+          fhir $resource -> Organization complex writable
+          openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[openEHR-EHR-CLUSTER.organisation.v1] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[openEHR-EHR-CLUSTER.organisation.v1,'Einsender'] CLUSTER
+          slotArchetype CLUSTER.organisation.v1
+            mapping orgName from CLUSTER.organisation.v1
+              fhir $resource.name -> Organization.name primitive writable
+              openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0001] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[openEHR-EHR-CLUSTER.organisation.v1,'Einsender']/items[at0001]/value DV_TEXT
+              derived string
+            mapping orgId from CLUSTER.organisation.v1
+              fhir $resource.identifier -> Organization.identifier complex writable
+              openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0003] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/protocol[at0008]/items[openEHR-EHR-CLUSTER.organisation.v1,'Einsender']/items[at0003]/value DV_IDENTIFIER
+              derived Identifier
+  mapping code from INSTRUCTION.service_request.v1
+    fhir $resource.code -> ServiceRequest.code complex writable
+    openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0121] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0121,'Name der Laborleistung']/value DV_CODED_TEXT
+    derived CodeableConcept
+  mapping category from ferrobridge_kds_laborauftrag
+    fhir $resource.category.coding -> CodeableConcept.coding complex writable
+    openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0148] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0148,'Art der Laborleistung (Kategorie)']/value DV_CODED_TEXT
+    manual categoryStatic
+      fhir $resource.category.coding.system -> Coding.system primitive writable = http://terminology.hl7.org/CodeSystem/observation-category
+      fhir $resource.category.coding.code -> Coding.code primitive writable = laboratory
+      fhir $resource.category.coding.display -> Coding.display primitive writable = Laboratory
+      openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0148]/defining_code/terminology_id/value -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0148,'Art der Laborleistung (Kategorie)']/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://terminology.hl7.org/ValueSet/observation-category
+      openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0148]/defining_code/code_string -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0148,'Art der Laborleistung (Kategorie)']/value DV_CODED_TEXT tail defining_code/code_string = laboratory
+      openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0148]/value -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0148,'Art der Laborleistung (Kategorie)']/value DV_CODED_TEXT = Laboratory
+      fhirCondition one of [laboratory] on fhir $resource -> ServiceRequest complex writable (ancestor)
+        attribute fhir $resource.category.coding.code -> Coding.code primitive writable
+      openehrCondition one of [laboratory] on openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung'] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung'] INSTRUCTION (ancestor)
+        attribute openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0148]/defining_code/code_string -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0148,'Art der Laborleistung (Kategorie)']/value DV_CODED_TEXT tail defining_code/code_string
+  mapping intent from ferrobridge_kds_laborauftrag
+    fhir $resource -> ServiceRequest complex writable
+    openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0065] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0065]/value DV_CODED_TEXT
+    manual intentStatic
+      fhir $resource.intent -> ServiceRequest.intent primitive writable = order
+      openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0065]/defining_code/terminology_id/value -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0065]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/request-intent
+      openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0065]/defining_code/code_string -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0065]/value DV_CODED_TEXT tail defining_code/code_string = order
+      openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0065]/value -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0065]/value DV_CODED_TEXT = Order
+      fhirCondition one of [laboratory] on fhir $resource -> ServiceRequest complex writable (element)
+        attribute fhir $resource.category.coding.code -> Coding.code primitive writable
+      openehrCondition one of [order] on openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung'] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung'] INSTRUCTION (ancestor)
+        attribute openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0065]/defining_code/code_string -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0065]/value DV_CODED_TEXT tail defining_code/code_string
+  mapping note from INSTRUCTION.service_request.v1
+    fhir $resource.note.text -> Annotation.text primitive writable
+    openehr /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0150] -> /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/activities[at0001]/description[at0009]/items[at0150]/value DV_TEXT
+    derived string
+  mapping compositionMapping from ferrobridge_kds_laborauftrag
+    fhir $resource -> ServiceRequest complex writable
+    openehr / ->  COMPOSITION
+    slotArchetype COMPOSITION.request.v1.ServiceRequest

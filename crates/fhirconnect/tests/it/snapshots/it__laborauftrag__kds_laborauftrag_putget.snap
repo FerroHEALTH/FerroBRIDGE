@@ -1,0 +1,30 @@
+---
+source: crates/fhirconnect/tests/it/laborauftrag.rs
+expression: declared
+---
+{
+  "first_leg": [
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
+    "the engine filled /composer",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "second_leg": [],
+  "lost": [
+    "contained[0].id = \"einsender\"",
+    "contained[0].identifier[0].system = \"http://example.org/fhir/sid/einsender\"",
+    "contained[0].identifier[0].value = \"EINS-0001\"",
+    "contained[0].name = \"Synthetisches Einsenderlabor\"",
+    "contained[0].resourceType = \"Organization\"",
+    "id = \"ferrobridge-kds-labrequest-1\"",
+    "meta.profile[0] = \"https://www.medizininformatik-initiative.de/fhir/core/modul-labor/StructureDefinition/ServiceRequestLab\""
+  ],
+  "added": [
+    "category[0].coding[0].display = \"Laboratory\"",
+    "code.text = \"Synthetic blood count panel\""
+  ],
+  "changed": [
+    "requester.reference: \"#einsender\" became \"Organization/768bf573c28b33629dc25336956dc1ccad0e5a70345239b0d0a29b04e53c8381\""
+  ]
+}

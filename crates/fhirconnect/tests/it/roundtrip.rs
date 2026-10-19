@@ -596,7 +596,23 @@ fn conformance_the_round_trip_chains_hold_their_pass_list() -> Result<(), Box<dy
             holds("GetPut", "person__kds_person_getput", getput)?,
         )
     };
-    let outcome = record(Corpus::Roundtrip, &[synthetic, kds, kds_person])?;
+    let kds_laborauftrag = chain_case(
+        "kds_laborauftrag",
+        holds(
+            "PutGet",
+            "laborauftrag__kds_laborauftrag_organization_putget",
+            crate::laborauftrag::organization_putget(),
+        )?,
+        holds(
+            "GetPut",
+            "laborauftrag__kds_laborauftrag_getput",
+            crate::laborauftrag::laborauftrag_getput(),
+        )?,
+    );
+    let outcome = record(
+        Corpus::Roundtrip,
+        &[synthetic, kds, kds_person, kds_laborauftrag],
+    )?;
     assert!(
         outcome.regressed.is_empty(),
         "cases the pass list records no longer pass: {:?}",

@@ -458,9 +458,10 @@ fn the_corpus_mapping_codes_pass_once_the_engine_registers_them() -> Result<(), 
 /// Returns every corpus file a program the suites compile reaches.
 ///
 /// A program reaches a model mapping it compiled and every extension it
-/// applied to one. The three programs are the diagnosis chain against the
-/// synthetic template and the KDS diagnosis and person project contexts
-/// against the published `KDS_Diagnose` and `KDS_Person` templates, and each
+/// applied to one. The four programs are the diagnosis chain against the
+/// synthetic template and the KDS diagnosis, person and laboratory request
+/// project contexts against the published `KDS_Diagnose`, `KDS_Person` and
+/// `KDS_Laborauftrag` templates, and each
 /// template carries the archetypes the files it reaches map.
 fn compiled_reach() -> Result<BTreeSet<String>, Box<dyn Error>> {
     let mut reached = BTreeSet::new();
@@ -468,6 +469,7 @@ fn compiled_reach() -> Result<BTreeSet<String>, Box<dyn Error>> {
         crate::resolve::diagnosis_chain()?,
         crate::roundtrip::kds_chain()?,
         crate::person::kds_person_chain()?,
+        crate::laborauftrag::kds_laborauftrag_chain()?,
     ] {
         let mut names: Vec<&str> = vec![program.context().as_str()];
         for model in program.models() {
