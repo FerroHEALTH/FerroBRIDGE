@@ -104,7 +104,7 @@ crates on crates.io.
   the declared character set or whose MSH-18 names no table 0211 code. A
   listed case fails when the face takes the message or answers it
   otherwise. The `hl7v2` badge moves from 290 to 453 of 511 and the
-  `hl7v2-smoke` badge from 369 to 373 of 379.
+  `hl7v2-smoke` badge from 375 to 379 of 379.
 
 - The release workflow refuses a tag whose milestone, titled exactly as the
   tag, is missing or still holds an open issue or pull request, and names
@@ -113,6 +113,13 @@ crates on crates.io.
 
 ### Fixed
 
+- The HL7 v2 parser judges a segment group by placing every following
+  segment with the same choice rule it applies to the segment itself, so a
+  repeated `ORDER`'s ORC in an OML^O21 opens a new `ORDER` instead of an
+  optional-led `PRIOR_RESULT.ORDER_PRIOR` it cannot complete (#638). The six
+  NIST LOI OML_O21 messages refused for it now parse and map. The nested
+  trial walks share a budget of 4096 placements per segment, our own bound
+  on the work an ambiguous message can cost.
 - The HL7 v2 face decodes a message whose MSH-18 repeats with its first
   repetition, the default character set by HL7 v2.9.1 chapter 2 (#641). It
   still refuses one whose MSH-20 names a switching scheme from table 0356.

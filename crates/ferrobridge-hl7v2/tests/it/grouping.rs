@@ -110,3 +110,41 @@ fn a_group_left_with_a_required_member_missing_is_a_refusal_naming_both() {
         )]
     );
 }
+
+/// An OML^O21 from a 2.5.1 sender with three orders, each with its timing,
+/// its request and a diagnosis, and no prior result.
+fn oml_o21_with_three_orders() -> Vec<u8> {
+    fixtures::message(&[
+        b"MSH|^~\\&|EHR|SOUTHCLINIC|LAB|NORTHLAB|20261019101500+0200||OML^O21^OML_O21|MSG00638|P|2.5.1",
+        b"PID|1||PAT-638^^^SOUTHCLINIC^MR||Doe^Jane",
+        b"ORC|NW|ORD-638A^EHR||GRP-638^EHR",
+        b"TQ1|1||||||20261019|20261119",
+        b"OBR|1|ORD-638A^EHR||2345-7^Glucose^LN",
+        b"DG1|1||R53.83^Other fatigue^I10C",
+        b"ORC|NW|ORD-638B^EHR||GRP-638^EHR",
+        b"TQ1|1||||||20261019|20261119",
+        b"OBR|2|ORD-638B^EHR||718-7^Hemoglobin^LN",
+        b"DG1|1||R53.83^Other fatigue^I10C",
+        b"ORC|NW|ORD-638C^EHR||GRP-638^EHR",
+        b"TQ1|1||||||20261019|20261119",
+        b"OBR|3|ORD-638C^EHR||3016-3^TSH^LN",
+        b"DG1|1||R53.83^Other fatigue^I10C",
+    ])
+}
+
+#[test]
+fn each_later_order_s_orc_opens_an_order_when_no_prior_result_can_complete() {
+    let parsed = support::parsed(&oml_o21_with_three_orders());
+    assert_eq!(
+        groups_of(&parsed, 6),
+        Some(vec!["ORDER"]),
+        "the ORC opens a second ORDER, since an ORDER_PRIOR needs its OBR before the TQ1"
+    );
+    assert_eq!(groups_of(&parsed, 7), Some(vec!["ORDER", "TIMING"]));
+    assert_eq!(
+        groups_of(&parsed, 8),
+        Some(vec!["ORDER", "OBSERVATION_REQUEST"])
+    );
+    assert_eq!(groups_of(&parsed, 10), Some(vec!["ORDER"]));
+    assert_eq!(refusals(&parsed), []);
+}
