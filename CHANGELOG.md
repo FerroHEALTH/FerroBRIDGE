@@ -179,6 +179,19 @@ crates on crates.io.
   and names those surfaces (the facade, the operator API, the operations
   lane); a server with only `/` and the health routes logs nothing
   (#1005).
+- `openehr-mapping-core` 0.1.120 passes the RM release it chooses to the
+  `openehr-sdt` composition builder (#901), so the builder writes
+  `ARCHETYPED.rm_version` and the walk that rewrote it afterwards is gone.
+  The choice is unchanged: Release 1.1.0, unless the composition holds a
+  `GENERIC_ENTRY` whose `data` is no `ITEM_TREE`.
+- `openehr-mapping-core` 0.1.120 builds a party through the `openehr-sdt`
+  template walk (#906) and drops its own party assembly with the OPT 1.4
+  structure index behind it. `ROLE.performer`, which no template node holds,
+  is still placed on the root after the walk (#1000). Breaking for a
+  consumer that matches on `PartyError`: `NoStructure`, `Unconstrained` and `InstanceGap`
+  are gone, and a value the builder refuses is the new `PartyError::Build`,
+  which carries the `openehr-sdt` `FlatError` as its source. `fhirconnect`
+  0.1.161 renders the new requirement.
 
 ### Fixed
 

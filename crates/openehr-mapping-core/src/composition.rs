@@ -16,6 +16,8 @@
 //! 0-based (Simplified Formats, §Instance Indexing).
 
 use openehr_rm::v1_2::paths::RmPath;
+use openehr_sdt::flat::build::BuildOptions;
+use openehr_sdt::flat::build::build_composition_with;
 use openehr_sdt::flat::path::FlatKey;
 use openehr_sdt::flat::path::MAX_INSTANCE_INDEX;
 use openehr_sdt::flat::path::Segment;
@@ -335,7 +337,7 @@ impl WebTemplateIndex {
     ///
     /// Every value is keyed by its node's place in the template, the
     /// composition is built through the Simplified Formats builder of
-    /// `openehr-its`, and the result is validated against the same template
+    /// `openehr-sdt`, and the result is validated against the same template
     /// before it is returned, so a composition this function answers with is
     /// one the CDR's own validation admits. `now` is the caller's current
     /// timestamp, which the builder uses for the `ctx/time` default alone
@@ -361,35 +363,7 @@ impl WebTemplateIndex {
         for value in values {
             flat.insert(self.flat_key(value)?.to_string(), value.value.clone());
         }
-        let document = openehr_sdt::flat::sim::flat::parse_flat(&flat).map_err(|source| {
-            PathError::CompositionBuild {
-                template_id: self.template_id().to_owned(),
-                source: Box::new(source),
-            }
-        })?;
-        let mut built =
-            openehr_sdt::flat::build::build_composition(&document, self.web_template(), now)
-                .map_err(|source| PathError::CompositionBuild {
-                    template_id: self.template_id().to_owned(),
-                    source: Box::new(source),
-                })?;
-        // TODO(#901): pass the chosen release to the builder once openehr-sdt takes it.
-        crate::release::stamp(&mut built);
-        let messages = openehr_sdt::rm_instance::validate_composition(&built, self.web_template());
-        if !messages.is_empty() {
-            return Err(PathError::InvalidComposition {
-                template_id: self.template_id().to_owned(),
-                messages: messages
-                    .iter()
-                    .map(|message| format!("{}: {}", message.path, message.message))
-                    .collect(),
-            });
-        }
-        Ok(CanonicalComposition {
-            value: built,
-            template_id: self.template_id().to_owned(),
-            generation: self.generation(),
-        })
+        self.build_from_flat(&flat, now)
     }
 
     /// Builds a canonical composition from a FLAT document.
@@ -398,7 +372,7 @@ impl WebTemplateIndex {
     /// paths (Simplified Formats, §Flat format), the second form a composition
     /// is exchanged in. `now` is the caller's current timestamp, used for the
     /// `ctx/time` default alone; this crate reads no clock.
-    /// The `rm_version` stamp follows [`Self::build_composition`].
+    /// The `rm_version` follows [`Self::build_composition`].
     ///
     /// # Errors
     ///
@@ -416,14 +390,15 @@ impl WebTemplateIndex {
                 source: Box::new(source),
             }
         })?;
-        let mut built =
-            openehr_sdt::flat::build::build_composition(&document, self.web_template(), now)
-                .map_err(|source| PathError::CompositionBuild {
+        let built = crate::release::build(|release| {
+            let options = BuildOptions::default().with_rm_version(release.spec_version());
+            build_composition_with(&document, self.web_template(), now, &options).map_err(
+                |source| PathError::CompositionBuild {
                     template_id: self.template_id().to_owned(),
                     source: Box::new(source),
-                })?;
-        // TODO(#901): pass the chosen release to the builder once openehr-sdt takes it.
-        crate::release::stamp(&mut built);
+                },
+            )
+        })?;
         let messages = openehr_sdt::rm_instance::validate_composition(&built, self.web_template());
         if !messages.is_empty() {
             return Err(PathError::InvalidComposition {
@@ -552,7 +527,7 @@ impl WebTemplateIndex {
     }
 
     /// Returns the FLAT key one value is written under.
-    fn flat_key(&self, value: &NodeValue) -> Result<FlatKey, PathError> {
+    pub(crate) fn flat_key(&self, value: &NodeValue) -> Result<FlatKey, PathError> {
         let mut segments = Vec::new();
         let flat_id = match value.place {
             // NOTE: Simplified Formats master04 §Context, a context field is

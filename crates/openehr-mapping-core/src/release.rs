@@ -9,9 +9,9 @@
 //! release version string. openEHR has published Releases 1.0.2 to 1.1.0 and
 //! a development line, with no 1.2.0
 //! (<https://specifications.openehr.org/releases/RM/>). The composition
-//! builder of `openehr-sdt` stamps the `v1_2` development generation's 1.2.0
-//! on every archetype root. A composition that holds no element outside
-//! Release 1.1.0 was created to that release, so it names 1.1.0.
+//! builder of `openehr-sdt` writes the release its caller names, and a
+//! composition that holds no element outside Release 1.1.0 was created to
+//! that release, so it names 1.1.0.
 
 use openehr_rm::Generation;
 use serde_json::Value;
@@ -19,23 +19,28 @@ use serde_json::Value;
 /// The member that names an object's RM class in canonical JSON.
 const TYPE: &str = "_type";
 
-/// Names the RM release `composition` conforms to in the `rm_version` of
-/// every `archetype_details` it holds, and returns that release.
+/// Builds a composition through `build`, naming the RM release it conforms
+/// to.
 ///
-/// The release is Release 1.1.0 unless the composition holds an element the
-/// development line changed. The one such element a composition can hold is
-/// a `GENERIC_ENTRY` whose `data` is no `ITEM_TREE`: Release 1.1.0
-/// Integration IM §2.4.1 types `GENERIC_ENTRY.data` as `ITEM_TREE`, and the
-/// development line widens it to `ITEM`. Such a composition keeps the
-/// development generation's version.
-pub(crate) fn stamp(composition: &mut Value) -> Generation {
-    let generation = if widens_generic_entry(composition) {
-        Generation::V1_2
+/// `build` is called with Release 1.1.0 first. The release is Release 1.1.0
+/// unless the result holds an element the development line changed, and the
+/// one such element a composition can hold is a `GENERIC_ENTRY` whose `data`
+/// is no `ITEM_TREE`: Release 1.1.0 Integration IM §2.4.1 types
+/// `GENERIC_ENTRY.data` as `ITEM_TREE`, and the development line widens it to
+/// `ITEM`. Such a composition is built a second time naming the development
+/// generation's version, since the element only shows once the template has
+/// been walked (no specification governs this: our own design).
+///
+/// # Errors
+///
+/// Returns the error of `build`.
+pub(crate) fn build<E>(mut build: impl FnMut(Generation) -> Result<Value, E>) -> Result<Value, E> {
+    let composition = build(Generation::V1_1)?;
+    if widens_generic_entry(&composition) {
+        build(Generation::V1_2)
     } else {
-        Generation::V1_1
-    };
-    name(composition, generation.spec_version());
-    generation
+        Ok(composition)
+    }
 }
 
 /// Answers whether `value` holds a `GENERIC_ENTRY` whose `data` is no
@@ -56,31 +61,10 @@ fn widens_generic_entry(value: &Value) -> bool {
     }
 }
 
-/// Writes `version` into the `rm_version` of every `archetype_details` under
-/// `value`.
-fn name(value: &mut Value, version: &str) {
-    match value {
-        Value::Object(members) => {
-            if let Some(Value::Object(details)) = members.get_mut("archetype_details")
-                && details.contains_key("rm_version")
-            {
-                details.insert(String::from("rm_version"), Value::from(version));
-            }
-            for member in members.values_mut() {
-                name(member, version);
-            }
-        }
-        Value::Array(items) => {
-            for item in items {
-                name(item, version);
-            }
-        }
-        _ => {}
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use core::convert::Infallible;
+
     use serde_json::json;
 
     use super::*;
@@ -108,52 +92,63 @@ mod tests {
         }
     }
 
-    fn details() -> Value {
-        json!({"archetype_id": {"value": "openEHR-EHR-X.y.v1"}, "rm_version": "1.2.0"})
+    fn details(release: Generation) -> Value {
+        json!({"archetype_id": {"value": "openEHR-EHR-X.y.v1"},
+               "rm_version": release.spec_version()})
+    }
+
+    /// Builds `content` as a stand-in builder would, naming the release it is
+    /// asked for, and returns the result with every release it was asked for.
+    fn built(content: fn(Generation) -> Value) -> (Value, Vec<Generation>) {
+        let mut asked = Vec::new();
+        let result = build(|release| {
+            asked.push(release);
+            Ok::<Value, Infallible>(json!({
+                "_type": "COMPOSITION",
+                "archetype_details": details(release),
+                "content": [content(release)]
+            }))
+        });
+        let Ok(value) = result;
+        (value, asked)
     }
 
     #[test]
     fn a_composition_of_release_elements_names_release_1_1_0() {
-        let mut composition = json!({
-            "_type": "COMPOSITION",
-            "archetype_details": details(),
-            "content": [{"_type": "EVALUATION", "archetype_details": details()}]
-        });
-        assert_eq!(Generation::V1_1, stamp(&mut composition));
+        let (composition, asked) =
+            built(|release| json!({"_type": "EVALUATION", "archetype_details": details(release)}));
+        assert_eq!(vec![Generation::V1_1], asked);
         assert_eq!(vec!["1.1.0", "1.1.0"], versions(&composition));
     }
 
     #[test]
     fn a_generic_entry_over_an_item_tree_is_a_release_element() {
-        let mut composition = json!({
-            "_type": "COMPOSITION",
-            "archetype_details": details(),
-            "content": [{"_type": "GENERIC_ENTRY", "archetype_details": details(),
-                         "data": {"_type": "ITEM_TREE", "archetype_node_id": "at0001"}}]
+        let (composition, asked) = built(|release| {
+            json!({"_type": "GENERIC_ENTRY", "archetype_details": details(release),
+                   "data": {"_type": "ITEM_TREE", "archetype_node_id": "at0001"}})
         });
-        assert_eq!(Generation::V1_1, stamp(&mut composition));
+        assert_eq!(vec![Generation::V1_1], asked);
         assert_eq!(vec!["1.1.0", "1.1.0"], versions(&composition));
     }
 
     #[test]
-    fn a_generic_entry_over_another_item_keeps_the_development_version() {
-        let mut composition = json!({
-            "_type": "COMPOSITION",
-            "archetype_details": details(),
-            "content": [{"_type": "GENERIC_ENTRY", "archetype_details": details(),
-                         "data": {"_type": "CLUSTER", "archetype_node_id": "at0001"}}]
+    fn a_generic_entry_over_another_item_names_the_development_version() {
+        let (composition, asked) = built(|release| {
+            json!({"_type": "GENERIC_ENTRY", "archetype_details": details(release),
+                   "data": {"_type": "CLUSTER", "archetype_node_id": "at0001"}})
         });
-        assert_eq!(Generation::V1_2, stamp(&mut composition));
+        assert_eq!(vec![Generation::V1_1, Generation::V1_2], asked);
         assert_eq!(vec!["1.2.0", "1.2.0"], versions(&composition));
     }
 
     #[test]
-    fn details_without_a_version_gain_none() {
-        let mut composition = json!({
-            "_type": "COMPOSITION",
-            "archetype_details": {"archetype_id": {"value": "openEHR-EHR-X.y.v1"}}
+    fn a_refused_build_is_not_retried() {
+        let mut calls = 0_u8;
+        let result = build(|_| {
+            calls = calls.saturating_add(1);
+            Err::<Value, &str>("refused")
         });
-        stamp(&mut composition);
-        assert!(versions(&composition).is_empty());
+        assert_eq!(Err("refused"), result);
+        assert_eq!(1, calls);
     }
 }

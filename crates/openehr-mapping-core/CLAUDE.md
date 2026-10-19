@@ -37,14 +37,13 @@ the language crate applies its own grammar to them.
   builder runs. A `ctx/` value is `NodeValue::context`; a whole value is the
   `raw` suffix (Simplified Formats master04 §Raw canonical JSON).
 
-- **A party is built here, never through FLAT.** `party::build_party` builds
-  a canonical `PARTY` through the `openehr-rm` types: the OPT 1.4 constraints
-  (`index::structure`) give the class, node id and rubric of every object a
-  Web Template compacted away, the `openehr_rm::v1_2::model` table says which
-  attribute is a list, and the result decodes strictly as the root's class.
-  It moves to `openehr-sdt` when that crate carries a party builder (#906).
+- **A party is built through the `openehr-sdt` template walk.**
+  `party::build_party` writes every value below the root under `raw` and
+  builds the party with `openehr_sdt::flat::build::build_root`, naming
+  `rm_version` 1.1.0, then decodes the result strictly as the root's class.
   A value at the root node places its members on the root (`ROLE.performer`),
-  each an attribute of the root's class, and a `ROLE` with no `performer`,
+  each an attribute of the root's class, because the builder takes no root
+  attribute of a party (#1000); and a `ROLE` with no `performer`,
   built or accepted, is `PartyError::RoleWithoutPerformer` (RM Demographic
   IM, the `ROLE` class).
 
