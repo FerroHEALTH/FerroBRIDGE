@@ -918,10 +918,12 @@ expression is a load error: the reference CDR's connector let `where()` and
   (#492) is `<subject parameter>.identifier` (§3.1.1.4.15), behind
   `[facade.identifier_search]`: a configured demographic AQL query, the
   Cadasto experimental AQL demographic extension (#480), resolves the
-  identifier to one party, whose uid is the patient's logical id and whose
-  EHR the subject link finds. No party matches nothing, two answer `400
-  multiple-matches`, and the `CapabilityStatement` documents the chain on
-  each subject parameter while it is on (our own design).
+  identifier to every party that carries it, each uid a patient's logical
+  id whose EHR the subject link finds. No party matches nothing, and two
+  match the resources of both, because a bare value matches "irrespective
+  of the value of the system property" (§3.1.1.4.10). The
+  `CapabilityStatement` documents the chain on each subject parameter while
+  it is on (our own design).
 - **Status codes are mapped as types**, from the ITS-REST outcome to the FHIR
   outcome, in a table that is FerroBRIDGE's own design with both sides cited
   and every row pinned by a wire test: a CDR `422` (template validation) is a

@@ -4,8 +4,8 @@
 //! The chained search through the patient identifier,
 //! `Condition?patient.identifier=…` and `subject.identifier`, over a CDR that
 //! serves Cadasto's experimental AQL demographic extension: the identifier
-//! resolved to one party, the party to its EHR, then the clinical query on
-//! that EHR (<https://hl7.org/fhir/R4/search.html>, §3.1.1.4.15).
+//! resolved to every party that carries it, each party to its EHR, then the
+//! clinical query on those EHRs (<https://hl7.org/fhir/R4/search.html>, §3.1.1.4.15).
 
 use std::sync::Arc;
 
@@ -33,11 +33,18 @@ use super::mount_rows;
 use super::queries;
 use super::row;
 
+/// The object id of a second synthetic party that carries the same
+/// identifier value under another system.
+const OTHER_PARTY: &str = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
+
+/// The EHR of [`OTHER_PARTY`].
+const OTHER_EHR: &str = "2c3d4e5f-0000-4000-8000-00000000000e";
+
 /// The identifier query every case configures, in the dialect's shape.
-const QUERY: &str = "SELECT p/uid/value FROM PERSON p WHERE p/details/items[at0001]/value/id = $identifier ORDER BY p/uid/value ASC LIMIT 2";
+const QUERY: &str = "SELECT p/uid/value FROM PERSON p WHERE p/details/items[at0001]/value/id = $identifier ORDER BY p/uid/value ASC";
 
 /// The identifier query of a value naming a system.
-const SYSTEM_QUERY: &str = "SELECT p/uid/value FROM PERSON p WHERE p/details/items[at0001]/value/id = $identifier AND p/details/items[at0001]/value/issuer = $system ORDER BY p/uid/value ASC LIMIT 2";
+const SYSTEM_QUERY: &str = "SELECT p/uid/value FROM PERSON p WHERE p/details/items[at0001]/value/id = $identifier AND p/details/items[at0001]/value/issuer = $system ORDER BY p/uid/value ASC";
 
 /// The party the synthetic identifier names, as a versioned uid.
 const PARTY: &str = "0f1e2d3c-4b5a-4968-8776-655443322110::cdr.example.org::1";
@@ -179,33 +186,60 @@ async fn an_unknown_identifier_answers_an_empty_searchset_with_no_clinical_query
 }
 
 #[tokio::test]
-async fn an_identifier_two_parties_carry_is_refused_asking_for_a_system()
+async fn an_identifier_two_parties_carry_matches_the_resources_of_both()
 -> Result<(), Box<dyn StdError>> {
-    // R4 search.html §3.1.1.4.15: a server SHOULD reject a search whose value
-    // refers to more than one matching resource.
+    // R4 search.html §3.1.1.4.10: a bare value matches "irrespective of the
+    // value of the system property", and §3.1.1.4.15 answers every match.
+    let harness = identifying(Some(by_value()), true).await;
+    harness.store.record_ehr(
+        &PersonId::new(NAMESPACE, &format!("Patient/{OTHER_PARTY}"))?,
+        &EhrId::new(OTHER_EHR)?,
+    )?;
+    mount_parties(
+        &harness,
+        &[PARTY, &format!("{OTHER_PARTY}::cdr.example.org::1")],
+    )
+    .await;
+    let composition = harness.composition();
+    mount_rows(&harness.cdr, &[row(VERSION_ONE, &composition)]).await;
+    let (status, body) = get(&harness, "Condition?patient.identifier=MRN-0001").await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let (_, clinical) = split_queries(&harness).await;
+    let rows = clinical
+        .first()
+        .ok_or("the clinical query reached the CDR")?;
+    let parameters = bound(rows);
+    assert!(parameters.contains(&String::from(EHR_ID)), "{rows}");
+    assert!(parameters.contains(&String::from(OTHER_EHR)), "{rows}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_party_with_no_ehr_among_several_leaves_the_others_matching()
+-> Result<(), Box<dyn StdError>> {
     let harness = identifying(Some(by_value()), true).await;
     mount_parties(
         &harness,
-        &[
-            PARTY,
-            "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d::cdr.example.org::1",
-        ],
+        &[PARTY, &format!("{OTHER_PARTY}::cdr.example.org::1")],
     )
     .await;
-    mount_rows(&harness.cdr, &[]).await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/ehr"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&harness.cdr)
+        .await;
+    let composition = harness.composition();
+    mount_rows(&harness.cdr, &[row(VERSION_ONE, &composition)]).await;
     let (status, body) = get(&harness, "Condition?patient.identifier=MRN-0001").await?;
-    assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");
-    let issue = first_issue(&body);
-    assert_eq!(Some("multiple-matches"), issue["code"].as_str(), "{body}");
-    let diagnostics = issue["diagnostics"].as_str().unwrap_or_default();
-    assert!(diagnostics.contains("[system]|[value]"), "{diagnostics}");
-    assert_eq!(
-        Some("patient.identifier"),
-        issue["location"][0].as_str(),
-        "{body}"
-    );
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(1, matches(&body).len(), "{body}");
     let (_, clinical) = split_queries(&harness).await;
-    assert!(clinical.is_empty(), "{clinical:?}");
+    let rows = clinical
+        .first()
+        .ok_or("the clinical query reached the CDR")?;
+    let parameters = bound(rows);
+    assert!(parameters.contains(&String::from(EHR_ID)), "{rows}");
+    assert!(!parameters.contains(&String::from(OTHER_EHR)), "{rows}");
     Ok(())
 }
 

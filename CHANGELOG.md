@@ -54,11 +54,10 @@ crates on crates.io.
   `Observation?patient.identifier=MRN-1`, `subject.identifier` and
   `subject:Patient.identifier`, on every type a search declaration answers.
   With `[facade.identifier_search] enabled`, a configured demographic AQL
-  query in Cadasto's experimental extension resolves the identifier to one
-  party, the party's uid names the patient, and the EHR comes from the
+  query in Cadasto's experimental extension resolves the identifier to its
+  parties, each party's uid names a patient, and the EHR comes from the
   identity map or `GET /ehr?subject_id=`. An unknown identifier answers an
-  empty searchset with no clinical query, two parties answer `400
-  multiple-matches` asking for a system, and `_count=0` answers the total
+  empty searchset with no clinical query, and `_count=0` answers the total
   alone. A value naming a system needs `system_query`. The
   `CapabilityStatement` documents the chain on each subject parameter while
   it is on. No specification governs the resolution: our own design.
@@ -123,6 +122,15 @@ crates on crates.io.
 
 ### Fixed
 
+- A chained `patient.identifier`, `subject.identifier` or
+  `subject:Patient.identifier` value that more than one patient carries now
+  matches the clinical resources of every one of them (#944). The facade
+  answered `400 multiple-matches` instead, which was non-conformant: FHIR R4
+  search §3.1.1.4.10 matches a bare value "irrespective of the value of the
+  system property", §3.1.1.4.15 answers every matching target, and R4's one
+  refusal there is for a chain whose matches span resource types. The default
+  `[facade.identifier_search] query` drops its `LIMIT 2`; a configured query
+  with a `LIMIT` should drop it too.
 - A pull request merged after a release no longer files its changelog
   entries under that release (#913). `scripts/gh/watch-prs.sh` merges
   `CHANGELOG.md` by entry through the new `scripts/gh/changelog-merge.sh`,

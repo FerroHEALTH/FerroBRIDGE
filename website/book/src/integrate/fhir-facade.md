@@ -670,7 +670,7 @@ key that is unique per composition.
 | a declared `string` | starts-with by default, `:contains` and `:exact` |
 | a declared `date` | the range of the value's precision, with the prefixes `eq`, `ne`, `gt`, `lt`, `ge`, `le`, `sa` and `eb` |
 | `patient`, `subject` (as declared) | `[id]`, `Patient/[id]`, an absolute URL on this server, or the `:Patient` modifier, resolved through the identity map to the EHR |
-| `patient.identifier`, `subject.identifier`, `subject:Patient.identifier` | with [`[facade.identifier_search]`](../operate/configuration.md#facadeidentifier_search) on: `[value]`, or `[system]\|[value]` where a system query is configured; the identifier is resolved to one demographic party and that party's EHR, and two parties answer `400 multiple-matches` |
+| `patient.identifier`, `subject.identifier`, `subject:Patient.identifier` | with [`[facade.identifier_search]`](../operate/configuration.md#facadeidentifier_search) on: `[value]`, or `[system]\|[value]` where a system query is configured; the identifier is resolved to every demographic party that carries it and each party's EHR, so a bare value two patients carry matches the resources of both (R4 search §3.1.1.4.10) |
 | `_id` | a logical id, resolved through the identity map to its composition |
 | `_count` | the page size, capped at `[facade] search_count_max`; `0` answers the total alone |
 | `_sort` | declared parameters read under the composition, `-` for descending, ahead of the declared order; a parameter read under a node is refused, because it has a value per node |

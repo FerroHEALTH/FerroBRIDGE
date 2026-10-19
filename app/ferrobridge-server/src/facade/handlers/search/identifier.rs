@@ -5,15 +5,15 @@
 //! search, resolved to the EHRs they name.
 //!
 //! Each value runs the configured identifier query over `POST /query/aql`
-//! (`crate::facade::search::identifier`), the one party it finds is the
-//! patient whose logical id is the party's uid, and that patient's EHR comes
-//! from the identity map or the CDR's lookup by subject, as every subject of
-//! the facade does (`crate::facade::ehr`). An identifier no party carries,
-//! or one whose party has no EHR, matches nothing; one that more than one
-//! party carries is refused, because R4 says a server "SHOULD reject a
-//! search where the logical id refers to more than one matching resource"
-//! (<https://hl7.org/fhir/R4/search.html>, §3.1.1.4.15). No specification
-//! governs the identifier-to-EHR resolution: our own design.
+//! (`crate::facade::search::identifier`). Each party it finds is the patient
+//! whose logical id is the party's uid, and that patient's EHR comes from the
+//! identity map or the CDR's lookup by subject, as every subject of the
+//! facade does (`crate::facade::ehr`). A bare value matches every patient
+//! that carries it (<https://hl7.org/fhir/R4/search.html>, §3.1.1.4.10), and
+//! a chain answers the resources of every matching target (§3.1.1.4.15), so
+//! the search reads the EHR of each party. An identifier no party carries,
+//! or a party with no EHR, adds nothing. No specification governs the
+//! identifier-to-EHR resolution: our own design.
 
 use http::StatusCode;
 use openehr_its::rest::client::ErrorBody;
@@ -29,19 +29,17 @@ use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::search::identifier;
-use crate::facade::search::identifier::Parties;
-use crate::facade::search::value::System;
 use crate::facade::search::value::Token;
 use crate::facade::status;
 
-/// Returns the EHR one identifier value of the chained parameter `name`
-/// names, `None` when it names none.
-pub(super) async fn ehr_of(
+/// Returns the EHRs of every patient one identifier value of the chained
+/// parameter `name` names, in the order the identifier query returns them.
+pub(super) async fn ehrs_of(
     facade: &Facade,
     client: &CdrClient,
     name: &str,
     token: &Token,
-) -> Result<Option<EhrId>, Refusal> {
+) -> Result<Vec<EhrId>, Refusal> {
     let search = facade.identifier_search().ok_or_else(|| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -69,21 +67,31 @@ pub(super) async fn ehr_of(
             return Err(write::refuse(&refused(&answered.upstream)));
         }
     };
-    let party = match identifier::parties(&rows) {
-        Ok(Parties::One(party)) => party,
-        Ok(Parties::None) => return Ok(None),
-        Ok(Parties::Many) => return Err(ambiguous(name, token)),
-        Err(error) => {
-            return Err(write::refuse(&status::Answer::new(
-                status::UPSTREAM,
-                error.to_string(),
-            )));
+    let parties = identifier::parties(&rows).map_err(|error| {
+        write::refuse(&status::Answer::new(status::UPSTREAM, error.to_string()))
+    })?;
+    let mut ehrs = Vec::new();
+    for party in &parties {
+        if let Some(found) = ehr_of_party(facade, client, party).await?
+            && !ehrs.contains(&found)
+        {
+            ehrs.push(found);
         }
-    };
+    }
+    Ok(ehrs)
+}
+
+/// Returns the EHR of the patient whose logical id is `party`, `None` when
+/// the CDR holds none.
+async fn ehr_of_party(
+    facade: &Facade,
+    client: &CdrClient,
+    party: &str,
+) -> Result<Option<EhrId>, Refusal> {
     let link = &facade.settings().subject;
     // NOTE: no specification governs this: our own design, a party uid no person key
     // can hold names no subject the facade links, so it matches nothing.
-    let Ok(person) = link.person_of_patient(&party) else {
+    let Ok(person) = link.person_of_patient(party) else {
         return Ok(None);
     };
     match ehr::resolve(client, facade.store(), &person, link, ehr::Policy::Existing).await {
@@ -115,21 +123,5 @@ fn refused(upstream: &crate::cdr::error::Upstream) -> status::Answer {
             identifier::EXTENSION,
             status::diagnostics(upstream.status(), &body)
         ),
-    )
-}
-
-/// Returns the `400` an identifier more than one party carries answers.
-fn ambiguous(name: &str, token: &Token) -> Refusal {
-    let advice = match token.system {
-        System::Any => "; qualify it with a system, as [system]|[value]",
-        System::Absent | System::Is(_) => "",
-    };
-    reply::refusal(
-        StatusCode::BAD_REQUEST,
-        Issue::error(IssueType::MultipleMatches)
-            .diagnosing(format!(
-                "{name}: the identifier names more than one patient{advice}"
-            ))
-            .at(name.to_owned()),
     )
 }
