@@ -25,6 +25,19 @@ crates on crates.io.
 
 ### Added
 
+- The FHIR facade serves `Patient`, `Practitioner`, `PractitionerRole` and
+  `Organization` from party contexts over the ITS-REST 1.1.0 Demographic API,
+  DEVELOPMENT, behind `[cdr] demographic` (#470). Read, vread,
+  `GET [type]/[id]/_history`, create, update (over `If-Match` or the latest
+  version) and `DELETE [type]/[id]`, which answer `not-supported` for a type no
+  party context serves; a party context with the key off is a boot refusal. The
+  id is the party's `versioned_object_uid` and `meta.versionId` its version
+  tree id, with no identity-map entry; a Demographic API `400` answers `500`,
+  and `404`, `409`, `412` and `422` answer as themselves. The
+  `CapabilityStatement` declares the six interactions and no search per party
+  type. A `PractitionerRole` is not created or updated yet (#911). No
+  specification governs a party context: our own design.
+
 - A party program runs through the engine (#905). `WebTemplateIndex::
   build_party` builds a canonical `PERSON`, `ORGANISATION` or `ROLE` from the
   node values a party context writes, through the `openehr-rm` types: the

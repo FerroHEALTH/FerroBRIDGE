@@ -93,6 +93,25 @@ pub enum LoadError {
         #[source]
         source: Box<crate::mappings::Error>,
     },
+    /// A party context loaded and `[cdr] demographic` is off.
+    #[error(
+        "the context {context} is a party context, served over the ITS-REST 1.1.0 Demographic \
+         API, DEVELOPMENT, and [cdr] demographic is off"
+    )]
+    DemographicOff {
+        /// The party context.
+        context: String,
+    },
+    /// Two party contexts map one resource type.
+    #[error("the party contexts {first} and {second} both map {resource_type}")]
+    SeveralParties {
+        /// The resource type.
+        resource_type: String,
+        /// The first context, in name order.
+        first: String,
+        /// The second.
+        second: String,
+    },
 }
 
 /// One compiled context, with the template index it runs against.
@@ -119,12 +138,20 @@ impl Loaded {
 }
 
 /// Every program this deployment loaded.
+///
+/// A party program (`Program::party`) is kept apart from the composition
+/// programs: it is served over the Demographic API by [`crate::facade::party`],
+/// and every composition lookup here leaves it out (no specification governs
+/// a party context: our own design).
 #[derive(Debug, Default)]
 pub struct Programs {
-    /// The programs, in context-name order.
+    /// The composition programs, in context-name order.
     loaded: Vec<Loaded>,
-    /// The programs alone, for the selection functions of `fhirconnect`.
-    programs: Vec<Arc<Program>>,
+    /// The composition programs alone, for the selection functions of
+    /// `fhirconnect`.
+    selectable: Vec<Arc<Program>>,
+    /// The party programs, in context-name order.
+    parties: Vec<Loaded>,
 }
 
 impl Programs {
@@ -137,23 +164,47 @@ impl Programs {
                 .as_str()
                 .cmp(right.program.context().as_str())
         });
-        let programs = loaded
+        let (parties, composition): (Vec<Loaded>, Vec<Loaded>) = loaded
+            .into_iter()
+            .partition(|entry| entry.program.party().is_some());
+        let selectable = composition
             .iter()
             .map(|entry| Arc::clone(&entry.program))
             .collect();
-        Self { loaded, programs }
+        Self {
+            loaded: composition,
+            selectable,
+            parties,
+        }
     }
 
     /// Returns how many programs were loaded.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.loaded.len()
+        self.loaded.len().saturating_add(self.parties.len())
     }
 
     /// Whether no program was loaded.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.loaded.is_empty()
+        self.loaded.is_empty() && self.parties.is_empty()
+    }
+
+    /// Returns the party programs, in context-name order.
+    #[must_use]
+    pub fn parties(&self) -> &[Loaded] {
+        &self.parties
+    }
+
+    /// Returns the party program that serves `resource_type`, when one does.
+    ///
+    /// [`check_parties`] refuses a load with two party programs for one type,
+    /// so the first is the only one.
+    #[must_use]
+    pub fn party(&self, resource_type: &str) -> Option<&Loaded> {
+        self.parties
+            .iter()
+            .find(|entry| entry.program.resource().as_str() == resource_type)
     }
 
     /// Returns every loaded program, in context-name order.
@@ -232,7 +283,7 @@ impl Programs {
         claimed: &[String],
         template: Option<&TemplateId>,
     ) -> Result<&Loaded, SelectError> {
-        let chosen = select_by_profile_pinned(&self.programs, claimed, template)?;
+        let chosen = select_by_profile_pinned(&self.selectable, claimed, template)?;
         self.loaded
             .iter()
             .find(|entry| Arc::ptr_eq(&entry.program, chosen))
@@ -296,6 +347,38 @@ fn referenced(mappings: &[Mapping], created: &mut BTreeSet<String>) {
         }
         referenced(mapping.followed_by(), created);
     }
+}
+
+/// Checks the party programs of a load against the Demographic API gate.
+///
+/// A party program is served over the ITS-REST 1.1.0 Demographic API, which
+/// the release marks `x-status: DEVELOPMENT`, so it loads only when
+/// `[cdr] demographic` is set; and one resource type is served by one party
+/// program (no specification governs this: our own design).
+///
+/// # Errors
+///
+/// Returns [`LoadError::DemographicOff`] for a party program with the gate
+/// off and [`LoadError::SeveralParties`] for two party programs of one type.
+pub fn check_parties(programs: &Programs, demographic: bool) -> Result<(), LoadError> {
+    let mut seen: BTreeMap<&str, &str> = BTreeMap::new();
+    for entry in programs.parties() {
+        let context = entry.program.context().as_str();
+        if !demographic {
+            return Err(LoadError::DemographicOff {
+                context: context.to_owned(),
+            });
+        }
+        let resource_type = entry.program.resource().as_str();
+        if let Some(first) = seen.insert(resource_type, context) {
+            return Err(LoadError::SeveralParties {
+                resource_type: resource_type.to_owned(),
+                first: first.to_owned(),
+                second: context.to_owned(),
+            });
+        }
+    }
+    Ok(())
 }
 
 /// Returns the FHIRconnect files under `directory`, sorted.

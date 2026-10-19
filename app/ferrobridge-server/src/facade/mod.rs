@@ -27,6 +27,7 @@ pub mod identity;
 pub mod ingest;
 pub mod media;
 pub mod outcome;
+pub mod party;
 pub mod programs;
 pub mod references;
 pub mod reply;
@@ -379,7 +380,7 @@ impl Facade {
 /// which the conformance statement declares only then.
 pub fn routes(facade: Arc<Facade>, shape: capability::Shape) -> Router {
     let shape = Arc::new(shape);
-    Router::new()
+    let router = Router::new()
         .route(
             &format!("{BASE_PATH}/metadata"),
             get(
@@ -405,12 +406,18 @@ pub fn routes(facade: Arc<Facade>, shape: capability::Shape) -> Router {
             post(handlers::validate_route),
         )
         .route(
-            &format!("{BASE_PATH}/{{resource_type}}/{{id}}"),
-            get(handlers::read_route).put(handlers::update_route),
-        )
-        .route(
             &format!("{BASE_PATH}/{{resource_type}}/{{id}}/_history/{{vid}}"),
             get(handlers::vread_route),
         )
-        .with_state(facade)
+        .route(
+            &format!("{BASE_PATH}/{{resource_type}}/{{id}}"),
+            get(handlers::read_route)
+                .put(handlers::update_route)
+                .delete(handlers::delete_route),
+        )
+        .route(
+            &format!("{BASE_PATH}/{{resource_type}}/{{id}}/_history"),
+            get(handlers::history_route),
+        );
+    router.with_state(facade)
 }

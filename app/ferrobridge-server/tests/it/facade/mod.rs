@@ -14,6 +14,7 @@ mod capability;
 mod conditional;
 mod created;
 mod credentials;
+mod demographic;
 mod examples;
 mod party;
 mod person;

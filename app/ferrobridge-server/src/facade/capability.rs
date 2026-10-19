@@ -386,7 +386,45 @@ fn resources(programs: &Programs, search: &Catalog) -> Vec<CapabilityStatementRe
         let entry = created_resource(&name);
         entries.insert(name, entry);
     }
+    for loaded in programs.parties() {
+        let name = String::from(loaded.program().resource().as_str());
+        let entry = party_resource(&name);
+        entries.insert(name, entry);
+    }
     entries.into_values().collect()
+}
+
+/// The type-level interactions a party type answers, over the ITS-REST 1.1.0
+/// Demographic API, DEVELOPMENT.
+///
+/// The Demographic API has no search or list operation, so no `search-type`
+/// is declared (no specification governs a party context: our own design).
+const PARTY_INTERACTIONS: [&str; 6] = [
+    "read",
+    "vread",
+    "history-instance",
+    "create",
+    "update",
+    "delete",
+];
+
+/// Returns the `rest.resource` entry of a type a party program serves.
+fn party_resource(name: &str) -> CapabilityStatementRestResource {
+    CapabilityStatementRestResource {
+        r#type: name.into(),
+        documentation: Some(crate::facade::party::DOCUMENTATION.into()),
+        interaction: PARTY_INTERACTIONS
+            .iter()
+            .map(|code| CapabilityStatementRestResourceInteraction {
+                code: (*code).into(),
+                ..CapabilityStatementRestResourceInteraction::default()
+            })
+            .collect(),
+        versioning: Some(VERSIONING.into()),
+        read_history: Some(true.into()),
+        update_create: Some(false.into()),
+        ..CapabilityStatementRestResource::default()
+    }
 }
 
 /// Returns the `rest.resource` entry of a type only a `reference` mapping

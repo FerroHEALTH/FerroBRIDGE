@@ -21,6 +21,7 @@ mod config;
 mod console;
 mod etl;
 mod facade;
+mod facade_demographic_e2e;
 mod facade_e2e;
 mod facade_person_e2e;
 mod hl7v2;

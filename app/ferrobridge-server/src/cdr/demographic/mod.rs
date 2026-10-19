@@ -31,6 +31,7 @@ use openehr_its::rest::generated::demographic::RoleCreateParams;
 use openehr_its::rest::generated::demographic::RoleDeleteParams;
 use openehr_its::rest::generated::demographic::RoleGetParams;
 use openehr_its::rest::generated::demographic::RoleUpdateParams;
+use openehr_its::rest::generated::demographic::VersionedPartyRevisionHistoryParams;
 use openehr_its::rest::generated::demographic::client::DemographicClient;
 use openehr_its::rest::generated::demographic::client::OrganisationCreateOutcome;
 use openehr_its::rest::generated::demographic::client::OrganisationDeleteOutcome;
@@ -44,6 +45,7 @@ use openehr_its::rest::generated::demographic::client::RoleCreateOutcome;
 use openehr_its::rest::generated::demographic::client::RoleDeleteOutcome;
 use openehr_its::rest::generated::demographic::client::RoleGetOutcome;
 use openehr_its::rest::generated::demographic::client::RoleUpdateOutcome;
+use openehr_its::rest::generated::demographic::client::VersionedPartyRevisionHistoryOutcome;
 use openehr_rm::v1_2::demographic::organisation::Organisation;
 use openehr_rm::v1_2::demographic::person::Person;
 use openehr_rm::v1_2::demographic::role::Role;
@@ -223,6 +225,28 @@ macro_rules! party_operations {
 }
 
 impl Demographic<'_> {
+    /// Reads the revision history of the `VERSIONED_PARTY` `versioned_object_uid`
+    /// names (`demographic-codegen.openapi.yaml`,
+    /// `versioned_party_revision_history`).
+    ///
+    /// # Errors
+    /// Returns [`CdrError`] when the call did not reach a documented answer.
+    pub async fn revision_history(
+        &self,
+        versioned_object_uid: &str,
+    ) -> Result<Answered<VersionedPartyRevisionHistoryOutcome>, CdrError> {
+        let client = self.cdr.party_call(HeaderMap::new())?;
+        let params = VersionedPartyRevisionHistoryParams {
+            versioned_object_uid: String::from(versioned_object_uid),
+            accept: None,
+            content_type: None,
+        };
+        let answered = DemographicClient::new(&client)
+            .versioned_party_revision_history(&params)
+            .await;
+        answered_by(&client, answered)
+    }
+
     party_operations! {
         kind: "PERSON",
         party: Person,

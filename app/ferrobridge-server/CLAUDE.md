@@ -69,6 +69,12 @@ the real run path; a binary-only crate cannot be imported from `tests/`
   drops a Release 1.1.0 `PARTY.reverse_relationships` before the decode
   (`cdr::demographic::party`). A refusal becomes a facade answer through
   `facade::status::demographic`.
+- **A party context is served by `facade::party`, never by the composition
+  path.** `Programs` keeps party programs apart (`Programs::party`), the
+  generic handlers hand a party type to `facade::party::{read, write}`, the
+  delete and history routes answer `not-supported` for any other type, and
+  `programs::check_parties` refuses a party context with the gate off. The id
+  is the party's `versioned_object_uid`, so no identity-map entry is written.
 - **Tests are `wiremock` contract tests under `tests/it/cdr/`**, one case per
   documented status plus the request-side assertions; every body is synthetic.
 

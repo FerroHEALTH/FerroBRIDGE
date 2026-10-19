@@ -87,6 +87,10 @@ pub enum Interaction {
     Vread,
     /// `PUT [base]/{type}/{id}`.
     Update,
+    /// `DELETE [base]/{type}/{id}`, a party resource only.
+    Delete,
+    /// `GET [base]/{type}/{id}/_history`, a party resource only.
+    History,
     /// `POST [base]/{type}/$validate`.
     Validate,
     /// `GET [base]/{type}` and `POST [base]/{type}/_search`.
@@ -121,6 +125,8 @@ impl Interaction {
             Self::Read => "read",
             Self::Vread => "vread",
             Self::Update => "update",
+            Self::Delete => "delete",
+            Self::History => "history-instance",
             Self::Validate => "validate",
             Self::Search => "search-type",
             Self::Transaction => "transaction",
@@ -139,8 +145,9 @@ impl Interaction {
     const fn permissions(self) -> &'static [Permission] {
         match self {
             Self::Create => &[Permission::Create],
-            Self::Read | Self::Vread => &[Permission::Read],
+            Self::Read | Self::Vread | Self::History => &[Permission::Read],
             Self::Update => &[Permission::Update],
+            Self::Delete => &[Permission::Delete],
             Self::Validate => &[Permission::Create, Permission::Update],
             Self::Search => &[Permission::Search],
             Self::Capabilities
@@ -417,7 +424,7 @@ pub fn forbidden() -> Refusal {
 /// [`Interaction::Unclassified`], which a guarded deployment refuses, so a
 /// route mounted without a classification fails closed (no specification
 /// governs the table: our own design).
-pub const CLASSIFIED: [(Method, &str, Interaction); 14] = [
+pub const CLASSIFIED: [(Method, &str, Interaction); 16] = [
     (Method::GET, "/metadata", Interaction::Capabilities),
     (Method::GET, SMART_CONFIGURATION, Interaction::Discovery),
     (Method::POST, "", Interaction::Transaction),
@@ -435,6 +442,12 @@ pub const CLASSIFIED: [(Method, &str, Interaction); 14] = [
     ),
     (Method::GET, "/{resource_type}/{id}", Interaction::Read),
     (Method::PUT, "/{resource_type}/{id}", Interaction::Update),
+    (Method::DELETE, "/{resource_type}/{id}", Interaction::Delete),
+    (
+        Method::GET,
+        "/{resource_type}/{id}/_history",
+        Interaction::History,
+    ),
     (
         Method::GET,
         "/{resource_type}/{id}/_history/{vid}",
@@ -468,7 +481,11 @@ fn classify(method: &Method, template: &str, path: &str) -> Option<Target> {
     let second = segments.next().map(str::to_owned);
     let (resource_type, id) = match interaction {
         Interaction::Create | Interaction::Search | Interaction::Validate => (first, None),
-        Interaction::Read | Interaction::Update | Interaction::Vread => (first, second),
+        Interaction::Read
+        | Interaction::Update
+        | Interaction::Vread
+        | Interaction::Delete
+        | Interaction::History => (first, second),
         Interaction::Capabilities
         | Interaction::Transaction
         | Interaction::Batch

@@ -194,7 +194,7 @@ pub(crate) async fn update(
 ///
 /// Returns a `400` [`Refusal`] with an `invalid` issue at `Resource.id` when
 /// the body carries no `id` or another one.
-fn same_id(inbound: &Inbound, id: &str) -> Result<(), Refusal> {
+pub(crate) fn same_id(inbound: &Inbound, id: &str) -> Result<(), Refusal> {
     let location = format!("{}.id", inbound.resource_type());
     let diagnostics = match inbound.id() {
         Some(carried) if carried.as_str() == id => return Ok(()),

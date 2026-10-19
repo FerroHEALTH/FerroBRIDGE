@@ -1306,8 +1306,13 @@ mapping rooted at a party: a context binds a composition template, and
   (`EngineError::PartyProgram`).
 - **Serving.** The facade serves `Patient`, `Practitioner`, `PractitionerRole`
   and `Organization` from party contexts over the Demographic API client
-  behind `[cdr] demographic` (#470, #894). The id of each is the party's
-  `versioned_object_uid` (section 9).
+  behind `[cdr] demographic` (#470, #894): read, vread, the instance history,
+  create, update over `If-Match` or the latest version, and delete of the
+  latest version, with no search because the API has none. A party context
+  with the gate off is a boot refusal, and one resource type is served by one
+  party context. The id of each is the party's `versioned_object_uid`
+  (section 9). A `ROLE`'s mandatory `performer` is no template node, so a
+  `PractitionerRole` is not created or updated until #911 maps it.
 - **The draft archetypes.** Every `openEHR-DEMOGRAPHIC-*` archetype in the
   international CKM is a v0 draft
   (<https://ckm.openehr.org/ckm/archetypes/1013.1.479>). The tests run against

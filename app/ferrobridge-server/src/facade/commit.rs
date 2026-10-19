@@ -39,6 +39,9 @@ const CREATION_CODE: &str = "249";
 /// The `change_type` code of a later commit, "modification".
 const MODIFICATION_CODE: &str = "251";
 
+/// The `change_type` code of a delete, "deleted".
+const DELETED_CODE: &str = "523";
+
 /// The `lifecycle_state` code of a committed version, "complete".
 const COMPLETE_CODE: &str = "532";
 
@@ -49,6 +52,8 @@ pub enum Change {
     Creation,
     /// A later version of a composition.
     Modification,
+    /// The deletion of the latest version.
+    Deleted,
 }
 
 impl Change {
@@ -58,6 +63,7 @@ impl Change {
         match self {
             Self::Creation => CREATION_CODE,
             Self::Modification => MODIFICATION_CODE,
+            Self::Deleted => DELETED_CODE,
         }
     }
 
@@ -67,6 +73,7 @@ impl Change {
         match self {
             Self::Creation => "creation",
             Self::Modification => "modification",
+            Self::Deleted => "deleted",
         }
     }
 }
