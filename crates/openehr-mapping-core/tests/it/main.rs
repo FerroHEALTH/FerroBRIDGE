@@ -12,6 +12,7 @@ mod diagnostic;
 mod embedded;
 mod header;
 mod malformed;
+mod party;
 mod paths;
 mod pins;
 mod registry;
