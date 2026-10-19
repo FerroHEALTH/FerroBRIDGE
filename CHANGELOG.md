@@ -58,6 +58,11 @@ crates on crates.io.
   `Program::party` answers `openehr_mapping_core::party::PartyClass`; a
   consumer imports it from there. `EngineError` gains `CompositionProgram` and
   `PartyBuild`, and a consumer that matches it exhaustively adds the arms.
+- The operator console draws with `ferrohealth-ui` 0.1.4 (#904). The
+  dashboard's build instant reads on one line as the library draws every
+  date-time, in UTC and cut to the second, with the value as the bridge
+  sent it in its title. On a phone the dashboard's tiles are compact
+  one-line tiles, and a disabled field keeps its edge in the dark theme.
 - The README, the landing page and the build-order page name v0.0.9 as the
   latest release, and `scripts/checks/versions.sh` compares the release each
   names with the workspace version and its changelog date, so the next cut

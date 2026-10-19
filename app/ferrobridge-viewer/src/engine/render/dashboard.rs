@@ -19,6 +19,7 @@ use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::layout::main_aside;
 use ferrohealth_ui::view::status::{badge, status};
 use ferrohealth_ui::view::surface::{Stat, card, facts_row, stack, stat_card, stat_grid};
+use ferrohealth_ui::view::time::timestamp;
 use http::StatusCode;
 use leptos::prelude::*;
 use openehr_mapping_core::diagnostic::Severity;
@@ -143,7 +144,7 @@ fn facts(info: &Info, loaded: Option<&EngineState>) -> (AnyView, AnyView, AnyVie
             "Commit",
             view! { <code>{info.build.commit_short.clone()}</code> }.into_any(),
         ),
-        ("Built", info.build.built_at.clone().into_any()),
+        ("Built", timestamp(&info.build.built_at).into_any()),
         ("Compiler", info.build.rustc.clone().into_any()),
     ];
     if let Some(state) = loaded {
