@@ -23,6 +23,18 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Added
+
+- `ferrobridge-hl7v2` ships message maps for 18 HL7 v2 structures the
+  v2-to-FHIR guide has none for (#637): ADT_A15, ADT_A16, ADT_A21, ADT_A39,
+  ADT_A44, ADT_A45, ADT_A60, BAR_P02, BAR_P12, DFT_P03, DFT_P11, MDM_T01,
+  OMG_O19, OUL_R23, OUL_R24, PPR_PC1, RDE_O11 and REF_I12. Each takes the
+  rows of a guide message map (or the shipped OUL_R22 map) for the segments
+  it shares, at its own group paths, so the guide's segment maps apply, and
+  its description names the map it composes. A supplement for ADT_A06 names
+  the guide's `ADT_A01.PD1` row `ADT_A06.PD1`, so ADT_A06 messages map too.
+  The `hl7v2` corpus goes from 290 to 346 passing messages.
+
 ### Changed
 
 - The release workflow refuses a tag whose milestone, titled exactly as the

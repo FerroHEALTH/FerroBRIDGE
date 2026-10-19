@@ -1,0 +1,531 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "message-ppr-pc1-to-bundle",
+  "url": "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/message-ppr-pc1-to-bundle",
+  "name": "FerroBRIDGEPprPc1ToBundle",
+  "title": "FerroBRIDGE supplement: PPR_PC1 to Bundle",
+  "status": "active",
+  "experimental": true,
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
+  "description": "Adds a message map for the HL7 v2 PPR_PC1 structure (PC1, problem add; http://hl7.org/v2/StructureDefinition/PPR_PC1), for which hl7.fhir.uv.v2mappings 1.0.0 ships none. The rows are those of ConceptMap/message-oru-r01-to-bundle for MSH, SFT, PID, PV1 and PV2 (the visit under PATIENT_VISIT), and its result OBX rows for the OBX of PROBLEM.PROBLEM_OBSERVATION. The guide ships no segment map for PRB, PRD, CTD, VAR, PTH or GOL, so the problem itself stays counted as unmapped, and the ORC and OBR of PROBLEM.ORDER, which no map of the guide places in a problem message, stay unmapped too. FerroBRIDGE #637.",
+  "group": [
+    {
+      "element": [
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.MSH",
+          "display": "Message Header",
+          "target": [
+            {
+              "code": "Bundle",
+              "display": "Bundle",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.MSH",
+          "display": "Message Header",
+          "target": [
+            {
+              "code": "MessageHeader[1]",
+              "display": "MessageHeader[1]",
+              "equivalence": "equivalent",
+              "comment": "Processing of the MSH segment results in the creation of a new MessageHeader resource"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.MSH",
+          "display": "Message Header",
+          "target": [
+            {
+              "code": "Provenance[1]",
+              "display": "Provenance[1]",
+              "equivalence": "equivalent",
+              "comment": "If the FHIR transformation does not yield a FHIR message, but only a set of resource (APIs, repository, etc.) than one should consider attaching this Provenance resource instance to the relevant FHIR resources generated.",
+              "dependsOn": [
+                {
+                  "property": "Narrative-Condition",
+                  "value": "If there is a source in MSH-4, or known based on the configuration."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.MSH",
+          "display": "Message Header",
+          "target": [
+            {
+              "code": "Provenance[2]",
+              "display": "Provenance[2]",
+              "equivalence": "equivalent",
+              "comment": "If the FHIR transformation does not yield a FHIR Bunlde, but only a set of resource (APIs, repository, etc.) than one should consider attaching this Provenance resource instance to the relevant FHIR resources generated."
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 0
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": -1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.SFT",
+          "display": "Software Segment",
+          "target": [
+            {
+              "code": "Provenance[1].entity.what(Device)",
+              "display": "Provenance[1].entity.what(Device)",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Narrative-Condition",
+                  "value": "If the software does represent not the original source system"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 0
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": -1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.SFT",
+          "display": "Software Segment",
+          "target": [
+            {
+              "code": "Provenance[1].entity.what(Device)",
+              "display": "Provenance[1].entity.what(Device)",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Narrative-Condition",
+                  "value": "If the software represents the original source system"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.PID",
+          "display": "Patient Identification",
+          "target": [
+            {
+              "code": "Patient[1]",
+              "display": "Patient[1]",
+              "equivalence": "equivalent",
+              "comment": "Processing of the PID segment results in the creation of a new Patient resource"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.PID",
+          "display": "Patient Identification",
+          "target": [
+            {
+              "code": "Provenance[4]",
+              "display": "Provenance[4]",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Computable-ANTLR",
+                  "value": "IF PID-33 AND PID-34 VALUED"
+                },
+                {
+                  "property": "Narrative-Condition",
+                  "value": "One  may drop PID-33 from the condition if PID-34 Last Update Facility is still sufficient without a date."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.PATIENT_VISIT.PV1",
+          "display": "Patient Visit",
+          "target": [
+            {
+              "code": "Encounter[1]",
+              "display": "Encounter[1]",
+              "equivalence": "equivalent",
+              "comment": "Processing of the PV1 segment results in the creation of a new Encounter resource"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.PATIENT_VISIT.PV1",
+          "display": "Patient Visit",
+          "target": [
+            {
+              "code": "Basic",
+              "display": "Basic",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Computable-ANTLR",
+                  "value": "IF PV1-43 VALUED"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.PATIENT_VISIT.PV1",
+          "display": "Patient Visit",
+          "target": [
+            {
+              "code": "Patient[1]",
+              "display": "Patient[1]",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.PATIENT_VISIT.PV1",
+          "display": "Patient Visit",
+          "target": [
+            {
+              "code": "Coverage[1]",
+              "display": "Coverage[1]",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Computable-ANTLR",
+                  "value": "IF PV1-20 VALUE"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 0
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.PATIENT_VISIT.PV2",
+          "display": "Patient Visit - Additional Info",
+          "target": [
+            {
+              "code": "Encounter[1]",
+              "display": "Encounter[1]",
+              "equivalence": "equivalent",
+              "comment": "Incorporate PV2 content into the Encounter created from the PV1 segment."
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.PROBLEM.PROBLEM_OBSERVATION.OBX",
+          "display": "Observation related to OBR",
+          "target": [
+            {
+              "code": "Observation[2]",
+              "display": "Observation[2]",
+              "equivalence": "equivalent",
+              "comment": "Implementers should consider the use case where OBX-5 repeats in a given OBX segment. Because the Observation value element is not allowed to repeat, multiple occurrences of OBX-5 must be handled either through the creation of multiple Observation resources, the use of Observation components, the concatenation of the results into a single value or another solution appropriate for the data and the implementation.\nNote that it is not clear that every OBX represents a results that can be associated with the encounter during which it was ordered/performed.\\",
+              "dependsOn": [
+                {
+                  "property": "Computable-ANTLR",
+                  "value": "IF (OBX-5 LST.count LESS THAN OR EQUALS 1 OR OBX-2 IS \"NA\") AND OBX-29 NOT IN (\"QST\", \"SCI\")"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.PROBLEM.PROBLEM_OBSERVATION.OBX",
+          "display": "Observation related to OBR",
+          "target": [
+            {
+              "code": "Observation[2]",
+              "display": "Observation[2]",
+              "equivalence": "equivalent",
+              "comment": "Implementers should consider the use case where OBX-5 repeats in a given OBX segment. Because the Observation value element is not allowed to repeat, multiple occurrences of OBX-5 must be handled either through the creation of multiple Observation resources, the use of Observation components, the concatenation of the results into a single value or another solution appropriate for the data and the implementation. When multiple OBX segments are tranformed into Observation components in a single Observation resource, implementers should consider how the metadata associated with the result (eg performer, status, date/time, etc) are populated. If the OBX segments being combined into a single resource contain different metadata, it must be considered whether or not the use of components is appropriate.",
+              "dependsOn": [
+                {
+                  "property": "Computable-ANTLR",
+                  "value": "IF (OBX-5 LST.count GREATER THAN 1 AND OBX-2 IS NOT \"NA\") AND OBX-29 NOT IN (\"QST\", \"SCI\")"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.PROBLEM.PROBLEM_OBSERVATION.OBX",
+          "display": "Observation related to OBR",
+          "target": [
+            {
+              "code": "Observation[2]",
+              "display": "Observation[2]",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Computable-ANTLR",
+                  "value": "IF (OBX-5 LST.count LESS THAN OR EQUALS 1 OR OBX-2 IS \"NA\") AND OBX-29 IN (\"QST\", \"SCI\")"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "PPR_PC1.PROBLEM.PROBLEM_OBSERVATION.OBX",
+          "display": "Observation related to OBR",
+          "target": [
+            {
+              "code": "Observation[2]",
+              "display": "Observation[2]",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Computable-ANTLR",
+                  "value": "IF (OBX-5 LST.count GREATER THAN 1 AND OBX-2 IS NOT \"NA\") AND OBX-29 AND OBX-29 IN (\"QST\", \"SCI\")"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
