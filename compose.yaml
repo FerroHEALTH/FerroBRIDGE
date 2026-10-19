@@ -24,6 +24,16 @@
 #   FERROBRIDGE__TERMINOLOGY__BASE_URL=https://tx.example.org/r4
 #   FERROBRIDGE__CDM__URL_FILE=/run/secrets/cdm_url
 #
+# INBOUND AUTHENTICATION is on by default. A lane that serves FHIR (the facade,
+# the operator API, or the FHIRconnect operations over a mapping directory)
+# refuses to start until you name the authorization server that issues your
+# callers' tokens, or say the network is trusted:
+#
+#   FERROBRIDGE__AUTH__ISSUER=https://auth.example.org/realms/clinic
+#   FERROBRIDGE__AUTH__AUDIENCE=["https://bridge.example.org/fhir"]
+#   # or, on a network only trusted callers reach:
+#   FERROBRIDGE__AUTH__ENABLED=false
+#
 # The names are the server's own: every key of the configuration tree is
 # reachable as FERROBRIDGE__<SECTION>__<KEY>, and every secret is read from the
 # file its `_file` sibling names rather than from the environment.
@@ -98,9 +108,14 @@ services:
       FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE:
       FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__AUDIENCE:
       FERROBRIDGE__CDM__URL_FILE:
+      # Inbound authentication (the [auth] section), passed through when set.
+      FERROBRIDGE__AUTH__ENABLED:
+      FERROBRIDGE__AUTH__ISSUER:
+      FERROBRIDGE__AUTH__AUDIENCE:
       # The operator API (it needs [auth]) saves console mapping files under
       # this path, the writable volume below; it saves nothing while it is off.
       FERROBRIDGE__OPERATOR__ENABLED:
+      FERROBRIDGE__OPERATOR__SCOPE:
       FERROBRIDGE__OPERATOR__MAPPING_DIR: /var/lib/ferrobridge/mappings
       # `auto` renders pretty output on a terminal and JSON otherwise.
       FERROBRIDGE__TELEMETRY__FORMAT: ${FERROBRIDGE_LOG_FORMAT:-auto}
@@ -256,7 +271,8 @@ services:
   # leave it unset so the session cookie carries Secure.
   #
   # The bridge refuses the console's calls unless it validates the operator's
-  # token: turn on its [auth] section, and [operator] for the mapping files.
+  # token: name the issuer in its [auth] section, and turn on [operator] for
+  # the mapping files.
   # The image's own HEALTHCHECK runs the binary's `healthcheck` subcommand.
   viewer:
     image: ghcr.io/ferrohealth/ferrobridge-viewer:${FERROBRIDGE_VERSION:-0.0.9}

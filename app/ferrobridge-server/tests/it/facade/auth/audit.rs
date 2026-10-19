@@ -38,16 +38,18 @@ fn logged<F: Future<Output = ()>>(case: F) -> String {
 fn audit_lines(text: &str) -> Vec<serde_json::Value> {
     text.lines()
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-        .filter(|line| line["target"].as_str() == Some("ferrobridge::audit"))
+        .filter(|line| line["target"].as_str() == Some(ferrohealth_smart::audit::AUDIT_TARGET))
         .collect()
 }
 
 #[test]
 fn an_admitted_request_leaves_one_audit_line_without_the_token() {
     let mut token = String::new();
+    let mut issuer_uri = String::new();
     let text = logged(async {
         let key = ec_key("k1", Algorithm::ES256);
         let issuer = Issuer::start(&[&key]).await;
+        issuer_uri = issuer.uri();
         let harness = harness().await;
         let app = secured(&harness, &authority(issuer.settings()).await);
         token = mint(&key, &issuer.claims("system/Condition.r"));
@@ -62,14 +64,21 @@ fn an_admitted_request_leaves_one_audit_line_without_the_token() {
     let fields = line;
     assert_eq!(
         Some("synthetic-client-sub"),
-        fields["subject"].as_str(),
+        fields["principal"].as_str(),
         "{line}"
     );
     assert_eq!(Some("synthetic-client"), fields["client"].as_str());
+    assert_eq!(Some("bearer"), fields["via"].as_str());
+    assert_eq!(Some(issuer_uri.as_str()), fields["issuer"].as_str());
     assert_eq!(Some("GET"), fields["method"].as_str());
     assert_eq!(Some("read"), fields["interaction"].as_str());
-    assert_eq!(Some("Condition"), fields["resource_type"].as_str());
-    assert_eq!(Some("c-audit-1"), fields["resource_id"].as_str());
+    assert_eq!(Some("/fhir/{resource_type}/{id}"), fields["route"].as_str());
+    // NOTE: no specification governs this: our own design; the line's `target`
+    // field shares its key with the JSON envelope's, so it is read from the text.
+    assert!(
+        text.contains("\"target\":\"Condition/c-audit-1\""),
+        "{text}"
+    );
     assert_eq!(Some(404), fields["status"].as_u64());
     assert!(fields["duration_ms"].is_number(), "{line}");
     assert!(fields["at"].is_string(), "{line}");
@@ -95,7 +104,7 @@ fn a_refused_token_is_audited_as_unauthenticated_without_the_token() {
     let lines = audit_lines(&text);
     assert_eq!(1, lines.len(), "{text}");
     let fields = &lines[0];
-    assert_eq!(Some("unauthenticated"), fields["subject"].as_str());
+    assert_eq!(Some("unauthenticated"), fields["principal"].as_str());
     assert_eq!(Some(401), fields["status"].as_u64());
     assert!(!text.contains(token), "the token never reaches the log");
 }
@@ -111,7 +120,8 @@ fn an_open_facade_audits_its_requests_with_no_subject() {
     });
     let lines = audit_lines(&text);
     assert_eq!(1, lines.len(), "{text}");
-    assert_eq!(Some("-"), lines[0]["subject"].as_str());
+    assert_eq!(Some("-"), lines[0]["principal"].as_str());
+    assert_eq!(Some("open"), lines[0]["via"].as_str());
 }
 
 #[test]
@@ -158,7 +168,10 @@ fn a_batch_audits_each_entry_and_the_batch_without_any_content() {
         .find(|line| line["entry"].as_u64() == Some(0))
         .expect("the first entry's line");
     assert_eq!(Some("read"), read["interaction"].as_str());
-    assert_eq!(Some("c-audit-4"), read["resource_id"].as_str());
+    assert!(
+        text.contains("\"target\":\"Condition/c-audit-4\""),
+        "{text}"
+    );
     assert_eq!(Some(404), read["status"].as_u64());
     let create = lines
         .iter()
@@ -173,18 +186,20 @@ fn a_batch_audits_each_entry_and_the_batch_without_any_content() {
 }
 
 /// The fields every audit line carries beside the log envelope (`timestamp`,
-/// `level`, `target` and `message`), in sorted order.
-const REQUEST_FIELDS: [&str; 10] = [
+/// `level`, `target` and `message`), in sorted order; its own `target` field
+/// shares the envelope's key and is asserted from the text.
+const REQUEST_FIELDS: [&str; 11] = [
     "at",
     "client",
     "duration_ms",
     "interaction",
+    "issuer",
     "method",
+    "principal",
     "request_id",
-    "resource_id",
-    "resource_type",
+    "route",
     "status",
-    "subject",
+    "via",
 ];
 
 /// Returns the keys of `line` outside the log envelope, sorted.

@@ -28,6 +28,8 @@
 
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
+use ferrohealth_smart::resource::Access;
+use ferrohealth_smart::scope::Permission;
 use fhirconnect::resolve::program::binding::TemplateId;
 use http::HeaderMap;
 use http::StatusCode;
@@ -37,10 +39,8 @@ use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_rm::v1_2::composition::composition::Composition;
 
-use crate::auth::Access;
-use crate::auth::compartment;
-use crate::auth::scope::Permission;
 use crate::facade::Facade;
+use crate::facade::compartment;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::Refusal;
 use crate::facade::handlers::conditional;
