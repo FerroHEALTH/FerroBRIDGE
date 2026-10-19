@@ -30,6 +30,9 @@ use crate::model::ast::keyword::DataType;
 /// against `Period` is the engine's `DV_INTERVAL<DV_DATE_TIME>` cell.
 /// `DV_BOOLEAN` against `boolean` is a primitive pair the chapter leaves out
 /// as "straight forward" (`data-mappings.adoc`).
+/// `PARTY_REF` against `Reference` is no row of the chapter: it carries
+/// `ROLE.performer` in a party context, and no specification governs it, so
+/// it is our own design.
 pub const PAIRS: &[(&str, &[&str])] = &[
     ("DV_TEXT", &["string", "Coding", "CodeableConcept"]),
     ("DV_CODED_TEXT", &["CodeableConcept", "Coding"]),
@@ -42,6 +45,7 @@ pub const PAIRS: &[(&str, &[&str])] = &[
     ("DV_IDENTIFIER", &["Identifier"]),
     ("DV_PROPORTION", &["Quantity"]),
     ("DV_BOOLEAN", &["boolean"]),
+    ("PARTY_REF", &["Reference"]),
 ];
 
 /// The FHIR type code every primitive that travels as a JSON string falls

@@ -32,6 +32,10 @@ use crate::engine::traverse::Written;
 use crate::engine::traverse::demographic::Shape;
 use crate::engine::traverse::error::EngineError;
 
+/// The class of a tail the [`crate::engine::lens::party_ref::PartyRefLens`]
+/// carries through the demographics endpoint.
+pub(super) const PARTY_REF: &str = "PARTY_REF";
+
 impl<T: Table + ?Sized> Run<'_, T> {
     /// Writes one FHIR element into the attribute a tail names below a node.
     ///
@@ -91,7 +95,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let mut object = self
             .held_object(&binding.openehr, node.flat_id())
             .map_err(refuse_rm)?;
-        let written = if carried == Carried::Value {
+        let written = if carried == Carried::Value && openehr.leaf_class() == Some(PARTY_REF) {
+            self.party_ref_of(mapping, target, view)?
+                .to_canonical()
+                .map_err(refuse_rm)?
+        } else if carried == Carried::Value {
             let leaf = openehr
                 .leaf_class()
                 .ok_or_else(|| unsupported_tail(mapping, openehr))?;

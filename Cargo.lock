@@ -1664,7 +1664,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "ferrobridge-testkit",
  "fhir-types",
@@ -3442,7 +3442,7 @@ dependencies = [
 
 [[package]]
 name = "openehr-mapping-core"
-version = "0.1.117"
+version = "0.1.118"
 dependencies = [
  "ferrobridge-testkit",
  "insta",

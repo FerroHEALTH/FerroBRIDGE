@@ -1318,8 +1318,22 @@ mapping rooted at a party: a context binds a composition template, and
   latest version, with no search because the API has none. A party context
   with the gate off is a boot refusal, and one resource type is served by one
   party context. The id of each is the party's `versioned_object_uid`
-  (section 9). A `ROLE`'s mandatory `performer` is no template node, so a
-  `PractitionerRole` is not created or updated until #911 maps it.
+  (section 9).
+- **`ROLE.performer`.** A `ROLE`'s mandatory `performer` is a `PARTY_REF` to
+  "the Version container of Actor playing the role" (RM Demographic IM, the
+  `ROLE` class), and no template node holds it (#911). A party context maps
+  it as `$archetype/performer`; the compiler admits that one tail on the
+  party root (`rm::PARTY_ROOTS`) and the party build places the value on the
+  root. `PractitionerRole.practitioner` carries it through the
+  `PARTY_REF`-against-`Reference` cell: the reference resolves through the
+  demographics endpoint, must be a party of this facade of the one resource
+  type the element's `targetProfile` names (from the `fhir-types` element
+  table), and carries nothing beside `reference`. It becomes `PARTY_REF`
+  `{namespace "demographic", type "ACTOR", id HIER_OBJECT_ID <uid>}`, and
+  reads back as `<type>/<uid>`. Anything else is refused with a typed error,
+  and a `ROLE` with no `performer`, built or served, is refused
+  (`PartyError::RoleWithoutPerformer`). An element whose reference admits no
+  single type is refused at load (`fc-party-ref-target`).
 - **The draft archetypes.** Every `openEHR-DEMOGRAPHIC-*` archetype in the
   international CKM is a v0 draft
   (<https://ckm.openehr.org/ckm/archetypes/1013.1.479>). The tests run against

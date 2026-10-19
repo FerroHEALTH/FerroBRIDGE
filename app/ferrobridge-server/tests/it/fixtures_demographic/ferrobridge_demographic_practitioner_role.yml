@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BUSL-1.1
 # The model mapping the demographic suite runs: a PractitionerRole onto the synthetic
 # ROLE template ferrobridge.role.v1 of the testkit, the code text onto the identity name and
-# the identifier onto the details identifier.
+# the identifier onto the details identifier, and the practitioner onto ROLE.performer.
 grammar: FHIRConnect/v1.0.0
 type: model
 metadata:
@@ -25,3 +25,7 @@ mappings:
     with:
       fhir: "$resource.identifier"
       openehr: "$archetype/details[at0001]/items[at0002]"
+  - name: "practitioner"
+    with:
+      fhir: "$resource.practitioner"
+      openehr: "$archetype/performer"

@@ -16,6 +16,7 @@
 //! attributes of a class.
 
 use openehr_base::containers::NonEmptyVec;
+use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
 use openehr_its::json::JsonParseError;
 use openehr_its::json::from_canonical_value;
 use openehr_its::json::to_canonical_value;
@@ -66,6 +67,8 @@ pub enum RmValue {
     Proportion(Box<DvProportion>),
     /// A `DV_BOOLEAN`.
     Boolean(DvBoolean),
+    /// A `PARTY_REF`, the party a `ROLE` names as its `performer`.
+    PartyRef(PartyRef),
 }
 
 /// Why a reference-model value could not be read or written.
@@ -125,6 +128,7 @@ impl RmValue {
             Self::Identifier(_) => "DV_IDENTIFIER",
             Self::Proportion(_) => "DV_PROPORTION",
             Self::Boolean(_) => "DV_BOOLEAN",
+            Self::PartyRef(_) => "PARTY_REF",
         }
     }
 
@@ -177,6 +181,9 @@ impl RmValue {
             "DV_PROPORTION" => from_canonical_value(value)
                 .map(|proportion| Self::Proportion(Box::new(proportion)))
                 .map_err(refuse),
+            "PARTY_REF" => from_canonical_value(value)
+                .map(Self::PartyRef)
+                .map_err(refuse),
             other => Err(RmError::UnknownClass {
                 rm_type: String::from(other),
             }),
@@ -201,6 +208,7 @@ impl RmValue {
             Self::DateTimeInterval(ref interval) => to_canonical_value(interval.as_ref()),
             Self::Party(ref party) => to_canonical_value(party),
             Self::Identifier(ref identifier) => to_canonical_value(identifier),
+            Self::PartyRef(ref party) => to_canonical_value(party),
             Self::Proportion(ref proportion) => {
                 for number in [proportion.numerator, proportion.denominator] {
                     if !number.is_finite() {
@@ -250,7 +258,8 @@ pub enum Carried {
 /// `DV_CODED_TEXT` and a `PARTY_PROXY` node a `PARTY_IDENTIFIED`
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_types.html#_dv_coded_text_class>).
 /// The class is the most general concrete one that declares the tail's first
-/// attribute. A tail below a structural node other than a [`FAMILIES`] entry,
+/// attribute. A tail below a structural node other than a [`FAMILIES`] or
+/// [`PARTY_ROOTS`] entry,
 /// and a tail that steps through or ends on a container attribute, is `None`:
 /// the engine walks a tail by attribute name and writes one value into the
 /// node. No specification governs the walk: our own design.
@@ -262,6 +271,12 @@ pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> 
         .find(|&&(owner, path)| path == wanted && model::is_a(rm_type, owner))
     {
         return Some((owner, Carried::Family));
+    }
+    if let Some(&(owner, _)) = PARTY_ROOTS
+        .iter()
+        .find(|&&(owner, path)| path == wanted && rm_type == owner)
+    {
+        return Some((owner, Carried::Value));
     }
     if derive::is_structural(rm_type) {
         return None;
@@ -346,6 +361,15 @@ pub const FAMILIES: &[(&str, &str)] = &[
     ("ENTRY", "provider"),
     ("EVENT_CONTEXT", "health_care_facility"),
 ];
+
+/// The attributes of a party root a party context maps although no template
+/// node holds them, which the party build places on the root.
+///
+/// `ROLE.performer` is a mandatory `PARTY_REF` to "the Version container of
+/// Actor playing the role" (RM Demographic IM, the `ROLE` class), and an
+/// operational template constrains no node for it. No specification governs
+/// a party context: our own design.
+pub const PARTY_ROOTS: &[(&str, &str)] = &[("ROLE", "performer")];
 
 /// Returns the FLAT family a tail of [`Carried::Family`] is written under.
 #[must_use]

@@ -43,6 +43,10 @@ the language crate applies its own grammar to them.
   Web Template compacted away, the `openehr_rm::v1_2::model` table says which
   attribute is a list, and the result decodes strictly as the root's class.
   It moves to `openehr-sdt` when that crate carries a party builder (#906).
+  A value at the root node places its members on the root (`ROLE.performer`),
+  each an attribute of the root's class, and a `ROLE` with no `performer`,
+  built or accepted, is `PartyError::RoleWithoutPerformer` (RM Demographic
+  IM, the `ROLE` class).
 
 The Web Template index, relative path derivation, and composition build and
 read (the other half of this crate's role in `docs/architecture.md` §7) are

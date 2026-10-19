@@ -605,3 +605,82 @@ async fn a_type_no_party_context_serves_has_no_delete_or_history() -> Result<(),
     );
     Ok(())
 }
+
+/// A synthetic `PractitionerRole` whose practitioner is `reference`.
+fn practitioner_role(reference: &str) -> serde_json::Value {
+    serde_json::json!({
+        "resourceType": "PractitionerRole",
+        "code": [{"text": "Synthetic Role"}],
+        "practitioner": {"reference": reference}
+    })
+}
+
+/// RM Demographic IM, the `ROLE` class: `performer` names the actor playing
+/// the role, here the `Practitioner` the facade serves under `UID`.
+#[tokio::test]
+async fn a_practitioner_role_creates_a_role_performed_by_its_practitioner()
+-> Result<(), Box<dyn StdError>> {
+    let (cdr, facade) = harness().await?;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path("/demographic/role"))
+        .respond_with(
+            ResponseTemplate::new(204).insert_header("ETag", format!("\"{}\"", version(1))),
+        )
+        .mount(&cdr)
+        .await;
+    let (status, body) = call(
+        app_over(&facade),
+        with_body(
+            http::Method::POST,
+            "/fhir/PractitionerRole",
+            &practitioner_role(&format!("Practitioner/{UID}")),
+        )?,
+    )
+    .await?;
+    assert_eq!(StatusCode::CREATED, status, "{body}");
+    assert_eq!(
+        body["practitioner"]["reference"],
+        format!("Practitioner/{UID}")
+    );
+    let requests = cdr.received_requests().await.unwrap_or_default();
+    let sent = requests
+        .iter()
+        .find(|request| request.method.as_str() == "POST")
+        .ok_or("the CDR received the role")?;
+    let sent: serde_json::Value = serde_json::from_slice(&sent.body)?;
+    assert_eq!(sent["_type"], "ROLE");
+    assert_eq!(
+        sent["performer"],
+        serde_json::json!({
+            "_type": "PARTY_REF",
+            "namespace": "demographic",
+            "type": "ACTOR",
+            "id": {"_type": "HIER_OBJECT_ID", "value": UID}
+        })
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_practitioner_of_another_server_is_a_422_and_reaches_no_cdr()
+-> Result<(), Box<dyn StdError>> {
+    let (cdr, facade) = harness().await?;
+    let (status, body) = call(
+        app_over(&facade),
+        with_body(
+            http::Method::POST,
+            "/fhir/PractitionerRole",
+            &practitioner_role(&format!("https://other.example/r4/Practitioner/{UID}")),
+        )?,
+    )
+    .await?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+    let requests = cdr.received_requests().await.unwrap_or_default();
+    assert!(
+        !requests
+            .iter()
+            .any(|request| request.method.as_str() == "POST"),
+        "the refused role reached the CDR"
+    );
+    Ok(())
+}

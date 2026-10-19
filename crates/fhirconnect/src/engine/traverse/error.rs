@@ -305,6 +305,27 @@ pub enum EngineError {
         #[source]
         source: Box<DemographicsError>,
     },
+    /// A reference onto a `PARTY_REF` names a party of another server, which
+    /// the demographic store of the CDR does not hold.
+    #[error(
+        "{mapping} names {reference}, which is no party of this server, so no PARTY_REF of the \
+         CDR's demographic store carries it"
+    )]
+    ForeignParty {
+        /// The mapping being run.
+        mapping: String,
+        /// The reference as the document carried it.
+        reference: String,
+    },
+    /// A mapping onto a `PARTY_REF` names a FHIR element whose reference
+    /// admits no single resource type.
+    #[error("{mapping} maps {element} onto a PARTY_REF, and its reference admits no single type")]
+    PartyRefTarget {
+        /// The mapping being run.
+        mapping: String,
+        /// The FHIR element.
+        element: String,
+    },
     /// A code could not be translated through the concept map its mapping
     /// names.
     #[error("{mapping} could not translate its code through {conceptmap}")]

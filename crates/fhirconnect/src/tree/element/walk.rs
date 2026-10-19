@@ -126,6 +126,7 @@ impl<T: Table + ?Sized> Walk<'_, T> {
             min: field.min,
             max: field.max,
             types,
+            target_profiles: field.target_profiles,
         };
         self.owner = String::from(field.path);
         if let Kind::Choice(_) = kind {
@@ -154,6 +155,7 @@ impl<T: Table + ?Sized> Walk<'_, T> {
             min: field.min,
             max: field.max,
             types: field.types,
+            target_profiles: field.target_profiles,
         }));
         Ok(())
     }
@@ -243,6 +245,7 @@ impl<T: Table + ?Sized> Walk<'_, T> {
             min: field.min,
             max: field.max,
             types,
+            target_profiles: field.target_profiles,
         };
         self.location = self.landing(kind)?;
         let last = self.moves.len().saturating_sub(1);
@@ -361,6 +364,7 @@ impl<T: Table + ?Sized> Walk<'_, T> {
                 min: field.min,
                 max: field.max,
                 types: field.types,
+                target_profiles: field.target_profiles,
             },
             url: String::from(url),
         });

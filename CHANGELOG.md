@@ -40,8 +40,25 @@ crates on crates.io.
   tree id, with no identity-map entry; a Demographic API `400` answers `500`,
   and `404`, `409`, `412` and `422` answer as themselves. The
   `CapabilityStatement` declares the six interactions and no search per party
-  type. A `PractitionerRole` is not created or updated yet (#911). No
-  specification governs a party context: our own design.
+  type. No specification governs a party context: our own design.
+- A party context maps `ROLE.performer`, the mandatory `PARTY_REF` no template
+  node holds (RM Demographic IM, the `ROLE` class), as `$archetype/performer`,
+  so the facade creates and updates a `PractitionerRole` (#911).
+  `PractitionerRole.practitioner` must name a `Practitioner` the facade
+  serves, relative or under its base, with nothing beside `reference`. It
+  becomes `PARTY_REF {namespace "demographic", type "ACTOR", id HIER_OBJECT_ID
+  <uid>}` and reads back as `Practitioner/<uid>`, the type taken from the
+  element's `targetProfile`. A reference of another server
+  (`EngineError::ForeignParty`), of another type, carrying a display, or local
+  to the request answers `422`, and a `ROLE` with no `performer`, built or
+  served, is refused (`PartyError::RoleWithoutPerformer`). An element whose
+  reference admits no single type is refused at load
+  (`fc-party-ref-target`). `fhirconnect` 0.1.151 adds `RmValue::PartyRef`,
+  the `PARTY_REF`-against-`Reference` pair, `EngineError::ForeignParty` and
+  `EngineError::PartyRefTarget`, which breaks an exhaustive match over
+  either enum; `openehr-mapping-core` 0.1.118 adds
+  `PartyError::RoleWithoutPerformer` the same way. No specification governs
+  this correspondence: our own design.
 
 - The facade's search chains through the patient identifier (#492):
   `Observation?patient.identifier=MRN-1`, `subject.identifier` and
