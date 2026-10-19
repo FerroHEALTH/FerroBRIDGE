@@ -25,6 +25,14 @@ crates on crates.io.
 
 ### Added
 
+- A `Patient` created in a party context gets its EHR under the subject link
+  when `[facade] ehr_policy` is `create_on_first_write` (#932): the facade
+  finds the EHR keyed by the new party's id, or creates it with that id in
+  `EHR_STATUS.subject`, so the clinical resources that name the `Patient` find
+  it. Under `existing` the create sends no EHR call. A failed EHR call after
+  the party committed answers the EHR refusal with a warning naming the stored
+  `Patient`. No specification governs this: our own design.
+
 - The FHIR facade serves `Patient`, `Practitioner`, `PractitionerRole` and
   `Organization` from party contexts over the ITS-REST 1.1.0 Demographic API,
   DEVELOPMENT, behind `[cdr] demographic` (#470). Read, vread,

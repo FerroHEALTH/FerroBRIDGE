@@ -39,13 +39,13 @@ use super::settings;
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures_demographic");
 
 /// The object id of the synthetic party every case reads or writes.
-const UID: &str = "a1b2c3d4-0000-4000-8000-000000000001";
+pub(super) const UID: &str = "a1b2c3d4-0000-4000-8000-000000000001";
 
 /// The creating system of every version.
 const SYSTEM: &str = "synthetic.example";
 
 /// Returns the `OBJECT_VERSION_ID` of version `tree` of the party.
-fn version(tree: u32) -> String {
+pub(super) fn version(tree: u32) -> String {
     format!("{UID}::{SYSTEM}::{tree}")
 }
 
@@ -94,7 +94,7 @@ fn person(tree: u32) -> serde_json::Value {
 }
 
 /// Returns a synthetic `Patient` with a name.
-fn patient() -> serde_json::Value {
+pub(super) fn patient() -> serde_json::Value {
     serde_json::json!({
         "resourceType": "Patient",
         "name": [{"text": "Synthetic Person"}]
@@ -104,6 +104,14 @@ fn patient() -> serde_json::Value {
 /// Returns the stub CDR and a facade over the demographic fixture set, with
 /// `[cdr] demographic` on.
 async fn harness() -> Result<(MockServer, Arc<Facade>), Box<dyn StdError>> {
+    harness_with(settings()).await
+}
+
+/// Returns the stub CDR and a facade over the demographic fixture set that
+/// runs with `facade_settings`, with `[cdr] demographic` on.
+pub(super) async fn harness_with(
+    facade_settings: ferrobridge_server::facade::Settings,
+) -> Result<(MockServer, Arc<Facade>), Box<dyn StdError>> {
     let cdr = MockServer::start().await;
     for (id, opt) in [
         (
@@ -135,7 +143,7 @@ async fn harness() -> Result<(MockServer, Arc<Facade>), Box<dyn StdError>> {
     let compiled = programs::compile_set(&set, &templates)?;
     programs::check_parties(&compiled, true)?;
     let store = Arc::new(MemoryStore::new());
-    let facade = Facade::new(compiled, handle(&store), client, settings());
+    let facade = Facade::new(compiled, handle(&store), client, facade_settings);
     Ok((cdr, Arc::new(facade)))
 }
 
@@ -171,7 +179,7 @@ fn refusal(status: u16, etag: Option<&str>) -> ResponseTemplate {
 }
 
 /// Sends a request with a FHIR JSON body.
-fn with_body(
+pub(super) fn with_body(
     method: http::Method,
     uri: &str,
     body: &serde_json::Value,

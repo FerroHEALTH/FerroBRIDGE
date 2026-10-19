@@ -17,6 +17,7 @@ mod credentials;
 mod demographic;
 mod examples;
 mod party;
+mod patient_ehr;
 mod person;
 mod read;
 mod reconcile;
