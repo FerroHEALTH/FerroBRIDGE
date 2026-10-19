@@ -322,7 +322,7 @@ async fn resolve(
     for subjects in &criteria.subjects {
         let mut ehrs: Vec<EhrId> = Vec::new();
         for subject in subjects {
-            let found = match *subject {
+            let found: Vec<EhrId> = match *subject {
                 Subject::Literal(ref reference) => {
                     // NOTE: no specification governs this: our own design, a reference no
                     // person key can hold names no subject the map binds, so it matches none.
@@ -333,11 +333,13 @@ async fn resolve(
                         .store()
                         .ehr_of(&person)
                         .map_err(|error| write::store_refusal(&error))?
+                        .into_iter()
+                        .collect()
                 }
                 Subject::Identifier {
                     ref parameter,
                     ref token,
-                } => identifier::ehr_of(facade, client, parameter, token).await?,
+                } => identifier::ehrs_of(facade, client, parameter, token).await?,
                 Subject::ReferenceIdentifier {
                     ref system,
                     ref value,
@@ -355,13 +357,15 @@ async fn resolve(
                         .store()
                         .ehr_of(&person)
                         .map_err(|error| write::store_refusal(&error))?
+                        .into_iter()
+                        .collect()
                 }
-                Subject::Never => None,
+                Subject::Never => Vec::new(),
             };
-            if let Some(ehr) = found
-                && !ehrs.contains(&ehr)
-            {
-                ehrs.push(ehr);
+            for ehr in found {
+                if !ehrs.contains(&ehr) {
+                    ehrs.push(ehr);
+                }
             }
         }
         resolved.ehrs.push(ehrs);

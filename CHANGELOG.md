@@ -93,11 +93,10 @@ crates on crates.io.
   `Observation?patient.identifier=MRN-1`, `subject.identifier` and
   `subject:Patient.identifier`, on every type a search declaration answers.
   With `[facade.identifier_search] enabled`, a configured demographic AQL
-  query in Cadasto's experimental extension resolves the identifier to one
-  party, the party's uid names the patient, and the EHR comes from the
+  query in Cadasto's experimental extension resolves the identifier to its
+  parties, each party's uid names a patient, and the EHR comes from the
   identity map or `GET /ehr?subject_id=`. An unknown identifier answers an
-  empty searchset with no clinical query, two parties answer `400
-  multiple-matches` asking for a system, and `_count=0` answers the total
+  empty searchset with no clinical query, and `_count=0` answers the total
   alone. A value naming a system needs `system_query`. The
   `CapabilityStatement` documents the chain on each subject parameter while
   it is on. No specification governs the resolution: our own design.
@@ -155,6 +154,10 @@ crates on crates.io.
   looks the same: 0.1.5 adds a per-row form field and a header title it
   does not use yet, and its browser half no longer asks for a wasm-bindgen
   of its own.
+- The operator console draws with `ferrohealth-ui` 0.1.6 (#948), the
+  FerroUI release every FerroHEALTH console moves to together. The console
+  looks the same: 0.1.6 adds the shared field shapes the other consoles
+  needed, and the console's fields already draw through the library.
 - The README, the landing page and the build-order page name v0.0.9 as the
   latest release, and `scripts/checks/versions.sh` compares the release each
   names with the workspace version and its changelog date, so the next cut
@@ -166,6 +169,15 @@ crates on crates.io.
   pull request's head, so the failed jobs of a run a later push superseded or
   cancelled no longer stop it as red (#955). `--self-test` checks the
   verdict against fixture checks, and the CI `tracker-helpers` job runs it.
+- A chained `patient.identifier`, `subject.identifier` or
+  `subject:Patient.identifier` value that more than one patient carries now
+  matches the clinical resources of every one of them (#944). The facade
+  answered `400 multiple-matches` instead, which was non-conformant: FHIR R4
+  search §3.1.1.4.10 matches a bare value "irrespective of the value of the
+  system property", §3.1.1.4.15 answers every matching target, and R4's one
+  refusal there is for a chain whose matches span resource types. The default
+  `[facade.identifier_search] query` drops its `LIMIT 2`; a configured query
+  with a `LIMIT` should drop it too.
 - A FHIRconnect run into openEHR declares every `INSTRUCTION.narrative` it
   leaves to the FLAT builder (#919). The narrative is a mandatory `DV_TEXT`
   (RM EHR IM §INSTRUCTION), and the builder fills one no mapping writes with
