@@ -24,12 +24,12 @@ use super::section::Auth;
 use super::section::Cdm;
 use super::section::Cdr;
 use super::section::Etl;
-use super::section::Facade;
 use super::section::Hl7v2;
 use super::section::Hl7v2Sender;
 use super::section::Mappings;
 use super::section::Operator;
 use super::section::Terminology;
+use super::section::facade::Facade;
 
 /// Returns the mapping-set paths `mappings` names, when it names both.
 ///
@@ -92,6 +92,7 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
         search: search_limits(facade)?,
         references: reference_policy(facade)?,
         identifier: identifier_search(facade)?,
+        party_search: party_search(facade)?,
     })
 }
 
@@ -123,6 +124,42 @@ fn identifier_search(
     )
     .map(Some)
     .map_err(refused("facade.identifier_search.system_query"))
+}
+
+/// Returns the party searches `facade` configures, `None` when they are off.
+fn party_search(
+    facade: &Facade,
+) -> Result<Option<crate::facade::search::party::PartySearch>, Error> {
+    let section = &facade.party_search;
+    if !section.enabled {
+        return Ok(None);
+    }
+    if section.types.is_empty() {
+        return Err(Error::Missing {
+            key: String::from("facade.party_search.types"),
+        });
+    }
+    let mut types = BTreeMap::new();
+    for (resource_type, queries) in &section.types {
+        let key = |field: &str| format!("facade.party_search.types.{resource_type}.{field}");
+        if queries.query.is_empty() {
+            return Err(Error::Missing { key: key("query") });
+        }
+        let system = (!queries.system_query.is_empty()).then_some(queries.system_query.as_str());
+        let field = if system.is_some() {
+            "system_query"
+        } else {
+            "query"
+        };
+        let search =
+            crate::facade::search::identifier::IdentifierSearch::new(&queries.query, system)
+                .map_err(|source| Error::IdentifierQuery {
+                    key: key(field),
+                    source,
+                })?;
+        types.insert(resource_type.clone(), search);
+    }
+    Ok(Some(crate::facade::search::party::PartySearch::new(types)))
 }
 
 /// Returns the subject link `facade` configures.

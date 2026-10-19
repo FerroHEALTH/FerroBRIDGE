@@ -41,6 +41,7 @@ use crate::facade::programs::Programs;
 use crate::facade::search::Catalog;
 use crate::facade::search::declaration;
 use crate::facade::search::declaration::ParameterType;
+use crate::facade::search::party::PartySearch;
 use crate::state;
 
 /// The FHIR release this facade speaks.
@@ -229,6 +230,7 @@ pub fn statement_with(
             security: None,
         },
         Chains::None,
+        None,
     )
 }
 
@@ -247,6 +249,7 @@ pub fn statement_of(
     base: &str,
     shape: &Shape,
     chains: Chains,
+    parties: Option<&PartySearch>,
 ) -> CapabilityStatement {
     let (operations, hl7v2) = (shape.operations, shape.hl7v2);
     let description = match hl7v2 {
@@ -279,7 +282,7 @@ pub fn statement_of(
         ),
         rest: vec![CapabilityStatementRest {
             mode: "server".into(),
-            resource: resources(programs, search, chains),
+            resource: resources(programs, search, chains, parties),
             // NOTE: `transaction` and `batch` are the system-level interactions of
             // `http://hl7.org/fhir/ValueSet/system-restful-interaction` this route answers.
             interaction: ["transaction", "batch"]
@@ -406,6 +409,7 @@ fn resources(
     programs: &Programs,
     search: &Catalog,
     chains: Chains,
+    parties: Option<&PartySearch>,
 ) -> Vec<CapabilityStatementRestResource> {
     let mut entries: std::collections::BTreeMap<String, CapabilityStatementRestResource> = programs
         .resource_types()
@@ -421,7 +425,7 @@ fn resources(
     }
     for loaded in programs.parties() {
         let name = String::from(loaded.program().resource().as_str());
-        let entry = party_resource(&name);
+        let entry = party_resource(&name, parties);
         entries.insert(name, entry);
     }
     entries.into_values().collect()
@@ -442,17 +446,46 @@ const PARTY_INTERACTIONS: [&str; 6] = [
 ];
 
 /// Returns the `rest.resource` entry of a type a party program serves.
-fn party_resource(name: &str) -> CapabilityStatementRestResource {
+///
+/// A type `parties` searches also takes `search-type` with the one
+/// `identifier` parameter, carrying the standard R4 parameter's canonical,
+/// and its documentation names the extension the search runs through.
+fn party_resource(name: &str, parties: Option<&PartySearch>) -> CapabilityStatementRestResource {
+    let searched = parties.and_then(|search| search.of_type(name)).is_some();
+    let (documentation, search_param) = if searched {
+        (
+            crate::facade::party::SEARCHED_DOCUMENTATION,
+            vec![CapabilityStatementRestResourceSearchParam {
+                name: crate::facade::search::party::PARAMETER.into(),
+                definition: declaration::standard(name, crate::facade::search::party::PARAMETER)
+                    .map(|standard| standard.url.into()),
+                r#type: ParameterType::Token.as_str().into(),
+                documentation: Some(
+                    format!(
+                        "Resolved through the {}",
+                        crate::facade::search::identifier::EXTENSION
+                    )
+                    .into(),
+                ),
+                ..CapabilityStatementRestResourceSearchParam::default()
+            }],
+        )
+    } else {
+        (crate::facade::party::DOCUMENTATION, Vec::new())
+    };
     CapabilityStatementRestResource {
         r#type: name.into(),
-        documentation: Some(crate::facade::party::DOCUMENTATION.into()),
+        documentation: Some(documentation.into()),
         interaction: PARTY_INTERACTIONS
             .iter()
+            .copied()
+            .chain(searched.then_some(SEARCH_INTERACTION))
             .map(|code| CapabilityStatementRestResourceInteraction {
-                code: (*code).into(),
+                code: code.into(),
                 ..CapabilityStatementRestResourceInteraction::default()
             })
             .collect(),
+        search_param,
         versioning: Some(VERSIONING.into()),
         read_history: Some(true.into()),
         update_create: Some(false.into()),

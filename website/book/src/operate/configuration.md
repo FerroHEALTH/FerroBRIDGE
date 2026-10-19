@@ -529,6 +529,47 @@ A query that does not bind the parameters it is handed is a boot error naming
 the key. A CDR that refuses the query answers a `500` whose diagnostics name
 the extension.
 
+### `[facade.party_search]`
+
+The search on the types a party context serves: `Patient`, `Practitioner`,
+`PractitionerRole` and `Organization`, by `identifier`
+(`Patient?identifier=MRN-1`). The ITS-REST Demographic API has no search, so
+the facade runs an AQL query rooted at a demographic class, the Cadasto
+experimental AQL demographic extension, and reads each party it names over
+the Demographic API. The reference CDR refuses demographic sources today.
+
+Each type has its own query and none has a default, because the archetypes a
+tenant stores and the dialect both move. A query's first column is the
+party's `uid/value`, and a versioned uid counts as its party. Leave `LIMIT`
+and `OFFSET` out: the facade pages the query with the query API's `offset`
+and `fetch`. Keep to the forms the extension documents or Cadasto observed as
+stable: a demographic root, `WHERE` over the parameters, `ORDER BY` and the
+`person_identifier` `CLUSTER`. A search takes `identifier`, `_count` and the
+paging cursor; any other parameter is a `400`, unless the client sends
+`Prefer: handling=lenient`. A CDR that answers `400` to the query does not
+serve the extension, or not this query of it: the search answers `501` with
+`not-supported`, naming the extension and carrying the CDR's words.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether the types under `types` are searched; off, no party type offers search |
+| `types.<Type>.query` | none | The AQL a value with no system runs for `<Type>`, binding the value as `$identifier` |
+| `types.<Type>.system_query` | empty | The AQL a `[system]\|[value]` value runs, binding `$identifier` and `$system`; empty refuses a value naming a system with `400 not-supported` |
+
+```toml
+[facade.party_search]
+enabled = true
+
+[facade.party_search.types.Patient]
+query = "SELECT p/uid/value FROM PERSON p WHERE p/details[openEHR-DEMOGRAPHIC-ITEM_TREE.person_details.v2]/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]/items[at0001]/value/id = $identifier ORDER BY p/uid/value ASC"
+```
+
+On with no type, a type with no `query`, a query that does not bind its
+parameters, and a type no party context serves are boot errors naming the
+key. `enabled` is settable as `FERROBRIDGE__FACADE__PARTY_SEARCH__ENABLED`;
+write the `types` tables in the file, because an environment key is read in
+lower case and a resource type name does not survive it.
+
 Each key is settable as `FERROBRIDGE__FACADE__REFERENCES__<KEY>`, and
 `fetch_bases` takes a TOML array:
 `FERROBRIDGE__FACADE__REFERENCES__FETCH_BASES='["https://sender.example/fhir"]'`.

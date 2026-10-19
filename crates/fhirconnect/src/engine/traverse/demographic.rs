@@ -9,20 +9,29 @@
 //! `PARTY_IDENTIFIED.adoc` resolves `reference` and adds "the resource
 //! identifier" to `identifiers`. Coming out, an identity the endpoint minted
 //! becomes `Reference.reference` again, and every other identifier stays an
-//! identifier.
+//! identifier. A `PARTY_REF` tail (`ROLE.performer`) resolves the same way and
+//! must name a party the endpoint minted.
 
+use fhir_types::r4::primitives::String as FhirString;
 use openehr_base::containers::NonEmptyVec;
+use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_rm::v1_2::common::generic::party_identified::PartyIdentifiedData;
 
 use crate::engine::demographics::PartyIdentity;
 use crate::engine::fhir::FhirValue;
+use crate::engine::lens::Lens;
+use crate::engine::lens::LensError;
 use crate::engine::lens::party::PartyLens;
+use crate::engine::lens::party_ref::PartyRefLens;
+use crate::engine::lens::party_ref::target_of;
 use crate::engine::rm::RmValue;
 use crate::engine::traverse::Run;
 use crate::engine::traverse::build::COMPOSER;
 use crate::engine::traverse::error::EngineError;
+use crate::model::ast::keyword::Direction;
 use crate::resolve::program::mapping::Mapping;
+use crate::resolve::program::target::FhirTarget;
 use crate::tree::element::Table;
 
 /// Where a route writes the identity of a party.
@@ -63,6 +72,83 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 mapping: String::from(mapping.name()),
                 source: Box::new(source),
             })
+    }
+
+    /// Returns the `PARTY_REF` the reference `view` carries, for a tail that
+    /// ends on one (`ROLE.performer`).
+    ///
+    /// The reference resolves through the demographics endpoint, which
+    /// refuses a reference to a resource of the request; one the endpoint did
+    /// not mint names a party of another server and is refused. What remains
+    /// is the relative literal the [`PartyRefLens`] carries, of the one type
+    /// the element admits. No specification governs this: our own design.
+    pub(super) fn party_ref_of(
+        &self,
+        mapping: &Mapping,
+        target: &FhirTarget,
+        view: &FhirValue,
+    ) -> Result<RmValue, EngineError> {
+        let refuse = |source: LensError| EngineError::Cell {
+            mapping: String::from(mapping.name()),
+            element: String::from(target.expression().as_str()),
+            source: Box::new(source),
+        };
+        let FhirValue::Reference(reference) = view else {
+            return Err(refuse(LensError::NoCell {
+                rm_type: String::from("PARTY_REF"),
+                kind: view.kind().as_str(),
+                direction: Direction::FhirToOpenehr,
+            }));
+        };
+        let lens = PartyRefLens::new(self.reference_target(mapping, target)?);
+        let mut relative = reference.as_ref().clone();
+        if let Some(literal) = PartyLens::deferred(reference) {
+            let identity = self.identity_of(mapping, literal)?;
+            let found = self
+                .seams
+                .demographics()
+                .reference_of(&identity)
+                .ok_or_else(|| EngineError::ForeignParty {
+                    mapping: String::from(mapping.name()),
+                    reference: String::from(literal),
+                })?;
+            relative.reference = Some(FhirString::from(found));
+        }
+        lens.put(&relative, None)
+            .map(RmValue::PartyRef)
+            .map_err(refuse)
+    }
+
+    /// Returns the reference a `PARTY_REF` names, read as the one type the
+    /// element `target` admits.
+    pub(super) fn reference_of_party(
+        &self,
+        mapping: &Mapping,
+        target: &FhirTarget,
+        party: &PartyRef,
+    ) -> Result<FhirValue, EngineError> {
+        PartyRefLens::new(self.reference_target(mapping, target)?)
+            .get(party)
+            .map(|reference| FhirValue::Reference(Box::new(reference)))
+            .map_err(|source| EngineError::Cell {
+                mapping: String::from(mapping.name()),
+                element: String::from(target.expression().as_str()),
+                source: Box::new(source),
+            })
+    }
+
+    /// Returns the one resource type the reference of `target` admits.
+    fn reference_target(
+        &self,
+        mapping: &Mapping,
+        target: &FhirTarget,
+    ) -> Result<&'static str, EngineError> {
+        target_of(self.table, target.resolved().target_profiles()).ok_or_else(|| {
+            EngineError::PartyRefTarget {
+                mapping: String::from(mapping.name()),
+                element: String::from(target.resolved().leaf()),
+            }
+        })
     }
 
     /// Returns `value` with the identity of the reference `view` carries, when

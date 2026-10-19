@@ -1317,16 +1317,113 @@ mapping rooted at a party: a context binds a composition template, and
   and `Organization` from party contexts over the Demographic API client
   behind `[cdr] demographic` (#470, #894): read, vread, the instance history,
   create, update over `If-Match` or the latest version, and delete of the
-  latest version, with no search because the API has none. A party context
+  latest version. The API has no search, so a party type is searched only by
+  `identifier` through `[facade.party_search]` (section 4.12). A party context
   with the gate off is a boot refusal, and one resource type is served by one
   party context. The id of each is the party's `versioned_object_uid`
-  (section 9). A `ROLE`'s mandatory `performer` is no template node, so a
-  `PractitionerRole` is not created or updated until #911 maps it.
+  (section 9).
+- **`ROLE.performer`.** A `ROLE`'s mandatory `performer` is a `PARTY_REF` to
+  "the Version container of Actor playing the role" (RM Demographic IM, the
+  `ROLE` class), and no template node holds it (#911). A party context maps
+  it as `$archetype/performer`; the compiler admits that one tail on the
+  party root (`rm::PARTY_ROOTS`) and the party build places the value on the
+  root. `PractitionerRole.practitioner` carries it through the
+  `PARTY_REF`-against-`Reference` cell: the reference resolves through the
+  demographics endpoint, must be a party of this facade of the one resource
+  type the element's `targetProfile` names (from the `fhir-types` element
+  table), and carries nothing beside `reference`. It becomes `PARTY_REF`
+  `{namespace "demographic", type "ACTOR", id HIER_OBJECT_ID <uid>}`, and
+  reads back as `<type>/<uid>`. Anything else is refused with a typed error,
+  and a `ROLE` with no `performer`, built or served, is refused
+  (`PartyError::RoleWithoutPerformer`). An element whose reference admits no
+  single type is refused at load (`fc-party-ref-target`).
 - **The draft archetypes.** Every `openEHR-DEMOGRAPHIC-*` archetype in the
   international CKM is a v0 draft
   (<https://ckm.openehr.org/ckm/archetypes/1013.1.479>). The tests run against
   synthetic party OPTs, and a production party mapping waits on a published
   archetype.
+
+### 4.12 Demographic AQL: the Cadasto experimental AQL demographic extension
+
+AQL 1.1.0 defines no demographic semantics (QUERY §3.13.2). Cadasto's
+platform runs an extension that roots a query at a demographic class and
+joins it with clinical data (#480). Its guide
+(<https://docs.cadasto.io/docs/guides/aql-archetype-query-language>,
+§Querying demographic data) names `PERSON`, `ORGANISATION`, `ROLE` and
+`PARTY_RELATIONSHIP` as roots and runs queries over `POST /query/aql`. It
+says: "Demographic AQL querying is an experimental extension. Syntax and
+behaviour may change in future releases." The owner expects the extension to
+become the specification for AQL over demographics (owner direction
+2026-10-15), so the bridge implements it. Every surface built on it carries
+the label "Cadasto experimental AQL demographic extension", and no
+specification governs it: each rule below is our own design, its source named.
+
+The guide shows examples and defines no semantics. Cadasto's own
+verification on a trial tenant (Cadasto's backlog, the issue that moves the
+extension from experimental to supported) records what the engine does and
+the findings it plans to change. Each answer below says which source it
+rests on: **documented** (the guide, or the demographic link page
+<https://docs.cadasto.io/docs/guides/cadasto-demographic-link>) or
+**observed** (the engine on a trial tenant, liable to change).
+
+| # | Question | Answer | Source |
+|---|---|---|---|
+| 1 | What `PERSON CONTAINS EHR` means | `PERSON p CONTAINS EHR e` and `EHR e CONTAINS PERSON p` both work, through the `cadasto-person-uid` link, which is stored apart from `EHR_STATUS.subject` and set by a request header. `EHR_STATUS.subject.external_ref` is not set by the link (finding F2) | observed; the link documented |
+| 2 | What `PERSON CONTAINS ROLE` means | The engine follows `PERSON.relationships[name="role"].target`, a reference crossed as if it were containment (F1). Roles are shared `ROLE` objects (`openEHR-DEMOGRAPHIC-ROLE.Role.v1`, told apart by `name/value`) whose `performer` is empty and which `ACTOR.roles` does not list (F3), against RM Demographic IM, which makes `ROLE.performer` mandatory | observed |
+| 3 | What `PARTY_RELATIONSHIP CONTAINS PERSON` means | Undecided: whether the relationship's `source` or `target` is crossed, and from which side, is not stated (F1) | neither |
+| 4 | Which structures `CONTAINS` reaches inside a party | `PERSON p CONTAINS CLUSTER id[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]` works; tenants store `person_details.v2` and `person_name.v2`. The guide's examples contain `ITEM_TREE`, `ADDRESS` and `PARTY_RELATIONSHIP` under a party, with no rule for what each reaches | the identifier `CLUSTER` observed; the examples documented |
+| 5 | Versioning | `uid/value` is always the versioned id (`uuid::ns::v`), so a bare uid matches only through `LIKE 'uuid*'` (F5). Which version a root selects is not stated; Cadasto's scope is the latest, logically deleted parties left out | observed; the version rule planned |
+| 6 | `ORGANISATION`, `GROUP` and `AGENT` as roots | `ORGANISATION` is a documented root with no example. `FROM PERSON`, `ROLE` and `GROUP` run, with `WHERE`, `ORDER BY`, `LIMIT` and `OFFSET`, `LIKE` and query parameters; `AGENT` is not shown | `ORGANISATION` documented; the rest observed |
+| 7 | What a CDR without the extension answers | Not stated by the guide or by ITS-REST. The reference CDR answers `400` to a demographic root (its `UnsupportedSourceClass` refusal) | neither; one reference observation |
+
+The open findings Cadasto plans to change, which the bridge must not build
+on: F1 (`CONTAINS` crossing references in an undocumented direction), F2 (the
+EHR link only through `cadasto-person-uid`), F3 (shared roles with no
+`performer`), F4 (`DV_DATE` compact in `SELECT` and extended in `WHERE`), F5
+(the versioned `uid/value`), F6 (`LIKE` case-sensitive), F7 (comparisons on
+non-ASCII values), F8 (no optional containment: `CONTAINS (ROLE r AND EHR e)`
+drops a person with no EHR) and F9 (the guide's examples return nothing on a
+real tenant: wrong archetype versions and at-codes).
+
+**What the bridge issues.** Every query is configuration, never a literal in
+code, because the tenant's archetypes and the dialect both move. The bridge
+keeps its queries to the forms that are documented or observed as stable: a
+demographic root, `WHERE` over a query parameter, `ORDER BY`, the paging the
+query API carries (`offset` and `fetch`), the `person_identifier` `CLUSTER`,
+and `PERSON` to `EHR`. It issues no query whose answer depends on F1 (role or
+relationship traversal), F4 (dates) or F5 (a bare uid): it reads each row's
+first column as a party uid and takes the object id before the first `::`, so
+a versioned uid names its party.
+
+- **`[facade.identifier_search]`** (#492) resolves the chained
+  `patient.identifier` to one party.
+- **`[facade.party_search]`** (#480) searches `Patient`, `Practitioner`,
+  `PractitionerRole` and `Organization` by `identifier`, one configured query
+  per type, which has no default. A configured type no party context serves
+  refuses to boot. Each page runs the query with `offset` and one row more
+  than the page in `fetch`, reads each party over the Demographic API and
+  maps it back as a read does. Only `identifier`, `_count` and the cursor are
+  taken. The `CapabilityStatement` declares `search-type` and the
+  `identifier` parameter, with the standard R4 canonical, on exactly the
+  configured types.
+- **A CDR that does not serve the extension.** Question 7 has no documented
+  answer, so a CDR `400` on a query of the extension cannot tell an absent
+  extension from a query outside the part the CDR serves. Both are a fact of
+  the deployment. The party search answers `501` with `not-supported`,
+  naming the extension and carrying the CDR's words (RFC 9110 §15.6.2), never
+  an empty searchset.
+- **#911 and F3.** The bridge keeps `ROLE` RM-conformant: a `ROLE` with no
+  `performer`, built or read, is refused with
+  `PartyError::RoleWithoutPerformer`. A tenant's shared role objects with an
+  empty `performer` are refused loudly, never guessed at.
+- **The patient link and F2.** The bridge finds a patient's EHR through
+  `EHR_STATUS.subject.external_ref` (the subject link, #467). An EHR that only the
+  `cadasto-person-uid` link names is not found that way, so a deployment on
+  Cadasto's platform sets both, as the link page allows.
+
+The reference CDR refuses demographic sources today, so the party search is
+tested against a `wiremock` CDR that serves the extension. The container test
+waits on a CDR that serves it.
 
 ## 5. The OMOP side
 

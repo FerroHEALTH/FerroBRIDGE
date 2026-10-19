@@ -480,7 +480,11 @@ onto a `ROLE`, and `Organization` onto an `ORGANISATION`.
   (over the version `If-Match` names, or the latest) and `delete` (the latest
   version). The Demographic API has no search or list operation, so a party
   type offers no search, and the `CapabilityStatement` documents that on the
-  type.
+  type. With [`[facade.party_search]`](../operate/configuration.md#facadeparty_search)
+  a configured type is searched by `identifier` through the Cadasto
+  experimental AQL demographic extension, and the statement declares
+  `search-type` and `identifier` on that type alone. A CDR that does not
+  serve the extension answers the search with `501 not-supported`.
 - **The patient's EHR.** With `ehr_policy = "create_on_first_write"`, a
   `Patient` create also gives the new party its EHR: the facade looks the
   party's id up through the subject link (`subject_namespace`,
@@ -497,9 +501,11 @@ onto a `ROLE`, and `Organization` onto an `ORGANISATION`.
 - **Authorization.** A `patient/` token reaches the one `Patient` its launch
   context names and no other party resource.
 
-A `PractitionerRole` reads, vreads, lists its history and deletes; it cannot
-be created or updated yet, because a party context cannot map the `ROLE`'s
-mandatory `performer` (#911). These rules are FerroBRIDGE's own design: no
+A `PractitionerRole` maps `practitioner` onto the `ROLE`'s mandatory
+`performer`. The reference must name a `Practitioner` this facade serves,
+relative (`Practitioner/<id>`) or under the facade's base, and carry nothing
+beside `reference`; the facade answers any other reference, and a role with
+no practitioner, with an error rather than dropping it. These rules are FerroBRIDGE's own design: no
 specification defines a FHIRconnect mapping rooted at a party.
 
 ## `$validate` is a dry run of this server
@@ -670,6 +676,7 @@ key that is unique per composition.
 | a declared `string` | starts-with by default, `:contains` and `:exact` |
 | a declared `date` | the range of the value's precision, with the prefixes `eq`, `ne`, `gt`, `lt`, `ge`, `le`, `sa` and `eb` |
 | `patient`, `subject` (as declared) | `[id]`, `Patient/[id]`, an absolute URL on this server, or the `:Patient` modifier, resolved through the identity map to the EHR |
+| `patient:identifier`, `subject:identifier` | `[system]\|[value]`, the identifier a resource's subject reference carries: the identity map's subject keyed by that system and value, which the facade renders with that `identifier`; a subject rendered as a literal reference carries none and matches nothing, `\|[value]` matches nothing, and `[value]` alone or `[system]\|` is a `400` |
 | `patient.identifier`, `subject.identifier`, `subject:Patient.identifier` | with [`[facade.identifier_search]`](../operate/configuration.md#facadeidentifier_search) on: `[value]`, or `[system]\|[value]` where a system query is configured; the identifier is resolved to every demographic party that carries it and each party's EHR, so a bare value two patients carry matches the resources of both (R4 search §3.1.1.4.10) |
 | `_id` | a logical id, resolved through the identity map to its composition |
 | `_count` | the page size, capped at `[facade] search_count_max`; `0` answers the total alone |
@@ -693,10 +700,8 @@ as wildcards with no escape (search it with `:exact`). The one supported
 chain is `identifier` on a subject parameter: any other chain is a parameter
 this server does not support. A modifier on the chain is a `400`, and a
 `subject:Group.identifier` names a target that is never an EHR subject, so it
-matches nothing. The `:identifier` modifier is not supported yet
-([issue #923](https://github.com/FerroHEALTH/FerroBRIDGE/issues/923)). The
-`CapabilityStatement` states the chain in the `documentation` of each subject
-parameter, and only while it is on.
+matches nothing. The `CapabilityStatement` states the chain in the
+`documentation` of each subject parameter, and only while it is on.
 
 ### The searchset
 

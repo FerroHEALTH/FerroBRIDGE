@@ -37,6 +37,28 @@ crates on crates.io.
   the element's types in definition order, in all five versions (#926), so a
   consumer reads which resource types a `Reference` admits from the element
   table. A consumer that builds a `FieldSchema` literal adds the field.
+- The facade's subject search parameters take the `:identifier` modifier
+  (#923): `Condition?patient:identifier=[system]|[value]` matches the
+  `Reference.identifier` of a resource's subject (R4 search.html
+  §3.1.1.4.12). That identifier is the subject the identity map keys by
+  system and value, which the facade renders as an identifier. A subject
+  rendered as a literal reference carries none and matches nothing, and so
+  does `|[value]`. `[value]` alone and `[system]|` answer `400 not-supported`,
+  because the map keys a subject by system and value. No specification
+  governs the identity map: our own design.
+- The facade searches `Patient`, `Practitioner`, `PractitionerRole` and
+  `Organization` by `identifier` through the Cadasto experimental AQL
+  demographic extension, behind `[facade.party_search]` with one configured
+  query per type (#480). Each page runs the query with `offset` and `fetch`
+  and reads every party it names over the Demographic API. A CDR that answers
+  `400` to the query, as one without the extension does, answers `501` with
+  `not-supported` naming the extension. The `CapabilityStatement` declares
+  `search-type` and `identifier` on exactly the configured types, and a
+  configured type no party context serves refuses to boot.
+  `docs/architecture.md` §4.12 writes down the dialect's semantics as the
+  extension's guide documents them and Cadasto observed them, with the
+  findings Cadasto plans to change. No specification governs the extension:
+  our own design.
 - The FHIR facade serves `Patient`, `Practitioner`, `PractitionerRole` and
   `Organization` from party contexts over the ITS-REST 1.1.0 Demographic API,
   DEVELOPMENT, behind `[cdr] demographic` (#470). Read, vread,
@@ -47,8 +69,25 @@ crates on crates.io.
   tree id, with no identity-map entry; a Demographic API `400` answers `500`,
   and `404`, `409`, `412` and `422` answer as themselves. The
   `CapabilityStatement` declares the six interactions and no search per party
-  type. A `PractitionerRole` is not created or updated yet (#911). No
-  specification governs a party context: our own design.
+  type. No specification governs a party context: our own design.
+- A party context maps `ROLE.performer`, the mandatory `PARTY_REF` no template
+  node holds (RM Demographic IM, the `ROLE` class), as `$archetype/performer`,
+  so the facade creates and updates a `PractitionerRole` (#911).
+  `PractitionerRole.practitioner` must name a `Practitioner` the facade
+  serves, relative or under its base, with nothing beside `reference`. It
+  becomes `PARTY_REF {namespace "demographic", type "ACTOR", id HIER_OBJECT_ID
+  <uid>}` and reads back as `Practitioner/<uid>`, the type taken from the
+  element's `targetProfile`. A reference of another server
+  (`EngineError::ForeignParty`), of another type, carrying a display, or local
+  to the request answers `422`, and a `ROLE` with no `performer`, built or
+  served, is refused (`PartyError::RoleWithoutPerformer`). An element whose
+  reference admits no single type is refused at load
+  (`fc-party-ref-target`). `fhirconnect` 0.1.151 adds `RmValue::PartyRef`,
+  the `PARTY_REF`-against-`Reference` pair, `EngineError::ForeignParty` and
+  `EngineError::PartyRefTarget`, which breaks an exhaustive match over
+  either enum; `openehr-mapping-core` 0.1.118 adds
+  `PartyError::RoleWithoutPerformer` the same way. No specification governs
+  this correspondence: our own design.
 
 - The facade's search chains through the patient identifier (#492):
   `Observation?patient.identifier=MRN-1`, `subject.identifier` and
@@ -131,6 +170,11 @@ crates on crates.io.
   refusal there is for a chain whose matches span resource types. The default
   `[facade.identifier_search] query` drops its `LIMIT 2`; a configured query
   with a `LIMIT` should drop it too.
+- `scripts/gh/watch-prs.sh` no longer stops on a changelog conflict whose
+  `[Unreleased]` keeps a blank line between two bullets or a heading with no
+  blank line above it (#946). The entry merge keeps the blank line between
+  bullets, renders a heading with one above it, and refuses only when the
+  text lines would not read back in order, naming the first such line.
 - A pull request merged after a release no longer files its changelog
   entries under that release (#913). `scripts/gh/watch-prs.sh` merges
   `CHANGELOG.md` by entry through the new `scripts/gh/changelog-merge.sh`,

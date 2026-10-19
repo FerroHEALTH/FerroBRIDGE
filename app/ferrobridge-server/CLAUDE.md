@@ -11,7 +11,8 @@ the real run path; a binary-only crate cannot be imported from `tests/`
   (`.claude/rules/rust-style.md` §Default values). The per-field
   `#[serde(default = "path")]` form is banned, and so is a `fn default_x()`.
 - **A new configuration key is three changes in one edit**: the field with its
-  default in `src/config/section.rs` (the file tree), the Operate page's
+  default in `src/config/section/` (the file tree, `[facade]` in its `facade`
+  child), the Operate page's
   variable table in `website/book/src/operate/`, and a case under
   `tests/it/config/`. A key with no documented variable name is a key an
   operator cannot set. `src/config/` holds the tree and its resolved settings

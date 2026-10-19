@@ -24,6 +24,7 @@ pub mod criteria;
 pub mod cursor;
 pub mod declaration;
 pub mod identifier;
+pub mod party;
 pub mod plan;
 pub mod template;
 pub mod value;

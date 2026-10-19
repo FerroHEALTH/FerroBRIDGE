@@ -18,6 +18,7 @@ mod functions;
 mod links;
 mod party;
 mod reference;
+mod role;
 mod split;
 mod sub_context;
 mod tail;

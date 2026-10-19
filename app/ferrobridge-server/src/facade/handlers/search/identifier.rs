@@ -67,7 +67,7 @@ pub(super) async fn ehrs_of(
             return Err(write::refuse(&refused(&answered.upstream)));
         }
     };
-    let parties = identifier::parties(&rows).map_err(|error| {
+    let parties = identifier::uids(&rows).map_err(|error| {
         write::refuse(&status::Answer::new(status::UPSTREAM, error.to_string()))
     })?;
     let mut ehrs = Vec::new();

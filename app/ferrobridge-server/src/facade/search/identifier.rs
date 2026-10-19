@@ -171,8 +171,7 @@ pub struct MalformedParty {
     pub row: usize,
 }
 
-/// Returns the uids of the parties the rows of a resolve name, each once, in
-/// row order.
+/// Returns the party uids the rows name, in row order, each once.
 ///
 /// Each row's first column is the party's `uid/value`. A versioned uid
 /// (`object_id::creating_system_id::version_tree_id`, RM Common
@@ -186,7 +185,7 @@ pub struct MalformedParty {
 ///
 /// Returns [`MalformedParty`] for a row whose first column is no non-empty
 /// string.
-pub fn parties(rows: &[ResultSetRow]) -> Result<Vec<String>, MalformedParty> {
+pub fn uids(rows: &[ResultSetRow]) -> Result<Vec<String>, MalformedParty> {
     let mut found: Vec<String> = Vec::new();
     for (row, values) in rows.iter().enumerate() {
         let uid = values
@@ -209,7 +208,7 @@ fn object_id(uid: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::{IdentifierQueryError, IdentifierSearch, Inexpressible, parties};
+    use super::{IdentifierQueryError, IdentifierSearch, Inexpressible, uids};
     use crate::facade::search::value::{System, Token};
 
     const QUERY: &str = "SELECT p/uid/value FROM PERSON p WHERE p/x = $identifier";
@@ -304,21 +303,21 @@ mod tests {
 
     #[test]
     fn the_rows_name_none_one_or_many_parties() {
-        assert_eq!(parties(&[]), Ok(Vec::new()));
+        assert_eq!(uids(&[]), Ok(Vec::new()));
         assert_eq!(
-            parties(&[
+            uids(&[
                 vec![serde_json::json!("p-1::cdr::1")],
                 vec![serde_json::json!("p-1::cdr::2")]
             ]),
             Ok(vec![String::from("p-1")])
         );
         assert_eq!(
-            parties(&[
+            uids(&[
                 vec![serde_json::json!("p-1::cdr::1")],
                 vec![serde_json::json!("p-2")]
             ]),
             Ok(vec![String::from("p-1"), String::from("p-2")])
         );
-        assert!(parties(&[vec![serde_json::json!(7)]]).is_err());
+        assert!(uids(&[vec![serde_json::json!(7)]]).is_err());
     }
 }

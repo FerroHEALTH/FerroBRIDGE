@@ -129,6 +129,9 @@ pub struct Facade {
     /// The identifier resolve a chained `patient.identifier` runs, when one is
     /// configured.
     identifier: Option<search::identifier::IdentifierSearch>,
+    /// The identifier queries the party types are searched with, when the
+    /// deployment configures them.
+    party_search: Option<search::party::PartySearch>,
     /// The terminology server every `conceptmap` code translates through.
     translator: Translator,
     /// What may be fetched to resolve a reference the request does not carry.
@@ -174,6 +177,7 @@ impl Facade {
             settings,
             limits: search::Limits::default(),
             identifier: None,
+            party_search: None,
             translator: Translator::default(),
             references: references::Policy::default(),
             usage: Arc::default(),
@@ -312,6 +316,24 @@ impl Facade {
     #[must_use]
     pub const fn identifier_search(&self) -> Option<&search::identifier::IdentifierSearch> {
         self.identifier.as_ref()
+    }
+
+    /// Returns this facade searching party types by `identifier` through
+    /// `party_search`, the configured queries of Cadasto's experimental AQL
+    /// demographic extension.
+    ///
+    /// A facade built without it offers no search on a party type.
+    #[must_use]
+    pub fn with_party_search(mut self, party_search: Option<search::party::PartySearch>) -> Self {
+        self.party_search = party_search;
+        self
+    }
+
+    /// Returns the queries the party types are searched with, when they are
+    /// configured.
+    #[must_use]
+    pub const fn party_search(&self) -> Option<&search::party::PartySearch> {
+        self.party_search.as_ref()
     }
 
     /// Returns the compiled programs of the current set.
