@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that writes Condition.recorder into
+# COMPOSITION.composer and Condition.asserter into a PARTICIPATION of the
+# composition's EVENT_CONTEXT, so one composition carries two party
+# references, against the synthetic ferrobridge.diagnose.v1 template of the
+# testkit.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_composer_participation
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "problemDiagnose"
+    with:
+      fhir: "$resource.code"
+      openehr: "$archetype/data[at0001]/items[at0002]"
+      type: "CODEABLECONCEPT"
+
+  - name: "composer"
+    with:
+      fhir: "$resource.recorder"
+      openehr: "$composition/composer"
+
+  - name: "participations"
+    with:
+      fhir: "$resource.asserter"
+      openehr: "$composition/context/participations"
+    participationsFunction: "asserter"
