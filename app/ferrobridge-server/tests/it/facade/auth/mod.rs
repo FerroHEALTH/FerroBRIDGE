@@ -11,6 +11,7 @@ mod audit;
 mod batch;
 mod compartment;
 mod discovery;
+mod forwarding;
 mod routes;
 mod scope;
 mod search;
