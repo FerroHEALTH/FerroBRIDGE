@@ -47,6 +47,16 @@ crates on crates.io.
   names with the workspace version and its changelog date, so the next cut
   fails the guard until they move with it (#908).
 
+### Fixed
+
+- A pull request merged after a release no longer files its changelog
+  entries under that release (#913). `scripts/gh/watch-prs.sh` merges
+  `CHANGELOG.md` by entry through the new `scripts/gh/changelog-merge.sh`,
+  which keeps a branch's entries under `[Unreleased]`, also when a clean line
+  merge would have placed them under a version cut meanwhile.
+  `scripts/checks/changelog-released.sh` fails CI when a released section from
+  0.0.9 on differs from its text at its tag.
+
 ## [0.0.9] - 2026-10-19
 
 ### Added

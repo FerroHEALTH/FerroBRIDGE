@@ -7,8 +7,11 @@
 #
 # - BEHIND: updates the branch.
 # - DIRTY in CHANGELOG.md or only in version lines: merges origin/main
-#   (both changelog sides, the branch's higher versions, a fresh Cargo.lock,
-#   the crate bump guard passing), pushes, and keeps watching.
+#   (the branch's changelog entries by scripts/gh/changelog-merge.sh, the
+#   branch's higher versions, a fresh Cargo.lock, the crate bump guard
+#   passing), pushes, and keeps watching.
+# - A clean merge that would file the branch's changelog entries under a
+#   released version (a release cut after the branch): merges the same way.
 # - Open and not queued: arms auto-merge again, since a push to the branch
 #   (an update or a resolved merge) drops the arming.
 # - DIRTY elsewhere, or a red required check with nothing pending: stops
@@ -19,8 +22,10 @@ if [ $# -eq 0 ]; then
   exit 64
 fi
 repo=$(git rev-parse --show-toplevel) || exit 1
-# A conflict this script resolves on its own: CHANGELOG.md keeps both sides,
-# and a version line (a crate manifest, the root manifest, the pin tables)
+merge_changelog="$(cd "$(dirname "$0")" && pwd)/changelog-merge.sh"
+# A conflict this script resolves on its own: CHANGELOG.md takes the branch's
+# entries into main's [Unreleased] whatever main released meanwhile, and a
+# version line (a crate manifest, the root manifest, the pin tables)
 # keeps the branch's side when the two sides differ only in their version
 # numbers. Cargo.lock is regenerated, and the crate bump guard must pass.
 resolve_merge() {
@@ -31,11 +36,17 @@ resolve_merge() {
   git -C "$repo" worktree add -q "$tmp" "origin/$b" 2>/dev/null || return 1
   (
     cd "$tmp" || exit 1
-    git merge --no-edit origin/main >/dev/null 2>&1
+    git merge --no-commit --no-ff origin/main >/dev/null 2>&1
+    mb=$(git merge-base HEAD origin/main) || { git merge --abort; exit 1; }
+    if ! git diff --quiet "$mb" HEAD -- CHANGELOG.md; then
+      "$merge_changelog" <(git show "$mb:CHANGELOG.md") <(git show HEAD:CHANGELOG.md) \
+        <(git show origin/main:CHANGELOG.md) >CHANGELOG.md.merged ||
+        { rm -f CHANGELOG.md.merged; git merge --abort; exit 1; }
+      mv CHANGELOG.md.merged CHANGELOG.md
+      git add CHANGELOG.md
+    fi
     for f in $(git diff --name-only --diff-filter=U); do
       case $f in
-        CHANGELOG.md)
-          perl -0pi -e 's/<<<<<<< HEAD\n(.*?)=======\n(.*?)>>>>>>> origin\/main\n/$1$2/gs' "$f" ;;
         Cargo.lock)
           git checkout --theirs Cargo.lock ;;
         Cargo.toml | crates/*/Cargo.toml | docs/VERSIONS.md | docs/architecture.md)
@@ -52,6 +63,17 @@ resolve_merge() {
   local rc=$?
   git -C "$repo" worktree remove --force "$tmp" >/dev/null 2>&1
   return $rc
+}
+# Whether a clean merge with main would change main's released sections: the
+# branch's changelog entries would land under a version cut after it.
+changelog_leaks() {
+  local p=$1 b tree
+  gh pr view "$p" --json files --jq '.files[].path' | grep -qx CHANGELOG.md || return 1
+  b=$(gh pr view "$p" --json headRefName --jq .headRefName)
+  git -C "$repo" fetch -q origin main "$b" || return 1
+  tree=$(git -C "$repo" merge-tree --write-tree origin/main "origin/$b" 2>/dev/null | head -n1) || return 1
+  ! cmp -s <("$merge_changelog" --released <(git -C "$repo" show "$tree:CHANGELOG.md")) \
+    <("$merge_changelog" --released <(git -C "$repo" show origin/main:CHANGELOG.md))
 }
 left=("$@")
 # A run started by a fresh push takes a moment to register; until it does,
@@ -73,6 +95,11 @@ while [ ${#left[@]} -gt 0 ]; do
       DIRTY)
         if resolve_merge "$p"; then echo "resolved merge #$p"; next+=("$p"); continue
         else echo "CONFLICT #$p"; exit 2; fi ;;
+      *)
+        if changelog_leaks "$p"; then
+          if resolve_merge "$p"; then echo "kept the changelog entries of #$p unreleased"; next+=("$p"); continue
+          else echo "CONFLICT #$p: its changelog entries would land under a released version"; exit 2; fi
+        fi ;;
     esac
     c=$(gh pr checks "$p" 2>&1)
     pend=$(printf '%s\n' "$c" | awk -F'\t' '$2=="pending"' | wc -l | tr -d ' ')
