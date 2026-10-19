@@ -56,9 +56,10 @@ pub enum Kind {
 
 /// One element of a type, in definition order.
 ///
-/// The cardinality, the path, the type codes, the content reference and the
-/// two flags are the `ElementDefinition` fields of the definition this element
-/// comes from (<https://hl7.org/fhir/R4/elementdefinition.html>).
+/// The cardinality, the path, the type codes and their target profiles, the
+/// content reference and the two flags are the `ElementDefinition` fields of
+/// the definition this element comes from
+/// (<https://hl7.org/fhir/R4/elementdefinition.html>).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FieldSchema {
     /// The element name (the JSON key; a choice's stem).
@@ -76,6 +77,11 @@ pub struct FieldSchema {
     /// The type codes the definition lists, in its order; a choice lists its
     /// alternatives and a content reference lists none.
     pub types: &'static [&'static str],
+    /// The canonical URLs the definition's types list in `targetProfile`, in
+    /// its order: the resources a `Reference` admits and the definitions a
+    /// `canonical` admits
+    /// (<https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.type.targetProfile>).
+    pub target_profiles: &'static [&'static str],
     /// The element path a `contentReference` names, without the leading `#`.
     pub content_reference: Option<&'static str>,
     /// Whether the element is part of the summary view, the `isSummary` flag a
