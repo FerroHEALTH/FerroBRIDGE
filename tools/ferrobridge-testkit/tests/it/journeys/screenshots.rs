@@ -14,9 +14,14 @@
 //! Without the gate the capture returns at once, so no CI job takes a
 //! screenshot.
 //!
+//! The capture then writes the release it ran at to [`CAPTURED`] beside the
+//! images.
+//!
 //! The guard runs in the ordinary suite: every route the console's router
 //! declares is shown by a shot, every shot has both images on disk, every
-//! image is a shot's, and every light image is shown by a page of the book.
+//! image is a shot's, every light image is shown by a page of the book, and
+//! [`CAPTURED`] names the workspace version, so a release bump fails until the
+//! images are taken again.
 //! No specification governs the screenshots: our own design.
 
 use std::collections::BTreeSet;
@@ -38,6 +43,9 @@ const SCREENSHOTS_GATE: &str = "FERROBRIDGE_SCREENSHOTS";
 
 /// The book's folder of console screenshots, from the workspace root.
 const IMAGES: &str = "website/book/src/operate/img/console";
+
+/// The file beside the images that names the release they show.
+const CAPTURED: &str = "captured-version.txt";
 
 /// The ignored folder of the phone-width screenshots, from the workspace
 /// root.
@@ -505,6 +513,10 @@ async fn the_book_shows_every_console_page_in_light_and_dark() -> Result<(), Box
             .await?;
         }
     }
+    std::fs::write(
+        root().join(IMAGES).join(CAPTURED),
+        format!("{}\n", env!("CARGO_PKG_VERSION")),
+    )?;
     Ok(())
 }
 
@@ -572,6 +584,19 @@ fn every_console_route_has_a_screenshot_in_light_and_dark() -> Result<(), Box<dy
             images.insert(image);
         }
     }
+    let captured = root().join(IMAGES).join(CAPTURED);
+    images.insert(captured.clone());
+    let version = std::fs::read_to_string(&captured).map_err(|error| {
+        format!(
+            "{} cannot be read ({error}): run the capture with {SCREENSHOTS_GATE}=1",
+            captured.display()
+        )
+    })?;
+    assert_eq!(
+        env!("CARGO_PKG_VERSION"),
+        version.trim_end(),
+        "the console screenshots were taken at another release: run the capture with {SCREENSHOTS_GATE}=1"
+    );
     for entry in std::fs::read_dir(root().join(IMAGES))? {
         let entry = root().join(IMAGES).join(entry?.file_name());
         assert!(

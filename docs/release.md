@@ -253,17 +253,26 @@ before a real cut.
    compares each claim with the workspace version and the date of its
    `CHANGELOG.md` section, so it fails until the pages and the changelog move
    with the version.
-4. **The changelog names the release.** `[Unreleased]` becomes the version and
+4. **The console screenshots show the release.** After the version moves,
+   take the book's operator console screenshots again on the release
+   commit's tree: `scripts/release/journey-tools.sh target/journey-tools`,
+   the release site bundle (`scripts/release/viewer-site.sh --release`), then
+   `FERROBRIDGE_SCREENSHOTS=1 cargo nextest run -p ferrobridge-testkit -E
+   'test(/screenshots::the_book_shows/)'`. The capture writes the version it
+   ran at to `website/book/src/operate/img/console/captured-version.txt`, and
+   the screenshot guard of the ordinary suite fails until that names the
+   workspace version. Read every image before the bump merges.
+5. **The changelog names the release.** `[Unreleased]` becomes the version and
    the date, with a fresh empty `[Unreleased]` above it and a new link
    reference. What sits under the version heading is what the release notes
    say, so read it as the release notes before you tag.
-5. **The gates pass on the release commit.** The tier-1 set is
+6. **The gates pass on the release commit.** The tier-1 set is
    `zizmor --min-severity=low .github/`, `actionlint`, `shellcheck
    --severity=style` over every tracked shell program, `hadolint` over every
    tracked Dockerfile, `scripts/checks/comment-style.sh --all`,
    `scripts/checks/versions.sh`, and `mdbook build website/book`, beside the
    Rust lanes (`docs/ci-cd.md`).
-6. **A pre-release has rehearsed any change to the lane itself.** Tag
+7. **A pre-release has rehearsed any change to the lane itself.** Tag
    `vX.Y.Z-rc.1`, watch the whole graph run, and read what it produced. A
    pre-release takes the same path and is never marked latest.
 
