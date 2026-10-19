@@ -8,7 +8,8 @@ expression: declared
     "the engine filled /composer",
     "the engine filled /context/setting",
     "the engine filled /language",
-    "the engine filled /territory"
+    "the engine filled /territory",
+    "the engine filled /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/narrative"
   ],
   "second_leg": [],
   "lost": [
