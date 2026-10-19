@@ -25,6 +25,11 @@ crates on crates.io.
 
 ### Added
 
+- `fhir-types` 0.1.127: every `schema::FieldSchema` carries
+  `target_profiles`, the `ElementDefinition.type.targetProfile` canonicals of
+  the element's types in definition order, in all five versions (#926), so a
+  consumer reads which resource types a `Reference` admits from the element
+  table. A consumer that builds a `FieldSchema` literal adds the field.
 - The FHIR facade serves `Patient`, `Practitioner`, `PractitionerRole` and
   `Organization` from party contexts over the ITS-REST 1.1.0 Demographic API,
   DEVELOPMENT, behind `[cdr] demographic` (#470). Read, vread,

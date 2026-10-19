@@ -197,6 +197,7 @@ pub(super) fn lower_struct(
             min: element.min,
             max: element.max,
             types: type_codes(&element.shape),
+            target_profiles: target_profiles_of(&element.shape),
             content_reference: content_reference_of(&element.shape),
             is_summary: element.is_summary,
             is_modifier: element.is_modifier,
@@ -278,6 +279,17 @@ fn type_codes(shape: &ElementShape) -> Vec<String> {
         ElementShape::Typed(types) | ElementShape::Choice(types) => {
             types.iter().map(|type_ref| type_ref.code.clone()).collect()
         }
+    }
+}
+
+/// The `targetProfile` canonicals of every type an element lists, in order.
+fn target_profiles_of(shape: &ElementShape) -> Vec<String> {
+    match shape {
+        ElementShape::Root | ElementShape::ContentReference { .. } => Vec::new(),
+        ElementShape::Typed(types) | ElementShape::Choice(types) => types
+            .iter()
+            .flat_map(|type_ref| type_ref.target_profiles.iter().cloned())
+            .collect(),
     }
 }
 
