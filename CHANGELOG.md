@@ -25,6 +25,17 @@ crates on crates.io.
 
 ### Added
 
+- The terminology lane authenticates with the OAuth 2.0 client credentials
+  grant (#962): `[terminology.credentials.oauth]` takes the keys of
+  `[cdr.credentials.oauth]`, and the same token cache obtains the token,
+  shares it across calls, renews it before it expires, and renews it once
+  when the terminology server answers `401`. A renewal that obtains no token
+  ends the call with the terminology server's refusal and the token
+  endpoint's error. `ferrobridge-term` 0.1.129 adds
+  `config::Credentials::OAuth` over a caller-supplied `config::TokenProvider`,
+  and the `error::Error::Token` and `error::Error::Renewal` variants.
+  `ferrobridge-validator` moves to 0.1.129 with it.
+
 - The party search takes `name`, `_id` and `_count=0` beside `identifier`
   (#931). `name` matches a name that starts with the value, case-insensitively
   as R4 string search asks: `[facade.party_search.types.<Type>] name_query`

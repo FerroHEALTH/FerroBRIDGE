@@ -167,9 +167,9 @@ repository already holds (RM Demographic IM Release 1.1.0 §2.2.1).
 ### `[cdr.credentials]` and `[terminology.credentials]`
 
 The bridge authenticates to an upstream in one of two modes: RFC 7617 basic
-authentication with `user` and `password`, or, for the CDR only, a token it
-obtains itself with the OAuth 2.0 client credentials grant
-([`[cdr.credentials.oauth]`](#cdrcredentialsoauth)). It takes no static
+authentication with `user` and `password`, or a token it obtains itself with
+the OAuth 2.0 client credentials grant
+([`[cdr.credentials.oauth]` and `[terminology.credentials.oauth]`](#cdrcredentialsoauth-and-terminologycredentialsoauth)). It takes no static
 bearer token: a `bearer_token` key is an unknown key and refuses the start.
 An inline value beside its `_file` sibling is a boot error too.
 
@@ -181,20 +181,23 @@ An inline value beside its `_file` sibling is a boot error too.
 The user and the password become the `Authorization` header of every call,
 `Basic` over `user:password`.
 
-### `[cdr.credentials.oauth]`
+### `[cdr.credentials.oauth]` and `[terminology.credentials.oauth]`
 
-The bridge can obtain its CDR token itself with the OAuth 2.0 client
-credentials grant (RFC 6749 §4.4) and renew it before it expires. The bridge
-always reaches the CDR under its own token for the CDR's audience and never
-forwards a caller's token, because an access token names the resource server
-it is for (RFC 9068 §4). Setting the section beside `user` is a boot error.
-Only the CDR takes it; under `[terminology.credentials]` it is an unknown key.
+The bridge can obtain its token for the CDR, and for the terminology server,
+itself with the OAuth 2.0 client credentials grant (RFC 6749 §4.4) and renew
+it before it expires. The bridge always reaches an upstream under its own
+token for that upstream's audience and never forwards a caller's token,
+because an access token names the resource server it is for (RFC 9068 §4).
+Setting the section beside `user` is a boot error. The two sections take the
+same keys, and each lane keeps its own token.
 
 Use this section when the FHIR facade and the CDR are separate audiences of
 one authorization server. Callers then hold tokens for the FHIR audience, and
 the bridge obtains and renews its own for the CDR's. Set `audience` or
 `resource` to whichever parameter that authorization server reads to select
-the CDR.
+the CDR. A terminology server that checks tokens, such as one that validates
+SMART tokens on writes, takes the same arrangement under
+`[terminology.credentials.oauth]`.
 
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
@@ -215,22 +218,22 @@ and on a `404` the OpenID Connect discovery document at the issuer followed
 by `/.well-known/openid-configuration`. The document's `issuer` must equal
 the configured value exactly, or no token is requested (RFC 8414 §3.3).
 
-The bridge fetches the token on the first CDR call, not at boot, and every
-call shares it. It fetches a new one `refresh_margin_ms` before `expires_in`
+The bridge fetches the token on the first call to that upstream, not at boot,
+and every call to it shares it. It fetches a new one `refresh_margin_ms` before `expires_in`
 runs out; the margin is capped at half the token's lifetime, so a short-lived
-token is still reused. A token without `expires_in` is reused until the CDR
-refuses it. Calls that find no usable token at the same time share one
-request to the token endpoint. When the CDR answers `401`, the bridge drops
-the token, fetches a new one and sends the call once more, a `POST`
-included, since a `401` means the CDR applied nothing (RFC 9110 §15.5.2). A
-second `401` reaches the caller as any refused credential does.
+token is still reused. A token without `expires_in` is reused until the
+upstream refuses it. Calls that find no usable token at the same time share
+one request to the token endpoint. When the upstream answers `401`, the bridge
+drops the token, fetches a new one and sends the call once more, a `POST`
+included, since a `401` means the upstream applied nothing (RFC 9110
+§15.5.2). A second `401` reaches the caller as any refused credential does.
 
 A token request that fails is an error naming the token endpoint's status
 and, when the body carries one, the OAuth `error` and `error_description`
 (RFC 6749 §5.2), for example `the token endpoint answered 401 Unauthorized:
 invalid_client (unknown client)`. A failed fetch is not cached: the next call
-asks again. The `cdr` readiness indicator reports down with that reason while
-no token can be obtained. The bridge sends bearer tokens only; a token
+asks again. The `cdr` or `terminology` readiness indicator reports down with
+that reason while no token can be obtained. The bridge sends bearer tokens only; a token
 response with another `token_type` is refused. Point `token_endpoint` and
 `issuer` at `https` URLs outside a network you control, because the client
 secret travels in the token request.
@@ -246,7 +249,8 @@ scope = "openehr"
 As environment variables, the same section reads
 `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__ISSUER`,
 `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_ID` and
-`FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE`.
+`FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE`. The terminology
+section reads the same names under `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__`.
 
 ### `[terminology]`
 
@@ -741,6 +745,7 @@ it carries.
 | `FERROBRIDGE__CDR__CREDENTIALS__PASSWORD` | `FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE` |
 | `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD` | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD_FILE` |
+| `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 | `FERROBRIDGE__CDM__URL` | `FERROBRIDGE__CDM__URL_FILE` |
 
 Prefer the `_file` route: a Docker or Kubernetes secret arrives as a file, and
@@ -754,9 +759,9 @@ exits 78, `EX_CONFIG`. Seven things are refused:
 - an unknown key or an unknown section;
 - a value of the wrong type, or one that is not a socket address, a URL, or a
   release name;
-- a `[cdr.credentials]` user beside its OAuth section, an OAuth section with
-  both an `issuer` and a `token_endpoint`, an `issuer` that is not an `https` URL
-  free of a query and a fragment, a `scope` that is not scope tokens, and a
+- a user beside the OAuth section of the same credentials section, an OAuth
+  section with both an `issuer` and a `token_endpoint`, an `issuer` that is
+  not an `https` URL free of a query and a fragment, a `scope` that is not scope tokens, and a
   `resource` with a fragment;
 - an `[auth]` algorithm that is symmetric or unknown, a `token_profile`
   other than `rfc9068` and `jwt`, and an `operator_scope` or a capability

@@ -176,7 +176,7 @@ FERROBRIDGE__CDM__URL_FILE=/run/secrets/cdm_url
 The CDR takes basic authentication, as above, or a token the bridge obtains
 with the OAuth 2.0 client credentials grant: leave the two basic variables
 unset and set the `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__` variables
-([`[cdr.credentials.oauth]`](configuration.md#cdrcredentialsoauth)), with the
+([`[cdr.credentials.oauth]`](configuration.md#cdrcredentialsoauth-and-terminologycredentialsoauth)), with the
 client secret in a compose secret of your own.
 
 Every credential is reachable through a `_file` sibling read once at boot, and

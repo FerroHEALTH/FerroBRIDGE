@@ -40,4 +40,5 @@ mod search_e2e;
 mod shutdown;
 mod support;
 mod telemetry;
+mod terminology_oauth;
 mod usage_report;

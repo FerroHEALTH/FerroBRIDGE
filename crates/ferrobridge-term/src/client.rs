@@ -4,7 +4,7 @@
 //! The client itself: one configured terminology server, one request at a
 //! time.
 
-use crate::config::{Config, Credentials};
+use crate::config::{Config, Credentials, TokenFailure};
 use crate::error::{Error, UpstreamError};
 use crate::outcome::{
     BatchOutcome, Coded, LookupOutcome, Request, TranslateOutcome, Translation, ValidateOutcome,
@@ -115,44 +115,72 @@ impl Client {
     ///
     /// Every FHIR REST server states its capabilities at that path
     /// (<https://hl7.org/fhir/R4/http.html#capabilities>), so a reachability
-    /// question needs no terminology operation. The call is sent once and
-    /// every status is returned as it stands, `401` and `404` included.
+    /// question needs no terminology operation. The call is not retried, and
+    /// every status is returned as it stands, `401` and `404` included; under
+    /// [`Credentials::OAuth`] a refused token is renewed once first.
     ///
     /// # Errors
     /// Returns [`Error::BaseUrl`] when the base URL cannot carry a path,
-    /// [`Error::Timeout`] when the server did not answer inside the configured
-    /// budget, and [`Error::Transport`] when the request never reached it.
+    /// [`Error::Token`] when no token could be obtained, [`Error::Timeout`]
+    /// when the server did not answer inside the configured budget, and
+    /// [`Error::Transport`] when the request never reached it.
     pub async fn reachability(&self) -> Result<StatusCode, Error> {
         let url = self.url(METADATA)?;
-        let request = self
-            .authorize(self.http.request(Method::GET, url.clone()))
-            .header(ACCEPT, FHIR_JSON);
-        let response = request.send().await.map_err(|source| {
-            if source.is_timeout() {
-                Error::Timeout {
-                    url: url.clone(),
-                    source,
-                }
-            } else {
-                Error::Transport {
-                    url: url.clone(),
-                    source,
-                }
-            }
-        })?;
+        let (response, renewal) = self
+            .send(&url, || {
+                self.http
+                    .request(Method::GET, url.clone())
+                    .header(ACCEPT, FHIR_JSON)
+            })
+            .await?;
+        if let Some(source) = renewal {
+            return Err(Error::Token { url, source });
+        }
         let status = response.status();
         tracing::debug!(path = url.path(), status = %status, "the terminology server answered a probe");
         Ok(status)
     }
 
-    /// Returns `request` carrying the configured credentials, when there are
-    /// any.
-    fn authorize(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        match self.config.credentials.as_ref() {
-            None => request,
+    /// Returns the response to the request `build` makes under the configured
+    /// credentials, with the provider's failure when the server refused an
+    /// OAuth token and no new one could be obtained.
+    ///
+    /// A refused OAuth token is dropped and the request sent once more under a
+    /// new one; a second `401` is returned as it stands.
+    async fn send(
+        &self,
+        url: &Url,
+        build: impl Fn() -> reqwest::RequestBuilder,
+    ) -> Result<(reqwest::Response, Option<TokenFailure>), Error> {
+        let provider = match self.config.credentials.as_ref() {
+            None => return Ok((dispatch(url, build()).await?, None)),
             Some(Credentials::Basic { user, password }) => {
-                request.basic_auth(user, Some(password.expose_secret()))
+                let request = build().basic_auth(user, Some(password.expose_secret()));
+                return Ok((dispatch(url, request).await?, None));
             }
+            Some(Credentials::OAuth(provider)) => provider,
+        };
+        let token = provider.token().await.map_err(|source| Error::Token {
+            url: url.clone(),
+            source,
+        })?;
+        let response = dispatch(url, build().bearer_auth(token.expose_secret())).await?;
+        // NOTE: RFC 9110 §15.5.2, a `401` means the request was not applied, so
+        // sending it once more under a renewed token cannot apply it twice.
+        if response.status() != StatusCode::UNAUTHORIZED {
+            return Ok((response, None));
+        }
+        provider.invalidate(&token);
+        match provider.token().await {
+            Ok(renewed) => {
+                tracing::debug!(
+                    path = url.path(),
+                    "the terminology server refused the token; re-sending once under a renewed one"
+                );
+                let request = build().bearer_auth(renewed.expose_secret());
+                Ok((dispatch(url, request).await?, None))
+            }
+            Err(source) => Ok((response, Some(source))),
         }
     }
 
@@ -438,27 +466,15 @@ impl Client {
 
     /// Sends `call` once and reads the whole answer.
     async fn attempt(&self, call: &Call) -> Result<Answer, Error> {
-        let mut request = self
-            .http
-            .request(Method::POST, call.url.clone())
-            .header(ACCEPT, FHIR_JSON)
-            .header(CONTENT_TYPE, FHIR_JSON)
-            .body(call.body.clone());
-        request = self.authorize(request);
-
-        let response = request.send().await.map_err(|source| {
-            if source.is_timeout() {
-                Error::Timeout {
-                    url: call.url.clone(),
-                    source,
-                }
-            } else {
-                Error::Transport {
-                    url: call.url.clone(),
-                    source,
-                }
-            }
-        })?;
+        let (response, renewal) = self
+            .send(&call.url, || {
+                self.http
+                    .request(Method::POST, call.url.clone())
+                    .header(ACCEPT, FHIR_JSON)
+                    .header(CONTENT_TYPE, FHIR_JSON)
+                    .body(call.body.clone())
+            })
+            .await?;
 
         let status = response.status();
         let headers = response.headers().clone();
@@ -480,6 +496,15 @@ impl Client {
             "the terminology server answered"
         );
 
+        if status == StatusCode::UNAUTHORIZED
+            && let Some(source) = renewal
+        {
+            return Err(Error::Renewal {
+                url: answer.url.clone(),
+                upstream: Box::new(self.upstream(&answer)),
+                source,
+            });
+        }
         if status == StatusCode::UNAUTHORIZED {
             return Err(Error::Unauthorized {
                 url: answer.url.clone(),
@@ -509,6 +534,23 @@ impl Client {
             upstream: Box::new(self.upstream(answer)),
         }
     }
+}
+
+/// Returns the response to `request`, sent once, for `url`.
+async fn dispatch(url: &Url, request: reqwest::RequestBuilder) -> Result<reqwest::Response, Error> {
+    request.send().await.map_err(|source| {
+        if source.is_timeout() {
+            Error::Timeout {
+                url: url.clone(),
+                source,
+            }
+        } else {
+            Error::Transport {
+                url: url.clone(),
+                source,
+            }
+        }
+    })
 }
 
 /// Returns the `WWW-Authenticate` challenge, when the answer carries usable

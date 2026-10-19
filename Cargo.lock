@@ -1507,8 +1507,9 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.1.128"
+version = "0.1.129"
 dependencies = [
+ "async-trait",
  "backon",
  "ferrobridge-testkit",
  "fhir-types",
@@ -1555,7 +1556,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.1.128"
+version = "0.1.129"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",

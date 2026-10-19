@@ -8,6 +8,7 @@ use omocl::engine::concept::VocabularyAliases;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use super::CdmSettings;
@@ -30,6 +31,7 @@ use super::section::Mappings;
 use super::section::Operator;
 use super::section::Terminology;
 use super::section::facade::Facade;
+use crate::cdr::oauth::cache::TokenSource;
 
 /// Returns the mapping-set paths `mappings` names, when it names both.
 ///
@@ -432,11 +434,29 @@ pub(super) fn resolve_terminology(
             initial_backoff: Duration::from_millis(terminology.retry.initial_backoff_ms),
             max_backoff: Duration::from_millis(terminology.retry.max_backoff_ms),
         });
-    if let Some(Basic { user, password }) =
-        resolve_credentials("terminology.credentials", &terminology.credentials)?
-    {
-        config = config
-            .with_credentials(ferrobridge_term::config::Credentials::Basic { user, password });
+    let basic = resolve_credentials("terminology.credentials", &terminology.credentials)?;
+    match (basic, terminology.credentials.oauth.as_ref()) {
+        (Some(_), Some(_)) => {
+            return Err(Error::OAuthScheme {
+                section: String::from("terminology.credentials"),
+            });
+        }
+        (Some(Basic { user, password }), None) => {
+            config = config
+                .with_credentials(ferrobridge_term::config::Credentials::Basic { user, password });
+        }
+        (None, Some(oauth)) => {
+            let grant = resolve_oauth("terminology.credentials.oauth", oauth)?;
+            let source =
+                TokenSource::new(grant, config.timeout).map_err(|source| Error::Client {
+                    upstream: "terminology",
+                    source: Box::new(source),
+                })?;
+            config = config.with_credentials(ferrobridge_term::config::Credentials::OAuth(
+                Arc::new(source),
+            ));
+        }
+        (None, None) => {}
     }
     Ok(config)
 }

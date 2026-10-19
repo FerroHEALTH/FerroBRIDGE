@@ -326,7 +326,7 @@ pub struct Cdr {
     /// The retry budget for idempotent calls.
     pub retry: Retry,
     /// The credentials the CDR expects.
-    pub credentials: Credentials<OAuthClient>,
+    pub credentials: Credentials,
     /// Whether the bridge reaches the ITS-REST 1.1.0 Demographic API of the
     /// CDR, a module the release marks `x-status: DEVELOPMENT`.
     pub demographic: bool,
@@ -344,8 +344,8 @@ impl Default for Cdr {
     }
 }
 
-/// The OAuth 2.0 client credentials grant the bridge obtains its CDR token
-/// with (RFC 6749 §4.4).
+/// The OAuth 2.0 client credentials grant the bridge obtains its token for one
+/// upstream with (RFC 6749 §4.4).
 ///
 /// Exactly one of `issuer` and `token_endpoint` is set.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -406,7 +406,7 @@ pub struct Terminology {
     /// The retry budget.
     pub retry: Retry,
     /// The credentials the server expects.
-    pub credentials: Credentials<NoGrant>,
+    pub credentials: Credentials,
 }
 
 impl Default for Terminology {
@@ -535,19 +535,15 @@ impl Default for Retry {
     }
 }
 
-/// The credentials one upstream expects: RFC 7617 basic authentication, which
-/// every upstream takes, and the token grant `Grant` names for the lanes that
-/// take one.
+/// The credentials one upstream expects: RFC 7617 basic authentication, or
+/// the OAuth 2.0 client credentials grant (RFC 6749 §4.4).
 ///
 /// Every secret is reachable inline or through its `_file` sibling; setting
-/// both is a boot error, and so is a user beside `oauth`. The CDR
-/// takes an [`OAuthClient`]; the terminology lane takes [`NoGrant`], so an
-/// `oauth` table under it is refused when the file is read. One shape serves
-/// both because `deny_unknown_fields` cannot be combined with
-/// `#[serde(flatten)]` (<https://serde.rs/field-attrs.html#flatten>).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+/// both is a boot error, and so is a user beside `oauth`. The CDR and the
+/// terminology lane share the shape.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct Credentials<Grant> {
+pub struct Credentials {
     /// The user name of RFC 7617 basic authentication.
     pub user: Option<String>,
     /// A file holding the user name, read at boot.
@@ -556,37 +552,9 @@ pub struct Credentials<Grant> {
     pub password: Option<Secret>,
     /// A file holding the password, read at boot.
     pub password_file: Option<PathBuf>,
-    /// The OAuth 2.0 client credentials grant (RFC 6749 §4.4) the bridge
-    /// obtains its token with, for a lane that takes one.
-    pub oauth: Option<Grant>,
-}
-
-impl<Grant> Default for Credentials<Grant> {
-    fn default() -> Self {
-        Self {
-            user: None,
-            user_file: None,
-            password: None,
-            password_file: None,
-            oauth: None,
-        }
-    }
-}
-
-/// The grant of a lane that obtains no token for itself: no value exists,
-/// and an `oauth` table is refused when the file is read.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NoGrant {}
-
-impl<'de> Deserialize<'de> for NoGrant {
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        Err(serde::de::Error::custom(
-            "this lane obtains no token with an OAuth grant, so it takes no `oauth` table",
-        ))
-    }
+    /// The OAuth 2.0 client credentials grant the bridge obtains its token
+    /// with.
+    pub oauth: Option<OAuthClient>,
 }
 
 /// The `FerroHEALTH` installation report to `FerroPULSE`.

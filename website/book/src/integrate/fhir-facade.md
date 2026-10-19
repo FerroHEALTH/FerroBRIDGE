@@ -169,7 +169,7 @@ interaction, resource type, id and status and its position in the Bundle as
 never carries the token, another claim, a query value or a body.
 
 The bridge reaches the CDR with its own credential
-([`[cdr.credentials.oauth]`](../operate/configuration.md#cdrcredentialsoauth)),
+([`[cdr.credentials.oauth]`](../operate/configuration.md#cdrcredentialsoauth-and-terminologycredentialsoauth)),
 never with the caller's token, because an access token is bound to the
 audience it was issued for. The CDR therefore records the bridge as the actor,
 and the caller's identity lives in the bridge's audit line.
