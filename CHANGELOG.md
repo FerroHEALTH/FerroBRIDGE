@@ -36,29 +36,6 @@ crates on crates.io.
   `engine::traverse::party::to_party` and `from_party` map a FHIR resource to a
   party and back; `WebTemplateIndex::read` reads any `CanonicalDocument`. No
   specification governs a party build: our own design.
-
-### Changed
-
-- **Breaking for a library consumer** of `fhirconnect` 0.1.148:
-  `fhirconnect::resolve::program::binding::PartyClass` is gone, and
-  `Program::party` answers `openehr_mapping_core::party::PartyClass`; a
-  consumer imports it from there. `EngineError` gains `CompositionProgram` and
-  `PartyBuild`, and a consumer that matches it exhaustively adds the arms.
-
-### Fixed
-
-- A pull request merged after a release no longer files its changelog
-  entries under that release (#913). `scripts/gh/watch-prs.sh` merges
-  `CHANGELOG.md` by entry through the new `scripts/gh/changelog-merge.sh`,
-  which keeps a branch's entries under `[Unreleased]`, also when a clean line
-  merge would have placed them under a version cut meanwhile.
-  `scripts/checks/changelog-released.sh` fails CI when a released section from
-  0.0.9 on differs from its text at its tag.
-
-## [0.0.9] - 2026-10-19
-
-### Added
-
 - FHIRconnect party contexts compile (#898). A context whose operational
   template is rooted at a `PERSON`, `ORGANISATION` or `ROLE` is a party
   context, read from the RM type of the template root, and `Program::party`
@@ -76,10 +53,25 @@ crates on crates.io.
 
 ### Changed
 
+- **Breaking for a library consumer** of `fhirconnect` 0.1.148:
+  `fhirconnect::resolve::program::binding::PartyClass` is gone, and
+  `Program::party` answers `openehr_mapping_core::party::PartyClass`; a
+  consumer imports it from there. `EngineError` gains `CompositionProgram` and
+  `PartyBuild`, and a consumer that matches it exhaustively adds the arms.
 - The README, the landing page and the build-order page name v0.0.9 as the
   latest release, and `scripts/checks/versions.sh` compares the release each
   names with the workspace version and its changelog date, so the next cut
   fails the guard until they move with it (#908).
+
+### Fixed
+
+- A pull request merged after a release no longer files its changelog
+  entries under that release (#913). `scripts/gh/watch-prs.sh` merges
+  `CHANGELOG.md` by entry through the new `scripts/gh/changelog-merge.sh`,
+  which keeps a branch's entries under `[Unreleased]`, also when a clean line
+  merge would have placed them under a version cut meanwhile.
+  `scripts/checks/changelog-released.sh` fails CI when a released section from
+  0.0.9 on differs from its text at its tag.
 
 ## [0.0.9] - 2026-10-19
 
