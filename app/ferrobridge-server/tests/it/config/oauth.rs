@@ -31,7 +31,7 @@ fn rule<'a>(error: &'a Error, section: &str) -> Option<&'a ConfigError> {
         Error::Credentials {
             section: named,
             source,
-        } if named == section => Some(source),
+        } if named == section => Some(source.as_ref()),
         _ => None,
     }
 }
@@ -333,7 +333,10 @@ fn an_issuer_that_is_not_https_or_carries_a_query_refuses_to_boot() -> Result<()
             &format!("issuer = \"{issuer}\"\nclient_id = \"c\"\nclient_secret = \"s\"\n"),
         ))?;
         assert!(
-            matches!(&error, Error::Issuer { key } if key == "cdr.credentials.oauth.issuer"),
+            matches!(
+                rule(&error, "cdr.credentials"),
+                Some(ConfigError::OauthIssuer { .. })
+            ),
             "{issuer}: {error:?}"
         );
     }
@@ -376,7 +379,12 @@ fn a_resource_with_a_fragment_refuses_to_boot() -> Result<(), Box<dyn StdError>>
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\nresource = \"https://cdr.example.org/v1#x\"\n",
     ))?;
     assert!(
-        matches!(&error, Error::Resource { key } if key == "cdr.credentials.oauth.resource"),
+        matches!(
+            rule(&error, "cdr.credentials"),
+            Some(ConfigError::Fragment {
+                key: "credentials.oauth.resource"
+            })
+        ),
         "{error:?}"
     );
     Ok(())

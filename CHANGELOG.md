@@ -60,6 +60,10 @@ crates on crates.io.
   where a caller's identity store does that. `OperationError` gains two
   variants, so a consumer that matches it exhaustively adds the arms.
   `fhirconnect` 0.1.156.
+- `[auth] scopes_supported`: the scopes the bridge honours, listed as
+  `scopes_supported` in the SMART discovery document, which "the server
+  SHALL support" (SMART App Launch 2.2.0, Conformance, Metadata); each
+  value is one scope token, checked at load (#1007).
 
 ### Changed
 
@@ -83,7 +87,7 @@ crates on crates.io.
     `ES256` and `ES384`, where it was `RS256` and `ES256`.
   - `auth.issuer` may be plain `http` on a loopback host; elsewhere it stays
     `https`.
-  - `auth.operator_scope` becomes `operator.scope`, and its default
+  - `auth.operator_scope` becomes `auth.product_scope`, and its default
     `ferrobridge.operator` becomes `__ferrobridge.operator`, the extension
     form SMART App Launch 2.2.0 gives a scope (a string starting with `__`
     or a full URI); any other value refuses the start. Grant the new scope
@@ -131,6 +135,21 @@ crates on crates.io.
   tag, is missing or still holds an open issue or pull request, and names
   each one; once every leg has succeeded, crates.io included, it closes that
   milestone (#983).
+- `ferrohealth-smart` 0.1.1 (#1007). The operator scope moves from
+  `[operator] scope` to `[auth] product_scope` (environment
+  `FERROBRIDGE__AUTH__PRODUCT_SCOPE`), default `__ferrobridge.operator`,
+  checked by the crate in the same two SMART extension forms. The audit
+  line's field for what a request addressed is `addressed`, where it was
+  `target`, so a JSON log keeps it beside the event's own `target`; a log
+  query that read `target` for the addressed resource reads `addressed`.
+  `[auth] capabilities` refuses at load a value SMART App Launch 2.2.0
+  does not define unless it is a full URI. The issuer and resource checks
+  of `[<lane>.credentials.oauth]` and the Basic password read are the
+  crate's now, with the same refusals at load.
+- `serve` warns that `[auth]` is off only when a surface it guards runs,
+  and names those surfaces (the facade, the operator API, the operations
+  lane); a server with only `/` and the health routes logs nothing
+  (#1005).
 
 ### Fixed
 

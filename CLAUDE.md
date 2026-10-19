@@ -111,7 +111,7 @@ the testkit tool crate. Beside it:
   id under `state_dir`, validated against the vendored schema in the tests.
   `src/operator/` is the
   read-only operator API behind `[operator]` and `[auth]` (#596): the guard
-  that admits only a token carrying `operator.scope`, the mapping roots
+  that admits only a token carrying `auth.product_scope`, the mapping roots
   with every wire path confined to its directory, and the running load as
   the `check` module reports it; with `[operator] mapping_dir` it checks a
   draft, saves it beside the provisioned tree and reloads (#597), swapping the

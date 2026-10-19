@@ -112,10 +112,11 @@ services:
       FERROBRIDGE__AUTH__ENABLED:
       FERROBRIDGE__AUTH__ISSUER:
       FERROBRIDGE__AUTH__AUDIENCE:
+      # The operator scope, `__ferrobridge.operator` when unset.
+      FERROBRIDGE__AUTH__PRODUCT_SCOPE:
       # The operator API (it needs [auth]) saves console mapping files under
       # this path, the writable volume below; it saves nothing while it is off.
       FERROBRIDGE__OPERATOR__ENABLED:
-      FERROBRIDGE__OPERATOR__SCOPE:
       FERROBRIDGE__OPERATOR__MAPPING_DIR: /var/lib/ferrobridge/mappings
       # `auto` renders pretty output on a terminal and JSON otherwise.
       FERROBRIDGE__TELEMETRY__FORMAT: ${FERROBRIDGE_LOG_FORMAT:-auto}

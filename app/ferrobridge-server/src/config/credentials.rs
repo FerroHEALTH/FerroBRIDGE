@@ -7,7 +7,6 @@
 use std::path::Path;
 
 use ferrohealth_smart::client::ClientCredentials;
-use ferrohealth_smart::client::Endpoint;
 use ferrohealth_smart::config::CredentialsSection;
 use ferrohealth_smart::config::Outbound;
 use secrecy::{ExposeSecret, SecretString};
@@ -34,70 +33,24 @@ pub(super) enum Upstream {
 ///
 /// `ferrohealth-smart` checks the table: Basic or the grant and never both,
 /// exactly one of each secret and its `_file`, exactly one of `issuer` and
-/// `token_endpoint`, a client id, the key of a `private_key_jwt` client, and
-/// every scope token. The bridge adds the issuer URL rule of RFC 8414 §2 and
-/// the fragment rule of RFC 8707 §2, so both refuse the start rather than the
-/// first token request.
+/// `token_endpoint`, the issuer URL rule of RFC 8414 §2, a client id, the
+/// key of a `private_key_jwt` client, every scope token, and a resource
+/// indicator without a fragment (RFC 8707 §2).
 pub(super) fn resolve_credentials(
     section: &str,
     credentials: &CredentialsSection,
 ) -> Result<Option<Upstream>, Error> {
     let outbound = credentials.resolve().map_err(|source| Error::Credentials {
         section: section.to_owned(),
-        source,
+        source: Box::new(source),
     })?;
-    match outbound {
-        None => Ok(None),
-        Some(Outbound::Basic(credential)) => Ok(Some(Upstream::Basic {
+    Ok(outbound.map(|outbound| match outbound {
+        Outbound::Basic(credential) => Upstream::Basic {
             user: credential.username().to_owned(),
-            password: basic_password(section, credentials)?,
-        })),
-        Some(Outbound::Oauth(grant)) => {
-            if let Endpoint::Issuer(issuer) = &grant.endpoint
-                && ferrohealth_smart::metadata::issuer_url(issuer).is_err()
-            {
-                return Err(Error::Issuer {
-                    key: format!("{section}.oauth.issuer"),
-                });
-            }
-            if grant
-                .resource
-                .as_ref()
-                .is_some_and(|resource| resource.fragment().is_some())
-            {
-                return Err(Error::Resource {
-                    key: format!("{section}.oauth.resource"),
-                });
-            }
-            Ok(Some(Upstream::OAuth(grant)))
-        }
-    }
-}
-
-/// Returns the Basic password of the table `section`, which
-/// `ferrohealth-smart` has already found set exactly once.
-fn basic_password(section: &str, credentials: &CredentialsSection) -> Result<SecretString, Error> {
-    // NOTE: no specification governs this: our own design; the crate's Basic
-    // credential keeps its password private and both clients take user and
-    // password, so the password is read from the table the crate checked.
-    match (&credentials.password, &credentials.password_file) {
-        (Some(password), _) => Ok(SecretString::from(password.expose_secret().to_owned())),
-        (None, Some(path)) => {
-            let text = SecretString::from(std::fs::read_to_string(path).map_err(|source| {
-                Error::Secret {
-                    key: format!("{section}.password_file"),
-                    path: path.clone(),
-                    source,
-                }
-            })?);
-            Ok(SecretString::from(
-                text.expose_secret().trim_end_matches(['\n', '\r']),
-            ))
-        }
-        (None, None) => Err(Error::Missing {
-            key: format!("{section}.password"),
-        }),
-    }
+            password: credential.password().clone(),
+        },
+        Outbound::Oauth(grant) => Upstream::OAuth(grant),
+    }))
 }
 
 /// Returns the key whose value `error` refuses: the CA's for a CA fault, the
