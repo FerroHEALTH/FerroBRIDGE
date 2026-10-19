@@ -121,6 +121,14 @@ fn required(node: Option<&Node>) -> bool {
     }
 }
 
+/// How many segments the trial walks behind one placement may place.
+///
+/// No specification governs this: our own design; the trial walks nest, so
+/// a bound keeps a message built to be ambiguous from costing more than
+/// linear work per segment, and once it is spent each trial segment takes
+/// the first node that accepts it.
+const TRIAL_BUDGET: usize = 4096;
+
 /// Places the segment `id` at `index`, returning whether a node took it.
 ///
 /// `rest` holds the ids of the segments that follow, in message order. The
@@ -128,7 +136,8 @@ fn required(node: Option<&Node>) -> bool {
 /// first, takes it, unless it opens a group the following segments leave
 /// with a required member empty: then the first later node whose taking
 /// leaves no required member empty takes it, and the first node does when
-/// no such node exists.
+/// no such node exists. The trial walk that judges a group places each
+/// following segment by the same rule.
 // NOTE: the HL7/v2ig message structures (`message_structures/*.json`) give each group member its
 // `min`; choosing among the nodes that accept a segment by those cardinalities is our own design.
 pub(super) fn place(
@@ -138,27 +147,32 @@ pub(super) fn place(
     rest: &[&str],
     missing: &mut Vec<Missing>,
 ) -> bool {
-    let Some(first) = accepting(stack, id) else {
+    let mut budget = TRIAL_BUDGET;
+    let Some(chosen) = choose(stack, id, index, rest, &mut budget) else {
         return false;
-    };
-    let chosen = if completes(stack, first, id, index, rest) {
-        first
-    } else {
-        alternatives(stack, id)
-            .into_iter()
-            .filter(|found| *found != first)
-            .find(|found| clean(stack, *found, id, index, rest))
-            .unwrap_or(first)
     };
     take(stack, chosen, id, index, missing)
 }
 
-/// Places the segment `id` at the first node that accepts it, without a
-/// look at the segments that follow.
-fn place_first(stack: &mut Vec<Frame>, id: &str, index: usize, missing: &mut Vec<Missing>) {
-    if let Some(found) = accepting(stack, id) {
-        take(stack, found, id, index, missing);
+/// The node that takes the segment `id` by the rule [`place`] states.
+fn choose(
+    stack: &[Frame],
+    id: &str,
+    index: usize,
+    rest: &[&str],
+    budget: &mut usize,
+) -> Option<(usize, usize)> {
+    let first = accepting(stack, id)?;
+    if completes(stack, first, id, index, rest, budget) {
+        return Some(first);
     }
+    Some(
+        alternatives(stack, id)
+            .into_iter()
+            .filter(|found| *found != first)
+            .find(|found| clean(stack, *found, id, index, rest, budget))
+            .unwrap_or(first),
+    )
 }
 
 /// Closes the frames above `depth` and takes node `position` of the frame
@@ -203,7 +217,14 @@ fn alternatives(stack: &[Frame], id: &str) -> Vec<(usize, usize)> {
 /// Whether taking `found` for `id` leaves no required member empty: none
 /// in the groups it closes, none among the nodes it passes over, and none
 /// in the group it opens.
-fn clean(stack: &[Frame], found: (usize, usize), id: &str, index: usize, rest: &[&str]) -> bool {
+fn clean(
+    stack: &[Frame],
+    found: (usize, usize),
+    id: &str,
+    index: usize,
+    rest: &[&str],
+    budget: &mut usize,
+) -> bool {
     let (depth, position) = found;
     let mut missing = Vec::new();
     for frame in stack.iter().skip(depth.saturating_add(1)) {
@@ -217,19 +238,20 @@ fn clean(stack: &[Frame], found: (usize, usize), id: &str, index: usize, rest: &
             frame.counts.get(skipped).copied().unwrap_or_default() == 0
                 && required(frame.nodes.get(skipped))
         });
-    missing.is_empty() && !passes && completes(stack, found, id, index, rest)
+    missing.is_empty() && !passes && completes(stack, found, id, index, rest, budget)
 }
 
 /// Whether the group `found` opens, when it is a group, has every required
 /// member filled by the time it closes: a trial walk of the segments in
-/// `rest` over a copy of the open groups, each placed at the first node
-/// that accepts it, until one falls outside the group.
+/// `rest` over a copy of the open groups, each placed by the rule of
+/// [`place`], until one falls outside the group.
 fn completes(
     stack: &[Frame],
     found: (usize, usize),
     id: &str,
     index: usize,
     rest: &[&str],
+    budget: &mut usize,
 ) -> bool {
     let (depth, position) = found;
     let opens = stack
@@ -249,10 +271,22 @@ fn completes(
     }
     let opened = depth.saturating_add(1);
     let mut missing = Vec::new();
-    for next in rest {
+    for (offset, next) in rest.iter().enumerate() {
         match accepting(&trial, next) {
             Some((at, _)) if at < opened => break,
-            Some(_) => place_first(&mut trial, next, index, &mut missing),
+            Some(first) => {
+                let chosen = if *budget == 0 {
+                    first
+                } else {
+                    *budget = budget.saturating_sub(1);
+                    let after = rest.get(offset.saturating_add(1)..).unwrap_or_default();
+                    choose(&trial, next, index, after, budget).unwrap_or(first)
+                };
+                if chosen.0 < opened {
+                    break;
+                }
+                take(&mut trial, chosen, next, index, &mut missing);
+            }
             None => {}
         }
     }
