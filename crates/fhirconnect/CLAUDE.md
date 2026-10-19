@@ -107,8 +107,13 @@ when the class pairs with it, a text primitive that is no pair converts as a
 `string`, and a choice element with no type filter is written as the first
 pair of the class the choice admits (going in, the alternative the document
 carries decides). An `Extension` against a data value converts through its
-`value[x]`. An untyped mapping onto a structural (`PATHABLE`) node anchors its
-children, and one with no child is a warning, never a silent nothing. Every
+`value[x]`. An untyped mapping onto a polymorphic `ELEMENT` (the Web Template
+gives each admitted data type a child node) converts into the alternative
+whose class lists the FHIR type earliest in `PAIRS` (`Derived::Value`) and
+anchors its children at the `ELEMENT`, because `FollowedBy.adoc` runs the
+children after the parent "has been executed". Any other untyped mapping
+onto a structural (`PATHABLE`) node anchors its children, and one with no
+child is a warning, never a silent nothing. Every
 pair in `PAIRS` must name a `FhirKind`; `engine::fhir` tests that.
 
 ## Direction enters the engine at three points only

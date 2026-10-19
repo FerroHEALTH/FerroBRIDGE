@@ -16,10 +16,11 @@ expression: declared
   "second_leg": [],
   "lost": [
     "active = true",
-    "id = \"ferrobridge-kds-patient-1\"",
-    "identifier[1].system = \"http://fhir.de/sid/gkv/kvid-10\"",
-    "identifier[1].value = \"Z000000000\""
+    "id = \"ferrobridge-kds-patient-1\""
   ],
-  "added": [],
+  "added": [
+    "identifier[1].type.coding[0].code = \"KVZ10\"",
+    "identifier[1].type.coding[0].system = \"http://fhir.de/CodeSystem/identifier-type-de-basis\""
+  ],
   "changed": []
 }

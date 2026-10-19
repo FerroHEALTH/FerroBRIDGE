@@ -209,6 +209,51 @@ fn getput_holds_on_the_kds_person_composition() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// `versicherungsId` maps the statutory insurance `Identifier` onto
+/// `items[at0006]`, an `ELEMENT` whose value admits five data types and which
+/// carries `followedBy` children. `FollowedBy.adoc` runs the children after
+/// the parent "has been executed", so the parent converts its value into the
+/// `DV_IDENTIFIER` alternative, the class `Identifier` pairs with.
+#[test]
+fn the_statutory_insurance_identifier_round_trips() -> Result<(), Box<dyn Error>> {
+    let (program, index) = kds_person_program()?;
+    let composition = inbound(&program, &index, kds_patient()?)?;
+    let flat = index.flatten(&composition)?;
+    let carried: Vec<&String> = flat
+        .iter()
+        .filter(|&(_, value)| *value == serde_json::json!("Z000000000"))
+        .map(|(key, _)| key)
+        .collect();
+    assert_eq!(
+        carried,
+        ["person/versicherungsinformationen/versicherungsnummer/identifier_value|id"],
+        "the DV_IDENTIFIER alternative carries the insurance number"
+    );
+    let outbound = fhirconnect::engine::traverse::to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        &composition,
+        &fhirconnect::engine::seam::Seams::default(),
+        &fhirconnect::engine::context::CallContext::new(),
+    )?;
+    let patient = outbound
+        .value()
+        .to_serde_json(&mut fhir_types::codec::Path::root("Patient"))?;
+    let identifiers = patient
+        .get("identifier")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("the Patient carries identifiers")?;
+    assert!(
+        identifiers.iter().any(|identifier| {
+            identifier.get("system") == Some(&serde_json::json!("http://fhir.de/sid/gkv/kvid-10"))
+                && identifier.get("value") == Some(&serde_json::json!("Z000000000"))
+        }),
+        "the insurance identifier comes back: {identifiers:?}"
+    );
+    Ok(())
+}
+
 /// `person.context.yaml` line 29 lists `KDS_person_data.v0`, a name no file
 /// of the library carries: the file that extends `ADMIN_ENTRY.person_data.v0`
 /// is named `KDS_admin_entry_person.v0`. A context's `extensions` reference
