@@ -497,9 +497,11 @@ onto a `ROLE`, and `Organization` onto an `ORGANISATION`.
 - **Authorization.** A `patient/` token reaches the one `Patient` its launch
   context names and no other party resource.
 
-A `PractitionerRole` reads, vreads, lists its history and deletes; it cannot
-be created or updated yet, because a party context cannot map the `ROLE`'s
-mandatory `performer` (#911). These rules are FerroBRIDGE's own design: no
+A `PractitionerRole` maps `practitioner` onto the `ROLE`'s mandatory
+`performer`. The reference must name a `Practitioner` this facade serves,
+relative (`Practitioner/<id>`) or under the facade's base, and carry nothing
+beside `reference`; the facade answers any other reference, and a role with
+no practitioner, with an error rather than dropping it. These rules are FerroBRIDGE's own design: no
 specification defines a FHIRconnect mapping rooted at a party.
 
 ## `$validate` is a dry run of this server

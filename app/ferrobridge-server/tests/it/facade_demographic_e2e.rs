@@ -6,22 +6,20 @@
 //! Demographic API, DEVELOPMENT).
 //!
 //! The testkit's synthetic party templates are uploaded, and `Patient`,
-//! `Practitioner` and `Organization` each create, read, update, vread, list
-//! their history and delete through the facade. A `ROLE` committed through the
-//! Demographic API reads, vreads, lists its history and deletes as a
-//! `PractitionerRole`. No specification governs a party context: our own
-//! design.
+//! `Practitioner`, `Organization` and `PractitionerRole` each create, read,
+//! update, vread, list their history and delete through the facade. The
+//! `PractitionerRole`'s practitioner is a `Practitioner` created first, which
+//! becomes the `ROLE`'s mandatory `performer` (RM Demographic IM, the `ROLE`
+//! class). No specification governs a party context: our own design.
 
 use std::error::Error as StdError;
 use std::sync::Arc;
 
 use axum::body::Body;
 use ferrobridge_server::cdr::CdrClient;
-use ferrobridge_server::cdr::Prefer;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::Settings;
-use ferrobridge_server::facade::commit::Change;
 use ferrobridge_server::facade::ehr::Policy;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::identity::store::Store;
@@ -31,8 +29,6 @@ use ferrobridge_testkit::fixtures;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use openehr_its::rest::generated::demographic::client::RoleCreateOutcome;
-use openehr_rm::v1_2::demographic::role::Role;
 
 use crate::facade_e2e::app;
 use crate::facade_e2e::call;
@@ -71,25 +67,37 @@ fn resource(resource_type: &str, name: &str) -> serde_json::Value {
     }
 }
 
+/// Returns a `PractitionerRole` coded `name` whose practitioner is the
+/// `Practitioner` the facade serves under `performer`.
+fn practitioner_role(name: &str, performer: &str) -> serde_json::Value {
+    serde_json::json!({
+        "resourceType": "PractitionerRole",
+        "identifier": [{"system": "http://example.org/fhir/sid/synthetic", "value": "SYN-0001"}],
+        "code": [{"text": name}],
+        "practitioner": {"reference": format!("Practitioner/{performer}")}
+    })
+}
+
 /// Returns the name `body` carries, as `type` spells it.
 fn name_of<'b>(resource_type: &str, body: &'b serde_json::Value) -> &'b serde_json::Value {
     match resource_type {
         "Organization" => &body["name"],
+        "PractitionerRole" => &body["code"][0]["text"],
         _ => &body["name"][0]["text"],
     }
 }
 
 /// Runs the whole lifecycle of one resource type through the facade.
-async fn lifecycle(facade: &Arc<Facade>, resource_type: &str) -> Result<(), Box<dyn StdError>> {
+async fn lifecycle(
+    facade: &Arc<Facade>,
+    resource_type: &str,
+    make: &dyn Fn(&str) -> serde_json::Value,
+) -> Result<(), Box<dyn StdError>> {
+    let first_body = make("Synthetic First");
     let base = format!("/fhir/{resource_type}");
     let created = call(
         app(facade),
-        with_body(
-            http::Method::POST,
-            &base,
-            &resource(resource_type, "Synthetic First"),
-            None,
-        )?,
+        with_body(http::Method::POST, &base, &first_body, None)?,
     )
     .await?;
     assert_eq!(
@@ -116,8 +124,11 @@ async fn lifecycle(facade: &Arc<Facade>, resource_type: &str) -> Result<(), Box<
         "{}",
         read.1
     );
+    if let Some(practitioner) = first_body.get("practitioner") {
+        assert_eq!(&read.1["practitioner"], practitioner, "{}", read.1);
+    }
 
-    let mut revised = resource(resource_type, "Synthetic Second");
+    let mut revised = make("Synthetic Second");
     revised["id"] = serde_json::Value::from(id.as_str());
     let updated = call(
         app(facade),
@@ -178,66 +189,6 @@ async fn lifecycle(facade: &Arc<Facade>, resource_type: &str) -> Result<(), Box<
     Ok(())
 }
 
-/// Commits a synthetic `ROLE` of the role template through the Demographic
-/// API, performed by the party `performer` names, and returns its object id.
-async fn seed_role(client: &CdrClient, performer: &str) -> Result<String, Box<dyn StdError>> {
-    let role: Role = openehr_its::json::from_canonical_value(&serde_json::json!({
-        "_type": "ROLE",
-        "name": {"_type": "DV_TEXT", "value": "Synthetic role"},
-        "archetype_node_id": "openEHR-DEMOGRAPHIC-ROLE.ferrobridge_role.v1",
-        "archetype_details": {
-            "_type": "ARCHETYPED",
-            "archetype_id": {"_type": "ARCHETYPE_ID", "value": "openEHR-DEMOGRAPHIC-ROLE.ferrobridge_role.v1"},
-            "template_id": {"_type": "TEMPLATE_ID", "value": fixtures::ROLE_TEMPLATE_ID},
-            "rm_version": "1.1.0"
-        },
-        "identities": [{
-            "_type": "PARTY_IDENTITY",
-            "name": {"_type": "DV_TEXT", "value": "Identity"},
-            "archetype_node_id": "at0003",
-            "details": {
-                "_type": "ITEM_TREE",
-                "name": {"_type": "DV_TEXT", "value": "Identity details"},
-                "archetype_node_id": "at0004",
-                "items": [{
-                    "_type": "ELEMENT",
-                    "name": {"_type": "DV_TEXT", "value": "Name"},
-                    "archetype_node_id": "at0005",
-                    "value": {"_type": "DV_TEXT", "value": "Synthetic Role"}
-                }]
-            }
-        }],
-        "performer": {
-            "_type": "PARTY_REF",
-            "namespace": "demographic",
-            "type": "PERSON",
-            "id": {"_type": "HIER_OBJECT_ID", "value": performer}
-        }
-    }))?;
-    let commit = ferrobridge_server::facade::commit::context(
-        Change::Creation,
-        "ferrobridge.e2e",
-        fixtures::ROLE_TEMPLATE_ID,
-    )?;
-    let answered = client
-        .demographic()
-        .ok_or("the case turned the Demographic API on")?
-        .role_create(&role, &commit, Prefer::Minimal)
-        .await?
-        .answered;
-    let etag = match answered.outcome {
-        RoleCreateOutcome::Created { headers, .. } => headers.etag,
-        RoleCreateOutcome::NoContent { headers } => headers.etag,
-        other => return Err(format!("the CDR refused the ROLE: {other:?}").into()),
-    };
-    let version = ferrobridge_server::cdr::ids::version_from_etag(
-        etag.as_deref().ok_or("the ROLE create answers an ETag")?,
-    )?;
-    Ok(String::from(
-        ferrobridge_server::cdr::ids::versioned_object_uid(&version).value(),
-    ))
-}
-
 #[tokio::test]
 async fn the_party_resources_live_in_the_reference_cdrs_demographic_store()
 -> Result<(), Box<dyn StdError>> {
@@ -272,7 +223,10 @@ async fn the_party_resources_live_in_the_reference_cdrs_demographic_store()
         },
     ));
     for resource_type in ["Patient", "Practitioner", "Organization"] {
-        lifecycle(&facade, resource_type).await?;
+        lifecycle(&facade, resource_type, &|name| {
+            resource(resource_type, name)
+        })
+        .await?;
     }
 
     let performer = call(
@@ -287,31 +241,9 @@ async fn the_party_resources_live_in_the_reference_cdrs_demographic_store()
     .await?;
     assert_eq!(StatusCode::CREATED, performer.0, "{}", performer.1);
     let performer = performer.1["id"].as_str().ok_or("an id")?.to_owned();
-    let role = seed_role(&client, &performer).await?;
-    let read = call(
-        app(&facade),
-        Request::get(format!("/fhir/PractitionerRole/{role}")).body(Body::empty())?,
-    )
+    lifecycle(&facade, "PractitionerRole", &|name| {
+        practitioner_role(name, &performer)
+    })
     .await?;
-    assert_eq!(StatusCode::OK, read.0, "{}", read.1);
-    assert_eq!(read.1["code"][0]["text"], "Synthetic Role", "{}", read.1);
-    let first = call(
-        app(&facade),
-        Request::get(format!("/fhir/PractitionerRole/{role}/_history/1")).body(Body::empty())?,
-    )
-    .await?;
-    assert_eq!(StatusCode::OK, first.0, "{}", first.1);
-    let history = call(
-        app(&facade),
-        Request::get(format!("/fhir/PractitionerRole/{role}/_history")).body(Body::empty())?,
-    )
-    .await?;
-    assert_eq!(StatusCode::OK, history.0, "{}", history.1);
-    let deleted = call(
-        app(&facade),
-        Request::delete(format!("/fhir/PractitionerRole/{role}")).body(Body::empty())?,
-    )
-    .await?;
-    assert_eq!(StatusCode::NO_CONTENT, deleted.0, "{}", deleted.1);
     Ok(())
 }

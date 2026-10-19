@@ -207,6 +207,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     source: Box::new(source),
                 };
                 let (view, withheld) = match source {
+                    Leaf::Value(ref value) if let RmValue::PartyRef(ref party) = **value => {
+                        (self.reference_of_party(mapping, target, party)?, Vec::new())
+                    }
                     Leaf::Value(ref value) => {
                         let terminology = self.binding_of(openehr.node());
                         self.read_value(value, kind, terminology.as_deref())

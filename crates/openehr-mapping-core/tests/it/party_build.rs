@@ -9,6 +9,8 @@
 use ferrobridge_testkit::fixtures::MINIMAL_EVALUATION_OPT;
 use ferrobridge_testkit::fixtures::PERSON_OPT;
 use ferrobridge_testkit::fixtures::PERSON_TEMPLATE_ID;
+use ferrobridge_testkit::fixtures::ROLE_OPT;
+use ferrobridge_testkit::fixtures::ROLE_TEMPLATE_ID;
 use openehr_mapping_core::composition::NodeValue;
 use openehr_mapping_core::composition::RmPosition;
 use openehr_mapping_core::index::WebTemplateIndex;
@@ -207,5 +209,98 @@ fn a_later_value_at_one_place_replaces_the_earlier() {
             .value()
             .pointer("/identities/0/details/items/0/value/value"),
         Some(&Value::from("Synthetic Other"))
+    );
+}
+
+/// The values of one synthetic role: a name, and the performer at the root.
+fn role_values(index: &WebTemplateIndex, performer: Option<Value>) -> Vec<NodeValue> {
+    let mut values = vec![raw(
+        index,
+        NAME,
+        json!({"_type": "DV_TEXT", "value": "Synthetic Role"}),
+    )];
+    if let Some(performer) = performer {
+        values.push(
+            NodeValue::new(
+                index.root(),
+                json!({"_type": "ROLE", "performer": performer}),
+            )
+            .with_datum("raw"),
+        );
+    }
+    values
+}
+
+/// A synthetic `PARTY_REF` to a party of the demographic store.
+fn performer() -> Value {
+    json!({
+        "_type": "PARTY_REF",
+        "namespace": "demographic",
+        "type": "ACTOR",
+        "id": {"_type": "HIER_OBJECT_ID", "value": "8f0e7d4c-0000-4000-8000-000000000001"}
+    })
+}
+
+#[test]
+fn a_value_at_the_role_root_places_the_performer_on_the_root() {
+    let index = index_of(ROLE_OPT);
+    let built = index
+        .build_party(&role_values(&index, Some(performer())))
+        .expect("a ROLE with a performer builds");
+    assert_eq!(built.class(), PartyClass::Role);
+    assert_eq!(built.value().get("performer"), Some(&performer()));
+    assert_eq!(
+        built
+            .value()
+            .pointer("/archetype_details/template_id/value"),
+        Some(&Value::from(ROLE_TEMPLATE_ID))
+    );
+}
+
+/// RM Demographic IM, the `ROLE` class: `performer` is `1..1`.
+#[test]
+fn a_role_without_a_performer_is_refused_naming_the_rm_attribute() {
+    let index = index_of(ROLE_OPT);
+    let refused = index.build_party(&role_values(&index, None));
+    assert!(
+        matches!(refused, Err(PartyError::RoleWithoutPerformer { .. })),
+        "a ROLE without a performer built: {refused:?}"
+    );
+    if let Err(error) = refused {
+        assert!(error.to_string().contains("ROLE.performer"), "{error}");
+    }
+}
+
+/// RM Demographic IM, the `ROLE` class: a role a CDR serves with no
+/// `performer` is no valid `ROLE`.
+#[test]
+fn a_served_role_without_a_performer_is_refused() {
+    let index = index_of(ROLE_OPT);
+    let mut served = index
+        .build_party(&role_values(&index, Some(performer())))
+        .expect("a ROLE with a performer builds")
+        .into_value();
+    if let Some(object) = served.as_object_mut() {
+        object.remove("performer");
+    }
+    let refused = index.accept_party(&served);
+    assert!(
+        matches!(refused, Err(PartyError::RoleWithoutPerformer { .. })),
+        "{refused:?}"
+    );
+}
+
+#[test]
+fn a_root_value_naming_no_attribute_of_the_class_is_refused() {
+    let index = index_of(ROLE_OPT);
+    let mut values = role_values(&index, Some(performer()));
+    values.push(
+        NodeValue::new(index.root(), json!({"_type": "ROLE", "carer": performer()}))
+            .with_datum("raw"),
+    );
+    let refused = index.build_party(&values);
+    assert!(
+        matches!(refused, Err(PartyError::UnknownAttribute { .. })),
+        "{refused:?}"
     );
 }

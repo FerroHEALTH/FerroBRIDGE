@@ -129,6 +129,7 @@ impl<'a> Compiler<'a> {
                 &path.field("with").field("openehr"),
             );
         }
+        self.party_ref_target(file, &name, (fhir.as_ref(), openehr.as_ref()), method, path);
         Mapping::new(MappingParts {
             name,
             model: owner.clone(),

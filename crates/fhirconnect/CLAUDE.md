@@ -81,8 +81,14 @@ what it refuses at load, one code each: what names a composition
 composition). The engine's composition entry points refuse a party program
 (`EngineError::PartyProgram`); it runs through `engine::traverse::party`
 (`to_party`, `from_party`), which builds through
-`WebTemplateIndex::build_party` and reads through the same `read`. No
-specification governs a party context: our own design.
+`WebTemplateIndex::build_party` and reads through the same `read`. One RM
+attribute of the party root that no template node holds is mappable,
+`ROLE.performer` (`engine::rm::PARTY_ROOTS`); its `PARTY_REF` travels
+through `engine::lens::party_ref`, the reference resolved through the
+demographics seam and its type read from the element's `targetProfile` in
+the `fhir-types` table, and a foreign, typed-otherwise or decorated
+reference is refused. No specification governs a party context: our own
+design.
 
 Every diagnostic the compiler raises is collected. A run reports every
 disagreement it found, because a mapping author fixing one refusal at a time is

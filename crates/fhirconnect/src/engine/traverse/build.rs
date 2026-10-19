@@ -9,6 +9,7 @@ use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::composition::NodeValue;
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::index::paths::AqlPath;
+use openehr_mapping_core::party::PartyClass;
 use openehr_mapping_core::template::PathError;
 use openehr_rm::v1_2::common::generic::party_identified::PartyIdentifiedData;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
@@ -220,6 +221,19 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
                 node: String::from(node.aql_path().as_str()),
                 source: Box::new(source),
             };
+            // NOTE: no specification governs a party context: our own design, an attribute of
+            // the party root (`rm::PARTY_ROOTS`) travels as the root's members, which no
+            // data-type cell reads whole.
+            if let Held::Partial(ref object) = written.value
+                && PartyClass::from_rm_type(node.rm_type()).is_some()
+            {
+                values.push(
+                    NodeValue::new(node, serde_json::Value::Object(object.clone()))
+                        .with_occurrences(written.positions.clone())
+                        .with_datum(rm::RAW),
+                );
+                continue;
+            }
             let value = match written.value {
                 Held::Value(ref value) => value.clone(),
                 Held::Partial(ref object) => {

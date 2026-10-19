@@ -63,6 +63,7 @@ pub struct Field {
     min: u32,
     max: Option<u32>,
     types: &'static [&'static str],
+    target_profiles: &'static [&'static str],
 }
 
 impl Field {
@@ -110,6 +111,14 @@ impl Field {
         self.types
     }
 
+    /// Returns the canonical URLs the definition's types list in
+    /// `targetProfile`, in its order
+    /// (<https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.type.targetProfile>).
+    #[must_use]
+    pub const fn target_profiles(&self) -> &'static [&'static str] {
+        self.target_profiles
+    }
+
     /// Returns whether the element repeats, so the JSON holds an array.
     #[must_use]
     pub fn repeats(&self) -> bool {
@@ -125,6 +134,7 @@ impl Field {
             min: self.min,
             max: self.max,
             types: self.types,
+            target_profiles: self.target_profiles,
         }
     }
 }
@@ -238,6 +248,24 @@ impl Resolved {
             | Location::Resource
             | Location::Deferred => None,
         }
+    }
+
+    /// Returns the `targetProfile` canonicals of the element the walk ends
+    /// on, empty when the walk ends on no element.
+    #[must_use]
+    pub fn target_profiles(&self) -> &'static [&'static str] {
+        self.moves
+            .iter()
+            .rev()
+            .find_map(|step| match step {
+                Move::Member(field)
+                | Move::Choice { field, .. }
+                | Move::Extension { field, .. } => Some(field.target_profiles()),
+                Move::Ordinal(_) | Move::Index(_) | Move::Predicate(_) | Move::Resolve { .. } => {
+                    None
+                }
+            })
+            .unwrap_or_default()
     }
 
     /// Returns the element path the walk ends on, the resource type when the

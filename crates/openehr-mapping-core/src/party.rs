@@ -152,6 +152,15 @@ pub enum PartyError {
         #[source]
         source: Box<JsonParseError>,
     },
+    /// A `ROLE` names no `performer`, which the RM makes mandatory.
+    #[error(
+        "the ROLE of the template `{template_id}` names no performer, which `ROLE.performer` \
+         requires (RM Demographic IM, the ROLE class, 1..1)"
+    )]
+    RoleWithoutPerformer {
+        /// The template.
+        template_id: String,
+    },
     /// The party was built against another template.
     #[error("the party names the template `{found}`, not `{expected}`")]
     TemplateMismatch {
@@ -226,9 +235,10 @@ impl WebTemplateIndex {
     /// below a node or a value not under `raw`, [`PartyError::Path`] for a
     /// node or an occurrence the template does not have,
     /// [`PartyError::UnknownAttribute`], [`PartyError::Unconstrained`] and
-    /// [`PartyError::InstanceGap`] for a path the build cannot place, and
-    /// [`PartyError::Invalid`] when the result does not decode as the root's
-    /// class.
+    /// [`PartyError::InstanceGap`] for a path the build cannot place,
+    /// [`PartyError::RoleWithoutPerformer`] for a `ROLE` with no `performer`,
+    /// and [`PartyError::Invalid`] when the result does not decode as the
+    /// root's class.
     pub fn build_party(&self, values: &[NodeValue]) -> Result<CanonicalParty, PartyError> {
         // TODO(#906): move the build to openehr-sdt once it carries a party builder.
         let kind = self.party_kind()?;
@@ -260,6 +270,7 @@ impl WebTemplateIndex {
             self.place(&mut party, value)?;
         }
         let built = Value::Object(party);
+        self.performed(kind, &built)?;
         let value = decode(kind, &built).map_err(|source| PartyError::Invalid {
             template_id: self.template_id().to_owned(),
             class: kind,
@@ -277,11 +288,13 @@ impl WebTemplateIndex {
     ///
     /// # Errors
     ///
-    /// Returns [`PartyError::NotAParty`] for a template rooted at no party and
-    /// [`PartyError::Invalid`] when the document does not decode as the root's
-    /// class.
+    /// Returns [`PartyError::NotAParty`] for a template rooted at no party,
+    /// [`PartyError::RoleWithoutPerformer`] for a `ROLE` with no `performer`,
+    /// and [`PartyError::Invalid`] when the document does not decode as the
+    /// root's class.
     pub fn accept_party(&self, value: &Value) -> Result<CanonicalParty, PartyError> {
         let kind = self.party_kind()?;
+        self.performed(kind, value)?;
         let value = decode(kind, value).map_err(|source| PartyError::Invalid {
             template_id: self.template_id().to_owned(),
             class: kind,
@@ -292,6 +305,23 @@ impl WebTemplateIndex {
             template_id: self.template_id().to_owned(),
             class: kind,
         })
+    }
+
+    /// Refuses a `ROLE` that names no `performer`.
+    ///
+    /// `ROLE.performer` is `1..1`, the "Reference to Version container of
+    /// Actor playing the role" (RM Demographic IM, the `ROLE` class), so a
+    /// role without one is no valid `ROLE`, built or read.
+    fn performed(&self, kind: PartyClass, value: &Value) -> Result<(), PartyError> {
+        let named = value
+            .get("performer")
+            .is_some_and(|performer| !performer.is_null());
+        if kind == PartyClass::Role && !named {
+            return Err(PartyError::RoleWithoutPerformer {
+                template_id: self.template_id().to_owned(),
+            });
+        }
+        Ok(())
     }
 
     /// Returns the class the template is rooted at.
@@ -327,6 +357,9 @@ impl WebTemplateIndex {
         }
         let node = self.node_by_flat_id(flat_id)?;
         let path = self.instance_path(node, occurrences)?;
+        if path.segments.is_empty() {
+            return root_members(party, &value.value).ok_or_else(|| unsupported("no object"))?;
+        }
         let mut current = party;
         let mut spelled = String::new();
         let mut segments = path.segments.iter().peekable();
@@ -380,6 +413,37 @@ impl WebTemplateIndex {
         );
         Ok(Value::Object(object))
     }
+}
+
+/// Places the members of a value written at the party root onto the root,
+/// `None` when the value is no object.
+///
+/// An attribute of the root that no template node holds (`ROLE.performer`,
+/// RM Demographic IM) is written this way; every member must be an attribute
+/// of the root's class, and its `_type` names that class and is not copied.
+fn root_members(party: &mut Map<String, Value>, value: &Value) -> Option<Result<(), PartyError>> {
+    let Value::Object(members) = value else {
+        return None;
+    };
+    let class = party
+        .get(TYPE)
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    for (attribute, member) in members {
+        if attribute == TYPE {
+            continue;
+        }
+        if openehr_rm::v1_2::model::attribute(&class, attribute).is_none() {
+            return Some(Err(PartyError::UnknownAttribute {
+                path: format!("/{attribute}"),
+                class,
+                attribute: attribute.clone(),
+            }));
+        }
+        party.insert(attribute.clone(), member.clone());
+    }
+    Some(Ok(()))
 }
 
 /// Puts `child` at `segment` of `owner`, or finds the instance already there,

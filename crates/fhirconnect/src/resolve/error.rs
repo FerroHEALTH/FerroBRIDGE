@@ -126,6 +126,10 @@ pub enum ResolveCode {
     /// A party context enters a context whose `start` slots a composition
     /// model.
     PartySubContextComposition,
+    /// A mapping onto a `PARTY_REF` names a FHIR element whose reference
+    /// admits no single resource type, so the reference it reads back has no
+    /// type to name.
+    PartyRefTarget,
 }
 
 impl ResolveCode {
@@ -179,6 +183,7 @@ impl ResolveCode {
             Self::PartyParticipation => "fc-party-participation",
             Self::PartyLink => "fc-party-link",
             Self::PartySubContextComposition => "fc-party-sub-context-composition",
+            Self::PartyRefTarget => "fc-party-ref-target",
         }
     }
 
@@ -232,6 +237,7 @@ impl ResolveCode {
             Self::PartyParticipation,
             Self::PartyLink,
             Self::PartySubContextComposition,
+            Self::PartyRefTarget,
         ]
     }
 }

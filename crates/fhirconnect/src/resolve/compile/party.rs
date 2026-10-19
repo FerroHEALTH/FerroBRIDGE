@@ -20,9 +20,13 @@ use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::position::Position;
 use openehr_rm::v1_2::paths::RmPath;
 
+use crate::engine::lens::party_ref::target_of;
 use crate::model::ast::Mapping;
+use crate::model::ast::ModelMappingFile;
 use crate::resolve::error::ResolveCode;
 use crate::resolve::extensions::diagnostic;
+use crate::resolve::program::target::FhirTarget;
+use crate::resolve::program::target::OpenehrTarget;
 
 use crate::resolve::compile::Compiler;
 
@@ -183,6 +187,49 @@ impl Compiler<'_> {
             ),
         );
         true
+    }
+
+    /// Refuses a mapping onto a `PARTY_REF` whose FHIR element admits no
+    /// single resource type, which the reference read back has to name.
+    pub(super) fn party_ref_target(
+        &mut self,
+        file: &ModelMappingFile,
+        mapping: &str,
+        sides: (Option<&FhirTarget>, Option<&OpenehrTarget>),
+        method: &Mapping,
+        path: &ModelPath,
+    ) {
+        let (Some(target), Some(openehr)) = sides else {
+            return;
+        };
+        if openehr.leaf_class() != Some("PARTY_REF") {
+            return;
+        }
+        let fhir_path = path.field("with").field("fhir");
+        let site = &Site {
+            file: file.file(),
+            owner: file.header().name().value(),
+            position: method.position,
+            path: &fhir_path,
+        };
+        let profiles = target.resolved().target_profiles();
+        if target_of(self.table, profiles).is_some() {
+            return;
+        }
+        let admitted = if profiles.is_empty() {
+            String::from("no target profile")
+        } else {
+            profiles.join(", ")
+        };
+        self.refuse(
+            site,
+            ResolveCode::PartyRefTarget,
+            format!(
+                "`{mapping}` maps `{}` onto a PARTY_REF, and its reference admits {admitted}, \
+                 which names no single resource type to read the party back as",
+                target.resolved().leaf()
+            ),
+        );
     }
 
     /// Records one refusal at `site`.
