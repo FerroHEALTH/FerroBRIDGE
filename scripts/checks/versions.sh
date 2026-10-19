@@ -23,6 +23,10 @@
 #   4. product version     CITATION.cff version against the docs/VERSIONS.md
 #                          product-version row, and against the root Cargo.toml
 #                          [workspace.package] version once that exists.
+#                          The release pages: the latest release README.md,
+#                          the landing page and the build-order page name
+#                          against the workspace version and its CHANGELOG.md
+#                          date, so a cut cannot leave them behind.
 #   5. CI tool pins        the zizmor, actionlint, shellcheck, hadolint and
 #                          sqlx-cli versions .github/workflows/ci.yml installs
 #                          (sqlx-cli also against the sqlx crate row), its
@@ -318,6 +322,71 @@ if [ -f CITATION.cff ]; then
   fi
 else
   note "no CITATION.cff yet, skipped"
+fi
+
+echo "== release pages (README.md, website/ <-> CHANGELOG.md and the product version)"
+release_ver="$(toml_val "[workspace.package]" version Cargo.toml 2>/dev/null || true)"
+release_date=""
+if [ -n "$release_ver" ] && [ -f CHANGELOG.md ]; then
+  release_date="$(sed -nE "s/^## \\[${release_ver//./\\.}\\] - ([0-9]{4}-[0-9]{2}-[0-9]{2})\$/\\1/p" CHANGELOG.md | head -n1)"
+fi
+# The release a page claims, or the claims, one per line: each pattern is
+# matched against the page with its lines joined, so a claim may wrap.
+page_claims() {
+  tr '\n' ' ' <"$1" | grep -oE "$2" || true
+}
+release_claim() {
+  local file="$1" what="$2" pattern="$3" expected="$4" claims claim
+  claims="$(page_claims "$file" "$pattern")"
+  if [ -z "$claims" ]; then
+    bad "release pages: $file has no release claim for $what"
+    return
+  fi
+  local agree=1
+  while IFS= read -r claim; do
+    if [ "$(printf '%s' "$claim" | tr -s ' ')" != "$expected" ]; then
+      bad "release pages: $file says '$claim' for $what, expected '$expected'"
+      agree=0
+    fi
+  done <<<"$claims"
+  if [ "$agree" = 1 ]; then note "OK: $file, $what"; fi
+}
+if [ -z "$release_ver" ]; then
+  note "no root Cargo.toml version, skipped"
+elif [ -z "$release_date" ]; then
+  bad "release pages: CHANGELOG.md has no '## [$release_ver] - YYYY-MM-DD' section"
+else
+  v="v$release_ver"
+  tag="https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v[0-9.]+"
+  if [ -f README.md ]; then
+    release_claim README.md "the latest release" \
+      "The latest release is \[v[0-9.]+\]\($tag\), cut on [0-9-]+\." \
+      "The latest release is [$v](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/$v), cut on $release_date."
+    release_claim README.md "the image tag" \
+      'ghcr\.io/ferrohealth/ferrobridge:[0-9.]+`' \
+      "ghcr.io/ferrohealth/ferrobridge:$release_ver\`"
+  fi
+  landing=website/landing/index.html
+  if [ -f "$landing" ]; then
+    release_claim "$landing" "the meta descriptions" \
+      "The latest release is v[0-9.]+\." "The latest release is $v."
+    release_claim "$landing" "the hero status" \
+      "Latest release: v[0-9.]+, [0-9-]+\." "Latest release: $v, $release_date."
+    release_claim "$landing" "the status panel" \
+      "the latest release is +v[0-9.]+, cut on [0-9-]+\." \
+      "the latest release is $v, cut on $release_date."
+  fi
+  order=website/book/src/evaluate/build-order.md
+  if [ -f "$order" ]; then
+    release_claim "$order" "the row of $v" \
+      "\| \[${v//./\\.}\]\($tag\) \| [0-9-]+ \|" \
+      "| [$v](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/$v) | $release_date |"
+    release_claim "$order" "the Next heading" \
+      "The milestones after v[0-9.]+," "The milestones after $v,"
+    if grep -qE "^[0-9]+\. \*\*${v//./\\.}," "$order"; then
+      bad "release pages: $order still lists $v under Next"
+    fi
+  fi
 fi
 
 echo "== CI tool pins (.github/workflows/ci.yml <-> docs/VERSIONS.md)"
