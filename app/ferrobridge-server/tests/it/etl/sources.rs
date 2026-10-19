@@ -21,7 +21,7 @@ const CLUSTERS: &str = concat!(
 );
 
 /// The smallest `[auth]` section the operator API boots beside.
-const AUTH: &str = "[auth]\nenabled = true\nissuer = \"https://as.example.org/realms/ferro\"\naudience = \"https://bridge.example.org/fhir\"\n";
+const AUTH: &str = "[auth]\nenabled = true\nissuer = \"https://as.example.org/realms/ferro\"\naudience = [\"https://bridge.example.org/fhir\"]\n";
 
 /// A provisioned OMOCL tree and a console tree under one temporary root.
 struct Trees {

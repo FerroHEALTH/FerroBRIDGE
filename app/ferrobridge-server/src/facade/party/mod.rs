@@ -29,6 +29,9 @@ pub(crate) mod provision;
 pub(crate) mod read;
 pub(crate) mod write;
 
+use ferrohealth_smart::resource::Access;
+use ferrohealth_smart::resource::Compartment;
+use ferrohealth_smart::scope::Permission;
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
 use http::StatusCode;
@@ -37,9 +40,6 @@ use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVer
 use openehr_mapping_core::party::CanonicalParty;
 use openehr_mapping_core::party::PartyClass;
 
-use crate::auth::Access;
-use crate::auth::Compartment;
-use crate::auth::scope::Permission;
 use crate::cdr::Answered;
 use crate::cdr::CdrClient;
 use crate::cdr::demographic::Demographic;
@@ -111,7 +111,7 @@ pub(crate) fn admit(
         {
             Ok(())
         }
-        Some(Compartment::Patient(_)) | None => Err(crate::auth::guard::forbidden()),
+        Some(Compartment::Patient(_)) | None => Err(crate::facade::guard::forbidden()),
     }
 }
 

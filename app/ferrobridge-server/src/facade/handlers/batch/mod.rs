@@ -22,6 +22,8 @@ use std::collections::BTreeSet;
 use std::time::Instant;
 
 use axum::response::Response;
+use ferrohealth_smart::guard::AnsweredAs;
+use ferrohealth_smart::resource::Access;
 use fhir_types::codec::Json as _;
 use fhir_types::codec::Value;
 use fhir_types::r4::bundle::Bundle;
@@ -34,12 +36,11 @@ use http::StatusCode;
 use http::Uri;
 use http::header;
 
-use crate::auth::Access;
-use crate::auth::guard;
-use crate::auth::guard::AuditedEntry;
-use crate::auth::guard::Interaction;
 use crate::facade::BASE_PATH;
 use crate::facade::Facade;
+use crate::facade::guard;
+use crate::facade::guard::AuditedEntry;
+use crate::facade::guard::Interaction;
 use crate::facade::handlers::Refusal;
 use crate::facade::handlers::search;
 use crate::facade::handlers::write;
@@ -191,7 +192,9 @@ pub(crate) async fn batch(
         )
     })?;
     let mut answer = reply::resource(StatusCode::OK, &body, &[]);
-    answer.extensions_mut().insert(Interaction::Batch);
+    answer
+        .extensions_mut()
+        .insert(AnsweredAs(Interaction::Batch.code()));
     Ok(answer)
 }
 

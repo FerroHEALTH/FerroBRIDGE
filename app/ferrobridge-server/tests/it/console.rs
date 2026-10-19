@@ -21,6 +21,9 @@ wire_version = "r4"
 
 [mappings]
 directory = "/srv/ferrobridge/mappings"
+
+[auth]
+enabled = false
 "#;
 
 #[test]

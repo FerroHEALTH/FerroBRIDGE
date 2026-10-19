@@ -1,103 +1,97 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The resolution of `[auth]` into the settings of the resource server.
+//! The resolution of `[auth]` and the operator scope into the settings of the
+//! resource server.
 
-use std::collections::BTreeSet;
-use std::str::FromStr;
-use std::time::Duration;
+use std::sync::Arc;
 
-use jsonwebtoken::Algorithm;
+use ferrohealth_smart::config::AuthSection;
 
-use super::credentials::is_scope;
 use super::error::Error;
-use super::resolve::url_of;
-use super::section::Auth;
-use crate::auth::AuthSettings;
-use crate::auth::TokenProfile;
+use super::section::Operator;
+use crate::smart::SmartSettings;
 
-/// Returns the resource server settings `auth` describes.
+/// Returns the resource server settings `auth` describes, `None` when it is
+/// off.
 ///
-/// The issuer is an `https` URL free of a query and a fragment (RFC 8414
-/// §2), the audience is set, every algorithm is an asymmetric JWS algorithm
-/// (RFC 7518 §3.1: a symmetric key would be one the authorization server
-/// shares with every resource server, and `none` signs nothing), and the
-/// operator scope and each capability are single scope tokens (RFC 6749
-/// §3.3).
-pub(super) fn resolve_auth(auth: &Auth) -> Result<AuthSettings, Error> {
-    let url = url_of("auth.issuer", &auth.issuer)?;
-    if url.scheme() != "https" || url.query().is_some() || url.fragment().is_some() {
-        return Err(Error::Issuer {
-            key: String::from("auth.issuer"),
-        });
+/// `ferrohealth-smart` checks the section: the issuer URL rule, at least one
+/// audience, asymmetric algorithms only, the clock skew bound and every
+/// Basic user. The bridge adds its own two rules: every capability is a
+/// single scope token (RFC 6749 §3.3), and the operator scope is one too, in
+/// a form SMART App Launch 2.2.0, Scopes and Launch Context, §Extensibility,
+/// gives an extension scope: a full URI, or a string starting with `__`.
+pub(super) fn resolve_auth(
+    auth: &AuthSection,
+    operator: &Operator,
+) -> Result<Option<SmartSettings>, Error> {
+    let resolved = auth.resolve().map_err(|source| Error::Auth { source })?;
+    if !resolved.enabled {
+        return Ok(None);
     }
-    if auth.audience.is_empty() {
-        return Err(Error::Missing {
-            key: String::from("auth.audience"),
-        });
-    }
-    if auth.algorithms.is_empty() {
-        return Err(Error::Missing {
-            key: String::from("auth.algorithms"),
-        });
-    }
-    let mut algorithms = Vec::new();
-    for name in &auth.algorithms {
-        let algorithm = Algorithm::from_str(name)
-            .ok()
-            .filter(|algorithm| algorithm.family() != jsonwebtoken::AlgorithmFamily::Hmac)
-            .ok_or_else(|| Error::Algorithm {
-                key: String::from("auth.algorithms"),
-                value: name.clone(),
-            })?;
-        if !algorithms.contains(&algorithm) {
-            algorithms.push(algorithm);
-        }
-    }
-    let profile = match auth.token_profile.as_str() {
-        "rfc9068" => TokenProfile::Rfc9068,
-        "jwt" => TokenProfile::Jwt,
-        _ => {
-            return Err(Error::TokenProfile {
-                key: String::from("auth.token_profile"),
-                value: auth.token_profile.clone(),
-            });
-        }
-    };
-    let mut scopeless_subjects = BTreeSet::new();
-    for subject in &auth.scopeless_subjects {
-        if subject.is_empty() {
-            return Err(Error::Missing {
-                key: String::from("auth.scopeless_subjects"),
-            });
-        }
-        scopeless_subjects.insert(subject.clone());
-    }
-    let single = |value: &str| is_scope(value) && !value.contains(' ');
-    if !single(&auth.operator_scope) {
-        return Err(Error::Scope {
-            key: String::from("auth.operator_scope"),
-        });
-    }
-    if !auth
+    if !resolved
         .capabilities
         .iter()
-        .all(|capability| single(capability))
+        .all(|capability| is_scope_token(capability))
     {
         return Err(Error::Scope {
             key: String::from("auth.capabilities"),
         });
     }
-    Ok(AuthSettings {
-        issuer: auth.issuer.clone(),
-        audience: auth.audience.clone(),
-        algorithms,
-        profile,
-        clock_skew: Duration::from_secs(auth.clock_skew_seconds),
-        jwks_refresh_interval: Duration::from_millis(auth.jwks_refresh_interval_ms),
-        timeout: Duration::from_millis(auth.timeout_ms),
-        scopeless_subjects,
-        operator_scope: auth.operator_scope.clone(),
-        capabilities: auth.capabilities.clone(),
-    })
+    if !is_extension_scope(&operator.scope) {
+        return Err(Error::Scope {
+            key: String::from("operator.scope"),
+        });
+    }
+    Ok(Some(SmartSettings {
+        issuers: resolved.issuers,
+        basic: resolved.basic.map(Arc::new),
+        realm: resolved.realm,
+        capabilities: resolved.capabilities,
+        operator_scope: operator.scope.clone(),
+    }))
+}
+
+/// Returns whether `token` is one scope token of RFC 6749 §3.3:
+/// `1*( %x21 / %x23-5B / %x5D-7E )`.
+pub(super) fn is_scope_token(token: &str) -> bool {
+    !token.is_empty()
+        && token
+            .bytes()
+            .all(|byte| matches!(byte, 0x21 | 0x23..=0x5B | 0x5D..=0x7E))
+}
+
+/// Returns whether `scope` is a scope token in an extension form SMART App
+/// Launch 2.2.0, Scopes and Launch Context, §Extensibility, names: "a full
+/// URI that you control", or "any string starting with `__`".
+fn is_extension_scope(scope: &str) -> bool {
+    let underscored = scope.len() > 2 && scope.starts_with("__");
+    // NOTE: a scope that does not parse as a URL is legitimately no URI form,
+    // so the failed parse is the answer and the `__` form decides.
+    let uri = url::Url::parse(scope).is_ok_and(|url| url.has_host());
+    is_scope_token(scope) && (underscored || uri)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_extension_scope;
+
+    #[test]
+    fn an_extension_scope_is_a_full_uri_or_starts_with_two_underscores() {
+        for scope in [
+            "__ferrobridge.operator",
+            "https://bridge.example.org/scope/operator",
+        ] {
+            assert!(is_extension_scope(scope), "{scope}");
+        }
+        for scope in [
+            "ferrobridge.operator",
+            "bridge:operator",
+            "__",
+            "__two words",
+            "",
+        ] {
+            assert!(!is_extension_scope(scope), "{scope}");
+        }
+    }
 }

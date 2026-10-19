@@ -191,70 +191,80 @@ async fn one_validation_goes_as_one_call() -> Result<(), Box<dyn StdError>> {
 #[tokio::test]
 async fn several_validations_go_as_one_batch_answered_by_position() -> Result<(), Box<dyn StdError>>
 {
-    let server = MockServer::start().await;
-    mount_base(
-        &server,
-        WireVersion::R4,
-        terminology::batch_response(&[
-            (
-                "200 OK",
-                terminology::parameters_resource(&terminology::validate_code_body(
-                    true,
-                    Some(fixtures::TERM_MEMBER_DISPLAY),
-                    None,
-                    None,
-                )),
-            ),
-            (
-                "404 Not Found",
-                terminology::outcome_body("not-found", Some("not-found"), "no such value set"),
-            ),
-        ]),
-    )
-    .await;
-    let answers = client(&server, WireVersion::R4)?
-        .validate_all(&[
-            validation(Coded::Coding(member())),
-            validation(Coded::Coding(member())),
-        ])
-        .await?;
-    let [first, second] = answers.as_slice() else {
-        return Err(format!("expected two answers, got {answers:?}").into());
-    };
-    assert!(
-        matches!(first, Ok(ValidateOutcome::Valid { .. })),
-        "{first:?}"
-    );
-    let Err(Error::Refused { upstream, .. }) = second else {
-        return Err(format!("the second entry is not a refusal: {second:?}").into());
-    };
-    assert_eq!(StatusCode::NOT_FOUND, upstream.status());
-    let body = request_body(&server, 0).await?;
-    assert_eq!(Some(&json!("batch")), body.get("type"));
+    for version in RELEASES {
+        let server = MockServer::start().await;
+        mount_base(
+            &server,
+            version,
+            terminology::batch_response(&[
+                (
+                    "200 OK",
+                    terminology::parameters_resource(&terminology::validate_code_body(
+                        true,
+                        Some(fixtures::TERM_MEMBER_DISPLAY),
+                        None,
+                        None,
+                    )),
+                ),
+                (
+                    "404 Not Found",
+                    terminology::outcome_body("not-found", Some("not-found"), "no such value set"),
+                ),
+            ]),
+        )
+        .await;
+        let answers = client(&server, version)?
+            .validate_all(&[
+                validation(Coded::Coding(member())),
+                validation(Coded::Coding(member())),
+            ])
+            .await?;
+        let [first, second] = answers.as_slice() else {
+            return Err(format!("expected two answers, got {answers:?}").into());
+        };
+        assert!(
+            matches!(first, Ok(ValidateOutcome::Valid { .. })),
+            "{version:?}: {first:?}"
+        );
+        let Err(Error::Refused { upstream, .. }) = second else {
+            return Err(
+                format!("{version:?}: the second entry is not a refusal: {second:?}").into(),
+            );
+        };
+        assert_eq!(StatusCode::NOT_FOUND, upstream.status());
+        assert!(upstream.has_tx_issue("not-found"));
+        let body = request_body(&server, 0).await?;
+        assert_eq!(Some(&json!("batch")), body.get("type"));
+    }
     Ok(())
 }
 
 #[tokio::test]
 async fn a_failed_batch_is_a_typed_error_carrying_the_upstream_status()
 -> Result<(), Box<dyn StdError>> {
-    let server = MockServer::start().await;
-    mount_base(
-        &server,
-        WireVersion::R4,
-        terminology::outcome(503, "transient", None, "the server is down"),
-    )
-    .await;
-    let error = client(&server, WireVersion::R4)?
-        .validate_all(&[
-            validation(Coded::Coding(member())),
-            validation(Coded::Coding(member())),
-        ])
-        .await
-        .expect_err("a 503 is never an answer");
-    assert!(matches!(error, Error::ServerFailure { .. }), "{error:?}");
-    assert_eq!(
-        Some(StatusCode::SERVICE_UNAVAILABLE),
-        error.upstream_status()
-    );
+    for version in RELEASES {
+        let server = MockServer::start().await;
+        mount_base(
+            &server,
+            version,
+            terminology::outcome(503, "transient", None, "the server is down"),
+        )
+        .await;
+        let error = client(&server, version)?
+            .validate_all(&[
+                validation(Coded::Coding(member())),
+                validation(Coded::Coding(member())),
+            ])
+            .await
+            .expect_err("a 503 is never an answer");
+        assert!(
+            matches!(error, Error::ServerFailure { .. }),
+            "{version:?}: {error:?}"
+        );
+        assert_eq!(
+            Some(StatusCode::SERVICE_UNAVAILABLE),
+            error.upstream_status()
+        );
+    }
     Ok(())
 }
