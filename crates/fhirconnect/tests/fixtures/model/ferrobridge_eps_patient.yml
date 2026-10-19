@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping from a Patient onto the synthetic
+# ferrobridge.diagnose.v1 template of the testkit. It exists so a document
+# whose one mapped resource is its Patient runs through $toopenehr; it says
+# nothing about how a patient summary maps to openEHR.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_eps_patient
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Patient
+
+mappings:
+  - name: "gender"
+    with:
+      fhir: "$resource.gender"
+      openehr: "$archetype/data[at0001]/items[at0002]"
