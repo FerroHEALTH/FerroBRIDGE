@@ -48,6 +48,7 @@ use crate::facade::handlers::search::total::count_all;
 use crate::facade::handlers::search::total::total_of;
 use crate::facade::handlers::write;
 use crate::facade::identity::FhirResourceId;
+use crate::facade::identity::PersonId;
 use crate::facade::identity::record::CompositionBinding;
 use crate::facade::ingest::Refused;
 use crate::facade::media;
@@ -363,6 +364,24 @@ async fn resolve(
                     ref parameter,
                     ref token,
                 } => identifier::ehr_of(facade, client, parameter, token).await?,
+                Subject::ReferenceIdentifier {
+                    ref system,
+                    ref value,
+                } => {
+                    // NOTE: no specification governs this: our own design, an identifier no
+                    // person key holds, or one whose subject renders as a literal reference
+                    // with no identifier (R4 search.html §3.1.1.4.12), matches nothing.
+                    let Ok(person) = PersonId::new(system, value) else {
+                        continue;
+                    };
+                    if link.reference_of(&person).is_some() {
+                        continue;
+                    }
+                    facade
+                        .store()
+                        .ehr_of(&person)
+                        .map_err(|error| write::store_refusal(&error))?
+                }
                 Subject::Never => None,
             };
             if let Some(ehr) = found

@@ -231,7 +231,7 @@ async fn an_unsupported_modifier_is_refused_even_under_lenient_handling()
     let harness = searching().await;
     for query in [
         "code:text=diabetes",
-        "patient:identifier=http://example.org/mrn%7C1",
+        "patient:missing=true",
         "onset-date:missing=true",
         "_id:not=x",
     ] {

@@ -28,6 +28,7 @@ use crate::facade::search::identifier::IdentifierSearch;
 use crate::facade::search::value;
 use crate::facade::search::value::DateValue;
 use crate::facade::search::value::StringMatch;
+use crate::facade::search::value::System;
 use crate::facade::search::value::Token;
 use crate::facade::search::value::ValueError;
 
@@ -92,6 +93,15 @@ pub enum Subject {
     Literal(String),
     /// A reference to a type no EHR subject is, which matches nothing.
     Never,
+    /// A subject reference named by its own `Reference.identifier`, through
+    /// the `:identifier` modifier
+    /// (<https://hl7.org/fhir/R4/search.html>, §3.1.1.4.12).
+    ReferenceIdentifier {
+        /// The identifier's system.
+        system: String,
+        /// The identifier's value.
+        value: String,
+    },
     /// A patient named by one identifier value through the chain
     /// `<subject parameter>.identifier`
     /// (<https://hl7.org/fhir/R4/search.html>, §3.1.1.4.15).
@@ -498,13 +508,22 @@ impl Reader<'_> {
         Ok(())
     }
 
-    /// Reads a subject parameter: `[id]`, `Patient/[id]`, an absolute URL, or
-    /// a `:[type]` modifier (<https://hl7.org/fhir/R4/search.html>,
-    /// §3.1.1.4.9).
+    /// Reads a subject parameter: `[id]`, `Patient/[id]`, an absolute URL, a
+    /// `:[type]` modifier (<https://hl7.org/fhir/R4/search.html>,
+    /// §3.1.1.4.9), or the `:identifier` modifier, whose value is a token
+    /// (§3.1.1.4.12).
     fn subject(&mut self, modifier: Option<&str>, text: &str) -> Result<(), Refused> {
         let typed = match modifier {
             None => None,
-            // TODO(#923): the `:identifier` modifier matches the subject reference's identifier.
+            Some("identifier") => {
+                let tokens = each(text, value::token)?;
+                let subjects = tokens
+                    .into_iter()
+                    .map(reference_identifier)
+                    .collect::<Result<Vec<Subject>, ValueError>>()?;
+                self.criteria.subjects.push(subjects);
+                return Ok(());
+            }
             Some(kind) if is_type_name(kind) => Some(kind),
             Some(other) => return Err(Refused::Modifier(other.to_owned())),
         };
@@ -596,6 +615,30 @@ fn each<T>(text: &str, read: impl Fn(&str) -> Result<T, ValueError>) -> Result<V
         .iter()
         .map(|part| read(part).map_err(Refused::Value))
         .collect()
+}
+
+/// Returns the subject one `:identifier` value names.
+///
+/// The value matches the `Reference.identifier` of the subject a resource
+/// carries (<https://hl7.org/fhir/R4/search.html>, §3.1.1.4.12). The facade
+/// writes that identifier only for a subject keyed by an identifier, with
+/// the key's namespace as `system`, so every rendered identifier names a
+/// system: `|[value]` matches nothing, and `[value]` alone, which matches
+/// across systems, is refused because the identity map keys a subject by
+/// system and value (no specification governs the map: our own design).
+fn reference_identifier(token: Token) -> Result<Subject, ValueError> {
+    let Some(value) = token.code else {
+        return Err(ValueError::Unsupported(String::from(
+            "an :identifier value names the identifier value, and this one names a system alone",
+        )));
+    };
+    match token.system {
+        System::Is(system) => Ok(Subject::ReferenceIdentifier { system, value }),
+        System::Absent => Ok(Subject::Never),
+        System::Any => Err(ValueError::Unsupported(String::from(
+            "an :identifier value names its system, as [system]|[value], because a subject is keyed by system and value",
+        ))),
+    }
 }
 
 /// Whether `text` reads as a FHIR resource type name: an upper-case letter,
