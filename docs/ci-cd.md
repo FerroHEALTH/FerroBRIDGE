@@ -33,14 +33,14 @@ the committed guards, so both are live code from day one and both need a gate.
 | `hadolint` | every tracked Dockerfile under `.hadolint.yaml` (`failure-threshold: warning`) |
 | `container-config` | `docker compose --profile viewer config` and the same over every profile, with empty secret files, then `docker buildx build --check` and a one-platform build with no output of `docker/viewer/Dockerfile` over placeholder files at the staged paths |
 | `comment-style` | `scripts/checks/comment-style.sh --all` |
-| `versions` | `scripts/checks/versions.sh` |
+| `versions` | `scripts/checks/versions.sh`, and `scripts/checks/changelog-released.sh`: every released `CHANGELOG.md` section from 0.0.9 on reads as it does at its tag |
 | `profile-packages` | `scripts/vendor/profile-packages.sh` over a cache keyed on `--cache-key` (the profile packages fetched at build time and never committed, each checked at its pinned count and digest), then `--self-test` and `--check`: every `PROVENANCE.md` against its pin, no unpinned tree, and every `dependencies` entry of every fetched `package.json` pinned too |
 | `favicon-sync` | `scripts/checks/favicon-sync.sh` |
 | `usage-report-off` | `scripts/checks/usage-report-off.sh --self-test`, then the guard itself: every launcher of the server in a script, a workflow or a Rust test switches the usage report off |
 | `todo-issues` | `scripts/checks/todo-issues.sh` with the job token at `issues: read`: every `TODO(#N)` and every issue `Command::pending_issue` names is open |
 | `file-length` | `scripts/checks/file-length.sh`: a hand-written Rust file stays at most 1000 lines |
 | `contribution-licence` | `scripts/checks/contribution-licence.sh` on a pull request: the licensing checkbox of the body is ticked |
-| `tracker-helpers` | the `--self-test` of `scripts/gh/fields.sh`, `labels.sh` and `migrate-fields.sh`, each driven against a stub `gh` on `PATH`, and of `scripts/deploy-probe.sh` against a stub `curl` |
+| `tracker-helpers` | the `--self-test` of `scripts/gh/fields.sh`, `labels.sh` and `migrate-fields.sh`, each driven against a stub `gh` on `PATH`, of `scripts/gh/changelog-merge.sh` on changelog fixtures that reproduce a release cut under a queued entry, and of `scripts/deploy-probe.sh` against a stub `curl` |
 
 `hadolint` runs against the two tracked recipes, `docker/Dockerfile` (#22)
 and `docker/viewer/Dockerfile` (#603), whose digest-pinned `FROM` lines the

@@ -242,7 +242,8 @@ the testkit tool crate. Beside it:
   the operator console beside the bridge.
 - `.claude/`: the working discipline. `rules/` (the path-scoped and standing
   rules), `hooks/`, `skills/`, `agents/`, `memory/`.
-- `scripts/gh/`: the tracker helpers (`rel.sh`, `project.sh`, `fields.sh`, `watch-prs.sh`,
+- `scripts/gh/`: the tracker helpers (`rel.sh`, `project.sh`, `fields.sh`, `watch-prs.sh` with
+  `changelog-merge.sh`, which keeps a branch's entries under `[Unreleased]`,
   `labels.sh`, `migrate-fields.sh`).
 - `scripts/checks/`: the committed guards. `comment-style.sh`; `versions.sh`,
   which fails when a file disagrees with the `docs/VERSIONS.md` pin matrix or
@@ -251,6 +252,7 @@ the testkit tool crate. Beside it:
   `usage-report-off.sh`, every launcher of the server in a test lane with the
   usage report switched off; `todo-issues.sh`, which fails a `TODO(#N)` or a pending subcommand's issue
   that the tracker reports closed;
+  `changelog-released.sh`, every released changelog section against its tag;
   `pin-freshness.sh`, every pin no ecosystem watches against its newest
   upstream release; and `conformance.sh`, the pass-list gate over the six
   corpora under `conformance/` (fifteen: the two mapping libraries, the

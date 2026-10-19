@@ -179,6 +179,7 @@ classify() {
     scripts/checks/crate-version-guard.sh | scripts/checks/favicon-sync.sh) echo inert ;;
     scripts/checks/file-length.sh | scripts/checks/file-length-allow.txt) echo inert ;;
     scripts/checks/pin-freshness.sh | scripts/checks/versions.sh) echo inert ;;
+    scripts/checks/changelog-released.sh) echo inert ;;
     scripts/checks/todo-issues.sh | scripts/checks/usage-report-off.sh) echo inert ;;
     scripts/deploy-probe.sh) echo inert ;;
     # The pass lists, the badges and the README badge block are read by the

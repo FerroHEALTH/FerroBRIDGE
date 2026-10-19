@@ -267,6 +267,9 @@ jobs:
         with:
           persist-credentials: false
       - run: bash scripts/checks/versions.sh
+      # Every released changelog section against its text at its tag, which
+      # it fetches from origin when the shallow checkout lacks it.
+      - run: bash scripts/checks/changelog-released.sh
       # The weekly freshness read's own reader of the Chrome for Testing
       # feed, over fixtures and with no network.
       - run: bash scripts/checks/pin-freshness.sh --self-test
@@ -375,6 +378,7 @@ jobs:
           bash scripts/gh/fields.sh --self-test
           bash scripts/gh/labels.sh --self-test
           bash scripts/gh/migrate-fields.sh --self-test
+          bash scripts/gh/changelog-merge.sh --self-test
           bash scripts/deploy-probe.sh --self-test
 
   # ---- Tier 2: the Rust lanes, gated on the workspace existing --------------
