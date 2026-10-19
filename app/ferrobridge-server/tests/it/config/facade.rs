@@ -278,6 +278,88 @@ fn an_unknown_identifier_search_key_refuses_to_boot() {
         format!("{ENABLED}\n[facade.identifier_search]\nenabled = true\nname_query = \"x\"\n");
     assert!(Config::from_sources(Some(&text), &BTreeMap::new()).is_err());
 }
+
+/// A party identifier query in the dialect's documented shape.
+const PARTY_QUERY: &str =
+    "SELECT p/uid/value FROM PERSON p WHERE p/details[at0001]/items[at0002]/value/id = $identifier";
+
+#[test]
+fn the_party_search_is_off_by_default() -> Result<(), Box<dyn StdError>> {
+    let settings = Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve()?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    assert!(facade.party_search.is_none());
+    Ok(())
+}
+
+#[test]
+fn the_party_search_takes_one_query_per_type() -> Result<(), Box<dyn StdError>> {
+    let text = format!(
+        "{ENABLED}\n[facade.party_search]\nenabled = true\n[facade.party_search.types.Patient]\nquery = \"{PARTY_QUERY}\"\n"
+    );
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let search = settings
+        .facade
+        .ok_or("the facade lane is on")?
+        .party_search
+        .ok_or("the party search is on")?;
+    assert_eq!(search.types().collect::<Vec<_>>(), ["Patient"]);
+    assert!(
+        !search
+            .of_type("Patient")
+            .ok_or("Patient is searched")?
+            .resolves_systems()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_party_search_with_no_type_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    let text = format!("{ENABLED}\n[facade.party_search]\nenabled = true\n");
+    let error = Config::from_sources(Some(&text), &BTreeMap::new())?
+        .resolve()
+        .expect_err("a party search needs a type");
+    assert!(
+        matches!(&error, Error::Missing { key } if key == "facade.party_search.types"),
+        "{error:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_party_query_binding_no_parameter_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    for (extra, refused) in [
+        (
+            "query = \"SELECT p/uid/value FROM PERSON p\"\n".to_owned(),
+            "facade.party_search.types.Patient.query",
+        ),
+        (
+            format!("query = \"{PARTY_QUERY}\"\nsystem_query = \"{PARTY_QUERY}\"\n"),
+            "facade.party_search.types.Patient.system_query",
+        ),
+    ] {
+        let text = format!(
+            "{ENABLED}\n[facade.party_search]\nenabled = true\n[facade.party_search.types.Patient]\n{extra}"
+        );
+        let error = Config::from_sources(Some(&text), &BTreeMap::new())?
+            .resolve()
+            .expect_err("a query must bind what the facade hands it");
+        match &error {
+            Error::IdentifierQuery { key, .. } => assert_eq!(refused, key, "{extra}"),
+            other => {
+                return Err(format!("expected an identifier query error, got {other:?}").into());
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn an_unknown_party_search_key_refuses_to_boot() {
+    let text = format!(
+        "{ENABLED}\n[facade.party_search]\nenabled = true\n[facade.party_search.types.Patient]\nquery = \"{PARTY_QUERY}\"\nname_query = \"x\"\n"
+    );
+    assert!(Config::from_sources(Some(&text), &BTreeMap::new()).is_err());
+}
 /// The `[facade]` section `extra` adds to, with the two required fields set.
 fn facade_with(extra: &str) -> String {
     format!(

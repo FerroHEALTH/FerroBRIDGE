@@ -195,6 +195,25 @@ pub struct MalformedParty {
 /// Returns [`MalformedParty`] for a row whose first column is no non-empty
 /// string.
 pub fn parties(rows: &[ResultSetRow]) -> Result<Parties, MalformedParty> {
+    let found = uids(rows)?;
+    Ok(match found.as_slice() {
+        [] => Parties::None,
+        [one] => Parties::One(one.clone()),
+        _ => Parties::Many,
+    })
+}
+
+/// Returns the party uids the rows name, in row order, each once.
+///
+/// Each row's first column is the party's `uid/value`, and a versioned uid
+/// names its party by the object id before the first `::`, as [`parties`]
+/// reads it.
+///
+/// # Errors
+///
+/// Returns [`MalformedParty`] for a row whose first column is no non-empty
+/// string.
+pub fn uids(rows: &[ResultSetRow]) -> Result<Vec<String>, MalformedParty> {
     let mut found: Vec<String> = Vec::new();
     for (row, values) in rows.iter().enumerate() {
         let uid = values
@@ -207,11 +226,7 @@ pub fn parties(rows: &[ResultSetRow]) -> Result<Parties, MalformedParty> {
             found.push(uid.to_owned());
         }
     }
-    Ok(match found.as_slice() {
-        [] => Parties::None,
-        [one] => Parties::One(one.clone()),
-        _ => Parties::Many,
-    })
+    Ok(found)
 }
 
 /// Returns the object id a possibly versioned uid names.

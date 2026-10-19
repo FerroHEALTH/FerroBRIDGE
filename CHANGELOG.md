@@ -46,6 +46,19 @@ crates on crates.io.
   does `|[value]`. `[value]` alone and `[system]|` answer `400 not-supported`,
   because the map keys a subject by system and value. No specification
   governs the identity map: our own design.
+- The facade searches `Patient`, `Practitioner`, `PractitionerRole` and
+  `Organization` by `identifier` through the Cadasto experimental AQL
+  demographic extension, behind `[facade.party_search]` with one configured
+  query per type (#480). Each page runs the query with `offset` and `fetch`
+  and reads every party it names over the Demographic API. A CDR that answers
+  `400` to the query, as one without the extension does, answers `501` with
+  `not-supported` naming the extension. The `CapabilityStatement` declares
+  `search-type` and `identifier` on exactly the configured types, and a
+  configured type no party context serves refuses to boot.
+  `docs/architecture.md` §4.12 writes down the dialect's semantics as the
+  extension's guide documents them and Cadasto observed them, with the
+  findings Cadasto plans to change. No specification governs the extension:
+  our own design.
 - The FHIR facade serves `Patient`, `Practitioner`, `PractitionerRole` and
   `Organization` from party contexts over the ITS-REST 1.1.0 Demographic API,
   DEVELOPMENT, behind `[cdr] demographic` (#470). Read, vread,

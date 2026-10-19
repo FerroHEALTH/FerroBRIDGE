@@ -112,6 +112,15 @@ pub enum LoadError {
         /// The second.
         second: String,
     },
+    /// `[facade.party_search]` configures a type no party context serves.
+    #[error(
+        "facade.party_search.types.{resource_type} is configured, and no party context serves \
+         {resource_type}"
+    )]
+    UnservedPartySearch {
+        /// The resource type.
+        resource_type: String,
+    },
 }
 
 /// One compiled context, with the template index it runs against.
@@ -379,6 +388,33 @@ pub fn check_parties(programs: &Programs, demographic: bool) -> Result<(), LoadE
         }
     }
     Ok(())
+}
+
+/// Checks that every type `[facade.party_search]` configures is served by a
+/// party program of the load.
+///
+/// A configured search of a type no party context serves would never run, so
+/// the boot refuses it (no specification governs this: our own design).
+///
+/// # Errors
+///
+/// Returns [`LoadError::UnservedPartySearch`] for the first such type.
+pub fn check_party_search(
+    programs: &Programs,
+    search: Option<&crate::facade::search::party::PartySearch>,
+) -> Result<(), LoadError> {
+    let Some(search) = search else {
+        return Ok(());
+    };
+    match search
+        .types()
+        .find(|resource_type| programs.party(resource_type).is_none())
+    {
+        Some(resource_type) => Err(LoadError::UnservedPartySearch {
+            resource_type: resource_type.to_owned(),
+        }),
+        None => Ok(()),
+    }
 }
 
 /// Returns the FHIRconnect files under `directory`, sorted.
