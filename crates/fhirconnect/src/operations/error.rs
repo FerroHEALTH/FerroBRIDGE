@@ -12,6 +12,7 @@ use fhir_types::operation::ParametersError;
 use fhir_types::r4::operation_outcome::OperationOutcome;
 use openehr_mapping_core::template::PathError;
 
+use crate::engine::seam::ReferenceError;
 use crate::engine::traverse::error::EngineError;
 use crate::operations::issues;
 use crate::resolve::select::SelectError;
@@ -154,6 +155,24 @@ pub enum OperationError {
         /// The resource type the program maps.
         resource: String,
     },
+    /// The caller's identity seam assigned the mapped resource no id.
+    #[error("the identity seam assigned the mapped {resource} no id")]
+    Identity {
+        /// The resource type the program maps.
+        resource: String,
+        /// Why the seam refused.
+        #[source]
+        source: ReferenceError,
+    },
+    /// The caller's identity seam answered an id outside the R4 `id`
+    /// grammar (<https://hl7.org/fhir/R4/datatypes.html#id>).
+    #[error("the identity seam assigned the mapped {resource} the id `{id}`, which is no FHIR id")]
+    InvalidId {
+        /// The resource type the program maps.
+        resource: String,
+        /// The id the seam answered.
+        id: String,
+    },
 }
 
 impl OperationError {
@@ -178,9 +197,11 @@ impl OperationError {
                 SelectError::NoMatch { .. } | SelectError::ProfileVersion { .. } => "not-found",
             },
             Self::SeveralSubjectResources { .. } | Self::SeveralSubjects { .. } => "business-rule",
-            Self::Mapping { .. } | Self::Serialization { .. } | Self::Unidentified { .. } => {
-                "processing"
-            }
+            Self::Mapping { .. }
+            | Self::Serialization { .. }
+            | Self::Unidentified { .. }
+            | Self::Identity { .. }
+            | Self::InvalidId { .. } => "processing",
         }
     }
 

@@ -228,6 +228,83 @@ impl IdentityRequest {
     }
 }
 
+/// What assigns the id of the resource a `$tofhir` run maps a composition to.
+///
+/// Without one the operations keep the id the mapping wrote or derive it from
+/// the composition (`crate::operations::run`); a caller with an identity
+/// store answers it here, so the same composition keeps one id across runs.
+/// No specification governs identity across runs: our own design.
+pub trait ResourceIdentity: fmt::Debug + Send + Sync {
+    /// Returns the FHIR id the mapped resource `request` describes takes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceError`] when no id can be assigned, which refuses
+    /// the run.
+    fn identify(&self, request: &ResourceRequest) -> Result<String, ReferenceError>;
+}
+
+/// Everything a `$tofhir` run knows about the resource it maps.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceRequest {
+    resource_type: String,
+    template: String,
+    composition: Option<String>,
+    written: Option<String>,
+}
+
+impl ResourceRequest {
+    /// Creates the request for a `resource_type` mapped from a composition of
+    /// `template`.
+    #[must_use]
+    pub fn new(resource_type: impl Into<String>, template: impl Into<String>) -> Self {
+        Self {
+            resource_type: resource_type.into(),
+            template: template.into(),
+            composition: None,
+            written: None,
+        }
+    }
+
+    /// Returns this request with the `OBJECT_VERSION_ID` of the composition.
+    #[must_use]
+    pub fn with_composition(mut self, uid: impl Into<String>) -> Self {
+        self.composition = Some(uid.into());
+        self
+    }
+
+    /// Returns this request with the `id` the mapping wrote.
+    #[must_use]
+    pub fn with_written(mut self, id: impl Into<String>) -> Self {
+        self.written = Some(id.into());
+        self
+    }
+
+    /// Returns the type of the mapped resource.
+    #[must_use]
+    pub fn resource_type(&self) -> &str {
+        &self.resource_type
+    }
+
+    /// Returns the template of the composition the run read.
+    #[must_use]
+    pub fn template(&self) -> &str {
+        &self.template
+    }
+
+    /// Returns the `OBJECT_VERSION_ID` of the composition, when it has one.
+    #[must_use]
+    pub fn composition(&self) -> Option<&str> {
+        self.composition.as_deref()
+    }
+
+    /// Returns the `id` the mapping wrote, when it wrote one.
+    #[must_use]
+    pub fn written(&self) -> Option<&str> {
+        self.written.as_deref()
+    }
+}
+
 /// The sink that derives an id from the request by a digest.
 ///
 /// Every field is framed with its byte length before it is hashed, so two
@@ -309,8 +386,9 @@ pub enum ReferenceError {
 /// Everything a run calls out to, in one place.
 ///
 /// [`Seams::default`] registers no function, resolves no reference, derives
-/// every created id with [`DerivedIdentity`] and translates through
-/// [`NoTerminology`], so a `conceptmap` fails closed.
+/// every created id with [`DerivedIdentity`], leaves the id of the mapped
+/// resource to the operations' own derivation (no [`ResourceIdentity`]) and
+/// translates through [`NoTerminology`], so a `conceptmap` fails closed.
 ///
 /// Every seam trait is `Send + Sync`, so the seams of one run are `Send` and
 /// an async caller can hold them across an `.await`
@@ -322,6 +400,7 @@ pub struct Seams<'seam> {
     identities: &'seam dyn IdentitySink,
     terminology: &'seam dyn Terminology,
     demographics: &'seam dyn Demographics,
+    resources: Option<&'seam dyn ResourceIdentity>,
 }
 
 // NOTE: no specification governs this: our own design, the seams of a run cross
@@ -339,6 +418,7 @@ impl Default for Seams<'_> {
             identities: &DerivedIdentity,
             terminology: &NoTerminology,
             demographics: &NoDemographics,
+            resources: None,
         }
     }
 }
@@ -409,6 +489,21 @@ impl<'seam> Seams<'seam> {
     #[must_use]
     pub fn demographics(&self) -> &'seam dyn Demographics {
         self.demographics
+    }
+
+    /// Returns these seams with `resources` as what assigns the id of the
+    /// resource a `$tofhir` run maps.
+    #[must_use]
+    pub fn with_resource_identity(mut self, resources: &'seam dyn ResourceIdentity) -> Self {
+        self.resources = Some(resources);
+        self
+    }
+
+    /// Returns what assigns the id of the mapped resource, `None` when the
+    /// run derives it (`crate::operations::run`).
+    #[must_use]
+    pub fn resource_identity(&self) -> Option<&'seam dyn ResourceIdentity> {
+        self.resources
     }
 }
 

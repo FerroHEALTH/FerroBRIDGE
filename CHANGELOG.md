@@ -23,6 +23,21 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Added
+
+- `fhirconnect::operations::run::to_fhir` takes the id of the mapped
+  resource from a caller-supplied identity seam when the seams carry one
+  (#619): `Seams::with_resource_identity` over the new
+  `engine::seam::ResourceIdentity` trait, which answers a
+  `ResourceRequest` (the resource type, the template, the composition's
+  `OBJECT_VERSION_ID` and the `id` the mapping wrote). A seam that refuses
+  ends the run with `OperationError::Identity`, and an id outside the R4
+  `id` grammar with `OperationError::InvalidId`. Without a seam the id still
+  derives from the written `id` or the composition's `versioned_object_uid`.
+  No specification governs identity across runs: our own design.
+  `OperationError` gains two variants, so a consumer that matches it
+  exhaustively adds the arms. `fhirconnect` 0.1.156.
+
 ### Changed
 
 - The release workflow refuses a tag whose milestone, titled exactly as the
