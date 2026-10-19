@@ -249,6 +249,67 @@ async fn count_zero_answers_the_total_alone() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
+async fn summary_count_answers_the_total_alone() -> Result<(), Box<dyn StdError>> {
+    // R4 search.html, `_summary`: `count` returns the count of matches alone.
+    let harness = identifying(Some(by_value()), true).await;
+    mount_parties(&harness, &[PARTY]).await;
+    let composition = harness.composition();
+    mount_count(&harness.cdr, std::slice::from_ref(&composition)).await;
+    mount_rows(&harness.cdr, &[row(VERSION_ONE, &composition)]).await;
+    let (status, body) = get(
+        &harness,
+        "Condition?patient.identifier=MRN-0001&_summary=count",
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(Some(1), body["total"].as_u64(), "{body}");
+    assert!(matches(&body).is_empty(), "{body}");
+    let (demographic, clinical) = split_queries(&harness).await;
+    assert_eq!(1, demographic.len());
+    assert!(
+        clinical.iter().all(|query| query["q"]
+            .as_str()
+            .is_some_and(|text| text.contains("COUNT("))),
+        "no row query is sent: {clinical:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn sort_and_count_apply_to_the_clinical_query() -> Result<(), Box<dyn StdError>> {
+    // R4 search.html §3.1.1.5.1 (`_sort`) and §3.1.1.5.3 (`_count`): the chain
+    // only narrows the EHR, so both reach the clinical query as on any search.
+    let harness = identifying(Some(by_value()), true).await;
+    mount_parties(&harness, &[PARTY]).await;
+    let composition = harness.composition();
+    mount_rows(&harness.cdr, &[row(VERSION_ONE, &composition)]).await;
+    let (status, body) = get(
+        &harness,
+        "Condition?patient.identifier=MRN-0001&_sort=-context-start&_count=5",
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let (_, clinical) = split_queries(&harness).await;
+    let rows = clinical
+        .first()
+        .ok_or("the clinical query reached the CDR")?;
+    let text = rows["q"].as_str().unwrap_or_default();
+    assert!(
+        text.contains("ORDER BY c/context/start_time/value DESC"),
+        "{text}"
+    );
+    assert_eq!(
+        Some(6),
+        rows["fetch"].as_i64(),
+        "a page of 5 reads one row more: {rows}"
+    );
+    let self_link = body["link"][0]["url"].as_str().unwrap_or_default();
+    assert!(self_link.contains("_sort=-context-start"), "{self_link}");
+    assert!(self_link.contains("_count=5"), "{self_link}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn count_zero_for_an_unknown_identifier_makes_no_clinical_call()
 -> Result<(), Box<dyn StdError>> {
     let harness = identifying(Some(by_value()), true).await;
