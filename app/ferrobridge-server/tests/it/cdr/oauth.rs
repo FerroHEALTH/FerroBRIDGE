@@ -12,8 +12,9 @@ use ferrobridge_server::cdr::Prefer;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::cdr::error::CdrError;
 use ferrobridge_server::cdr::ids::EhrId;
-use ferrobridge_server::cdr::oauth::cache::{Clock, TokenSource};
-use ferrobridge_server::cdr::oauth::{ClientAuth, Endpoint, OAuthConfig, TokenError};
+use ferrohealth_smart::client::cache::{Clock, TokenSource};
+use ferrohealth_smart::client::{ClientAuth, ClientCredentials, Endpoint, TokenError};
+use ferrohealth_smart::metadata::DiscoveryError;
 use http::StatusCode;
 use openehr_its::rest::client::{ClientError, RetryPolicy};
 use openehr_its::rest::generated::ehr::client::EhrGetByIdOutcome;
@@ -31,8 +32,8 @@ const EHR: &str = "7d44b88c-4199-4bad-97dc-d78268e01398";
 const TOKEN_PATH: &str = "/oauth/token";
 
 /// Returns a grant against the token endpoint of `server`.
-fn grant(server: &MockServer) -> Result<OAuthConfig, Box<dyn Error>> {
-    Ok(OAuthConfig::new(
+fn grant(server: &MockServer) -> Result<ClientCredentials, Box<dyn Error>> {
+    Ok(ClientCredentials::new(
         Endpoint::Token(format!("{}{TOKEN_PATH}", server.uri()).parse()?),
         String::from("bridge"),
         SecretString::from("synthetic-secret"),
@@ -119,12 +120,12 @@ async fn the_token_endpoint_is_discovered_from_rfc_8414_metadata() -> Result<(),
         .mount(&server)
         .await;
 
-    let config = OAuthConfig::new(
+    let config = ClientCredentials::new(
         Endpoint::Issuer(issuer),
         String::from("bridge"),
         SecretString::from("synthetic-secret"),
     );
-    let source = TokenSource::new(config, Duration::from_secs(5))?;
+    let source = TokenSource::new(config)?;
     let token = source.token().await.map_err(|error| error.to_string())?;
     assert_eq!("Bearer synthetic-token-1", token.header().to_str()?);
     Ok(())
@@ -151,12 +152,12 @@ async fn discovery_falls_back_to_the_openid_connect_location() -> Result<(), Box
         .mount(&server)
         .await;
 
-    let config = OAuthConfig::new(
+    let config = ClientCredentials::new(
         Endpoint::Issuer(issuer),
         String::from("bridge"),
         SecretString::from("synthetic-secret"),
     );
-    let source = TokenSource::new(config, Duration::from_secs(5))?;
+    let source = TokenSource::new(config)?;
     assert!(source.token().await.is_ok());
     Ok(())
 }
@@ -173,17 +174,17 @@ async fn metadata_naming_another_issuer_is_refused() -> Result<(), Box<dyn Error
         .mount(&server)
         .await;
 
-    let config = OAuthConfig::new(
+    let config = ClientCredentials::new(
         Endpoint::Issuer(format!("{}/realms/ferro", server.uri())),
         String::from("bridge"),
         SecretString::from("synthetic-secret"),
     );
-    let error = TokenSource::new(config, Duration::from_secs(5))?
+    let error = TokenSource::new(config)?
         .token()
         .await
         .expect_err("RFC 8414 §3.3 refuses a mismatched issuer");
     assert!(
-        matches!(token_error(&error), TokenError::IssuerMismatch { found, .. } if found == "https://attacker.invalid"),
+        matches!(token_error(&error), TokenError::Discovery(DiscoveryError::IssuerMismatch { found, .. }) if found == "https://attacker.invalid"),
         "{error:?}"
     );
     assert_eq!(
@@ -217,7 +218,7 @@ async fn client_secret_basic_form_encodes_the_id_and_the_secret() -> Result<(), 
         .mount(&server)
         .await;
 
-    let mut config = OAuthConfig::new(
+    let mut config = ClientCredentials::new(
         Endpoint::Token(format!("{}{TOKEN_PATH}", server.uri()).parse()?),
         String::from("bridge client"),
         SecretString::from("s3cr3t/secret"),
@@ -225,7 +226,7 @@ async fn client_secret_basic_form_encodes_the_id_and_the_secret() -> Result<(), 
     config.scope = Some(String::from("openehr system/*.crs"));
     config.audience = Some(String::from("ferroehr"));
     config.resource = Some("https://cdr.example.org/v1".parse()?);
-    let source = TokenSource::new(config, Duration::from_secs(5))?;
+    let source = TokenSource::new(config)?;
     assert!(source.token().await.is_ok());
     let requests = server.received_requests().await.ok_or("recording")?;
     let body = String::from_utf8(requests.first().ok_or("one request")?.body.clone())?;
@@ -252,12 +253,7 @@ async fn client_secret_post_carries_the_id_and_the_secret_in_the_body() -> Resul
 
     let mut config = grant(&server)?;
     config.client_auth = ClientAuth::ClientSecretPost;
-    assert!(
-        TokenSource::new(config, Duration::from_secs(5))?
-            .token()
-            .await
-            .is_ok()
-    );
+    assert!(TokenSource::new(config)?.token().await.is_ok());
     let requests = server.received_requests().await.ok_or("recording")?;
     let request = requests.first().ok_or("one request")?;
     assert!(
@@ -277,7 +273,7 @@ async fn a_cached_token_is_reused() -> Result<(), Box<dyn Error>> {
         .mount(&server)
         .await;
 
-    let source = TokenSource::new(grant(&server)?, Duration::from_secs(5))?;
+    let source = TokenSource::new(grant(&server)?)?;
     for _ in 0..3 {
         let token = source.token().await.map_err(|error| error.to_string())?;
         assert_eq!("Bearer synthetic-token-1", token.header().to_str()?);
@@ -307,8 +303,8 @@ async fn a_token_is_renewed_the_margin_before_it_expires() -> Result<(), Box<dyn
         .await;
 
     let clock = Arc::new(ManualClock(Mutex::new(Instant::now())));
-    let source = TokenSource::with_clock(grant(&server)?, Duration::from_secs(5), clock.clone())?;
-    let header = |token: Arc<ferrobridge_server::cdr::oauth::cache::Token>| {
+    let source = TokenSource::with_clock(grant(&server)?, clock.clone())?;
+    let header = |token: Arc<ferrohealth_smart::client::cache::Token>| {
         token.header().to_str().map(str::to_owned)
     };
     let first = source.token().await.map_err(|error| error.to_string())?;
@@ -338,7 +334,7 @@ async fn concurrent_callers_share_one_fetch() -> Result<(), Box<dyn Error>> {
         .mount(&server)
         .await;
 
-    let source = TokenSource::new(grant(&server)?, Duration::from_secs(5))?;
+    let source = TokenSource::new(grant(&server)?)?;
     let mut tasks = Vec::new();
     for _ in 0..16 {
         let source = source.clone();
@@ -398,7 +394,7 @@ async fn a_failing_token_endpoint_keeps_its_status() -> Result<(), Box<dyn Error
         .mount(&server)
         .await;
 
-    let error = TokenSource::new(grant(&server)?, Duration::from_secs(5))?
+    let error = TokenSource::new(grant(&server)?)?
         .token()
         .await
         .expect_err("a 503 is no token");
@@ -425,7 +421,7 @@ async fn a_failed_fetch_is_not_cached() -> Result<(), Box<dyn Error>> {
         .mount(&server)
         .await;
 
-    let source = TokenSource::new(grant(&server)?, Duration::from_secs(5))?;
+    let source = TokenSource::new(grant(&server)?)?;
     assert!(source.token().await.is_err());
     assert!(source.token().await.is_ok(), "the next call fetches again");
     Ok(())
@@ -442,7 +438,7 @@ async fn a_malformed_token_response_is_a_typed_error() -> Result<(), Box<dyn Err
         .mount(&server)
         .await;
 
-    let error = TokenSource::new(grant(&server)?, Duration::from_secs(5))?
+    let error = TokenSource::new(grant(&server)?)?
         .token()
         .await
         .expect_err("RFC 6749 §5.1 requires access_token");
@@ -465,7 +461,7 @@ async fn a_token_that_is_not_a_bearer_token_is_refused() -> Result<(), Box<dyn E
         .mount(&server)
         .await;
 
-    let error = TokenSource::new(grant(&server)?, Duration::from_secs(5))?
+    let error = TokenSource::new(grant(&server)?)?
         .token()
         .await
         .expect_err("the bridge sends bearer tokens");
@@ -489,7 +485,7 @@ async fn a_token_type_is_compared_case_insensitively() -> Result<(), Box<dyn Err
         .mount(&server)
         .await;
 
-    let source = TokenSource::new(grant(&server)?, Duration::from_secs(5))?;
+    let source = TokenSource::new(grant(&server)?)?;
     assert!(source.token().await.is_ok());
     Ok(())
 }

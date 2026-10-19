@@ -11,15 +11,15 @@ default. No specification governs it: it is FerroBRIDGE's own design.
 
 Set `[operator] enabled = true` (or `FERROBRIDGE__OPERATOR__ENABLED=true`).
 The API needs inbound authentication, so the server refuses to start when
-`[operator] enabled` is true and `[auth] enabled` is not. The routes are
+`[operator] enabled` is true and `[auth] enabled` is false or `[auth]` names
+no issuer. The routes are
 mounted under `/operator` on the server's one listener; the bridge has no
 second admin listener.
 
 ```toml
 [auth]
-enabled = true
 issuer = "https://auth.example.org/realms/clinic"
-audience = "https://bridge.example.org/fhir"
+audience = ["https://bridge.example.org/fhir"]
 
 [operator]
 enabled = true
@@ -29,14 +29,19 @@ mapping_dir = "/var/lib/ferrobridge/mappings"
 ## The operator scope
 
 Every route needs a bearer access token from the configured issuer, checked
-as the FHIR facade checks one. The token's `scope` claim must carry the
-operator scope, `auth.operator_scope`, which is `ferrobridge.operator` unless
-you set another single scope token. SMART scopes cover FHIR resources only,
-so the operator scope has nothing in SMART to overlap with.
+as the FHIR facade checks one, or the Basic credential of an
+`[[auth.basic.users]]` user. The token's `scope` claim, or the user's
+`scopes`, must carry the operator scope, `[operator] scope`, which is
+`__ferrobridge.operator` unless you set another. SMART scopes cover FHIR
+resources only, so the operator scope is FerroBRIDGE's own, in a form SMART
+App Launch 2.2.0 (Scopes and Launch Context, Extensibility) gives an
+extension scope: a string starting with `__` or a full URI. Any other value
+refuses the start.
 
 | Request | Answer |
 |---|---|
-| no token, or a token that does not hold | `401` with `WWW-Authenticate: Bearer` (`error="invalid_token"` for a bad token) |
+| no credential, or one that does not hold | `401` with `WWW-Authenticate: Bearer` (`error="invalid_token"` for a bad token) |
+| two credentials, or an `Authorization` value that is no credential | `400` with `WWW-Authenticate: Bearer error="invalid_request"` |
 | a valid token without the operator scope | `403` with `WWW-Authenticate: Bearer error="insufficient_scope"` |
 | the issuer's keys cannot be read | `503` |
 
@@ -168,10 +173,13 @@ restart; the console reloads the replica behind its configured URL.
 
 ## What the log records
 
-Every operator request leaves one line on the `ferrobridge::audit` target
-with the token's `sub`, the method, the matched route (such as
-`/operator/mappings/{*path}`), the status, the duration and the request id,
-beside the ordinary request line. A save adds one more line with
+Every operator request leaves one audit line on the
+`ferrohealth_smart::audit` target, the record every FerroHEALTH product
+writes: the token's `sub` as `principal`, its `client_id` and issuer, the
+scheme (`via`), the method, the matched route (such as
+`/operator/mappings/{*path}`), the interaction `operator`, the status, the
+duration and the request id, beside the ordinary request line. A save adds
+one more line on the `ferrobridge::audit` target with the caller's `subject`,
 `action` `save`, the `file` it wrote, `old_sha256` (`-` for a new file),
 `new_sha256`, the `reason` and the status; a reload adds `action` `reload`.
 No line carries a token or any mapping content.

@@ -20,6 +20,8 @@
 //! that `build_composition` performs, and the strict RM read. The outcome says
 //! so in `issue.details`.
 
+use ferrohealth_smart::resource::Access;
+use ferrohealth_smart::scope::Permission;
 use fhir_types::r4::operation_outcome::OperationOutcome;
 use fhirconnect::operations::issues::of_warning;
 use http::HeaderMap;
@@ -27,10 +29,8 @@ use http::StatusCode;
 use http::Uri;
 use openehr_rm::v1_2::composition::composition::Composition;
 
-use crate::auth::Access;
-use crate::auth::compartment;
-use crate::auth::scope::Permission;
 use crate::facade::Facade;
+use crate::facade::compartment;
 use crate::facade::ehr::Policy;
 use crate::facade::engine;
 use crate::facade::handlers::Body;
@@ -46,10 +46,20 @@ use crate::terminology::Direction;
 /// What the outcome names as the validator that ran.
 const VALIDATOR: &str = "the FerroBRIDGE mapping engine, the Web Template validation of the composition build, and the strict openEHR RM reader; openEHR ITS-REST 1.1.0 documents no composition-validation route, and this dry run commits nothing";
 
+/// Who asks for a dry run: the caller's access and the operator scope, which
+/// admits it without a clinical write scope.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Admission<'a> {
+    /// What the layer admitted the caller with.
+    pub(crate) access: &'a Access,
+    /// The operator scope, when inbound authentication is on.
+    pub(crate) operator: Option<&'a str>,
+}
+
 /// `POST [base]/{type}/$validate`.
 pub(crate) async fn validate(
     facade: &Facade,
-    access: &Access,
+    admission: Admission<'_>,
     resource_type: &str,
     headers: &HeaderMap,
     uri: &Uri,
@@ -74,7 +84,10 @@ pub(crate) async fn validate(
     };
     // NOTE: no specification governs this: our own design, a dry run commits
     // nothing, so the operator scope admits it like the guard does.
-    let admitted = access.is_operator()
+    let access = admission.access;
+    let admitted = admission
+        .operator
+        .is_some_and(|operator| access.has_scope(operator))
         || [Permission::Create, Permission::Update]
             .into_iter()
             .any(|permission| {
@@ -82,7 +95,7 @@ pub(crate) async fn validate(
                     .is_ok()
             });
     if !admitted {
-        return Err(crate::auth::guard::forbidden());
+        return Err(crate::facade::guard::forbidden());
     }
     // NOTE: no specification governs this: our own design, one instant serves
     // every defaulted time of one run, and this one is discarded with the

@@ -11,7 +11,6 @@
 //! stop. `main.rs` only hands in the arguments and returns the exit code.
 #![doc(test(attr(deny(warnings))))]
 
-pub mod auth;
 pub mod banner;
 pub mod boot;
 pub mod build_info;
@@ -19,6 +18,7 @@ pub mod cdr;
 pub mod check;
 pub mod cli;
 pub mod config;
+pub mod credentials;
 pub mod etl;
 pub mod facade;
 pub mod health;
@@ -32,6 +32,7 @@ pub mod operator;
 pub mod panic;
 pub mod request_id;
 pub mod request_log;
+pub mod smart;
 pub mod startup;
 pub mod state;
 pub mod telemetry;
@@ -102,7 +103,11 @@ where
         Ok(job) => job,
         Err(code) => return code,
     };
-    let settings = match Config::load(cli.config.as_deref()).and_then(|config| config.resolve()) {
+    let resolved = Config::load(cli.config.as_deref()).and_then(|config| match job {
+        Job::Serve => config.resolve(),
+        Job::CdmInit { .. } | Job::EtlRun(_) | Job::MappingCheck { .. } => config.resolve_job(),
+    });
+    let settings = match resolved {
         Ok(settings) => settings,
         Err(error) => {
             eprintln!("ferrobridge: cannot start: {}", chain(&error));
@@ -319,9 +324,9 @@ fn chain(error: &dyn std::error::Error) -> String {
 /// and `503` with each indicator's state otherwise, and `GET /health/info`
 /// answers the build facts and the pins as JSON. The two FHIRconnect
 /// operations and their direct forms are mounted under `/fhir`. Every route
-/// passes [`auth::guard::guard`], which checks the bearer token of a FHIR
-/// request when the state carries a resource server and leaves the facade
-/// open when it does not.
+/// passes the layer of [`facade::guard::layer`], which checks the credential
+/// of a request under `/fhir` when the state carries a resource server and
+/// leaves the facade open when it does not.
 pub fn router(state: Arc<AppState>, server: &ServerSettings) -> Router {
     let mut routes = Router::new()
         .route("/", get(root))
@@ -330,13 +335,10 @@ pub fn router(state: Arc<AppState>, server: &ServerSettings) -> Router {
         .route("/health/info", get(info))
         .with_state(Arc::clone(&state))
         .merge(operations::router(Arc::clone(&state)));
-    if let Some(authority) = state.auth() {
-        routes = routes.merge(auth::smart::routes(authority));
+    if let Some(smart) = state.auth() {
+        routes = routes.merge(smart::routes(smart));
         if let Some(operator) = state.operator() {
-            routes = routes.merge(operator::routes(
-                Arc::clone(operator),
-                Arc::clone(authority),
-            ));
+            routes = routes.merge(operator::routes(Arc::clone(operator), smart));
         }
     }
     if let Some(mounted) = state.facade() {
@@ -351,21 +353,14 @@ pub fn router(state: Arc<AppState>, server: &ServerSettings) -> Router {
             } else {
                 facade::capability::Hl7v2::Absent
             },
-            security: state
-                .auth()
-                .map(|authority| auth::smart::security(authority)),
+            security: state.auth().map(|smart| smart.security()),
         };
-        routes = routes.merge(facade::routes(Arc::clone(mounted), shape));
+        let operator = facade::guard::OperatorScope(
+            state.auth().map(|smart| smart.operator_scope().to_owned()),
+        );
+        routes = routes.merge(facade::routes(Arc::clone(mounted), shape, operator));
     }
-    let gate = state
-        .auth()
-        .map_or_else(auth::guard::Gate::open, |authority| {
-            auth::guard::Gate::new(Arc::clone(authority))
-        });
-    let routes = routes.layer(axum::middleware::from_fn_with_state(
-        gate,
-        auth::guard::guard,
-    ));
+    let routes = routes.layer(facade::guard::layer(state.auth().map(AsRef::as_ref)));
     with_middleware(routes, state, server)
 }
 

@@ -96,7 +96,8 @@ if [ "$fetch" = true ]; then
     has "$packages" ferrobridge-validator; then
     run scripts/vendor/fhir-packages.sh --build-time
   fi
-  if has "$packages" ferrobridge-validator; then
+  # fhirconnect maps the HL7 Europe EPS example documents of one of them.
+  if has "$packages" ferrobridge-validator || has "$packages" fhirconnect; then
     run scripts/vendor/profile-packages.sh
   fi
 fi

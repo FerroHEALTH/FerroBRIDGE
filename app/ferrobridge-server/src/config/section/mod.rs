@@ -9,6 +9,8 @@ use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use ferrohealth_smart::config::CredentialsSection;
+
 use crate::telemetry::{DEFAULT_FILTER, Format};
 
 pub mod facade;
@@ -66,61 +68,6 @@ pub struct Mappings {
     /// The directory the OMOCL files `etl run` maps with are read from,
     /// recursively.
     pub omocl: Option<PathBuf>,
-}
-
-/// Inbound authentication: the FHIR routes as a SMART App Launch 2.x
-/// resource server.
-///
-/// Off until `enabled` is set. Off, the facade authenticates no caller and
-/// serves every request it receives, so a deployment keeps it on a network
-/// only trusted callers reach. On, the issuer's metadata and key set are
-/// read at boot.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct Auth {
-    /// Whether every FHIR request needs a bearer access token.
-    pub enabled: bool,
-    /// The issuer identifier, an `https` URL (RFC 8414 §2).
-    pub issuer: String,
-    /// The audience every token must name: this deployment's FHIR base.
-    pub audience: String,
-    /// The signature algorithms a token may use, asymmetric only.
-    pub algorithms: Vec<String>,
-    /// The claims a token must carry: `rfc9068` or `jwt`.
-    pub token_profile: String,
-    /// The clock skew `exp`, `nbf` and `iat` are checked with, in seconds.
-    pub clock_skew_seconds: u64,
-    /// The shortest time between two reads of the key set an unknown `kid`
-    /// triggers.
-    pub jwks_refresh_interval_ms: u64,
-    /// How long one call to the authorization server may take.
-    pub timeout_ms: u64,
-    /// The subjects a token with no clinical scope gets system-wide access
-    /// for.
-    pub scopeless_subjects: Vec<String>,
-    /// The scope that guards the operator API.
-    pub operator_scope: String,
-    /// SMART capabilities the discovery document adds, such as
-    /// `launch-standalone`.
-    pub capabilities: Vec<String>,
-}
-
-impl Default for Auth {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            issuer: String::new(),
-            audience: String::new(),
-            algorithms: vec![String::from("RS256"), String::from("ES256")],
-            token_profile: String::from("rfc9068"),
-            clock_skew_seconds: 60,
-            jwks_refresh_interval_ms: 60_000,
-            timeout_ms: 10_000,
-            scopeless_subjects: Vec::new(),
-            operator_scope: String::from(crate::auth::OPERATOR_SCOPE),
-            capabilities: Vec::new(),
-        }
-    }
 }
 
 /// The HL7 v2 face: an MLLP listener whose messages enter the facade's
@@ -218,7 +165,7 @@ pub struct Hl7v2Profile {
 /// Off until `enabled` is set, and refused at boot while `[auth]` is off, so
 /// the API is never served to an unauthenticated caller. No specification
 /// governs the operator surface: our own design.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Operator {
     /// Whether the operator routes are mounted under `/operator`.
@@ -226,6 +173,19 @@ pub struct Operator {
     /// The writable directory console saves go to; unset, the API saves
     /// nothing.
     pub mapping_dir: Option<PathBuf>,
+    /// The scope that guards the operator API and admits `$validate`,
+    /// `$tofhir` and `$toopenehr` on the facade, which commit nothing.
+    pub scope: String,
+}
+
+impl Default for Operator {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            mapping_dir: None,
+            scope: String::from(crate::smart::OPERATOR_SCOPE),
+        }
+    }
 }
 
 /// The FHIRconnect operations lane.
@@ -316,7 +276,7 @@ impl Default for Telemetry {
 }
 
 /// The openEHR CDR lane.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Cdr {
     /// The openEHR REST API root, the path `/ehr` and `/query` live under.
@@ -326,7 +286,7 @@ pub struct Cdr {
     /// The retry budget for idempotent calls.
     pub retry: Retry,
     /// The credentials the CDR expects.
-    pub credentials: Credentials,
+    pub credentials: CredentialsSection,
     /// Whether the bridge reaches the ITS-REST 1.1.0 Demographic API of the
     /// CDR, a module the release marks `x-status: DEVELOPMENT`.
     pub demographic: bool,
@@ -338,63 +298,14 @@ impl Default for Cdr {
             base_url: String::new(),
             timeout_ms: 30_000,
             retry: Retry::default(),
-            credentials: Credentials::default(),
+            credentials: CredentialsSection::default(),
             demographic: false,
         }
     }
 }
 
-/// The OAuth 2.0 client credentials grant the bridge obtains its token for one
-/// upstream with (RFC 6749 §4.4).
-///
-/// Exactly one of `issuer` and `token_endpoint` is set.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct OAuthClient {
-    /// The issuer identifier whose metadata names the token endpoint
-    /// (RFC 8414 §2).
-    pub issuer: Option<String>,
-    /// The token endpoint, when it is not discovered (RFC 6749 §3.2).
-    pub token_endpoint: Option<String>,
-    /// The client identifier (RFC 6749 §2.2).
-    pub client_id: String,
-    /// The client secret.
-    pub client_secret: Option<Secret>,
-    /// A file holding the client secret, read at boot.
-    pub client_secret_file: Option<PathBuf>,
-    /// How the client authenticates: `client_secret_basic` or
-    /// `client_secret_post` (RFC 6749 §2.3.1).
-    pub client_auth: crate::cdr::oauth::ClientAuth,
-    /// The `scope` request parameter (RFC 6749 §3.3).
-    pub scope: Option<String>,
-    /// The `audience` request parameter, for an authorization server that
-    /// reads one.
-    pub audience: Option<String>,
-    /// The `resource` request parameter (RFC 8707 §2).
-    pub resource: Option<String>,
-    /// How long before the token expires a new one is fetched.
-    pub refresh_margin_ms: u64,
-}
-
-impl Default for OAuthClient {
-    fn default() -> Self {
-        Self {
-            issuer: None,
-            token_endpoint: None,
-            client_id: String::new(),
-            client_secret: None,
-            client_secret_file: None,
-            client_auth: crate::cdr::oauth::ClientAuth::default(),
-            scope: None,
-            audience: None,
-            resource: None,
-            refresh_margin_ms: 30_000,
-        }
-    }
-}
-
 /// The FHIR terminology lane.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Terminology {
     /// The FHIR service base URL.
@@ -406,7 +317,7 @@ pub struct Terminology {
     /// The retry budget.
     pub retry: Retry,
     /// The credentials the server expects.
-    pub credentials: Credentials,
+    pub credentials: CredentialsSection,
 }
 
 impl Default for Terminology {
@@ -416,7 +327,7 @@ impl Default for Terminology {
             wire_version: String::from("r4"),
             timeout_ms: 30_000,
             retry: Retry::default(),
-            credentials: Credentials::default(),
+            credentials: CredentialsSection::default(),
         }
     }
 }
@@ -533,28 +444,6 @@ impl Default for Retry {
             max_backoff_ms: 5_000,
         }
     }
-}
-
-/// The credentials one upstream expects: RFC 7617 basic authentication, or
-/// the OAuth 2.0 client credentials grant (RFC 6749 §4.4).
-///
-/// Every secret is reachable inline or through its `_file` sibling; setting
-/// both is a boot error, and so is a user beside `oauth`. The CDR and the
-/// terminology lane share the shape.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct Credentials {
-    /// The user name of RFC 7617 basic authentication.
-    pub user: Option<String>,
-    /// A file holding the user name, read at boot.
-    pub user_file: Option<PathBuf>,
-    /// The password of RFC 7617 basic authentication.
-    pub password: Option<Secret>,
-    /// A file holding the password, read at boot.
-    pub password_file: Option<PathBuf>,
-    /// The OAuth 2.0 client credentials grant the bridge obtains its token
-    /// with.
-    pub oauth: Option<OAuthClient>,
 }
 
 /// The `FerroHEALTH` installation report to `FerroPULSE`.
