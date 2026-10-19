@@ -195,6 +195,48 @@ pub(crate) async fn get(
     })
 }
 
+/// Reads the latest version of the party `uid` names, `None` when the CDR
+/// holds none (`404`) or reports it deleted (`204`).
+///
+/// A search by `_id` matches the party or nothing, so neither answer is a
+/// refusal there (no specification governs this: our own design).
+pub(crate) async fn find(
+    demographic: Demographic<'_>,
+    class: PartyClass,
+    uid: &str,
+) -> Result<Option<Held>, Refusal> {
+    macro_rules! find_as {
+        ($call:ident, $outcome:ident) => {{
+            use openehr_its::rest::generated::demographic::client::$outcome;
+            let Answered { outcome, upstream } = demographic
+                .$call(uid, None)
+                .await
+                .map_err(|error| client_refusal(&error))?
+                .answered;
+            match outcome {
+                $outcome::Ok { body, headers } => Some(Held {
+                    value: openehr_its::json::to_canonical_value(&body),
+                    version: version_of(stringify!($call), &upstream, headers.etag.as_deref())?,
+                }),
+                $outcome::NoContent | $outcome::NotFound { .. } => None,
+            }
+        }};
+    }
+    Ok(match class {
+        PartyClass::Person => find_as!(person_get, PersonGetOutcome),
+        PartyClass::Organisation => find_as!(organisation_get, OrganisationGetOutcome),
+        PartyClass::Role => find_as!(role_get, RoleGetOutcome),
+    })
+}
+
+/// Answers whether `held` is a party of `loaded`'s template.
+pub(crate) fn of_template(loaded: &Loaded, held: &Held) -> bool {
+    held.value
+        .pointer("/archetype_details/template_id/value")
+        .and_then(serde_json::Value::as_str)
+        == Some(loaded.program().template().id().as_str())
+}
+
 /// Returns the `410` of a party the CDR reports deleted.
 fn gone(resource_type: &str, uid: &str) -> Refusal {
     reply::refusal(

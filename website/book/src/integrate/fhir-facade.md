@@ -481,9 +481,9 @@ onto a `ROLE`, and `Organization` onto an `ORGANISATION`.
   version). The Demographic API has no search or list operation, so a party
   type offers no search, and the `CapabilityStatement` documents that on the
   type. With [`[facade.party_search]`](../operate/configuration.md#facadeparty_search)
-  a configured type is searched by `identifier` through the Cadasto
-  experimental AQL demographic extension, and the statement declares
-  `search-type` and `identifier` on that type alone. A CDR that does not
+  a configured type is searched by `identifier` or `name` through the Cadasto
+  experimental AQL demographic extension, or by `_id`, and the statement
+  declares `search-type` and exactly those parameters on that type. A CDR that does not
   serve the extension answers the search with `501 not-supported`.
 - **The patient's EHR.** With `ehr_policy = "create_on_first_write"`, a
   `Patient` create also gives the new party its EHR: the facade looks the

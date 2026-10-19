@@ -25,6 +25,16 @@ crates on crates.io.
 
 ### Added
 
+- The party search takes `name`, `_id` and `_count=0` beside `identifier`
+  (#931). `name` matches a name that starts with the value, case-insensitively
+  as R4 string search asks: `[facade.party_search.types.<Type>] name_query`
+  binds the value as typed, in lower case and capitalised, because the
+  extension's `LIKE` is case-sensitive; other case forms and accents are a
+  stated gap. `_id` reads the one party it names. `_count=0` answers the
+  number of matches in `total` with no entries (R4 search §3.1.1.5.3), and
+  `_count` is capped at `search_count_max`. A bare identifier value two
+  parties carry answers both. A type's `query` is now optional, and the
+  `CapabilityStatement` declares exactly the parameters each type takes.
 - A `Patient` created in a party context gets its EHR under the subject link
   when `[facade] ehr_policy` is `create_on_first_write` (#932): the facade
   finds the EHR keyed by the new party's id, or creates it with that id in

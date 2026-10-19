@@ -142,22 +142,38 @@ fn party_search(
     let mut types = BTreeMap::new();
     for (resource_type, queries) in &section.types {
         let key = |field: &str| format!("facade.party_search.types.{resource_type}.{field}");
-        if queries.query.is_empty() {
+        let system = (!queries.system_query.is_empty()).then_some(queries.system_query.as_str());
+        if queries.query.is_empty() && system.is_some() {
             return Err(Error::Missing { key: key("query") });
         }
-        let system = (!queries.system_query.is_empty()).then_some(queries.system_query.as_str());
         let field = if system.is_some() {
             "system_query"
         } else {
             "query"
         };
-        let search =
-            crate::facade::search::identifier::IdentifierSearch::new(&queries.query, system)
-                .map_err(|source| Error::IdentifierQuery {
-                    key: key(field),
-                    source,
-                })?;
-        types.insert(resource_type.clone(), search);
+        let identifier = (!queries.query.is_empty())
+            .then(|| {
+                crate::facade::search::identifier::IdentifierSearch::new(&queries.query, system)
+                    .map_err(|source| Error::IdentifierQuery {
+                        key: key(field),
+                        source,
+                    })
+            })
+            .transpose()?;
+        let name = (!queries.name_query.is_empty())
+            .then(|| {
+                crate::facade::search::party::NameSearch::new(&queries.name_query).map_err(
+                    |source| Error::IdentifierQuery {
+                        key: key("name_query"),
+                        source,
+                    },
+                )
+            })
+            .transpose()?;
+        types.insert(
+            resource_type.clone(),
+            crate::facade::search::party::PartyQueries::new(identifier, name),
+        );
     }
     Ok(Some(crate::facade::search::party::PartySearch::new(types)))
 }

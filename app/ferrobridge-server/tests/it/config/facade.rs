@@ -306,7 +306,8 @@ fn the_party_search_takes_one_query_per_type() -> Result<(), Box<dyn StdError>> 
     assert!(
         !search
             .of_type("Patient")
-            .ok_or("Patient is searched")?
+            .and_then(|queries| queries.identifier())
+            .ok_or("Patient is searched by identifier")?
             .resolves_systems()
     );
     Ok(())
@@ -354,9 +355,42 @@ fn a_party_query_binding_no_parameter_refuses_to_boot() -> Result<(), Box<dyn St
 }
 
 #[test]
+fn a_party_type_takes_a_name_query_alone() -> Result<(), Box<dyn StdError>> {
+    let text = format!(
+        "{ENABLED}\n[facade.party_search]\nenabled = true\n[facade.party_search.types.Practitioner]\nname_query = \"SELECT p/uid/value FROM PERSON p WHERE n LIKE $name\"\n"
+    );
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let search = settings
+        .facade
+        .ok_or("the facade lane is on")?
+        .party_search
+        .ok_or("the party search is on")?;
+    let queries = search
+        .of_type("Practitioner")
+        .ok_or("Practitioner is searched")?;
+    assert_eq!(queries.parameters(), ["_id", "name"]);
+    Ok(())
+}
+
+#[test]
+fn a_name_query_binding_no_name_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    let text = format!(
+        "{ENABLED}\n[facade.party_search]\nenabled = true\n[facade.party_search.types.Patient]\nname_query = \"SELECT p/uid/value FROM PERSON p WHERE n LIKE $name_lower\"\n"
+    );
+    let error = Config::from_sources(Some(&text), &BTreeMap::new())?
+        .resolve()
+        .expect_err("a name query must bind $name");
+    assert!(
+        matches!(&error, Error::IdentifierQuery { key, .. } if key == "facade.party_search.types.Patient.name_query"),
+        "{error:?}"
+    );
+    Ok(())
+}
+
+#[test]
 fn an_unknown_party_search_key_refuses_to_boot() {
     let text = format!(
-        "{ENABLED}\n[facade.party_search]\nenabled = true\n[facade.party_search.types.Patient]\nquery = \"{PARTY_QUERY}\"\nname_query = \"x\"\n"
+        "{ENABLED}\n[facade.party_search]\nenabled = true\n[facade.party_search.types.Patient]\nquery = \"{PARTY_QUERY}\"\nbirthdate_query = \"x\"\n"
     );
     assert!(Config::from_sources(Some(&text), &BTreeMap::new()).is_err());
 }
