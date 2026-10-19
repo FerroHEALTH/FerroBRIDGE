@@ -29,6 +29,7 @@ use crate::engine::origin::Origin;
 use crate::engine::origin::SourceItem;
 use crate::engine::outcome::Warning;
 use crate::engine::seam::BundleReferences;
+use crate::engine::seam::ResourceRequest;
 use crate::engine::seam::Seams;
 use crate::engine::traverse;
 use crate::engine::traverse::Defaults;
@@ -205,7 +206,11 @@ pub fn to_fhir_with_warnings<T: Table + ?Sized>(
     let resource_type = String::from(program.resource().as_str());
     let mut object = object_of(outcome.value())?;
     subject(table, &mut object, &resource_type, request.context())?;
-    let id = identity(&object, &composition, &resource_type)?;
+    let mapped = Mapped {
+        resource_type: &resource_type,
+        template: template.as_str(),
+    };
+    let id = identity(&object, &composition, &mapped, seams)?;
     object.insert(String::from("id"), Value::String(id.clone()));
     let mapped = typed(&object, &resource_type)?;
     let mut targets = vec![format!("{resource_type}/{id}")];
@@ -391,17 +396,42 @@ fn object_of(document: &Value) -> Result<Object, OperationError> {
 
 /// Returns the FHIR id the mapped resource takes.
 ///
-/// A mapping that wrote an `id` keeps it. Otherwise the id is the
-/// `versioned_object_uid` of the composition, the leading segment of its
-/// `OBJECT_VERSION_ID`, which is the one part stable across versions (openEHR
-/// RM Common §`OBJECT_VERSION_ID`) and which fits the FHIR id grammar
+/// A caller's [`crate::engine::seam::ResourceIdentity`] seam assigns it when the seams carry one,
+/// and the id it answers must fit the FHIR id grammar
 /// `[A-Za-z0-9\-\.]{1,64}` (<https://hl7.org/fhir/R4/resource.html>).
-// TODO(#619): the identity map assigns the id and keeps it stable across runs.
+/// Without one, a mapping that wrote an `id` keeps it, and otherwise the id
+/// is the `versioned_object_uid` of the composition, the leading segment of
+/// its `OBJECT_VERSION_ID`, which is the one part stable across versions
+/// (openEHR RM Common §`OBJECT_VERSION_ID`) and fits that grammar.
 fn identity(
     object: &Object,
     composition: &CanonicalComposition,
-    resource_type: &str,
+    mapped: &Mapped<'_>,
+    seams: &Seams<'_>,
 ) -> Result<String, OperationError> {
+    let resource_type = mapped.resource_type;
+    if let Some(resources) = seams.resource_identity() {
+        let mut request = ResourceRequest::new(resource_type, mapped.template);
+        if let Some(uid) = composition_uid(composition) {
+            request = request.with_composition(uid);
+        }
+        if let Some(Value::String(written)) = object.get("id") {
+            request = request.with_written(written.clone());
+        }
+        let id = resources
+            .identify(&request)
+            .map_err(|source| OperationError::Identity {
+                resource: String::from(resource_type),
+                source,
+            })?;
+        if !is_fhir_id(&id) {
+            return Err(OperationError::InvalidId {
+                resource: String::from(resource_type),
+                id,
+            });
+        }
+        return Ok(id);
+    }
     if let Some(Value::String(written)) = object.get("id")
         && is_fhir_id(written)
     {
@@ -414,6 +444,13 @@ fn identity(
         .ok_or_else(|| OperationError::Unidentified {
             resource: String::from(resource_type),
         })
+}
+
+/// The mapped resource of one `$tofhir` run, as its identity is asked for.
+#[derive(Debug, Clone, Copy)]
+struct Mapped<'run> {
+    resource_type: &'run str,
+    template: &'run str,
 }
 
 /// Returns whether `text` fits the R4 `id` grammar.
