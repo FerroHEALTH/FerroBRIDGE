@@ -11,7 +11,7 @@ expression: inbound.value().value()
         "_type": "ITEM_TREE",
         "name": {
           "_type": "DV_TEXT",
-          "value": "at0001"
+          "value": "Tree"
         },
         "archetype_node_id": "at0001",
         "items": [
