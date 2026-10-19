@@ -32,6 +32,7 @@ struct Expected {
     min: u32,
     max: Option<u32>,
     types: Vec<String>,
+    target_profiles: Vec<String>,
     content_reference: Option<String>,
     is_summary: bool,
     is_modifier: bool,
@@ -193,6 +194,7 @@ fn children_of(elements: &[Value], parent: &str) -> Vec<Expected> {
                         .map(|entry| type_code(path, entry))
                         .map(|code| element_id_code(element, code)),
                 ),
+                target_profiles: target_profiles_of(element),
                 content_reference: element.get("contentReference").and_then(Value::as_str).map(
                     |reference| {
                         reference
@@ -212,6 +214,44 @@ fn children_of(elements: &[Value], parent: &str) -> Vec<Expected> {
             })
         })
         .collect()
+}
+
+/// The `targetProfile` canonicals of every type entry of `element`, in order:
+/// a list from R4 on, one URI per entry in STU3
+/// (<https://hl7.org/fhir/STU3/elementdefinition-definitions.html#ElementDefinition.type.targetProfile>).
+fn target_profiles_of(element: &Value) -> Vec<String> {
+    element
+        .get("type")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry.get("targetProfile"))
+        .flat_map(|profiles| match *profiles {
+            Value::String(ref url) => vec![url.clone()],
+            Value::Array(ref urls) => urls
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect(),
+            _ => Vec::new(),
+        })
+        .collect()
+}
+
+/// `PractitionerRole.practitioner` is `Reference(Practitioner)` in every
+/// version (<https://hl7.org/fhir/R4/practitionerrole.html>).
+#[test]
+fn a_reference_element_carries_its_target_profile_in_every_version() {
+    for (module, schemas) in tables() {
+        let (_, field) = schemas
+            .element("PractitionerRole.practitioner")
+            .unwrap_or_else(|| panic!("{module}: PractitionerRole.practitioner resolves"));
+        assert_eq!(
+            field.target_profiles,
+            ["http://hl7.org/fhir/StructureDefinition/Practitioner"],
+            "{module}"
+        );
+    }
 }
 
 /// The codes in their first-stated order, each once: STU3 repeats a code once
@@ -268,6 +308,10 @@ fn assert_type(module: &str, schema: &TypeSchema, expected: &[Expected]) {
             "{at}: the repetition"
         );
         assert_eq!(field.types, expected.types, "{at}: the type codes");
+        assert_eq!(
+            field.target_profiles, expected.target_profiles,
+            "{at}: the target profiles"
+        );
         assert_eq!(
             field.content_reference,
             expected.content_reference.as_deref(),

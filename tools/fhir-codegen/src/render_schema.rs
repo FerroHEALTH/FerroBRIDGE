@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The per-version element table: every struct type's elements in definition
-//! order, each with its path, cardinality, type codes, content reference, and
+//! order, each with its path, cardinality, type codes, target profiles,
+//! content reference, and
 //! the kind the XML codec needs.
 //!
 //! The table is the one input of the runtime XML codec and the one source of
@@ -75,6 +76,11 @@ pub fn render_schema(model: &VersionModule) -> Result<String, fmt::Error> {
                 Max::Unbounded => String::from("None"),
             };
             let types: Vec<String> = field.types.iter().map(|code| format!("{code:?}")).collect();
+            let target_profiles: Vec<String> = field
+                .target_profiles
+                .iter()
+                .map(|url| format!("{url:?}"))
+                .collect();
             let content_reference = field.content_reference.as_ref().map_or_else(
                 || String::from("None"),
                 |target| format!("Some({target:?})"),
@@ -85,8 +91,9 @@ pub fn render_schema(model: &VersionModule) -> Result<String, fmt::Error> {
             let is_modifier = field.is_modifier;
             writeln!(
                 out,
-                "                FieldSchema {{ name: {name:?}, path: {path:?}, kind: {kind}, min: {min}, max: {max}, many: {many}, types: &[{}], content_reference: {content_reference}, is_summary: {is_summary}, is_modifier: {is_modifier} }},",
-                types.join(", ")
+                "                FieldSchema {{ name: {name:?}, path: {path:?}, kind: {kind}, min: {min}, max: {max}, many: {many}, types: &[{}], target_profiles: &[{}], content_reference: {content_reference}, is_summary: {is_summary}, is_modifier: {is_modifier} }},",
+                types.join(", "),
+                target_profiles.join(", ")
             )?;
         }
         out.push_str("            ],\n        },\n");

@@ -186,6 +186,9 @@ pub struct Field {
     /// The type codes the definition lists, in its order; a choice lists its
     /// alternatives and a content reference lists none.
     pub types: Vec<String>,
+    /// The `targetProfile` canonicals the definition lists across its types,
+    /// in its order.
+    pub target_profiles: Vec<String>,
     /// The element path a `contentReference` names, without the leading `#`.
     pub content_reference: Option<String>,
     /// The `isSummary` flag of the definition.

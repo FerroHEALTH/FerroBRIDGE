@@ -32,7 +32,11 @@ crates on crates.io.
   it. Under `existing` the create sends no EHR call. A failed EHR call after
   the party committed answers the EHR refusal with a warning naming the stored
   `Patient`. No specification governs this: our own design.
-
+- `fhir-types` 0.1.127: every `schema::FieldSchema` carries
+  `target_profiles`, the `ElementDefinition.type.targetProfile` canonicals of
+  the element's types in definition order, in all five versions (#926), so a
+  consumer reads which resource types a `Reference` admits from the element
+  table. A consumer that builds a `FieldSchema` literal adds the field.
 - The FHIR facade serves `Patient`, `Practitioner`, `PractitionerRole` and
   `Organization` from party contexts over the ITS-REST 1.1.0 Demographic API,
   DEVELOPMENT, behind `[cdr] demographic` (#470). Read, vread,
@@ -107,6 +111,11 @@ crates on crates.io.
   date-time, in UTC and cut to the second, with the value as the bridge
   sent it in its title. On a phone the dashboard's tiles are compact
   one-line tiles, and a disabled field keeps its edge in the dark theme.
+- The operator console draws with `ferrohealth-ui` 0.1.5 (#924), the
+  FerroUI release every FerroHEALTH console moves to together. The console
+  looks the same: 0.1.5 adds a per-row form field and a header title it
+  does not use yet, and its browser half no longer asks for a wasm-bindgen
+  of its own.
 - The README, the landing page and the build-order page name v0.0.9 as the
   latest release, and `scripts/checks/versions.sh` compares the release each
   names with the workspace version and its changelog date, so the next cut
