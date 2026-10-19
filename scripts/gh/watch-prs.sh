@@ -16,7 +16,72 @@
 #   (an update or a resolved merge) drops the arming.
 # - DIRTY elsewhere, or a red required check with nothing pending: stops
 #   (exit 2 or 3) so the session fixes it. Advisory analyzers never stop it.
+#   Only the newest run of each workflow on the head is judged, so a run a
+#   later push superseded or cancelled never stops it.
+#
+# scripts/gh/watch-prs.sh --self-test   judges fixture checks, with no gh call.
 set -u
+# The checks of the newest run of each workflow, from `gh pr checks --json
+# name,bucket,link,workflow`; a check whose link names no Actions run is kept.
+# Prints the pending count, a tab, and the red required checks.
+judge() {
+  jq -r '
+    def run: ((.link // "") | capture("/actions/runs/(?<r>[0-9]+)") | .r | tonumber) // 0;
+    def advisory: .name == "conclusion" or .name == "analyze" or .name == "CodeQL"
+      or .name == "Analyze (rust)" or .name == "SonarCloud Code Analysis";
+    map(. + {run: run})
+    | group_by(.workflow)
+    | map((map(.run) | max) as $newest | map(select(.run == $newest)))
+    | flatten
+    | [([.[] | select(.bucket == "pending")] | length | tostring),
+       ([.[] | select(.bucket == "fail" and (advisory | not)) | .name] | join(" "))]
+    | join("\t")'
+}
+self_test() {
+  local failures=0 got
+  # A cancelled run's failed jobs, superseded by a newer green run of CI.
+  got=$(judge <<'EOF'
+[{"name":"clippy (${{ matrix.packages }})","bucket":"fail","workflow":"CI","link":"https://github.com/o/r/actions/runs/100/job/1"},
+ {"name":"clippy (a b)","bucket":"pass","workflow":"CI","link":"https://github.com/o/r/actions/runs/101/job/2"},
+ {"name":"build","bucket":"pass","workflow":"Docs","link":"https://github.com/o/r/actions/runs/99/job/3"}]
+EOF
+  )
+  if [ "$got" != "0	" ]; then
+    echo "watch-prs: self-test: a superseded run was judged: [$got]" >&2
+    failures=$((failures + 1))
+  fi
+  # The newest run is red, and an advisory analyzer never counts.
+  got=$(judge <<'EOF'
+[{"name":"clippy (a b)","bucket":"pass","workflow":"CI","link":"https://github.com/o/r/actions/runs/100/job/1"},
+ {"name":"test (a b)","bucket":"fail","workflow":"CI","link":"https://github.com/o/r/actions/runs/101/job/2"},
+ {"name":"analyze","bucket":"fail","workflow":"SonarQube Cloud","link":"https://github.com/o/r/actions/runs/102/job/3"}]
+EOF
+  )
+  if [ "$got" != "0	test (a b)" ]; then
+    echo "watch-prs: self-test: the newest red run was not judged: [$got]" >&2
+    failures=$((failures + 1))
+  fi
+  # A pending job of the newest run holds the verdict.
+  got=$(judge <<'EOF'
+[{"name":"test (a b)","bucket":"fail","workflow":"CI","link":"https://github.com/o/r/actions/runs/101/job/2"},
+ {"name":"e2e","bucket":"pending","workflow":"CI","link":"https://github.com/o/r/actions/runs/101/job/4"},
+ {"name":"status","bucket":"fail","workflow":"","link":"https://example.org/status"}]
+EOF
+  )
+  if [ "$got" != "1	status test (a b)" ]; then
+    echo "watch-prs: self-test: a pending job or a check outside Actions was misread: [$got]" >&2
+    failures=$((failures + 1))
+  fi
+  if [ "$failures" != 0 ]; then
+    echo "watch-prs: self-test: $failures check(s) failed" >&2
+    exit 1
+  fi
+  echo "watch-prs: self-test passed"
+}
+if [ "${1:-}" = --self-test ]; then
+  self_test
+  exit 0
+fi
 if [ $# -eq 0 ]; then
   echo "usage: scripts/gh/watch-prs.sh <pr> [<pr>...]" >&2
   exit 64
@@ -103,9 +168,10 @@ while [ ${#left[@]} -gt 0 ]; do
           else echo "CONFLICT #$p: its changelog entries would land under a released version"; exit 2; fi
         fi ;;
     esac
-    c=$(gh pr checks "$p" 2>&1)
-    pend=$(printf '%s\n' "$c" | awk -F'\t' '$2=="pending"' | wc -l | tr -d ' ')
-    fails=$(printf '%s\n' "$c" | awk -F'\t' '$2=="fail" && $1!="conclusion" && $1!="analyze" && $1!="CodeQL" && $1!="Analyze (rust)" && $1!="SonarCloud Code Analysis" {print $1}' | tr '\n' ' ')
+    # gh exits non-zero while a check is pending or red and still prints them.
+    verdict=$(gh pr checks "$p" --json name,bucket,link,workflow 2>/dev/null | judge) || verdict="1	"
+    pend=${verdict%%	*}
+    fails=${verdict#*	}
     if [ "$pend" = 0 ] && [ -n "$fails" ]; then echo "RED #$p: $fails"; exit 3; fi
     next+=("$p")
   done

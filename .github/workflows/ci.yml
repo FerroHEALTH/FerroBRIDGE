@@ -379,6 +379,7 @@ jobs:
           bash scripts/gh/labels.sh --self-test
           bash scripts/gh/migrate-fields.sh --self-test
           bash scripts/gh/changelog-merge.sh --self-test
+          bash scripts/gh/watch-prs.sh --self-test
           bash scripts/deploy-probe.sh --self-test
 
   # ---- Tier 2: the Rust lanes, gated on the workspace existing --------------
