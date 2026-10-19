@@ -81,3 +81,4 @@
 - [Autonomous loop](autonomous-loop.md) — never stop, never wait idle, never ask the owner; keep working the issues while PRs drain; owner 2026-10-17
 - [FerroUI](ferroui.md) — one shared UI component library for every console, pinned Cargo dependency, owner sign-off to migrate the siblings; owner 2026-10-18
 - [One milestone at a time](one-milestone-at-a-time.md) — every worker on the current milestone until it is cut; an externally blocked straggler moves to the next
+- [Release closes milestone](release-closes-milestone.md): release.yml refuses a tag whose milestone is missing or not empty and closes it after every leg; check it after a manual or recovery release; owner 2026-10-19 (#983)
