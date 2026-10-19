@@ -21,6 +21,7 @@
 //! other converters, so they are a comparison and never the guide's answer.
 
 mod compare;
+mod refusals;
 mod sets;
 mod tables;
 
@@ -41,6 +42,7 @@ use fhir_types::codec::{Json, Value};
 use tokio_util::codec::{Decoder, Encoder};
 
 use crate::corpus::compare::{Targets, compare, expected_bundle};
+use crate::corpus::refusals::Expected;
 use crate::corpus::sets::{
     Message, VENDOR, aira, converter, nist, normalised, reportstream, v2_to_fhir,
 };
@@ -214,9 +216,13 @@ async fn run(
     guide: &ferrobridge_hl7v2::map::corpus::Corpus,
     targets: &Targets,
     client: &Client,
+    expected: Option<&Expected>,
 ) -> Case {
     let normal = normalised(&message.bytes);
-    let mut case = verdict(message, &normal, guide, targets, client).await;
+    let mut case = match expected {
+        Some(expected) => refused(&message.id, &normal, expected),
+        None => verdict(message, &normal, guide, targets, client).await,
+    };
     let (family, version) = declared(&normal);
     if let Some(family) = family {
         case = case.with_family(family);
@@ -225,6 +231,37 @@ async fn run(
         case = case.with_version(version);
     }
     case
+}
+
+/// The verdict on a message the expected-refusal list names: it passes when
+/// the face answers it with the listed code and an ERR carrying the listed
+/// table 0357 code, and fails when the face takes it or answers otherwise.
+fn refused(id: &str, normal: &[u8], expected: &Expected) -> Case {
+    let bytes = match framed(normal) {
+        Ok(bytes) => bytes,
+        Err(reason) => return Case::fail(id, reason),
+    };
+    let listed = format!("{:?} with ERR-3 {}", expected.code, expected.error);
+    match inbound::receive(&bytes, Charset::Ascii, structure_for, support::STAMP) {
+        Received::Answered { code, reply }
+            if code == expected.code && refusals::error_codes(&reply).contains(&expected.error) =>
+        {
+            let mut outcomes = BTreeMap::new();
+            outcomes.insert(String::from(expected.reason.kind()), 1);
+            Case::pass(id).with_outcomes(outcomes)
+        }
+        Received::Answered { code, reply } => Case::fail(
+            id,
+            format!(
+                "listed as refused {listed}, {}",
+                answer_reason(&format!("{code:?}"), &reply)
+            ),
+        ),
+        Received::Parsed(_) => Case::fail(id, format!("listed as refused {listed}, and parsed")),
+        Received::Unanswerable => {
+            Case::fail(id, format!("listed as refused {listed}, unanswerable"))
+        }
+    }
 }
 
 /// Runs one normalised message through the face and returns its verdict.
@@ -307,9 +344,11 @@ async fn measure(corpus: Corpus, messages: &[Message]) -> Result<(), Box<dyn Err
     let shipped = support::shipped();
     let tables = GuideTables::load(&support::package())?;
     let (_server, client) = tables.serve().await?;
+    let listed = refusals::expected()?;
     let mut cases = Vec::with_capacity(messages.len());
     for message in messages {
-        cases.push(run(message, &shipped, &targets, &client).await);
+        let expected = listed.get(&message.id);
+        cases.push(run(message, &shipped, &targets, &client, expected).await);
     }
     let outcome = record(corpus, &cases)?;
     assert!(

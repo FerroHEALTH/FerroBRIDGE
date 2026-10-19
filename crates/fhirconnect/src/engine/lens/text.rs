@@ -25,6 +25,7 @@ use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::lens::term_mapping::coding_of;
 use crate::engine::lens::term_mapping::equivalents;
 use crate::engine::lens::term_mapping::mappings_of;
+use crate::engine::lens::term_mapping::uncarried;
 use crate::engine::lens::term_mapping::withheld;
 use crate::model::ast::keyword::Direction;
 
@@ -68,6 +69,12 @@ impl Lens<DvTextData, FhirString> for TextLens {
 
     fn fallbacks(&self, _view: &FhirString) -> Vec<Fallback> {
         Vec::new()
+    }
+
+    // NOTE: DV_TEXT.adoc §String gives `mappings` no FHIRpath row, so a string
+    // carries none of them and each is a declared loss.
+    fn withheld(&self, source: &DvTextData) -> Vec<Withheld> {
+        uncarried(source.mappings.iter().flatten())
     }
 }
 

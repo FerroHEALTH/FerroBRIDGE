@@ -11,8 +11,9 @@
 //! of the message structure the generated `hl7v2-types` tables define.
 //!
 //! A segment the definitions do not know (a Z-segment, a local one), a known
-//! segment the structure has no place for, and a valued field beyond a
-//! segment's table are counted outcomes ([`Unplaced`]). A missing required
+//! segment the structure has no place for, a valued field beyond a
+//! segment's table, and a valued repetition, component or subcomponent
+//! beyond its definition are counted outcomes ([`Unplaced`]). A missing required
 //! segment or field and an escape sequence this crate does not decode are
 //! refusals ([`Refusal`]), which the acknowledgment reports as `AE` with one
 //! `ERR` segment each.
@@ -20,6 +21,7 @@
 //! [`lex`]: lex::lex
 //! [`group`]: grouping::group
 
+mod arity;
 pub mod grouping;
 pub mod lex;
 mod place;
@@ -447,6 +449,29 @@ pub enum Unplaced {
         /// Where.
         location: Location,
     },
+    /// A valued repetition of a field beyond the field's cardinality.
+    ExtraRepetition {
+        /// Where: the field and the repetition.
+        location: Location,
+        /// The field's element id, for example `PID.8-administrativeSex`.
+        field: &'static str,
+    },
+    /// A valued component beyond the components of the field's data type,
+    /// or past the first of a primitive.
+    ExtraComponent {
+        /// Where: the field, the repetition and the component.
+        location: Location,
+        /// The data type code, for example `CX`.
+        data_type: &'static str,
+    },
+    /// A valued subcomponent beyond the components of the component's data
+    /// type, or past the first of a primitive.
+    ExtraSubcomponent {
+        /// Where: down to the subcomponent.
+        location: Location,
+        /// The component's data type code, for example `HD`.
+        data_type: &'static str,
+    },
     /// The message declares an earlier version than the definitions, and is
     /// parsed against them: the legacy tables carry no tree of the structure
     /// at that version.
@@ -513,6 +538,9 @@ impl Unplaced {
             Self::UnknownSegment { .. } => "unknown-segment",
             Self::OutOfStructure { .. } => "out-of-structure",
             Self::ExtraField { .. } => "extra-field",
+            Self::ExtraRepetition { .. } => "extra-repetition",
+            Self::ExtraComponent { .. } => "extra-component",
+            Self::ExtraSubcomponent { .. } => "extra-subcomponent",
             Self::EarlierVersion { .. } => "earlier-version",
             Self::VersionSelected { .. } => "version-selected",
             Self::MissingRequiredField { .. } => "missing-required-field",

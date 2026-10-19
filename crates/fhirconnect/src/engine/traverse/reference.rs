@@ -117,6 +117,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
         mappings: &[Mapping],
         binding: &Binding,
     ) -> Result<(), EngineError> {
+        // NOTE: engine/references.adoc has the engine GET a referenced resource, which only a
+        // literal reference addresses (R4 references.html §2.3.0.2), so a display alone skips.
         let Some(literal) = self.reference_at(mapping, input)? else {
             let location = self.locate(mapping, input);
             self.warnings.push(Warning::new(

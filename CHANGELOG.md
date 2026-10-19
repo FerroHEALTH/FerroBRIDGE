@@ -25,6 +25,27 @@ crates on crates.io.
 
 ### Added
 
+- The HL7 v2 parser counts a valued repetition past a field's cardinality,
+  a valued component past its data type's components and a valued
+  subcomponent past its component's data type, as the new
+  `extra-repetition`, `extra-component` and `extra-subcomponent` outcomes
+  (#295). HL7 v2 chapter 2 §2.6 tells a receiver to ignore such
+  constituents, so none refuses the message and each value stays in the
+  parsed message. Components are checked against the v2.9.1 data types
+  only, since the tables of earlier versions carry no component tables.
+- A FHIRconnect mapping with no `type` onto an `ELEMENT` whose value admits
+  several data types converts the `ELEMENT`'s own value, then runs its
+  `followedBy` children (#544), as FHIRconnect `FollowedBy.adoc` orders them
+  ("after the parent mapping method has been executed"). The compiler picks
+  the value alternative whose class lists the FHIR type earliest in
+  `resolve::derive::PAIRS`, the first in template order on a tie (our own
+  design), and the program carries it as `Derived::Value`; such a mapping was
+  an anchor that wrote nothing. The statutory insurance identifier of the
+  library's `versicherungsinformationen.v0` now round-trips in the KDS person
+  chain as a `DV_IDENTIFIER`, and the two `collected` mappings of
+  `specimen.v1` no longer warn `fc-anchor-without-children`. `Derived` gains
+  a variant, so a consumer that matches it exhaustively adds the arm.
+  `fhirconnect` 0.1.158.
 - `fhirconnect::operations::run::to_fhir` takes the id of the mapped
   resource from a caller-supplied identity seam when the seams carry one
   (#619): `Seams::with_resource_identity` over the new
@@ -94,6 +115,18 @@ crates on crates.io.
   `src/auth/` and `src/cdr/oauth/` are gone from the server (#977), and
   `ferrobridge_server::credentials::UpstreamToken` hands the crate's token to
   both upstream clients.
+
+- The HL7 v2 corpora count a message the face refuses correctly as a pass
+  (#639). `crates/ferrobridge-hl7v2/tests/it/corpus/expected-refusals.txt`
+  lists 167 messages with the acknowledgment code and the HL7 table 0357
+  error HL7 v2 chapter 2 owes them: 152 ReportStream mapping-inventory
+  fragments, 6 FHIR-Converter samples that break their declared structure,
+  4 AIRA examples built to omit the RXA, and 5 messages whose bytes leave
+  the declared character set or whose MSH-18 names no table 0211 code. A
+  listed case fails when the face takes the message or answers it
+  otherwise. The `hl7v2` badge moves from 290 to 453 of 511 and the
+  `hl7v2-smoke` badge from 375 to 379 of 379.
+
 - The release workflow refuses a tag whose milestone, titled exactly as the
   tag, is missing or still holds an open issue or pull request, and names
   each one; once every leg has succeeded, crates.io included, it closes that
@@ -112,6 +145,26 @@ crates on crates.io.
 - A Bundle entry member the HL7 v2 interpreter cannot write is a counted
   `entry-unwritable` outcome naming the resource and the path, where it was
   only a warning in the log (#316).
+- A `TERM_MAPPING` that a `DV_TEXT` or `DV_CODED_TEXT` value carries out to a
+  FHIR `string`, or a `DV_CODED_TEXT` value carries out to a single `Coding`,
+  is a declared loss (#623). Those pairs give `mappings` no FHIR row
+  (FHIRconnect `DV_TEXT.adoc` §String, `DV_CODED_TEXT.adoc` §Coding), so the
+  engine writes none of them, as before, and now reports each one as a
+  `Loss::Skipped` with the new `SkipReason::TermMappingUncarried`, located at
+  the element and the value's `mappings`; `term_mapping::Withheld` gains
+  `cause()`. A consumer that matches `SkipReason` exhaustively adds the arm.
+  The facade's loss log labels it `skipped-term-mapping-uncarried`.
+- `SkipReason::EmptyReference` documents what the engine does (#511): a
+  `Reference` with no literal reference is skipped whatever else it carries,
+  because a `display` or an `identifier` alone names no resource to fetch
+  (R4 references.html §2.3.0.3 and §2.3.0.4). `fhirconnect` 0.1.159.
+- The HL7 v2 parser judges a segment group by placing every following
+  segment with the same choice rule it applies to the segment itself, so a
+  repeated `ORDER`'s ORC in an OML^O21 opens a new `ORDER` instead of an
+  optional-led `PRIOR_RESULT.ORDER_PRIOR` it cannot complete (#638). The six
+  NIST LOI OML_O21 messages refused for it now parse and map. The nested
+  trial walks share a budget of 4096 placements per segment, our own bound
+  on the work an ambiguous message can cost.
 - The HL7 v2 face decodes a message whose MSH-18 repeats with its first
   repetition, the default character set by HL7 v2.9.1 chapter 2 (#641). It
   still refuses one whose MSH-20 names a switching scheme from table 0356.
