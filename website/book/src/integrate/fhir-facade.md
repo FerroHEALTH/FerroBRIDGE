@@ -158,7 +158,10 @@ entry too, and an entry the token does not cover, or one outside a
 
 Every request under `/fhir` leaves one audit line on the `ferrobridge::audit`
 log target: the time, the token's `sub` and `client_id`, the method, the
-interaction, the resource type and id, the status and the duration. A
+interaction, the resource type and id, the status and the duration. Beside
+the log envelope its fields are exactly `at`, `subject`, `client`, `method`,
+`interaction`, `resource_type`, `resource_id`, `status`, `duration_ms` and
+`request_id`, the `X-Request-Id` that ties the line to the request log. A
 refused token is recorded as `unauthenticated`, and with `[auth]` off the
 subject reads `-`. A batch leaves one line per entry, carrying the entry's
 interaction, resource type, id and status and its position in the Bundle as
