@@ -41,6 +41,8 @@ pub mod provenance;
 
 pub mod run;
 
+mod subjects;
+
 /// The `$tofhir` operation code, without the `$`.
 ///
 /// `ToFhir.fsh` declares `code = #tofhir` at the system level.
