@@ -428,7 +428,7 @@ fn constrains(segment: &PathSegment) -> bool {
 /// Returns the refusal the index raised for a prefix that is not simply
 /// absent, so a lost occurrence axis is a diagnostic rather than a node that
 /// silently stops repeating.
-pub(super) fn occurrences(
+pub(crate) fn occurrences(
     template: &WebTemplateIndex,
     node: &ResolvedNode,
 ) -> Result<Vec<openehr_mapping_core::index::paths::FlatId>, PathError> {

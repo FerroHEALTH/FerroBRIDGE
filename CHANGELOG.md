@@ -170,6 +170,13 @@ crates on crates.io.
   refusal there is for a chain whose matches span resource types. The default
   `[facade.identifier_search] query` drops its `LIMIT 2`; a configured query
   with a `LIMIT` should drop it too.
+- A FHIRconnect run into openEHR declares every `INSTRUCTION.narrative` it
+  leaves to the FLAT builder (#919). The narrative is a mandatory `DV_TEXT`
+  (RM EHR IM §INSTRUCTION), and the builder fills one no mapping writes with
+  a placeholder text. The run now records it as one more `Loss::Defaulted`
+  warning per instruction instance, and in the composition's `FEEDER_AUDIT`
+  when the run carries an origin, so the stored composition names the value
+  no mapping wrote.
 - `scripts/gh/watch-prs.sh` no longer stops on a changelog conflict whose
   `[Unreleased]` keeps a blank line between two bullets or a heading with no
   blank line above it (#946). The entry merge keeps the blank line between

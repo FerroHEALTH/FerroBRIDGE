@@ -3,10 +3,13 @@
 
 //! The composition defaults and the build of the values a run produced.
 
+use std::collections::BTreeSet;
+
 use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
 use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::composition::NodeValue;
+use openehr_mapping_core::composition::RmPosition;
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::index::paths::AqlPath;
 use openehr_mapping_core::party::PartyClass;
@@ -30,9 +33,13 @@ use crate::engine::traverse::Held;
 use crate::engine::traverse::Routed;
 use crate::engine::traverse::Run;
 use crate::engine::traverse::error::EngineError;
+use crate::resolve::compile::openehr::occurrences;
 
 /// The archetype path of `COMPOSITION.composer`.
 pub(super) const COMPOSER: &str = "/composer";
+
+/// The RM type of an `INSTRUCTION` entry (RM EHR IM §INSTRUCTION).
+const INSTRUCTION: &str = "INSTRUCTION";
 
 impl<'a, T: Table + ?Sized> Run<'a, T> {
     /// Fills the composition fields no mapping wrote.
@@ -99,7 +106,60 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
         if let Some(ref code) = defaults.territory {
             self.default_context(&mut filled, "/territory", "territory", code)?;
         }
+        self.declare_narratives(&mut filled)?;
         Ok(filled)
+    }
+
+    /// Declares every `INSTRUCTION.narrative` the run leaves to the FLAT
+    /// builder, one per instruction instance the run writes into.
+    ///
+    /// `narrative` is a mandatory `DV_TEXT` of `INSTRUCTION` (RM EHR IM
+    /// §INSTRUCTION), and the builder fills one no key carries with a
+    /// placeholder text, so the value reaches the composition without a
+    /// mapping writing it. `engine/defaults-for-fields.adoc` does not list
+    /// it; declaring the fill as a default is our own design, so the stored
+    /// composition names it in `FEEDER_AUDIT` and the run warns.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Template`] when the template cannot answer for
+    /// a narrative node or its occurrence axes.
+    fn declare_narratives(&mut self, filled: &mut Vec<String>) -> Result<(), EngineError> {
+        let instructions: Vec<&'a ResolvedNode> = self
+            .index
+            .nodes()
+            .filter(|node| node.rm_type() == INSTRUCTION)
+            .collect();
+        for instruction in instructions {
+            let path = format!("{}/narrative", instruction.aql_path().as_str());
+            let narrative = self.node_at(&path)?.map(|node| node.flat_id().clone());
+            let refuse = |source: PathError| EngineError::Template {
+                mapping: String::from(self.program.context().as_str()),
+                node: path.clone(),
+                source: Box::new(source),
+            };
+            let depth = occurrences(self.index, instruction).map_err(refuse)?.len();
+            let within = format!("{}/", instruction.flat_id().as_str());
+            let instances: BTreeSet<&[RmPosition]> = self
+                .written
+                .iter()
+                .filter(|written| written.flat_id.as_str().starts_with(&within))
+                .filter_map(|written| written.positions.get(..depth))
+                .collect();
+            let unwritten = instances
+                .into_iter()
+                .filter(|instance| {
+                    !self.written.iter().any(|written| {
+                        narrative.as_ref() == Some(&written.flat_id)
+                            && written.positions.get(..depth) == Some(*instance)
+                    })
+                })
+                .count();
+            for _ in 0..unwritten {
+                self.defaulted(filled, &path);
+            }
+        }
+        Ok(())
     }
 
     /// Writes one default as the `ctx/` key `field`, when the template holds
