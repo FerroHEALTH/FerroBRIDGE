@@ -10,6 +10,7 @@
 //! `unidirectional` marker, a reference that resolves to nothing, or an
 //! optional code its concept map does not translate), a
 //! `TERM_MAPPING` whose `match` is not `=` and so has no FHIR form, a
+//! `TERM_MAPPING` of a value written into an element with no coding, a
 //! composition field the engine defaulted, the occurrences a `0..n` into a
 //! `0..1` dropped, a one-way row a data-type cell took, and a reference whose
 //! resolution belongs to the facade. Nothing else is a warning, and the
@@ -21,6 +22,7 @@ use core::fmt;
 use fhir_types::codec::Value;
 
 use crate::engine::lens::Fallback;
+use crate::engine::lens::term_mapping::Cause;
 use crate::engine::lens::term_mapping::Withheld;
 
 /// A produced document with the losses the run declared.
@@ -232,14 +234,20 @@ impl Warning {
     /// FHIR element, at `location`.
     #[must_use]
     pub fn withheld(mapping: &str, taken: &Withheld, location: Location) -> Self {
+        let terminology = String::from(taken.terminology());
+        let code = String::from(taken.code());
+        let reason = match taken.cause() {
+            Cause::Match => SkipReason::TermMappingMatch {
+                match_code: taken.match_code(),
+                terminology,
+                code,
+            },
+            Cause::Uncarried => SkipReason::TermMappingUncarried { terminology, code },
+        };
         Self::new(
             Loss::Skipped {
                 mapping: String::from(mapping),
-                reason: SkipReason::TermMappingMatch {
-                    match_code: taken.match_code(),
-                    terminology: String::from(taken.terminology()),
-                    code: String::from(taken.code()),
-                },
+                reason,
             },
             location,
         )
@@ -349,8 +357,13 @@ pub enum SkipReason {
         /// The reference as the document wrote it.
         reference: String,
     },
-    /// The `Reference` carries no literal reference and no display, so it
-    /// names nothing to map.
+    /// The `Reference` carries no literal reference, so it names no resource
+    /// to resolve or link.
+    ///
+    /// A `display` is "a very short description of the target resource" and
+    /// an `identifier` a logical reference (R4 references.html §2.3.0.3 and
+    /// §2.3.0.4), so neither alone names a resource the mapping can fetch,
+    /// and a `Reference` holding only those is skipped the same way.
     EmptyReference,
     /// The concept map the mapping names translates the input code to no
     /// equivalent concept, so the optional output element is not written.
@@ -366,6 +379,19 @@ pub enum SkipReason {
     TermMappingMatch {
         /// The `match` operator of the mapping: `>`, `<` or `?`.
         match_code: char,
+        /// The `terminology_id` value of the mapping's target.
+        terminology: String,
+        /// The `code_string` of the mapping's target.
+        code: String,
+    },
+    /// A `TERM_MAPPING` of the value has no place in the FHIR element.
+    ///
+    /// The `DV_TEXT` against `string` and the `DV_CODED_TEXT` against
+    /// `Coding` tables give `mappings` no FHIR row
+    /// (`types-of-mappings/data-type/DV_TEXT.adoc` §String and
+    /// `DV_CODED_TEXT.adoc` §Coding), so the mapping wrote no `Coding` for
+    /// this term; the rest of the value converted.
+    TermMappingUncarried {
         /// The `terminology_id` value of the mapping's target.
         terminology: String,
         /// The `code_string` of the mapping's target.
@@ -403,6 +429,14 @@ impl fmt::Display for SkipReason {
                 f,
                 "its TERM_MAPPING `{match_code}` to {code} of {terminology} is no equivalence, \
                  and only `=` maps to a Coding"
+            ),
+            Self::TermMappingUncarried {
+                ref terminology,
+                ref code,
+            } => write!(
+                f,
+                "its TERM_MAPPING to {code} of {terminology} has no place in an element \
+                 that carries no coding"
             ),
         }
     }

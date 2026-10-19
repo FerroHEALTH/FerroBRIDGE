@@ -104,12 +104,26 @@ pub fn get(
 /// Returns the term mappings [`get`] leaves out of the FHIR element `kind`
 /// names, in the order the value holds them.
 ///
-/// Only the cells that carry `mappings` withhold any: `DV_TEXT` against
-/// `Coding` and `CodeableConcept`, and `DV_CODED_TEXT` against
-/// `CodeableConcept`.
+/// The cells that carry `mappings` (`DV_TEXT` against `Coding` and
+/// `CodeableConcept`, `DV_CODED_TEXT` against `CodeableConcept`) withhold
+/// the ones whose `match` is not `=`. The cells whose FHIR element has no
+/// coding (`DV_TEXT` and `DV_CODED_TEXT` against `string`, `DV_CODED_TEXT`
+/// against `Coding`) withhold every one.
 #[must_use]
 pub fn withheld(source: &RmValue, kind: FhirKind, binding: Option<&str>) -> Vec<Withheld> {
     match (source, kind) {
+        (RmValue::Text(text), FhirKind::String) => {
+            Lens::<DvTextData, fhir_types::r4::primitives::String>::withheld(&TextLens, text)
+        }
+        (RmValue::CodedText(text), FhirKind::String) => {
+            Lens::<DvTextData, fhir_types::r4::primitives::String>::withheld(
+                &TextLens,
+                &plain(text.as_ref()),
+            )
+        }
+        (RmValue::CodedText(text), FhirKind::Coding) => {
+            Lens::<DvCodedText, Coding>::withheld(&coded_lens(binding), text.as_ref())
+        }
         (RmValue::Text(text), FhirKind::Coding) => {
             Lens::<DvTextData, Coding>::withheld(&TextLens, text)
         }
@@ -358,8 +372,10 @@ fn held_proportion(
 mod tests {
     use super::get;
     use super::put;
+    use super::withheld;
     use crate::engine::fhir::FhirKind;
     use crate::engine::fhir::FhirValue;
+    use crate::engine::lens::term_mapping::Cause;
     use crate::engine::rm::RmValue;
     use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
@@ -411,5 +427,76 @@ mod tests {
             produced.fallbacks.is_empty(),
             "the cell took no one-way row"
         );
+    }
+
+    /// Returns two synthetic `TERM_MAPPING`s, one `=` and one `>`.
+    fn mappings() -> serde_json::Value {
+        let term = |relation: &str, code: &str| {
+            serde_json::json!({
+                "_type": "TERM_MAPPING",
+                "match": relation,
+                "target": {
+                    "_type": "CODE_PHRASE",
+                    "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "http://example.org/fhir/CodeSystem/synthetic"},
+                    "code_string": code,
+                },
+            })
+        };
+        serde_json::json!([term("=", "SYN-001"), term(">", "SYN-002")])
+    }
+
+    /// Returns a synthetic `DV_TEXT` annotated with [`mappings`].
+    fn text() -> RmValue {
+        let value = serde_json::json!({
+            "_type": "DV_TEXT",
+            "value": "a synthetic rubric",
+            "mappings": mappings(),
+        });
+        RmValue::from_canonical("DV_TEXT", "/synthetic", &value).expect("a DV_TEXT")
+    }
+
+    /// Returns a synthetic `DV_CODED_TEXT` annotated with [`mappings`].
+    fn coded_text() -> RmValue {
+        let value = serde_json::json!({
+            "_type": "DV_CODED_TEXT",
+            "value": "a synthetic rubric",
+            "mappings": mappings(),
+            "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "local"},
+                "code_string": "at0017",
+            },
+        });
+        RmValue::from_canonical("DV_CODED_TEXT", "/synthetic", &value).expect("a DV_CODED_TEXT")
+    }
+
+    /// Returns the cause and code of every term `withheld` reports.
+    fn reported(source: &RmValue, kind: FhirKind) -> Vec<(Cause, String)> {
+        withheld(source, kind, None)
+            .iter()
+            .map(|taken| (taken.cause(), String::from(taken.code())))
+            .collect()
+    }
+
+    #[test]
+    fn a_cell_with_no_coding_withholds_every_term_mapping() {
+        // DV_TEXT.adoc §String and DV_CODED_TEXT.adoc §Coding give `mappings`
+        // no FHIRpath row.
+        let every = vec![
+            (Cause::Uncarried, String::from("SYN-001")),
+            (Cause::Uncarried, String::from("SYN-002")),
+        ];
+        assert_eq!(reported(&text(), FhirKind::String), every);
+        assert_eq!(reported(&coded_text(), FhirKind::String), every);
+        assert_eq!(reported(&coded_text(), FhirKind::Coding), every);
+    }
+
+    #[test]
+    fn a_cell_with_codings_withholds_only_what_no_coding_states() {
+        // TERM_MAPPING.adoc: `match` is "hard coded to `=`".
+        let relation = vec![(Cause::Match, String::from("SYN-002"))];
+        assert_eq!(reported(&text(), FhirKind::Coding), relation);
+        assert_eq!(reported(&text(), FhirKind::CodeableConcept), relation);
+        assert_eq!(reported(&coded_text(), FhirKind::CodeableConcept), relation);
     }
 }

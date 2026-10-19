@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that carries the problem name as the
+# FHIR string Condition.code.text, the DV_TEXT against String pair of
+# types-of-mappings/data-type/DV_TEXT.adoc, against the synthetic
+# ferrobridge.diagnose.v1 template of the testkit.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_diagnose_text
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "problemText"
+    with:
+      fhir: "$resource.code.text"
+      openehr: "$archetype/data[at0001]/items[at0002]"
