@@ -430,6 +430,28 @@ Only a reference whose type some loaded `reference` mapping names is
 followed, because no other is read. The keys are on the Operate page under
 `[facade.references]`.
 
+### Demographic references
+
+A reference a mapping writes as a party (a recorder as the composer or as
+`ENTRY.provider`, a participant) is never dropped. FHIRconnect sends it to a
+demographics service, and with none "a FHIRconnect engine should use the IDs
+maintained by the FHIRconnect engine's FHIR-server" (`engine/demographics.adoc`).
+The facade is that server, so a relative reference, or one under
+`[facade] base_url`, becomes an identity issued by that base:
+
+- in `PARTY_IDENTIFIED.identifiers` as a `DV_IDENTIFIER` whose `issuer` is
+  the base, whose `id` is `<Type>/<id>` and whose `type` is `fhir-reference`,
+  where the FLAT format carries identifiers (`ENTRY.provider`);
+- in `PARTY_PROXY.external_ref` as a `PARTY_REF` in the base's namespace
+  with a `GENERIC_ID` of scheme `fhir-reference`, on the composer and on a
+  participation's performer, whose FLAT keys carry only the reference.
+
+A read turns either back into the same `Reference.reference`. A reference to
+another server keeps that server as its issuer, and a `urn:` reference to an
+entry of the request is refused. The identity shapes are FerroBRIDGE's own
+design. A CDR that refuses identified parties in clinical content answers
+`422`, and the facade passes its words through in `issue.diagnostics`.
+
 ## `$validate` is a dry run of this server
 
 `POST /fhir/{type}/$validate` runs the whole inbound path up to the commit and

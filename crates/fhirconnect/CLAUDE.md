@@ -142,6 +142,14 @@ resolves a reference against the request Bundle first and the seams'
 reference source after it; the server passes none, so it reads the Bundle
 only.
 
+The fifth seam is `engine::demographics::Demographics`, the demographics
+endpoint a party reference resolves through. The default `NoDemographics`
+refuses, so a reference with no endpoint fails closed; `IssuerDemographics`
+is the stateless fallback over one FHIR server base. `engine::traverse::
+demographic` puts the identity in `identifiers` where FLAT carries it and in
+`external_ref` on the composer and the participations, and reads both shapes
+back through `reference_of`. Never drop a reference.
+
 The fourth seam is `engine::terminology::Terminology`, the server a
 `conceptmap` translates through, over the generated R4 `$translate`
 contract. The default `NoTerminology` refuses, so a `conceptmap` with no

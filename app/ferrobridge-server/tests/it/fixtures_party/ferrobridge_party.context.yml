@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The context the identified-party suite runs: the facade profile onto the synthetic
+# ferrobridge.diagnose.v1 template of the testkit. The profile URL is
+# example.org, which RFC 6761 section 6.5 reserves for examples.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_party.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://example.org/fhir/StructureDefinition/ferrobridge-facade-diagnosis"
+  template:
+    id: "ferrobridge.diagnose.v1"
+  archetypes:
+    - "ferrobridge_party"
+  start: "ferrobridge_party"

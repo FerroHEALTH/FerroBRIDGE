@@ -15,6 +15,7 @@ mod conditional;
 mod created;
 mod credentials;
 mod examples;
+mod party;
 mod person;
 mod read;
 mod reconcile;
