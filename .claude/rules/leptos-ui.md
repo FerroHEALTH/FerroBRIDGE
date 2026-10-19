@@ -374,7 +374,9 @@ changes here and nowhere else.
   - Within 314 KiB, `ferrohealth-ui` 0.1.2 measured 315175 and 0.1.3 315639
     (2026-10-19): their stacked tables, chevron select and nested-reveal
     rules are stylesheet, and the data table they stack is the one the
-    console already drew.
+    console already drew. 0.1.4 measured 315522 (2026-10-19): its
+    timestamp is drawn on the server, and its compact tile and stacking
+    rules are stylesheet.
 
   The headroom is the quarter FerroFED's console started with, enough for
   toolchain drift and small growth and too little for a slice to pass
