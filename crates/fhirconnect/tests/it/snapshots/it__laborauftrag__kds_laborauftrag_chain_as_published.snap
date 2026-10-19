@@ -32,8 +32,6 @@ expression: rows(&diagnostics)
   "specimen.v1.yml:200 fc-unknown-template-node",
   "specimen.v1.yml:202 fc-unknown-template-node",
   "specimen.v1.yml:204 fc-unknown-template-node",
-  "specimen.v1.yml:27 fc-anchor-without-children",
-  "specimen.v1.yml:38 fc-anchor-without-children",
   "specimen.v1.yml:56 fc-unknown-template-node",
   "specimen.v1.yml:61 fc-unknown-template-node",
   "specimen.v1.yml:66 fc-unknown-template-node",
