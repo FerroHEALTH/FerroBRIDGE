@@ -23,6 +23,16 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Fixed
+
+- The HL7 v2 parser judges a segment group by placing every following
+  segment with the same choice rule it applies to the segment itself, so a
+  repeated `ORDER`'s ORC in an OML^O21 opens a new `ORDER` instead of an
+  optional-led `PRIOR_RESULT.ORDER_PRIOR` it cannot complete (#638). The six
+  NIST LOI OML_O21 messages refused for it now parse and map. The nested
+  trial walks share a budget of 4096 placements per segment, our own bound
+  on the work an ambiguous message can cost.
+
 ## [0.0.10] - 2026-10-19
 
 The openEHR demographics release. The FHIR facade serves `Patient`,
