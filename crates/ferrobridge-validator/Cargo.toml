@@ -4,7 +4,7 @@
 name = "ferrobridge-validator"
 description = "A FHIR R4 and STU3 profile validator over packages read offline, the generated fhir-types model and its element table"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.126"
+version = "0.1.127"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
