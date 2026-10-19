@@ -230,10 +230,13 @@ impl IdentityRequest {
 
 /// What assigns the id of the resource a `$tofhir` run maps a composition to.
 ///
-/// Without one the operations keep the id the mapping wrote or derive it from
-/// the composition (`crate::operations::run`); a caller with an identity
-/// store answers it here, so the same composition keeps one id across runs.
-/// No specification governs identity across runs: our own design.
+/// The engine "must implement its own ID management" and an export's resource
+/// ids "must remain the same" every time a composition is exported
+/// (`docs/specs/fhirconnect/modules/ROOT/pages/engine/id-management.adoc`,
+/// §Resource IDs and §Deterministic IDs). A caller with an identity store
+/// answers that here; without one the operations keep the id the mapping
+/// wrote or derive it from the composition (`crate::operations::run`). The
+/// shape of the seam is our own design.
 pub trait ResourceIdentity: fmt::Debug + Send + Sync {
     /// Returns the FHIR id the mapped resource `request` describes takes.
     ///

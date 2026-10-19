@@ -3,9 +3,10 @@
 
 //! The id of the resource `$tofhir` maps, from a caller's identity seam.
 //!
-//! No specification governs identity across runs: our own design. Without a
-//! seam the id derives from the written `id` or the composition's
-//! `versioned_object_uid`, which `runs.rs` pins.
+//! `engine/id-management.adoc` §Resource IDs has the engine maintain its own
+//! ids; the seam is how a caller's store does that. Without a seam the id
+//! derives from the written `id` or the composition's `versioned_object_uid`,
+//! which `runs.rs` pins.
 
 use core::error::Error;
 use std::sync::Mutex;
