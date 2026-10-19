@@ -76,13 +76,15 @@ endpoints, for clients that discover SMART through the statement (see
 
 ## Security
 
-With [`[auth]`](../operate/configuration.md#auth) on, the facade is a SMART
-App Launch 2.x resource server for one authorization server, fixed by its
-issuer and the audience the deployment configures. **With `[auth]` off, the
+With [`[auth]`](../operate/configuration.md#auth) on, the default, the facade
+is a SMART App Launch 2.x resource server for the authorization servers the
+deployment trusts, each fixed by its issuer, and the audiences it configures.
+The check is `ferrohealth-smart`'s, the resource server every FerroHEALTH
+product runs. **With `[auth]` off, the
 facade authenticates nobody and serves every request it receives.**
 
 Every request under `/fhir` carries `Authorization: Bearer <access token>`,
-except `GET /fhir/metadata` and the SMART discovery document at
+or the Basic credential of a user `[[auth.basic.users]]` lists, except `GET /fhir/metadata` and the SMART discovery document at
 `GET /fhir/.well-known/smart-configuration` (also served at
 `/.well-known/smart-configuration`), which a client reads before it holds a
 token. The health routes stay open too. The token is a JWT signed by a key
@@ -93,14 +95,17 @@ clock skew. Under the default `rfc9068` profile it also carries `typ: at+jwt`,
 
 | Answer | When | `WWW-Authenticate` |
 |---|---|---|
-| `401` | No bearer token, or a token in another scheme | `Bearer` |
+| `401` | No credential, or one in a scheme the server does not admit | `Bearer`, and a `Basic realm="", charset="UTF-8"` challenge beside it when Basic users are configured |
+| `400` | Two credentials, or an `Authorization` value that is no credential | `Bearer error="invalid_request"` |
 | `401` | A token that does not hold, whatever the reason, including a token of another issuer or for another audience | `Bearer error="invalid_token"` |
+| `401` | A Basic credential that does not hold, whatever the reason | `Basic realm="", charset="UTF-8"` |
 | `403` | A valid token whose scopes do not permit the request | `Bearer error="insufficient_scope"` |
-| `403` | Any request to a route under `/fhir` the guard does not classify, before the token is read | `Bearer error="insufficient_scope"` |
+| `403` | Any request to a route under `/fhir` the guard does not classify, before the token is read | none |
 | `503` | A token naming a key the server cannot fetch because the key set does not answer | none |
 
-Each refusal carries an `OperationOutcome`, `login` for a `401` and
-`forbidden` for a `403`. Neither names the claim that failed or the scope
+Each refusal carries an `OperationOutcome`, `login` for a `401`, `invalid` for
+a `400` and `forbidden` for a `403`. A configured `realm` is named on every
+challenge. Neither names the claim that failed or the scope
 that was missing.
 
 The guard classifies every route it admits by name: the interactions in the
@@ -121,7 +126,7 @@ on the resource type in the path or in the entry:
 | delete (a party resource) | `d` |
 | search (`GET [base]/{type}`, `POST [base]/{type}/_search`) | `s` |
 | update | `u` |
-| `$validate` | `c` or `u`, or the operator scope (`auth.operator_scope`): the dry run commits nothing, so an operator console needs no clinical write scope |
+| `$validate` | `c` or `u`, or the operator scope (`[operator] scope`): the dry run commits nothing, so an operator console needs no clinical write scope |
 | transaction | the permission of each entry's `request.method`: `c` for `POST`, `u` for `PUT`, `r` for `GET`, `d` for `DELETE` |
 | batch | per entry, the permission of the interaction its `request` names: `c` for a create, `u` for an update, `r` for a read or vread, `s` for a search |
 | `$tofhir`, `$toopenehr` | a valid token, no clinical scope, the operator scope included: they transform the request body and reach no CDR |
@@ -156,16 +161,22 @@ entry too, and an entry the token does not cover, or one outside a
 `patient/` token's compartment, answers `403 Forbidden` inside the
 `batch-response` while the other entries run.
 
-Every request under `/fhir` leaves one audit line on the `ferrobridge::audit`
-log target: the time, the token's `sub` and `client_id`, the method, the
-interaction, the resource type and id, the status and the duration. Beside
-the log envelope its fields are exactly `at`, `subject`, `client`, `method`,
-`interaction`, `resource_type`, `resource_id`, `status`, `duration_ms` and
-`request_id`, the `X-Request-Id` that ties the line to the request log. A
-refused token is recorded as `unauthenticated`, and with `[auth]` off the
-subject reads `-`. A batch leaves one line per entry, carrying the entry's
-interaction, resource type, id and status and its position in the Bundle as
-`entry`, then the request's own line with the interaction `batch`. The line
+Every request under `/fhir` but the discovery document leaves one audit line
+on the `ferrohealth_smart::audit` log target, the record every FerroHEALTH
+product writes: the time, the token's `sub` or the Basic user as
+`principal`, the token's `client_id` and issuer, the scheme the credential
+arrived with as `via` (`bearer` or `basic`), the method, the matched route,
+what was addressed (`Condition/c-1`, or the type alone), the interaction,
+the status and the duration. Beside the log envelope its fields are exactly
+`at`, `request_id` (the `X-Request-Id` that ties the line to the request
+log), `principal`, `client`, `via`, `issuer`, `method`, `route`, `target`,
+`interaction`, `status` and `duration_ms`; the JSON rendering writes the
+line's `target` beside the envelope's key of the same name. A refused
+credential is recorded as `unauthenticated` with `via` `none`, and with
+`[auth]` off the principal reads `-` with `via` `open`. A batch leaves one
+line per entry, carrying the entry's interaction, what it addressed and its
+status and its position in the Bundle as `entry`, then the request's own
+line with the interaction `batch`. The line
 never carries the token, another claim, a query value or a body.
 
 The bridge reaches the CDR with its own credential

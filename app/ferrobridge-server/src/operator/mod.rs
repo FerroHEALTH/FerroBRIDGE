@@ -6,7 +6,7 @@
 //!
 //! The API is mounted under `/operator` when `[operator] enabled` is true,
 //! which the configuration refuses without `[auth]`, and every route passes
-//! [`guard::guard`]. `GET /operator/state` answers what the running load
+//! the layer of [`guard::layer`]. `GET /operator/state` answers what the running load
 //! compiled, `GET /operator/mappings` every mapping file with its digest and
 //! owner, and `GET /operator/mappings/{path}` one file's verbatim bytes with
 //! its digest as the `ETag`. With `[operator] mapping_dir`, `POST
@@ -35,7 +35,6 @@ use axum::routing::post;
 use http::StatusCode;
 use http::header;
 
-use crate::auth::Authority;
 use crate::operator::files::Root;
 use crate::operator::snapshot::Snapshot;
 
@@ -159,9 +158,9 @@ impl Operator {
     }
 }
 
-/// Returns the operator routes over `operator`, every one guarded by
-/// `authority`.
-pub fn routes(operator: Arc<Operator>, authority: Arc<Authority>) -> Router {
+/// Returns the operator routes over `operator`, every one guarded by the
+/// gate of `smart` and its operator scope.
+pub fn routes(operator: Arc<Operator>, smart: &crate::smart::Smart) -> Router {
     Router::new()
         .route("/operator/state", get(state))
         .route("/operator/mappings", get(mappings))
@@ -169,10 +168,7 @@ pub fn routes(operator: Arc<Operator>, authority: Arc<Authority>) -> Router {
         .route("/operator/mappings/{*path}", get(mapping).put(save::save))
         .route("/operator/reload", post(save::reload))
         .with_state(operator)
-        .route_layer(axum::middleware::from_fn_with_state(
-            authority,
-            guard::guard,
-        ))
+        .route_layer(guard::layer(smart))
 }
 
 /// `GET /operator/state`: the running load.

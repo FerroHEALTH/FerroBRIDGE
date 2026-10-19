@@ -17,7 +17,6 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use ferrobridge_server::auth::AuthSettings;
 use ferrobridge_server::boot::{Backoff, serve_settings};
 use ferrobridge_server::operator::OperatorSettings;
 use ferrobridge_testkit::oidc::Provider;
@@ -34,7 +33,7 @@ const CLIENT_ID: &str = "ferrobridge-viewer";
 
 /// The scope of the operator's access token: the operator API, and every
 /// FHIR interaction the playground and the capability read call.
-const SCOPE: &str = "openid ferrobridge.operator system/*.cruds";
+const SCOPE: &str = "openid __ferrobridge.operator system/*.cruds";
 
 /// The profile the provisioned context claims.
 pub(crate) const PROFILE: &str =
@@ -297,18 +296,14 @@ async fn bridge(
          [mappings]\ndirectory = {mappings}\ntemplates = {templates}\n\n\
          [operations]\nenabled = {operations}\ncomposition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\nidentity_store = {identity}\n\
-         composition_language = \"en\"\ncomposition_territory = \"NL\"\n",
+         composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
+         [auth]\nissuer = \"{issuer}\"\naudience = [\"{bridge}/fhir\"]\n",
         cdr = cdr.uri(),
+        issuer = provider.issuer(),
     );
     let mut settings =
         ferrobridge_server::config::Config::from_sources(Some(&text), &BTreeMap::new())?
             .resolve()?;
-    // NOTE: RFC 8414 §2 has the issuer an https URL, which `[auth]` holds to;
-    // the test provider is http on loopback, so the settings name it directly.
-    settings.auth = Some(AuthSettings::new(
-        provider.issuer(),
-        format!("{bridge}/fhir"),
-    ));
     settings.operator = Some(OperatorSettings {
         mapping_dir: Some(tree.join("console")),
     });

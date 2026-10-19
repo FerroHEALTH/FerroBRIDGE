@@ -11,7 +11,7 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 
 use axum::body::Body;
-use ferrobridge_server::auth::Authority;
+use ferrobridge_server::smart::Smart;
 use http::Request;
 use http::StatusCode;
 use http::header;
@@ -48,7 +48,7 @@ struct Case {
     /// The facade.
     harness: Harness,
     /// The resource server.
-    authority: Arc<Authority>,
+    authority: Arc<Smart>,
 }
 
 impl Case {

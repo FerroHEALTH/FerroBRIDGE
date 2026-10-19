@@ -12,13 +12,13 @@
 //! identifier, or by another literal form, cannot be shown to be the patient,
 //! so a patient-scoped token is refused for it (no specification governs
 //! the mapping from a FHIR compartment to an openEHR EHR: our own design).
-//! A refusal is the same `403` the guard answers, naming no scope.
+//! A refusal is the same `403` the layer answers, naming no scope.
 
+use ferrohealth_smart::resource::Access;
+use ferrohealth_smart::resource::Compartment;
+use ferrohealth_smart::scope::Permission;
 use http::StatusCode;
 
-use crate::auth::Access;
-use crate::auth::Compartment;
-use crate::auth::scope::Permission;
 use crate::cdr::ids::EhrId;
 use crate::facade::Facade;
 use crate::facade::identity::PersonId;
@@ -52,10 +52,10 @@ pub fn admit_person(
             if admitted {
                 Ok(())
             } else {
-                Err(crate::auth::guard::forbidden())
+                Err(crate::facade::guard::forbidden())
             }
         }
-        None => Err(crate::auth::guard::forbidden()),
+        None => Err(crate::facade::guard::forbidden()),
     }
 }
 

@@ -41,6 +41,58 @@ crates on crates.io.
 
 ### Changed
 
+- **Breaking:** the facade, the operator API and the CDR and terminology
+  lanes authenticate through `ferrohealth-smart` 0.1.0, the FerroHEALTH
+  family's SMART and OAuth 2.0 resource-server crate (#981). Its sections
+  replace the bridge's own, so a deployment changes these keys:
+  - `[auth]` is on by default (`enabled = true`). `serve` refuses to start a
+    facade, an operator API or a FHIRconnect operations lane until `[auth]`
+    names `issuer` and `audience`, or until `enabled = false`
+    (`FERROBRIDGE__AUTH__ENABLED=false`) serves them open. A server that
+    serves only `/` and the health routes, and the jobs, read no `[auth]`.
+  - `auth.audience` is a list (`audience = ["https://…/fhir"]`, and
+    `FERROBRIDGE__AUTH__AUDIENCE='["https://…/fhir"]'`); a token's `aud`
+    must contain one of them.
+  - `auth.jwks_refresh_interval_ms` becomes `auth.jwks_refresh_interval_seconds`
+    (default `60`), and `auth.jwks_max_age_seconds` (default `600`) is new:
+    a key set older than that is read again before a token is checked, so a
+    key the issuer withdrew stops verifying (#972).
+  - `auth.algorithms` defaults to `RS256`, `RS384`, `PS256`, `PS384`,
+    `ES256` and `ES384`, where it was `RS256` and `ES256`.
+  - `auth.issuer` may be plain `http` on a loopback host; elsewhere it stays
+    `https`.
+  - `auth.operator_scope` becomes `operator.scope`, and its default
+    `ferrobridge.operator` becomes `__ferrobridge.operator`, the extension
+    form SMART App Launch 2.2.0 gives a scope (a string starting with `__`
+    or a full URI); any other value refuses the start. Grant the new scope
+    in the authorization server before you upgrade.
+  - New in `[auth]`: `[[auth.issuer]]` tables for several trusted issuers,
+    `[[auth.basic.users]]` for HTTP Basic callers with an Argon2id
+    `password_hash` (or `password_hash_file`) and their `scopes`,
+    `jwks_file`, and `realm`.
+  - `[cdr.credentials]` and `[terminology.credentials]` lose `user_file`;
+    the user-id is read inline from `user`.
+  - `[cdr.credentials.oauth]` and `[terminology.credentials.oauth]` take
+    `client_auth = "private_key_jwt"` with `private_key_file`, `kid` and
+    `assertion_alg`, and `timeout_ms` (default `10000`), which bounds a call
+    to the token endpoint in place of the lane's own timeout; an empty
+    `scope` sends no `scope` parameter.
+
+  The facade's refusals keep their `OperationOutcome` bodies and challenges;
+  two `Authorization` values, or a value that is no credential (a scheme
+  with nothing after it), answer `400` with `invalid_request` (RFC 6750
+  §3.1), and a route the guard does not classify answers its `403` without
+  a challenge. The discovery
+  document no longer claims `permission-v2`, which SMART App Launch 2.2.0
+  defines as granular scope support the facade does not evaluate. The audit
+  line moves to the `ferrohealth_smart::audit` target with the family's
+  field set: `principal` replaces `subject`, `target` (`Condition/c-1`)
+  replaces `resource_type` and `resource_id`, and `via`, `issuer` and
+  `route` are new. The operator API's request line moves there too; a save
+  or a reload still writes its change record on `ferrobridge::audit`.
+  `src/auth/` and `src/cdr/oauth/` are gone from the server (#977), and
+  `ferrobridge_server::credentials::UpstreamToken` hands the crate's token to
+  both upstream clients.
 - The release workflow refuses a tag whose milestone, titled exactly as the
   tag, is missing or still holds an open issue or pull request, and names
   each one; once every leg has succeeded, crates.io included, it closes that
@@ -48,6 +100,12 @@ crates on crates.io.
 
 ### Fixed
 
+- The HL7 v2 face decodes a message whose MSH-18 repeats with its first
+  repetition, the default character set by HL7 v2.9.1 chapter 2 (#641). It
+  still refuses one whose MSH-20 names a switching scheme from table 0356.
+  In `ferrobridge-hl7v2`, `DecodeError::AlternateCharsets` is replaced by
+  `DecodeError::SwitchingScheme { scheme }`; a caller matching the old variant
+  matches the new one.
 - `$toopenehr` compares the subjects of a Bundle as the entries their
   references resolve to (#399), by the R4 rules for resolving a reference in
   a Bundle (bundle.html §2.36.4.1): an absolute reference (`urn:uuid`,

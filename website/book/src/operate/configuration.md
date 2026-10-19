@@ -175,8 +175,13 @@ An inline value beside its `_file` sibling is a boot error too.
 
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
-| `user` | none | | The user name of RFC 7617 basic authentication; a `user_file` sibling names a file holding it, read at boot like a secret |
-| `password` | none | yes | The password of RFC 7617 basic authentication |
+| `user` | none | | The user-id of RFC 7617 basic authentication, written inline; it is no secret, and it may hold no colon (RFC 7617 §2) |
+| `password` | none | yes | The password of RFC 7617 basic authentication; use `password_file` to read it from a file |
+
+The table is the one `ferrohealth-smart`, the FerroHEALTH resource-server
+crate, defines for every upstream of every product. A `password` without a
+`user` is a boot error, and so is a `user_file` key: the user-id is read
+inline only.
 
 The user and the password become the `Authorization` header of every call,
 `Basic` over `user:password`.
@@ -202,14 +207,18 @@ SMART tokens on writes, takes the same arrangement under
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
 | `token_endpoint` | none | | The token endpoint URL (RFC 6749 §3.2) |
-| `issuer` | none | | The issuer identifier, an `https` URL with no query or fragment (RFC 8414 §2); the token endpoint is read from its metadata |
+| `issuer` | none | | The issuer identifier, an `https` URL with no query or fragment (RFC 8414 §2), or plain `http` on a loopback host; the token endpoint is read from its metadata |
 | `client_id` | none, required | | The client identifier (RFC 6749 §2.2) |
-| `client_secret` | none, required | yes | The client secret; use `client_secret_file` to read it from a file |
-| `client_auth` | `client_secret_basic` | | `client_secret_basic` sends the id and the secret as HTTP Basic, `client_secret_post` sends them in the request body (RFC 6749 §2.3.1) |
-| `scope` | none | | The `scope` parameter, space-delimited scope tokens (RFC 6749 §3.3) |
+| `client_auth` | `client_secret_basic` | | `client_secret_basic` sends the id and the secret as HTTP Basic, `client_secret_post` sends them in the request body (RFC 6749 §2.3.1), `private_key_jwt` sends a client assertion signed with `private_key_file` (RFC 7523 §2.2) |
+| `client_secret` | none | yes | The client secret, required under `client_secret_basic` and `client_secret_post`; use `client_secret_file` to read it from a file |
+| `private_key_file` | none | yes | The PEM file of the private key a `private_key_jwt` assertion is signed with |
+| `kid` | none | | The `kid` the assertion names; the RFC 7638 thumbprint of the key when unset |
+| `assertion_alg` | by key type | | The algorithm the assertion is signed with, such as `ES384` |
+| `scope` | none | | The `scope` parameter, space-delimited scope tokens (RFC 6749 §3.3); empty sends none |
 | `audience` | none | | An `audience` parameter, for an authorization server that reads one; no specification defines it for this grant |
 | `resource` | none | | The `resource` parameter, an absolute URI with no fragment (RFC 8707 §2) |
 | `refresh_margin_ms` | `30000` | | How long before the token expires a new one is fetched |
+| `timeout_ms` | `10000` | | How long one call to the authorization server may take |
 
 Set exactly one of `token_endpoint` and `issuer`; both, or neither, is a boot
 error. With an `issuer`, the bridge reads the RFC 8414 metadata at
@@ -613,51 +622,79 @@ lower case and a resource type name does not survive it.
 
 ### `[auth]`
 
-Inbound authentication: the FHIR routes as a SMART App Launch 2.x resource
-server. It is off until `enabled` is true. **While it is off, the facade
-authenticates no caller and serves every request that reaches it**, reads and
-writes of patient data included, and the server logs a warning saying so at
-start-up. Keep an unauthenticated bridge on a network only trusted callers
-reach. The [FHIR facade](../integrate/fhir-facade.md#security) page says what
-a caller sends and what each refusal looks like.
+Inbound authentication: the FHIR routes and the operator API as a SMART App
+Launch 2.x resource server. The section is the one `ferrohealth-smart`, the
+FerroHEALTH resource-server crate, defines for every product, and it is **on
+by default**: `serve` refuses to start a facade, an operator API or a
+FHIRconnect operations lane until `[auth]` names an issuer and an audience,
+or until `enabled = false` says the bridge runs on a network only trusted
+callers reach. A server that serves only `/` and the health routes, and the
+jobs (`cdm init`, `etl run`, `mapping check`), read no `[auth]`. **While it
+is off, the facade authenticates no caller and serves every request that
+reaches it**, reads and writes of patient data included, and the server logs
+a warning saying so at start-up. The
+[FHIR facade](../integrate/fhir-facade.md#security) page says what a caller
+sends and what each refusal looks like.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `enabled` | `false` | Whether every FHIR request needs a bearer access token |
-| `issuer` | none, required | The authorization server's issuer identifier, an `https` URL with no query or fragment (RFC 8414 §2); every token's `iss` must equal it |
-| `audience` | none, required | The audience every token's `aud` must contain, normally the facade's `base_url` (RFC 9068 §4) |
-| `algorithms` | `["RS256", "ES256"]` | The signature algorithms a token may use: `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384` or `EdDSA`; a symmetric `HS*` algorithm and `none` are refused |
-| `token_profile` | `rfc9068` | `rfc9068` requires the JWT access token profile (`typ` of `at+jwt`, and `iss`, `exp`, `aud`, `sub`, `client_id`, `iat` and `jti`); `jwt` accepts any `typ` and needs only `iss`, `exp`, `aud` and `sub`, for an authorization server that does not issue RFC 9068 tokens |
-| `clock_skew_seconds` | `60` | The leeway `exp`, `nbf` and `iat` are checked with |
-| `jwks_refresh_interval_ms` | `60000` | The shortest time between two reads of the key set that a token naming an unknown `kid` triggers |
+| `enabled` | `true` | Whether every guarded request needs a credential; `false` serves the facade and the operations open |
+| `issuer` | none, required | The authorization server's issuer identifier, an `https` URL with no query or fragment (RFC 8414 §2), or plain `http` on a loopback host; every token's `iss` must equal it. Several issuers are `[[auth.issuer]]` tables instead |
+| `audience` | none, required | The audiences, a list, of which every token's `aud` must contain one, normally the facade's `base_url` (RFC 9068 §4) |
+| `algorithms` | `["RS256", "RS384", "PS256", "PS384", "ES256", "ES384"]` | The signature algorithms a token may use; a symmetric `HS*` algorithm is refused and `none` is no algorithm |
+| `token_profile` | `rfc9068` | `rfc9068` requires the JWT access token profile (`typ` of `at+jwt`, and `iss`, `exp`, `aud`, `sub`, `client_id`, `iat` and `jti`); `jwt` accepts a `typ` of `JWT` or none and needs only `iss`, `exp`, `aud` and `sub`, for an authorization server that does not issue RFC 9068 tokens |
+| `clock_skew_seconds` | `60` | The leeway `exp`, `nbf` and `iat` are checked with, at most `300` |
+| `jwks_max_age_seconds` | `600` | How long a key set is used before it is read again, so a key the issuer withdrew stops verifying |
+| `jwks_refresh_interval_seconds` | `60` | The shortest time between two reads of the key set that a token naming an unknown `kid`, or a failed read, triggers |
+| `jwks_file` | none | A JWK Set file handed over out of band, read in place of the issuer's `jwks_uri`; the issuer's metadata is then not read |
 | `timeout_ms` | `10000` | How long one call to the authorization server may take |
+| `realm` | none | The `realm` every `WWW-Authenticate` challenge names |
 | `scopeless_subjects` | `[]` | The `sub` values whose token gets system-wide access when it names no SMART clinical scope, such as a backend service whose authorization server issues no scope; any other scopeless token is refused with `403` |
-| `operator_scope` | `ferrobridge.operator` | The scope that guards the [operator API](operator-api.md) and admits `$validate`, `$tofhir` and `$toopenehr`, which commit nothing; SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own |
-| `capabilities` | `[]` | SMART capabilities the discovery document lists beside the four the facade enforces (`permission-v1`, `permission-v2`, `permission-patient`, `permission-user`), such as `launch-standalone` or `client-confidential-asymmetric`, which describe the authorization server |
+| `capabilities` | `[]` | SMART capabilities the discovery document lists beside the three the facade enforces (`permission-v1`, `permission-patient`, `permission-user`) and the ones the issuer's metadata shows, such as `launch-ehr` or `context-ehr-patient` |
 
-At start-up the server reads the issuer's metadata, at
+Each `[[auth.issuer]]` table takes `issuer` and any of `audience`,
+`algorithms`, `token_profile`, `clock_skew_seconds`, `jwks_max_age_seconds`,
+`jwks_refresh_interval_seconds` and `jwks_file`; a key a table leaves out is
+the section's. A token is checked by the issuer its `iss` names, and the
+discovery document and the `CapabilityStatement` name the first.
+
+`[[auth.basic.users]]` tables admit HTTP Basic callers (RFC 7617) beside the
+tokens. Each table takes `user`, the Argon2id PHC string of the password as
+`password_hash` or in the file `password_hash_file`, and `scopes`, the SMART
+scopes the user is granted, which the facade checks as it checks a token's.
+
+```toml
+[[auth.basic.users]]
+user = "etl"
+password_hash_file = "/run/secrets/etl.phc"
+scopes = ["system/Condition.rs"]
+```
+
+At start-up the server reads each issuer's metadata, at
 `/.well-known/oauth-authorization-server` inserted before the issuer's path and
 on a `404` at the issuer followed by `/.well-known/openid-configuration`, and
 the key set its `jwks_uri` names. Metadata naming another issuer, metadata
-without a `jwks_uri` or a `token_endpoint`, and a key set that cannot be read
-each refuse the start. A token whose `kid` the key set does not hold makes the
-server read the key set once more, which is how a key rotation arrives, and
-never more often than `jwks_refresh_interval_ms`.
+without a `jwks_uri`, a first issuer without a `token_endpoint`, and a key
+set that cannot be read each refuse the start. A key set older than
+`jwks_max_age_seconds` is read again before a token is checked against it. A
+token whose `kid` the key set does not hold makes the server read the key set
+once more, which is how a key rotation arrives, and never more often than
+`jwks_refresh_interval_seconds`.
 
 ```toml
 [auth]
-enabled = true
 issuer = "https://auth.example.org/realms/clinic"
-audience = "https://bridge.example.org/fhir"
+audience = ["https://bridge.example.org/fhir"]
 algorithms = ["RS256"]
 scopeless_subjects = ["service-account-ferrofed"]
 ```
 
 As environment variables, the same section reads
 `FERROBRIDGE__AUTH__ENABLED`, `FERROBRIDGE__AUTH__ISSUER`,
-`FERROBRIDGE__AUTH__AUDIENCE` and `FERROBRIDGE__AUTH__ALGORITHMS`. The section
-holds no secret: the resource server checks signatures with the issuer's
-public keys.
+`FERROBRIDGE__AUTH__AUDIENCE` (a list, such as
+`["https://bridge.example.org/fhir"]`) and `FERROBRIDGE__AUTH__ALGORITHMS`.
+Apart from the Basic users' hashes the section holds no secret: the resource
+server checks signatures with the issuer's public keys.
 
 ### `[hl7v2]`
 
@@ -694,13 +731,14 @@ naming the key.
 The operator API under `/operator`, which an operator console reads the
 engine state and the mapping files through. It is off until `enabled` is
 true, and it needs `[auth]`: an `[operator]` section turned on while
-`[auth]` is off refuses the start. The [operator API](operator-api.md) page
+`[auth]` is off, or names no issuer, refuses the start. The [operator API](operator-api.md) page
 has the routes and the scope.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `enabled` | `false` | Whether the operator routes are mounted, each requiring a token that carries `auth.operator_scope` |
+| `enabled` | `false` | Whether the operator routes are mounted, each requiring a token that carries `scope` |
 | `mapping_dir` | none | The writable directory console saves go to (`<mapping_dir>/fhirconnect/`); unset, the API checks and saves nothing. Keep it on its own volume when the root file system is read-only |
+| `scope` | `__ferrobridge.operator` | The scope that guards the operator API and admits `$validate`, `$tofhir` and `$toopenehr` on the facade, which commit nothing. SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own, in a form SMART App Launch 2.2.0 gives an extension scope: a string starting with `__` or a full URI; any other value refuses the start |
 
 ### `[operations]`
 
@@ -760,12 +798,15 @@ exits 78, `EX_CONFIG`. Seven things are refused:
 - a value of the wrong type, or one that is not a socket address, a URL, or a
   release name;
 - a user beside the OAuth section of the same credentials section, an OAuth
-  section with both an `issuer` and a `token_endpoint`, an `issuer` that is
-  not an `https` URL free of a query and a fragment, a `scope` that is not scope tokens, and a
-  `resource` with a fragment;
-- an `[auth]` algorithm that is symmetric or unknown, a `token_profile`
-  other than `rfc9068` and `jwt`, and an `operator_scope` or a capability
-  that is not one scope token;
+  section with both an `issuer` and a `token_endpoint` or neither, an
+  `issuer` that is not an `https` URL free of a query and a fragment, a
+  `scope` that is not scope tokens, a `resource` with a fragment, and a
+  `private_key_jwt` client without a readable `private_key_file`;
+- an `[auth]` section with no issuer or audience while a guarded surface is
+  served, an algorithm that is symmetric or unknown, a clock skew over 300
+  seconds, a `token_profile` other than `rfc9068` and `jwt`, a Basic user
+  whose hash is no Argon2id PHC string, a capability that is not one scope
+  token, and an `[operator] scope` outside the two SMART extension forms;
 - a `[cdm] url` that names no `sslmode`, or one that falls back to plaintext
   or is not a libpq mode, a `[cdm]` CA that holds no PEM certificate, and a
   `PGSSLROOTCERT`, `PGSSLCERT` or `PGSSLKEY` in the environment;
@@ -806,7 +847,6 @@ composition_language = "en"
 composition_territory = "GB"
 
 [auth]
-enabled = true
 issuer = "https://auth.example.org/realms/clinic"
-audience = "https://bridge.example.org/fhir"
+audience = ["https://bridge.example.org/fhir"]
 ```

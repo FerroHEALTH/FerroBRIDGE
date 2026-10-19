@@ -6,9 +6,10 @@
 //! each upstream with, and every refusal of it.
 
 use ferrobridge_server::cdr::config::CdrCredentials;
-use ferrobridge_server::cdr::oauth::{ClientAuth, Endpoint, OAuthConfig};
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::error::Error;
+use ferrohealth_smart::client::{ClientAuth, ClientCredentials, Endpoint};
+use ferrohealth_smart::config::ConfigError;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
@@ -23,6 +24,26 @@ fn text(credentials: &str, oauth: &str) -> String {
     )
 }
 
+/// Returns the rule of `ferrohealth-smart` a refusal of the table `section`
+/// names.
+fn rule<'a>(error: &'a Error, section: &str) -> Option<&'a ConfigError> {
+    match error {
+        Error::Credentials {
+            section: named,
+            source,
+        } if named == section => Some(source),
+        _ => None,
+    }
+}
+
+/// Returns the secret of `grant`, exposed for the assertion.
+fn exposed(grant: &ClientCredentials) -> Option<&str> {
+    grant
+        .client_secret
+        .as_ref()
+        .map(ExposeSecret::expose_secret)
+}
+
 /// Returns the refusal `text` boots into.
 fn refusal(text: &str) -> Result<Error, Box<dyn StdError>> {
     match Config::from_sources(Some(text), &BTreeMap::new()) {
@@ -35,7 +56,7 @@ fn refusal(text: &str) -> Result<Error, Box<dyn StdError>> {
 }
 
 /// Returns the grant `text` resolves to.
-fn grant(text: &str) -> Result<OAuthConfig, Box<dyn StdError>> {
+fn grant(text: &str) -> Result<ClientCredentials, Box<dyn StdError>> {
     let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
     match settings.cdr.ok_or("the CDR lane is on")?.credentials {
         Some(CdrCredentials::OAuth(oauth)) => Ok(*oauth),
@@ -59,6 +80,7 @@ fn a_grant_reads_every_key_and_its_secret_file() -> Result<(), Box<dyn StdError>
                 "audience = \"ferroehr\"\n",
                 "resource = \"https://cdr.example.org/v1\"\n",
                 "refresh_margin_ms = 60000\n",
+                "timeout_ms = 4000\n",
             ),
             file.path()
         ),
@@ -69,8 +91,8 @@ fn a_grant_reads_every_key_and_its_secret_file() -> Result<(), Box<dyn StdError>
     );
     assert_eq!("ferrobridge", oauth.client_id);
     assert_eq!(
-        "synthetic-secret",
-        oauth.client_secret.expose_secret(),
+        Some("synthetic-secret"),
+        exposed(&oauth),
         "the trailing newline is not part of the secret"
     );
     assert_eq!(ClientAuth::ClientSecretPost, oauth.client_auth);
@@ -81,6 +103,7 @@ fn a_grant_reads_every_key_and_its_secret_file() -> Result<(), Box<dyn StdError>
         oauth.resource.as_ref().map(url::Url::as_str)
     );
     assert_eq!(Duration::from_secs(60), oauth.refresh_margin);
+    assert_eq!(Duration::from_secs(4), oauth.timeout);
     assert!(!format!("{oauth:?}").contains("synthetic-secret"));
     Ok(())
 }
@@ -99,6 +122,7 @@ fn a_grant_defaults_to_client_secret_basic_and_a_thirty_second_margin()
     );
     assert_eq!(ClientAuth::ClientSecretBasic, oauth.client_auth);
     assert_eq!(Duration::from_secs(30), oauth.refresh_margin);
+    assert_eq!(Duration::from_secs(10), oauth.timeout);
     assert_eq!(None, oauth.scope);
     Ok(())
 }
@@ -132,7 +156,7 @@ fn a_grant_is_reachable_through_the_environment() -> Result<(), Box<dyn StdError
     let settings = Config::from_sources(None, &environment)?.resolve()?;
     match settings.cdr.ok_or("the CDR lane is on")?.credentials {
         Some(CdrCredentials::OAuth(oauth)) => {
-            assert_eq!("synthetic-secret", oauth.client_secret.expose_secret());
+            assert_eq!(Some("synthetic-secret"), exposed(&oauth));
             assert_eq!(Duration::from_secs(10), oauth.refresh_margin);
             Ok(())
         }
@@ -158,9 +182,39 @@ fn an_unknown_oauth_key_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
 fn an_unknown_client_auth_method_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
     let error = refusal(&text(
         "",
-        "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\nclient_auth = \"private_key_jwt\"\n",
+        "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\nclient_auth = \"tls_client_auth\"\n",
     ))?;
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
+    Ok(())
+}
+
+#[test]
+fn a_private_key_jwt_client_needs_its_key_file() -> Result<(), Box<dyn StdError>> {
+    // NOTE: RFC 7523 §2.2, the client authenticates with an assertion it signs.
+    let error = refusal(&text(
+        "",
+        "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_auth = \"private_key_jwt\"\n",
+    ))?;
+    assert!(
+        matches!(
+            rule(&error, "cdr.credentials"),
+            Some(ConfigError::Missing {
+                key: "credentials.oauth.private_key_file"
+            })
+        ),
+        "{error:?}"
+    );
+    let error = refusal(&text(
+        "",
+        "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_auth = \"private_key_jwt\"\nprivate_key_file = \"/nonexistent/key.pem\"\n",
+    ))?;
+    assert!(
+        matches!(
+            rule(&error, "cdr.credentials"),
+            Some(ConfigError::SecretFile { .. })
+        ),
+        "{error:?}"
+    );
     Ok(())
 }
 
@@ -171,7 +225,12 @@ fn a_grant_without_a_secret_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\n",
     ))?;
     assert!(
-        matches!(&error, Error::Missing { key } if key == "cdr.credentials.oauth.client_secret"),
+        matches!(
+            rule(&error, "cdr.credentials"),
+            Some(ConfigError::Secret {
+                key: "credentials.oauth.client_secret"
+            })
+        ),
         "{error:?}"
     );
     Ok(())
@@ -184,7 +243,7 @@ fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn Std
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret_file = \"/nonexistent/secret\"\n",
     ))?;
     assert!(
-        matches!(&error, Error::Secret { key, .. } if key == "cdr.credentials.oauth.client_secret_file"),
+        matches!(rule(&error, "cdr.credentials"), Some(ConfigError::SecretFile { path, .. }) if path == std::path::Path::new("/nonexistent/secret")),
         "{error:?}"
     );
     Ok(())
@@ -197,7 +256,12 @@ fn a_secret_and_its_file_together_refuse_to_boot() -> Result<(), Box<dyn StdErro
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\nclient_secret_file = \"/run/secrets/s\"\n",
     ))?;
     assert!(
-        matches!(&error, Error::Conflict { key } if key == "cdr.credentials.oauth.client_secret"),
+        matches!(
+            rule(&error, "cdr.credentials"),
+            Some(ConfigError::Secret {
+                key: "credentials.oauth.client_secret"
+            })
+        ),
         "{error:?}"
     );
     Ok(())
@@ -210,7 +274,12 @@ fn a_grant_without_a_client_id_refuses_to_boot() -> Result<(), Box<dyn StdError>
         "token_endpoint = \"https://as.example.org/token\"\nclient_secret = \"s\"\n",
     ))?;
     assert!(
-        matches!(&error, Error::Missing { key } if key == "cdr.credentials.oauth.client_id"),
+        matches!(
+            rule(&error, "cdr.credentials"),
+            Some(ConfigError::Missing {
+                key: "credentials.oauth.client_id"
+            })
+        ),
         "{error:?}"
     );
     Ok(())
@@ -220,7 +289,12 @@ fn a_grant_without_a_client_id_refuses_to_boot() -> Result<(), Box<dyn StdError>
 fn a_grant_with_no_endpoint_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
     let error = refusal(&text("", "client_id = \"c\"\nclient_secret = \"s\"\n"))?;
     assert!(
-        matches!(&error, Error::Missing { key } if key == "cdr.credentials.oauth.token_endpoint"),
+        matches!(
+            rule(&error, "cdr.credentials"),
+            Some(ConfigError::Missing {
+                key: "credentials.oauth.issuer or credentials.oauth.token_endpoint"
+            })
+        ),
         "{error:?}"
     );
     Ok(())
@@ -233,7 +307,13 @@ fn a_grant_with_an_issuer_and_a_token_endpoint_refuses_to_boot() -> Result<(), B
         "issuer = \"https://as.example.org\"\ntoken_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\n",
     ))?;
     assert!(
-        matches!(&error, Error::OAuthEndpoint { section } if section == "cdr.credentials.oauth"),
+        matches!(
+            rule(&error, "cdr.credentials"),
+            Some(ConfigError::Exclusive {
+                left: "credentials.oauth.issuer",
+                right: "credentials.oauth.token_endpoint"
+            })
+        ),
         "{error:?}"
     );
     Ok(())
@@ -263,7 +343,7 @@ fn an_issuer_that_is_not_https_or_carries_a_query_refuses_to_boot() -> Result<()
 #[test]
 fn a_scope_that_is_not_scope_tokens_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
     // NOTE: RFC 6749 §3.3, scope tokens of NQCHAR separated by one space.
-    for scope in ["", "a  b", "a\\\\b", "a \\\"b\\\""] {
+    for scope in ["a  b", "a\\\\b", "a \\\"b\\\"", " a"] {
         let error = refusal(&text(
             "",
             &format!(
@@ -271,10 +351,20 @@ fn a_scope_that_is_not_scope_tokens_refuses_to_boot() -> Result<(), Box<dyn StdE
             ),
         ))?;
         assert!(
-            matches!(&error, Error::Scope { key } if key == "cdr.credentials.oauth.scope"),
+            matches!(
+                rule(&error, "cdr.credentials"),
+                Some(ConfigError::Scope { .. })
+            ),
             "{scope:?}: {error:?}"
         );
     }
+    // NOTE: no specification governs this: our own design, the crate's, an
+    // empty `scope` is the unset key and sends no `scope` parameter.
+    let unset = grant(&text(
+        "",
+        "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\nscope = \"\"\n",
+    ))?;
+    assert_eq!(None, unset.scope);
     Ok(())
 }
 
@@ -299,7 +389,13 @@ fn a_grant_beside_a_static_scheme_refuses_to_boot() -> Result<(), Box<dyn StdErr
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\n",
     ))?;
     assert!(
-        matches!(&error, Error::OAuthScheme { section } if section == "cdr.credentials"),
+        matches!(
+            rule(&error, "cdr.credentials"),
+            Some(ConfigError::Exclusive {
+                left: "credentials.user",
+                right: "credentials.oauth"
+            })
+        ),
         "{error:?}"
     );
     Ok(())
@@ -386,7 +482,13 @@ fn a_terminology_grant_beside_a_user_refuses_to_boot() -> Result<(), Box<dyn Std
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\n",
     ))?;
     assert!(
-        matches!(&error, Error::OAuthScheme { section } if section == "terminology.credentials"),
+        matches!(
+            rule(&error, "terminology.credentials"),
+            Some(ConfigError::Exclusive {
+                left: "credentials.user",
+                right: "credentials.oauth"
+            })
+        ),
         "{error:?}"
     );
     Ok(())
@@ -399,7 +501,12 @@ fn a_terminology_grant_refusal_names_the_terminology_key() -> Result<(), Box<dyn
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\n",
     ))?;
     assert!(
-        matches!(&error, Error::Missing { key } if key == "terminology.credentials.oauth.client_secret"),
+        matches!(
+            rule(&error, "terminology.credentials"),
+            Some(ConfigError::Secret {
+                key: "credentials.oauth.client_secret"
+            })
+        ),
         "{error:?}"
     );
     Ok(())

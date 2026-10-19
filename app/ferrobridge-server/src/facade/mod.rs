@@ -19,9 +19,11 @@
 
 pub mod capability;
 pub mod commit;
+pub mod compartment;
 pub mod edge;
 pub mod ehr;
 pub mod engine;
+pub mod guard;
 pub mod handlers;
 pub mod identity;
 pub mod ingest;
@@ -424,8 +426,13 @@ impl Facade {
 /// (<https://hl7.org/fhir/R4/http.html>). `shape`
 /// says whether the same router serves the FHIRconnect operations, whether
 /// the HL7 v2 face runs and which authorization server guards the facade,
-/// which the conformance statement declares only then.
-pub fn routes(facade: Arc<Facade>, shape: capability::Shape) -> Router {
+/// which the conformance statement declares only then, and `operator` is the
+/// operator scope `$validate` admits.
+pub fn routes(
+    facade: Arc<Facade>,
+    shape: capability::Shape,
+    operator: guard::OperatorScope,
+) -> Router {
     let shape = Arc::new(shape);
     let router = Router::new()
         .route(
@@ -465,6 +472,7 @@ pub fn routes(facade: Arc<Facade>, shape: capability::Shape) -> Router {
         .route(
             &format!("{BASE_PATH}/{{resource_type}}/{{id}}/_history"),
             get(handlers::history_route),
-        );
+        )
+        .layer(axum::Extension(operator));
     router.with_state(facade)
 }

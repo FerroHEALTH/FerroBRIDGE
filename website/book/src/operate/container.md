@@ -193,6 +193,19 @@ The CDR takes the same five OAuth variables under
 `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__`. Leave every credential variable of a
 server that checks no credentials unset.
 
+Inbound authentication is on by default
+([`[auth]`](configuration.md#auth)), so a bridge that serves the FHIR facade,
+the operator API or the FHIRconnect operations refuses to start until it
+names the authorization server that issues its callers' tokens:
+
+```sh
+FERROBRIDGE__AUTH__ISSUER=https://auth.example.org/realms/clinic
+FERROBRIDGE__AUTH__AUDIENCE='["https://bridge.example.org/fhir"]'
+```
+
+On a network only trusted callers reach, `FERROBRIDGE__AUTH__ENABLED=false`
+serves those routes open instead.
+
 Every credential is reachable through a `_file` sibling read once at boot, and
 that is what the compose secrets are for: a secret mounts at
 `/run/secrets/<name>`, so the `_file` variable names that path and the value
@@ -337,8 +350,8 @@ of these variables through only when you set it, because an absent issuer is
 a console without sign-in while an empty one is a boot error.
 
 The console calls the bridge with the operator's own access token, so the
-bridge must validate it: turn on the bridge's `[auth]` section, and
-`[operator]` for the mapping files ([The operator API](operator-api.md)).
+bridge must validate it: name the issuer and the audience in the bridge's
+`[auth]` section, and turn on `[operator]` for the mapping files ([The operator API](operator-api.md)).
 
 ## The OMOP CDM profiles
 
