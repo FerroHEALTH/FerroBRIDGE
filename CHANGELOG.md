@@ -63,6 +63,18 @@ crates on crates.io.
   specification governs a party context: our own design. Breaking for a
   consumer that matches `ResolveCode` or `EngineError` exhaustively: add the
   new arms.
+
+### Changed
+
+- The README, the landing page and the build-order page name v0.0.9 as the
+  latest release, and `scripts/checks/versions.sh` compares the release each
+  names with the workspace version and its changelog date, so the next cut
+  fails the guard until they move with it (#908).
+
+## [0.0.9] - 2026-10-19
+
+### Added
+
 - The ITS-REST 1.1.0 Demographic API, DEVELOPMENT, behind `[cdr] demographic`
   (off by default; #894). The Demographic OpenAPI document is vendored beside
   the other ITS-REST documents, its `x-status: DEVELOPMENT` checked, and a test
