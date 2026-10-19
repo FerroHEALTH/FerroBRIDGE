@@ -650,6 +650,7 @@ async fn render_entry(
             subject: subject.as_ref(),
             store: facade.store(),
             usage: facade.usage(),
+            demographics: facade.demographics(),
         },
         plan.session,
     )

@@ -29,6 +29,7 @@ use crate::engine::traverse::Binding;
 use crate::engine::traverse::Held;
 use crate::engine::traverse::Run;
 use crate::engine::traverse::Written;
+use crate::engine::traverse::demographic::Shape;
 use crate::engine::traverse::error::EngineError;
 
 impl<T: Table + ?Sized> Run<'_, T> {
@@ -73,9 +74,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     self.locate(mapping, &binding.fhir),
                 ));
             }
-            let RmValue::Party(ref party) = produced.value else {
+            let value = self.identified(mapping, view, produced.value, Shape::Identifier)?;
+            let RmValue::Party(ref party) = value else {
                 return Err(refuse_rm(RmError::UnknownClass {
-                    rm_type: String::from(produced.value.rm_type()),
+                    rm_type: String::from(value.rm_type()),
                 }));
             };
             self.families.extend(family::provider(
@@ -117,7 +119,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     self.locate(mapping, &binding.fhir),
                 ));
             }
-            produced.value.to_canonical().map_err(refuse_rm)?
+            self.identified(mapping, view, produced.value, Shape::Identifier)?
+                .to_canonical()
+                .map_err(refuse_rm)?
         } else {
             let element = String::from(target.resolved().leaf());
             let text = view.write(&element).map_err(|source| EngineError::Fhir {

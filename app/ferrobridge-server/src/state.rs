@@ -5,6 +5,9 @@
 
 use std::sync::Arc;
 
+use fhirconnect::engine::demographics::Demographics;
+use fhirconnect::engine::demographics::IssuerDemographics;
+use fhirconnect::engine::demographics::NoDemographics;
 use fhirconnect::engine::traverse::Defaults;
 use fhirconnect::operations::programs::ProgramSet;
 
@@ -33,6 +36,7 @@ pub struct OperationsLane {
     language: Option<String>,
     territory: Option<String>,
     translator: Translator,
+    demographics: Arc<dyn Demographics>,
 }
 
 impl OperationsLane {
@@ -46,6 +50,7 @@ impl OperationsLane {
             language: None,
             territory: None,
             translator: Translator::default(),
+            demographics: Arc::new(NoDemographics),
         }
     }
 
@@ -57,6 +62,23 @@ impl OperationsLane {
     pub fn with_translator(mut self, translator: Translator) -> Self {
         self.translator = translator;
         self
+    }
+
+    /// Returns this lane resolving every party reference through
+    /// `demographics`.
+    ///
+    /// The default resolves none, so a party reference refuses the run.
+    #[must_use]
+    pub fn with_demographics(mut self, demographics: Arc<dyn Demographics>) -> Self {
+        self.demographics = demographics;
+        self
+    }
+
+    /// Returns the demographics endpoint the runs resolve party references
+    /// through.
+    #[must_use]
+    pub fn demographics(&self) -> &dyn Demographics {
+        self.demographics.as_ref()
     }
 
     /// Returns the terminology server the runs translate through.
@@ -216,6 +238,17 @@ impl AppState {
             .map_err(|source| crate::config::error::Error::Mappings {
                 source: Box::new(source),
             })?;
+        // NOTE: engine/demographics.adoc falls back to "the IDs maintained by the FHIRconnect
+        // engine's FHIR-server"; with no facade there is none, so a party reference refuses.
+        let demographics: Arc<dyn Demographics> = match settings.facade.as_ref() {
+            Some(facade) => Arc::new(IssuerDemographics::new(&facade.settings.base_url).map_err(
+                |source| crate::config::error::Error::DemographicsIssuer {
+                    key: String::from("facade.base_url"),
+                    source: Box::new(source),
+                },
+            )?),
+            None => Arc::new(NoDemographics),
+        };
         let operations = programs.map(|programs| {
             Arc::new(
                 OperationsLane::new(programs, settings.operations.device_reference.as_str())
@@ -224,7 +257,8 @@ impl AppState {
                         settings.operations.composition_language.clone(),
                         settings.operations.composition_territory.clone(),
                     )
-                    .with_translator(Translator::new(terminology.clone())),
+                    .with_translator(Translator::new(terminology.clone()))
+                    .with_demographics(Arc::clone(&demographics)),
             )
         });
         Ok(Self {

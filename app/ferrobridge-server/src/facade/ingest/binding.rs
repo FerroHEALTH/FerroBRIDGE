@@ -201,7 +201,8 @@ impl Ingest<'_> {
                     provenance.source_for(inbound.document()),
                     &Seams::default()
                         .with_terminology(terminology)
-                        .with_references(self.references),
+                        .with_references(self.references)
+                        .with_demographics(self.demographics),
                 )
             })
             .await;

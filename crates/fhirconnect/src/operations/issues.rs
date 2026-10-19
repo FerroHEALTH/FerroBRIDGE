@@ -77,17 +77,13 @@ pub fn issue(severity: &str, code: &str, text: &str) -> OperationOutcomeIssue {
 pub fn of_warning(warning: &Warning) -> OperationOutcomeIssue {
     let severity = match *warning.loss() {
         Loss::Defaulted { .. } => INFORMATION,
-        Loss::Skipped { .. }
-        | Loss::LastOfMany { .. }
-        | Loss::OneWayFallback { .. }
-        | Loss::DeferredReference { .. } => WARNING,
+        Loss::Skipped { .. } | Loss::LastOfMany { .. } | Loss::OneWayFallback { .. } => WARNING,
     };
     let code = match *warning.loss() {
         Loss::Defaulted { .. } => "informational",
-        Loss::Skipped { .. }
-        | Loss::LastOfMany { .. }
-        | Loss::OneWayFallback { .. }
-        | Loss::DeferredReference { .. } => "incomplete",
+        Loss::Skipped { .. } | Loss::LastOfMany { .. } | Loss::OneWayFallback { .. } => {
+            "incomplete"
+        }
     };
     let mut rendered = issue(severity, code, &warning.to_string());
     let location = warning.location();

@@ -4,6 +4,7 @@
 //! The data-type cell of one mapping, run over its input values.
 
 use fhir_types::codec::Value;
+use fhir_types::r4::primitives::String as FhirString;
 use openehr_mapping_core::composition::RmPosition;
 
 use crate::engine::cell;
@@ -12,6 +13,7 @@ use crate::engine::fhir::FhirValue;
 use crate::engine::lens::LensError;
 use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::outcome::Warning;
+use crate::engine::rm::RmValue;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::manual::Manual;
 use crate::resolve::program::manual::ManualValue;
@@ -27,6 +29,7 @@ use crate::engine::traverse::Binding;
 use crate::engine::traverse::Leaf;
 use crate::engine::traverse::Run;
 use crate::engine::traverse::Written;
+use crate::engine::traverse::demographic::Shape;
 use crate::engine::traverse::error::EngineError;
 use crate::engine::traverse::functions::MappingCodeError;
 use crate::engine::traverse::place::rm_positions;
@@ -123,6 +126,23 @@ impl<T: Table + ?Sized> Run<'_, T> {
         Ok(bindings)
     }
 
+    /// Returns the FHIR value one openEHR value reads as, with what the cell
+    /// withheld, a party's minted identity read back as its reference.
+    fn read_value(
+        &self,
+        value: &RmValue,
+        kind: FhirKind,
+        terminology: Option<&str>,
+    ) -> Result<(FhirValue, Vec<Withheld>), LensError> {
+        let (value, reference) = self.minted(value);
+        let withheld = cell::withheld(&value, kind, terminology);
+        let mut view = cell::get(&value, kind, terminology)?;
+        if let (Some(reference), FhirValue::Reference(held)) = (reference, &mut view) {
+            held.reference = Some(FhirString::from(reference));
+        }
+        Ok((view, withheld))
+    }
+
     /// Runs one occurrence of a mapping through its data-type cell.
     fn convert(
         &mut self,
@@ -165,7 +185,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     self.warnings
                         .push(Warning::fallback(taken, self.locate(mapping, input)));
                 }
-                self.put_openehr(mapping, binding, produced.value);
+                let value = self.identified(mapping, &view, produced.value, Shape::at(node))?;
+                self.put_openehr(mapping, binding, value);
                 Ok(())
             }
             Direction::OpenehrToFhir => {
@@ -185,12 +206,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     element: String::from(target.expression().as_str()),
                     source: Box::new(source),
                 };
-                let mut withheld = Vec::new();
-                let view = match source {
+                let (view, withheld) = match source {
                     Leaf::Value(ref value) => {
                         let terminology = self.binding_of(openehr.node());
-                        withheld = cell::withheld(value, kind, terminology.as_deref());
-                        cell::get(value, kind, terminology.as_deref()).map_err(refuse)?
+                        self.read_value(value, kind, terminology.as_deref())
+                            .map_err(refuse)?
                     }
                     // NOTE: a scalar leaf carries text, so only an element that
                     // travels as text takes it; no specification governs this:
@@ -198,13 +218,13 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     Leaf::Scalar(ref text) => match kind {
                         FhirKind::String | FhirKind::Date | FhirKind::DateTime => {
                             let element = target.resolved().leaf();
-                            FhirValue::read(kind, element, &Value::String(text.clone())).map_err(
-                                |source| EngineError::Fhir {
+                            let read = FhirValue::read(kind, element, &Value::String(text.clone()))
+                                .map_err(|source| EngineError::Fhir {
                                     mapping: String::from(mapping.name()),
                                     element: String::from(element),
                                     source: Box::new(source),
-                                },
-                            )?
+                                })?;
+                            (read, Vec::new())
                         }
                         FhirKind::Boolean
                         | FhirKind::Coding

@@ -210,7 +210,9 @@ async fn run_to_fhir(
     let programs = lane.programs();
     lane.translator()
         .run(Direction::ToFhir, |terminology| {
-            let seams = Seams::default().with_terminology(terminology);
+            let seams = Seams::default()
+                .with_terminology(terminology)
+                .with_demographics(lane.demographics());
             run::to_fhir(&programs, &SCHEMAS, &seams, settings, request)
         })
         .await
@@ -227,7 +229,9 @@ async fn run_to_openehr(
     let programs = lane.programs();
     lane.translator()
         .run(Direction::ToOpenehr, |terminology| {
-            let seams = Seams::default().with_terminology(terminology);
+            let seams = Seams::default()
+                .with_terminology(terminology)
+                .with_demographics(lane.demographics());
             run::to_openehr(&programs, &SCHEMAS, &seams, settings, request)
         })
         .await

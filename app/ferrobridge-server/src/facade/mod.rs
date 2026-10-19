@@ -37,6 +37,10 @@ pub mod subject;
 
 use std::sync::Arc;
 
+use fhirconnect::engine::demographics::Demographics;
+use fhirconnect::engine::demographics::IssuerDemographics;
+use fhirconnect::engine::demographics::NoDemographics;
+
 use axum::Router;
 use axum::routing::get;
 use axum::routing::post;
@@ -128,6 +132,21 @@ pub struct Facade {
     /// The usage report's window the ingest and the renders count mapping
     /// failures in.
     usage: Arc<Window>,
+    /// The demographics endpoint every run resolves a party reference
+    /// through: the ids of this FHIR server.
+    demographics: Arc<dyn Demographics>,
+}
+
+/// Returns the demographics endpoint of a facade at `settings.base_url`: the
+/// ids of this FHIR server, the fallback `engine/demographics.adoc` names when
+/// no demographics service is implemented.
+fn demographics_of(settings: &Settings) -> Arc<dyn Demographics> {
+    match IssuerDemographics::new(&settings.base_url) {
+        Ok(port) => Arc::new(port),
+        // NOTE: no specification governs this: our own design; `[facade] base_url` is checked
+        // at boot, and a base that still cannot issue refuses every reference rather than drop one.
+        Err(_) => Arc::new(NoDemographics),
+    }
 }
 
 impl Facade {
@@ -147,6 +166,7 @@ impl Facade {
             store,
             claims: Claims::new(),
             client,
+            demographics: demographics_of(&settings),
             settings,
             limits: search::Limits::default(),
             translator: Translator::default(),
@@ -181,6 +201,13 @@ impl Facade {
     #[must_use]
     pub fn usage(&self) -> &Window {
         &self.usage
+    }
+
+    /// Returns the demographics endpoint every run resolves a party reference
+    /// through.
+    #[must_use]
+    pub fn demographics(&self) -> &dyn Demographics {
+        self.demographics.as_ref()
     }
 
     /// Returns the terminology server the engine runs translate through.
@@ -336,6 +363,7 @@ impl Facade {
         )
         .with_translator(&self.translator)
         .with_usage(&self.usage)
+        .with_demographics(self.demographics.as_ref())
     }
 }
 

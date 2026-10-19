@@ -27,10 +27,13 @@
 //!
 //! The engine makes no call of its own. What a run asks of its caller, the
 //! `mappingCode` functions, the resource a reference points at, the id of a
-//! resource the run creates and the translation a `conceptmap` names, is the
-//! [`seam`] it is handed.
+//! resource the run creates, the translation a `conceptmap` names and the
+//! demographics endpoint a party reference resolves through, is the [`seam`]
+//! it is handed.
 
 pub mod cell;
+
+pub mod demographics;
 
 pub mod condition;
 

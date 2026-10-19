@@ -153,6 +153,17 @@ crates on crates.io.
 
 ### Changed
 
+- **Breaking for a library consumer** of `fhirconnect` 0.1.146: a demographic
+  `Reference.reference` resolves through the new `Demographics` seam
+  (`engine::demographics`, #469), and the `Seams` default, `NoDemographics`,
+  refuses it. A consumer installs `IssuerDemographics` (the ids of its own
+  FHIR server, the fallback `engine/demographics.adoc` names) or its own
+  `Demographics` with `Seams::with_demographics`. The identity travels in
+  `PARTY_IDENTIFIED.identifiers` where the FLAT format carries it, and in
+  `PARTY_PROXY.external_ref` on the composer and on a participation's
+  performer; a read turns it back into the reference. The server installs
+  the facade-base port, `[facade] base_url` is checked at boot as its
+  issuer, and the operations lane uses it when the facade is configured.
 - `ferrobridge-validator`, `ferrobridge-term` and `ferrobridge-fhirpath` join
   the crate line at 0.1.126, leaving their 0.0.0 name reservations, so the
   next publish ships the validator as it stands on `main`. Pin each exactly,
@@ -199,6 +210,10 @@ crates on crates.io.
 
 ### Fixed
 
+- A demographic `Reference.reference` (a recorder, a provider, a
+  participant) was dropped without a trace on the way into openEHR; it now
+  reaches the composition as the identity the demographics endpoint gives it,
+  or the run refuses (#469). The unused `Loss::DeferredReference` is gone.
 - Every composition the bridge builds, and every `EHR_STATUS` the facade
   creates, names RM Release 1.1.0 in `ARCHETYPED.rm_version` in place of
   1.2.0, a release openEHR has not published (RM Common IM Release 1.1.0

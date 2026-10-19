@@ -305,18 +305,6 @@ pub enum Loss {
         /// The attribute the row filled.
         field: String,
     },
-    /// A reference whose resolution belongs to the facade.
-    ///
-    /// `PARTY_IDENTIFIED.adoc` resolves a `Reference` through the demographics
-    /// server and puts the resolved resource's identifier in `identifiers`.
-    /// The engine makes no call, so it records the reference instead of
-    /// inventing an identifier for it. The reference stays here for the
-    /// facade; the warning's location is the element holding it, so the
-    /// location can be logged without the identifier.
-    DeferredReference {
-        /// The reference string the facade resolves.
-        reference: String,
-    },
 }
 
 impl fmt::Display for Loss {
@@ -335,9 +323,6 @@ impl fmt::Display for Loss {
                 ref cell,
                 ref field,
             } => write!(f, "{cell} filled {field} by a rule that runs one way"),
-            Self::DeferredReference { ref reference } => {
-                write!(f, "{reference} is left for the facade to resolve")
-            }
         }
     }
 }

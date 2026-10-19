@@ -10,6 +10,7 @@ use openehr_mapping_core::template::PathError;
 use openehr_rm::v1_2::paths::EhrUriError;
 
 use crate::engine::condition::ConditionError;
+use crate::engine::demographics::DemographicsError;
 use crate::engine::family::FamilyError;
 use crate::engine::fhir::FhirError;
 use crate::engine::invariant::Breach;
@@ -267,6 +268,16 @@ pub enum EngineError {
         mapping: String,
         /// The expression that reached the reference.
         expression: String,
+    },
+    /// The demographics endpoint did not resolve a party reference, which is
+    /// never dropped.
+    #[error("{mapping} could not resolve its party reference through the demographics endpoint")]
+    Demographics {
+        /// The mapping being run.
+        mapping: String,
+        /// The refusal of the endpoint.
+        #[source]
+        source: Box<DemographicsError>,
     },
     /// A code could not be translated through the concept map its mapping
     /// names.

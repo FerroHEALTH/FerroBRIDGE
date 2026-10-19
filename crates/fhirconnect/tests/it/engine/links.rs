@@ -4,10 +4,12 @@
 //! The `link` and `participationsFunction` families.
 
 use core::error::Error;
+use std::sync::LazyLock;
 
 use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::demographics::IssuerDemographics;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::error::EngineError;
 use fhirconnect::engine::traverse::to_fhir;
@@ -22,6 +24,15 @@ use crate::engine::defaults;
 use crate::engine::reference::condition_with;
 
 /// A synthetic `ehr:` URI of a composition version the link targets.
+/// The FHIR server base the bridge mints demographic identities under.
+const BASE: &str = "https://bridge.example/fhir";
+
+/// The demographics endpoint every run resolves a participant through: the
+/// ids of the FHIR server at [`BASE`].
+#[expect(clippy::expect_used, reason = "test plumbing over a literal base")]
+static DEMOGRAPHICS: LazyLock<IssuerDemographics> =
+    LazyLock::new(|| IssuerDemographics::new(BASE).expect("a legal base"));
+
 const LINKED: &str = "ehr://ferrobridge.example/3a2f1c4e-0000-4000-8000-0000000000ab/compositions/d2b3c1a0-0000-4000-8000-000000000001::ferrobridge.example::1";
 
 #[test]
@@ -35,7 +46,7 @@ fn a_link_is_written_and_read_back() -> Result<(), Box<dyn Error>> {
         &SCHEMAS,
         &index,
         &condition_with(serde_json::json!({"encounter": {"reference": LINKED}}))?,
-        &Seams::default(),
+        &Seams::default().with_demographics(&*DEMOGRAPHICS),
         &defaults(),
         &CallContext::new(),
     )?;
@@ -68,7 +79,7 @@ fn a_link_is_written_and_read_back() -> Result<(), Box<dyn Error>> {
         &SCHEMAS,
         &index,
         inbound.value(),
-        &Seams::default(),
+        &Seams::default().with_demographics(&*DEMOGRAPHICS),
         &CallContext::new(),
     )?;
     assert_eq!(
@@ -96,7 +107,7 @@ fn a_link_to_what_no_ehr_uri_names_refuses() -> Result<(), Box<dyn Error>> {
         &condition_with(serde_json::json!({
             "encounter": {"reference": "Encounter/synthetic-encounter-1"}
         }))?,
-        &Seams::default(),
+        &Seams::default().with_demographics(&*DEMOGRAPHICS),
         &defaults(),
         &CallContext::new(),
     )
@@ -124,7 +135,7 @@ fn a_participation_on_the_event_context_is_written_and_read_back() -> Result<(),
         &SCHEMAS,
         &index,
         &condition_with(serde_json::json!({"asserter": asserter}))?,
-        &Seams::default(),
+        &Seams::default().with_demographics(&*DEMOGRAPHICS),
         &defaults(),
         &CallContext::new(),
     )?;
@@ -151,7 +162,7 @@ fn a_participation_on_the_event_context_is_written_and_read_back() -> Result<(),
         &SCHEMAS,
         &index,
         inbound.value(),
-        &Seams::default(),
+        &Seams::default().with_demographics(&*DEMOGRAPHICS),
         &CallContext::new(),
     )?;
     assert_eq!(
@@ -181,7 +192,7 @@ fn a_participation_is_written_and_read_back() -> Result<(), Box<dyn Error>> {
         &SCHEMAS,
         &index,
         &condition_with(serde_json::json!({"asserter": asserter}))?,
-        &Seams::default(),
+        &Seams::default().with_demographics(&*DEMOGRAPHICS),
         &defaults(),
         &CallContext::new(),
     )?;
@@ -210,14 +221,14 @@ fn a_participation_is_written_and_read_back() -> Result<(), Box<dyn Error>> {
         participation
             .pointer("/performer/external_ref/namespace")
             .and_then(serde_json::Value::as_str),
-        Some("Practitioner")
+        Some(BASE)
     );
     let outbound = to_fhir(
         &program,
         &SCHEMAS,
         &index,
         inbound.value(),
-        &Seams::default(),
+        &Seams::default().with_demographics(&*DEMOGRAPHICS),
         &CallContext::new(),
     )?;
     assert_eq!(

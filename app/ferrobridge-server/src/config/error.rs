@@ -114,6 +114,15 @@ pub enum Error {
         #[source]
         source: Box<crate::facade::identity::store::StoreError>,
     },
+    /// The facade base cannot issue demographic identities.
+    #[error("{key} cannot be the issuer of a demographic identity")]
+    DemographicsIssuer {
+        /// The key that holds it.
+        key: String,
+        /// Why.
+        #[source]
+        source: Box<fhirconnect::engine::demographics::DemographicsError>,
+    },
     /// A URL does not parse.
     #[error("{key} is not a URL")]
     Url {

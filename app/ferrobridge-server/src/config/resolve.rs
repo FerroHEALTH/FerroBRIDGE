@@ -73,6 +73,12 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
             });
         }
     }
+    fhirconnect::engine::demographics::IssuerDemographics::new(&facade.base_url).map_err(
+        |source| Error::DemographicsIssuer {
+            key: String::from("facade.base_url"),
+            source: Box::new(source),
+        },
+    )?;
     Ok(FacadeSettings {
         settings: crate::facade::Settings {
             base_url: facade.base_url.clone(),

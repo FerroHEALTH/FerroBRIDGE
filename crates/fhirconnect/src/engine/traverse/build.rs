@@ -31,7 +31,7 @@ use crate::engine::traverse::Run;
 use crate::engine::traverse::error::EngineError;
 
 /// The archetype path of `COMPOSITION.composer`.
-const COMPOSER: &str = "/composer";
+pub(super) const COMPOSER: &str = "/composer";
 
 impl<'a, T: Table + ?Sized> Run<'a, T> {
     /// Fills the composition fields no mapping wrote.

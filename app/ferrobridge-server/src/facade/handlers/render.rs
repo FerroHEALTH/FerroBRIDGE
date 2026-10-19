@@ -17,6 +17,7 @@
 use crate::cdr::ids::EhrId;
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
+use fhirconnect::engine::demographics::Demographics;
 use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::outcome::SkipReason;
 use fhirconnect::engine::outcome::Warning;
@@ -84,6 +85,8 @@ pub(crate) struct Origin<'a> {
     pub(crate) store: &'a dyn Store,
     /// The usage report's window an engine refusal of the run is counted in.
     pub(crate) usage: &'a Window,
+    /// The demographics endpoint every party reference resolves through.
+    pub(crate) demographics: &'a dyn Demographics,
 }
 
 /// Returns the resource `composition` maps to, decorated with its identity
@@ -230,15 +233,29 @@ async fn produce(
 ) -> Result<(Value, Vec<Value>, Vec<Warning>), Refusal> {
     let resolved = session
         .resolve(Direction::ToFhir, |terminology| {
-            engine::outbound(program, index, composition, &DerivedIdentity, terminology)
+            engine::outbound(
+                program,
+                index,
+                composition,
+                &DerivedIdentity,
+                terminology,
+                origin.demographics,
+            )
         })
         .await;
     let identities = CreatedIdentities::new(origin.store, program.resource().as_str(), origin.id);
-    let produced =
-        engine::outbound(program, index, composition, &identities, &resolved).map_err(|error| {
-            origin.usage.record_mapping_failure();
-            Refusal::from(Refused::of_answer(&status::of_outbound_refusal(&error)))
-        })?;
+    let produced = engine::outbound(
+        program,
+        index,
+        composition,
+        &identities,
+        &resolved,
+        origin.demographics,
+    )
+    .map_err(|error| {
+        origin.usage.record_mapping_failure();
+        Refusal::from(Refused::of_answer(&status::of_outbound_refusal(&error)))
+    })?;
     let warnings = produced.warnings().to_vec();
     let (value, created) = produced.into_parts();
     Ok((value, created, warnings))
@@ -366,7 +383,6 @@ pub(crate) const fn loss_kind(loss: &Loss) -> &'static str {
         Loss::Defaulted { .. } => "defaulted",
         Loss::LastOfMany { .. } => "last-of-many",
         Loss::OneWayFallback { .. } => "one-way-fallback",
-        Loss::DeferredReference { .. } => "deferred-reference",
     }
 }
 
@@ -454,8 +470,11 @@ mod tests {
                     .with_openehr("/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"),
             ),
             Warning::new(
-                Loss::DeferredReference {
-                    reference: String::from("Dr. Jane Synthetic-Marker"),
+                Loss::Skipped {
+                    mapping: String::from("recorder"),
+                    reason: SkipReason::UnresolvedReference {
+                        reference: String::from("Practitioner/Synthetic-Marker"),
+                    },
                 },
                 Location::default().with_fhir("Condition.recorder"),
             ),
@@ -483,7 +502,7 @@ mod tests {
             "{text}"
         );
         assert!(
-            text.contains("deferred-reference fhir=Condition.recorder"),
+            text.contains("skipped-unresolved-reference fhir=Condition.recorder"),
             "{text}"
         );
         assert!(

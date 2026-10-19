@@ -23,6 +23,7 @@
 
 pub mod build;
 pub mod convert;
+pub mod demographic;
 pub mod error;
 pub mod functions;
 pub mod links;
@@ -80,12 +81,6 @@ const INSTANCE_CEILING: u32 = 1024;
 /// and the `link` key leaves it optional. No specification governs the
 /// value: our own design.
 const LINK_TYPE: &str = "reference";
-
-/// The `external_ref.id.scheme` of a participant a FHIR reference names.
-///
-/// The id is the FHIR literal reference, so the scheme names FHIR. No
-/// specification governs the value: our own design.
-const PARTICIPATION_SCHEME: &str = "FHIR";
 
 /// The composition fields the engine fills when no mapping does.
 ///

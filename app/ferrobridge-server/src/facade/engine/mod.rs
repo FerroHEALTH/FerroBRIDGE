@@ -14,6 +14,7 @@ pub mod entry;
 
 use fhir_types::codec::Value;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::demographics::Demographics;
 use fhirconnect::engine::origin::Origin;
 use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::outcome::Outcome;
@@ -45,7 +46,8 @@ pub const COMPOSER: &str = "FerroBRIDGE";
 /// data that have been transformed into openEHR form and committed to the
 /// system" (<https://specifications.openehr.org/releases/RM/Release-1.1.0/common.html>).
 /// Every `conceptmap` code is translated through `terminology`, which
-/// [`crate::terminology::Translator::run`] supplies with the codes resolved.
+/// [`crate::terminology::Translator::run`] supplies with the codes resolved,
+/// and every party reference resolves through `demographics`.
 ///
 /// # Errors
 ///
@@ -59,6 +61,7 @@ pub fn inbound(
     now: &str,
     settings: &crate::facade::Settings,
     terminology: &dyn Terminology,
+    demographics: &dyn Demographics,
 ) -> Result<Outcome<CanonicalComposition>, EngineError> {
     inbound_from(
         program,
@@ -67,7 +70,9 @@ pub fn inbound(
         now,
         settings,
         SourceItem::of(document),
-        &Seams::default().with_terminology(terminology),
+        &Seams::default()
+            .with_terminology(terminology)
+            .with_demographics(demographics),
     )
 }
 
@@ -118,7 +123,8 @@ pub fn inbound_from(
 }
 
 /// Maps one composition into a FHIR document, translating every
-/// `conceptmap` code through `terminology`.
+/// `conceptmap` code through `terminology` and reading every party reference
+/// back through `demographics`.
 ///
 /// Every resource the run creates beside the one it maps (a `hierarchy.split`
 /// occurrence or a `reference`) takes the id `identities` assigns.
@@ -134,6 +140,7 @@ pub fn outbound(
     composition: &CanonicalComposition,
     identities: &dyn IdentitySink,
     terminology: &dyn Terminology,
+    demographics: &dyn Demographics,
 ) -> Result<Outcome<Value>, EngineError> {
     to_fhir(
         program,
@@ -142,7 +149,8 @@ pub fn outbound(
         composition,
         &Seams::default()
             .with_identities(identities)
-            .with_terminology(terminology),
+            .with_terminology(terminology)
+            .with_demographics(demographics),
         &CallContext::new(),
     )
 }

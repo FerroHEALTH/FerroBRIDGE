@@ -4,8 +4,9 @@
 //! What a run asks of its caller.
 //!
 //! A run asks for the functions a `mappingCode` names, the resources a
-//! reference points at, the identity of a resource the run creates, and the
-//! terminology server a `conceptmap` translates through.
+//! reference points at, the identity of a resource the run creates, the
+//! terminology server a `conceptmap` translates through, and the demographics
+//! endpoint a party reference resolves through.
 //!
 //! The engine makes no call of its own. Going into openEHR, a `reference`
 //! mapping maps the referenced resource, which "should" be fetched when it is
@@ -23,6 +24,8 @@ use core::fmt;
 use fhir_types::codec::Value;
 use sha2::Digest;
 
+use crate::engine::demographics::Demographics;
+use crate::engine::demographics::NoDemographics;
 use crate::engine::terminology::NoTerminology;
 use crate::engine::terminology::Terminology;
 use crate::engine::traverse::functions::MappingFunctions;
@@ -318,6 +321,7 @@ pub struct Seams<'seam> {
     references: &'seam dyn ReferenceSource,
     identities: &'seam dyn IdentitySink,
     terminology: &'seam dyn Terminology,
+    demographics: &'seam dyn Demographics,
 }
 
 // NOTE: no specification governs this: our own design, the seams of a run cross
@@ -334,6 +338,7 @@ impl Default for Seams<'_> {
             references: &NoReferences,
             identities: &DerivedIdentity,
             terminology: &NoTerminology,
+            demographics: &NoDemographics,
         }
     }
 }
@@ -390,6 +395,20 @@ impl<'seam> Seams<'seam> {
     #[must_use]
     pub fn terminology(&self) -> &'seam dyn Terminology {
         self.terminology
+    }
+
+    /// Returns these seams with `demographics` as the endpoint a party
+    /// reference resolves through.
+    #[must_use]
+    pub fn with_demographics(mut self, demographics: &'seam dyn Demographics) -> Self {
+        self.demographics = demographics;
+        self
+    }
+
+    /// Returns the demographics endpoint.
+    #[must_use]
+    pub fn demographics(&self) -> &'seam dyn Demographics {
+        self.demographics
     }
 }
 
