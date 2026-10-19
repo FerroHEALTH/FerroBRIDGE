@@ -5,6 +5,7 @@
 
 use hl7v2_types::model::{Node, SegmentRef, Structure};
 
+use crate::parse::arity::check_arity;
 use crate::parse::lex::Lexed;
 use crate::parse::place::close;
 use crate::parse::place::{Missing, place};
@@ -120,6 +121,7 @@ pub fn group(lexed: Lexed, structure: &'static Structure) -> Parsed {
     let placed = placed_segments(&parsed.items);
     for (index, node) in placed {
         check_fields(&mut parsed, index, node);
+        check_arity(&mut parsed, index, node);
     }
     parsed
 }
