@@ -19,6 +19,7 @@
 mod embedded;
 pub mod matching;
 pub mod paths;
+mod structure;
 
 use std::collections::BTreeMap;
 
@@ -196,6 +197,9 @@ pub struct WebTemplateIndex {
     /// The template an operational template states it embeds at an archetype
     /// root, keyed by the root's `aqlPath`.
     embedded: BTreeMap<AqlPath, String>,
+    /// The RM object an OPT 1.4 constrains at each node-identified path,
+    /// keyed by `aqlPath`; empty for an OPT2.
+    structures: BTreeMap<AqlPath, structure::Structural>,
 }
 
 impl WebTemplateIndex {
@@ -219,6 +223,7 @@ impl WebTemplateIndex {
         let mut index = Self::over(web_template, source.generation())?;
         if let TemplateSource::Opt14(ref template) = *source {
             index.embedded = embedded::embedded_templates(template);
+            index.structures = structure::structures(template);
         }
         Ok(index)
     }
@@ -295,6 +300,7 @@ impl WebTemplateIndex {
             by_aql_path,
             by_flat_id,
             embedded: BTreeMap::new(),
+            structures: BTreeMap::new(),
         })
     }
 
@@ -338,6 +344,12 @@ impl WebTemplateIndex {
     #[must_use]
     pub fn embedded_template(&self, node: &ResolvedNode) -> Option<&str> {
         self.embedded.get(node.aql_path()).map(String::as_str)
+    }
+
+    /// Returns the RM object the operational template constrains at `path`,
+    /// when the index was built from an OPT 1.4 that carries one there.
+    pub(crate) fn structure(&self, path: &AqlPath) -> Option<&structure::Structural> {
+        self.structures.get(path)
     }
 
     /// Returns the root node of the template.

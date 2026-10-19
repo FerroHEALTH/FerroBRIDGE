@@ -24,6 +24,7 @@ pub mod diagnostic;
 pub mod header;
 pub mod index;
 pub mod loader;
+pub mod party;
 pub mod path;
 pub mod position;
 pub mod registry;

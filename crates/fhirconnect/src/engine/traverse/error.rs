@@ -18,8 +18,9 @@ use crate::engine::lens::LensError;
 use crate::engine::rm::RmError;
 use crate::engine::seam::ReferenceError;
 use crate::engine::terminology::TerminologyError;
-use crate::resolve::program::binding::PartyClass;
 use crate::resolve::program::hierarchy::Create;
+use openehr_mapping_core::party::PartyClass;
+use openehr_mapping_core::party::PartyError;
 
 use crate::tree::error::ReadError;
 use crate::tree::error::WriteError;
@@ -48,6 +49,19 @@ pub enum EngineError {
         context: String,
         /// The demographic class the program is rooted at.
         party: PartyClass,
+    },
+    /// A composition program reached an entry point that runs over a party.
+    #[error("the context {context} is no party context, and this entry point runs over a party")]
+    CompositionProgram {
+        /// The context mapping the program compiled from.
+        context: String,
+    },
+    /// The values a party program produced do not build a party.
+    #[error("the values the run produced do not build a party")]
+    PartyBuild {
+        /// What the party build refused.
+        #[source]
+        source: Box<PartyError>,
     },
     /// A `manual` path writes a `$context` member and the run carries no call
     /// context.

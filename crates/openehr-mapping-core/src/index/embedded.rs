@@ -70,7 +70,7 @@ fn walk(attributes: &[CAttribute], parent: &str, found: &mut BTreeMap<AqlPath, S
 
 /// Appends one `attribute[predicate]` step to `parent`, as the Web Template
 /// builder spells it.
-fn step(parent: &str, attribute: &str, node_id: &str, name: Option<&str>) -> String {
+pub(super) fn step(parent: &str, attribute: &str, node_id: &str, name: Option<&str>) -> String {
     match (node_id.is_empty(), name) {
         (true, _) => format!("{parent}/{attribute}"),
         (false, Some(name)) => format!("{parent}/{attribute}[{node_id},'{name}']"),
@@ -80,7 +80,7 @@ fn step(parent: &str, attribute: &str, node_id: &str, name: Option<&str>) -> Str
 
 /// Returns the name a single-valued `name/value` constraint fixes among
 /// `attributes`.
-fn fixed_name(attributes: &[CAttribute]) -> Option<&str> {
+pub(super) fn fixed_name(attributes: &[CAttribute]) -> Option<&str> {
     attributes.iter().find_map(|attribute| {
         let CAttribute::CSingleAttribute(single) = attribute else {
             return None;

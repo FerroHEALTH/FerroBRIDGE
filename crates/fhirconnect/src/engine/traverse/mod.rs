@@ -28,6 +28,7 @@ pub mod error;
 pub mod functions;
 pub mod links;
 pub mod manual;
+pub mod party;
 pub mod place;
 pub mod reference;
 pub mod split;
@@ -41,6 +42,7 @@ use fhir_types::codec::Object;
 use fhir_types::codec::Value;
 use fhir_types::r4::coding::Coding;
 use openehr_mapping_core::composition::CanonicalComposition;
+use openehr_mapping_core::composition::CanonicalDocument;
 use openehr_mapping_core::composition::NodeValue;
 use openehr_mapping_core::composition::RmPosition;
 use openehr_mapping_core::index::WebTemplateIndex;
@@ -319,6 +321,19 @@ pub fn to_fhir<T: Table + ?Sized>(
     context: &CallContext,
 ) -> Result<Outcome<Value>, EngineError> {
     composition_program(program)?;
+    read_out(program, table, index, composition, seams, context)
+}
+
+/// Runs `program` over a canonical document, a composition or a party,
+/// producing a FHIR resource.
+fn read_out<T: Table + ?Sized>(
+    program: &Program,
+    table: &T,
+    index: &WebTemplateIndex,
+    document: &dyn CanonicalDocument,
+    seams: &Seams<'_>,
+    context: &CallContext,
+) -> Result<Outcome<Value>, EngineError> {
     let mut run = Run::new(
         program,
         table,
@@ -327,7 +342,7 @@ pub fn to_fhir<T: Table + ?Sized>(
         *seams,
         context,
         empty_resource(program.resource().as_str()),
-        Some(composition),
+        Some(document),
     );
     run.admits_context()?;
     run.split_or_run(
@@ -350,9 +365,9 @@ pub fn to_fhir<T: Table + ?Sized>(
 ///
 /// A party program reads and builds a `PARTY`, and the composition builder
 /// applies the composition defaults and the `ctx/` vocabulary, so a party
-/// program never reaches it. No specification governs this: our own design.
+/// program never reaches it; it runs through [`party::to_party`] and
+/// [`party::from_party`]. No specification governs this: our own design.
 fn composition_program(program: &Program) -> Result<(), EngineError> {
-    // TODO(#897): a party program runs through the canonical PARTY build #897 settles.
     match program.party() {
         Some(party) => Err(EngineError::PartyProgram {
             context: String::from(program.context().as_str()),
@@ -384,7 +399,7 @@ struct Run<'a, T: Table + ?Sized> {
     /// The FHIR document the mappings read or write: the run's own resource,
     /// or the referenced or created one a nested run swapped in.
     fhir: Value,
-    composition: Option<&'a CanonicalComposition>,
+    composition: Option<&'a dyn CanonicalDocument>,
     written: Vec<Written>,
     families: Vec<NodeValue>,
     /// The defaults the run writes as `ctx/` keys.
@@ -424,7 +439,7 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
         seams: Seams<'a>,
         context: &'a CallContext,
         fhir: Value,
-        composition: Option<&'a CanonicalComposition>,
+        composition: Option<&'a dyn CanonicalDocument>,
     ) -> Self {
         Self {
             program,

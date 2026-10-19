@@ -38,7 +38,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         }
         if let Some(uid) = self
             .composition
-            .and_then(|composition| composition.value().get("uid"))
+            .and_then(|composition| composition.document().get("uid"))
             .and_then(|uid| uid.get("value"))
             .and_then(serde_json::Value::as_str)
         {

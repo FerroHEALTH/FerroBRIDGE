@@ -48,12 +48,12 @@ use crate::resolve::extensions::diagnostic;
 use crate::resolve::program::Program;
 use crate::resolve::program::ProgramParts;
 use crate::resolve::program::binding::ModelBinding;
-use crate::resolve::program::binding::PartyClass;
 use crate::resolve::program::binding::ResourceType;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
 use crate::tree::element::Table;
 use crate::tree::path::FhirPath;
+use openehr_mapping_core::party::PartyClass;
 
 use crate::resolve::compile::fhir::root_expression;
 use crate::resolve::compile::openehr::compaction_map;
