@@ -1198,6 +1198,16 @@ transform and save goes through the bridge. Linking these crates is what
 `codegen.md` asks of a consumer, which may not shadow a model the workspace
 already defines.
 
+**The console draws with `ferrohealth-ui`, the FerroHEALTH component
+library** (published on crates.io, pinned exactly in the root
+`[workspace.dependencies]`), which every FerroHEALTH console shares. It is
+not a workspace crate, so the dependency-closure test admits it as it admits
+any other registry crate: it carries views, the stylesheet and the brand
+themes, and fetches nothing. The console keeps only its brand theme
+(`style/theme.css`) and its screens; the server serves the library's
+stylesheet and that theme as two stylesheets of its own origin, so the
+Content-Security-Policy keeps `style-src 'self'`.
+
 **The operator API is off by default.** It is mounted under `/operator` on
 the bridge's listener when `[operator] enabled = true`, and enabling it
 without `[auth]` is a configuration error at load. Every route requires a

@@ -8,7 +8,9 @@
 //! With `FERROBRIDGE_SCREENSHOTS=1` the capture drives the journeys' stack
 //! and browser through every shot of [`shots`], in the light and the dark
 //! theme, at 1440 CSS pixels wide and the full height of the page, and
-//! writes each as `<image>.png` and `<image>-dark.png` under [`IMAGES`].
+//! writes each as `<image>.png` and `<image>-dark.png` under [`IMAGES`]; it
+//! takes each again at 390 CSS pixels, a phone, under the ignored
+//! [`NARROW_IMAGES`], for the visual review the book does not show.
 //! Without the gate the capture returns at once, so no CI job takes a
 //! screenshot.
 //!
@@ -37,8 +39,28 @@ const SCREENSHOTS_GATE: &str = "FERROBRIDGE_SCREENSHOTS";
 /// The book's folder of console screenshots, from the workspace root.
 const IMAGES: &str = "website/book/src/operate/img/console";
 
-/// The width every screenshot is taken at, in CSS pixels.
-const WIDTH: u32 = 1440;
+/// The ignored folder of the phone-width screenshots, from the workspace
+/// root.
+const NARROW_IMAGES: &str = "target/console-screenshots/narrow";
+
+/// A width a screenshot is taken at.
+#[derive(Debug, Clone, Copy)]
+enum Width {
+    /// 1440 CSS pixels, the book's.
+    Wide,
+    /// 390 CSS pixels, a phone.
+    Narrow,
+}
+
+impl Width {
+    /// The width in CSS pixels.
+    const fn pixels(self) -> u32 {
+        match self {
+            Self::Wide => 1440,
+            Self::Narrow => 390,
+        }
+    }
+}
 
 /// The height of the window a page is laid out in before its full height is
 /// measured.
@@ -185,7 +207,7 @@ const EDIT_SAVED: Shot = Shot {
     image: "edit-saved",
     route: "/edit",
     url: "/edit",
-    ready: "//span[contains(., 'Saved, and the set reloaded with it.')]",
+    ready: "//div[contains(., 'Saved, and the set reloaded with it.')]",
 };
 
 /// Every shot the capture takes.
@@ -255,17 +277,28 @@ struct ContentSize {
     height: f64,
 }
 
-/// Lays the page out in a window `height` CSS pixels tall at [`WIDTH`].
-async fn window(browser: &Browser, height: u32) -> Result<(), Box<dyn Error>> {
+/// Lays the page out in a window `height` CSS pixels tall at `width`.
+async fn window(browser: &Browser, width: Width, height: u32) -> Result<(), Box<dyn Error>> {
     browser
         .driver()
         .cdp()
         .send_raw(
             "Emulation.setDeviceMetricsOverride",
-            json!({ "width": WIDTH, "height": height, "deviceScaleFactor": 1, "mobile": false }),
+            json!({ "width": width.pixels(), "height": height, "deviceScaleFactor": 1, "mobile": false }),
         )
         .await?;
     Ok(())
+}
+
+/// Where the image of `image` in `theme` at `width` is written: the book's
+/// folder for the wide one, the ignored folder for the narrow one.
+fn output(image: &str, theme: Theme, width: Width) -> PathBuf {
+    match width {
+        Width::Wide => file(image, theme),
+        Width::Narrow => root()
+            .join(NARROW_IMAGES)
+            .join(format!("{image}{}.png", theme.suffix())),
+    }
 }
 
 /// Has the browser report `theme` as the system's colour scheme, so the
@@ -337,18 +370,23 @@ async fn to_top(browser: &Browser) -> Result<(), Box<dyn Error>> {
 
 /// Waits for `shot` to show in `theme`, and writes it at the page's full
 /// height.
-async fn capture(browser: &Browser, shot: &Shot, theme: Theme) -> Result<(), Box<dyn Error>> {
+async fn capture(
+    browser: &Browser,
+    shot: &Shot,
+    theme: Theme,
+    width: Width,
+) -> Result<(), Box<dyn Error>> {
     browser.element(By::XPath(shot.ready)).await?;
     browser
         .element(By::Css(format!(r#"html[data-theme="{}"]"#, theme.word())))
         .await?;
     hydrated(browser).await?;
     let height = content_height(browser).await?;
-    window(browser, height).await?;
+    window(browser, width, height).await?;
     to_top(browser).await?;
     let png = browser.driver().screenshot_as_png().await?;
-    window(browser, HEIGHT).await?;
-    std::fs::write(file(shot.image, theme), png)?;
+    window(browser, width, HEIGHT).await?;
+    std::fs::write(output(shot.image, theme, width), png)?;
     if shot.route != NOT_FOUND.route {
         return browser.console_clean(shot.image).await;
     }
@@ -366,10 +404,10 @@ async fn visit(
     browser: &Browser,
     stack: &Stack,
     shot: &Shot,
-    theme: Theme,
+    (theme, width): (Theme, Width),
 ) -> Result<(), Box<dyn Error>> {
     browser.goto(&stack.url(shot.url)).await?;
-    capture(browser, shot, theme).await
+    capture(browser, shot, theme, width).await
 }
 
 /// Puts the theme cookie for `theme` in the browser, which must be at the
@@ -391,47 +429,59 @@ async fn enter(browser: &Browser, stack: &Stack, theme: Theme) -> Result<(), Box
 
 /// Runs the playground's answers and the editor's two outcomes, and
 /// captures each in `theme`.
-async fn answers(browser: &Browser, stack: &Stack, theme: Theme) -> Result<(), Box<dyn Error>> {
+async fn answers(
+    browser: &Browser,
+    stack: &Stack,
+    (theme, width): (Theme, Width),
+) -> Result<(), Box<dyn Error>> {
     browser.goto(&stack.url("/playground")).await?;
     hydrated(browser).await?;
     to_openehr(browser, &bundle()?).await?;
-    capture(browser, &PLAYGROUND_ANSWERED, theme).await?;
+    capture(browser, &PLAYGROUND_ANSWERED, theme, width).await?;
     browser.goto(&stack.url("/playground")).await?;
     hydrated(browser).await?;
     to_fhir(browser, "{}").await?;
-    capture(browser, &PLAYGROUND_REFUSED, theme).await?;
+    capture(browser, &PLAYGROUND_REFUSED, theme, width).await?;
 
     let slug = "second";
     let path = context_path(slug);
     draft(browser, stack, &path, &context(slug, MISSING_TEMPLATE)).await?;
     save(browser, "a context over a template the bridge lacks").await?;
-    capture(browser, &EDIT_REFUSED, theme).await?;
+    capture(browser, &EDIT_REFUSED, theme, width).await?;
     draft(browser, stack, &path, &context(slug, TEMPLATE)).await?;
     save(browser, "a second profile over the diagnosis").await?;
-    capture(browser, &EDIT_SAVED, theme).await
+    capture(browser, &EDIT_SAVED, theme, width).await
 }
 
 /// Captures every shot of the full stack in `theme`.
-async fn every_page(browser: &Browser, stack: &Stack, theme: Theme) -> Result<(), Box<dyn Error>> {
+async fn every_page(
+    browser: &Browser,
+    stack: &Stack,
+    (theme, width): (Theme, Width),
+) -> Result<(), Box<dyn Error>> {
     enter(browser, stack, theme).await?;
-    visit(browser, stack, &SIGN_IN, theme).await?;
+    visit(browser, stack, &SIGN_IN, (theme, width)).await?;
     sign_in(browser, stack).await?;
     for shot in &PAGES {
-        visit(browser, stack, shot, theme).await?;
+        visit(browser, stack, shot, (theme, width)).await?;
     }
-    answers(browser, stack, theme).await?;
-    visit(browser, stack, &NOT_FOUND, theme).await
+    answers(browser, stack, (theme, width)).await?;
+    visit(browser, stack, &NOT_FOUND, (theme, width)).await
 }
 
 /// Captures the playground of a bridge whose operations lane is off in
 /// `theme`.
-async fn lane_off(browser: &Browser, stack: &Stack, theme: Theme) -> Result<(), Box<dyn Error>> {
+async fn lane_off(
+    browser: &Browser,
+    stack: &Stack,
+    (theme, width): (Theme, Width),
+) -> Result<(), Box<dyn Error>> {
     enter(browser, stack, theme).await?;
     sign_in(browser, stack).await?;
     browser.goto(&stack.url("/playground")).await?;
     hydrated(browser).await?;
     to_openehr(browser, &bundle()?).await?;
-    capture(browser, &PLAYGROUND_OFF, theme).await
+    capture(browser, &PLAYGROUND_OFF, theme, width).await
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -440,17 +490,20 @@ async fn the_book_shows_every_console_page_in_light_and_dark() -> Result<(), Box
         return Ok(());
     }
     std::fs::create_dir_all(root().join(IMAGES))?;
-    // Each theme runs on a stack of its own, so a save the light pass made
-    // is not on the dark pass's pages.
-    for theme in [Theme::Light, Theme::Dark] {
-        let stack = Stack::start().await?;
-        let off = Stack::start_with(Lanes::WithoutOperations).await?;
-        with_browser(async |browser| {
-            window(browser, HEIGHT).await?;
-            every_page(browser, &stack, theme).await?;
-            lane_off(browser, &off, theme).await
-        })
-        .await?;
+    std::fs::create_dir_all(root().join(NARROW_IMAGES))?;
+    // Each theme and width runs on a stack of its own, so a save one pass
+    // made is not on another pass's pages.
+    for width in [Width::Wide, Width::Narrow] {
+        for theme in [Theme::Light, Theme::Dark] {
+            let stack = Stack::start().await?;
+            let off = Stack::start_with(Lanes::WithoutOperations).await?;
+            with_browser(async |browser| {
+                window(browser, width, HEIGHT).await?;
+                every_page(browser, &stack, (theme, width)).await?;
+                lane_off(browser, &off, (theme, width)).await
+            })
+            .await?;
+        }
     }
     Ok(())
 }

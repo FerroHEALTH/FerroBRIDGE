@@ -172,9 +172,16 @@ async fn a_check_sends_the_draft_verbatim_and_draws_its_diagnostics() -> Result<
         &cookie,
     )
     .await?;
-    let html = answer.as_str().unwrap_or_default();
+    let html = html(&answer);
     assert!(html.contains("does not compile with this draft"), "{html}");
     assert!(html.contains("the synthetic name is refused"), "{html}");
+    assert!(
+        html.contains(&format!(
+            r##"<a href="#edit-draft-L4"><code>{PATH}:4:9</code></a>"##
+        )),
+        "the diagnostic links to its line: {html}"
+    );
+    assert_eq!(json!([{"line": 4, "kind": "Error"}]), answer["marks"]);
     let asked = bridge.received_requests().await.ok_or("recorded")?;
     let check = asked
         .iter()

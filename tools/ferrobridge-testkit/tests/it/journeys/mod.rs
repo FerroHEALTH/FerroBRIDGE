@@ -29,6 +29,7 @@ mod screenshots;
 mod shell;
 mod sign_in;
 mod stack;
+mod states;
 
 /// The environment variable that opts in to the browser journeys.
 const JOURNEYS_GATE: &str = "FERROBRIDGE_JOURNEYS";

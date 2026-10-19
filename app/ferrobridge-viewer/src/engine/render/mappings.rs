@@ -8,6 +8,11 @@
 //! source, the OMOCL files, and every diagnostic of the running load.
 
 use ferrobridge_operator_api::operator::{EngineState, Program, Template};
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::empty::empty_quiet;
+use ferrohealth_ui::view::layout::bullet_list;
+use ferrohealth_ui::view::surface::{card, stack};
 use leptos::prelude::*;
 
 use crate::bridge::BridgeError;
@@ -20,89 +25,81 @@ pub fn render(state: &Result<EngineState, BridgeError>) -> String {
         Ok(state) => overview(state),
         Err(error) => parts::failed("Mappings", error),
     };
-    view! { <div class="sections">{sections}</div> }.to_html()
+    stack(sections).to_html()
 }
 
 /// A file path as a `<code>`, or a word for a definition with no file.
 fn file(path: Option<&str>) -> AnyView {
     match path {
         Some(path) => view! { <code>{path.to_owned()}</code> }.into_any(),
-        None => view! { <span class="text-muted">"no file"</span> }.into_any(),
+        None => view! { <span class="fui-muted">"no file"</span> }.into_any(),
     }
 }
 
 /// The sections of `state`.
 fn overview(state: &EngineState) -> AnyView {
-    let contexts = state.contexts.iter().map(context).collect_view();
-    let templates = state.templates.iter().map(template).collect_view();
-    let omocl_files = state
+    let context_table = if state.contexts.is_empty() {
+        empty_quiet(
+            Glyph::LAYERS,
+            "No context",
+            "The running load compiled no context.",
+        )
+        .into_any()
+    } else {
+        parts::table(
+            "Contexts",
+            &[
+                "Context",
+                "Template",
+                "Profile",
+                "Resource",
+                "Models and extensions",
+                "Search",
+            ],
+            state.contexts.iter().map(context).collect_view().into_any(),
+        )
+    };
+    let template_table = if state.templates.is_empty() {
+        empty_quiet(
+            Glyph::FILES,
+            "No template",
+            "The running load reads no template.",
+        )
+        .into_any()
+    } else {
+        parts::table(
+            "Templates",
+            &["Template", "Source", "File"],
+            state
+                .templates
+                .iter()
+                .map(template)
+                .collect_view()
+                .into_any(),
+        )
+    };
+    let omocl_files: Vec<AnyView> = state
         .omocl
         .files
         .iter()
-        .map(|path| {
-            view! {
-                <li>
-                    <code>{path.clone()}</code>
-                </li>
-            }
-        })
-        .collect_view();
+        .map(|path| view! { <code>{path.clone()}</code> }.into_any())
+        .collect();
     let (verdict, tone) = if state.omocl.valid {
-        ("valid", "badge tone-ok")
+        ("valid", Tone::Ok)
     } else {
-        ("refused", "badge tone-danger")
+        ("refused", Tone::Bad)
     };
-    let context_table = if state.contexts.is_empty() {
-        view! { <p>"No context compiled."</p> }.into_any()
-    } else {
-        view! {
-            <div class="table-scroll" tabindex="0">
-                <table>
-                    <thead>
-                        <tr>
-                            <th scope="col">"Context"</th>
-                            <th scope="col">"Template"</th>
-                            <th scope="col">"Profile"</th>
-                            <th scope="col">"Resource"</th>
-                            <th scope="col">"Models and extensions"</th>
-                            <th scope="col">"Search"</th>
-                        </tr>
-                    </thead>
-                    <tbody>{contexts}</tbody>
-                </table>
-            </div>
-        }
-        .into_any()
+    let omocl = view! {
+        <p>
+            "The OMOCL files are " <span class=tone.badge()>{verdict}</span> "."
+        </p>
+        {(!omocl_files.is_empty()).then(|| bullet_list(omocl_files))}
     };
     view! {
-        <section class="card">
-            <h2>"Contexts"</h2>
-            {context_table}
-        </section>
-        <section class="card">
-            <h2>"Templates"</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th scope="col">"Template"</th>
-                        <th scope="col">"Source"</th>
-                        <th scope="col">"File"</th>
-                    </tr>
-                </thead>
-                <tbody>{templates}</tbody>
-            </table>
-        </section>
-        <section class="card">
-            <h2>"OMOCL"</h2>
-            <p>
-                "The OMOCL files are " <span class=tone>{verdict}</span> "."
-            </p>
-            <ul>{omocl_files}</ul>
-        </section>
-        <section class="card">
-            <h2>"Diagnostics"</h2>
-            {parts::diagnostics_table(&state.diagnostics)}
-        </section>
+        {card("Contexts", context_table)}
+        {card("Templates", template_table)}
+        {card("OMOCL", omocl)}
+        {card("Diagnostics", parts::diagnostics_table(&state.diagnostics))}
     }
     .into_any()
 }
@@ -118,8 +115,8 @@ fn template(template: &Template) -> AnyView {
             <th scope="row">
                 <code>{id.clone()}</code>
             </th>
-            <td>{source}</td>
-            <td>{file(at)}</td>
+            <td data-label="Source">{source}</td>
+            <td data-label="File">{file(at)}</td>
         </tr>
     }
     .into_any()
@@ -136,7 +133,7 @@ fn context(program: &Program) -> AnyView {
                 .iter()
                 .map(|extension| {
                     view! {
-                        <li>
+                        <li class="fui-muted">
                             "extended by " <code>{extension.name.clone()}</code> " in "
                             {file(extension.file.as_deref())}
                         </li>
@@ -148,14 +145,20 @@ fn context(program: &Program) -> AnyView {
                     <code>{model.name.clone()}</code>
                     " in "
                     {file(model.file.as_deref())}
-                    <ul>{extensions}</ul>
+                    <ul class="fui-bullets">{extensions}</ul>
                 </li>
             }
         })
         .collect_view();
     let search = match &program.search {
         Some(path) => view! { <code>{path.clone()}</code> }.into_any(),
-        None => view! { <span class="text-muted">"none"</span> }.into_any(),
+        None => view! { <span class="fui-muted">"none"</span> }.into_any(),
+    };
+    let profile = if program.profile.is_empty() {
+        view! { <span class="fui-muted">"none"</span> }.into_any()
+    } else {
+        view! { <code>{format!("{} | {}", program.profile, program.profile_version)}</code> }
+            .into_any()
     };
     view! {
         <tr>
@@ -164,17 +167,15 @@ fn context(program: &Program) -> AnyView {
                 <br />
                 {file(program.file.as_deref())}
             </th>
-            <td>
+            <td data-label="Template">
                 <code>{program.template.clone()}</code>
             </td>
-            <td>
-                <code>{format!("{} | {}", program.profile, program.profile_version)}</code>
+            <td data-label="Profile">{profile}</td>
+            <td data-label="Resource">{program.resource_type.clone()}</td>
+            <td data-label="Models and extensions">
+                <ul class="fui-bullets">{models}</ul>
             </td>
-            <td>{program.resource_type.clone()}</td>
-            <td>
-                <ul>{models}</ul>
-            </td>
-            <td>{search}</td>
+            <td data-label="Search">{search}</td>
         </tr>
     }
     .into_any()

@@ -26,12 +26,11 @@ pub(crate) fn bundle() -> Result<String, Box<dyn Error>> {
         String::from("meta"),
         serde_json::json!({ "profile": [PROFILE] }),
     );
-    Ok(serde_json::json!({
+    Ok(serde_json::to_string_pretty(&serde_json::json!({
         "resourceType": "Bundle",
         "type": "collection",
         "entry": [{ "resource": condition }],
-    })
-    .to_string())
+    }))?)
 }
 
 /// A submit still disabled for want of the bundle: any form's, save the

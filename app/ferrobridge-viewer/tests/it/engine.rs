@@ -106,6 +106,15 @@ async fn answer(bridge: &MockServer, route: &str, status: u16, body: &serde_json
         .await;
 }
 
+/// Whether the card headed `heading` in `html` holds an alert that says
+/// `words`, in place of its content.
+fn section_alerts(html: &str, heading: &str, words: &str) -> bool {
+    let title = format!("<h2 class=\"fui-card-title\">{heading}</h2>");
+    html.split_once(&title)
+        .and_then(|(_, rest)| rest.split_once("</section>"))
+        .is_some_and(|(section, _)| section.contains("role=\"alert\"") && section.contains(words))
+}
+
 /// The console over `bridge` and a signed-in session's cookie.
 async fn signed_in(bridge: &str) -> Result<(axum::Router, String), Box<dyn Error>> {
     let provider = Provider::start().await?;
@@ -160,10 +169,47 @@ async fn the_dashboard_draws_build_facts_lanes_pins_readiness_and_counts()
         assert!(html.contains(expected), "{expected}: {html}");
     }
     assert!(
-        html.contains(r#"<span class="badge tone-danger">down</span>"#),
+        html.contains(r#"<span class="fui-badge fui-tone-bad">down</span>"#),
         "{html}"
     );
     assert!(!html.contains(OPERATOR_TOKEN));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_column_no_row_fills_is_left_out_and_the_bridge_card_counts_the_files()
+-> Result<(), Box<dyn Error>> {
+    let bridge = MockServer::start().await;
+    let mut quiet = info();
+    quiet["lanes"] =
+        json!([{"name": "facade", "enabled": true}, {"name": "etl", "enabled": false}]);
+    answer(&bridge, "/health/info", 200, &quiet).await;
+    answer(
+        &bridge,
+        "/health/readiness",
+        200,
+        &json!({"state": "up", "indicators": {"cdr": {"state": "up"}}}),
+    )
+    .await;
+    answer(&bridge, "/operator/state", 200, &state()).await;
+    let (service, cookie) = signed_in(&format!("{}/", bridge.uri())).await?;
+    let html = drawn(&service, "/api/dashboard", &cookie).await?;
+    assert!(!html.contains(">Listener<"), "{html}");
+    assert!(!html.contains("none of its own"), "{html}");
+    assert!(!html.contains(">Detail<"), "{html}");
+    assert!(html.contains(">Indicator<"), "{html}");
+    for expected in [
+        "Templates",
+        "FHIRconnect files",
+        "OMOCL files",
+        "The mappings overview",
+    ] {
+        assert!(html.contains(expected), "{expected}: {html}");
+    }
+    assert!(
+        !html.contains(">Mappings</h2>"),
+        "no card repeats the tiles: {html}"
+    );
     Ok(())
 }
 
@@ -241,10 +287,9 @@ async fn an_answer_of_another_shape_is_named_never_drawn_empty() -> Result<(), B
     answer(&bridge, "/operator/state", 200, &foreign).await;
     let (service, cookie) = signed_in(&format!("{}/", bridge.uri())).await?;
     let html = drawn(&service, "/api/dashboard", &cookie).await?;
-    let unreadable =
-        "<p role=\"alert\">the bridge answered 200 with a body this console cannot read</p>";
+    let unreadable = "the bridge answered 200 with a body this console cannot read";
     assert!(
-        html.contains(&format!("<h2>Bridge</h2>{unreadable}")),
+        section_alerts(&html, "Bridge", unreadable),
         "an info without its version: {html}"
     );
     assert!(
@@ -252,7 +297,7 @@ async fn an_answer_of_another_shape_is_named_never_drawn_empty() -> Result<(), B
         "a 200 that says down: {html}"
     );
     assert!(
-        html.contains(&format!("<h2>Mappings</h2>{unreadable}")),
+        section_alerts(&html, "Mappings", unreadable),
         "a diagnostic without its position: {html}"
     );
     Ok(())
@@ -273,7 +318,7 @@ async fn the_capability_screen_draws_resources_security_raw_json_and_discovery()
     let (service, cookie) = signed_in(&format!("{}/", bridge.uri())).await?;
     let html = drawn(&service, "/api/capability", &cookie).await?;
     for expected in [
-        "<h2>Observation</h2>",
+        "<h2 class=\"fui-card-title\">Observation</h2>",
         "read, search-type",
         "<code>code</code>",
         "token",
@@ -284,6 +329,7 @@ async fn the_capability_screen_draws_resources_security_raw_json_and_discovery()
         "https://idp.example.org/token",
         "permission-v2",
         "ferrobridge.operator",
+        "<dt>Profile</dt><dd><span class=\"fui-muted\">none</span></dd>",
     ] {
         assert!(html.contains(expected), "{expected}: {html}");
     }
@@ -297,12 +343,18 @@ async fn discovery_a_bridge_without_tokens_does_not_serve_is_its_refusal()
     answer(&bridge, "/fhir/metadata", 200, &statement()).await;
     let (service, cookie) = signed_in(&format!("{}/", bridge.uri())).await?;
     let html = drawn(&service, "/api/capability", &cookie).await?;
-    assert!(html.contains("<h2>SMART discovery</h2>"), "{html}");
+    assert!(
+        html.contains("<h2 class=\"fui-card-title\">SMART discovery</h2>"),
+        "{html}"
+    );
     assert!(
         html.contains("404: the bridge refused the request."),
         "{html}"
     );
-    assert!(html.contains("<h2>Observation</h2>"), "{html}");
+    assert!(
+        html.contains("<h2 class=\"fui-card-title\">Observation</h2>"),
+        "{html}"
+    );
     Ok(())
 }
 
@@ -348,14 +400,17 @@ async fn each_page_carries_its_drawn_screen_and_a_visitor_reads_the_sign_in()
     let (response, page) = send(&service, get_with("/mappings", &cookie)?).await?;
     assert_eq!(StatusCode::OK, response.status());
     assert!(page.contains("synthetic-observation"), "{page}");
-    assert!(page.contains("<h1>Mappings</h1>"), "{page}");
+    assert!(page.contains(">Mappings</h1>"), "{page}");
     let (_response, page) = send(&service, get_with("/capability", &cookie)?).await?;
-    assert!(page.contains("<h2>Observation</h2>"), "{page}");
+    assert!(
+        page.contains("<h2 class=\"fui-card-title\">Observation</h2>"),
+        "{page}"
+    );
     let (_state, visitor) = console("")?;
     for path in ["/", "/capability", "/mappings"] {
         let (_response, page) = send(&visitor, get(path)?).await?;
         assert!(page.contains(">Sign in</a>"), "{path}: {page}");
-        assert!(!page.contains("<h1>Mappings</h1>"), "{path}");
+        assert!(!page.contains(">Mappings</h1>"), "{path}");
     }
     Ok(())
 }

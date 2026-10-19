@@ -1,0 +1,30 @@
+/* SPDX-FileCopyrightText: Cadasto B.V. */
+/* SPDX-License-Identifier: BUSL-1.1 */
+/* The FerroBRIDGE brand, "Indigo & Iron" from assets/brand: the accent of
+   each theme over the roles of the ferrohealth-ui stylesheet, loaded after
+   it. tests/it/contrast.rs holds every pairing to WCAG 2.2 AA. */
+:root {
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-ink: #ffffff;
+  --accent-tint: rgb(79 70 229 / 0.1);
+  --focus: #4f46e5;
+}
+
+:root[data-theme="dark"] {
+  --accent: #a5b4fc;
+  --accent-hover: #c7d2fe;
+  --accent-ink: #0f172a;
+  --accent-tint: rgb(129 140 248 / 0.12);
+  --focus: #a5b4fc;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"], [data-theme="dark"]) {
+    --accent: #a5b4fc;
+    --accent-hover: #c7d2fe;
+    --accent-ink: #0f172a;
+    --accent-tint: rgb(129 140 248 / 0.12);
+    --focus: #a5b4fc;
+  }
+}

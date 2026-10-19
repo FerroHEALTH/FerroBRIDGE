@@ -8,6 +8,11 @@
 //! pages for a path the console does not serve and for a session store it
 //! cannot read.
 
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::theme::Theme;
+use ferrohealth_ui::view::button::{Variant, label};
+use ferrohealth_ui::view::shell::{MAIN_ID, Shell};
+use ferrohealth_ui::view::sign_in::{Provider, SignIn, sign_in};
 use leptos::either::Either;
 use leptos::prelude::*;
 use leptos_meta::{Stylesheet, Title, provide_meta_context};
@@ -16,8 +21,6 @@ use leptos_router::{SsrMode, path};
 
 use crate::model::SessionState;
 use crate::shell::Bar;
-use crate::styles;
-use crate::theme::Theme;
 
 /// The product name as an operator reads it.
 pub const PRODUCT: &str = "FerroBRIDGE Console";
@@ -28,8 +31,13 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Who makes the console, which the footer and the About page name.
 pub const MANUFACTURER: &str = "Cadasto B.V.";
 
-/// The path of the stylesheet cargo-leptos writes into the site bundle.
-pub const STYLESHEET: &str = "/pkg/ferrobridge-viewer.css";
+/// The path the server serves the `FerroHEALTH` stylesheet at, beside the
+/// site bundle.
+pub const STYLESHEET: &str = "/pkg/ferrohealth-ui.css";
+
+/// The path the server serves the console's brand theme at, which loads
+/// after the stylesheet.
+pub const THEME: &str = "/pkg/ferrobridge-theme.css";
 
 /// The path of the sign-in route the server serves.
 pub const SIGN_IN: &str = "/login";
@@ -83,7 +91,8 @@ pub fn App() -> impl IntoView {
         bridge: Resource::new_blocking(|| (), |()| crate::status::bridge_status()),
     });
     view! {
-        <Stylesheet id="leptos" href=STYLESHEET />
+        <Stylesheet id="ferrohealth-ui" href=STYLESHEET />
+        <Stylesheet id="theme" href=THEME />
         <Title text=PRODUCT />
         <Router>{layout(session, operator, bar, bridge)}</Router>
     }
@@ -104,33 +113,28 @@ fn layout(session: SessionState, operator: String, bar: Option<Bar>, bridge: Str
 
 /// The shell of a signed-in operator: the top bar, the navigation beside
 /// the page, and the footer.
-fn signed_in(operator: String, bar: Bar, routes: AnyView) -> impl IntoView {
-    view! {
-        <div class=styles::PAGE>
-            <a href="#main" class=styles::SKIP>
-                "Skip to the page"
-            </a>
-            {crate::shell::topbar(operator, bar)}
-            <div class=styles::BODY>
-                {crate::shell::sidebar()} <main id="main" class=styles::MAIN>
-                    <div class=styles::COLUMN>{routes}</div>
-                </main>
-            </div>
-            {crate::shell::footer()}
-        </div>
-    }
+fn signed_in(operator: String, bar: Bar, routes: AnyView) -> AnyView {
+    ferrohealth_ui::view::shell::shell(Shell {
+        topbar: crate::shell::topbar(operator, bar),
+        banner: None,
+        sidebar: crate::shell::sidebar(),
+        content: routes,
+        footer: crate::shell::FOOTER,
+    })
 }
 
 /// The shell of a visitor: the page alone, and the footer.
-fn visitor(page: AnyView) -> impl IntoView {
+fn visitor(page: AnyView) -> AnyView {
+    let foot = crate::shell::footer().into_any();
     view! {
-        <div class=styles::PAGE>
-            <main id="main" class="flex flex-1 flex-col px-4 py-8">
-                {page}
+        <div class="fui-page">
+            <main id=MAIN_ID class="fui-main">
+                <div class="fui-column">{page}</div>
             </main>
-            {crate::shell::footer()}
+            {foot}
         </div>
     }
+    .into_any()
 }
 
 /// The page `page` for a request whose session is `session`: the page for a
@@ -221,22 +225,28 @@ fn routes(session: SessionState, bridge: String) -> AnyView {
 /// route, which the client router leaves alone.
 #[component]
 fn SignInPage() -> impl IntoView {
+    // NOTE: OpenID Connect Core 1.0 §3.1: the console signs an operator in at
+    // their provider alone, so the card offers the provider's button and no form.
+    let card = sign_in(SignIn {
+        lockup: crate::shell::lockup().into_any(),
+        notices: Vec::new(),
+        refusal: None,
+        basic: None,
+        provider: Some(Provider {
+            href: String::from(SIGN_IN),
+            label: String::from("Sign in"),
+        }),
+        links: Vec::new(),
+    });
     view! {
         <Title text=PRODUCT />
-        <div class=styles::CENTRED>
-            <div class=styles::CARD>
-                <span class=styles::MARK aria-hidden="true"></span>
-                <h1>{PRODUCT}</h1>
-                <p class="text-muted">
-                    "The operator console of the FerroBRIDGE bridge. Sign in to continue."
-                </p>
-                <a href=SIGN_IN rel="external" class=styles::BUTTON_PRIMARY>
-                    "Sign in"
-                </a>
-            </div>
+        <div class="fui-centred">
+            <h1 class="fui-sr-only">{PRODUCT}</h1>
+            {card}
         </div>
     }
 }
+
 /// The page a visitor reads when the console cannot read its session store:
 /// it cannot tell whether they are signed in, so it offers neither the
 /// sign-in nor the operator's pages, and answers `500`.
@@ -245,15 +255,16 @@ fn unreadable() -> impl IntoView {
     if let Some(response) = use_context::<leptos_axum::ResponseOptions>() {
         response.set_status(http::StatusCode::INTERNAL_SERVER_ERROR);
     }
+    let alert = ferrohealth_ui::view::refusal::fault(
+        "500: the console cannot read its session store, so it cannot tell whether you \
+         are signed in. Ask the console's operator to restart it.",
+    );
     view! {
         <Title text="Fault" />
-        <div class=styles::CENTRED>
-            <div class=styles::CARD>
+        <div class="fui-centred">
+            <div class="fui-card fui-sign-in">
                 <h1>"The console cannot read its sessions"</h1>
-                <p role="alert">
-                    "500: the console cannot read its session store, so it cannot tell whether you "
-                    "are signed in. Ask the console's operator to restart it."
-                </p>
+                {alert}
             </div>
         </div>
     }
@@ -266,16 +277,22 @@ fn NotFound() -> impl IntoView {
     if let Some(response) = use_context::<leptos_axum::ResponseOptions>() {
         response.set_status(http::StatusCode::NOT_FOUND);
     }
+    let back = view! {
+        <a href="/" class=Variant::Primary.class()>
+            {label(Some(Glyph::ARROW_LEFT), "Back to the console")}
+        </a>
+    };
+    let empty = ferrohealth_ui::view::empty::empty_state(
+        Glyph::COMPASS,
+        "Not found",
+        "404: the console has no page at this address.",
+        back,
+    );
     view! {
         <Title text="Not found" />
-        <div class=styles::CENTRED>
-            <div class=styles::CARD>
-                <h1>"Not found"</h1>
-                <p class="text-muted">"404: the console has no page at this address."</p>
-                <a href="/" class=styles::BUTTON_SECONDARY>
-                    "Back to the console"
-                </a>
-            </div>
+        <div class="fui-centred">
+            <h1 class="fui-sr-only">"Not found"</h1>
+            <div class="fui-card">{empty}</div>
         </div>
     }
 }

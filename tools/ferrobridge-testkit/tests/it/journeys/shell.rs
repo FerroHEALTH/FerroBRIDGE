@@ -21,11 +21,7 @@ const ENTRIES: [(&str, &str, &str); 8] = [
     ("Overview", "/mappings", "Mappings"),
     ("Files", "/files", "Mapping files"),
     ("New file", "/edit", "Edit a mapping file"),
-    (
-        "Transform playground",
-        "/playground",
-        "Transform playground",
-    ),
+    ("Playground", "/playground", "Transform playground"),
     ("Validation dry run", "/validate", "Validation dry run"),
     ("Capability", "/capability", "Capability"),
     ("About", "/about", "About"),
@@ -60,7 +56,7 @@ async fn every_entry_leads_to_its_page_and_marks_itself_current() -> Result<(), 
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn the_theme_switch_redraws_the_page_and_the_sign_out_ends_the_session()
+async fn the_theme_toggle_swaps_in_place_keeps_the_choice_and_the_sign_out_ends_the_session()
 -> Result<(), Box<dyn Error>> {
     if !journeys_enabled() {
         return Ok(());
@@ -68,24 +64,39 @@ async fn the_theme_switch_redraws_the_page_and_the_sign_out_ends_the_session()
     let stack = Stack::start().await?;
     with_browser(async |browser| {
         sign_in(browser, &stack).await?;
-        browser.goto(&stack.url("/files")).await?;
         browser
-            .element(By::XPath(
-                "//div[@role = 'group' and @aria-label = 'Theme']//button[normalize-space(.) = 'Dark']",
-            ))
-            .await?
-            .click()
+            .driver()
+            .cdp()
+            .send_raw(
+                "Emulation.setEmulatedMedia",
+                serde_json::json!({ "features": [{ "name": "prefers-color-scheme", "value": "light" }] }),
+            )
             .await?;
-        browser.element(By::Css(r#"html[data-theme="dark"]"#)).await?;
+        browser.goto(&stack.url("/files")).await?;
+        until("the toggle swaps the theme in place", async || {
+            let to_dark = browser.element(By::Id("theme-to-dark")).await?;
+            if to_dark.is_displayed().await? {
+                to_dark.click().await?;
+            }
+            Ok(!browser
+                .driver()
+                .find_all(By::Css(r#"html[data-theme="dark"]"#))
+                .await?
+                .is_empty())
+        })
+        .await?;
         browser.at(&stack.url("/files")).await?;
-        browser.console_clean("the theme switch").await?;
+        browser.element(By::Id("theme-to-light")).await?;
+        browser.goto(&stack.url("/files")).await?;
+        browser.element(By::Css(r#"html[data-theme="dark"]"#)).await?;
+        browser.console_clean("the theme toggle").await?;
 
         browser
             .element(By::XPath("//header//button[@popovertarget]//span"))
             .await?;
         let menu = browser
             .driver()
-            .find_all(By::XPath("//header//button[@popovertarget and not(normalize-space(.) = 'Menu')]"))
+            .find_all(By::XPath("//header//button[@aria-controls = 'operator-menu']"))
             .await?;
         let operator = menu.first().ok_or("the operator menu button")?;
         operator.click().await?;

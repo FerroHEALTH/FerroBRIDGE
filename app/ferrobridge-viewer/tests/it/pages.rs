@@ -51,7 +51,7 @@ async fn a_signed_in_operator_reads_their_name_the_bridge_and_no_token()
     assert_eq!(StatusCode::OK, response.status());
     assert!(body.contains(OPERATOR_NAME), "{body}");
     assert!(body.contains("Bridge UP · v0.0.8"), "{body}");
-    assert!(body.contains("<h1>Dashboard</h1>"), "{body}");
+    assert!(body.contains(">Dashboard</h1>"), "{body}");
     assert!(!body.contains(OPERATOR_TOKEN), "{body}");
     assert!(!body.contains(r#"href="/login""#), "{body}");
     Ok(())

@@ -199,7 +199,7 @@ async fn a_refused_draft_changes_nothing_and_a_save_is_byte_identical_and_reload
         draft(browser, &stack, &path, &context(SECOND, MISSING_TEMPLATE)).await?;
         press(browser, "Check").await?;
         browser
-            .text("span", "The set does not compile with this draft")
+            .text("div", "The set does not compile with this draft")
             .await?;
         save(browser, "a context over a template the bridge lacks").await?;
         browser.text("h2", "Not saved").await?;
@@ -210,11 +210,11 @@ async fn a_refused_draft_changes_nothing_and_a_save_is_byte_identical_and_reload
         draft(browser, &stack, &path, &valid).await?;
         press(browser, "Check").await?;
         browser
-            .text("span", "The set compiles with this draft.")
+            .text("div", "The set compiles with this draft.")
             .await?;
         save(browser, "a second profile over the diagnosis").await?;
         browser
-            .text("span", "Saved, and the set reloaded with it.")
+            .text("div", "Saved, and the set reloaded with it.")
             .await?;
         browser.console_clean("a save").await?;
         assert_eq!(valid.as_bytes(), std::fs::read(&saved)?.as_slice());
@@ -228,7 +228,7 @@ async fn a_refused_draft_changes_nothing_and_a_save_is_byte_identical_and_reload
         press(browser, "Reload").await?;
         browser
             .text(
-                "span",
+                "div",
                 "The files on disk compiled and replaced the running set.",
             )
             .await?;

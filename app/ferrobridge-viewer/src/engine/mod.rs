@@ -120,14 +120,19 @@ where
 fn drawn_screen(title: &'static str, drawn: Resource<Result<String, ViewError>>) -> impl IntoView {
     view! {
         <Title text=format!("{title} · {PRODUCT}") />
-        <h1>{title}</h1>
+        {ferrohealth_ui::view::surface::page_header(title, None, ())}
         <Suspense fallback=|| {
-            view! { <p>"Asking the bridge."</p> }
+            ferrohealth_ui::view::empty::busy(
+                "Asking the bridge",
+                ferrohealth_ui::view::empty::Busy::Section,
+            )
         }>
             {move || Suspend::new(async move {
                 match drawn.await {
                     Ok(html) => view! { <div inner_html=html></div> }.into_any(),
-                    Err(error) => view! { <p role="alert">{error.to_string()}</p> }.into_any(),
+                    Err(error) => {
+                        ferrohealth_ui::view::refusal::fault(error.to_string()).into_any()
+                    }
                 }
             })}
         </Suspense>

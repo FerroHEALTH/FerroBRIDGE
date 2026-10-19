@@ -168,6 +168,27 @@ crates on crates.io.
   the crate line at 0.1.126, leaving their 0.0.0 name reservations, so the
   next publish ships the validator as it stands on `main`. Pin each exactly,
   as for every crate of the line (#432).
+
+- The operator console draws with `ferrohealth-ui` 0.1.3, the FerroHEALTH
+  component library the four consoles share (#850). It keeps only its brand
+  theme and its screens: the shell, the cards, tables, pagers, code panels,
+  forms, refusals and empty states are the library's, its icons are the
+  library's Lucide glyphs, and the console's own Tailwind stylesheet, style
+  module and highlighter are gone; the site build no longer installs the
+  Tailwind CSS CLI (#890). The top bar carries the one theme toggle,
+  a moon in the light theme and a sun in the dark one, which posts with no
+  script and, once hydrated, swaps the theme in place while the server keeps
+  the choice in its cookie. The playground (its navigation entry now
+  reads "Playground") takes its composition, Bundle and resource in JSON
+  editors with numbered lines, shows its answers as highlighted JSON in
+  bounded panels, and an issue row shows its `details.text` and the
+  openEHR path it names. The mapping editor highlights the draft as YAML
+  with numbered lines as you type, marks the lines a check's diagnostics
+  name, and links each diagnostic to its line. A mapping or a resource
+  without a profile says "none". The dashboard's Bridge card carries the
+  build facts across one row with the file counts the tiles leave out, a
+  table column no row fills is left out, and every screen reads at 390 CSS
+  pixels as well as 1440.
 - The README's generated badge block keeps the two HL7 v2 corpus badges in
   view and folds the per-family and per-version badges into a collapsed
   block, which `scripts/checks/conformance.sh --update` renders (#860).
