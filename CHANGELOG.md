@@ -35,6 +35,28 @@ crates on crates.io.
   `ferrobridge-hl7v2` gains the `batch` module. The ReportStream
   `sample-batch-pdi-20210608-0001.hl7` file now passes the `hl7v2` corpus.
 
+### Changed
+
+- The release workflow refuses a tag whose milestone, titled exactly as the
+  tag, is missing or still holds an open issue or pull request, and names
+  each one; once every leg has succeeded, crates.io included, it closes that
+  milestone (#983).
+
+### Fixed
+
+- `$toopenehr` compares the subjects of a Bundle as the entries their
+  references resolve to (#399), by the R4 rules for resolving a reference in
+  a Bundle (bundle.html §2.36.4.1): an absolute reference (`urn:uuid`,
+  `urn:oid`, a URL) matches an entry's `fullUrl`, a relative `<type>/<id>`
+  is made absolute against the root of the referring entry's RESTful
+  `fullUrl`, and a version-specific reference also matches
+  `meta.versionId`. A document that addresses its Patient entry by a
+  `urn:uuid` `fullUrl`, as both HL7 Europe EPS example documents do, now
+  maps; references that resolve to two Patient entries are still refused. A
+  relative reference in an entry with no RESTful `fullUrl`, which R4 gives no
+  meaning, is read against each entry's type and id (our own design).
+  `fhirconnect` 0.1.153.
+
 ## [0.0.10] - 2026-10-19
 
 The openEHR demographics release. The FHIR facade serves `Patient`,
@@ -181,11 +203,6 @@ static bearer token is gone from both upstreams.
   new arms.
 
 ### Changed
-
-- The release workflow refuses a tag whose milestone, titled exactly as the
-  tag, is missing or still holds an open issue or pull request, and names
-  each one; once every leg has succeeded, crates.io included, it closes that
-  milestone (#983).
 
 - Only the newest release is supported (#979). `SECURITY.md` says that every
   earlier release stops receiving fixes when a new one is published, with no
