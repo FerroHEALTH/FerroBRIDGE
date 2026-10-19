@@ -3,11 +3,13 @@
 
 //! The page tree the server renders and the browser hydrates.
 //!
-//! It holds the document in the operator's theme, the shell a signed-in
+//! It holds the document in the operator's theme and the request's locale
+//! (`crate::locale`), the shell a signed-in
 //! operator reads, the centred pages a visitor reads, the routes, and the
 //! pages for a path the console does not serve and for a session store it
 //! cannot read.
 
+use ferrohealth_ui::i18n::{Locale, provide_locale};
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::theme::Theme;
 use ferrohealth_ui::view::button::{Variant, label};
@@ -19,6 +21,7 @@ use leptos_meta::{Stylesheet, Title, provide_meta_context};
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::{SsrMode, path};
 
+use crate::locale::{Msg, tr};
 use crate::model::SessionState;
 use crate::shell::Bar;
 
@@ -58,9 +61,10 @@ const OPERATOR: &str = "Operator";
 #[must_use]
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     let theme = crate::theme::server::requested().key();
+    let lang = crate::locale::requested().tag();
     view! {
         <!DOCTYPE html>
-        <html lang="en" data-theme=theme>
+        <html lang=lang data-theme=theme>
             <head>
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -85,6 +89,8 @@ pub fn App() -> impl IntoView {
     let session = *SharedValue::new_str(session_state);
     let operator = SharedValue::new_str(operator_name).into_inner();
     let theme = *SharedValue::new_str(theme_requested);
+    let tag = SharedValue::new_str(locale_requested).into_inner();
+    provide_locale(Locale::parse(&tag).unwrap_or_default());
     let bridge = SharedValue::new_str(bridge_base).into_inner();
     let bar = (session == SessionState::SignedIn).then(|| Bar {
         theme,
@@ -234,7 +240,7 @@ fn SignInPage() -> impl IntoView {
         basic: None,
         provider: Some(Provider {
             href: String::from(SIGN_IN),
-            label: String::from("Sign in"),
+            label: tr(Msg::SignIn),
         }),
         links: Vec::new(),
     });
@@ -255,15 +261,12 @@ fn unreadable() -> impl IntoView {
     if let Some(response) = use_context::<leptos_axum::ResponseOptions>() {
         response.set_status(http::StatusCode::INTERNAL_SERVER_ERROR);
     }
-    let alert = ferrohealth_ui::view::refusal::fault(
-        "500: the console cannot read its session store, so it cannot tell whether you \
-         are signed in. Ask the console's operator to restart it.",
-    );
+    let alert = ferrohealth_ui::view::refusal::fault(tr(Msg::UnreadableFault));
     view! {
-        <Title text="Fault" />
+        <Title text=tr(Msg::UnreadableTitle) />
         <div class="fui-centred">
             <div class="fui-card fui-sign-in">
-                <h1>"The console cannot read its sessions"</h1>
+                <h1>{tr(Msg::UnreadableHeading)}</h1>
                 {alert}
             </div>
         </div>
@@ -279,19 +282,19 @@ fn NotFound() -> impl IntoView {
     }
     let back = view! {
         <a href="/" class=Variant::Primary.class()>
-            {label(Some(Glyph::ARROW_LEFT), "Back to the console")}
+            {label(Some(Glyph::ARROW_LEFT), tr(Msg::NotFoundBack))}
         </a>
     };
     let empty = ferrohealth_ui::view::empty::empty_state(
         Glyph::COMPASS,
-        "Not found",
-        "404: the console has no page at this address.",
+        tr(Msg::NotFoundTitle),
+        tr(Msg::NotFoundBody),
         back,
     );
     view! {
-        <Title text="Not found" />
+        <Title text=tr(Msg::NotFoundTitle) />
         <div class="fui-centred">
-            <h1 class="fui-sr-only">"Not found"</h1>
+            <h1 class="fui-sr-only">{tr(Msg::NotFoundTitle)}</h1>
             <div class="fui-card">{empty}</div>
         </div>
     }
@@ -337,6 +340,20 @@ fn theme_requested() -> Theme {
     #[cfg(target_arch = "wasm32")]
     {
         Theme::default()
+    }
+}
+
+/// The tag of the locale the request is served in.
+fn locale_requested() -> String {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        crate::locale::requested().tag()
+    }
+    // NOTE: the browser reads the value the server decided; this runs only if
+    // that value is missing, and then draws the reference locale.
+    #[cfg(target_arch = "wasm32")]
+    {
+        Locale::english().tag()
     }
 }
 

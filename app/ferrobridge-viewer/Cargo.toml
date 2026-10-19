@@ -41,6 +41,8 @@ thiserror.workspace = true
 # The FerroHEALTH components, stylesheet and role tokens, in both halves;
 # the console keeps only its brand theme (style/theme.css) and its screens.
 ferrohealth-ui.workspace = true
+# The console's own string catalogs under locales/, in both halves.
+fluent-templates.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 leptos = { workspace = true, features = ["hydrate"] }

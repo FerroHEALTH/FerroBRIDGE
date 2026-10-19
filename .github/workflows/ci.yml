@@ -276,6 +276,21 @@ jobs:
           persist-credentials: false
       - run: bash scripts/checks/file-length.sh
 
+  # The stray-literal guard: a string the operator console draws belongs in
+  # its catalog under app/ferrobridge-viewer/locales/, and a file may hold no
+  # more stray literals than its baseline while the strings move (#956).
+  stray-literals:
+    name: stray-literals
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: bash scripts/checks/stray-literals.sh app/ferrobridge-viewer/src
+
   # The version-drift guard. It compares every present config file against
   # docs/VERSIONS.md and skips loudly for the files that have not landed yet,
   # so it is useful now and grows teeth as files appear.
@@ -1291,6 +1306,7 @@ jobs:
       - container-config
       - comment-style
       - file-length
+      - stray-literals
       - versions
       - profile-packages
       - favicon-sync

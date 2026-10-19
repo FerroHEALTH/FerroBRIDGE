@@ -28,6 +28,7 @@ fn no_file_and_no_environment_resolve_to_the_defaults() {
     assert_eq!("127.0.0.1:3000", settings.listen.to_string());
     assert_eq!("http://127.0.0.1:8080/", settings.bridge.base.as_str());
     assert_eq!(Duration::from_secs(30), settings.bridge.timeout);
+    assert_eq!("en", settings.locale.tag(), "English unless configured");
 }
 
 #[test]
@@ -97,6 +98,7 @@ fn text_that_is_not_toml_is_refused_as_syntax() {
 fn each_value_its_key_does_not_admit_is_refused_by_key() {
     for (text, key) in [
         ("[server]\nlisten = \"localhost\"\n", "server.listen"),
+        ("[server]\nlocale = \"not a tag\"\n", "server.locale"),
         ("[bridge]\nbase_url = \"\"\n", "bridge.base_url"),
         ("[bridge]\nbase_url = \"not a url\"\n", "bridge.base_url"),
         (
@@ -119,6 +121,7 @@ fn each_value_its_key_does_not_admit_is_refused_by_key() {
             .expect_err("the value is refused");
         let named = match &error {
             Error::Address { key, .. }
+            | Error::Locale { key, .. }
             | Error::Url { key, .. }
             | Error::UrlShape { key, .. }
             | Error::Zero { key }

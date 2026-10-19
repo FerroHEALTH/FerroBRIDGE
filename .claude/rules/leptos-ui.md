@@ -334,15 +334,23 @@ changes here and nowhere else.
 
 | Measure | Budget |
 |---|---|
-| WebAssembly, brotli-compressed | 321536 bytes |
+| WebAssembly, brotli-compressed | 458752 bytes |
 
 - **The gating number is the brotli-compressed WebAssembly.** The book's
   `deployment/binary_size` chapter has a site serve its WebAssembly
   compressed, every current browser accepts brotli, and the compressed size
   is the download. The raw and gzip sizes are reported beside it, ungated.
-- **The budget is 314 KiB**, 25% over the 257500 bytes the mapping editor
-  of #608 measured (2026-10-17, cargo-leptos 0.3.11, wasm-bindgen 0.2.129,
-  Tailwind CSS 4.3.3, Rust 1.98.1). Its history:
+- **The budget is 448 KiB**, 25% over the 366571 bytes the move to
+  `ferrohealth-ui` 0.1.7 measured (#956, 2026-10-19, cargo-leptos 0.3.11,
+  wasm-bindgen 0.2.129, Rust 1.98.1), 51871 bytes over 0.1.6's 314700: every
+  word the components and the console draw now comes from a Fluent catalog,
+  so the bundle carries the Fluent parser that reads the embedded catalogs
+  once, the CLDR plural rules a catalog selects a form by, and the
+  catalogs. FerroUI's gallery measured the same cost (53325 bytes). Its
+  history:
+  - 314 KiB, 25% over the 257500 bytes the mapping editor of #608
+    measured (2026-10-17, cargo-leptos 0.3.11, wasm-bindgen 0.2.129,
+    Tailwind CSS 4.3.3, Rust 1.98.1).
   - 112 KiB, 26% over the 90964 bytes of the scaffold of #599: the router,
     the meta tags and the hydration of a two-route shell.
   - 192 KiB for the sign-in of #600, which measured 157809. 54766 of the
@@ -442,3 +450,27 @@ changes here and nowhere else.
   needs and the library lacks is added to the library.
 - An icon never carries meaning alone (§10): it sits beside the word it
   illustrates.
+
+## 14. Strings and locales
+
+The catalog rule is FerroUI's (its `.claude/rules/leptos-ui.md` §13): no
+string the console draws lives outside a catalog, and a language joins as a
+catalog file with no code change. What is particular here:
+
+- The console's catalog is `app/ferrobridge-viewer/locales/<tag>/ferrobridge-viewer.ftl`,
+  embedded by `fluent_templates::static_loader!` in `crate::locale`, where
+  each message is one `Msg`. A test holds every catalog directory to the
+  full message set, and a throwaway catalog under `tests/locales/` shows the
+  words change with no code change.
+- The server chooses the locale once per request (`crate::locale::requested`):
+  the best language of `Accept-Language` the console's catalog holds, else
+  `[server] locale`. `App` hands the same tag to the browser through a
+  `SharedValue` and provides it with `ferrohealth_ui::i18n::provide_locale`,
+  so the console's words and the library's switch together, and the document
+  writes it as `<html lang>`.
+- `scripts/checks/stray-literals.sh app/ferrobridge-viewer/src` runs in CI
+  against `scripts/checks/stray-literals.baseline`: a file may hold no more
+  stray literals than its count, and a change that moves strings into the
+  catalog lowers the count with `--update`. Most of the remaining strings
+  reach a component that takes a `&'static str`, which FerroHEALTH/FerroUI#114
+  widens.
