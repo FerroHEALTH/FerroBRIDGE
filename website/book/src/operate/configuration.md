@@ -526,8 +526,9 @@ adds nothing. Put no `LIMIT` in the query, because every row counts.
 | `system_query` | empty | The AQL a `[system]\|[value]` value runs, binding `$identifier` and `$system`. Empty refuses a value that names a system with `400 not-supported`, because FHIRconnect maps no FHIR identifier system to a `DV_IDENTIFIER` attribute |
 
 A query that does not bind the parameters it is handed is a boot error naming
-the key. A CDR that refuses the query answers a `500` whose diagnostics name
-the extension.
+the key. A CDR that refuses the query does not serve the extension, or not
+this query of it: the search answers `501` with `not-supported`, naming the
+extension and carrying the CDR's words, as the party search does.
 
 ### `[facade.party_search]`
 

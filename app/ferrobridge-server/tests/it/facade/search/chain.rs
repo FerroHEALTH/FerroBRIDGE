@@ -400,8 +400,11 @@ async fn a_party_with_no_ehr_matches_nothing() -> Result<(), Box<dyn StdError>> 
     Ok(())
 }
 
+/// A CDR without the extension refuses the identifier query, and that is the
+/// one answer the party search gives too: `501 not-supported` (RFC 9110
+/// §15.6.2), never a `500`.
 #[tokio::test]
-async fn a_refused_identifier_query_is_a_500_naming_the_extension() -> Result<(), Box<dyn StdError>>
+async fn a_refused_identifier_query_is_a_501_naming_the_extension() -> Result<(), Box<dyn StdError>>
 {
     let harness = identifying(Some(by_value()), true).await;
     Mock::given(matchers::method("POST"))
@@ -414,7 +417,8 @@ async fn a_refused_identifier_query_is_a_500_naming_the_extension() -> Result<()
         .mount(&harness.cdr)
         .await;
     let (status, body) = get(&harness, "Condition?patient.identifier=MRN-0001").await?;
-    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
+    assert_eq!(StatusCode::NOT_IMPLEMENTED, status, "{body}");
+    assert_eq!(first_issue(&body)["code"], "not-supported", "{body}");
     let diagnostics = first_issue(&body)["diagnostics"]
         .as_str()
         .unwrap_or_default();
