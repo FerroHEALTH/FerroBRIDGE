@@ -19,12 +19,14 @@
 use axum::Extension;
 use axum::extract::Query;
 use axum::response::{IntoResponse, Response};
+use ferrohealth_ui::i18n::Locale;
 use http::header::{CACHE_CONTROL, LOCATION, SET_COOKIE};
 use http::{HeaderMap, HeaderValue, StatusCode};
 use serde::Deserialize;
 use url::Url;
 
 use crate::config::settings::{OFFLINE_ACCESS, OidcSettings};
+use crate::locale::{Msg, catalog, negotiated, tr_in};
 use crate::server::ViewerState;
 use crate::session::{COOKIE, PendingSignIn, SIGN_IN_COOKIE, SessionError, challenge};
 
@@ -72,21 +74,23 @@ pub fn authorization_request(oidc: &OidcSettings, pending: &PendingSignIn) -> Ur
 }
 
 /// Serves `GET /login`: begins a sign-in and redirects to the provider.
-pub async fn login(Extension(state): Extension<ViewerState>) -> Response {
+pub async fn login(Extension(state): Extension<ViewerState>, headers: HeaderMap) -> Response {
+    let locale = locale_of(&state, &headers);
     let Some(oidc) = state.settings().oidc.as_ref() else {
         return plain(
             StatusCode::SERVICE_UNAVAILABLE,
-            "sign-in is not configured on this console",
+            &locale,
+            Msg::SignInNotConfigured,
         );
     };
     let pending = match PendingSignIn::mint() {
         Ok(pending) => pending,
-        Err(error) => return refused(&error),
+        Err(error) => return refused(&locale, &error),
     };
     let location = authorization_request(oidc, &pending);
     let id = match state.sessions().begin(pending) {
         Ok(id) => id,
-        Err(error) => return refused(&error),
+        Err(error) => return refused(&locale, &error),
     };
     let cookie = state.sessions().sign_in_cookie(&id).to_string();
     let (Ok(location), Ok(cookie)) = (
@@ -96,7 +100,8 @@ pub async fn login(Extension(state): Extension<ViewerState>) -> Response {
         tracing::error!("the sign-in redirect could not be written as headers");
         return plain(
             StatusCode::INTERNAL_SERVER_ERROR,
-            "the sign-in redirect could not be written",
+            &locale,
+            Msg::SignInRedirectUnwritten,
         );
     };
     let mut response = StatusCode::SEE_OTHER.into_response();
@@ -127,13 +132,14 @@ pub async fn callback(
     headers: HeaderMap,
     Query(query): Query<CallbackQuery>,
 ) -> Response {
+    let locale = locale_of(&state, &headers);
     let Some(id) = state.sessions().cookie_in(&headers, SIGN_IN_COOKIE) else {
-        return plain(StatusCode::BAD_REQUEST, "no sign-in is pending");
+        return plain(StatusCode::BAD_REQUEST, &locale, Msg::NoSignInPending);
     };
     let mut response = match state.sessions().take_pending(&id) {
         Ok(Some(pending)) => redirected(&state, &headers, &pending, &query).await,
-        Ok(None) => plain(StatusCode::BAD_REQUEST, "no sign-in is pending"),
-        Err(error) => return refused(&error),
+        Ok(None) => plain(StatusCode::BAD_REQUEST, &locale, Msg::NoSignInPending),
+        Err(error) => return refused(&locale, &error),
     };
     // NOTE: no specification governs this: our own design; the sign-in is
     // spent either way, so the browser is told to drop its cookie.
@@ -153,6 +159,7 @@ async fn redirected(
     pending: &PendingSignIn,
     query: &CallbackQuery,
 ) -> Response {
+    let locale = &locale_of(state, headers);
     // NOTE: RFC 6749 §10.12: a redirect whose `state` is not the one the
     // request carried is refused before anything else it says is read.
     if !query
@@ -160,44 +167,33 @@ async fn redirected(
         .as_deref()
         .is_some_and(|sent| pending.answers(sent))
     {
-        return plain(
-            StatusCode::BAD_REQUEST,
-            "the sign-in state does not match this session",
-        );
+        return plain(StatusCode::BAD_REQUEST, locale, Msg::SignInStateMismatch);
     }
     if query.error.is_some() {
-        return plain(
-            StatusCode::UNAUTHORIZED,
-            "the OpenID Provider did not sign the operator in",
-        );
+        return plain(StatusCode::UNAUTHORIZED, locale, Msg::ProviderDidNotSignIn);
     }
     let Some(code) = query.code.as_deref() else {
-        return plain(StatusCode::BAD_REQUEST, "the redirect carries no code");
+        return plain(StatusCode::BAD_REQUEST, locale, Msg::RedirectCarriesNoCode);
     };
     let Some(oidc) = state.settings().oidc.as_ref() else {
         return plain(
             StatusCode::SERVICE_UNAVAILABLE,
-            "sign-in is not configured on this console",
+            locale,
+            Msg::SignInNotConfigured,
         );
     };
     let signed_in = match exchange::exchange(state.provider(), oidc, pending, code).await {
         Ok(signed_in) => signed_in,
         Err(error) if error.refuses_the_operator() => {
             tracing::warn!(error = %error, "a sign-in's ID Token was refused");
-            return plain(
-                StatusCode::UNAUTHORIZED,
-                "the OpenID Provider's ID Token did not verify",
-            );
+            return plain(StatusCode::UNAUTHORIZED, locale, Msg::IdTokenDidNotVerify);
         }
         Err(error) => {
             tracing::error!(
                 error = %crate::command::chain(&error),
                 "a sign-in could not be completed at the OpenID Provider"
             );
-            return plain(
-                StatusCode::BAD_GATEWAY,
-                "the sign-in could not be completed at the OpenID Provider",
-            );
+            return plain(StatusCode::BAD_GATEWAY, locale, Msg::SignInNotCompleted);
         }
     };
     // NOTE: no specification governs this: our own design; a new sign-in ends
@@ -205,18 +201,19 @@ async fn redirected(
     if let Some(replaced) = state.sessions().cookie_in(headers, COOKIE)
         && let Err(error) = state.sessions().end(&replaced)
     {
-        return refused(&error);
+        return refused(locale, &error);
     }
     let id = match state.sessions().establish(signed_in) {
         Ok(id) => id,
-        Err(error) => return refused(&error),
+        Err(error) => return refused(locale, &error),
     };
     let Ok(cookie) = HeaderValue::from_str(&state.sessions().session_cookie(&id).to_string())
     else {
         tracing::error!("the session cookie could not be written as a header");
         return plain(
             StatusCode::INTERNAL_SERVER_ERROR,
-            "the session could not be begun",
+            locale,
+            Msg::SessionNotBegun,
         );
     };
     let mut response = StatusCode::SEE_OTHER.into_response();
@@ -228,23 +225,27 @@ async fn redirected(
 }
 
 /// The answer to a session store that failed.
-fn refused(error: &SessionError) -> Response {
+fn refused(locale: &Locale, error: &SessionError) -> Response {
     match error {
-        SessionError::Full => plain(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "the console holds as many sessions as it may; try again later",
-        ),
+        SessionError::Full => plain(StatusCode::SERVICE_UNAVAILABLE, locale, Msg::SessionsFull),
         SessionError::Random | SessionError::Poisoned => {
             tracing::error!(%error, "a sign-in session could not be begun");
             plain(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "a sign-in session could not be begun",
+                locale,
+                Msg::SignInSessionNotBegun,
             )
         }
     }
 }
 
 /// A plain-text answer that no cache keeps.
-fn plain(status: StatusCode, text: &'static str) -> Response {
+fn plain(status: StatusCode, locale: &Locale, msg: Msg) -> Response {
+    let text = tr_in(catalog(), locale, msg);
     (status, [(CACHE_CONTROL, "no-store")], text).into_response()
+}
+
+/// The locale of a request to a sign-in route with `headers`.
+fn locale_of(state: &ViewerState, headers: &HeaderMap) -> Locale {
+    negotiated(headers, state.settings().locale.clone())
 }

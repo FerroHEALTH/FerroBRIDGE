@@ -13,7 +13,9 @@ use std::error::Error;
 
 use base64::Engine as _;
 use ferrobridge_testkit::oidc::{IdTokenClaims, Provider, TokenAnswer};
+use ferrobridge_viewer::locale::{Msg, catalog, tr_in};
 use ferrobridge_viewer::session::Occupancy;
+use ferrohealth_ui::i18n::Locale;
 use http::StatusCode;
 use jsonwebtoken::{Algorithm, Header};
 use secrecy::ExposeSecret as _;
@@ -51,6 +53,23 @@ async fn answers(provider: &Provider, claims: &IdTokenClaims) -> Result<(), Box<
         ..TokenAnswer::bearer(OPERATOR_TOKEN)
     };
     provider.answer_code(&answer).await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_sign_in_refusal_reads_its_words_from_the_catalog_in_the_requested_locale()
+-> Result<(), Box<dyn Error>> {
+    let (_state, service) = console("")?;
+    let mut request = get("/login")?;
+    request.headers_mut().insert(
+        http::header::ACCEPT_LANGUAGE,
+        http::HeaderValue::from_static("qaa, en;q=0.5"),
+    );
+    let (response, body) = send(&service, request).await?;
+    assert_eq!(StatusCode::SERVICE_UNAVAILABLE, response.status());
+    let english = tr_in(catalog(), &Locale::english(), Msg::SignInNotConfigured);
+    assert_eq!(english, body);
+    assert_eq!("sign-in is not configured on this console", body);
     Ok(())
 }
 

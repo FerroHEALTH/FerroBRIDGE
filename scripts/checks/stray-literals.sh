@@ -19,8 +19,8 @@
 #
 # A single lower-case word in code (`=> "fatal"`) reads as a key and is
 # passed over, so a word drawn that way is review's to catch. Lines that
-# speak to a developer are passed over: `expect(`, log macros,
-# `write!(f`, `f.write_str(`, `debug_struct(`, `.field(`, a lint's `reason`, assertions and
+# speak to a developer are passed over: `expect(`, log macros (every line
+# of one that rustfmt breaks after its `!(`), `write!(f`, `f.write_str(`, `debug_struct(`, `.field(`, a lint's `reason`, assertions and
 # attributes. A literal the check reads wrong is allowed by a line of the
 # allow file, and a file the check does not cover is skipped there:
 #
@@ -116,14 +116,17 @@ found="$(
     }
     FNR == 1 {
       off = 0
+      inlog = 0
       for (i = 1; i <= nskip; i++) if (index(FILENAME, skip[i]) == 1) off = 1
       if ($0 ~ /@generated/) off = 1
     }
     off { next }
+    inlog { if ($0 ~ /^[ \t]*\)[;,]?[ \t]*$/) inlog = 0; next }
+    /(info|warn|error|debug|trace)!\([ \t]*$/ { inlog = 1; next }
     /^#\[cfg\(test\)\]/ { off = 1; next }
     /^[ \t]*\/\// { next }
     /^[ \t]*#!?\[/ { next }
-    /reason = "|expect\(|logging::|warn!\(|error!\(|debug!\(|log!\(|write!\(f|write_str\(|debug_struct\(|\.field\(|assert|panic!\(|unreachable!\(|include_str!\(/ { next }
+    /reason = "|expect\(|logging::|info!\(|warn!\(|error!\(|debug!\(|trace!\(|log!\(|write!\(f|write_str\(|debug_struct\(|\.field\(|assert|panic!\(|unreachable!\(|include_str!\(/ { next }
     {
       code = $0
       while ((s = index(code, "r#\"")) > 0) {

@@ -19,6 +19,7 @@ use secrecy::{ExposeSecret as _, SecretString};
 use url::Url;
 
 use crate::config::settings::OidcSettings;
+use crate::locale::Msg;
 use crate::server::ViewerState;
 use crate::session::COOKIE;
 
@@ -52,10 +53,12 @@ pub fn end_session_request(oidc: &OidcSettings, id_token: Option<&SecretString>)
 /// cookie, and redirects to the provider's end-session endpoint or to the
 /// landing page.
 pub async fn logout(Extension(state): Extension<ViewerState>, headers: HeaderMap) -> Response {
+    let locale = super::locale_of(&state, &headers);
     let Some(oidc) = state.settings().oidc.as_ref() else {
         return super::plain(
             StatusCode::SERVICE_UNAVAILABLE,
-            "sign-in is not configured on this console",
+            &locale,
+            Msg::SignInNotConfigured,
         );
     };
     let sessions = state.sessions();
@@ -66,7 +69,8 @@ pub async fn logout(Extension(state): Extension<ViewerState>, headers: HeaderMap
             tracing::error!(%error, "a session could not be ended");
             return super::plain(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "the session could not be ended",
+                &locale,
+                Msg::SessionNotEnded,
             );
         }
     };
@@ -80,7 +84,8 @@ pub async fn logout(Extension(state): Extension<ViewerState>, headers: HeaderMap
         tracing::error!("the sign-out redirect could not be written as headers");
         return super::plain(
             StatusCode::INTERNAL_SERVER_ERROR,
-            "the sign-out redirect could not be written",
+            &locale,
+            Msg::SignOutRedirectUnwritten,
         );
     };
     let mut response = StatusCode::SEE_OTHER.into_response();

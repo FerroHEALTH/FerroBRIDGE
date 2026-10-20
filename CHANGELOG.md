@@ -221,6 +221,14 @@ crates on crates.io.
 
 ### Changed
 
+- Every word the operator console shows now comes from its catalog
+  (#956): the faults and refusals it draws in a page, the severity of a
+  diagnostic, and the plain-text answers of sign-in, sign-out and a
+  request from outside its pages, which follow the request's
+  `Accept-Language` like the pages do. English is the one catalog, so the
+  words are unchanged, and a language joins as one catalog file. The
+  stray-literal check in CI now holds the console to no string outside the
+  catalog, with a reason recorded for each protocol token it allows.
 - A reference the facade could not fetch now refuses the request with
   `502 Bad Gateway` when a mapping reads it (#94): a sending site that
   answers a status other than `404` or `410`, times out, or answers a body
