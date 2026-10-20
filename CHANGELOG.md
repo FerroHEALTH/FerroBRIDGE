@@ -376,6 +376,12 @@ crates on crates.io.
 
 ### Fixed
 
+- A facade write, transaction or `$validate` whose mapping run fails because
+  the terminology server failed (no answer, a timeout, a `5xx`, a refused
+  `$translate` or `$lookup`, an answer that does not decode) now answers
+  `502` with `transient` and the upstream status in the diagnostics (#1094).
+  It answered `422` with `processing`, as if the resource were wrong. A
+  translation the server answers with no match stays the mapping's `422`.
 - A FHIRconnect `DV_INTERVAL<DV_DATE_TIME>` whose present bound is excluded
   is refused going out to `Period` (#1076), because both R4 `Period` bounds
   are inclusive; it was written as an inclusive bound with no loss declared.
