@@ -264,6 +264,19 @@ crates on crates.io.
   template does not carry, and a method an extension contributes are still
   refused. `WebTemplateIndex::archetype_defines` is the new
   `openehr-mapping-core` call behind it.
+- A FHIRconnect mapping onto `$composition/context/end_time` now compiles and
+  round-trips (#1043). The engine writes `EVENT_CONTEXT.end_time` as the
+  `_end_time` family of the `context` node, as Simplified Formats master05
+  §EVENT_CONTEXT spells it, and reads it back from the context, where it was
+  refused with `fc-uncarried-tail`.
+- A FHIRconnect path that names an `ELEMENT` the Web Template compacts into
+  its value now reaches the element's `links` (#1042), as
+  `FHIRReference.adoc` §Dedicated Node writes `$openehrRoot/links` below an
+  element. A `link` there writes the element's `_link:i` family and reads it
+  back from the element, and a condition on `links` reads the element's list;
+  the resolver used to walk `links` on the value's class and refuse it.
+  `openehr-mapping-core` gains `WebTemplateIndex::read_element` and
+  `PathError::NotAnElementValue`.
 - Two sibling FHIRconnect mapping methods that share a name now compile with
   an `fc-duplicate-method-name` warning, and the refusal moves to the
   `overwrite` or `appendTo` that names the shared name (#1041). FHIRconnect

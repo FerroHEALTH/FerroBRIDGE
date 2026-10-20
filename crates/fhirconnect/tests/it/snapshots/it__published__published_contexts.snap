@@ -106,9 +106,6 @@ projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:33 fc-uncarried-tail
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:65 fc-uncarried-tail
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:87 fc-uncarried-tail
-    model/cluster/org.openehr/specimen.v1.yml:110 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:119 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:131 fc-unknown-template-node
     model/cluster/org.openehr/specimen.v1.yml:139 fc-ambiguous-template-node
     model/cluster/org.openehr/specimen.v1.yml:152 fc-ambiguous-template-node
     model/cluster/org.openehr/specimen.v1.yml:156 fc-unknown-template-node
@@ -131,7 +128,6 @@ projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:62 fc-unknown-template-node
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:64 fc-unknown-template-node
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:70 fc-unknown-template-node
-    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:86 fc-uncarried-tail
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:98 fc-unknown-fhir-element
     model/observation/org.openehr/laboratory_test_result.v1.yml:120 fc-anchor-without-children
     model/observation/org.openehr/laboratory_test_result.v1.yml:142 fc-unknown-fhir-element
@@ -143,7 +139,6 @@ projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
     model/observation/org.openehr/laboratory_test_result.v1.yml:61 fc-unknown-template-node
     model/observation/org.openehr/laboratory_test_result.v1.yml:77 fc-uncarried-tail
     model/observation/org.openehr/laboratory_test_result.v1.yml:79 fc-uncarried-tail
-    model/observation/org.openehr/laboratory_test_result.v1.yml:91 fc-uncarried-tail
     projects/org.highmed/KDS/laborbericht/KDS_composition.yml:65 fc-nested-extension-method
     projects/org.highmed/KDS/laborbericht/KDS_laborbericht.yml:56 fc-unknown-extension-target
 projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml

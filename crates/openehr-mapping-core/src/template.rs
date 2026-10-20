@@ -450,6 +450,12 @@ pub enum PathError {
         /// The template the composition names.
         found: String,
     },
+    /// The node is no value an `ELEMENT` holds, so it has no element to read.
+    #[error("`{aql_path}` names no value an ELEMENT holds")]
+    NotAnElementValue {
+        /// The `aqlPath` of the node.
+        aql_path: String,
+    },
 }
 
 impl PathError {
@@ -469,6 +475,7 @@ impl PathError {
             Self::UnknownPath { .. }
             | Self::UnknownNode { .. }
             | Self::NotADescendant { .. }
+            | Self::NotAnElementValue { .. }
             | Self::OccurrenceCount { .. } => DiagnosticCode::UnknownTemplatePath,
             Self::CompositionBuild { .. }
             | Self::InstanceIndex { .. }

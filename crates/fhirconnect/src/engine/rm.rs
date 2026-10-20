@@ -367,9 +367,10 @@ fn held(declared_type: &str) -> Option<Carried> {
     }
 }
 
-// TODO(#618): the `_provider` and `_health_care_facility` families are spelled
-// here and in `family::provider` until openehr-sdt honours `|raw` on
-// `_`-prefixed attribute families (sibling request S1).
+// TODO(#618): the `_provider`, `_health_care_facility` and `_end_time`
+// families are spelled here and in `family::provider` and `family::end_time`
+// until openehr-sdt honours `|raw` on `_`-prefixed attribute families
+// (sibling request S1).
 /// The attributes of a structural class FLAT writes as a `_`-prefixed family
 /// of the class's node.
 ///
@@ -381,10 +382,12 @@ fn held(declared_type: &str) -> Option<Carried> {
 /// `EVENT_CONTEXT.health_care_facility` is a `PARTY_IDENTIFIED`
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/ehr.html#_event_context_class>),
 /// spelled `_health_care_facility` under the `context` node (the same file,
-/// the `EVENT_CONTEXT` section).
+/// the `EVENT_CONTEXT` section), and `EVENT_CONTEXT.end_time` is an optional
+/// `DV_DATE_TIME` the same section spells `_end_time`.
 pub const FAMILIES: &[(&str, &str)] = &[
     ("ENTRY", "provider"),
     ("EVENT_CONTEXT", "health_care_facility"),
+    ("EVENT_CONTEXT", "end_time"),
 ];
 
 /// The attributes of a party root a party context maps although no template
@@ -581,5 +584,13 @@ mod tests {
             Some(("EVENT_CONTEXT", Carried::Family))
         );
         assert_eq!(carried("EVENT_CONTEXT", &["location"]), None);
+    }
+
+    #[test]
+    fn the_context_end_time_is_a_family() {
+        assert_eq!(
+            carried("EVENT_CONTEXT", &["end_time"]),
+            Some(("EVENT_CONTEXT", Carried::Family))
+        );
     }
 }
