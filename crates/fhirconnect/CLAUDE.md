@@ -245,9 +245,13 @@ run whose `Defaults` carry
 an `engine::origin::Origin` records the originating system, the source
 resource and every defaulted field in the composition's
 `FEEDER_AUDIT`, in the same order as the `Loss::Defaulted` warnings. A
-`link` target must be an `ehr:` URI, because `LINK.target` is a `DV_EHR_URI`;
-the linked composition of a `link` whose FHIR side is no reference is
-refused, since one run produces one composition.
+`link` target is a `DV_EHR_URI`: an `ehr:` URI is written as it stands, and a
+reference to a resource is the linked composition, read through the
+reference seam and answered by the `engine::linked::LinkedCompositions`
+seam (`Seams::with_linked`) as the `ehr:` URI of the composition the caller
+committed it as, or `Linked::Unmapped`, a `SkipReason::UnmappedLink`. A run
+with no such seam, or a `link` whose FHIR side is no reference, refuses,
+since one run produces one composition.
 
 ## A value travels whole, and the attribute model decides a tail
 

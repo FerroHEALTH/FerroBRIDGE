@@ -28,6 +28,7 @@ use crate::engine::bundle::Entry;
 use crate::engine::bundle::resolve;
 use crate::engine::demographics::Demographics;
 use crate::engine::demographics::NoDemographics;
+use crate::engine::linked::LinkedCompositions;
 use crate::engine::terminology::NoTerminology;
 use crate::engine::terminology::Terminology;
 use crate::engine::traverse::functions::MappingFunctions;
@@ -401,6 +402,16 @@ pub enum ReferenceError {
         /// How many entries it names.
         count: usize,
     },
+    /// The caller could not link the composition of the resource a `link`
+    /// names.
+    #[error("the composition of {reference} could not be linked")]
+    Link {
+        /// The reference the `link` names.
+        reference: String,
+        /// Why the caller could not link it.
+        #[source]
+        source: Box<dyn Error + Send + Sync>,
+    },
     /// The sink could not assign an id.
     #[error("no id could be assigned to the {resource_type} the run creates")]
     Identity {
@@ -430,6 +441,7 @@ pub struct Seams<'seam> {
     terminology: &'seam dyn Terminology,
     demographics: &'seam dyn Demographics,
     resources: Option<&'seam dyn ResourceIdentity>,
+    linked: Option<&'seam dyn LinkedCompositions>,
 }
 
 // NOTE: no specification governs this: our own design, the seams of a run cross
@@ -448,6 +460,7 @@ impl Default for Seams<'_> {
             terminology: &NoTerminology,
             demographics: &NoDemographics,
             resources: None,
+            linked: None,
         }
     }
 }
@@ -533,6 +546,22 @@ impl<'seam> Seams<'seam> {
     #[must_use]
     pub fn resource_identity(&self) -> Option<&'seam dyn ResourceIdentity> {
         self.resources
+    }
+
+    /// Returns these seams with `linked` as where the composition each
+    /// linked resource was committed as
+    /// ([`crate::engine::linked`]).
+    #[must_use]
+    pub fn with_linked(mut self, linked: &'seam dyn LinkedCompositions) -> Self {
+        self.linked = Some(linked);
+        self
+    }
+
+    /// Returns where linked compositions stand, `None` when the run produces
+    /// one composition and refuses a `link` that names a resource.
+    #[must_use]
+    pub fn linked(&self) -> Option<&'seam dyn LinkedCompositions> {
+        self.linked
     }
 }
 

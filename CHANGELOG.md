@@ -25,6 +25,24 @@ crates on crates.io.
 
 ### Added
 
+- FHIRconnect LINKED mappings (#94): a `link` whose FHIR side names a
+  resource, such as a Condition's `encounter`, now commits that resource as a
+  composition of its own through the context its `meta.profile` names, and
+  writes `ehr:/<ehr_id>/compositions/<versioned_object_uid>` into the
+  linking composition's `LINK.target`. A facade create or update runs in two
+  passes, because ITS-REST 1.1.0 lets the CDR, not the client, assign a new
+  composition's id: a probe run finds the linked resources, each is
+  committed as a `POST` would commit it (a replay links the composition the
+  first delivery produced, and a resource this server already serves links
+  where it stands), and the final run writes their URIs. A resource no
+  context maps is a declared loss, `skipped-unmapped-link`. A linking commit
+  the CDR refuses answers its refusal with a warning naming each linked
+  composition it left. A transaction or batch entry that links a resource is
+  refused, since a transaction is one `CONTRIBUTION`, and `$validate` runs
+  the link without committing. The engine gains the
+  `engine::linked::LinkedCompositions` seam (`Seams::with_linked`),
+  `SkipReason::UnmappedLink` and `ReferenceError::Link`; a run with no seam
+  refuses as before. `fhirconnect` 0.1.174.
 - A FHIRconnect mapping can now name the origin of an observation's
   history, `$archetype/data/origin`, which no Web Template node carries
   (#95). The engine writes it as the Simplified Formats `history_origin` of

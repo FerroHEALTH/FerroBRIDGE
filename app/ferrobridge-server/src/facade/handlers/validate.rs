@@ -104,6 +104,9 @@ pub(crate) async fn validate(
     let now = jiff::Timestamp::now().to_string();
     let client = facade.client_for(headers);
     let resolved = crate::facade::references::resolve(facade, &client, inbound.document()).await;
+    // NOTE: R4 operation-resource-validate.html: validation changes nothing, so a linked
+    // composition is answered with the probe URI and never committed (our own design).
+    let linker = crate::facade::ingest::linked::Linker::probing();
     let built = match facade
         .translator()
         .run(Direction::ToOpenehr, |terminology| {
@@ -118,7 +121,8 @@ pub(crate) async fn validate(
                     .with_functions(&Library)
                     .with_terminology(terminology)
                     .with_demographics(facade.demographics())
-                    .with_references(&resolved),
+                    .with_references(&resolved)
+                    .with_linked(&linker),
             )
         })
         .await
