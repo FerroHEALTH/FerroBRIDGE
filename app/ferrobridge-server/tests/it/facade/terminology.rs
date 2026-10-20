@@ -117,6 +117,77 @@ async fn a_terminology_server_failure_refuses_the_write_with_502_and_the_upstrea
     Ok(())
 }
 
+/// Returns a harness whose `$translate` calls reach a terminology server
+/// that answers `503`, with the EHR mounted.
+async fn failing_terminology() -> Result<(Harness, MockServer, tempfile::TempDir), Box<dyn StdError>>
+{
+    let server = MockServer::start().await;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path("/r4/ConceptMap/$translate"))
+        .respond_with(ResponseTemplate::new(503))
+        .mount(&server)
+        .await;
+    let fixtures = translating_fixtures()?;
+    let harness = translating(&fixtures, &server).await?;
+    mount_ehr(&harness.cdr).await;
+    Ok((harness, server, fixtures))
+}
+
+#[tokio::test]
+async fn validate_answers_502_when_the_terminology_server_fails() -> Result<(), Box<dyn StdError>> {
+    // R4 operation-resource-validate.html: the outcome judges the resource,
+    // and a failed terminology server says nothing about it.
+    let (harness, _server, _fixtures) = failing_terminology().await?;
+    let (status, outcome) = call(
+        harness.app(),
+        http::Request::post("/fhir/Condition/$validate")
+            .header(http::header::CONTENT_TYPE, "application/fhir+json")
+            .body(axum::body::Body::from(condition().to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::BAD_GATEWAY, status, "{outcome}");
+    assert!(
+        first_names(&outcome, "transient", &["503", CONCEPT_MAP]),
+        "{outcome}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_transaction_answers_502_when_the_terminology_server_fails()
+-> Result<(), Box<dyn StdError>> {
+    let (harness, _server, _fixtures) = failing_terminology().await?;
+    let bundle = serde_json::json!({
+        "resourceType": "Bundle",
+        "type": "transaction",
+        "entry": [{
+            "fullUrl": "urn:uuid:7c2e0000-0000-4000-8000-0000000000c1",
+            "resource": condition(),
+            "request": { "method": "POST", "url": "Condition" }
+        }]
+    });
+    let (status, outcome) = call(
+        harness.app(),
+        http::Request::post("/fhir")
+            .header(http::header::CONTENT_TYPE, "application/fhir+json")
+            .body(axum::body::Body::from(bundle.to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::BAD_GATEWAY, status, "{outcome}");
+    assert!(
+        first_names(&outcome, "transient", &["503", CONCEPT_MAP]),
+        "{outcome}"
+    );
+    assert!(
+        harness
+            .sent("POST", &format!("/ehr/{EHR_ID}/contribution"))
+            .await
+            .is_none(),
+        "nothing was committed"
+    );
+    Ok(())
+}
+
 #[tokio::test]
 async fn a_refused_translation_refuses_the_write_with_502_and_the_upstream_status()
 -> Result<(), Box<dyn StdError>> {
