@@ -414,3 +414,219 @@ fn a_reference_without_a_literal_is_skipped_whatever_else_it_carries() -> Result
     );
     Ok(())
 }
+/// Returns a synthetic `Encounter` whose one diagnosis references the
+/// synthetic `Condition` and carries `use_code` as its use.
+fn encounter_using(use_code: &str) -> Value {
+    Value::from_serde_json(serde_json::json!({
+        "resourceType": "Encounter",
+        "id": "synthetic-encounter-1",
+        "status": "finished",
+        "class": {"system": "http://terminology.hl7.org/CodeSystem/v3-ActCode", "code": "AMB"},
+        "diagnosis": [{
+            "condition": {"reference": "Condition/synthetic-condition-1"},
+            "use": {"coding": [{
+                "system": "http://example.org/fhir/CodeSystem/ferrobridge-diagnosis-use",
+                "code": use_code
+            }]}
+        }]
+    }))
+}
+
+/// Returns the referenced `Condition` of [`encounter_using`].
+fn referenced_condition() -> Value {
+    Value::from_serde_json(serde_json::json!({
+        "resourceType": "Condition",
+        "id": "synthetic-condition-1",
+        "subject": {"reference": "Patient/synthetic-patient-1"},
+        "code": {"text": "Synthetic problem one"}
+    }))
+}
+
+/// Returns the code of the problem-diagnosis certainty element a
+/// composition holds, the node the worked example's `diagnosisTyp` writes.
+fn diagnosis_use_of(
+    index: &WebTemplateIndex,
+    composition: &CanonicalComposition,
+) -> Result<Option<String>, Box<dyn Error>> {
+    let node = index.node(&AqlPath::new(
+        "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0073]/value",
+    ))?;
+    Ok(index.read(composition, node, &[])?.and_then(|value| {
+        value
+            .get("defining_code")?
+            .get("code_string")?
+            .as_str()
+            .map(String::from)
+    }))
+}
+
+/// Maps `encounter` through the caret fixture with the referenced
+/// `Condition` held by the reference seam.
+fn caret_run(
+    encounter: &Value,
+) -> Result<(CanonicalComposition, WebTemplateIndex), Box<dyn Error>> {
+    let program = compiled("ferrobridge_caret_reference")?;
+    let index = template()?;
+    let mut held = BTreeMap::new();
+    held.insert(
+        String::from("Condition/synthetic-condition-1"),
+        referenced_condition(),
+    );
+    let references = MapReferences(held);
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        encounter,
+        &Seams::default().with_references(&references),
+        &defaults(),
+        &CallContext::new(),
+    )?;
+    Ok((inbound.into_value(), index))
+}
+
+#[test]
+fn the_worked_caret_example_reads_the_diagnosis_use_from_inside_the_reference()
+-> Result<(), Box<dyn Error>> {
+    // basics/path_operators.adoc §Recurrence and parent elements: the
+    // diagnosis type "is contained in the Encounter, while the rest of the
+    // diagnosis is contained in a referenced `Condition`", and `^^.use.coding`
+    // reaches it from inside the reference.
+    let (composition, index) = caret_run(&encounter_using("treatment-diagnosis"))?;
+    assert_eq!(
+        diagnosis_use_of(&index, &composition)?.as_deref(),
+        Some("treatment-diagnosis"),
+        "the Encounter's diagnosis use reached the composition"
+    );
+    assert_eq!(
+        problem_name_of(&index, &composition)?.as_deref(),
+        Some("Synthetic problem one"),
+        "the referenced Condition's code reached the composition"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_worked_caret_example_skips_a_use_its_condition_does_not_list() -> Result<(), Box<dyn Error>>
+{
+    // The example's `fhirCondition` admits `referral-diagnosis` and
+    // `treatment-diagnosis` at `^^.use.coding.code` (Conditions.adoc, `one of`).
+    let (composition, index) = caret_run(&encounter_using("billing"))?;
+    assert_eq!(diagnosis_use_of(&index, &composition)?, None);
+    Ok(())
+}
+
+/// Returns the problem name a composition holds.
+fn problem_name_of(
+    index: &WebTemplateIndex,
+    composition: &CanonicalComposition,
+) -> Result<Option<String>, Box<dyn Error>> {
+    let node = index.node(&AqlPath::new(
+        "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value",
+    ))?;
+    Ok(index
+        .read(composition, node, &[])?
+        .and_then(|value| value.get("value")?.as_str().map(String::from)))
+}
+#[test]
+fn the_worked_caret_example_writes_the_diagnosis_use_beside_the_created_reference()
+-> Result<(), Box<dyn Error>> {
+    // Coming out of openEHR the reference creates the Condition
+    // (Reference.adoc), and `^^.use.coding` writes the use into the Encounter
+    // diagnosis that references it (path_operators.adoc).
+    let program = compiled("ferrobridge_caret_reference")?;
+    let (composition, index) = caret_run(&encounter_using("treatment-diagnosis"))?;
+    let mut ids = BTreeMap::new();
+    ids.insert(
+        String::from("Condition"),
+        String::from("created-condition-1"),
+    );
+    let identities = MapIdentities {
+        ids,
+        seen: Mutex::default(),
+    };
+    let outbound = to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        &composition,
+        &Seams::default().with_identities(&identities),
+        &CallContext::new(),
+    )?;
+    let listed = outbound
+        .value()
+        .get("diagnosis")
+        .and_then(Value::as_array)
+        .ok_or("the Encounter carries its diagnosis")?;
+    assert_eq!(1, listed.len(), "{:?}", outbound.value());
+    let diagnosis = listed.first().ok_or("one diagnosis")?;
+    assert_eq!(
+        diagnosis
+            .get("condition")
+            .and_then(|condition| condition.get("reference"))
+            .and_then(Value::as_str),
+        Some("Condition/created-condition-1")
+    );
+    assert_eq!(
+        diagnosis
+            .get("use")
+            .and_then(|used| used.get("coding"))
+            .and_then(|coding| coding.as_array()?.first())
+            .and_then(|coding| coding.get("code"))
+            .and_then(Value::as_str),
+        Some("treatment-diagnosis"),
+        "the use lands in the diagnosis that references the created Condition"
+    );
+    let created = outbound
+        .created()
+        .first()
+        .ok_or("the run created the Condition")?;
+    assert_eq!(
+        created
+            .get("code")
+            .and_then(|code| code.get("text"))
+            .and_then(Value::as_str),
+        Some("Synthetic problem one")
+    );
+    assert!(
+        created.get("diagnosis").is_none() && created.get("use").is_none(),
+        "nothing of the Encounter leaks into the created Condition: {created:?}"
+    );
+    Ok(())
+}
+#[test]
+fn a_caret_run_reads_only_the_occurrence_the_reference_was_entered_at() -> Result<(), Box<dyn Error>>
+{
+    // `^^` climbs from the referenced Condition to the diagnosis that
+    // references it (path_operators.adoc §Recurrence and parent elements), so
+    // the later diagnosis, which references nothing, cannot overwrite its use.
+    let encounter = Value::from_serde_json(serde_json::json!({
+        "resourceType": "Encounter",
+        "id": "synthetic-encounter-2",
+        "status": "finished",
+        "class": {"system": "http://terminology.hl7.org/CodeSystem/v3-ActCode", "code": "AMB"},
+        "diagnosis": [
+            {
+                "condition": {"reference": "Condition/synthetic-condition-1"},
+                "use": {"coding": [{
+                    "system": "http://example.org/fhir/CodeSystem/ferrobridge-diagnosis-use",
+                    "code": "treatment-diagnosis"
+                }]}
+            },
+            {
+                "condition": {"display": "Synthetic unreferenced diagnosis"},
+                "use": {"coding": [{
+                    "system": "http://example.org/fhir/CodeSystem/ferrobridge-diagnosis-use",
+                    "code": "referral-diagnosis"
+                }]}
+            }
+        ]
+    }));
+    let (composition, index) = caret_run(&encounter)?;
+    assert_eq!(
+        diagnosis_use_of(&index, &composition)?.as_deref(),
+        Some("treatment-diagnosis"),
+        "the referencing diagnosis's own use reached the composition"
+    );
+    Ok(())
+}

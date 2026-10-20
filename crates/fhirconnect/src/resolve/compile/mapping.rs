@@ -128,10 +128,10 @@ impl<'a> Compiler<'a> {
         });
         let openehr =
             with.and_then(|with| self.openehr_side(file, with, scope, &path.field("with")));
+        let anchored = fhir
+            .as_ref()
+            .map_or_else(|| scope.clone(), |target| scope.anchored_at(target));
         let inner = Scope {
-            fhir: fhir
-                .as_ref()
-                .map_or_else(|| scope.fhir.clone(), |target| target.expression().clone()),
             openehr: openehr
                 .as_ref()
                 .map_or_else(|| scope.openehr.clone(), |target| target.path().clone()),
@@ -139,7 +139,7 @@ impl<'a> Compiler<'a> {
             file: file.file().to_path_buf(),
             conceptmap: conceptmap.clone(),
             prefix: name.clone(),
-            ..scope.clone()
+            ..anchored
         };
         let (fhir_condition, openehr_condition) =
             self.conditions(node, scope, fhir.as_ref(), openehr.as_ref(), path);
@@ -331,10 +331,7 @@ impl<'a> Compiler<'a> {
             .map(|target| Target::Openehr(Box::new(target)))
         }?;
         let inner = match root {
-            Target::Fhir(ref target) => Scope {
-                fhir: target.expression().clone(),
-                ..scope.clone()
-            },
+            Target::Fhir(ref target) => scope.anchored_at(target),
             Target::Openehr(ref target) => Scope {
                 openehr: target.path().clone(),
                 ..scope.clone()

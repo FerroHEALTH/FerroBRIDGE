@@ -205,6 +205,27 @@ struct Setting {
 struct Binding {
     fhir: Occurrence,
     openehr: Vec<RmPosition>,
+    /// How many references deep the document the FHIR occurrence indexes
+    /// lies, the program's own resource being `0`.
+    level: usize,
+}
+
+/// A document a `reference` mapping left to run over the resource it
+/// resolved or creates.
+///
+/// A `^` run can climb back out of the referenced resource
+/// (`basics/path_operators.adoc`, §Recurrence and parent elements), so the
+/// document stays reachable with the occurrence the reference was entered at.
+#[derive(Debug)]
+struct Frame {
+    /// The document the reference mapping was written in.
+    document: Value,
+    /// The occurrence of the reference element in that document.
+    occurrence: Occurrence,
+    /// The split pin that document held.
+    pin: Option<(Vec<String>, Occurrence)>,
+    /// The instance counters of that document.
+    counters: BTreeMap<(String, String), usize>,
 }
 
 /// One openEHR value the run produced.
@@ -416,6 +437,9 @@ struct Run<'a, T: Table + ?Sized> {
     chain: Vec<String>,
     /// The references the current reference chain entered, outermost first.
     references: Vec<String>,
+    /// The documents the current reference chain left, outermost first, so
+    /// the frame at index `n` is the document of level `n`.
+    frames: Vec<Frame>,
     /// The resources the run created beside its own.
     created: Vec<Value>,
     /// The literal references a `slotContext` consumed.
@@ -463,6 +487,7 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             counters: BTreeMap::new(),
             chain: Vec::new(),
             references: Vec::new(),
+            frames: Vec::new(),
             created: Vec::new(),
             consumed: Vec::new(),
             pins: Vec::new(),
@@ -492,12 +517,117 @@ impl<T: Table + ?Sized> Run<'_, T> {
     ) -> Location {
         let mut location = Location::default();
         if let Some(target) = fhir {
-            location = location.with_fhir(locate(&self.fhir, target.resolved(), occurrence));
+            location = location.with_fhir(locate(
+                self.document_for(target),
+                target.resolved(),
+                occurrence,
+            ));
         }
         if let Some(target) = openehr {
             location = location.with_openehr(openehr_path(target));
         }
         location
+    }
+
+    /// Returns the FHIR document `target` is rooted in: the current one, or
+    /// the one an enclosing `reference` mapping left.
+    fn document_for(&self, target: &FhirTarget) -> &Value {
+        self.frames
+            .get(target.level())
+            .map_or(&self.fhir, |frame| &frame.document)
+    }
+
+    /// Returns the FHIR document a condition's `targetRoot` is rooted in.
+    fn condition_document(&self, gate: &crate::resolve::program::condition::Condition) -> &Value {
+        match *gate.target() {
+            crate::resolve::program::target::Target::Fhir(ref target) => self.document_for(target),
+            crate::resolve::program::target::Target::Openehr(_) => &self.fhir,
+        }
+    }
+
+    /// Returns the FHIR document `target` is rooted in, to write.
+    fn document_for_mut(&mut self, target: &FhirTarget) -> &mut Value {
+        match self.frames.get_mut(target.level()) {
+            Some(frame) => &mut frame.document,
+            None => &mut self.fhir,
+        }
+    }
+
+    /// Returns the split pin of the document `target` is rooted in.
+    fn pin_for(&self, target: &FhirTarget) -> Option<&(Vec<String>, Occurrence)> {
+        self.frames
+            .get(target.level())
+            .map_or(self.fhir_pin.as_ref(), |frame| frame.pin.as_ref())
+    }
+
+    /// Returns the instance counters of the document of `level`.
+    fn counters_at(&mut self, level: usize) -> &mut BTreeMap<(String, String), usize> {
+        match self.frames.get_mut(level) {
+            Some(frame) => &mut frame.counters,
+            None => &mut self.counters,
+        }
+    }
+
+    /// Returns the binding a mapping whose FHIR side is `target` runs under.
+    ///
+    /// A parent at the target's level binds it. A target a `^` run bound in
+    /// an enclosing document lies under the occurrence that document's
+    /// reference was entered at, whatever the parent inside the reference
+    /// bound.
+    fn scoped(&self, target: Option<&FhirTarget>, parent: &Binding) -> Binding {
+        let Some(target) = target.filter(|target| target.level() != parent.level) else {
+            return parent.clone();
+        };
+        self.frames.get(target.level()).map_or_else(
+            || parent.clone(),
+            |frame| Binding {
+                fhir: frame.occurrence.clone(),
+                openehr: parent.openehr.clone(),
+                level: target.level(),
+            },
+        )
+    }
+
+    /// Enters a document of its own for a `reference` mapping, keeping the
+    /// current one as a frame, and returns the level of the entered one.
+    ///
+    /// Going into openEHR the FHIR side is the input, so the frame keeps the
+    /// split pin and the counters stay with the openEHR output; coming out
+    /// the FHIR side is the output, so the frame keeps the instance counters
+    /// of the document left.
+    fn enter_frame(&mut self, document: Value, occurrence: Occurrence) -> usize {
+        // NOTE: no specification governs this: our own design, the document a
+        // `^` run climbs back into is kept whole beside the occurrence it left.
+        let document = core::mem::replace(&mut self.fhir, document);
+        let (pin, counters) = match self.direction {
+            Direction::FhirToOpenehr => (self.fhir_pin.take(), BTreeMap::new()),
+            Direction::OpenehrToFhir => (None, core::mem::take(&mut self.counters)),
+        };
+        self.frames.push(Frame {
+            document,
+            occurrence,
+            pin,
+            counters,
+        });
+        self.frames.len()
+    }
+
+    /// Leaves the document [`Self::enter_frame`] entered, and returns it.
+    #[expect(
+        clippy::expect_used,
+        reason = "every caller pairs this with the enter_frame it made in the same function, \
+                  so a frame is always there to leave"
+    )]
+    fn leave_frame(&mut self) -> Value {
+        let frame = self
+            .frames
+            .pop()
+            .expect("a reference should leave the frame it entered");
+        match self.direction {
+            Direction::FhirToOpenehr => self.fhir_pin = frame.pin,
+            Direction::OpenehrToFhir => self.counters = frame.counters,
+        }
+        core::mem::replace(&mut self.fhir, frame.document)
     }
 }
 

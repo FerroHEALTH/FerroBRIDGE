@@ -17,6 +17,7 @@ use crate::model::ast::keyword::Direction;
 use crate::resolve::program::binding::ResourceType;
 use crate::resolve::program::mapping::Mapping;
 use crate::resolve::program::mapping::Method;
+use crate::resolve::program::target::FhirTarget;
 use crate::tree::Occurrence;
 
 use crate::tree::element::Table;
@@ -92,6 +93,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     let binding = Binding {
                         fhir: input.clone(),
                         openehr: parent.openehr.clone(),
+                        level: mapping.fhir().map_or(parent.level, FhirTarget::level),
                     };
                     self.enter_reference(mapping, input, resource, mappings, &binding)?;
                     bindings.push(binding);
@@ -155,17 +157,16 @@ impl<T: Table + ?Sized> Run<'_, T> {
         if enters_context && !literal.starts_with('#') && !self.consumed.contains(&literal) {
             self.consumed.push(literal.clone());
         }
-        let outer = core::mem::replace(&mut self.fhir, fetched);
-        let held_pin = self.fhir_pin.take();
+        let level = self.enter_frame(fetched, binding.fhir.clone());
         self.references.push(literal);
         let inner = Binding {
             fhir: Occurrence::default(),
             openehr: binding.openehr.clone(),
+            level,
         };
         let ran = self.mappings(mappings, &inner);
         self.references.pop();
-        self.fhir_pin = held_pin;
-        self.fhir = outer;
+        self.leave_frame();
         ran
     }
 
@@ -251,13 +252,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let Some(target) = mapping.fhir() else {
             return Ok(None);
         };
-        let matches = read(self.table, &self.fhir, target.expression()).map_err(|source| {
-            EngineError::Read {
-                mapping: String::from(mapping.name()),
-                expression: String::from(target.expression().as_str()),
-                source: Box::new(source),
-            }
-        })?;
+        let matches =
+            read(self.table, self.document_for(target), target.expression()).map_err(|source| {
+                EngineError::Read {
+                    mapping: String::from(mapping.name()),
+                    expression: String::from(target.expression().as_str()),
+                    source: Box::new(source),
+                }
+            })?;
         Ok(matches
             .iter()
             .find(|matched| matched.occurrence() == input)
@@ -274,15 +276,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
         mappings: &[Mapping],
         binding: &Binding,
     ) -> Result<(), EngineError> {
-        let outer = core::mem::replace(&mut self.fhir, empty_resource(resource.as_str()));
-        let counters = core::mem::take(&mut self.counters);
+        let level = self.enter_frame(empty_resource(resource.as_str()), binding.fhir.clone());
         let inner = Binding {
             fhir: Occurrence::default(),
             openehr: binding.openehr.clone(),
+            level,
         };
         let ran = self.mappings(mappings, &inner);
-        self.counters = counters;
-        let mut created = core::mem::replace(&mut self.fhir, outer);
+        let mut created = self.leave_frame();
         ran?;
         // NOTE: no specification governs this: our own design, a resource its
         // mappings wrote nothing into carries no content, so no resource and no
@@ -340,9 +341,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
         } else {
             Value::String(String::from(literal))
         };
+        let table = self.table;
         write(
-            self.table,
-            &mut self.fhir,
+            table,
+            self.document_for_mut(target),
             target.expression(),
             &binding.fhir,
             value,

@@ -104,12 +104,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
             return Ok(true);
         };
         match self.direction {
-            Direction::FhirToOpenehr => condition::evaluate(self.table, &self.fhir, gate, false)
-                .map(|verdict| verdict.admits_any())
-                .map_err(|source| EngineError::Condition {
-                    mapping: String::from(mapping.name()),
-                    source: Box::new(source),
-                }),
+            Direction::FhirToOpenehr => {
+                condition::evaluate(self.table, self.condition_document(gate), gate, false)
+                    .map(|verdict| verdict.admits_any())
+                    .map_err(|source| EngineError::Condition {
+                        mapping: String::from(mapping.name()),
+                        source: Box::new(source),
+                    })
+            }
             Direction::OpenehrToFhir => self.openehr_holds(mapping.name(), gate, &binding.openehr),
         }
     }

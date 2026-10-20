@@ -121,6 +121,28 @@ struct Scope {
 }
 
 impl Scope {
+    /// Returns this scope with `$fhirRoot` at `target`, rooted at the
+    /// resource the target is bound in.
+    ///
+    /// A target a `^` run bound in an enclosing resource anchors what is
+    /// written under it in that resource, so the scope climbs out of the
+    /// references it left.
+    fn anchored_at(&self, target: &FhirTarget) -> Self {
+        let climbed = self.enclosing.len().saturating_sub(target.level());
+        let mut scope = Self {
+            fhir: target.expression().clone(),
+            ..self.clone()
+        };
+        if let Some(outer) = climbed
+            .checked_sub(1)
+            .and_then(|index| self.enclosing.get(index))
+        {
+            scope.resource = outer.resource.clone();
+            scope.enclosing = self.enclosing.iter().skip(climbed).cloned().collect();
+        }
+        scope
+    }
+
     /// Returns the dotted name of a method called `name` in this scope.
     fn name_of(&self, name: &str) -> String {
         if self.prefix.is_empty() {

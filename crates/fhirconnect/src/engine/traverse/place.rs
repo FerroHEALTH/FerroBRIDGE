@@ -70,13 +70,13 @@ impl<T: Table + ?Sized> Run<'_, T> {
         openehr: &OpenehrTarget,
         occurrence: &Occurrence,
     ) -> Result<Option<FhirValue>, EngineError> {
-        let matches = read(self.table, &self.fhir, read_at.expression()).map_err(|source| {
-            EngineError::Read {
+        let matches = read(self.table, self.document_for(read_at), read_at.expression()).map_err(
+            |source| EngineError::Read {
                 mapping: String::from(mapping.name()),
                 expression: String::from(read_at.expression().as_str()),
                 source: Box::new(source),
-            }
-        })?;
+            },
+        )?;
         let Some(found) = matches
             .iter()
             .find(|matched| matched.occurrence() == occurrence)
@@ -119,13 +119,13 @@ impl<T: Table + ?Sized> Run<'_, T> {
         pairings: &'mapping [Pairing],
         occurrence: &Occurrence,
     ) -> Result<Option<(&'mapping OpenehrTarget, FhirValue)>, EngineError> {
-        let matches = read(self.table, &self.fhir, read_at.expression()).map_err(|source| {
-            EngineError::Read {
+        let matches = read(self.table, self.document_for(read_at), read_at.expression()).map_err(
+            |source| EngineError::Read {
                 mapping: String::from(mapping.name()),
                 expression: String::from(read_at.expression().as_str()),
                 source: Box::new(source),
-            }
-        })?;
+            },
+        )?;
         let Some(found) = matches
             .iter()
             .find(|matched| matched.occurrence() == occurrence)
@@ -169,13 +169,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
         occurrence: &Occurrence,
         kind: FhirKind,
     ) -> Result<Option<FhirValue>, EngineError> {
-        let matches = read(self.table, &self.fhir, target.expression()).map_err(|source| {
-            EngineError::Read {
-                mapping: String::from(mapping.name()),
-                expression: String::from(target.expression().as_str()),
-                source: Box::new(source),
-            }
-        })?;
+        let matches =
+            read(self.table, self.document_for(target), target.expression()).map_err(|source| {
+                EngineError::Read {
+                    mapping: String::from(mapping.name()),
+                    expression: String::from(target.expression().as_str()),
+                    source: Box::new(source),
+                }
+            })?;
         let Some(found) = matches
             .iter()
             .find(|matched| matched.occurrence() == occurrence)
@@ -245,9 +246,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
             element: element.clone(),
             source: Box::new(source),
         })?;
+        let table = self.table;
         write(
-            self.table,
-            &mut self.fhir,
+            table,
+            self.document_for_mut(target),
             target.expression(),
             &binding.fhir,
             value,
@@ -275,6 +277,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         parent: &Binding,
         inputs: &[Occurrence],
     ) -> Result<Vec<Binding>, EngineError> {
+        let parent = &self.scoped(mapping.fhir(), parent);
         let axes = self.output_axes(mapping);
         let mut bound = parent_depth(parent, self.direction);
         while axes
@@ -312,6 +315,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         axes: &[String],
         taken: Option<usize>,
     ) -> Result<Binding, EngineError> {
+        let level = mapping.fhir().map_or(parent.level, FhirTarget::level);
         let bound = parent_depth(parent, self.direction);
         let mut indices: Vec<usize> = match self.direction {
             // NOTE: an openEHR position is 1-based and an instance index is
@@ -348,7 +352,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 } else {
                     fresh = true;
                     let key = (axis.clone(), render(&indices));
-                    let next = self.counters.entry(key).or_insert(0);
+                    let counters = match self.direction {
+                        Direction::FhirToOpenehr => &mut self.counters,
+                        Direction::OpenehrToFhir => self.counters_at(level),
+                    };
+                    let next = counters.entry(key).or_insert(0);
                     let taken = *next;
                     *next = next.saturating_add(1);
                     taken
@@ -375,11 +383,13 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 Ok(Binding {
                     fhir: input.clone(),
                     openehr: positions,
+                    level,
                 })
             }
             Direction::OpenehrToFhir => Ok(Binding {
                 fhir: Occurrence::new(indices),
                 openehr: rm_positions(mapping.name(), input.indices())?,
+                level,
             }),
         }
     }

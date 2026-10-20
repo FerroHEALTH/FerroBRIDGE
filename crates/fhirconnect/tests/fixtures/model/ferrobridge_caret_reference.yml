@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping in the shape of the worked `^^`
+# example of basics/path_operators.adoc, section Recurrence and parent
+# elements: an Encounter diagnosis whose Condition is referenced, with the
+# diagnosis use read from inside the reference through two carets.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_caret_reference
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Encounter
+
+mappings:
+  - name: "problemDiagnosis"
+    with:
+      fhir: "$resource.diagnosis"
+      openehr: "$archetype"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "referencedDiagnose"
+          with:
+            fhir: "condition.reference"
+            openehr: "$reference"
+          reference:
+            resourceType: "Condition"
+            mappings:
+              - name: "diagnosisName"
+                with:
+                  fhir: "$fhirRoot.code"
+                  openehr: "$archetype/data[at0001]/items[at0002]"
+                  type: "CODEABLECONCEPT"
+              - name: "diagnosisTyp"
+                with:
+                  fhir: "^^.use.coding"
+                  openehr: "$archetype/data[at0001]/items[at0073]"
+                fhirCondition:
+                  targetRoot: "^^.use.coding.code"
+                  targetAttribute: "value"
+                  operator: "one of"
+                  criteria:
+                    - "referral-diagnosis"
+                    - "treatment-diagnosis"
