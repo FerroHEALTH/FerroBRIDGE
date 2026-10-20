@@ -265,6 +265,14 @@ crates on crates.io.
   out (an `ITEM_TREE` under an entry, for example) by its term definition in
   the template, where it named it by its node id before (RM Common IM,
   `LOCATABLE.name`). The `openehr-sdt` 0.0.89 builder does this.
+- `ferrohealth-smart` 0.3.1 and the `openehr-*` crates 0.0.90 (#1062),
+  which `ferrohealth-smart` 0.3.1 pins; `fhirconnect` 0.1.168 and
+  `openehr-mapping-core` 0.1.124 build on them. The facade and the operator
+  API refuse a token whose `sub` is empty or whitespace only (RFC 9068
+  §2.2, RFC 7519 §4.1.2) and a bearer value outside the RFC 6750 §2.1 `b64token` syntax,
+  each with the generic `401 invalid_token`. An enabled `[auth]` section
+  with Basic users and no issuer is refused at load: the discovery document
+  and the `CapabilityStatement` name the issuer's token endpoint.
 - `ferrohealth-smart` 0.2.0 (#1018). The SMART discovery document writes
   `issuer` and `sso-openid-connect` only when `[auth] capabilities` names
   `sso-openid-connect`; SMART App Launch 2.2.0 (Conformance, Metadata) omits

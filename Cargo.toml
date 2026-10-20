@@ -47,10 +47,10 @@ rust_decimal = { version = "1.43.0", default-features = false, features = ["std"
 regex = "1.13.1"
 # The openEHR RM model and the BASE path parser: the code conforms to RM
 # Release 1.1.0 and compiles against the `v1_2` generation (docs/VERSIONS.md).
-openehr-rm = "0.0.89"
+openehr-rm = "0.0.90"
 # The BASE identification types the RM leaves to it: TERMINOLOGY_ID is a
 # CODE_PHRASE field, so a lens that builds one names this crate.
-openehr-base = "0.0.89"
+openehr-base = "0.0.90"
 # anyhow is a binary-only error type (.claude/rules/rust-style.md).
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
@@ -68,7 +68,7 @@ socket2 = "0.6.5"
 # version: cargo resolves the path locally and the version on crates.io.
 fhir-types = { path = "crates/fhir-types", version = "0.1.127", default-features = false }
 hl7v2-types = { path = "crates/hl7v2-types", version = "0.0.0" }
-openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "0.1.123" }
+openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "0.1.124" }
 # The health and operator documents the server writes and the console reads.
 ferrobridge-operator-api = { path = "crates/ferrobridge-operator-api", version = "0.0.0" }
 # The OMOP CDM layer, taken metadata-only by default: a consumer that writes
@@ -90,7 +90,7 @@ ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2" }
 # The FHIRconnect language crate: the facade, the operations surface and the
 # published ferrobridge-hl7v2 consume it, so the requirement carries both a
 # path and a version.
-fhirconnect = { path = "crates/fhirconnect", version = "0.1.167" }
+fhirconnect = { path = "crates/fhirconnect", version = "0.1.168" }
 # The OMOCL language crate: the ETL runner is its one in-process consumer, so
 # the requirement is path-only too.
 omocl = { path = "crates/omocl" }
@@ -101,16 +101,16 @@ omocl = { path = "crates/omocl" }
 # .claude/rules/codegen.md forbids. From 0.0.69 the Simplified Data Template
 # engines (FLAT, STRUCTURED, Web Template, TDD, RM-instance validation) live in
 # openehr-sdt, taken without its `cache` feature (`moka`).
-openehr-its = { version = "0.0.89", default-features = false, features = ["opt14", "json", "rest", "rest-client"] }
-openehr-sdt = { version = "0.0.89", default-features = false, features = ["flat"] }
-openehr-am = "0.0.89"
+openehr-its = { version = "0.0.90", default-features = false, features = ["opt14", "json", "rest", "rest-client"] }
+openehr-sdt = { version = "0.0.90", default-features = false, features = ["flat"] }
+openehr-am = "0.0.90"
 # The AQL 1.1.0 parser: the ETL checks its configured queries at load
 # (docs/architecture.md section 5.4). Verified against crates.io on 2026-09-25.
-openehr-query = "0.0.89"
+openehr-query = "0.0.90"
 # The ADL 2 parser: openehr-mapping-core compiles its ADL 2 test fixtures from
 # their .adls sources with it, and the server reads the archetype HRID an adl2
 # template ETag carries with its `hrid::parse_hrid`.
-openehr-adl = "0.0.89"
+openehr-adl = "0.0.90"
 # The HTTP client for the CDR wire. reqwest 0.13 spells the rustls selection
 # "rustls"; it carries its own platform verifier and aws-lc-rs provider.
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "http2"] }
@@ -118,10 +118,10 @@ backon = "1.6.0"
 # The FerroHEALTH family's SMART App Launch and OAuth 2.0 resource-server
 # crate: the token check of the facade and the operator API, the scopes, the
 # audit line, and the client credentials token of the CDR and terminology
-# lanes. Pinned exactly; verified against crates.io on 2026-10-20 (0.2.0,
+# lanes. Pinned exactly; verified against crates.io on 2026-10-20 (0.3.1,
 # published 2026-10-20). `fetch` reads each issuer's metadata and key set
 # and runs the client credentials token client.
-ferrohealth-smart = { version = "=0.2.0", default-features = false, features = ["axum", "fetch"] }
+ferrohealth-smart = { version = "=0.3.1", default-features = false, features = ["axum", "fetch"] }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off. Verified against crates.io on 2026-10-16 (11.1.0,
