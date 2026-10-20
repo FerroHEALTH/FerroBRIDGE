@@ -76,14 +76,40 @@ pub(crate) fn render(diagnostics: &[Diagnostic]) -> String {
         .iter()
         .map(|diagnostic| {
             format!(
-                "{} {}: {}",
+                "{} {} {}: {}",
                 diagnostic.file().display(),
+                diagnostic.severity(),
                 diagnostic.code(),
                 diagnostic.message()
             )
         })
         .collect::<Vec<String>>()
         .join("; ")
+}
+
+/// Renders diagnostics as sorted `file:line severity code` rows, the file by
+/// its name, so a warning never reads as a refusal.
+pub(crate) fn rows(diagnostics: &[Diagnostic]) -> Vec<String> {
+    let mut found: Vec<String> = diagnostics
+        .iter()
+        .map(|diagnostic| {
+            let file = diagnostic
+                .file()
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let line = diagnostic
+                .position()
+                .map_or(0, openehr_mapping_core::position::Position::line);
+            format!(
+                "{file}:{line} {} {}",
+                diagnostic.severity(),
+                diagnostic.code()
+            )
+        })
+        .collect();
+    found.sort();
+    found
 }
 
 /// A compiled program with the published files of the library it loads,

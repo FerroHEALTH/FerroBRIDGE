@@ -22,7 +22,6 @@ use fhirconnect::model::semantic::StaticMappingCodes;
 use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
 use openehr_mapping_core::composition::CanonicalComposition;
-use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::template::TemplateSource;
@@ -30,6 +29,7 @@ use openehr_mapping_core::template::TemplateSource;
 use crate::laws;
 use crate::support::FIXTURES;
 use crate::support::render;
+use crate::support::rows;
 
 /// The vendored mapping library, relative to this crate's manifest.
 const CORPUS: &str = concat!(
@@ -132,26 +132,6 @@ pub(crate) fn kds_person_program() -> Result<(Arc<Program>, WebTemplateIndex), B
 pub(crate) fn kds_person_chain() -> Result<crate::support::Chain, Box<dyn Error>> {
     let (program, _) = kds_person_program()?;
     Ok((PUBLISHED, program))
-}
-
-/// Renders diagnostics as sorted `file:line code` rows, the file by its name.
-fn rows(diagnostics: &[Diagnostic]) -> Vec<String> {
-    let mut found: Vec<String> = diagnostics
-        .iter()
-        .map(|diagnostic| {
-            let file = diagnostic
-                .file()
-                .file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            let line = diagnostic
-                .position()
-                .map_or(0, openehr_mapping_core::position::Position::line);
-            format!("{file}:{line} {}", diagnostic.code())
-        })
-        .collect();
-    found.sort();
-    found
 }
 
 /// Returns the synthetic MII Person `Patient` of the testkit.
@@ -273,7 +253,7 @@ fn the_published_person_context_names_an_extension_no_file_carries() -> Result<(
     };
     assert_eq!(
         rows(&diagnostics),
-        vec!["person.context.yaml:29 fc-unknown-mapping-reference"]
+        vec!["person.context.yaml:29 error fc-unknown-mapping-reference"]
     );
     assert!(
         diagnostics
@@ -304,7 +284,7 @@ fn the_published_admin_entry_extension_names_a_function_the_engine_lacks()
     let found = rows(&diagnostics);
     assert!(
         found.contains(&String::from(
-            "KDS_admin_entry_person.yml:23 fc-unknown-mapping-code"
+            "KDS_admin_entry_person.yml:23 error fc-unknown-mapping-code"
         )),
         "{found:?}"
     );
