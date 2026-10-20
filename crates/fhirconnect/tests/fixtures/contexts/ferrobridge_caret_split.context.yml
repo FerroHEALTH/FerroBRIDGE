@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The context that compiles the caret split model mappings beside this file
+# against the synthetic ferrobridge.diagnose.v1 template of the testkit.
+# The profile URL is example.org, which RFC 6761 section 6.5 reserves for
+# examples.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_caret_split.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://example.org/fhir/StructureDefinition/ferrobridge-caret-split"
+  template:
+    id: "ferrobridge.diagnose.v1"
+  archetypes:
+    - "ferrobridge_caret_split"
+    - "ferrobridge_caret_split_location"
+  start: "ferrobridge_caret_split"

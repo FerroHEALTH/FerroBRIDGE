@@ -156,13 +156,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
         target: &FhirTarget,
         occurrence: &Occurrence,
     ) -> Result<Option<Value>, EngineError> {
-        let matches = read(self.table, &self.fhir, target.expression()).map_err(|source| {
-            EngineError::Read {
-                mapping: String::from(mapping.name()),
-                expression: String::from(target.expression().as_str()),
-                source: Box::new(source),
-            }
-        })?;
+        let matches =
+            read(self.table, self.document_for(target), target.expression()).map_err(|source| {
+                EngineError::Read {
+                    mapping: String::from(mapping.name()),
+                    expression: String::from(target.expression().as_str()),
+                    source: Box::new(source),
+                }
+            })?;
         Ok(matches
             .iter()
             .find(|matched| matched.occurrence() == occurrence)
@@ -192,9 +193,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
             }
             (_, element) => element,
         };
+        let table = self.table;
         write(
-            self.table,
-            &mut self.fhir,
+            table,
+            self.document_for_mut(target),
             target.expression(),
             &binding.fhir,
             merged,

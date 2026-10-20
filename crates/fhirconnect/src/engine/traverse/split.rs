@@ -202,19 +202,21 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 node: String::from(node.node().aql_path().as_str()),
             }));
         }
-        let matches = read(self.table, &self.fhir, with.expression()).map_err(|source| {
-            EngineError::Read {
-                mapping: String::from(model),
-                expression: String::from(with.expression().as_str()),
-                source: Box::new(source),
-            }
-        })?;
+        let parent_scope = self.scoped(Some(with), parent);
+        let matches =
+            read(self.table, self.document_for(with), with.expression()).map_err(|source| {
+                EngineError::Read {
+                    mapping: String::from(model),
+                    expression: String::from(with.expression().as_str()),
+                    source: Box::new(source),
+                }
+            })?;
         let mut groups: Vec<(Vec<String>, Vec<Occurrence>)> = Vec::new();
         for matched in matches {
             if !matched
                 .occurrence()
                 .indices()
-                .starts_with(parent.fhir.indices())
+                .starts_with(parent_scope.fhir.indices())
             {
                 continue;
             }
@@ -256,10 +258,12 @@ impl<T: Table + ?Sized> Run<'_, T> {
             }
             for occurrence in members {
                 let held = core::mem::replace(&mut self.pins, pins.clone());
-                let held_fhir = self.fhir_pin.replace((with_axes.clone(), occurrence));
+                let held_fhir = self
+                    .pin_at(with.level())
+                    .replace((with_axes.clone(), occurrence));
                 let ran = self.mappings(mappings, parent);
                 self.pins = held;
-                self.fhir_pin = held_fhir;
+                *self.pin_at(with.level()) = held_fhir;
                 ran?;
             }
         }
@@ -340,13 +344,12 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 tuple.push(String::new());
                 continue;
             };
-            let matches = read(self.table, &self.fhir, target.expression()).map_err(|source| {
-                EngineError::Read {
+            let matches = read(self.table, self.document_for(target), target.expression())
+                .map_err(|source| EngineError::Read {
                     mapping: String::from(model),
                     expression: String::from(target.expression().as_str()),
                     source: Box::new(source),
-                }
-            })?;
+                })?;
             let mut texts = Vec::new();
             for matched in &matches {
                 if !matched
