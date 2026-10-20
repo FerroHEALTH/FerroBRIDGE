@@ -25,6 +25,13 @@ crates on crates.io.
 
 ### Added
 
+- The shipped `datatype-pl-to-location` supplement writes PL.11, the
+  assigning authority, into the `identifier.assigner` of each location level
+  the PL carries (#345). The guide's two PL.11 rows address all six levels
+  with a `[1-6].` prefix the guide's notation does not define, so the
+  interpreter still refuses them as `unsupported-target`; the supplement
+  spells them as one row per level under that level's condition. The
+  vendored `hl7v2` corpus loses 22 `unsupported-target` outcomes.
 - `ferrobridge-hl7v2` ships message maps for 18 HL7 v2 structures the
   v2-to-FHIR guide has none for (#637): ADT_A15, ADT_A16, ADT_A21, ADT_A39,
   ADT_A44, ADT_A45, ADT_A60, BAR_P02, BAR_P12, DFT_P03, DFT_P11, MDM_T01,
