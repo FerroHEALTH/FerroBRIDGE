@@ -13,8 +13,12 @@
 //! A `Period` may carry one bound only
 //! (<https://hl7.org/fhir/R4/datatypes.html#Period>), and the reference
 //! model's `Interval` states `lower_unbounded` as the absence of `lower`, so
-//! an absent bound is the unbounded one and is not included. The `DV_QUANTITY`
-//! interval against `Range` is not in this module.
+//! an absent bound is the unbounded one and is not included. Both `Period`
+//! bounds are inclusive (R4 `Period.start` "The boundary is inclusive",
+//! `Period.end` "includes any matching date/time"), so a present bound the
+//! interval excludes has no `Period` that states it and is refused going out,
+//! as the `Range` cell refuses one. The `DV_QUANTITY` interval against `Range`
+//! is not in this module.
 
 use fhir_types::r4::period::Period;
 use fhir_types::r4::primitives::DateTime;
@@ -26,6 +30,7 @@ use crate::engine::lens::Lens;
 use crate::engine::lens::LensError;
 use crate::engine::lens::code_phrase::text_of;
 use crate::engine::lens::date_time::instant;
+use crate::model::ast::keyword::Direction;
 
 /// The name this cell carries in a diagnostic.
 pub const CELL: &str = "DV_INTERVAL<DV_DATE_TIME> against Period";
@@ -41,14 +46,16 @@ impl Lens<DvInterval<DvDateTime>, Period> for DateTimeIntervalLens {
 
     fn get(&self, source: &DvInterval<DvDateTime>) -> Result<Period, LensError> {
         Ok(Period {
-            start: source
-                .lower
-                .as_ref()
-                .map(|lower| DateTime::from(lower.value.clone())),
-            end: source
-                .upper
-                .as_ref()
-                .map(|upper| DateTime::from(upper.value.clone())),
+            start: limit(
+                source.lower.as_ref(),
+                source.lower_included,
+                "DV_INTERVAL.lower_included",
+            )?,
+            end: limit(
+                source.upper.as_ref(),
+                source.upper_included,
+                "DV_INTERVAL.upper_included",
+            )?,
             ..Period::default()
         })
     }
@@ -79,6 +86,28 @@ impl Lens<DvInterval<DvDateTime>, Period> for DateTimeIntervalLens {
     fn fallbacks(&self, _view: &Period) -> Vec<Fallback> {
         Vec::new()
     }
+}
+
+/// Returns the `Period` bound one interval bound reads as, refusing a present
+/// bound the interval excludes.
+fn limit(
+    bound: Option<&DvDateTime>,
+    included: bool,
+    attribute: &'static str,
+) -> Result<Option<DateTime>, LensError> {
+    let Some(bound) = bound else {
+        return Ok(None);
+    };
+    if !included {
+        return Err(LensError::Shape {
+            cell: CELL,
+            attribute,
+            found: String::from("false"),
+            reason: "a Period bound is inclusive",
+            direction: Direction::OpenehrToFhir,
+        });
+    }
+    Ok(Some(DateTime::from(bound.value.clone())))
 }
 
 /// Returns one bound of the interval, `None` when the period leaves it open.
@@ -175,6 +204,47 @@ mod tests {
             Some(String::from("2026-09-13T10:00:00+01:00")),
             "the offset travels byte for byte"
         );
+    }
+
+    #[test]
+    fn an_excluded_lower_bound_has_no_period() {
+        // R4 Period.start: "The boundary is inclusive."
+        let source = DvInterval {
+            lower_included: false,
+            ..interval(Some("2026-09-13"), Some("2026-09-14"))
+        };
+        let error = DateTimeIntervalLens
+            .get(&source)
+            .expect_err("an excluded start is no Period start");
+        assert!(
+            error.to_string().contains("lower_included"),
+            "the refusal names the flag: {error}"
+        );
+    }
+
+    #[test]
+    fn an_excluded_upper_bound_has_no_period() {
+        // R4 Period.end: "The high value includes any matching date/time."
+        let source = DvInterval {
+            upper_included: false,
+            ..interval(Some("2026-09-13"), Some("2026-09-14"))
+        };
+        let error = DateTimeIntervalLens
+            .get(&source)
+            .expect_err("an excluded end is no Period end");
+        assert!(
+            error.to_string().contains("upper_included"),
+            "the refusal names the flag: {error}"
+        );
+    }
+
+    #[test]
+    fn an_absent_bound_needs_no_inclusion() {
+        let source = interval(Some("2026-09-13"), None);
+        let view = DateTimeIntervalLens
+            .get(&source)
+            .expect("an unbounded end is an absent Period end");
+        assert_eq!(view.end, None);
     }
 
     #[test]
