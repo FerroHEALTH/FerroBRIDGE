@@ -11,6 +11,7 @@ use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::ModelPath;
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::position::Position;
+use openehr_rm::v1_2::model;
 
 use crate::model::ast::ModelMappingFile;
 use crate::model::ast::keyword::Direction;
@@ -19,6 +20,7 @@ use crate::resolve::error::ResolveCode;
 use crate::resolve::extensions::diagnostic;
 use crate::resolve::program::mapping::Alternative;
 use crate::resolve::program::mapping::Derived;
+use crate::resolve::program::mapping::EventTime;
 use crate::resolve::program::mapping::Pairing;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
@@ -49,6 +51,29 @@ const EXTENSION_VALUE: &str = "value";
 /// The reference-model class of a leaf of an item structure, whose `value`
 /// holds one data value (openEHR RM, the data structures `ELEMENT` class).
 const ELEMENT: &str = "ELEMENT";
+
+/// The abstract class of an event of a history (openEHR RM, the data
+/// structures `EVENT` class).
+const EVENT: &str = "EVENT";
+
+/// The event a point in time makes (RM data structures, `POINT_EVENT`).
+const POINT_EVENT: &str = "POINT_EVENT";
+
+/// The event a period makes (RM data structures, `INTERVAL_EVENT`).
+const INTERVAL_EVENT: &str = "INTERVAL_EVENT";
+
+/// The attribute of an event that carries its time (RM `EVENT.time`).
+const TIME: &str = "time";
+
+/// The FHIR type a `POINT_EVENT` is written as.
+const DATE_TIME: &str = "dateTime";
+
+/// The FHIR type an `INTERVAL_EVENT` is written as.
+const PERIOD: &str = "Period";
+
+/// The FHIR types `EVENT.adoc` pairs with a `POINT_EVENT` besides `dateTime`,
+/// which go in and have no event class to come out as.
+const POINT_CODES: &[&str] = &["instant", "date", "time"];
 
 impl<'a> Compiler<'a> {
     /// Derives what the data-type cell of a mapping converts, when the
@@ -114,6 +139,9 @@ impl<'a> Compiler<'a> {
         } = sides;
         let class = openehr.leaf_class().unwrap_or(openehr.node().rm_type());
         if derive::is_structural(class) {
+            if let Some(event) = self.event_time(file, fhir, openehr, position, path) {
+                return Some(event);
+            }
             if let Some(polymorphic) = self.element_choice(file, fhir, openehr, position, path) {
                 return Some(polymorphic);
             }
@@ -245,6 +273,95 @@ impl<'a> Compiler<'a> {
             openehr.occurrences().to_vec(),
         );
         Some(Derived::Value { code: pair, target })
+    }
+
+    /// Returns the event time a FHIR time maps onto an `EVENT` node as, when
+    /// the node is one and the FHIR element is a time, a `Period` or a choice
+    /// admitting either.
+    ///
+    /// `types-of-mappings/data-type/EVENT.adoc` §`POINT_EVENT` and
+    /// `INTERVAL_EVENT` pairs `time`, `date`, `dateTime` and `instant` with a
+    /// `POINT_EVENT` and `Period` with an `INTERVAL_EVENT`. Coming out a
+    /// `POINT_EVENT` is written as `dateTime` and an `INTERVAL_EVENT` as
+    /// `Period`, and a node the template narrows to one class takes only its
+    /// own (no specification governs which alternative is written: our own
+    /// design).
+    fn event_time(
+        &mut self,
+        file: &'a ModelMappingFile,
+        fhir: &FhirTarget,
+        openehr: &OpenehrTarget,
+        position: Position,
+        path: &ModelPath,
+    ) -> Option<Derived> {
+        let class = openehr.node().rm_type();
+        if !model::is_a(class, EVENT) || !openehr.tail().segments.is_empty() {
+            return None;
+        }
+        let points = model::is_a(POINT_EVENT, class);
+        let intervals = model::is_a(INTERVAL_EVENT, class);
+        let time = self.event_time_node(openehr)?;
+        let (point, interval) = match *fhir.resolved().location() {
+            Location::Choice(_) => {
+                let variants = match fhir.resolved().moves().last() {
+                    Some(Move::Choice { schema, .. }) => match schema.kind {
+                        Kind::Choice(variants) => variants,
+                        _ => &[],
+                    },
+                    _ => &[],
+                };
+                let point = derive::suffix_of(DATE_TIME, variants).filter(|_| points);
+                let interval = derive::suffix_of(PERIOD, variants).filter(|_| intervals);
+                if point.is_none() && interval.is_none() {
+                    return None;
+                }
+                let mut written = |suffix: Option<&str>| match suffix {
+                    Some(suffix) => self
+                        .derived_target(file, fhir, &format!("as({suffix})"), position, path)
+                        .map(Some),
+                    None => Some(None),
+                };
+                (written(point)?, written(interval)?)
+            }
+            Location::Complex(_) | Location::Primitive(_) => match fhir.resolved().type_code()? {
+                PERIOD if intervals => (None, Some(fhir.clone())),
+                DATE_TIME if points => (Some(fhir.clone()), None),
+                code if points && POINT_CODES.contains(&code) => (None, None),
+                _ => return None,
+            },
+            Location::Attribute
+            | Location::PrimitiveElement
+            | Location::Resource
+            | Location::Deferred => return None,
+        };
+        Some(Derived::Event(Box::new(EventTime::new(
+            fhir.clone(),
+            time,
+            point,
+            interval,
+        ))))
+    }
+
+    /// Returns the `time` node of an `EVENT` node, with the event's axes.
+    ///
+    /// `EVENT.time` is 1..1 (openEHR RM data structures, the `EVENT` class), so
+    /// the node repeats exactly where the event does.
+    fn event_time_node(&self, openehr: &OpenehrTarget) -> Option<OpenehrTarget> {
+        let child = openehr.node().children().iter().find_map(|flat_id| {
+            self.template.node_by_flat_id(flat_id).ok().filter(|child| {
+                child
+                    .rm_path()
+                    .segments
+                    .last()
+                    .is_some_and(|segment| segment.attribute == TIME)
+            })
+        })?;
+        Some(OpenehrTarget::new(
+            child.rm_path().clone(),
+            child.clone(),
+            openehr.tail().clone(),
+            openehr.occurrences().to_vec(),
+        ))
     }
 
     /// Returns the pairs a choice element converts through against a

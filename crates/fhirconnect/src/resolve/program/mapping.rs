@@ -171,6 +171,70 @@ pub enum Derived {
     /// A choice element the `type` key resolves, read and written as the
     /// alternative of that type.
     Declared(Alternative),
+    /// A FHIR time against an `EVENT` node itself, whose class the time
+    /// decides (`types-of-mappings/data-type/EVENT.adoc` §`POINT_EVENT` and
+    /// `INTERVAL_EVENT`).
+    Event(Box<EventTime>),
+}
+
+/// The event time a FHIR time maps onto an `EVENT` node as, in a
+/// [`Derived::Event`] mapping.
+///
+/// Going into openEHR the type of the element (or the alternative of a choice
+/// the document carries) decides the class; coming out the class of the event
+/// picks the target written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EventTime {
+    read: FhirTarget,
+    time: OpenehrTarget,
+    point: Option<FhirTarget>,
+    interval: Option<FhirTarget>,
+}
+
+impl EventTime {
+    /// Pairs the FHIR element the time is read at with the event's `time`
+    /// node, and the targets a `POINT_EVENT` and an `INTERVAL_EVENT` are
+    /// written through.
+    #[must_use]
+    pub const fn new(
+        read: FhirTarget,
+        time: OpenehrTarget,
+        point: Option<FhirTarget>,
+        interval: Option<FhirTarget>,
+    ) -> Self {
+        Self {
+            read,
+            time,
+            point,
+            interval,
+        }
+    }
+
+    /// Returns the FHIR element the time is read at going into openEHR.
+    #[must_use]
+    pub const fn read(&self) -> &FhirTarget {
+        &self.read
+    }
+
+    /// Returns the event's `time` node.
+    #[must_use]
+    pub const fn time(&self) -> &OpenehrTarget {
+        &self.time
+    }
+
+    /// Returns the `dateTime` target a `POINT_EVENT` is written through,
+    /// `None` when the element admits none.
+    #[must_use]
+    pub const fn point(&self) -> Option<&FhirTarget> {
+        self.point.as_ref()
+    }
+
+    /// Returns the `Period` target an `INTERVAL_EVENT` is written through,
+    /// `None` when the element admits none.
+    #[must_use]
+    pub const fn interval(&self) -> Option<&FhirTarget> {
+        self.interval.as_ref()
+    }
 }
 
 /// One pair of a choice alternative and the `ELEMENT` value node it converts
@@ -260,6 +324,16 @@ impl fmt::Display for Derived {
                         pairing.alternative.code,
                         pairing.target.node().rm_type()
                     )?;
+                }
+                Ok(())
+            }
+            Self::Event(ref event) => {
+                write!(f, "event time read {} into {}", event.read, event.time)?;
+                if let Some(ref point) = event.point {
+                    write!(f, " point as {point}")?;
+                }
+                if let Some(ref interval) = event.interval {
+                    write!(f, " interval as {interval}")?;
                 }
                 Ok(())
             }

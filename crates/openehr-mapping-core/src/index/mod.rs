@@ -16,6 +16,7 @@
 //! id, which the Simplified Formats specification carries in its interface
 //! form for an archetype root.
 
+mod amend;
 mod embedded;
 pub mod matching;
 pub mod paths;

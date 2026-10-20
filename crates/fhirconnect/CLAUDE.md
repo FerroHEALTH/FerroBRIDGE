@@ -127,7 +127,12 @@ children after the parent "has been executed". A choice element onto a
 polymorphic `ELEMENT` keeps every pair of an alternative with a value node
 (`Derived::Polymorphic`): going in the document's alternative picks the value
 node, coming out the `_type` the composition holds picks the alternative, and
-an alternative or a class no pair names refuses. Any other untyped mapping
+an alternative or a class no pair names refuses. An untyped mapping of a
+FHIR time onto an `EVENT` node itself is `Derived::Event` (`EVENT.adoc`):
+going in the type picks a `POINT_EVENT` time or an `INTERVAL_EVENT`
+(`engine::traverse::event`), whose `_type`, `width` and `math_function` the
+builder cannot spell on an `EVENT` node, so the engine sets them on the
+built composition (`WebTemplateIndex::amend`). Any other untyped mapping
 onto a structural (`PATHABLE`) node anchors its children, and one with no
 child is a warning, never a silent nothing. Every
 pair in `PAIRS` must name a `FhirKind`; `engine::fhir` tests that.

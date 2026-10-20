@@ -25,6 +25,24 @@ crates on crates.io.
 
 ### Added
 
+- A FHIRconnect mapping that names an `EVENT` node itself, with a FHIR time
+  on the other side, writes and reads the event's time (#1059), as
+  `types-of-mappings/data-type/EVENT.adoc` §POINT_EVENT and INTERVAL_EVENT
+  pairs them. A `dateTime`, `instant` or `date` is a `POINT_EVENT`'s `time`;
+  a `Period` is an `INTERVAL_EVENT` whose `time` is `Period.end`, whose
+  `width` is the span back to `Period.start` and whose `math_function` is
+  the RM default `640|actual|`. A choice element such as `effective[x]`
+  picks the class from the alternative going in and from the event's class
+  coming out. A FHIR `time`, a period with a missing or partial bound, and a
+  non-choice element of the other class are refused; an interval event whose
+  `math_function` is not `actual` declares it as a loss going out.
+  `WebTemplateIndex::amend` edits one node instance of a built composition
+  and validates it again. New variants a consumer matching exhaustively adds
+  arms for: `PathError::AbsentInstance`, `Derived::Event`,
+  `EngineError::EventTime` and `SkipReason::EventFunctionUncarried`.
+  `laboratory_test_result.v1.yml:120` and `:448` no longer warn
+  `fc-anchor-without-children`. `openehr-mapping-core` 0.1.126,
+  `fhirconnect` 0.1.175.
 - A FHIRconnect mapping can now name the origin of an observation's
   history, `$archetype/data/origin`, which no Web Template node carries
   (#95). The engine writes it as the Simplified Formats `history_origin` of
