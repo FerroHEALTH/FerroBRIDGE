@@ -488,6 +488,46 @@ pub struct Uncarried {
     parameter: &'static str,
 }
 
+/// Returns whether the terminology server failed anywhere in `error`'s cause
+/// chain.
+///
+/// A call that reached no answer, a refusal, an answer that does not decode
+/// and a batch entry answered with another operation's outcome are the
+/// server's failure. A request this client could not build or send
+/// ([`Uncarried`], a base URL or a parameter the release lacks) and a question
+/// the probe runs never met ([`Unresolved`]) are this bridge's own, and are
+/// not.
+#[must_use]
+pub fn failed_upstream(error: &(dyn core::error::Error + 'static)) -> bool {
+    let mut cause = Some(error);
+    while let Some(current) = cause {
+        let node: &(dyn core::error::Error + 'static) =
+            match current.downcast_ref::<Arc<dyn core::error::Error + Send + Sync>>() {
+                Some(shared) => &**shared,
+                None => current,
+            };
+        if node.is::<fetch::UnexpectedAnswer>() {
+            return true;
+        }
+        if let Some(failure) = node.downcast_ref::<ferrobridge_term::error::Error>() {
+            return matches!(
+                failure,
+                ferrobridge_term::error::Error::Transport { .. }
+                    | ferrobridge_term::error::Error::Timeout { .. }
+                    | ferrobridge_term::error::Error::ServerFailure { .. }
+                    | ferrobridge_term::error::Error::Unauthorized { .. }
+                    | ferrobridge_term::error::Error::Token { .. }
+                    | ferrobridge_term::error::Error::Renewal { .. }
+                    | ferrobridge_term::error::Error::Refused { .. }
+                    | ferrobridge_term::error::Error::Body { .. }
+                    | ferrobridge_term::error::Error::BatchArity { .. }
+            );
+        }
+        cause = current.source();
+    }
+    false
+}
+
 /// An answer that names no translation.
 fn unresolved() -> ConceptMapTranslateResponse {
     ConceptMapTranslateResponse {

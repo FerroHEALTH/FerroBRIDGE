@@ -26,6 +26,7 @@ mod replay;
 mod search;
 pub(crate) mod stub;
 mod sub_context;
+mod terminology;
 mod transaction;
 mod validate;
 mod vread;

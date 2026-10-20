@@ -667,16 +667,27 @@ pub enum RepresentationError {
 ///
 /// A run refused because a referenced resource could not be fetched
 /// ([`crate::facade::references::Unfetched`]) failed upstream, so it answers
-/// the [`crate::facade::status::UPSTREAM`] row, a `502` with `transient`.
+/// the [`crate::facade::status::UPSTREAM`] row, a `502` with `transient`, and
+/// so does a run refused because the terminology server failed
+/// ([`crate::terminology::failed_upstream`]); the diagnostics carry the
+/// upstream status the failure names.
 #[must_use]
 pub fn engine_refusal(error: &EngineError) -> Refused {
+    let row = status::UPSTREAM;
     if crate::facade::references::unfetched(error).is_some() {
-        let row = status::UPSTREAM;
         return Refused::new(
             row.status(),
             Issue::error(row.issue())
                 .diagnosing(chain(error))
                 .detailing("a resource the mapping reads could not be fetched"),
+        );
+    }
+    if crate::terminology::failed_upstream(error) {
+        return Refused::new(
+            row.status(),
+            Issue::error(row.issue())
+                .diagnosing(chain(error))
+                .detailing("the terminology server failed while the mapping ran"),
         );
     }
     Refused::new(
