@@ -257,7 +257,10 @@ impl AppState {
                         settings.operations.composition_language.clone(),
                         settings.operations.composition_territory.clone(),
                     )
-                    .with_translator(Translator::new(terminology.clone()))
+                    .with_translator(
+                        Translator::new(terminology.clone())
+                            .with_display_fallback(settings.display_fallback),
+                    )
                     .with_demographics(Arc::clone(&demographics)),
             )
         });

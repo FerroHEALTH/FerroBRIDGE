@@ -159,7 +159,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             return self.convert_tail(mapping, target, openehr, &view, binding);
         }
         let held = self.held(&binding.openehr, node.flat_id());
-        let produced = cell::put(
+        let mut produced = cell::put(
             &view,
             node.rm_type(),
             held.as_ref(),
@@ -170,6 +170,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             element: String::from(target.expression().as_str()),
             source: Box::new(source),
         })?;
+        self.resolve_display(mapping, &view, &mut produced)?;
         for taken in &produced.fallbacks {
             self.warnings
                 .push(Warning::fallback(taken, self.locate(mapping, input)));

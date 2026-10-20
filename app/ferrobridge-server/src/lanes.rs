@@ -382,7 +382,9 @@ async fn build_facade(
     let store = facade::identity::redb_store::RedbStore::open(&lane.identity_store)
         .with_context(|| format!("opening {}", lane.identity_store.display()))?;
     let built = facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone())
-        .with_translator(Translator::new(terminology));
+        .with_translator(
+            Translator::new(terminology).with_display_fallback(settings.display_fallback),
+        );
     Ok((
         built
             .with_search(search, lane.search)

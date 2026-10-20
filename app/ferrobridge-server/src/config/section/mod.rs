@@ -305,6 +305,9 @@ pub struct Terminology {
     pub retry: Retry,
     /// The credentials the server expects.
     pub credentials: CredentialsSection,
+    /// Whether a code the server does not know takes `coding.code` as its
+    /// display going into openEHR, rather than refusing the unit.
+    pub display_fallback: bool,
 }
 
 impl Default for Terminology {
@@ -315,6 +318,7 @@ impl Default for Terminology {
             timeout_ms: 30_000,
             retry: Retry::default(),
             credentials: CredentialsSection::default(),
+            display_fallback: false,
         }
     }
 }

@@ -136,6 +136,30 @@ fn the_omocl_directory_is_read_from_the_mappings_section() -> Result<(), Box<dyn
 }
 
 #[test]
+fn the_display_fallback_is_off_unless_the_terminology_lane_turns_it_on()
+-> Result<(), Box<dyn StdError>> {
+    let lane = "[terminology]\nbase_url = \"http://tx.invalid/fhir\"\n";
+    let off = Config::from_sources(Some(lane), &BTreeMap::new())?.resolve()?;
+    assert!(
+        !off.display_fallback,
+        "a code the server does not know refuses"
+    );
+    let on = Config::from_sources(
+        Some(&format!("{lane}display_fallback = true\n")),
+        &BTreeMap::new(),
+    )?
+    .resolve()?;
+    assert!(on.display_fallback);
+    let from_environment = Config::from_sources(
+        Some(lane),
+        &super::env("FERROBRIDGE__TERMINOLOGY__DISPLAY_FALLBACK", "true"),
+    )?
+    .resolve()?;
+    assert!(from_environment.display_fallback);
+    Ok(())
+}
+
+#[test]
 fn the_terminology_lane_accepts_each_release_the_client_speaks() -> Result<(), Box<dyn StdError>> {
     for (spelled, expected) in [
         ("stu3", ferrobridge_term::config::WireVersion::Stu3),

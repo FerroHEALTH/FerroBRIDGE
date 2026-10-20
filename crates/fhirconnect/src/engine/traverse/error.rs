@@ -338,6 +338,31 @@ pub enum EngineError {
         #[source]
         source: Box<TerminologyError>,
     },
+    /// The terminology server failed while the engine asked it for the
+    /// display of a code.
+    #[error("{mapping} could not resolve the display of {code} in {system}")]
+    DisplayLookup {
+        /// The mapping being run.
+        mapping: String,
+        /// The code system.
+        system: String,
+        /// The code.
+        code: String,
+        /// The refusal of the seam.
+        #[source]
+        source: Box<TerminologyError>,
+    },
+    /// The terminology server does not know a code that carries no display,
+    /// and the deployment did not choose the code as its display.
+    #[error("{mapping} found no display for {code} in {system}, and openEHR requires one")]
+    UnknownDisplay {
+        /// The mapping being run.
+        mapping: String,
+        /// The code system.
+        system: String,
+        /// The code.
+        code: String,
+    },
     /// A code the concept map does not translate, at an element the output
     /// requires.
     ///
