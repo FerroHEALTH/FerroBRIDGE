@@ -231,6 +231,13 @@ crates on crates.io.
   `BundleReferences::with_referrer` names the entry whose references it
   resolves. A consumer that matches `ReferenceError` exhaustively adds the
   arm. `fhirconnect` 0.1.161.
+- The FHIRconnect operations answer a refusing identity seam and an id it
+  answers outside the R4 `id` grammar as the server failures they are (#1012):
+  `500` with the issue code `exception` for `OperationError::Identity` and
+  `500` with `value` for `OperationError::InvalidId`, where both were a `400`
+  with `processing`. `OperationError::issue_type` changes for the two
+  variants, and the server's status table names every variant, so a new one
+  is a compile error until it is placed. `fhirconnect` 0.1.162.
 - A `TERM_MAPPING` that a `DV_TEXT` or `DV_CODED_TEXT` value carries out to a
   FHIR `string`, or a `DV_CODED_TEXT` value carries out to a single `Coding`,
   is a declared loss (#623). Those pairs give `mappings` no FHIR row

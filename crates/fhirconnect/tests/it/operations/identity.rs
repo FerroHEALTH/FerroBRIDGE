@@ -135,7 +135,7 @@ fn a_seam_that_refuses_refuses_the_run() -> Result<(), Box<dyn Error>> {
         matches!(error, OperationError::Identity { ref resource, .. } if resource == "Condition"),
         "{error}"
     );
-    assert_eq!(error.issue_type(), "processing");
+    assert_eq!(error.issue_type(), "exception");
     Ok(())
 }
 
@@ -150,6 +150,7 @@ fn a_seam_id_outside_the_id_grammar_is_refused() -> Result<(), Box<dyn Error>> {
         matches!(error, OperationError::InvalidId { ref id, .. } if id == "not an id"),
         "{error}"
     );
+    assert_eq!(error.issue_type(), "value");
     Ok(())
 }
 
