@@ -51,6 +51,16 @@ use sub_contexts::validate_sub_contexts;
 pub trait MappingCodeRegistry: fmt::Debug {
     /// Whether a function of this name is registered.
     fn contains(&self, code: &str) -> bool;
+
+    /// Returns the openEHR ports the function `code` reads and writes, each a
+    /// path relative to the mapping's `with.openehr`, `""` for that node.
+    ///
+    /// The compiler resolves every port against the template at load. A
+    /// registry that knows only names answers `None`, and a mapping that
+    /// names such a function compiles with no port.
+    fn ports(&self, _code: &str) -> Option<&'static [&'static str]> {
+        None
+    }
 }
 
 /// A registry over a fixed set of names.

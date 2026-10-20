@@ -268,7 +268,7 @@ async fn the_list_draws_every_file_with_its_owner_and_a_link_to_it() -> Result<(
         html.contains("read-only") && html.contains("editable"),
         "{html}"
     );
-    assert!(html.contains("1 errors, 0 warnings"), "{html}");
+    assert!(html.contains("1 error, 0 warnings"), "{html}");
     assert!(
         html.contains("not read"),
         "a file the load did not read: {html}"

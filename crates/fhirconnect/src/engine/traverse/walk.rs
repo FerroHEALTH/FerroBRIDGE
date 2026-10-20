@@ -497,7 +497,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 self.chain.pop();
                 Ok(bindings)
             }
-            Method::Programmed { ref code } => self.programmed(mapping, parent, inputs, code),
+            Method::Programmed {
+                ref code,
+                ref ports,
+            } => self.programmed(mapping, parent, inputs, code, ports),
             Method::Reference {
                 ref resource,
                 ref mappings,

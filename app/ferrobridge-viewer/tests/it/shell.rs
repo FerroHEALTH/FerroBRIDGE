@@ -12,7 +12,7 @@ use std::error::Error;
 use axum::body::Body;
 use ferrobridge_testkit::oidc::{Provider, TokenAnswer};
 use ferrobridge_viewer::model::{BridgeView, Outcome, Refusal, ViewError};
-use ferrobridge_viewer::shell::{NAVIGATION, bridge_status};
+use ferrobridge_viewer::shell::{bridge_status, navigation};
 use ferrohealth_ui::tone::Tone;
 use http::{Request, StatusCode};
 use wiremock::matchers::{method, path};
@@ -115,13 +115,14 @@ async fn the_signed_in_shell_carries_the_bar_the_navigation_and_the_footer()
 #[tokio::test]
 async fn the_navigation_draws_its_groups_in_order_and_leaves_an_empty_one_out()
 -> Result<(), Box<dyn Error>> {
-    let titles: Vec<&str> = NAVIGATION.iter().map(|group| group.title).collect();
+    let groups = navigation();
+    let titles: Vec<String> = groups.iter().map(|group| group.title.to_string()).collect();
     assert_eq!(vec!["Overview", "Mappings", "Tools", "Bridge"], titles);
     let bridge = bridge().await;
     let (service, cookie) = signed_in(&bridge).await?;
     let (_response, page) = send(&service, get_with("/", &cookie)?).await?;
     let mut at = 0;
-    for group in NAVIGATION {
+    for group in groups {
         let heading = format!(r#"id="{}""#, group.id);
         match page.find(&heading) {
             Some(found) if !group.entries.is_empty() => {

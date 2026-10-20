@@ -152,6 +152,7 @@ impl<'a> Compiler<'a> {
             })
             .collect();
         let method_kind = self.method(node, &inner, path);
+        let method_kind = self.ports(node, method_kind, openehr.as_ref(), &inner, path);
         let followed_by = self.mappings(&node.followed_by, &inner);
         let data_type = with.and_then(|with| with.data_type.as_ref().map(|kind| *kind.value()));
         let plain =

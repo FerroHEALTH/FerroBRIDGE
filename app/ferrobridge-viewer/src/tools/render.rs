@@ -19,13 +19,14 @@ use leptos::prelude::*;
 
 use crate::bridge::BridgeError;
 use crate::engine::render::parts;
+use crate::locale::{Msg, tr, tr_with};
 
 /// The section of input the console does not send: why, by field.
 #[must_use]
-pub fn invalid(heading: &'static str, reason: &str) -> String {
+pub fn invalid(heading: &str, reason: &str) -> String {
     view! {
         <section class="fui-card">
-            <h2 class="fui-card-title">{heading}</h2>
+            <h2 class="fui-card-title">{heading.to_owned()}</h2>
             {notice(Tone::Bad, Announce::Alert, None, reason.to_owned())}
         </section>
     }
@@ -50,7 +51,7 @@ pub fn bundle(answer: &Result<serde_json::Value, BridgeError>) -> String {
                     let kind = resource
                         .get("resourceType")
                         .and_then(serde_json::Value::as_str)
-                        .unwrap_or("an entry with no resource")
+                        .unwrap_or(&tr(Msg::EntryNoResource))
                         .to_owned();
                     let id = resource
                         .get("id")
@@ -75,15 +76,15 @@ pub fn bundle(answer: &Result<serde_json::Value, BridgeError>) -> String {
             let count = entries.len();
             view! {
                 <section class="fui-card">
-                    <h2 class="fui-card-title">"$tofhir answered"</h2>
-                    <p>{format!("The Bundle holds {count} resources.")}</p>
+                    <h2 class="fui-card-title">{tr(Msg::TofhirAnswered)}</h2>
+                    <p>{tr_with(Msg::BundleHolds, &[("count", count.into())])}</p>
                     <ol class="fui-divided">{items}</ol>
-                    {parts::raw_json("The Bundle as JSON", bundle)}
+                    {parts::raw_json(&tr(Msg::TheBundleAsJson), bundle)}
                 </section>
             }
             .into_any()
         }
-        Err(error) => parts::failed("$tofhir answered", error),
+        Err(error) => parts::failed(&tr(Msg::TofhirAnswered), error),
     };
     ferrohealth_ui::view::surface::stack(section).to_html()
 }
@@ -118,21 +119,21 @@ pub fn composition(answer: &Result<(Parameters, serde_json::Value), BridgeError>
                     .ok()
                     .and_then(|value| serde_json::to_string_pretty(&value).ok())
                     .unwrap_or(text),
-                None => String::from("The answer carries no composition."),
+                None => tr(Msg::AnswerCarriesNoComposition),
             };
             let issues = outcome.as_ref().map(issues_table);
             view! {
                 <section class="fui-card">
-                    <h2 class="fui-card-title">"$toopenehr answered"</h2>
-                    <h3 class="fui-card-title">"Composition"</h3>
-                    {code_panel("The composition", Language::Json, &shown)}
+                    <h2 class="fui-card-title">{tr(Msg::ToopenehrAnswered)}</h2>
+                    <h3 class="fui-card-title">{tr(Msg::Composition)}</h3>
+                    {code_panel(&tr(Msg::TheComposition), Language::Json, &shown)}
                     {issues}
-                    {parts::raw_json("The Parameters as JSON", raw)}
+                    {parts::raw_json(&tr(Msg::TheParametersAsJson), raw)}
                 </section>
             }
             .into_any()
         }
-        Err(error) => parts::failed("$toopenehr answered", error),
+        Err(error) => parts::failed(&tr(Msg::ToopenehrAnswered), error),
     };
     ferrohealth_ui::view::surface::stack(section).to_html()
 }
@@ -144,13 +145,13 @@ pub fn outcome(answer: &Result<(OperationOutcome, serde_json::Value), BridgeErro
     let section = match answer {
         Ok((outcome, raw)) => view! {
             <section class="fui-card">
-                <h2 class="fui-card-title">"$validate answered"</h2>
+                <h2 class="fui-card-title">{tr(Msg::ValidateAnswered)}</h2>
                 {issues_table(outcome)}
-                {parts::raw_json("The OperationOutcome as JSON", raw)}
+                {parts::raw_json(&tr(Msg::TheOperationoutcomeAsJson), raw)}
             </section>
         }
         .into_any(),
-        Err(error) => parts::failed("$validate answered", error),
+        Err(error) => parts::failed(&tr(Msg::ValidateAnswered), error),
     };
     ferrohealth_ui::view::surface::stack(section).to_html()
 }
@@ -195,19 +196,24 @@ fn issues_table(outcome: &OperationOutcome) -> AnyView {
                     <td>
                         <span class=tone>{severity}</span>
                     </td>
-                    <td data-label="Code">
+                    <td data-label=tr(Msg::Code)>
                         <code>{code}</code>
                     </td>
-                    <td data-label="Where">{places}</td>
-                    <td data-label="Message">{said}</td>
+                    <td data-label=tr(Msg::Where)>{places}</td>
+                    <td data-label=tr(Msg::Message)>{said}</td>
                 </tr>
             }
         })
         .collect_view()
         .into_any();
     parts::table(
-        "Issues, by severity",
-        &["Severity", "Code", "Where", "Message"],
+        &tr(Msg::IssuesBySeverity),
+        &[
+            &tr(Msg::Severity),
+            &tr(Msg::Code),
+            &tr(Msg::Where),
+            &tr(Msg::Message),
+        ],
         rows,
     )
 }

@@ -1,6 +1,6 @@
 ---
 name: pr-auto-merge
-description: "Every pull request gets auto-merge enabled the moment it is opened (gh pr merge <n> --auto --squash) so it lands when the conclusion check is green; owner instruction 2026-09-04"
+description: "Every pull request gets auto-merge enabled the moment it is opened (gh pr merge <n> --auto) so it lands when the conclusion check is green; owner instruction 2026-09-04"
 metadata:
   node_type: memory
   type: feedback
@@ -12,7 +12,7 @@ metadata:
 After opening a pull request, enable auto-merge at once:
 
 ```sh
-gh pr create ... && gh pr merge <n> --auto --squash
+gh pr create ... && gh pr merge <n> --auto
 ```
 
 Never leave a pull request waiting for a manual merge.
@@ -25,7 +25,7 @@ hand-off: GitHub merges the moment the check passes. The repository has
 
 **No `--delete-branch`:** `main` has a merge queue, and `gh pr merge` refuses
 the flag there ("Cannot use `-d` or `--delete-branch` when merge queue
-enabled", seen on #934, 2026-10-19). `--auto --squash` arms the queue, which
+enabled", seen on #934, 2026-10-19). `--auto` arms the queue, which
 merges with the strategy `main` sets, and `delete_branch_on_merge` removes
 the remote branch after the merge.
 

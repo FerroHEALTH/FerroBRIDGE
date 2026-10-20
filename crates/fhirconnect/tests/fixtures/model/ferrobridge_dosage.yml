@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping over the dosage cluster whose two
+# mappings name programmed functions: the administration duration and the
+# interval of a non-daily timing, both read from Timing.repeat.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_dosage
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-CLUSTER.dosage.v2
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Dosage
+
+mappings:
+  - name: "duration"
+    with:
+      fhir: "$fhirRoot.timing.repeat"
+      openehr: "$archetype/items[at0102]"
+    mappingCode: "dosageDurationToAdministrationDuration"
+
+  - name: "nonDaily"
+    with:
+      fhir: "$fhirRoot.timing.repeat"
+      openehr: "$archetype/items[openEHR-EHR-CLUSTER.timing_nondaily.v1]"
+    mappingCode: "timingNonDaily"

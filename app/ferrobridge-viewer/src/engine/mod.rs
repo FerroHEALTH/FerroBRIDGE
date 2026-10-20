@@ -16,6 +16,7 @@ use leptos::prelude::*;
 use leptos_meta::Title;
 
 use crate::app::PRODUCT;
+use crate::locale::{Msg, tr};
 use crate::model::ViewError;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -108,7 +109,7 @@ pub async fn mappings() -> Result<String, ViewError> {
 
 /// A screen read through `fetch`, titled `title`: the HTML the server drew,
 /// or the console's fault.
-fn screen<F>(title: &'static str, fetch: fn() -> F) -> impl IntoView
+fn screen<F>(title: String, fetch: fn() -> F) -> impl IntoView
 where
     F: Future<Output = Result<String, ViewError>> + Send + 'static,
 {
@@ -117,13 +118,14 @@ where
 }
 
 /// The page titled `title` that shows what `drawn` answers.
-fn drawn_screen(title: &'static str, drawn: Resource<Result<String, ViewError>>) -> impl IntoView {
+fn drawn_screen(title: String, drawn: Resource<Result<String, ViewError>>) -> impl IntoView {
+    let document = format!("{title} · {PRODUCT}");
     view! {
-        <Title text=format!("{title} · {PRODUCT}") />
+        <Title text=document />
         {ferrohealth_ui::view::surface::page_header(title, None, ())}
         <Suspense fallback=|| {
             ferrohealth_ui::view::empty::busy(
-                "Asking the bridge",
+                tr(Msg::AskingTheBridge),
                 ferrohealth_ui::view::empty::Busy::Section,
             )
         }>
@@ -142,7 +144,7 @@ fn drawn_screen(title: &'static str, drawn: Resource<Result<String, ViewError>>)
 /// The mapping file list page.
 #[component]
 pub fn FilesPage() -> impl IntoView {
-    screen("Mapping files", mapping_files)
+    screen(tr(Msg::MappingFiles), mapping_files)
 }
 
 /// The page of one mapping file, the wire path after `/files/` naming it.
@@ -153,23 +155,23 @@ pub fn FilePage() -> impl IntoView {
     // the empty one, which the bridge client refuses before it asks anything.
     let path = move || params.read().get("path").unwrap_or_default();
     let drawn = Resource::new_blocking(path, mapping_file);
-    drawn_screen("Mapping file", drawn)
+    drawn_screen(tr(Msg::MappingFile), drawn)
 }
 
 /// The dashboard page.
 #[component]
 pub fn DashboardPage() -> impl IntoView {
-    screen("Dashboard", dashboard)
+    screen(tr(Msg::Dashboard), dashboard)
 }
 
 /// The capability page.
 #[component]
 pub fn CapabilityPage() -> impl IntoView {
-    screen("Capability", capability)
+    screen(tr(Msg::Capability), capability)
 }
 
 /// The mappings overview page.
 #[component]
 pub fn MappingsPage() -> impl IntoView {
-    screen("Mappings", mappings)
+    screen(tr(Msg::Mappings), mappings)
 }

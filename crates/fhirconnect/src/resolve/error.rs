@@ -133,6 +133,12 @@ pub enum ResolveCode {
     /// admits no single resource type, so the reference it reads back has no
     /// type to name.
     PartyRefTarget,
+    /// A port a programmed function declares adds a repeating node below the
+    /// mapping's `with.openehr`, so one call would read or write many values.
+    RepeatingFunctionPort,
+    /// A programmed function declares openEHR ports, and the mapping that
+    /// names it writes no `with.openehr` to anchor them.
+    UnanchoredFunctionPort,
 }
 
 impl ResolveCode {
@@ -188,6 +194,8 @@ impl ResolveCode {
             Self::PartyLink => "fc-party-link",
             Self::PartySubContextComposition => "fc-party-sub-context-composition",
             Self::PartyRefTarget => "fc-party-ref-target",
+            Self::RepeatingFunctionPort => "fc-repeating-function-port",
+            Self::UnanchoredFunctionPort => "fc-unanchored-function-port",
         }
     }
 
@@ -243,6 +251,8 @@ impl ResolveCode {
             Self::PartyLink,
             Self::PartySubContextComposition,
             Self::PartyRefTarget,
+            Self::RepeatingFunctionPort,
+            Self::UnanchoredFunctionPort,
         ]
     }
 }

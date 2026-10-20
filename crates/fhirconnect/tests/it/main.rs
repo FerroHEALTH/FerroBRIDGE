@@ -13,6 +13,7 @@ mod engine;
 mod kds_coding;
 mod laborauftrag;
 mod laws;
+mod library;
 mod locations;
 mod model;
 mod operations;

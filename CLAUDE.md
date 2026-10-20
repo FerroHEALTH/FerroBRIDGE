@@ -378,7 +378,10 @@ ships):
 
 Discipline is unchanged for subagents: they obey the hard rules below (never
 hand-edit a generated file, no test-weakening, conventional-type branches, no
-AI attribution). Delegate with a tight spec and verify the result.
+AI attribution). Delegate with a tight spec and verify the result. Every
+worker brief names the worker's own scratch subfolder (`<scratchpad>/<task>/`)
+and forbids the scratchpad root, so one worker never publishes another's file
+(`.claude/memory/worker-scratch-subfolders.md`).
 
 ## IMPORTANT hard rules
 

@@ -32,7 +32,6 @@ use crate::engine::traverse::Run;
 use crate::engine::traverse::Written;
 use crate::engine::traverse::demographic::Shape;
 use crate::engine::traverse::error::EngineError;
-use crate::engine::traverse::functions::MappingCodeError;
 use crate::engine::traverse::place::rm_positions;
 use crate::engine::traverse::translate::Output;
 
@@ -90,39 +89,6 @@ impl<T: Table + ?Sized> Run<'_, T> {
         };
         for (input, binding) in inputs.iter().zip(bindings.iter()) {
             self.convert(mapping, input, binding)?;
-        }
-        Ok(bindings)
-    }
-
-    /// Runs the registered function a `mappingCode` names.
-    pub(super) fn programmed(
-        &mut self,
-        mapping: &Mapping,
-        parent: &Binding,
-        inputs: &[Occurrence],
-        code: &str,
-    ) -> Result<Vec<Binding>, EngineError> {
-        let bindings = self.bindings(mapping, parent, inputs)?;
-        let refuse = |source: MappingCodeError| EngineError::MappingCode {
-            mapping: String::from(mapping.name()),
-            code: String::from(code),
-            source: Box::new(source),
-        };
-        for binding in &bindings {
-            match self.direction {
-                Direction::FhirToOpenehr => {
-                    let produced = self
-                        .seams
-                        .functions()
-                        .to_openehr(code, None)
-                        .map_err(refuse)?;
-                    self.put_openehr(mapping, binding, produced);
-                }
-                Direction::OpenehrToFhir => {
-                    let produced = self.seams.functions().to_fhir(code, None).map_err(refuse)?;
-                    self.put_fhir(mapping, binding, &produced)?;
-                }
-            }
         }
         Ok(bindings)
     }
@@ -244,9 +210,20 @@ impl<T: Table + ?Sized> Run<'_, T> {
         kind: FhirKind,
         text: &str,
     ) -> Result<FhirValue, EngineError> {
+        let refuse = |source: LensError| EngineError::Cell {
+            mapping: String::from(mapping.name()),
+            element: String::from(target.expression().as_str()),
+            source: Box::new(source),
+        };
         // NOTE: a scalar leaf carries text, so only an element that travels as
-        // text takes it; no specification governs this: our own design.
+        // text, or one `String.adoc` writes as text, takes it; no specification
+        // governs the rest: our own design.
         match kind {
+            FhirKind::Coding | FhirKind::Identifier | FhirKind::Reference
+                if openehr.leaf_class() == Some(cell::STRING) =>
+            {
+                cell::get_string(text, kind).map_err(refuse)
+            }
             FhirKind::String
             | FhirKind::Date
             | FhirKind::DateTime
@@ -272,15 +249,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
             | FhirKind::Decimal
             | FhirKind::Count
             | FhirKind::Duration
-            | FhirKind::Attachment => Err(EngineError::Cell {
-                mapping: String::from(mapping.name()),
-                element: String::from(target.expression().as_str()),
-                source: Box::new(LensError::NoCell {
-                    rm_type: String::from(openehr.leaf_class().unwrap_or("String")),
-                    kind: kind.as_str(),
-                    direction: Direction::OpenehrToFhir,
-                }),
-            }),
+            | FhirKind::Attachment => Err(refuse(LensError::NoCell {
+                rm_type: String::from(openehr.leaf_class().unwrap_or(cell::STRING)),
+                kind: kind.as_str(),
+                direction: Direction::OpenehrToFhir,
+            })),
         }
     }
 
@@ -380,7 +353,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
     }
 
     /// Returns the positions one input occurrence names for an openEHR node.
-    fn positions_of(
+    pub(super) fn positions_of(
         mapping: &Mapping,
         input: &Occurrence,
         target: &OpenehrTarget,

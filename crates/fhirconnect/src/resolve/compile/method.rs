@@ -130,6 +130,7 @@ impl<'a> Compiler<'a> {
             }
             return Method::Programmed {
                 code: code.value().clone(),
+                ports: Vec::new(),
             };
         }
         if let Some(ref function) = method.participations_function {

@@ -161,13 +161,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 .to_canonical()
                 .map_err(refuse_rm)?
         } else {
-            let element = String::from(target.resolved().leaf());
-            let text = view.write(&element).map_err(|source| EngineError::Fhir {
-                mapping: String::from(mapping.name()),
-                element: element.clone(),
-                source: Box::new(source),
-            })?;
-            scalar_json(carried, class, node, &text).map_err(refuse_rm)?
+            self.scalar_written(mapping, target, binding, view, (carried, class, node))?
         };
         merge_value(&mut object, &segments, written);
         let kept = object
@@ -187,6 +181,47 @@ impl<T: Table + ?Sized> Run<'_, T> {
         Ok(())
     }
 
+    /// Returns the JSON a FHIR value writes into one scalar attribute of
+    /// `class` below `node`.
+    ///
+    /// A `Coding`, `Identifier` or `Reference` written into a text attribute
+    /// runs the `String.adoc` cells; every other element writes its own
+    /// lexical form.
+    fn scalar_written(
+        &mut self,
+        mapping: &Mapping,
+        target: &FhirTarget,
+        binding: &Binding,
+        view: &FhirValue,
+        (carried, class, node): (Carried, &str, &ResolvedNode),
+    ) -> Result<serde_json::Value, EngineError> {
+        if let (Carried::Text, Some(produced)) = (carried, cell::put_string(view)) {
+            let produced = produced.map_err(|source| EngineError::Cell {
+                mapping: String::from(mapping.name()),
+                element: String::from(target.expression().as_str()),
+                source: Box::new(source),
+            })?;
+            for taken in &produced.fallbacks {
+                self.warnings.push(Warning::fallback(
+                    taken,
+                    self.locate(mapping, &binding.fhir),
+                ));
+            }
+            return Ok(serde_json::Value::String(produced.value));
+        }
+        let element = String::from(target.resolved().leaf());
+        let text = view.write(&element).map_err(|source| EngineError::Fhir {
+            mapping: String::from(mapping.name()),
+            element: element.clone(),
+            source: Box::new(source),
+        })?;
+        scalar_json(carried, class, node, &text).map_err(|source| EngineError::Rm {
+            mapping: String::from(mapping.name()),
+            node: String::from(node.aql_path().as_str()),
+            source: Box::new(source),
+        })
+    }
+
     /// Returns the canonical JSON the run holds at one place, empty when it
     /// holds nothing there.
     fn held_object(
@@ -202,7 +237,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
             return Ok(serde_json::Map::new());
         };
         match written.value {
-            Held::Partial(ref object) => Ok(object.clone()),
+            Held::Partial(ref object) | Held::Canonical(serde_json::Value::Object(ref object)) => {
+                Ok(object.clone())
+            }
+            Held::Canonical(_) => Ok(serde_json::Map::new()),
             Held::Value(ref value) => match value.to_canonical()? {
                 serde_json::Value::Object(object) => Ok(object),
                 _ => Ok(serde_json::Map::new()),

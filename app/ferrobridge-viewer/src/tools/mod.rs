@@ -25,6 +25,7 @@ use leptos::server_fn::ServerFn as _;
 use leptos_meta::Title;
 
 use crate::app::PRODUCT;
+use crate::locale::{Msg, tr};
 use crate::model::{Outcome, ViewError};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -114,7 +115,7 @@ fn answer(value: Option<Result<String, ViewError>>) -> AnyView {
 }
 
 /// A labelled text field bound to `value`.
-fn field(id: &'static str, label: &'static str, value: RwSignal<String>) -> impl IntoView {
+fn field(id: &'static str, label: String, value: RwSignal<String>) -> impl IntoView {
     let control = view! {
         <input
             id=id
@@ -134,7 +135,7 @@ fn field(id: &'static str, label: &'static str, value: RwSignal<String>) -> impl
 /// and editable once `ready`.
 fn area(
     id: &'static str,
-    label: &'static str,
+    label: String,
     value: RwSignal<String>,
     ready: RwSignal<bool>,
 ) -> impl IntoView {
@@ -168,18 +169,18 @@ fn to_fhir_form() -> AnyView {
     };
     view! {
         <section class="fui-card">
-            <h2 class="fui-card-title">"openEHR to FHIR: $tofhir"</h2>
+            <h2 class="fui-card-title">{tr(Msg::OpenehrToFhirTofhir)}</h2>
             <form method="post" action=RunToFhir::url() autocomplete="off" class=FORM on:submit=submit>
-                {area("tofhir-composition", "Composition, canonical or FLAT JSON", composition, ready)}
-                {field("tofhir-template", "Template id (required for FLAT)", template_id)}
-                {field("tofhir-patient", "context.patient, a reference such as Patient/123", patient)}
+                {area("tofhir-composition", tr(Msg::CompositionCanonicalFlatJson), composition, ready)}
+                {field("tofhir-template", tr(Msg::TemplateIdRequiredFlat), template_id)}
+                {field("tofhir-patient", tr(Msg::ContextPatientReferenceSuchPatient123), patient)}
                 <div class="fui-cluster">
                     <button
                         type="submit"
                         class=Variant::Primary.class()
                         disabled=move || !ready.get() || run.pending().get()
                     >
-                        {label(Some(Glyph::PLAY), "Run $tofhir")}
+                        {label(Some(Glyph::PLAY), tr(Msg::RunTofhir))}
                     </button>
                 </div>
             </form>
@@ -206,13 +207,13 @@ fn to_openehr_form() -> AnyView {
     };
     view! {
         <section class="fui-card">
-            <h2 class="fui-card-title">"FHIR to openEHR: $toopenehr"</h2>
+            <h2 class="fui-card-title">{tr(Msg::FhirToOpenehrToopenehr)}</h2>
             <form method="post" action=RunToOpenehr::url() autocomplete="off" class=FORM on:submit=submit>
-                {area("toopenehr-bundle", "Bundle, JSON", bundle, ready)}
-                {field("toopenehr-template", "Template id", template_id)}
+                {area("toopenehr-bundle", tr(Msg::BundleJson), bundle, ready)}
+                {field("toopenehr-template", tr(Msg::TemplateId), template_id)}
                 {ferrohealth_ui::view::form::field(
                     "toopenehr-format",
-                    "Composition format",
+                    tr(Msg::CompositionFormat),
                     None,
                     view! {
                         <select
@@ -222,9 +223,9 @@ fn to_openehr_form() -> AnyView {
                             on:change:target=move |event| format.set(event.target().value())
                         >
                             <option value="canonical" selected=true>
-                                "canonical"
+                                {tr(Msg::Canonical)}
                             </option>
-                            <option value="flat">"flat"</option>
+                            <option value="flat">{tr(Msg::Flat)}</option>
                         </select>
                     },
                 )}
@@ -234,7 +235,7 @@ fn to_openehr_form() -> AnyView {
                         class=Variant::Primary.class()
                         disabled=move || !ready.get() || run.pending().get()
                     >
-                        {label(Some(Glyph::PLAY), "Run $toopenehr")}
+                        {label(Some(Glyph::PLAY), tr(Msg::RunToopenehr))}
                     </button>
                 </div>
             </form>
@@ -253,10 +254,10 @@ fn to_openehr_form() -> AnyView {
 pub fn PlaygroundPage() -> impl IntoView {
     let forms = (to_fhir_form(), to_openehr_form());
     view! {
-        <Title text=format!("Transform playground · {PRODUCT}") />
+        <Title text=format!("{} · {PRODUCT}", tr(Msg::TransformPlayground)) />
         {page_header(
-            "Transform playground",
-            Some(String::from("Runs a transform against the bridge's running programs. Nothing you enter or the bridge answers is kept.")),
+            tr(Msg::TransformPlayground),
+            Some(tr(Msg::RunsTransformAgainstBridgeSRunning)),
             (),
         )}
         {stack(view! {
@@ -288,7 +289,7 @@ fn validate_form(types: Vec<String>) -> AnyView {
         <form method="post" action=RunValidate::url() autocomplete="off" class=FORM on:submit=submit>
             {ferrohealth_ui::view::form::field(
                 "validate-type",
-                "Resource type",
+                tr(Msg::ResourceType),
                 None,
                 view! {
                     <select
@@ -301,14 +302,14 @@ fn validate_form(types: Vec<String>) -> AnyView {
                     </select>
                 },
             )}
-            {area("validate-resource", "Resource, JSON", resource, ready)}
+            {area("validate-resource", tr(Msg::ResourceJson), resource, ready)}
             <div class="fui-cluster">
                 <button
                     type="submit"
                     class=Variant::Primary.class()
                     disabled=move || !ready.get() || run.pending().get()
                 >
-                    {label(Some(Glyph::PLAY), "Run $validate")}
+                    {label(Some(Glyph::PLAY), tr(Msg::RunValidate))}
                 </button>
             </div>
         </form>
@@ -327,19 +328,19 @@ fn validate_form(types: Vec<String>) -> AnyView {
 pub fn ValidatePage() -> impl IntoView {
     let types = Resource::new_blocking(|| (), |()| validate_types());
     view! {
-        <Title text=format!("Validation dry run · {PRODUCT}") />
+        <Title text=format!("{} · {PRODUCT}", tr(Msg::ValidationDryRun)) />
         {page_header(
-            "Validation dry run",
-            Some(String::from("Runs $validate, which commits nothing. Nothing you enter or the bridge answers is kept.")),
+            tr(Msg::ValidationDryRun),
+            Some(tr(Msg::RunsValidateWhichCommitsNothingNothing)),
             (),
         )}
         <section class="fui-card">
-            <h2 class="fui-card-title">"$validate"</h2>
-            <Suspense fallback=|| busy("Reading the resource types the bridge validates", Busy::Section)>
+            <h2 class="fui-card-title">{tr(Msg::Validate)}</h2>
+            <Suspense fallback=|| busy(tr(Msg::ReadingResourceTypesBridgeValidates), Busy::Section)>
                 {move || Suspend::new(async move {
                     match types.await {
                         Ok(Outcome::Shown(types)) if types.is_empty() => {
-                            fault("The bridge declares $validate on no resource type.").into_any()
+                            fault(tr(Msg::BridgeDeclaresValidateNoResourceType)).into_any()
                         }
                         Ok(Outcome::Shown(types)) => validate_form(types),
                         Ok(Outcome::Refused(refusal)) => fault(refusal.to_string()).into_any(),

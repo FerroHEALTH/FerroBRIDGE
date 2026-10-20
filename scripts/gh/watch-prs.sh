@@ -5,6 +5,9 @@
 #
 # Usage: scripts/gh/watch-prs.sh <pr> [<pr>...]   (run it in the background)
 #
+# Run a long watch from a copy outside the worktree: bash reads a script as
+# it runs, so a branch switch or rebase mid-watch mixes two versions of it.
+#
 # - BEHIND: updates the branch.
 # - DIRTY in CHANGELOG.md or only in version lines: merges origin/main
 #   (the branch's changelog entries by scripts/gh/changelog-merge.sh, the

@@ -22,8 +22,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use fhir_types::r4::schema::SCHEMAS;
+use fhirconnect::engine::library::Library;
 use fhirconnect::model::load::load_set;
-use fhirconnect::model::semantic::StaticMappingCodes;
 use fhirconnect::resolve::compile::compile;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::index::WebTemplateIndex;
@@ -214,10 +214,7 @@ fn verdict(context: &str, opt: Opt) -> Result<Verdict, Box<dyn Error>> {
 
     let mut dropped = BTreeMap::new();
     let set = loop {
-        match load_set(
-            files.iter().map(|file| library(file)),
-            &StaticMappingCodes::default(),
-        ) {
+        match load_set(files.iter().map(|file| library(file)), &Library) {
             Ok(set) => break set,
             Err(diagnostics) => {
                 let refused: BTreeMap<String, String> =
@@ -258,15 +255,9 @@ fn verdict(context: &str, opt: Opt) -> Result<Verdict, Box<dyn Error>> {
             });
         }
     };
-    let outcome = compile(
-        &set,
-        &name,
-        &index,
-        &SCHEMAS,
-        &StaticMappingCodes::default(),
-    )
-    .map(|program| (files, program))
-    .map_err(|diagnostics| rows(&diagnostics));
+    let outcome = compile(&set, &name, &index, &SCHEMAS, &Library)
+        .map(|program| (files, program))
+        .map_err(|diagnostics| rows(&diagnostics));
     Ok(Verdict {
         context: context.to_owned(),
         dropped,

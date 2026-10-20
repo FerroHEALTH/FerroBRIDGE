@@ -36,6 +36,24 @@ crates on crates.io.
   32-bit `integer` and a comparator into a count are typed refusals.
   `FhirKind`, `FhirValue` and `RmValue` gain variants, so a consumer that
   matches them exhaustively adds the arms. `fhirconnect` 0.1.163.
+- A FHIRconnect PROGRAMMED mapping now runs a registered function (#95).
+  `fhirconnect::engine::library::Library` is the registry the crate ships,
+  and the server hands it to the loader, the compiler and every run. A
+  function declares the openEHR ports it reads and writes below the
+  mapping's `with.openehr`, and the compiler resolves each port against the
+  template at load: a port the template lacks is `fc-unknown-template-node`,
+  one below a repeating node `fc-repeating-function-port`, and ports under a
+  mapping with no openEHR side `fc-unanchored-function-port`. The first two
+  functions of the published library are registered:
+  `dosageDurationToAdministrationDuration` (`Timing.repeat.duration` and its
+  unit against the administration duration) and `timingNonDaily` (a timing
+  once per week, month or year against the interval of the non-daily
+  timing), both converting through the engine's `DV_DURATION` cell and
+  refusing what they cannot carry. The library's
+  `timing_non_daily.yml` now loads in every published context. Breaking for
+  consumers: `MappingFunctions` takes the FHIR element and the port values,
+  `Method::Programmed` carries its ports, and `MappingCodeRegistry` gains
+  `ports`. `fhirconnect` 0.1.166.
 - Every published FHIRconnect context now has its operational template in
   the tree (#258). Nine KDS templates join the three already vendored, each
   fetched by its own `scripts/vendor/kds-*-opt.sh` from the openFHIR commit
@@ -68,6 +86,14 @@ crates on crates.io.
   `Attachment` has no field for the algorithm, and an attachment with data and
   no size takes the decoded length, a one-way row. `fhirconnect` now depends
   on `base64`. `fhirconnect` 0.1.165.
+- A FHIRconnect mapping writes a `Coding`, an `Identifier` or a `Reference`
+  into an openEHR `String` attribute and reads it back (#93), the cells of
+  FHIRconnect `String.adoc`: a coding travels as `system::code`, an
+  identifier as `system::value`, and a reference as its identifier, or as its
+  `reference` string coming in when it has none, a one-way row. Text holding
+  `::` that would read back as another system and code is refused. Before, a
+  tail on a `String` attribute against those elements refused with no cell.
+  `fhirconnect` 0.1.166.
 - The shipped `datatype-pl-to-location` supplement writes PL.11, the
   assigning authority, into the `identifier.assigner` of each location level
   the PL carries (#345). The guide's two PL.11 rows address all six levels
@@ -135,6 +161,12 @@ crates on crates.io.
 
 ### Changed
 
+- The operator console takes FerroUI 0.2.0 and reads every word it hands
+  FerroUI from its catalog at run time (#956): table captions, column
+  headers, pager nouns with their plurals, navigation, fields, dialogs and
+  page titles come from `locales/en/ferrobridge-viewer.ftl`, and the
+  stray-literal baseline drops from 384 to 78 literals. English remains the
+  only locale.
 - `openehr-mapping-core` 0.1.121 parses a mapping header's
   `spec.openEhrConfig.archetype` through the `openehr-base` BASE 1.2.0
   `ArchetypeId` and drops its own copy of the grammar (#1026). The accepted
@@ -263,6 +295,9 @@ crates on crates.io.
 
 ### Fixed
 
+- The console's file editor names its mode in its header (#982): the New
+  file route reads "New mapping file" and an existing file reads "Edit
+  <file>", with the matching page title.
 - An HL7 v2 message sent under a code and trigger event that no v2.9.1
   message definition carries, and whose MSH-9.3 names no known structure, is
   parsed against the structure the interactions of its version's tables send

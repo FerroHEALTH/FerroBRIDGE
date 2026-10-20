@@ -18,6 +18,7 @@ use leptos::prelude::*;
 
 use crate::bridge::BridgeError;
 use crate::engine::render::parts::{self, Shape};
+use crate::locale::{Msg, tr, tr_with};
 
 /// The capability screen for the two answers.
 #[must_use]
@@ -27,13 +28,12 @@ pub fn render(
 ) -> String {
     let capability = match statement {
         Ok((statement, raw)) => cards(statement, raw),
-        Err(error) => parts::failed("CapabilityStatement", error),
+        Err(error) => parts::failed(&tr(Msg::Capabilitystatement), error),
     };
     let discovery = match smart {
-        Ok(document) => {
-            discovery(document).unwrap_or_else(|shape| parts::unreadable("SMART discovery", &shape))
-        }
-        Err(error) => parts::failed("SMART discovery", error),
+        Ok(document) => discovery(document)
+            .unwrap_or_else(|shape| parts::unreadable(&tr(Msg::SmartDiscovery), &shape)),
+        Err(error) => parts::failed(&tr(Msg::SmartDiscovery), error),
     };
     stack(view! {
         {capability}
@@ -65,22 +65,22 @@ fn cards(statement: &CapabilityStatement, raw: &serde_json::Value) -> AnyView {
     let rests = statement.rest.iter().map(rest).collect_view();
     view! {
         <section class="fui-card">
-            <h2 class="fui-card-title">"CapabilityStatement"</h2>
+            <h2 class="fui-card-title">{tr(Msg::Capabilitystatement)}</h2>
             <dl class="fui-facts">
-                <dt>"Software"</dt>
+                <dt>{tr(Msg::Software)}</dt>
                 <dd>{format!("{name} {version}")}</dd>
-                <dt>"FHIR version"</dt>
+                <dt>{tr(Msg::FhirVersion)}</dt>
                 <dd>{value(statement.fhir_version.value.as_ref())}</dd>
-                <dt>"Kind"</dt>
+                <dt>{tr(Msg::Kind)}</dt>
                 <dd>{value(statement.kind.value.as_ref())}</dd>
-                <dt>"Status"</dt>
+                <dt>{tr(Msg::Status)}</dt>
                 <dd>{value(statement.status.value.as_ref())}</dd>
-                <dt>"Formats"</dt>
+                <dt>{tr(Msg::Formats)}</dt>
                 <dd>{formats}</dd>
             </dl>
         </section>
         {rests}
-        {parts::raw_json("The CapabilityStatement as JSON", raw)}
+        {parts::raw_json(&tr(Msg::TheCapabilitystatementAsJson), raw)}
     }
     .into_any()
 }
@@ -105,11 +105,16 @@ fn rest(rest: &CapabilityStatementRest) -> AnyView {
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-            let cors = security
-                .cors
-                .as_ref()
-                .and_then(|cors| cors.value)
-                .map_or("not stated", |cors| if cors { "yes" } else { "no" });
+            let cors = security.cors.as_ref().and_then(|cors| cors.value).map_or(
+                tr(Msg::NotStated),
+                |cors| {
+                    if cors {
+                        "yes".to_owned()
+                    } else {
+                        "no".to_owned()
+                    }
+                },
+            );
             let description = value(
                 security
                     .description
@@ -118,17 +123,17 @@ fn rest(rest: &CapabilityStatementRest) -> AnyView {
             );
             view! {
                 <dl class="fui-facts">
-                    <dt>"Services"</dt>
+                    <dt>{tr(Msg::Services)}</dt>
                     <dd>{services}</dd>
-                    <dt>"CORS"</dt>
+                    <dt>{tr(Msg::Cors)}</dt>
                     <dd>{cors}</dd>
-                    <dt>"Description"</dt>
+                    <dt>{tr(Msg::Description)}</dt>
                     <dd>{description}</dd>
                 </dl>
             }
             .into_any()
         }
-        None => view! { <p>"The statement declares no security."</p> }.into_any(),
+        None => view! { <p>{tr(Msg::StatementDeclaresNoSecurity)}</p> }.into_any(),
     };
     let interactions = rest
         .interaction
@@ -152,13 +157,13 @@ fn rest(rest: &CapabilityStatementRest) -> AnyView {
     let resources = rest.resource.iter().map(resource).collect_view();
     view! {
         <section class="fui-card">
-            <h2 class="fui-card-title">{format!("REST, {mode} mode: security")}</h2>
+            <h2 class="fui-card-title">{tr_with(Msg::RestSecurity, &[("mode", mode.clone().into())])}</h2>
             {security}
         </section>
         <section class="fui-card">
-            <h2 class="fui-card-title">{format!("REST, {mode} mode: system")}</h2>
+            <h2 class="fui-card-title">{tr_with(Msg::RestSystem, &[("mode", mode.clone().into())])}</h2>
             <dl class="fui-facts">
-                <dt>"Interactions"</dt>
+                <dt>{tr(Msg::Interactions)}</dt>
                 <dd>{interactions}</dd>
             </dl>
             <ul class="fui-bullets">{operations}</ul>
@@ -212,15 +217,19 @@ fn resource(resource: &CapabilityStatementRestResource) -> AnyView {
         })
         .collect_view();
     let searches = (!resource.search_param.is_empty()).then(|| {
-        parts::table_unstacked("Search parameters", &["Search parameter", "Type"], search)
+        parts::table_unstacked(
+            &tr(Msg::SearchParameters),
+            &[&tr(Msg::SearchParameter), &tr(Msg::Type)],
+            search,
+        )
     });
     view! {
         <section class="fui-card">
             <h2 class="fui-card-title">{kind}</h2>
             <dl class="fui-facts">
-                <dt>"Profile"</dt>
+                <dt>{tr(Msg::Profile)}</dt>
                 <dd>{profile}</dd>
-                <dt>"Interactions"</dt>
+                <dt>{tr(Msg::Interactions)}</dt>
                 <dd>{interactions}</dd>
             </dl>
             {searches}
@@ -234,13 +243,13 @@ fn resource(resource: &CapabilityStatementRestResource) -> AnyView {
 /// and its JSON.
 fn discovery(document: &serde_json::Value) -> Result<AnyView, Shape> {
     let issuer = parts::optional_text(document, "issuer")?
-        .unwrap_or("not stated")
+        .unwrap_or(&tr(Msg::NotStated))
         .to_owned();
     let authorize = parts::text(document, "authorization_endpoint")?.to_owned();
     let token = parts::text(document, "token_endpoint")?.to_owned();
     let words = |key: &'static str| -> Result<String, Shape> {
         match document.get(key) {
-            None => Ok(String::from("not stated")),
+            None => Ok(tr(Msg::NotStated)),
             Some(serde_json::Value::Array(items)) => items
                 .iter()
                 .map(|item| item.as_str().ok_or(Shape { path: key }))
@@ -253,26 +262,26 @@ fn discovery(document: &serde_json::Value) -> Result<AnyView, Shape> {
     let scopes = words("scopes_supported")?;
     Ok(view! {
         <section class="fui-card">
-            <h2 class="fui-card-title">"SMART discovery"</h2>
+            <h2 class="fui-card-title">{tr(Msg::SmartDiscovery)}</h2>
             <dl class="fui-facts">
-                <dt>"Issuer"</dt>
+                <dt>{tr(Msg::Issuer)}</dt>
                 <dd>
                     <code>{issuer}</code>
                 </dd>
-                <dt>"Authorization endpoint"</dt>
+                <dt>{tr(Msg::AuthorizationEndpoint)}</dt>
                 <dd>
                     <code>{authorize}</code>
                 </dd>
-                <dt>"Token endpoint"</dt>
+                <dt>{tr(Msg::TokenEndpoint)}</dt>
                 <dd>
                     <code>{token}</code>
                 </dd>
-                <dt>"Capabilities"</dt>
+                <dt>{tr(Msg::Capabilities)}</dt>
                 <dd>{capabilities}</dd>
-                <dt>"Scopes"</dt>
+                <dt>{tr(Msg::Scopes)}</dt>
                 <dd>{scopes}</dd>
             </dl>
-            {parts::raw_json("The discovery document as JSON", document)}
+            {parts::raw_json(&tr(Msg::DiscoveryDocumentJson), document)}
         </section>
     }
     .into_any())

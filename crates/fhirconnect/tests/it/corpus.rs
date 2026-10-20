@@ -19,6 +19,7 @@ use std::path::PathBuf;
 use ferrobridge_testkit::conformance::Case;
 use ferrobridge_testkit::conformance::Corpus;
 use ferrobridge_testkit::conformance::record;
+use fhirconnect::engine::library::Library;
 use fhirconnect::model::error::SchemaKind;
 use fhirconnect::model::load::load_set;
 use fhirconnect::model::schema::Schemas;
@@ -499,10 +500,11 @@ fn compiled_reach() -> Result<BTreeSet<String>, Box<dyn Error>> {
 }
 
 /// Returns the first refusal the whole corpus loaded as one set raises
-/// against each file, keyed by relative path.
+/// against each file, keyed by relative path, with the functions the engine
+/// registers.
 fn set_refusals() -> Result<BTreeMap<String, String>, Box<dyn Error>> {
     let mut first = BTreeMap::new();
-    if let Err(diagnostics) = load_set(corpus_paths()?, &StaticMappingCodes::default()) {
+    if let Err(diagnostics) = load_set(corpus_paths()?, &Library) {
         for diagnostic in diagnostics {
             let file = diagnostic
                 .file()

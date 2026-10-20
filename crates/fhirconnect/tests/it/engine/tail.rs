@@ -130,6 +130,66 @@ fn a_tail_below_a_node_is_written_and_read_in_both_directions() -> Result<(), Bo
     Ok(())
 }
 
+/// The path of the problem name value in the synthetic template.
+const PROBLEM: &str =
+    "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value";
+
+#[test]
+fn a_coding_travels_as_system_and_code_in_a_string_attribute() -> Result<(), Box<dyn Error>> {
+    // String.adoc §Coding: the coding is parsed into the String "and back as
+    // `system::code`".
+    let program = compiled("ferrobridge_tail_string")?;
+    let index = template()?;
+    let mut parsed: serde_json::Value =
+        serde_json::from_str(ferrobridge_testkit::fixtures::R4_CONDITION)?;
+    let object = parsed.as_object_mut().ok_or("the Condition is an object")?;
+    object.insert(
+        String::from("code"),
+        serde_json::json!({"coding": [{
+            "system": "http://example.org/fhir/CodeSystem/synthetic-problems",
+            "code": "SYN-042",
+        }]}),
+    );
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &Value::from_serde_json(parsed),
+        &Seams::default(),
+        &defaults(),
+        &CallContext::new(),
+    )?;
+    let written = value_at(&index, inbound.value(), PROBLEM)?;
+    assert_eq!(
+        written.get("value").and_then(serde_json::Value::as_str),
+        Some("http://example.org/fhir/CodeSystem/synthetic-problems::SYN-042"),
+        "the coding is the text: {written}"
+    );
+    let outbound = to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        inbound.value(),
+        &Seams::default(),
+        &CallContext::new(),
+    )?;
+    let coding = outbound
+        .value()
+        .get("code")
+        .and_then(|code| code.get("coding"))
+        .ok_or("the Condition carries the coding")?
+        .to_serde_json(&mut fhir_types::codec::Path::root("Coding"))?;
+    assert_eq!(
+        coding,
+        serde_json::json!([{
+            "system": "http://example.org/fhir/CodeSystem/synthetic-problems",
+            "code": "SYN-042",
+        }]),
+        "the text reads back into the coding"
+    );
+    Ok(())
+}
+
 /// Returns the value the node at `path` holds in `composition`.
 fn value_at(
     index: &WebTemplateIndex,

@@ -30,6 +30,7 @@ use fhir_types::r4::parameters::ParametersParameter;
 use fhir_types::r4::parameters::ParametersParameterValue;
 use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
+use fhirconnect::engine::library::Library;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::operations::TO_FHIR;
 use fhirconnect::operations::TO_OPENEHR;
@@ -211,6 +212,7 @@ async fn run_to_fhir(
     lane.translator()
         .run(Direction::ToFhir, |terminology| {
             let seams = Seams::default()
+                .with_functions(&Library)
                 .with_terminology(terminology)
                 .with_demographics(lane.demographics());
             run::to_fhir(&programs, &SCHEMAS, &seams, settings, request)
@@ -230,6 +232,7 @@ async fn run_to_openehr(
     lane.translator()
         .run(Direction::ToOpenehr, |terminology| {
             let seams = Seams::default()
+                .with_functions(&Library)
                 .with_terminology(terminology)
                 .with_demographics(lane.demographics());
             run::to_openehr(&programs, &SCHEMAS, &seams, settings, request)

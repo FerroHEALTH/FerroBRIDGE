@@ -21,7 +21,7 @@ use ferrohealth_ui::view::button::{Variant, label};
 use ferrohealth_ui::view::empty::{Busy, busy};
 use ferrohealth_ui::view::form::{FORM, INPUT, check, field, help_id};
 use ferrohealth_ui::view::refusal::fault;
-use ferrohealth_ui::view::surface::{page_header, stack};
+use ferrohealth_ui::view::surface::{Crumb, Header, Mode, editor_heading, editor_title, stack};
 use ferrohealth_ui::widget::editor::{Editor, LineMark, code_editor};
 use leptos::html::Div;
 use leptos::prelude::*;
@@ -30,6 +30,7 @@ use leptos_meta::Title;
 use serde::{Deserialize, Serialize};
 
 use crate::app::PRODUCT;
+use crate::locale::{Msg, message, tr};
 use crate::model::{Outcome, ViewError};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -141,6 +142,7 @@ pub async fn reload_set() -> Result<String, ViewError> {
 /// The server half of the editor's functions.
 #[cfg(not(target_arch = "wasm32"))]
 pub mod server {
+    use crate::locale::{Msg, tr_served};
     use http::StatusCode;
 
     use crate::bridge::editing::Precondition;
@@ -170,9 +172,7 @@ pub mod server {
             Ok(file) => {
                 let Ok(text) = String::from_utf8(file.bytes) else {
                     return Ok(Outcome::Refused(Refusal::Invalid {
-                        reason: String::from(
-                            "The file is not UTF-8, so the console does not open it.",
-                        ),
+                        reason: tr_served(Msg::FileNotUtf8SoConsole),
                     }));
                 };
                 Ok(Outcome::Shown(Source {
@@ -228,8 +228,8 @@ pub mod server {
         if confirmed != "yes" {
             return Ok(SaveView {
                 html: crate::tools::render::invalid(
-                    "Not saved",
-                    "Confirm the save before it is sent.",
+                    &tr_served(Msg::NotSaved),
+                    &tr_served(Msg::ConfirmSaveBeforeSent),
                 ),
                 etag: None,
             });
@@ -357,8 +357,8 @@ fn save_form(editing: Editing) -> AnyView {
         <form method="post" action=SaveDraft::url() autocomplete="off" class=FORM on:submit=on_save>
             {field(
                 "edit-reason",
-                "Why you save it, one line",
-                Some("Two hundred characters at most."),
+                tr(Msg::WhyYouSaveOneLine),
+                Some(tr(Msg::TwoHundredCharactersMost)),
                 view! {
                     <input
                         id="edit-reason"
@@ -375,7 +375,7 @@ fn save_form(editing: Editing) -> AnyView {
             )}
             {check(
                 "edit-confirm",
-                "Save this draft and reload the set. The bridge refuses a draft that does not compile.",
+                tr(Msg::SaveDraftReloadSetBridgeRefuses),
                 view! {
                     <input
                         id="edit-confirm"
@@ -392,7 +392,7 @@ fn save_form(editing: Editing) -> AnyView {
                     class=Variant::Primary.class()
                     disabled=move || !ready.get() || !confirmed.get() || save.pending().get()
                 >
-                    {label(Some(Glyph::SAVE), if fresh { "Create the file" } else { "Save" })}
+                    {label(Some(Glyph::SAVE), if fresh { tr(Msg::CreateTheFile) } else { tr(Msg::Save) })}
                 </button>
             </div>
         </form>
@@ -427,11 +427,11 @@ fn check_section(editing: Editing) -> AnyView {
     };
     view! {
         <section class="fui-card">
-            <h2 class="fui-card-title">"Check"</h2>
+            <h2 class="fui-card-title">{tr(Msg::Check)}</h2>
             <form method="post" action=CheckDraft::url() autocomplete="off" class=FORM on:submit=on_check>
                 {field(
                     "edit-path",
-                    "Path, below fhirconnect/ or omocl/",
+                    tr(Msg::PathBelowFhirconnectOmocl),
                     None,
                     view! {
                         <input
@@ -450,7 +450,7 @@ fn check_section(editing: Editing) -> AnyView {
                 )}
                 {field(
                     DRAFT,
-                    "The file",
+                    tr(Msg::TheFile),
                     None,
                     code_editor(
                         Editor {
@@ -469,7 +469,7 @@ fn check_section(editing: Editing) -> AnyView {
                         class=Variant::Primary.class()
                         disabled=move || !ready.get() || check.pending().get()
                     >
-                        {label(Some(Glyph::CIRCLE_CHECK), "Check")}
+                        {label(Some(Glyph::CIRCLE_CHECK), tr(Msg::Check))}
                     </button>
                 </div>
             </form>
@@ -490,16 +490,16 @@ fn reload_section(ready: RwSignal<bool>) -> AnyView {
     };
     view! {
         <section class="fui-card">
-            <h2 class="fui-card-title">"Reload"</h2>
+            <h2 class="fui-card-title">{tr(Msg::Reload)}</h2>
             <form method="post" action=ReloadSet::url() class=FORM on:submit=on_reload>
-                <p>"Compiles the files on disk and replaces the running set when they compile."</p>
+                <p>{tr(Msg::CompilesFilesDiskReplacesRunningSet)}</p>
                 <div class="fui-cluster">
                     <button
                         type="submit"
                         class=Variant::Secondary.class()
                         disabled=move || !ready.get() || reload.pending().get()
                     >
-                        {label(Some(Glyph::REFRESH_CW), "Reload")}
+                        {label(Some(Glyph::REFRESH_CW), tr(Msg::Reload))}
                     </button>
                 </div>
             </form>
@@ -531,7 +531,7 @@ fn editor(source: Source) -> AnyView {
     } else {
         view! {
             <p role="note" class="fui-muted">
-                "This file is provisioned, so the console checks a draft of it but never saves over it."
+                {tr(Msg::FileProvisionedSoConsoleChecksDraft)}
             </p>
         }
         .into_any()
@@ -539,7 +539,7 @@ fn editor(source: Source) -> AnyView {
     stack(view! {
         {check_section(editing)}
         <section class="fui-card">
-            <h2 class="fui-card-title">"Save"</h2>
+            <h2 class="fui-card-title">{tr(Msg::Save)}</h2>
             {saving}
             <div node_ref=result tabindex="-1" aria-live="polite">
                 {move || {
@@ -576,14 +576,33 @@ pub fn EditPage() -> impl IntoView {
             mapping_source(path).await
         }
     });
-    view! {
-        <Title text=format!("Edit a mapping file · {PRODUCT}") />
-        {page_header(
-            "Edit a mapping file",
-            Some(String::from("Check a draft against the running set, save it beside the provisioned tree, and reload.")),
+    // NOTE: no specification governs this: our own design; the heading says
+    // whether the form creates a file or changes the one the path names.
+    let mode = move || {
+        let path = path();
+        if path.is_empty() {
+            Mode::Creating
+        } else {
+            Mode::Editing(path)
+        }
+    };
+    let heading = move || {
+        editor_heading(
+            message(Msg::FileEditor),
+            &mode(),
+            Header {
+                subtitle: Some(tr(Msg::CheckDraftAgainstRunningSetSave)),
+                crumbs: vec![Crumb::new(tr(Msg::MappingFiles), crate::engine::FILES)],
+
+                ..Header::default()
+            },
             (),
-        )}
-        <Suspense fallback=|| busy("Asking the bridge for the file", Busy::Section)>
+        )
+    };
+    view! {
+        <Title text=move || format!("{} · {PRODUCT}", editor_title(message(Msg::FileEditor), &mode())) />
+        {heading}
+        <Suspense fallback=|| busy(tr(Msg::AskingBridgeFile), Busy::Section)>
             {move || Suspend::new(async move {
                 match source.await {
                     Ok(Outcome::Shown(source)) => editor(source),
