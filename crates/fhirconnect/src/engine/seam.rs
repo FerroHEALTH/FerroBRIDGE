@@ -24,6 +24,8 @@ use core::fmt;
 use fhir_types::codec::Value;
 use sha2::Digest;
 
+use crate::engine::bundle::Entry;
+use crate::engine::bundle::resolve;
 use crate::engine::demographics::Demographics;
 use crate::engine::demographics::NoDemographics;
 use crate::engine::terminology::NoTerminology;
@@ -64,12 +66,16 @@ impl ReferenceSource for NoReferences {
 
 /// The entries of one Bundle, looked up before a further source.
 ///
-/// A reference names an entry by its `fullUrl` or, relative to the server, as
-/// `<type>/<id>` (<https://hl7.org/fhir/R4/references.html#literal> and
-/// <https://hl7.org/fhir/R4/bundle.html#references>).
+/// A reference names an entry by the R4 rules for resolving a reference
+/// inside a Bundle (<https://hl7.org/fhir/R4/bundle.html#references>,
+/// §2.36.4.1), the same resolver the `$toopenehr` subject check runs: an
+/// absolute reference matches a `fullUrl`, a relative `<type>/<id>` is read
+/// against the service base of the referrer's server `fullUrl`, and a
+/// version-specific reference matches the entry's `meta.versionId`.
 #[derive(Debug)]
 pub struct BundleReferences<'source> {
-    entries: Vec<(Option<String>, Value)>,
+    entries: Vec<Entry>,
+    referrer: Option<String>,
     further: &'source dyn ReferenceSource,
 }
 
@@ -82,7 +88,19 @@ impl<'source> BundleReferences<'source> {
         entries: Vec<(Option<String>, Value)>,
         further: &'source dyn ReferenceSource,
     ) -> Self {
-        Self { entries, further }
+        Self {
+            entries,
+            referrer: None,
+            further,
+        }
+    }
+
+    /// Returns this source with the `fullUrl` of the entry whose references
+    /// it resolves, which a relative reference is read against.
+    #[must_use]
+    pub fn with_referrer(mut self, full_url: impl Into<String>) -> Self {
+        self.referrer = Some(full_url.into());
+        self
     }
 }
 
@@ -92,22 +110,16 @@ impl ReferenceSource for BundleReferences<'_> {
         reference: &str,
         expected: &ResourceType,
     ) -> Result<Option<Value>, ReferenceError> {
-        let found = self.entries.iter().find(|&(full_url, resource)| {
-            full_url.as_deref() == Some(reference)
-                || relative(resource).as_deref() == Some(reference)
-        });
-        match found {
-            Some((_, resource)) => Ok(Some(resource.clone())),
-            None => self.further.fetch(reference, expected),
+        let found = resolve(&self.entries, self.referrer.as_deref(), reference);
+        match *found.as_slice() {
+            [] => self.further.fetch(reference, expected),
+            [only] => Ok(self.entries.get(only).map(|(_, resource)| resource.clone())),
+            ref several => Err(ReferenceError::Ambiguous {
+                reference: String::from(reference),
+                count: several.len(),
+            }),
         }
     }
-}
-
-/// Returns the `<type>/<id>` a resource is referenced by, when it has an id.
-fn relative(resource: &Value) -> Option<String> {
-    let kind = resource.get("resourceType").and_then(Value::as_str)?;
-    let id = resource.get("id").and_then(Value::as_str)?;
-    Some(format!("{kind}/{id}"))
 }
 
 /// What assigns the id of a resource a run creates.
@@ -375,6 +387,20 @@ pub enum ReferenceError {
         /// The resource type the source answered with.
         found: String,
     },
+    /// The reference names more than one entry of the Bundle.
+    ///
+    /// Two entries answer one reference when they share a `fullUrl`, which
+    /// the R4 Bundle invariant `bdl-7` allows only for different versions of
+    /// one resource (<https://hl7.org/fhir/R4/bundle.html>), or, read against
+    /// no server `fullUrl`, a `resourceType` and `id`; a reference that names
+    /// no version cannot choose between them.
+    #[error("{reference} names {count} entries of the bundle")]
+    Ambiguous {
+        /// The reference that was resolved.
+        reference: String,
+        /// How many entries it names.
+        count: usize,
+    },
     /// The sink could not assign an id.
     #[error("no id could be assigned to the {resource_type} the run creates")]
     Identity {
@@ -517,6 +543,7 @@ mod tests {
     use super::IdentityRequest;
     use super::IdentitySink;
     use super::NoReferences;
+    use super::ReferenceError;
     use super::ReferenceSource;
     use crate::resolve::program::binding::ResourceType;
     use fhir_types::codec::Value;
@@ -578,6 +605,82 @@ mod tests {
                 .fetch("Specimen/another", &expected)
                 .expect("no failure"),
             None
+        );
+    }
+
+    /// Returns a synthetic `Specimen` with `id`, at `version` when given.
+    fn specimen(id: &str, version: Option<&str>) -> Value {
+        let mut resource = serde_json::json!({ "resourceType": "Specimen", "id": id });
+        if let (Some(version), Some(object)) = (version, resource.as_object_mut()) {
+            object.insert(
+                String::from("meta"),
+                serde_json::json!({ "versionId": version }),
+            );
+        }
+        Value::from_serde_json(resource)
+    }
+
+    #[test]
+    fn a_relative_reference_is_read_against_the_server_base_of_the_referrer() {
+        // bundle.html §2.36.4.1: a relative reference is relative to the
+        // server base of the referrer's fullUrl.
+        let near = specimen("synthetic-specimen-1", None);
+        let far = specimen("synthetic-specimen-1", None);
+        let source = BundleReferences::new(
+            vec![
+                (
+                    Some(String::from(
+                        "http://example.net/fhir/Specimen/synthetic-specimen-1",
+                    )),
+                    far,
+                ),
+                (
+                    Some(String::from(
+                        "http://example.org/fhir/Specimen/synthetic-specimen-1",
+                    )),
+                    near.clone(),
+                ),
+            ],
+            &NoReferences,
+        )
+        .with_referrer("http://example.org/fhir/Observation/synthetic-9");
+        let expected = ResourceType::new("Specimen");
+        assert_eq!(
+            source
+                .fetch("Specimen/synthetic-specimen-1", &expected)
+                .expect("no failure"),
+            Some(near)
+        );
+    }
+
+    #[test]
+    fn a_versioned_reference_answers_the_entry_at_that_version() {
+        let url = "http://example.org/fhir/Specimen/synthetic-specimen-1";
+        let second = specimen("synthetic-specimen-1", Some("2"));
+        let source = BundleReferences::new(
+            vec![
+                (
+                    Some(String::from(url)),
+                    specimen("synthetic-specimen-1", Some("1")),
+                ),
+                (Some(String::from(url)), second.clone()),
+            ],
+            &NoReferences,
+        )
+        .with_referrer("http://example.org/fhir/Observation/synthetic-9");
+        let expected = ResourceType::new("Specimen");
+        assert_eq!(
+            source
+                .fetch("Specimen/synthetic-specimen-1/_history/2", &expected)
+                .expect("no failure"),
+            Some(second)
+        );
+        let refused = source
+            .fetch(url, &expected)
+            .expect_err("two versions answer an unversioned reference");
+        assert!(
+            matches!(refused, ReferenceError::Ambiguous { count: 2, .. }),
+            "the refusal counts the entries: {refused}"
         );
     }
 }

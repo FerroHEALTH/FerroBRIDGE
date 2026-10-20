@@ -171,6 +171,17 @@ crates on crates.io.
   `defining_code`. A consumer that matches `SkipReason` exhaustively adds the
   arm. The facade's loss log labels it `skipped-defining-code-uncarried`.
   `fhirconnect` 0.1.160.
+- `$toopenehr` resolves a `reference` mapping against the request Bundle by
+  the R4 rules for a reference inside a Bundle (R4 bundle.html §2.36.4.1),
+  the same resolver the subject check runs (#1010): a version-specific
+  reference matches the entry's `meta.versionId`, and a relative `<type>/<id>`
+  is read against the server base of the mapped entry's `fullUrl`. Before, the
+  seam matched only an exact `fullUrl` or `<type>/<id>`, so a versioned
+  reference fell through to the further source. A reference two entries
+  answer refuses the run with the new `ReferenceError::Ambiguous`, and
+  `BundleReferences::with_referrer` names the entry whose references it
+  resolves. A consumer that matches `ReferenceError` exhaustively adds the
+  arm. `fhirconnect` 0.1.161.
 - A `TERM_MAPPING` that a `DV_TEXT` or `DV_CODED_TEXT` value carries out to a
   FHIR `string`, or a `DV_CODED_TEXT` value carries out to a single `Coding`,
   is a declared loss (#623). Those pairs give `mappings` no FHIR row

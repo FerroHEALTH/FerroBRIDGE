@@ -309,7 +309,14 @@ pub fn to_openehr_with_warnings<T: Table + ?Sized>(
         origin = origin.with_source(source);
     }
     let defaults = settings.defaults().clone().with_origin(origin);
-    let references = BundleReferences::new(addressed, seams.references());
+    let referrer = addressed
+        .iter()
+        .find(|&(_, resource)| *resource == document)
+        .and_then(|(full_url, _)| full_url.clone());
+    let mut references = BundleReferences::new(addressed, seams.references());
+    if let Some(full_url) = referrer {
+        references = references.with_referrer(full_url);
+    }
     let seams = seams.with_references(&references);
     let outcome = traverse::to_openehr(
         program,
