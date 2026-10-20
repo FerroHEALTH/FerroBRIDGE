@@ -58,7 +58,7 @@ fn polymorphic_index() -> Result<WebTemplateIndex, Box<dyn Error>> {
     let (constraint, tail) = rest
         .split_once("</children>")
         .ok_or("the text constraint closes")?;
-    let added: String = ADDED
+    let added: Vec<String> = ADDED
         .iter()
         .map(|class| {
             let escaped = class.replace('<', "&lt;").replace('>', "&gt;");
@@ -70,6 +70,7 @@ fn polymorphic_index() -> Result<WebTemplateIndex, Box<dyn Error>> {
             )
         })
         .collect();
+    let added = added.concat();
     let xml = format!("{head}{text}{constraint}</children>{added}{tail}");
     let opt = openehr_its::opt14::from_xml(&xml)?;
     Ok(WebTemplateIndex::build(&TemplateSource::Opt14(Box::new(
