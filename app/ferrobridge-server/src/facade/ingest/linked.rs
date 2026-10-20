@@ -161,7 +161,10 @@ impl Ingest<'_> {
         let mut answers = BTreeMap::new();
         let mut committed = Vec::new();
         for (reference, resource) in asked {
-            let (linked, version) = self.commit_linked(&reference, resource).await?;
+            let (linked, version) = self
+                .commit_linked(&reference, resource)
+                .await
+                .map_err(|refused| with_committed(refused, &committed))?;
             if let Some(version) = version {
                 committed.push(CommittedLink {
                     reference: reference.clone(),
