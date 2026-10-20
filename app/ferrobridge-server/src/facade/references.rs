@@ -23,10 +23,16 @@
 //!   URL it names.
 //! - References are followed to `max_depth` levels, each literal at most
 //!   once, which keeps a cycle from looping.
-//! - Every reference that is not resolved is a declared skip of the engine
-//!   (`Loss::Skipped`), and a fetch that failed is logged with the upstream
-//!   status. Every fetch is logged by the referenced type and id and the
-//!   base, never a body.
+//! - A reference whose resource is absent (off the allow-list, no `<Type>/<id>`,
+//!   unknown to the identity map, or answered `404` or `410`) is a declared
+//!   skip of the engine (`Loss::Skipped`), as the chapter allows.
+//! - A fetch that failed (no answer, any other status, or a body that is not
+//!   the referenced resource) refuses the request if a mapping reads the
+//!   reference, with the upstream status: the chapter's "proceeds with the
+//!   mapping" yields to the strictness of `engine/Fail.adoc`, and an upstream
+//!   failure is never flattened into an absence.
+//! - Every fetch is logged by the referenced type and id and the base, never
+//!   a body.
 //!
 //! The engine reads synchronously, so the references are resolved before the
 //! run and handed to it as [`Resolved`].
@@ -134,8 +140,10 @@ impl Policy {
 pub struct Resolved {
     /// Each resolved resource, under the literal reference that named it.
     held: BTreeMap<String, Value>,
-    /// Each reference that was tried and not resolved.
+    /// Each reference that was tried and found absent.
     skipped: Vec<Unresolved>,
+    /// Each reference whose fetch failed, with why.
+    failed: BTreeMap<String, Reason>,
 }
 
 impl core::fmt::Debug for Resolved {
@@ -143,16 +151,26 @@ impl core::fmt::Debug for Resolved {
         f.debug_struct("Resolved")
             .field("held", &self.held.keys().collect::<Vec<_>>())
             .field("skipped", &self.skipped)
+            .field("failed", &self.failed)
             .finish()
     }
 }
 
 impl Resolved {
-    /// Returns each reference that was tried and not resolved, in the order
+    /// Returns each reference that was tried and found absent, in the order
     /// it was tried.
     #[must_use]
     pub fn skipped(&self) -> &[Unresolved] {
         &self.skipped
+    }
+
+    /// Returns each reference whose fetch failed, by its literal.
+    ///
+    /// The engine refuses the run that reads one of them, so these are never
+    /// skips.
+    #[must_use]
+    pub const fn failed(&self) -> &BTreeMap<String, Reason> {
+        &self.failed
     }
 
     /// Returns how many resources were resolved.
@@ -174,8 +192,61 @@ impl ReferenceSource for Resolved {
         reference: &str,
         _expected: &ResourceType,
     ) -> Result<Option<Value>, ReferenceError> {
+        if let Some(reason) = self.failed.get(reference) {
+            return Err(ReferenceError::Fetch {
+                reference: String::from(reference),
+                source: Box::new(Unfetched {
+                    reference: String::from(reference),
+                    reason: reason.clone(),
+                }),
+            });
+        }
         Ok(self.held.get(reference).cloned())
     }
+}
+
+/// A referenced resource whose fetch failed, which refuses the run that
+/// reads it.
+///
+/// The references chapter lets the engine proceed when a fetch is "not
+/// possible" (`engine/references.adoc`), and `engine/Fail.adoc` asks that
+/// "either all data should be mapped, or the mapping should fail". An absent
+/// resource is the first case; a sending site or CDR that failed to answer is
+/// an upstream failure, which never becomes an absence.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("the referenced resource {reference} could not be fetched: {reason}")]
+pub struct Unfetched {
+    /// The literal reference.
+    reference: String,
+    /// Why the fetch failed.
+    reason: Reason,
+}
+
+impl Unfetched {
+    /// Returns the literal reference.
+    #[must_use]
+    pub fn reference(&self) -> &str {
+        &self.reference
+    }
+
+    /// Returns why the fetch failed.
+    #[must_use]
+    pub const fn reason(&self) -> &Reason {
+        &self.reason
+    }
+}
+
+/// Returns the failed reference fetch anywhere in `error`'s cause chain.
+#[must_use]
+pub fn unfetched<'e>(error: &'e (dyn core::error::Error + 'static)) -> Option<&'e Unfetched> {
+    let mut cause = Some(error);
+    while let Some(current) = cause {
+        if let Some(found) = current.downcast_ref::<Unfetched>() {
+            return Some(found);
+        }
+        cause = current.source();
+    }
+    None
 }
 
 /// One reference that was tried and not resolved.
@@ -229,6 +300,25 @@ pub enum Reason {
     /// The facade's identity map does not bind the referenced resource.
     #[error("this server holds no such resource")]
     Absent,
+}
+
+impl Reason {
+    /// Returns whether the reason says the resource is absent, which the
+    /// engine skips, rather than that its fetch failed, which refuses.
+    ///
+    /// A `404` or `410` says the server holds no such resource
+    /// (<https://hl7.org/fhir/R4/http.html#read>); every other status, a
+    /// missing answer and a body that is not the resource are failures.
+    #[must_use]
+    pub fn is_absence(&self) -> bool {
+        match *self {
+            Self::NotAllowed | Self::Unreadable | Self::Absent => true,
+            Self::Status { status } => {
+                status == StatusCode::NOT_FOUND || status == StatusCode::GONE
+            }
+            Self::NoAnswer { .. } | Self::Mismatch => false,
+        }
+    }
 }
 
 /// Where one literal reference points.
@@ -375,7 +465,8 @@ async fn resolve_from(
     resolved
 }
 
-/// Records and logs one reference that was not resolved.
+/// Records and logs one reference that was not resolved, as an absence the
+/// engine skips or as a failure that refuses the run reading it.
 ///
 /// The reference literal is a resource type and id, an identifier, and the
 /// base is configuration, so the line carries no clinical content.
@@ -384,6 +475,17 @@ fn skip(resolved: &mut Resolved, literal: String, reason: Reason, base: &str) {
         Reason::Status { status } => Some(status.as_u16()),
         _ => None,
     };
+    if !reason.is_absence() {
+        tracing::warn!(
+            reference = literal.as_str(),
+            base,
+            status,
+            reason = %reason,
+            "a referenced resource could not be fetched, and a mapping that reads it refuses"
+        );
+        resolved.failed.insert(literal, reason);
+        return;
+    }
     tracing::warn!(
         reference = literal.as_str(),
         base,

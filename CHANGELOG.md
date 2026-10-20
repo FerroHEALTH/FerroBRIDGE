@@ -170,6 +170,15 @@ crates on crates.io.
 
 ### Changed
 
+- A reference the facade could not fetch now refuses the request with
+  `502 Bad Gateway` when a mapping reads it (#94): a sending site that
+  answers a status other than `404` or `410`, times out, or answers a body
+  that is not the referenced resource, and a CDR read that fails, are
+  upstream failures, which `engine/Fail.adoc` does not let a mapping drop.
+  The single create and update, a transaction and `$validate` all answer
+  it, and the `OperationOutcome` names the reference and the upstream
+  status. A resource the sending site or this server does not hold stays a
+  declared skip.
 - The operator console takes FerroUI 0.2.0 and reads every word it hands
   FerroUI from its catalog at run time (#956): table captions, column
   headers, pager nouns with their plurals, navigation, fields, dialogs and

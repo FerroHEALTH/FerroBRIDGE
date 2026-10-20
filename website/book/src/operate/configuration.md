@@ -502,14 +502,19 @@ How the facade resolves a reference a request names and does not carry, for a
 resource this server committed, and the facade reads it through the identity
 map and the CDR as a read answers it. An absolute reference to another server
 is fetched only from a base listed in `fetch_bases`, with redirects refused,
-so by default nothing is fetched. A reference that is not resolved, because
-its base is not listed, the server answered another status, the fetch timed
-out or this server holds no such resource, is a declared skip: the mapping
-proceeds without it and the log line names the reference, the base and the
-upstream status. FHIRconnect says only that the engine "should attempt to GET
-it from the sending site. If not possible, the engine proceeds with the
-mapping"; the allow-list, the depth and the timeout are FerroBRIDGE's own
-design.
+so by default nothing is fetched. A reference whose resource is absent,
+because its base is not listed, the server answered `404` or `410`, or this
+server holds no such resource, is a declared skip: the mapping proceeds
+without it and the log line names the reference, the base and the upstream
+status. A fetch that failed, because the server answered another status, the
+fetch timed out or the body is not the referenced resource, refuses a request
+whose mapping reads that reference with `502 Bad Gateway`, and the
+`OperationOutcome` names the reference and the upstream status. FHIRconnect
+says only that the engine "should attempt to GET it from the sending site. If
+not possible, the engine proceeds with the mapping"; its strictness chapter
+asks that "either all data should be mapped, or the mapping should fail", so
+an upstream failure refuses. The allow-list, the depth and the timeout are
+FerroBRIDGE's own design.
 
 | Key | Default | Meaning |
 |---|---|---|

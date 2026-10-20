@@ -295,10 +295,19 @@ impl Ingest<'_> {
             .unwrap_or_default();
         let partition = self.map_entries(entries, unmapped, provenance).await;
         if !partition.failures.is_empty() {
-            return Err(Refused::of(
-                StatusCode::UNPROCESSABLE_ENTITY,
-                partition.failures,
-            ));
+            // NOTE: no specification governs this: our own design, an entry that failed
+            // upstream (a reference fetch) answers the bundle as the `UPSTREAM` row does.
+            let upstream = status::UPSTREAM;
+            let status = if partition
+                .failures
+                .iter()
+                .any(|issue| issue.code() == upstream.issue())
+            {
+                upstream.status()
+            } else {
+                StatusCode::UNPROCESSABLE_ENTITY
+            };
+            return Err(Refused::of(status, partition.failures));
         }
         let Some(ref subject) = partition.subject else {
             return Err(nothing_mapped(&partition));

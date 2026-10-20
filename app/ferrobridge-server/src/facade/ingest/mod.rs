@@ -664,8 +664,21 @@ pub enum RepresentationError {
 /// An element the program cannot map refuses the unit (no specification
 /// governs this: our own design), so the answer is a `422` whose diagnostics
 /// name the mapping and the element the engine refused at.
+///
+/// A run refused because a referenced resource could not be fetched
+/// ([`crate::facade::references::Unfetched`]) failed upstream, so it answers
+/// the [`crate::facade::status::UPSTREAM`] row, a `502` with `transient`.
 #[must_use]
 pub fn engine_refusal(error: &EngineError) -> Refused {
+    if crate::facade::references::unfetched(error).is_some() {
+        let row = status::UPSTREAM;
+        return Refused::new(
+            row.status(),
+            Issue::error(row.issue())
+                .diagnosing(chain(error))
+                .detailing("a resource the mapping reads could not be fetched"),
+        );
+    }
     Refused::new(
         StatusCode::UNPROCESSABLE_ENTITY,
         Issue::error(IssueType::Processing)
