@@ -6,7 +6,6 @@
 use core::str::FromStr;
 
 use fhir_types::codec::Value;
-use fhir_types::r4::primitives::String as FhirString;
 use openehr_mapping_core::composition::RmPosition;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::model;
@@ -124,7 +123,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         };
         let mut view = cell::get(&value, kind, terminology)?;
         if let (Some(reference), FhirValue::Reference(held)) = (reference, &mut view) {
-            held.reference = Some(FhirString::from(reference));
+            held.reference = Some(fhir_types::r4::primitives::String::from(reference));
         }
         Ok((view, dropped))
     }
