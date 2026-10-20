@@ -48,6 +48,16 @@ crates on crates.io.
   EHDS laboratory template the library ships does not parse. A context that
   compiles joins the mapping-library pass list on its own. The list stays at
   10 of 107.
+- The FHIRconnect engine converts `DV_TIME` against `time` and `DV_DURATION`
+  against `Duration` (#93). The duration cell runs the UCUM to ISO 8601
+  bridge of FHIRconnect `DV_DURATION.adoc`, the eight
+  `CommonUCUMCodesForDuration` rows as one committed table: a duration of
+  several components reads in its smallest one by the factors UCUM fixes, a
+  code outside the bridge, a comparator and a system other than UCUM are
+  typed refusals, and `ms` is a one-way row. The time cell moves the text
+  unchanged, gives the ISO 8601 basic form its separators, and refuses a time
+  with an offset or with no seconds, which R4 `time` cannot state.
+  `fhirconnect` 0.1.164.
 - The shipped `datatype-pl-to-location` supplement writes PL.11, the
   assigning authority, into the `identifier.assigner` of each location level
   the PL carries (#345). The guide's two PL.11 rows address all six levels
