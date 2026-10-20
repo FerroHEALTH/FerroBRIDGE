@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use fhir_types::codec::Value;
+use fhirconnect::engine::subject::SubjectIdentifier;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_base::v1_3::base_types::identification::uid_based_id::UidBasedId;
@@ -355,6 +356,12 @@ impl Ingest<'_> {
         .await
         .map_err(|error| ehr_refusal(&error))?;
         let preceding = self.preceding(&ehr_id, &partition.mapped, &revised).await?;
+        let offered: Vec<SubjectIdentifier> = partition
+            .mapped
+            .iter()
+            .flat_map(|mapped| mapped.offered.iter().cloned())
+            .collect();
+        Box::pin(self.write_subject(&ehr_id, &offered)).await?;
         let (contribution, returned) = self
             .commit_all(&ehr_id, &partition.mapped, &preceding)
             .await?;

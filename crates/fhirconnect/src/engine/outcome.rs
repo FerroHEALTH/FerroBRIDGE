@@ -26,6 +26,7 @@ use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use crate::engine::lens::Fallback;
 use crate::engine::lens::term_mapping::Cause;
 use crate::engine::lens::term_mapping::Withheld;
+use crate::engine::subject::SubjectIdentifier;
 
 /// A produced document with the losses the run declared.
 ///
@@ -38,6 +39,7 @@ pub struct Outcome<T> {
     warnings: Vec<Warning>,
     created: Vec<Value>,
     consumed: Vec<String>,
+    subject: Vec<SubjectIdentifier>,
 }
 
 impl<T> Outcome<T> {
@@ -49,6 +51,7 @@ impl<T> Outcome<T> {
             warnings: Vec::new(),
             created: Vec::new(),
             consumed: Vec::new(),
+            subject: Vec::new(),
         }
     }
 
@@ -60,6 +63,7 @@ impl<T> Outcome<T> {
             warnings,
             created: Vec::new(),
             consumed: Vec::new(),
+            subject: Vec::new(),
         }
     }
 
@@ -76,6 +80,21 @@ impl<T> Outcome<T> {
     pub fn with_consumed(mut self, consumed: Vec<String>) -> Self {
         self.consumed = consumed;
         self
+    }
+
+    /// Returns this outcome with the identifiers a `mappingCode` function
+    /// offered as the subject reference of the EHR.
+    #[must_use]
+    pub fn with_subject(mut self, subject: Vec<SubjectIdentifier>) -> Self {
+        self.subject = subject;
+        self
+    }
+
+    /// Returns the identifiers the run offered as the subject reference of
+    /// its EHR, in the order it read them ([`crate::engine::subject`]).
+    #[must_use]
+    pub fn subject(&self) -> &[SubjectIdentifier] {
+        &self.subject
     }
 
     /// Returns the literal references whose resources a `slotContext` pulled
@@ -135,6 +154,7 @@ impl<T> Outcome<T> {
             warnings: self.warnings,
             created: self.created,
             consumed: self.consumed,
+            subject: self.subject,
         }
     }
 }
@@ -429,6 +449,10 @@ pub enum SkipReason {
         /// The `code_string` of the defining code.
         code: String,
     },
+    /// The mapping writes the subject reference of the EHR, which the
+    /// `EHR_STATUS` holds and a run over a composition never reads (openEHR
+    /// RM EHR IM Release 1.1.0, the `EHR_STATUS` class).
+    EhrStatusSubject,
 }
 
 impl fmt::Display for SkipReason {
@@ -477,6 +501,9 @@ impl fmt::Display for SkipReason {
                 f,
                 "its defining_code {code} of {terminology} has no place in a string, \
                  which carries the rubric only"
+            ),
+            Self::EhrStatusSubject => f.write_str(
+                "it writes the subject of the EHR, which the EHR_STATUS holds and no composition does",
             ),
         }
     }

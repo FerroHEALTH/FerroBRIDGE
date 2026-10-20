@@ -31,6 +31,9 @@ pub struct Facade {
     pub subject_id_form: String,
     /// The `PARTY_REF.type` of the subject of an EHR the facade creates.
     pub subject_type: String,
+    /// The `Identifier.system` whose identifier a run that offers the subject of
+    /// the EHR writes as `EHR_STATUS.subject.external_ref`; empty names none.
+    pub ehr_status_identifier_system: String,
     /// The `AUDIT_DETAILS.system_id` every commit records.
     pub system_id: String,
     /// The `COMPOSITION.language` every commit carries, ISO 639-1.
@@ -65,6 +68,7 @@ impl Default for Facade {
             subject_namespace: String::from("ferrobridge"),
             subject_id_form: String::from("reference"),
             subject_type: String::from("PERSON"),
+            ehr_status_identifier_system: String::new(),
             system_id: String::from("FerroBRIDGE"),
             composition_language: String::new(),
             composition_territory: String::new(),

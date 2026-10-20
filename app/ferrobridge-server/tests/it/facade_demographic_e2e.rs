@@ -220,6 +220,7 @@ async fn the_party_resources_live_in_the_reference_cdrs_demographic_store()
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("en"),
             territory: String::from("GB"),
+            ehr_status_system: None,
         },
     ));
     for resource_type in ["Patient", "Practitioner", "Organization"] {

@@ -87,6 +87,15 @@ pub struct Settings {
     pub language: String,
     /// The `COMPOSITION.territory` the facade writes, an ISO 3166-1 code.
     pub territory: String,
+    /// The `Identifier.system` whose identifier a `mappingCode` function writes
+    /// as `EHR_STATUS.subject.external_ref`, `None` when the deployment names
+    /// none.
+    ///
+    /// The RM leaves which identifier the reference holds to the deployment: it
+    /// "can be used to contain a direct reference to the subject in a
+    /// demographic or identity service" (openEHR RM EHR IM Release 1.1.0, the
+    /// `EHR_STATUS` class).
+    pub ehr_status_system: Option<String>,
 }
 
 /// The programs and search declarations of one load, which a reload swaps

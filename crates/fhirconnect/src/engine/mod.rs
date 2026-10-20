@@ -61,6 +61,8 @@ pub mod rm;
 
 pub mod seam;
 
+pub mod subject;
+
 pub mod terminology;
 
 pub mod traverse;

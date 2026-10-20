@@ -10,6 +10,7 @@ mod composition;
 mod contribution;
 mod demographic;
 mod ehr;
+mod ehr_status;
 mod end_to_end;
 mod oauth;
 mod pins;

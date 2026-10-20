@@ -53,6 +53,7 @@ async fn the_facade_round_trips_the_kds_patient_through_a_real_cdr() -> Result<(
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("de"),
             territory: String::from("DE"),
+            ehr_status_system: None,
         },
     ));
     let input: serde_json::Value = serde_json::from_str(fixtures::KDS_PERSON_PATIENT)?;

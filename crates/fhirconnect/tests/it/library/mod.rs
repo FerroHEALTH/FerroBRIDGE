@@ -18,6 +18,7 @@ use fhirconnect::model::semantic::MappingCodeRegistry;
 use proptest::prelude::*;
 
 mod daily;
+mod ehr_status;
 mod range;
 mod ratio;
 
@@ -98,6 +99,7 @@ fn the_library_registers_each_function_with_its_ports() {
         [
             DURATION,
             "dosageQuantityToRange",
+            "ehrStatusAddExternalREF",
             "rangeToText",
             "ratio_to_dosage",
             "ratio_to_dosage_action",

@@ -462,6 +462,7 @@ This lane reaches identifiable data, and the server says so once at start-up.
 | `subject_namespace` | `ferrobridge` | The namespace a literal subject reference is looked up in on the CDR, the `PARTY_REF.namespace` of `EHR_STATUS.subject` |
 | `subject_id_form` | `reference` | How the id of a literal subject reference is written: `reference` keeps `Patient/<id>`, `logical_id` keeps the bare `<id>`, and `uuid` keeps the bare `<id>` and refuses one that is no UUID |
 | `subject_type` | `PERSON` | The `PARTY_REF.type` of the subject of an EHR the facade creates, one of the BASE `Type_validity` values (`PERSON`, `ORGANISATION`, `GROUP`, `AGENT`, `ROLE`, `PARTY`, `ACTOR`) or `ANY` |
+| `ehr_status_identifier_system` | none | The `Identifier.system` whose identifier a mapping that offers the subject of the EHR (`ehrStatusAddExternalREF`) writes as `EHR_STATUS.subject.external_ref` |
 | `system_id` | `FerroBRIDGE` | The `AUDIT_DETAILS.system_id` every commit records |
 | `composition_language` | none, required | The `COMPOSITION.language` every commit carries, an ISO 639-1 code |
 | `composition_territory` | none, required | The `COMPOSITION.territory` every commit carries, an ISO 3166-1 code |
@@ -487,6 +488,25 @@ already holds. A subject named by `identifier` keeps the identifier's
 `system` as its namespace and its `value` as its id. A `subject_type` outside
 the BASE set, or a `subject_namespace` that breaks the `OBJECT_REF`
 namespace rule, is a boot error naming the key.
+
+A mapping can offer the resource's identifiers as the subject of the EHR,
+as the published `KDS_admin_entry_person.yml` does with
+`ehrStatusAddExternalREF`. The openEHR RM leaves which identifier
+`EHR_STATUS.subject.external_ref` holds to the deployment, so
+`ehr_status_identifier_system` names its `system`. A CDR that takes subject
+pseudonyms only (FerroEHR with `[privacy] subject_namespaces`) takes the
+system its pseudonyms are issued in. The reference is written the way the
+facade writes the subject of an EHR it creates: namespace and scheme from the
+`system`, id from the `value`, type from `subject_type`. Before the
+composition is committed the facade reads the `EHR_STATUS`: one that already
+holds the reference is left as it is, one with no subject reference takes it
+with `If-Match` on the version read, and one that names another subject
+answers `409`. A CDR refusal of the write answers through the same status
+table as a composition write, a `412` with the latest version as its `ETag`,
+and nothing is committed after it. With the key unset, a write whose mapping
+offers identifiers answers `422` naming the key; identifiers of another
+system are left out of the subject reference, and two distinct identifiers of
+the configured system answer `422`.
 
 The two composition fields have no default. FHIRconnect puts them on the
 project performing the mapping, and there is no correct language for a clinical

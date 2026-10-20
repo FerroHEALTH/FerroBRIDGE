@@ -290,7 +290,7 @@ impl Ingest<'_> {
                 .diagnosing(text)
                 .at(String::from(full_url))
         })?;
-        let (composition, instant, consumed) = self
+        let (composition, instant, consumed, offered) = self
             .run_consuming(program, &inbound, provenance)
             .await
             .map_err(|error| {
@@ -328,6 +328,7 @@ impl Ingest<'_> {
                 composition: Box::new(rm),
                 instant,
                 consumed,
+                offered,
             }),
             subject,
         ))

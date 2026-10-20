@@ -246,8 +246,9 @@ impl Ingest<'_> {
         )
         .await
         .map_err(|error| ehr_refusal(&error))?;
-        let composition = self.build(program, inbound, provenance).await?;
+        let (composition, offered) = self.build_offering(program, inbound, provenance).await?;
         let rm = strict_read(&composition)?;
+        Box::pin(self.write_subject(&ehr_id, &offered)).await?;
         let context = self.commit_context(commit::Change::Creation, &composition)?;
         let answered = self
             .client
@@ -331,9 +332,10 @@ impl Ingest<'_> {
             preceding,
             ..
         } = *revision;
-        let built = self.build(program, inbound, provenance).await?;
+        let (built, offered) = self.build_offering(program, inbound, provenance).await?;
         let composition = splice(program, &built, revision)?;
         let rm = strict_read(&composition)?;
+        Box::pin(self.write_subject(ehr_id, &offered)).await?;
         let context = self.commit_context(commit::Change::Modification, &composition)?;
         let answered = self
             .client

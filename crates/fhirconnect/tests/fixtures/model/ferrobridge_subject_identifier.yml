@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping over the synthetic problem-diagnosis
+# template that offers every Condition.identifier as the subject of the EHR,
+# the form the published KDS_admin_entry_person.yml writes: $resource.identifier
+# onto $reference through ehrStatusAddExternalREF.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_subject_identifier
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "problemDiagnose"
+    with:
+      fhir: "$resource.code"
+      openehr: "$archetype/data[at0001]/items[at0002]"
+      type: "CODEABLECONCEPT"
+
+  - name: "identifier"
+    with:
+      fhir: "$resource.identifier"
+      openehr: "$reference"
+    mappingCode: "ehrStatusAddExternalREF"

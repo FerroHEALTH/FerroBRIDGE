@@ -432,6 +432,22 @@ fn the_subject_link_takes_the_cdr_owners_namespace_form_and_type() -> Result<(),
 }
 
 #[test]
+fn the_ehr_status_identifier_system_is_unset_until_a_deployment_names_one()
+-> Result<(), Box<dyn StdError>> {
+    let settings = Config::from_sources(Some(&facade_with("")), &BTreeMap::new())?.resolve()?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    assert_eq!(None, facade.settings.ehr_status_system);
+    let text = facade_with("ehr_status_identifier_system = \"urn:oid:2.999.1\"\n");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    assert_eq!(
+        Some("urn:oid:2.999.1"),
+        facade.settings.ehr_status_system.as_deref()
+    );
+    Ok(())
+}
+
+#[test]
 fn a_subject_type_outside_type_validity_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
     // BASE base_types PARTY_REF §Invariants, Type_validity: PATIENT is no party type.
     let text = facade_with("subject_type = \"PATIENT\"\n");
