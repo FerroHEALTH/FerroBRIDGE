@@ -17,6 +17,10 @@ use fhirconnect::engine::traverse::functions::SELF_PORT;
 use fhirconnect::model::semantic::MappingCodeRegistry;
 use proptest::prelude::*;
 
+mod daily;
+mod range;
+mod ratio;
+
 /// The name of the administration duration function.
 const DURATION: &str = "dosageDurationToAdministrationDuration";
 
@@ -58,16 +62,48 @@ fn written(produced: Option<Value>) -> Result<serde_json::Value, Box<dyn Error>>
         .to_serde_json(&mut Path::root("Timing.repeat"))?)
 }
 
+/// Returns the ports holding one value of `class` at `port`, as its JSON.
+fn holding(port: &str, class: &str, json: serde_json::Value) -> Ports {
+    Ports::new().with(port, Datum::new(class, json))
+}
+
+/// Returns the canonical JSON of the value of `class` at `port`.
+fn held<'ports>(
+    ports: &'ports Ports,
+    port: &str,
+    class: &str,
+) -> Option<&'ports serde_json::Value> {
+    ports
+        .get(port)
+        .filter(|datum| datum.class() == class)
+        .map(Datum::value)
+}
+
 /// Returns whether a refusal is the function's own, naming `code`.
 fn refused_by(error: &MappingCodeError, code: &str) -> bool {
     matches!(*error, MappingCodeError::Refused { code: ref named, .. } if named == code)
+}
+
+/// Returns whether a refusal is the function's own or its cell's, naming
+/// `code`.
+fn refused_or_cell(error: &MappingCodeError, code: &str) -> bool {
+    refused_by(error, code)
+        || matches!(*error, MappingCodeError::Cell { code: ref named, .. } if named == code)
 }
 
 #[test]
 fn the_library_registers_each_function_with_its_ports() {
     assert_eq!(
         Library::codes().collect::<Vec<_>>(),
-        [DURATION, NON_DAILY],
+        [
+            DURATION,
+            "dosageQuantityToRange",
+            "rangeToText",
+            "ratio_to_dosage",
+            "ratio_to_dosage_action",
+            NON_DAILY,
+            "timingToDaily",
+        ],
         "the library holds the functions it implements, in name order"
     );
     assert!(Library.contains(DURATION));
