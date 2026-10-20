@@ -219,6 +219,10 @@ crates on crates.io.
   left out. A search configured over `GROUP`, `AGENT` or
   `PARTY_RELATIONSHIP`, which the CDR refuses, answers `501 not-supported`
   naming the Cadasto experimental AQL demographic extension.
+- The FHIRconnect engine's data-type cell dispatch is a module folder,
+  `engine::cell` with the held-value readers in a child module (#1079),
+  under the file-length threshold. Behaviour and public API are unchanged.
+  `fhirconnect` 0.1.170.
 - The operator console takes FerroUI 0.2.0 and reads every word it hands
   FerroUI from its catalog at run time (#956): table captions, column
   headers, pager nouns with their plurals, navigation, fields, dialogs and
