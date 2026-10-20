@@ -58,31 +58,17 @@ projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.context.yaml
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (fc-extension-method-outside-model)
   left out model/observation/org.openehr/medication_statement.v0.yml (fc-unknown-mapping-reference)
   refused
-    model/cluster/org.openehr/specimen.v1.yml:101 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:104 fc-anchor-without-children
-    model/cluster/org.openehr/specimen.v1.yml:124 fc-anchor-without-children
-    model/cluster/org.openehr/specimen.v1.yml:139 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:152 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:156 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:158 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:160 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:174 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:178 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:180 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:182 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:19 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:196 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:200 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:202 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:204 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:56 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:61 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:66 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:71 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:76 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:81 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:91 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:96 fc-unknown-template-node
+    model/cluster/org.openehr/specimen.v1.yml:101 fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:139 fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:19 fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:56 fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:61 fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:66 fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:71 fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:76 fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:81 fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:91 fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:96 fc-excluded-template-node
     model/composition/org.openehr/request.v1.ServiceRequest.yml:41 fc-unknown-template-node
     model/composition/org.openehr/request.v1.ServiceRequest.yml:43 fc-unknown-template-node
     model/composition/org.openehr/request.v1.ServiceRequest.yml:45 fc-unknown-template-node
@@ -150,47 +136,7 @@ projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
     model/observation/org.openehr/laboratory_test_result.v1.yml:120 fc-anchor-without-children
     model/observation/org.openehr/laboratory_test_result.v1.yml:142 fc-unknown-fhir-element
     model/observation/org.openehr/laboratory_test_result.v1.yml:156 fc-unknown-fhir-element
-    model/observation/org.openehr/laboratory_test_result.v1.yml:178 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:186 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:190 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:192 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:194 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:207 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:211 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:213 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:215 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:229 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:233 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:235 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:237 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:251 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:255 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:257 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:259 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:273 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:277 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:279 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:281 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:295 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:299 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:301 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:303 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:317 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:321 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:323 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:325 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:339 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:343 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:345 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:347 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:361 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:365 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:367 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:369 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:382 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:388 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:390 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:392 fc-unknown-template-node
+    model/observation/org.openehr/laboratory_test_result.v1.yml:178 fc-excluded-template-node
     model/observation/org.openehr/laboratory_test_result.v1.yml:448 fc-anchor-without-children
     model/observation/org.openehr/laboratory_test_result.v1.yml:47 fc-uncarried-tail
     model/observation/org.openehr/laboratory_test_result.v1.yml:49 fc-uncarried-tail

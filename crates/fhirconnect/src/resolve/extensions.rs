@@ -105,9 +105,9 @@ pub(crate) fn apply<'a>(
     extensions: &[&'a ModelMappingFile],
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Merged<'a> {
-    refuse_duplicate_names(model, model.mappings(), &ModelPath::root(), diagnostics);
+    warn_duplicate_names(model, model.mappings(), &ModelPath::root(), diagnostics);
     for extension in extensions {
-        refuse_duplicate_names(
+        warn_duplicate_names(
             extension,
             extension.mappings(),
             &ModelPath::root(),
@@ -240,6 +240,16 @@ fn append<'a>(
         ));
         return;
     };
+    if let Some(refusal) = duplicate_target(
+        extension,
+        mappings,
+        target.value(),
+        target.position(),
+        &path.field("appendTo"),
+    ) {
+        diagnostics.push(refusal);
+        return;
+    }
     let Some(node) = locate_mut(mappings, target.value()) else {
         diagnostics.push(refusal(
             extension,
@@ -342,6 +352,16 @@ fn overwrite<'a>(
         ));
         return;
     }
+    if let Some(refusal) = duplicate_target(
+        extension,
+        mappings,
+        &target,
+        method.name.position(),
+        &path.field("name"),
+    ) {
+        diagnostics.push(refusal);
+        return;
+    }
     let Some(node) = locate_mut(mappings, &target) else {
         diagnostics.push(refusal(
             extension,
@@ -391,15 +411,15 @@ fn refuse_nested_methods(
     }
 }
 
-/// Refuses two sibling mapping methods of one file that carry one name.
+/// Warns of two sibling mapping methods of one file that carry one name.
 ///
-/// `overwrite` "overwrites the mapping method with the same name" and
-/// `appendTo` names a method, or a child by its dotted path
-/// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/extension-methods.adoc`),
-/// so a name two siblings share addresses neither of them, and an edit aimed
-/// at one could land on the other. The refusal names both positions. Every
-/// list is checked, the `followedBy` and `reference` lists included.
-fn refuse_duplicate_names(
+/// Mapping names, "apart from being used when referenced in extension
+/// methods, … serve no deeper meaning"
+/// (`docs/specs/fhirconnect/modules/ROOT/pages/basics/body.adoc`), so a
+/// shared name is a warning here, and [`duplicate_on_path`] refuses the
+/// `overwrite` or `appendTo` that names it. The warning names both positions.
+/// Every list is checked, the `followedBy` and `reference` lists included.
+fn warn_duplicate_names(
     file: &ModelMappingFile,
     mappings: &[Mapping],
     parent: &ModelPath,
@@ -415,27 +435,29 @@ fn refuse_duplicate_names(
         {
             let first_at = first.name.position();
             let again = method.name.position();
-            diagnostics.push(refusal(
-                file,
-                file.header().name().value(),
-                ResolveCode::DuplicateMethodName,
-                again,
-                &path.field("name"),
-                format!(
-                    "`{}` names two mapping methods of one list in {}, at line {} column {} and \
-                     at line {} column {}, so an `overwrite` or an `appendTo` of it has no \
-                     single target",
-                    method.name.value(),
-                    file.file().display(),
-                    first_at.line(),
-                    first_at.column(),
-                    again.line(),
-                    again.column()
-                ),
-            ));
+            diagnostics.push(
+                Diagnostic::warning(
+                    file.file().to_path_buf(),
+                    ResolveCode::DuplicateMethodName.into(),
+                    format!(
+                        "`{}` names two mapping methods of one list in {}, at line {} column {} \
+                         and at line {} column {}, so an `overwrite` or an `appendTo` of it has \
+                         no single target and is refused",
+                        method.name.value(),
+                        file.file().display(),
+                        first_at.line(),
+                        first_at.column(),
+                        again.line(),
+                        again.column()
+                    ),
+                )
+                .with_position(again)
+                .with_mapping_name(file.header().name().value().clone())
+                .with_model_path(path.field("name")),
+            );
         }
         if let Some(ref followed) = method.followed_by {
-            refuse_duplicate_names(
+            warn_duplicate_names(
                 file,
                 &followed.mappings,
                 &path.field("followedBy"),
@@ -443,7 +465,7 @@ fn refuse_duplicate_names(
             );
         }
         if let Some(ref reference) = method.reference {
-            refuse_duplicate_names(
+            warn_duplicate_names(
                 file,
                 &reference.mappings,
                 &path.field("reference"),
@@ -451,6 +473,64 @@ fn refuse_duplicate_names(
             );
         }
     }
+}
+
+/// Builds the refusal for an `overwrite` or `appendTo` whose dotted path
+/// reaches a name two sibling methods share.
+fn duplicate_target(
+    extension: &ModelMappingFile,
+    mappings: &[Node<'_>],
+    dotted: &str,
+    position: Position,
+    path: &ModelPath,
+) -> Option<Diagnostic> {
+    let (first, again) = duplicate_on_path(mappings, dotted)?;
+    let first_at = first.mapping.name.position();
+    let again_at = again.mapping.name.position();
+    Some(refusal(
+        extension,
+        extension.header().name().value(),
+        ResolveCode::DuplicateMethodName,
+        position,
+        path,
+        format!(
+            "`{dotted}` reaches `{}`, which names two mapping methods of one list, in {} at line \
+             {} column {} and in {} at line {} column {}, so the edit has no single target",
+            first.name(),
+            first.origin.file().display(),
+            first_at.line(),
+            first_at.column(),
+            again.origin.file().display(),
+            again_at.line(),
+            again_at.column()
+        ),
+    ))
+}
+
+/// Returns the first two sibling methods a dotted `parent.child` path reaches
+/// by one shared name, at whichever level it meets them.
+///
+/// An `overwrite` "overwrites the mapping method with the same name" and an
+/// `appendTo` names a method or a child by its dotted path
+/// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/extension-methods.adoc`),
+/// so a name two siblings share addresses neither of them.
+fn duplicate_on_path<'n, 'a>(
+    mappings: &'n [Node<'a>],
+    dotted: &str,
+) -> Option<(&'n Node<'a>, &'n Node<'a>)> {
+    let mut level: Vec<&'n Node<'a>> = mappings.iter().collect();
+    for segment in dotted.split('.') {
+        let named: Vec<&'n Node<'a>> = level
+            .into_iter()
+            .filter(|node| node.name() == segment)
+            .collect();
+        match *named.as_slice() {
+            [first, again, ..] => return Some((first, again)),
+            [only] => level = only.followed_by.iter().chain(&only.reference).collect(),
+            [] => return None,
+        }
+    }
+    None
 }
 
 /// Resolves a dotted `parent.child` mapping-method path in the merged tree.
