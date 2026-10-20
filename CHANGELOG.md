@@ -345,6 +345,13 @@ crates on crates.io.
   out (an `ITEM_TREE` under an entry, for example) by its term definition in
   the template, where it named it by its node id before (RM Common IM,
   `LOCATABLE.name`). The `openehr-sdt` 0.0.89 builder does this.
+- `ferrohealth-smart` 0.4.0 (#1110). Every `[<lane>.credentials.oauth]`
+  table takes the keys the crate adds: `client_auth = "tls_client_auth"` or
+  `"self_signed_tls_client_auth"` with `client_certificate_file` and
+  `client_key_file` for RFC 8705 §2 mutual TLS to the token endpoint,
+  `ca_file` for trust roots added to the built-in ones, and
+  `assertion_audience = "issuer"` for a `private_key_jwt` assertion that
+  names the issuer (RFC 7523 §3) in place of the token endpoint.
 - `ferrohealth-smart` 0.3.1 and the `openehr-*` crates 0.0.90 (#1062),
   which `ferrohealth-smart` 0.3.1 pins; `fhirconnect` 0.1.168 and
   `openehr-mapping-core` 0.1.124 build on them. The facade and the operator
@@ -558,6 +565,12 @@ crates on crates.io.
   next line. It now keeps the higher version at each position, leaves any
   hunk that differs beyond its versions to stop the merge, and refuses a
   manifest `cargo metadata` cannot read.
+
+### Security
+
+- `rustls-webpki` 0.103.16, `webpki-root-certs` 1.0.10 and `webpki-roots`
+  1.0.10 in the lock, past RUSTSEC-2026-0382 and RUSTSEC-2026-0383
+  (certificate paths through the distrusted emSign intermediates) (#1110).
 
 ## [0.0.10] - 2026-10-19
 
