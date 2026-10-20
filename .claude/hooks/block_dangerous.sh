@@ -15,16 +15,13 @@
 #
 #   .claude/hooks/block_dangerous.sh --self-test   # run the built-in cases
 #
-# The force-push rule reads only an actual `git push` invocation: the command
-# is split into simple commands at ; & | and newlines, and only one whose
-# words are `git [global options] push …` is checked, by its own arguments.
-# A protected name elsewhere (a sed string, an issue body) is never read.
-#
-# The delete rules read only an actual `rm` or `git rm` invocation. A perl
-# tokenizer splits the command the way the shell does (quotes, `$( … )`,
+# Both rules read only an actual `rm`, `git rm` or `git push` invocation. A
+# perl tokenizer splits the command the way the shell does (quotes, `$( … )`,
 # here-documents, comments and redirections), so the words inside an argument
 # such as an issue body are never judged. The command a `trap`, `eval`,
-# `bash -c`, `find -exec`, `xargs` or `sudo` runs is judged too.
+# `bash -c`, `find -exec`, `xargs` or `sudo` runs is judged too. A push is
+# checked by its own arguments, so a protected name elsewhere (a sed string,
+# an issue body) is never read.
 
 set -euo pipefail
 
@@ -263,7 +260,8 @@ judge_rm() {
 }
 
 # Prints the reason and returns 2 when the simple command whose words are the
-# arguments, or a command it runs, deletes what the delete rules refuse.
+# arguments, or a command it runs, deletes what the delete rules refuse or
+# force-pushes what the push rule refuses.
 judge_command() {
   local -a w=("$@")
   local n=$# i=0 j word base
@@ -306,6 +304,9 @@ judge_command() {
       done
       if [ "$j" -lt "$n" ] && [ "${w[$j]}" = rm ]; then
         check_protected "${w[@]:$((j + 1))}" || return $?
+      fi
+      if [ "$j" -lt "$n" ] && [ "${w[$j]}" = push ]; then
+        check_push "${w[@]:$((j + 1))}" || return $?
       fi
       ;;
     trap)
@@ -363,35 +364,13 @@ judge_string() {
   return 0
 }
 
-# Prints the reason and returns 2 when the simple command $1 is a force push
-# that targets main or master or names no conventional-type branch.
+# Prints the reason and returns 2 when the `git push` whose arguments are the
+# arguments is a force push that targets main or master or names no
+# conventional-type branch.
 check_push() {
-  local -a words
-  local i=0 word force=0 named=0 ref dst
-  read -r -a words <<< "$1" || true
-  # Leading environment assignments and a subshell parenthesis.
-  while [ "$i" -lt "${#words[@]}" ] && [[ "${words[$i]}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; do
-    i=$((i + 1))
-  done
-  [ "$i" -lt "${#words[@]}" ] || return 0
-  word="${words[$i]#(}"
-  [ "$word" = "git" ] || return 0
-  i=$((i + 1))
-  # Global options before the subcommand; -C and -c take a value.
-  while [ "$i" -lt "${#words[@]}" ] && [[ "${words[$i]}" == -* ]]; do
-    case "${words[$i]}" in
-      -C | -c) i=$((i + 2)) ;;
-      *) i=$((i + 1)) ;;
-    esac
-  done
-  [ "$i" -lt "${#words[@]}" ] && [ "${words[$i]}" = "push" ] || return 0
-  i=$((i + 1))
-
+  local word force=0 named=0 ref dst
   local -a refs=()
-  for word in "${words[@]:$i}"; do
-    word="${word//\"/}"
-    word="${word//\'/}"
-    word="${word%)}"
+  for word in "$@"; do
     case "$word" in
       --force | -f | --force-if-includes) force=1 ;;
       --force-with-lease) force=1 ;;
@@ -430,16 +409,8 @@ check_push() {
 
 # Prints the reason and returns 2 when the command $1 must be blocked.
 verdict() {
-  local cmd="$1" segment status
   mktemp_vars=" "
-  judge_string "$cmd" || return $?
-
-  while IFS= read -r segment; do
-    status=0
-    check_push "$segment" || status=$?
-    [ "$status" -eq 0 ] || return "$status"
-  done < <(printf '%s\n' "$cmd" | tr ';&|' '\n')
-  return 0
+  judge_string "$1"
 }
 
 # Runs every case: a command and the exit status the hook must give it. A
@@ -470,6 +441,10 @@ self_test() {
 2	git push --force-with-lease=main origin feat/x:main
 2	git push --force
 2	git push --force-with-lease origin some-branch
+2	sudo git push --force origin main
+2	bash -c 'git push --force origin main'
+2	(git push --force origin main)
+2	echo "a; b" && git push --force-with-lease origin "main"
 2	rm -rf build
 2	rm -r -f build
 2	rm -fr build
@@ -517,6 +492,9 @@ self_test() {
 0	sed -n '/--force-with-lease/p' notes.md; echo main
 0	git push origin main
 0	git push -u origin feat/x
+0	gh issue create --title "push" --body "a; git push --force origin main"
+0	git commit -m "never: git push -f origin main && git push origin +master"
+0	gh pr comment 1 --body 'refused | git push --force-with-lease origin main'
 0	git log --oneline main
 0	rm -rf /tmp/scratch
 0	rm -rf /private/tmp/scratch
