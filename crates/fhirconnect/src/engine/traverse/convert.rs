@@ -220,34 +220,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         self.read_value(value, kind, terminology.as_deref())
                             .map_err(refuse)?
                     }
-                    // NOTE: a scalar leaf carries text, so only an element that
-                    // travels as text takes it; no specification governs this:
-                    // our own design.
-                    Leaf::Scalar(ref text) => match kind {
-                        FhirKind::String | FhirKind::Date | FhirKind::DateTime => {
-                            let element = target.resolved().leaf();
-                            let read = FhirValue::read(kind, element, &Value::String(text.clone()))
-                                .map_err(|source| EngineError::Fhir {
-                                    mapping: String::from(mapping.name()),
-                                    element: String::from(element),
-                                    source: Box::new(source),
-                                })?;
-                            (read, Dropped::default())
-                        }
-                        FhirKind::Boolean
-                        | FhirKind::Coding
-                        | FhirKind::CodeableConcept
-                        | FhirKind::Period
-                        | FhirKind::Reference
-                        | FhirKind::Identifier
-                        | FhirKind::Quantity => {
-                            return Err(refuse(LensError::NoCell {
-                                rm_type: String::from(openehr.leaf_class().unwrap_or("String")),
-                                kind: kind.as_str(),
-                                direction: Direction::OpenehrToFhir,
-                            }));
-                        }
-                    },
+                    Leaf::Scalar(ref text) => (
+                        Self::read_scalar(mapping, target, openehr, kind, text)?,
+                        Dropped::default(),
+                    ),
                 };
                 let output = Output::fhir(target, &binding.fhir);
                 let Some(view) = self.translated(mapping, view, output)? else {
@@ -257,6 +233,45 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 self.record_dropped(mapping, binding, &dropped);
                 Ok(())
             }
+        }
+    }
+
+    /// Reads the text a scalar leaf holds as the FHIR element `kind` names.
+    fn read_scalar(
+        mapping: &Mapping,
+        target: &FhirTarget,
+        openehr: &OpenehrTarget,
+        kind: FhirKind,
+        text: &str,
+    ) -> Result<FhirValue, EngineError> {
+        // NOTE: a scalar leaf carries text, so only an element that travels as
+        // text takes it; no specification governs this: our own design.
+        match kind {
+            FhirKind::String | FhirKind::Date | FhirKind::DateTime => {
+                let element = target.resolved().leaf();
+                FhirValue::read(kind, element, &Value::String(String::from(text))).map_err(
+                    |source| EngineError::Fhir {
+                        mapping: String::from(mapping.name()),
+                        element: String::from(element),
+                        source: Box::new(source),
+                    },
+                )
+            }
+            FhirKind::Boolean
+            | FhirKind::Coding
+            | FhirKind::CodeableConcept
+            | FhirKind::Period
+            | FhirKind::Reference
+            | FhirKind::Identifier
+            | FhirKind::Quantity => Err(EngineError::Cell {
+                mapping: String::from(mapping.name()),
+                element: String::from(target.expression().as_str()),
+                source: Box::new(LensError::NoCell {
+                    rm_type: String::from(openehr.leaf_class().unwrap_or("String")),
+                    kind: kind.as_str(),
+                    direction: Direction::OpenehrToFhir,
+                }),
+            }),
         }
     }
 
