@@ -20,10 +20,10 @@ projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml
   left out projects/org.highmed/KDS/diagnose/KDS_lebensphase.yml (fc-unknown-mapping-reference)
   left out projects/org.highmed/KDS/diagnose/KDS_problem_diagnose.yml (yaml-syntax)
   refused
-    projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml:20 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml:25 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml:27 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml:29 fc-unknown-mapping-reference
+    projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml:20 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml:25 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml:27 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml:29 error fc-unknown-mapping-reference
 projects/org.highmed/KDS/fall/KDS_fall_einfach.context.yaml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
   left out model/action/org.openehr/medication.v1.yml (fc-unknown-mapping-reference)
@@ -39,7 +39,7 @@ projects/org.highmed/KDS/fall/KDS_fall_einfach.context.yaml
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (fc-extension-method-outside-model)
   left out model/observation/org.openehr/medication_statement.v0.yml (fc-unknown-mapping-reference)
   refused
-    projects/org.highmed/KDS/fall/KDS_fall_einfach.context.yaml:30 fc-unknown-mapping-reference
+    projects/org.highmed/KDS/fall/KDS_fall_einfach.context.yaml:30 error fc-unknown-mapping-reference
 projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.context.yaml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
   left out model/action/org.openehr/medication.v1.yml (fc-unknown-mapping-reference)
@@ -55,29 +55,29 @@ projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.context.yaml
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (fc-extension-method-outside-model)
   left out model/observation/org.openehr/medication_statement.v0.yml (fc-unknown-mapping-reference)
   refused
-    model/cluster/org.openehr/specimen.v1.yml:101 fc-excluded-template-node
-    model/cluster/org.openehr/specimen.v1.yml:139 fc-excluded-template-node
-    model/cluster/org.openehr/specimen.v1.yml:19 fc-excluded-template-node
-    model/cluster/org.openehr/specimen.v1.yml:56 fc-excluded-template-node
-    model/cluster/org.openehr/specimen.v1.yml:61 fc-excluded-template-node
-    model/cluster/org.openehr/specimen.v1.yml:66 fc-excluded-template-node
-    model/cluster/org.openehr/specimen.v1.yml:71 fc-excluded-template-node
-    model/cluster/org.openehr/specimen.v1.yml:76 fc-excluded-template-node
-    model/cluster/org.openehr/specimen.v1.yml:81 fc-excluded-template-node
-    model/cluster/org.openehr/specimen.v1.yml:91 fc-excluded-template-node
-    model/cluster/org.openehr/specimen.v1.yml:96 fc-excluded-template-node
-    model/composition/org.openehr/request.v1.ServiceRequest.yml:41 fc-unknown-template-node
-    model/composition/org.openehr/request.v1.ServiceRequest.yml:43 fc-unknown-template-node
-    model/composition/org.openehr/request.v1.ServiceRequest.yml:45 fc-unknown-template-node
-    model/composition/org.openehr/request.v1.ServiceRequest.yml:64 fc-unknown-template-node
-    model/composition/org.openehr/request.v1.ServiceRequest.yml:66 fc-unknown-template-node
-    model/composition/org.openehr/request.v1.ServiceRequest.yml:68 fc-unknown-template-node
-    model/instruction/org.openehr/service_request.v1.yml:19 fc-unknown-template-node
-    model/instruction/org.openehr/service_request.v1.yml:34 fc-unknown-template-node
-    projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:108 fc-unknown-extension-target
-    projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:17 fc-archetype-mismatch
-    projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:54 fc-uncarried-tail
-    projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:83 fc-uncarried-tail
+    model/cluster/org.openehr/specimen.v1.yml:101 warning fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:139 warning fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:19 warning fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:56 warning fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:61 warning fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:66 warning fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:71 warning fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:76 warning fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:81 warning fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:91 warning fc-excluded-template-node
+    model/cluster/org.openehr/specimen.v1.yml:96 warning fc-excluded-template-node
+    model/composition/org.openehr/request.v1.ServiceRequest.yml:41 error fc-unknown-template-node
+    model/composition/org.openehr/request.v1.ServiceRequest.yml:43 error fc-unknown-template-node
+    model/composition/org.openehr/request.v1.ServiceRequest.yml:45 error fc-unknown-template-node
+    model/composition/org.openehr/request.v1.ServiceRequest.yml:64 error fc-unknown-template-node
+    model/composition/org.openehr/request.v1.ServiceRequest.yml:66 error fc-unknown-template-node
+    model/composition/org.openehr/request.v1.ServiceRequest.yml:68 error fc-unknown-template-node
+    model/instruction/org.openehr/service_request.v1.yml:19 error fc-unknown-template-node
+    model/instruction/org.openehr/service_request.v1.yml:34 error fc-unknown-template-node
+    projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:108 error fc-unknown-extension-target
+    projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:17 error fc-archetype-mismatch
+    projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:54 error fc-uncarried-tail
+    projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:83 error fc-uncarried-tail
 projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
   left out model/action/org.openehr/medication.v1.yml (fc-unknown-mapping-reference)
@@ -93,50 +93,50 @@ projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (fc-extension-method-outside-model)
   left out model/observation/org.openehr/medication_statement.v0.yml (fc-unknown-mapping-reference)
   refused
-    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:109 fc-uncarried-tail
-    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:131 fc-uncarried-tail
-    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:153 fc-uncarried-tail
-    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:175 fc-uncarried-tail
-    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:197 fc-uncarried-tail
-    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:214 fc-anchor-without-children
-    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:33 fc-uncarried-tail
-    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:65 fc-uncarried-tail
-    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:87 fc-uncarried-tail
-    model/cluster/org.openehr/specimen.v1.yml:139 fc-ambiguous-template-node
-    model/cluster/org.openehr/specimen.v1.yml:152 fc-ambiguous-template-node
-    model/cluster/org.openehr/specimen.v1.yml:156 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:158 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:160 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:174 fc-ambiguous-template-node
-    model/cluster/org.openehr/specimen.v1.yml:178 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:180 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:182 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:196 fc-ambiguous-template-node
-    model/cluster/org.openehr/specimen.v1.yml:200 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:202 fc-unknown-template-node
-    model/cluster/org.openehr/specimen.v1.yml:204 fc-unknown-template-node
-    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:119 fc-unknown-template-node
-    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:121 fc-unknown-template-node
-    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:123 fc-unknown-template-node
-    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:37 fc-uncarried-tail
-    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:39 fc-uncarried-tail
-    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:60 fc-unknown-template-node
-    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:62 fc-unknown-template-node
-    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:64 fc-unknown-template-node
-    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:70 fc-unknown-template-node
-    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:98 fc-unknown-fhir-element
-    model/observation/org.openehr/laboratory_test_result.v1.yml:120 fc-anchor-without-children
-    model/observation/org.openehr/laboratory_test_result.v1.yml:142 fc-unknown-fhir-element
-    model/observation/org.openehr/laboratory_test_result.v1.yml:156 fc-unknown-fhir-element
-    model/observation/org.openehr/laboratory_test_result.v1.yml:178 fc-excluded-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:448 fc-anchor-without-children
-    model/observation/org.openehr/laboratory_test_result.v1.yml:47 fc-uncarried-tail
-    model/observation/org.openehr/laboratory_test_result.v1.yml:49 fc-uncarried-tail
-    model/observation/org.openehr/laboratory_test_result.v1.yml:61 fc-unknown-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:77 fc-uncarried-tail
-    model/observation/org.openehr/laboratory_test_result.v1.yml:79 fc-uncarried-tail
-    projects/org.highmed/KDS/laborbericht/KDS_composition.yml:65 fc-nested-extension-method
-    projects/org.highmed/KDS/laborbericht/KDS_laborbericht.yml:56 fc-unknown-extension-target
+    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:109 error fc-uncarried-tail
+    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:131 error fc-uncarried-tail
+    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:153 error fc-uncarried-tail
+    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:175 error fc-uncarried-tail
+    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:197 error fc-uncarried-tail
+    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:214 warning fc-anchor-without-children
+    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:33 error fc-uncarried-tail
+    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:65 error fc-uncarried-tail
+    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:87 error fc-uncarried-tail
+    model/cluster/org.openehr/specimen.v1.yml:139 error fc-ambiguous-template-node
+    model/cluster/org.openehr/specimen.v1.yml:152 error fc-ambiguous-template-node
+    model/cluster/org.openehr/specimen.v1.yml:156 error fc-unknown-template-node
+    model/cluster/org.openehr/specimen.v1.yml:158 error fc-unknown-template-node
+    model/cluster/org.openehr/specimen.v1.yml:160 error fc-unknown-template-node
+    model/cluster/org.openehr/specimen.v1.yml:174 error fc-ambiguous-template-node
+    model/cluster/org.openehr/specimen.v1.yml:178 error fc-unknown-template-node
+    model/cluster/org.openehr/specimen.v1.yml:180 error fc-unknown-template-node
+    model/cluster/org.openehr/specimen.v1.yml:182 error fc-unknown-template-node
+    model/cluster/org.openehr/specimen.v1.yml:196 error fc-ambiguous-template-node
+    model/cluster/org.openehr/specimen.v1.yml:200 error fc-unknown-template-node
+    model/cluster/org.openehr/specimen.v1.yml:202 error fc-unknown-template-node
+    model/cluster/org.openehr/specimen.v1.yml:204 error fc-unknown-template-node
+    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:119 error fc-unknown-template-node
+    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:121 error fc-unknown-template-node
+    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:123 error fc-unknown-template-node
+    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:37 error fc-uncarried-tail
+    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:39 error fc-uncarried-tail
+    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:60 error fc-unknown-template-node
+    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:62 error fc-unknown-template-node
+    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:64 error fc-unknown-template-node
+    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:70 error fc-unknown-template-node
+    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:98 error fc-unknown-fhir-element
+    model/observation/org.openehr/laboratory_test_result.v1.yml:120 warning fc-anchor-without-children
+    model/observation/org.openehr/laboratory_test_result.v1.yml:142 error fc-unknown-fhir-element
+    model/observation/org.openehr/laboratory_test_result.v1.yml:156 error fc-unknown-fhir-element
+    model/observation/org.openehr/laboratory_test_result.v1.yml:178 warning fc-excluded-template-node
+    model/observation/org.openehr/laboratory_test_result.v1.yml:448 warning fc-anchor-without-children
+    model/observation/org.openehr/laboratory_test_result.v1.yml:47 error fc-uncarried-tail
+    model/observation/org.openehr/laboratory_test_result.v1.yml:49 error fc-uncarried-tail
+    model/observation/org.openehr/laboratory_test_result.v1.yml:61 error fc-unknown-template-node
+    model/observation/org.openehr/laboratory_test_result.v1.yml:77 error fc-uncarried-tail
+    model/observation/org.openehr/laboratory_test_result.v1.yml:79 error fc-uncarried-tail
+    projects/org.highmed/KDS/laborbericht/KDS_composition.yml:65 error fc-nested-extension-method
+    projects/org.highmed/KDS/laborbericht/KDS_laborbericht.yml:56 error fc-unknown-extension-target
 projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
   left out model/action/org.openehr/medication.v1.yml (fc-unknown-mapping-reference)
@@ -153,11 +153,11 @@ projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml
   left out model/observation/org.openehr/medication_statement.v0.yml (fc-unknown-mapping-reference)
   left out projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.yml (fc-unknown-mapping-reference)
   refused
-    projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml:18 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml:21 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml:25 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml:30 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml:32 fc-unknown-mapping-reference
+    projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml:18 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml:21 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml:25 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml:30 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml:32 error fc-unknown-mapping-reference
 projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
   left out model/action/org.openehr/medication.v1.yml (fc-unknown-mapping-reference)
@@ -175,12 +175,12 @@ projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.c
   left out projects/org.highmed/KDS/medikationsverabreichung/KDS_composition.yml (fc-unknown-mapping-reference)
   left out projects/org.highmed/KDS/medikationsverabreichung/KDS_medikamentenverabreichung.yml (fc-unknown-mapping-reference)
   refused
-    projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml:18 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml:20 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml:23 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml:25 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml:26 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml:28 fc-unknown-mapping-reference
+    projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml:18 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml:20 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml:23 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml:25 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml:26 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml:28 error fc-unknown-mapping-reference
 projects/org.highmed/KDS/person/person.context.yaml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
   left out model/action/org.openehr/medication.v1.yml (fc-unknown-mapping-reference)
@@ -197,8 +197,8 @@ projects/org.highmed/KDS/person/person.context.yaml
   left out model/observation/org.openehr/medication_statement.v0.yml (fc-unknown-mapping-reference)
   left out projects/org.highmed/KDS/person/KDS_admin_entry_person.yml (fc-unknown-mapping-code)
   refused
-    projects/org.highmed/KDS/person/person.context.yaml:29 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/person/person.context.yaml:34 fc-unknown-mapping-reference
+    projects/org.highmed/KDS/person/person.context.yaml:29 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/person/person.context.yaml:34 error fc-unknown-mapping-reference
 projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
   left out model/action/org.openehr/medication.v1.yml (fc-unknown-mapping-reference)
@@ -216,10 +216,10 @@ projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml
   left out projects/org.highmed/KDS/person_pseudo/KDS_composition.yml (fc-unknown-mapping-reference)
   left out projects/org.highmed/KDS/person_pseudo/KDS_pseudo_admin_person.yml (fc-unknown-mapping-reference)
   refused
-    projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml:26 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml:27 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml:28 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml:29 fc-unknown-mapping-reference
+    projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml:26 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml:27 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml:28 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml:29 error fc-unknown-mapping-reference
 projects/org.highmed/KDS/procedure/procedure.context.yaml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
   left out model/action/org.openehr/medication.v1.yml (fc-unknown-mapping-reference)
@@ -236,9 +236,9 @@ projects/org.highmed/KDS/procedure/procedure.context.yaml
   left out model/observation/org.openehr/medication_statement.v0.yml (fc-unknown-mapping-reference)
   left out projects/org.highmed/KDS/procedure/KDS_procedure.v1.yml (fc-unknown-mapping-reference)
   refused
-    projects/org.highmed/KDS/procedure/procedure.context.yaml:19 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/procedure/procedure.context.yaml:24 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/procedure/procedure.context.yaml:27 fc-unknown-mapping-reference
+    projects/org.highmed/KDS/procedure/procedure.context.yaml:19 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/procedure/procedure.context.yaml:24 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/procedure/procedure.context.yaml:27 error fc-unknown-mapping-reference
 projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
   left out model/action/org.openehr/medication.v1.yml (fc-unknown-mapping-reference)
@@ -255,11 +255,11 @@ projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml
   left out model/observation/org.openehr/medication_statement.v0.yml (fc-unknown-mapping-reference)
   left out projects/org.highmed/KDS/studienteilnahme/KDS_informed_consent.yaml (fc-schema-violation)
   refused
-    projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml:18 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml:19 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml:20 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml:22 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml:23 fc-unknown-mapping-reference
+    projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml:18 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml:19 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml:20 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml:22 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml:23 error fc-unknown-mapping-reference
 projects/org.highmed/KDS/todesursache/KDS_Todesursache.context.yaml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
   left out model/action/org.openehr/medication.v1.yml (fc-unknown-mapping-reference)
@@ -276,9 +276,9 @@ projects/org.highmed/KDS/todesursache/KDS_Todesursache.context.yaml
   left out model/observation/org.openehr/medication_statement.v0.yml (fc-unknown-mapping-reference)
   left out projects/org.highmed/KDS/todesursache/KDS_cause_of_death.yml (fc-unknown-mapping-reference)
   refused
-    projects/org.highmed/KDS/todesursache/KDS_Todesursache.context.yaml:18 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/todesursache/KDS_Todesursache.context.yaml:23 fc-unknown-mapping-reference
-    projects/org.highmed/KDS/todesursache/KDS_Todesursache.context.yaml:26 fc-unknown-mapping-reference
+    projects/org.highmed/KDS/todesursache/KDS_Todesursache.context.yaml:18 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/todesursache/KDS_Todesursache.context.yaml:23 error fc-unknown-mapping-reference
+    projects/org.highmed/KDS/todesursache/KDS_Todesursache.context.yaml:26 error fc-unknown-mapping-reference
 projects/org.highmed/KDS/vitalstatus/KDS_Vitalstatus.context.yaml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
   left out model/action/org.openehr/medication.v1.yml (fc-unknown-mapping-reference)
@@ -294,39 +294,39 @@ projects/org.highmed/KDS/vitalstatus/KDS_Vitalstatus.context.yaml
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (fc-extension-method-outside-model)
   left out model/observation/org.openehr/medication_statement.v0.yml (fc-unknown-mapping-reference)
   refused
-    model/composition/org.openehr/report.v1.Observation.yml:101 fc-unknown-template-node
-    model/composition/org.openehr/report.v1.Observation.yml:103 fc-unknown-template-node
-    model/composition/org.openehr/report.v1.Observation.yml:108 fc-unknown-fhir-element
-    model/composition/org.openehr/report.v1.Observation.yml:120 fc-uncarried-tail
-    model/composition/org.openehr/report.v1.Observation.yml:122 fc-uncarried-tail
-    model/composition/org.openehr/report.v1.Observation.yml:129 fc-unknown-fhir-element
-    model/composition/org.openehr/report.v1.Observation.yml:134 fc-unknown-fhir-element
-    model/composition/org.openehr/report.v1.Observation.yml:138 fc-unknown-fhir-element
-    model/composition/org.openehr/report.v1.Observation.yml:143 fc-unknown-template-node
-    model/composition/org.openehr/report.v1.Observation.yml:145 fc-unknown-template-node
-    model/composition/org.openehr/report.v1.Observation.yml:147 fc-unknown-template-node
-    model/composition/org.openehr/report.v1.Observation.yml:18 fc-unknown-fhir-element
-    model/composition/org.openehr/report.v1.Observation.yml:36 fc-unknown-fhir-element
-    model/composition/org.openehr/report.v1.Observation.yml:42 fc-unknown-fhir-element
-    model/composition/org.openehr/report.v1.Observation.yml:47 fc-unknown-fhir-element
-    model/composition/org.openehr/report.v1.Observation.yml:52 fc-unknown-fhir-element
-    model/composition/org.openehr/report.v1.Observation.yml:63 fc-unknown-fhir-element
-    model/composition/org.openehr/report.v1.Observation.yml:73 fc-unknown-template-node
-    model/composition/org.openehr/report.v1.Observation.yml:75 fc-unknown-template-node
-    model/composition/org.openehr/report.v1.Observation.yml:77 fc-unknown-template-node
-    model/composition/org.openehr/report.v1.Observation.yml:81 fc-duplicate-method-name
-    model/composition/org.openehr/report.v1.Observation.yml:89 fc-unknown-fhir-element
-    model/composition/org.openehr/report.v1.Observation.yml:99 fc-unknown-template-node
-    model/evaluation/org.openehr/vital_status.v1.yml:105 fc-duplicate-method-name
-    model/evaluation/org.openehr/vital_status.v1.yml:113 fc-duplicate-method-name
-    model/evaluation/org.openehr/vital_status.v1.yml:121 fc-duplicate-method-name
-    model/evaluation/org.openehr/vital_status.v1.yml:36 fc-uncarried-tail
-    model/evaluation/org.openehr/vital_status.v1.yml:38 fc-uncarried-tail
-    model/evaluation/org.openehr/vital_status.v1.yml:51 fc-unknown-template-node
-    model/evaluation/org.openehr/vital_status.v1.yml:67 fc-uncarried-tail
-    model/evaluation/org.openehr/vital_status.v1.yml:69 fc-uncarried-tail
-    model/evaluation/org.openehr/vital_status.v1.yml:74 fc-anchor-without-children
-    model/evaluation/org.openehr/vital_status.v1.yml:97 fc-duplicate-method-name
+    model/composition/org.openehr/report.v1.Observation.yml:101 error fc-unknown-template-node
+    model/composition/org.openehr/report.v1.Observation.yml:103 error fc-unknown-template-node
+    model/composition/org.openehr/report.v1.Observation.yml:108 error fc-unknown-fhir-element
+    model/composition/org.openehr/report.v1.Observation.yml:120 error fc-uncarried-tail
+    model/composition/org.openehr/report.v1.Observation.yml:122 error fc-uncarried-tail
+    model/composition/org.openehr/report.v1.Observation.yml:129 error fc-unknown-fhir-element
+    model/composition/org.openehr/report.v1.Observation.yml:134 error fc-unknown-fhir-element
+    model/composition/org.openehr/report.v1.Observation.yml:138 error fc-unknown-fhir-element
+    model/composition/org.openehr/report.v1.Observation.yml:143 error fc-unknown-template-node
+    model/composition/org.openehr/report.v1.Observation.yml:145 error fc-unknown-template-node
+    model/composition/org.openehr/report.v1.Observation.yml:147 error fc-unknown-template-node
+    model/composition/org.openehr/report.v1.Observation.yml:18 error fc-unknown-fhir-element
+    model/composition/org.openehr/report.v1.Observation.yml:36 error fc-unknown-fhir-element
+    model/composition/org.openehr/report.v1.Observation.yml:42 error fc-unknown-fhir-element
+    model/composition/org.openehr/report.v1.Observation.yml:47 error fc-unknown-fhir-element
+    model/composition/org.openehr/report.v1.Observation.yml:52 error fc-unknown-fhir-element
+    model/composition/org.openehr/report.v1.Observation.yml:63 error fc-unknown-fhir-element
+    model/composition/org.openehr/report.v1.Observation.yml:73 error fc-unknown-template-node
+    model/composition/org.openehr/report.v1.Observation.yml:75 error fc-unknown-template-node
+    model/composition/org.openehr/report.v1.Observation.yml:77 error fc-unknown-template-node
+    model/composition/org.openehr/report.v1.Observation.yml:81 warning fc-duplicate-method-name
+    model/composition/org.openehr/report.v1.Observation.yml:89 error fc-unknown-fhir-element
+    model/composition/org.openehr/report.v1.Observation.yml:99 error fc-unknown-template-node
+    model/evaluation/org.openehr/vital_status.v1.yml:105 warning fc-duplicate-method-name
+    model/evaluation/org.openehr/vital_status.v1.yml:113 warning fc-duplicate-method-name
+    model/evaluation/org.openehr/vital_status.v1.yml:121 warning fc-duplicate-method-name
+    model/evaluation/org.openehr/vital_status.v1.yml:36 error fc-uncarried-tail
+    model/evaluation/org.openehr/vital_status.v1.yml:38 error fc-uncarried-tail
+    model/evaluation/org.openehr/vital_status.v1.yml:51 error fc-unknown-template-node
+    model/evaluation/org.openehr/vital_status.v1.yml:67 error fc-uncarried-tail
+    model/evaluation/org.openehr/vital_status.v1.yml:69 error fc-uncarried-tail
+    model/evaluation/org.openehr/vital_status.v1.yml:74 warning fc-anchor-without-children
+    model/evaluation/org.openehr/vital_status.v1.yml:97 warning fc-duplicate-method-name
 projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
   left out model/action/org.openehr/medication.v1.yml (fc-unknown-mapping-reference)
@@ -344,5 +344,5 @@ projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml
   left out projects/org.openehr/EEHRxF/lab/bundle/lab_composition.yml (empty-document)
   left out projects/org.openehr/EEHRxF/lab/bundle/lab_result.yml (fc-unknown-mapping-reference)
   refused
-    projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml:21 fc-unknown-mapping-reference
-    projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml:23 fc-unknown-mapping-reference
+    projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml:21 error fc-unknown-mapping-reference
+    projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml:23 error fc-unknown-mapping-reference
