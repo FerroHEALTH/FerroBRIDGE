@@ -194,16 +194,18 @@ impl<T: Table + ?Sized> Run<'_, T> {
             let Target::Fhir(ref target) = *path.target() else {
                 continue;
             };
-            let occurrence = self.entry_occurrence(target, binding, &mut shared);
+            let scoped = self.scoped(Some(target), binding);
+            let occurrence = self.entry_occurrence(target, &scoped, &mut shared);
             let element = String::from(target.resolved().leaf());
             let text = Value::String(String::from(self.manual_text(
                 mapping,
                 entry,
                 path.value(),
             )?));
+            let table = self.table;
             write(
-                self.table,
-                &mut self.fhir,
+                table,
+                self.document_for_mut(target),
                 target.expression(),
                 &occurrence,
                 text,
@@ -235,7 +237,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             let index = if let Some(&taken) = shared.get(axis) {
                 taken
             } else {
-                let taken = self.next_index(axis, &indices);
+                let taken = self.next_index(target.level(), axis, &indices);
                 shared.insert(axis.clone(), taken);
                 taken
             };

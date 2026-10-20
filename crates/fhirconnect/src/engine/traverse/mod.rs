@@ -560,6 +560,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
             .map_or(self.fhir_pin.as_ref(), |frame| frame.pin.as_ref())
     }
 
+    /// Returns the split pin of the document of `level`, to set.
+    fn pin_at(&mut self, level: usize) -> &mut Option<(Vec<String>, Occurrence)> {
+        match self.frames.get_mut(level) {
+            Some(frame) => &mut frame.pin,
+            None => &mut self.fhir_pin,
+        }
+    }
+
     /// Returns the instance counters of the document of `level`.
     fn counters_at(&mut self, level: usize) -> &mut BTreeMap<(String, String), usize> {
         match self.frames.get_mut(level) {

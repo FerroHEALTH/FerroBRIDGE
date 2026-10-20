@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping beside the caret reference fixture: an
+# Encounter diagnosis whose Condition is referenced, and inside the reference
+# a PROGRAMMED mapping and a manual mapping that climb back to the diagnosis
+# with two carets (basics/path_operators.adoc, Recurrence and parent elements).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_caret_kinds
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Encounter
+
+mappings:
+  - name: "problemDiagnosis"
+    with:
+      fhir: "$resource.diagnosis"
+      openehr: "$archetype"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "referencedDiagnose"
+          with:
+            fhir: "condition.reference"
+            openehr: "$reference"
+          reference:
+            resourceType: "Condition"
+            mappings:
+              - name: "diagnosisName"
+                with:
+                  fhir: "$fhirRoot.code"
+                  openehr: "$archetype/data[at0001]/items[at0002]"
+                  type: "CODEABLECONCEPT"
+              - name: "diagnosisUse"
+                unidirectional: "fhir->openehr"
+                with:
+                  fhir: "^^.use"
+                  openehr: "$archetype/data[at0001]"
+                mappingCode: "caretUse"
+              - name: "diagnosisUseText"
+                unidirectional: "openehr->fhir"
+                with:
+                  fhir: "^^.use"
+                manual:
+                  - name: "useText"
+                    fhir:
+                      - path: "text"
+                        value: "Treatment diagnosis"

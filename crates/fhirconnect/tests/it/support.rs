@@ -13,6 +13,7 @@ use fhirconnect::model::ast::ModelMappingFile;
 use fhirconnect::model::load::MappingSet;
 use fhirconnect::model::parse::lower_context;
 use fhirconnect::model::parse::lower_model;
+use fhirconnect::model::semantic::MappingCodeRegistry;
 use fhirconnect::model::semantic::StaticMappingCodes;
 use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
@@ -42,17 +43,39 @@ pub(crate) fn compiled_against(
     fixture: &str,
     index: &WebTemplateIndex,
 ) -> Result<Arc<Program>, Box<dyn Error>> {
+    compiled_with(fixture, index, &StaticMappingCodes::default())
+}
+
+/// Compiles the context and model fixture pair named `fixture` against
+/// `index`, with `codes` as the `mappingCode` registry.
+pub(crate) fn compiled_with(
+    fixture: &str,
+    index: &WebTemplateIndex,
+    codes: &dyn MappingCodeRegistry,
+) -> Result<Arc<Program>, Box<dyn Error>> {
+    compiled_models(fixture, &[fixture], index, codes)
+}
+
+/// Compiles the context fixture named `fixture` with the model fixtures
+/// `models` against `index`, with `codes` as the `mappingCode` registry.
+pub(crate) fn compiled_models(
+    fixture: &str,
+    models: &[&str],
+    index: &WebTemplateIndex,
+    codes: &dyn MappingCodeRegistry,
+) -> Result<Arc<Program>, Box<dyn Error>> {
     let mut set = MappingSet::new();
-    for (name, text) in [
-        (
-            format!("contexts/{fixture}.context.yml"),
-            std::fs::read_to_string(format!("{FIXTURES}/contexts/{fixture}.context.yml"))?,
-        ),
-        (
-            format!("model/{fixture}.yml"),
-            std::fs::read_to_string(format!("{FIXTURES}/model/{fixture}.yml"))?,
-        ),
-    ] {
+    let mut files = vec![(
+        format!("contexts/{fixture}.context.yml"),
+        std::fs::read_to_string(format!("{FIXTURES}/contexts/{fixture}.context.yml"))?,
+    )];
+    for model in models {
+        files.push((
+            format!("model/{model}.yml"),
+            std::fs::read_to_string(format!("{FIXTURES}/model/{model}.yml"))?,
+        ));
+    }
+    for (name, text) in files {
         let name = name.as_str();
         let document = openehr_mapping_core::loader::load_str(name, &text)?;
         if text.contains("\ntype: context\n") {
@@ -67,14 +90,8 @@ pub(crate) fn compiled_against(
         }
     }
     let context = MappingName::new(format!("{fixture}.context"))?;
-    compile(
-        &set,
-        &context,
-        index,
-        &SCHEMAS,
-        &StaticMappingCodes::default(),
-    )
-    .map_err(|diagnostics| Box::<dyn Error>::from(render(&diagnostics)))
+    compile(&set, &context, index, &SCHEMAS, codes)
+        .map_err(|diagnostics| Box::<dyn Error>::from(render(&diagnostics)))
 }
 
 /// Renders a diagnostic list as one error message.

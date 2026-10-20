@@ -390,6 +390,12 @@ crates on crates.io.
   `502` with `transient` and the upstream status in the diagnostics (#1094).
   It answered `422` with `processing`, as if the resource were wrong. A
   translation the server answers with no match stays the mapping's `422`.
+- A FHIRconnect `mappingCode` mapping, a `manual` mapping and a
+  `hierarchy.split` inside a `reference` now run when their FHIR path climbs
+  out of the referenced resource with `^` (#1095). They read and wrote the
+  referenced resource and refused with an unknown element; they now read
+  and write the resource the path climbs to, as every other mapping has
+  since the worked `^^.use.coding` example ran. `fhirconnect` 0.1.173.
 - A FHIRconnect `DV_INTERVAL<DV_DATE_TIME>` whose present bound is excluded
   is refused going out to `Period` (#1076), because both R4 `Period` bounds
   are inclusive; it was written as an inclusive bound with no loss declared.

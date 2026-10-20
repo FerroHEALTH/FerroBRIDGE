@@ -17,6 +17,7 @@ mod demographics;
 mod display;
 mod element_links;
 mod end_time;
+mod frames;
 mod functions;
 mod interval;
 mod links;
