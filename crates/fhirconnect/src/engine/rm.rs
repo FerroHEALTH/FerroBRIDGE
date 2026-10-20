@@ -180,7 +180,7 @@ impl RmValue {
             rm_type: String::from(rm_type),
             source,
         };
-        match rm_type {
+        match derive::base_class(rm_type) {
             "DV_TEXT" | "DV_CODED_TEXT" => from_canonical_value::<DvText>(value)
                 .map(|text| match text {
                     DvText::DvCodedText(coded) => Self::CodedText(Box::new(coded)),
@@ -199,7 +199,9 @@ impl RmValue {
             "DV_DATE_TIME" => from_canonical_value(value)
                 .map(|date| Self::DateTime(Box::new(date)))
                 .map_err(refuse),
-            "DV_INTERVAL" if bound_class(value) == Some("DV_QUANTITY") => {
+            "DV_INTERVAL"
+                if rm_type == QUANTITY_INTERVAL || bound_class(value) == Some("DV_QUANTITY") =>
+            {
                 from_canonical_value(value)
                     .map(|interval| Self::QuantityInterval(Box::new(interval)))
                     .map_err(refuse)
@@ -295,6 +297,9 @@ impl RmValue {
         Ok(encoded)
     }
 }
+
+/// The Web Template type name of a quantity interval node.
+const QUANTITY_INTERVAL: &str = "DV_INTERVAL<DV_QUANTITY>";
 
 /// Returns the class a `DV_INTERVAL`'s bounds carry, read from the `_type` of
 /// whichever bound the document holds.

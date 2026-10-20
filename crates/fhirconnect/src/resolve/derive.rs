@@ -66,13 +66,24 @@ pub const TEXT: &str = "string";
 /// and no data value is one.
 const STRUCTURAL: &str = "PATHABLE";
 
+/// Returns the class a Web Template type name names, without the generic
+/// parameter a `DV_INTERVAL<T>` node carries (`DV_INTERVAL<DV_DATE_TIME>`).
+///
+/// `DV_INTERVAL<T>` is generic in its bound class
+/// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_types.html#_dv_interval_class>),
+/// and the cells and the pairs are keyed by the class.
+#[must_use]
+pub fn base_class(rm_type: &str) -> &str {
+    rm_type.split_once('<').map_or(rm_type, |(class, _)| class)
+}
+
 /// Returns the FHIR type codes `class` converts with, empty for a class no
 /// cell carries.
 #[must_use]
 pub fn pairs(class: &str) -> &'static [&'static str] {
     PAIRS
         .iter()
-        .find(|&&(name, _)| name == class)
+        .find(|&&(name, _)| name == base_class(class))
         .map_or(&[], |&(_, codes)| codes)
 }
 

@@ -51,6 +51,7 @@ use crate::engine::lens::time::TimeLens;
 use crate::engine::lens::uri::UriLens;
 use crate::engine::rm::RmValue;
 use crate::model::ast::keyword::Direction;
+use crate::resolve::derive;
 
 /// What a cell produced, with the one-way rows it took.
 #[derive(Debug, Clone, PartialEq)]
@@ -275,7 +276,7 @@ pub fn put(
     binding: Option<&str>,
 ) -> Result<Produced<RmValue>, LensError> {
     let coded = coded_lens(binding);
-    let value = match (rm_type, view) {
+    let value = match (derive::base_class(rm_type), view) {
         ("DV_TEXT", FhirValue::String(text)) => {
             TextLens.put(text, held_text(existing)).map(RmValue::Text)
         }
@@ -376,7 +377,7 @@ fn fallbacks(
     // NOTE: DV_QUANTITY.adoc §Primitives hardcodes `units` as 1, which is a
     // one-way row only where no held value supplies the units.
     let unheld = held_quantity(existing).is_none();
-    match (rm_type, view) {
+    match (derive::base_class(rm_type), view) {
         ("DV_QUANTITY", FhirValue::Quantity(quantity)) => QuantityLens.fallbacks(quantity.as_ref()),
         ("DV_DURATION", FhirValue::Duration(duration)) => DurationLens.fallbacks(duration.as_ref()),
         ("DV_INTERVAL", FhirValue::Range(range)) => QuantityIntervalLens.fallbacks(range.as_ref()),
@@ -659,6 +660,29 @@ mod tests {
             produced.fallbacks.is_empty(),
             "the cell took no one-way row"
         );
+    }
+
+    #[test]
+    fn a_generic_interval_node_runs_the_cell_of_its_bound_class() {
+        // RM 1.1.0 data_types §DV_INTERVAL: the Web Template names the node
+        // `DV_INTERVAL<DV_QUANTITY>`, and DV_INTERVAL.adoc §Range is its cell.
+        let held = RmValue::from_canonical(
+            "DV_INTERVAL<DV_QUANTITY>",
+            "/synthetic",
+            &serde_json::json!({
+                "_type": "DV_INTERVAL",
+                "lower_unbounded": true,
+                "upper_unbounded": true,
+                "lower_included": false,
+                "upper_included": false,
+            }),
+        )
+        .expect("a quantity interval with no bounds");
+        assert!(matches!(held, RmValue::QuantityInterval(_)));
+        let view = FhirValue::Range(Box::default());
+        let produced = put(&view, "DV_INTERVAL<DV_QUANTITY>", Some(&held), None)
+            .expect("the Range cell carries the node");
+        assert_eq!(produced.value, held);
     }
 
     #[test]

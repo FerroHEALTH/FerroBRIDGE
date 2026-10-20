@@ -80,7 +80,10 @@ crates on crates.io.
   (#93), the `Range` table of FHIRconnect `DV_INTERVAL.adoc`, each bound
   through the `DV_QUANTITY` cell. An absent bound is the unbounded side, as
   the `Period` cell reads it, and an excluded bound or a bound with a
-  comparator, which no `Range` states (R4 `sqty-1`), is refused.
+  comparator, which no `Range` states (R4 `sqty-1`), is refused. A node the
+  Web Template types `DV_INTERVAL<DV_DATE_TIME>` or `DV_INTERVAL<DV_QUANTITY>`
+  now reaches its cell and its pairs by the class `DV_INTERVAL`; before, the
+  generic name matched no cell and a run over such a node refused.
   `fhirconnect` 0.1.167.
 - The shipped `datatype-pl-to-location` supplement writes PL.11, the
   assigning authority, into the `identifier.assigner` of each location level
