@@ -58,8 +58,7 @@ pub trait MappingCodeRegistry: fmt::Debug {
     /// The compiler resolves every port against the template at load. A
     /// registry that knows only names answers `None`, and a mapping that
     /// names such a function compiles with no port.
-    fn ports(&self, code: &str) -> Option<&'static [&'static str]> {
-        let _ = code;
+    fn ports(&self, _code: &str) -> Option<&'static [&'static str]> {
         None
     }
 }

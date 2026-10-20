@@ -19,6 +19,7 @@ use crate::resolve::program::hierarchy::Preprocessor;
 use crate::resolve::program::manual::Manual;
 use crate::resolve::program::manual::render_manual;
 use crate::resolve::program::port::Port;
+use crate::resolve::program::port::render_ports;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
 
@@ -444,13 +445,7 @@ impl Mapping {
             Method::Programmed {
                 ref code,
                 ref ports,
-            } => {
-                write!(f, "{inner}mappingCode {code}")?;
-                for port in ports {
-                    write!(f, " port {port}")?;
-                }
-                writeln!(f)?;
-            }
+            } => writeln!(f, "{inner}mappingCode {code}{}", render_ports(ports))?,
             Method::Participation { ref function } => {
                 writeln!(f, "{inner}participationsFunction {function}")?;
             }

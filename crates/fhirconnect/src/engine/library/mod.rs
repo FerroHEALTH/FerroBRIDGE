@@ -133,7 +133,7 @@ fn decode<T: Json>(
     let refuse = |source| MappingCodeError::FhirDecode {
         code: String::from(code),
         element,
-        source,
+        source: Box::new(source),
     };
     let object = expect_object(value, &path).map_err(refuse)?;
     T::from_json(object, &mut path).map_err(refuse)
@@ -146,7 +146,7 @@ fn encode<T: Json>(code: &str, element: &T) -> Result<Value, MappingCodeError> {
         .map(Value::Object)
         .map_err(|source| MappingCodeError::FhirEncode {
             code: String::from(code),
-            source,
+            source: Box::new(source),
         })
 }
 
@@ -191,7 +191,7 @@ fn port_value<T: DeserializeOwned>(
             code: String::from(code),
             port: String::from(port),
             class: String::from(datum.class()),
-            source,
+            source: Box::new(source),
         })
 }
 

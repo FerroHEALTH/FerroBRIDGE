@@ -202,8 +202,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
             return Ok(serde_json::Map::new());
         };
         match written.value {
-            Held::Partial(ref object) => Ok(object.clone()),
-            Held::Canonical(serde_json::Value::Object(ref object)) => Ok(object.clone()),
+            Held::Partial(ref object) | Held::Canonical(serde_json::Value::Object(ref object)) => {
+                Ok(object.clone())
+            }
             Held::Canonical(_) => Ok(serde_json::Map::new()),
             Held::Value(ref value) => match value.to_canonical()? {
                 serde_json::Value::Object(object) => Ok(object),

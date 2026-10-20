@@ -172,7 +172,7 @@ pub enum MappingCodeError {
         element: &'static str,
         /// The refusal of the generated codec.
         #[source]
-        source: DecodeError,
+        source: Box<DecodeError>,
     },
     /// The FHIR element the function built has no JSON form.
     #[error("the function {code} built a FHIR element with no JSON form")]
@@ -181,7 +181,7 @@ pub enum MappingCodeError {
         code: String,
         /// The refusal of the generated codec.
         #[source]
-        source: EncodeError,
+        source: Box<EncodeError>,
     },
     /// A port's canonical JSON does not decode as the class it names.
     #[error("the function {code} cannot read the {class} at port `{port}`")]
@@ -194,7 +194,7 @@ pub enum MappingCodeError {
         class: String,
         /// The refusal of the ITS-JSON reader.
         #[source]
-        source: JsonParseError,
+        source: Box<JsonParseError>,
     },
     /// The function wrote a port its signature does not declare.
     #[error("the function {code} wrote the port `{port}` its signature does not declare")]

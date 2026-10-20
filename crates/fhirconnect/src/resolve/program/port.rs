@@ -52,6 +52,17 @@ impl Port {
     }
 }
 
+/// Renders the ports of a PROGRAMMED mapping as the program rendering
+/// writes them after its `mappingCode`, empty for none.
+pub(crate) fn render_ports(ports: &[Port]) -> String {
+    let mut rendered = String::new();
+    for port in ports {
+        rendered.push_str(" port ");
+        rendered.push_str(&port.to_string());
+    }
+    rendered
+}
+
 impl fmt::Display for Port {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = if self.name.is_empty() { "." } else { self.name };

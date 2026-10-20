@@ -68,11 +68,25 @@ pub fn non_daily_to_openehr(element: &Value) -> Result<Ports, MappingCodeError> 
     let Some(ref period) = repeat.period else {
         return Ok(Ports::new());
     };
-    let amount = primitive(code, "period", period.id.as_ref(), &period.extension, period.value.as_ref())?;
+    let amount = primitive(
+        code,
+        "period",
+        period.id.as_ref(),
+        &period.extension,
+        period.value.as_ref(),
+    )?;
     let unit = repeat
         .period_unit
         .as_ref()
-        .map(|unit| primitive(code, "periodUnit", unit.id.as_ref(), &unit.extension, unit.value.as_ref()))
+        .map(|unit| {
+            primitive(
+                code,
+                "periodUnit",
+                unit.id.as_ref(),
+                &unit.extension,
+                unit.value.as_ref(),
+            )
+        })
         .transpose()?
         .ok_or_else(|| refused(code, "a period has a unit (R4 `tim-2`)"))?;
     let unit = TimeUnit::from_ucum(unit)
