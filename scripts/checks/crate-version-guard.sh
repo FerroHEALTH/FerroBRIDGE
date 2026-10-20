@@ -18,7 +18,10 @@
 # The diff runs from the merge base of the base ref and the head, never from
 # the base ref itself, so a crate change the base gained after the head forked
 # is not counted against the head (#969). CI passes the current tip of the
-# pull request's target branch as the base ref.
+# pull request's target branch as the base ref on a pull request, and the
+# queue base on a merge group, so a changed crate whose version the queue base
+# already reached fails before it merges (#1096). A version moves strictly
+# upward: equal to the base, or below it, fails.
 #
 # The head ref may be the literal WORKTREE, which compares the base with the
 # tree as it stands rather than with a commit. That is what the pre-commit hook
@@ -100,6 +103,30 @@ self_test() {
   t_git commit -qam bump
   expect 0 "a crate change with its bump" main HEAD
 
+  # The #1096 case: a branch bumped to the version main reaches while it waits
+  # in the merge queue. The queue builds the merge onto main and names main's
+  # tip as the base, so the change arrives at a version that is not above it.
+  t_git checkout -q main
+  echo 'pub fn d() {}' > "$tmp/repo/crates/demo/src/d.rs"
+  t_git add -A
+  t_git commit -qm 'main reaches 0.1.2'
+  set_version 0.1.2
+  t_git commit -qam 'main bumps to 0.1.2'
+  t_git checkout -q -b queued main~2
+  echo 'pub fn e() {}' > "$tmp/repo/crates/demo/src/e.rs"
+  t_git add -A
+  set_version 0.1.2
+  t_git commit -qam 'queued change at 0.1.2'
+  t_git checkout -q --detach main
+  t_git merge -q --no-ff -m 'merge group' queued > /dev/null 2>&1
+  expect 1 "a queued change at the version the queue base reached" main HEAD
+  set_version 0.1.1
+  t_git commit -qam 'below the base'
+  expect 1 "a queued change below the version of the queue base" main HEAD
+  set_version 0.1.3
+  t_git commit -qam 'above the base'
+  expect 0 "a queued change above the version of the queue base" main HEAD
+
   if [[ "$failures" -ne 0 ]]; then
     echo "crate-version-guard: self-test: $failures case(s) failed" >&2
     return 1
@@ -162,6 +189,13 @@ if grep -qx 'Cargo.toml' <<<"$changed"; then
   done
 fi
 
+# Whether version $1 sorts strictly above version $2. Equal is not above: a
+# queued change whose version the queue base already reached would publish
+# different content under one version.
+version_above() {
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ]]
+}
+
 package_field() {
   awk -F'"' -v key="$1" '/^\[package\]/{p=1} p && $0 ~ "^" key " = " {print $2; exit}'
 }
@@ -204,8 +238,8 @@ for manifest in crates/*/Cargo.toml; do
     reserved="$reserved $name"
     continue
   fi
-  if [[ -n "$old_ver" ]] && [[ "$old_ver" = "$new_ver" ]]; then
-    echo "::error::packaged content of $name changed but its version is still $new_ver. Bump $manifest, move any internal requirement in the root Cargo.toml with it, refresh Cargo.lock, or apply the 'no-crate-bump' label when the diff provably does not alter packaged bytes." >&2
+  if [[ -n "$old_ver" ]] && ! version_above "$new_ver" "$old_ver"; then
+    echo "::error::packaged content of $name changed but its version $new_ver is not above the base's $old_ver. Bump $manifest, move any internal requirement in the root Cargo.toml with it, refresh Cargo.lock, or apply the 'no-crate-bump' label when the diff provably does not alter packaged bytes." >&2
     fail=1
     continue
   fi
