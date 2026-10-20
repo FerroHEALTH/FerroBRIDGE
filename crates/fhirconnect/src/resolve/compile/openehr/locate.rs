@@ -14,6 +14,7 @@ use crate::resolve::compile::openehr::LocateError;
 use crate::resolve::compile::openehr::Reached;
 use crate::resolve::compile::openehr::constrains;
 use crate::resolve::compile::openehr::names_same_place;
+use crate::resolve::derive;
 
 impl<'a> Compiler<'a> {
     /// Returns the deepest template node an openEHR path names, and the
@@ -165,6 +166,9 @@ const ELEMENT_VALUE: &str = "value";
 /// it, because a declared type may be abstract (`ELEMENT.value` is
 /// `DATA_VALUE`) and the attribute then belongs to one of its descendants.
 ///
+/// A generic node (`DV_INTERVAL<DV_QUANTITY>`) is walked by its class, and a
+/// bound below it is its parameter ([`derive::attribute_class`]).
+///
 /// A type the model does not carry stops the walk rather than refusing it: the
 /// mapping is then checked as far as the model reaches and no further.
 ///
@@ -173,7 +177,7 @@ const ELEMENT_VALUE: &str = "value";
 /// the declared type, or its one concrete descendant when the declared type is
 /// abstract and has exactly one.
 pub(super) fn rm_tail(rm_type: &str, tail: &RmPath) -> Result<Option<String>, String> {
-    let mut candidates = concrete_forms(rm_type);
+    let mut candidates = concrete_forms(derive::base_class(rm_type));
     if candidates.is_empty() {
         return Ok(None);
     }
@@ -186,8 +190,13 @@ pub(super) fn rm_tail(rm_type: &str, tail: &RmPath) -> Result<Option<String>, St
             let Some(found) = rm_model::attribute(candidate, attribute) else {
                 continue;
             };
-            declared.get_or_insert(found.declared_type);
-            for form in concrete_forms(found.declared_type) {
+            let held = if position == 0 {
+                derive::attribute_class(rm_type, found)
+            } else {
+                found.declared_type
+            };
+            declared.get_or_insert(held);
+            for form in concrete_forms(held) {
                 if !next.contains(&form) {
                     next.push(form);
                 }

@@ -350,7 +350,9 @@ pub enum Carried {
 /// `DV_CODED_TEXT` and a `PARTY_PROXY` node a `PARTY_IDENTIFIED`
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_types.html#_dv_coded_text_class>).
 /// The class is the most general concrete one that declares the tail's first
-/// attribute. A tail below a structural node other than a [`FAMILIES`] or
+/// attribute. A generic node (`DV_INTERVAL<DV_QUANTITY>`) is looked up by its
+/// class, and a bound below it is its parameter
+/// ([`derive::attribute_class`]). A tail below a structural node other than a [`FAMILIES`] or
 /// [`PARTY_ROOTS`] entry,
 /// and a tail that steps through or ends on a container attribute, is `None`:
 /// the engine walks a tail by attribute name and writes one value into the
@@ -358,39 +360,42 @@ pub enum Carried {
 #[must_use]
 pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> {
     let wanted = tail.join("/");
-    if wanted == HISTORY_ORIGIN.1 && model::is_a(rm_type, HISTORY_ORIGIN.0) {
+    let class = derive::base_class(rm_type);
+    if wanted == HISTORY_ORIGIN.1 && model::is_a(class, HISTORY_ORIGIN.0) {
         return Some((HISTORY_ORIGIN.0, Carried::HistoryOrigin));
     }
     if let Some(&(owner, _)) = FAMILIES
         .iter()
-        .find(|&&(owner, path)| path == wanted && model::is_a(rm_type, owner))
+        .find(|&&(owner, path)| path == wanted && model::is_a(class, owner))
     {
         return Some((owner, Carried::Family));
     }
     if let Some(&(owner, _)) = PARTY_ROOTS
         .iter()
-        .find(|&&(owner, path)| path == wanted && rm_type == owner)
+        .find(|&&(owner, path)| path == wanted && class == owner)
     {
         return Some((owner, Carried::Value));
     }
-    if derive::is_structural(rm_type) {
+    if derive::is_structural(class) {
         return None;
     }
     let (&first, rest) = tail.split_first()?;
-    let owner = owner_of(rm_type, first)?;
+    let owner = owner_of(class, first)?;
     let mut attribute = model::attribute(owner, first)?;
+    let mut declared = derive::attribute_class(rm_type, attribute);
     for &segment in rest {
         if attribute.container != Container::None {
             return None;
         }
-        attribute = concrete_forms(attribute.declared_type)
+        attribute = concrete_forms(declared)
             .into_iter()
             .find_map(|form| model::attribute(form, segment))?;
+        declared = attribute.declared_type;
     }
     if attribute.container != Container::None {
         return None;
     }
-    Some((owner, held(attribute.declared_type)?))
+    Some((owner, held(declared)?))
 }
 
 /// Returns the most general concrete class at or below `rm_type` that
@@ -630,6 +635,36 @@ mod tests {
             carried("DV_INTERVAL", &["lower_included"]),
             Some(("DV_INTERVAL", Carried::Boolean))
         );
+    }
+
+    #[test]
+    fn a_tail_below_a_generic_interval_reaches_its_parameter() {
+        // RM 1.1.0 data_types §DV_INTERVAL: `lower` and `upper` are `T`.
+        assert_eq!(
+            carried("DV_INTERVAL<DV_QUANTITY>", &["lower"]),
+            Some(("DV_INTERVAL", Carried::Value))
+        );
+        assert_eq!(
+            carried("DV_INTERVAL<DV_QUANTITY>", &["upper", "magnitude"]),
+            Some(("DV_INTERVAL", Carried::Real))
+        );
+        assert_eq!(
+            carried("DV_INTERVAL<DV_COUNT>", &["lower", "magnitude"]),
+            Some(("DV_INTERVAL", Carried::Integer))
+        );
+        assert_eq!(
+            carried("DV_INTERVAL<DV_QUANTITY>", &["lower_included"]),
+            Some(("DV_INTERVAL", Carried::Boolean))
+        );
+    }
+
+    #[test]
+    fn a_tail_the_interval_parameter_does_not_carry_is_not_carried() {
+        assert_eq!(
+            carried("DV_INTERVAL<DV_QUANTITY>", &["lower", "numerator"]),
+            None
+        );
+        assert_eq!(carried("DV_INTERVAL<DV_QUANTITY>", &["middle"]), None);
     }
 
     #[test]

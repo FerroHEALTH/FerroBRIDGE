@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that names an attribute the bound
+# class of the problem name value does not declare, which the test turns
+# into a DV_INTERVAL<DV_QUANTITY>: DV_QUANTITY has no numerator.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_interval_tail_unknown
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "low"
+    with:
+      fhir: "$resource.onset.as(Range).low"
+      openehr: "$archetype/data[at0001]/items[at0002]/value/lower/numerator"
