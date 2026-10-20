@@ -14,6 +14,7 @@ mod chain;
 mod composer;
 mod conditions;
 mod demographics;
+mod display;
 mod element_links;
 mod end_time;
 mod functions;

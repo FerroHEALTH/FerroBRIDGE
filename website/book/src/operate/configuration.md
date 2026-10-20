@@ -265,14 +265,21 @@ section reads the same names under `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH
 
 The FHIR terminology lane. The facade, the `$tofhir` and `$toopenehr`
 operations and the HL7 v2 face translate every `conceptmap` code through it.
+Going into openEHR, they also resolve the display of a coding that carries
+none through `CodeSystem/$lookup`, because a `DV_CODED_TEXT` needs a value.
 Absent, the bridge holds no terminology client, and the engines fail closed on
-anything that would need one: a `conceptmap` mapping refuses.
+anything that would need one: a `conceptmap` mapping refuses, and a coding
+with no display keeps its code as the value.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `base_url` | none, required | The FHIR service base URL |
 | `wire_version` | `r4` | `stu3`, `r4` or `r4b`, the release the server answers in |
 | `timeout_ms` | `30000` | How long one call may take, connection included |
+| `display_fallback` | `false` | For a code the server does not know: `true` writes the code as the value of the `DV_CODED_TEXT`, `false` refuses the resource. A failed call refuses either way |
+
+As an environment variable, `display_fallback` reads
+`FERROBRIDGE__TERMINOLOGY__DISPLAY_FALLBACK`.
 
 ### `[cdm]`
 

@@ -1716,6 +1716,17 @@ never passed through under the target system, and an untranslatable optional
 code writes nothing rather than a wrong terminology assertion (two invariants
 the reference CDR's connector pinned by test, section 12).
 
+**Display resolution, as built (#95).** `Terminology::lookup` answers
+`CodeSystem/$lookup` over the generated R4 contract, `None` for a code the
+server does not know, and `Terminology::display_fallback` carries the
+deployment setting (`[terminology] display_fallback`, default `false`). Going
+into openEHR, a `DV_CODED_TEXT` whose value the cell filled from the code of
+a coding with no display asks for the display; archetype-local codes
+(`local`, `openehr`) are never asked. With no server configured the code
+stands, because the page offers it "if a term server is not an option". The
+server's `Translator` answers lookups from the same prepared rounds as
+translations.
+
 **The `conceptmap` seam, as built.** The FHIRconnect engine makes no call of
 its own: `fhirconnect::engine::terminology::Terminology` is the seam a
 `conceptmap` translates through, over the generated R4 `$translate`

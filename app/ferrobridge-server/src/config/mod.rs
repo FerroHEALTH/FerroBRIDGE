@@ -257,6 +257,10 @@ impl Config {
                 .as_ref()
                 .map(resolve_terminology)
                 .transpose()?,
+            display_fallback: self
+                .terminology
+                .as_ref()
+                .is_some_and(|terminology| terminology.display_fallback),
             cdm: self.cdm.as_ref().map(resolve_cdm).transpose()?,
             etl: self.etl.as_ref().map(resolve_etl).transpose()?,
             mapping_directory: self.mappings.directory.clone(),
@@ -346,6 +350,9 @@ pub struct Settings {
     pub cdr: Option<crate::cdr::config::CdrConfig>,
     /// The terminology client configuration, when the lane is on.
     pub terminology: Option<ferrobridge_term::config::Config>,
+    /// Whether a code the terminology server does not know takes its code as
+    /// display (`[terminology] display_fallback`).
+    pub display_fallback: bool,
     /// The OMOP CDM database, when the lane is on.
     pub cdm: Option<CdmSettings>,
     /// The OMOP ETL job, when it is configured.

@@ -6,13 +6,17 @@
 //!
 //! A mapping that names a `conceptmap` has its codes "transformed using the
 //! conceptmap" (`types-of-mappings/concept-type/manual.adoc`, §`ConceptMaps`),
-//! and the engine asks [`Terminology::translate`] for each distinct code. The
-//! seam is synchronous and [`Client`] is async, so [`Translator::run`]
-//! answers the engine from codes it resolved before the run: a run that meets
-//! a code not yet resolved is discarded, the codes it met are resolved
-//! through `$translate`, and the run is repeated. Every run adds at least one
-//! code, so the repetition ends. No specification governs this: our own
-//! design, which keeps every blocking wait off the runtime.
+//! and the engine asks [`Terminology::translate`] for each distinct code. A
+//! coding that reaches a `DV_CODED_TEXT` with no display has its display
+//! resolved through [`Terminology::lookup`], as `DV_CODED_TEXT.adoc`
+//! recommends "since the value is mandatory in openEHR". The seam is
+//! synchronous and [`Client`] is async, so [`Translator::run`] answers the
+//! engine from questions it resolved before the run: a run that meets a
+//! question not yet resolved is discarded, the questions it met are sent
+//! (`$translate` and `$lookup`, one call or one `batch`), and the run is
+//! repeated. Every run adds at least one question, so the repetition ends.
+//! No specification governs this: our own design, which keeps every blocking
+//! wait off the runtime.
 //!
 //! FHIRconnect names no direction for a concept map. A map is read as
 //! authored from openEHR to FHIR: the FHIR-bound run translates forward, and
@@ -22,21 +26,27 @@
 //!
 //! With no `[terminology]` server the engine keeps its default,
 //! [`NoTerminology`], which refuses every code: a code is never passed
-//! through under a system it was not translated into.
+//! through under a system it was not translated into, and a missing display
+//! keeps the code, the page's alternative "if a term server is not an
+//! option".
 
-use core::error::Error;
+pub mod fetch;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use ferrobridge_term::client::Client;
-use ferrobridge_term::concept::{Concept, Match};
-use ferrobridge_term::outcome::{BatchOutcome, Request, TranslateOutcome, Translation};
-use fhir_types::r4::coding::Coding;
-use fhir_types::r4::operations::concept_map_translate::{
-    ConceptMapTranslateRequest, ConceptMapTranslateResponse, ConceptMapTranslateResponseMatch,
+use ferrobridge_term::outcome::Translation;
+use fhir_types::r4::operations::code_system_lookup::{
+    CodeSystemLookupRequest, CodeSystemLookupResponse,
 };
-use fhir_types::r4::primitives::{Boolean, Canonical, Code, String as FhirString, Uri};
+use fhir_types::r4::operations::concept_map_translate::{
+    ConceptMapTranslateRequest, ConceptMapTranslateResponse,
+};
+use fhir_types::r4::primitives::{Boolean, String as FhirString};
 use fhirconnect::engine::terminology::{NoTerminology, Terminology, TerminologyError};
+
+use crate::terminology::fetch::{Answer, Displayed, Lookup, fetch};
 
 /// The direction of one engine run, which decides `reverse`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,15 +57,14 @@ pub enum Direction {
     ToOpenehr,
 }
 
-/// What the server answered for one code, shared across the repeated runs.
-type Answer = Result<ConceptMapTranslateResponse, Arc<dyn Error + Send + Sync>>;
-
 /// The terminology server the engine runs translate through, when one is
 /// configured.
 #[derive(Debug, Clone, Default)]
 pub struct Translator {
     /// The client of the `[terminology]` server.
     client: Option<Client>,
+    /// Whether a code the server does not know takes its code as display.
+    display_fallback: bool,
 }
 
 impl Translator {
@@ -63,7 +72,20 @@ impl Translator {
     /// server is configured.
     #[must_use]
     pub const fn new(client: Option<Client>) -> Self {
-        Self { client }
+        Self {
+            client,
+            display_fallback: false,
+        }
+    }
+
+    /// Returns this translator with `display_fallback` as the answer to
+    /// [`Terminology::display_fallback`]: whether a code the server does not
+    /// know takes `coding.code` as its display, which `DV_CODED_TEXT.adoc`
+    /// offers "alternatively". The default refuses the unit.
+    #[must_use]
+    pub const fn with_display_fallback(mut self, display_fallback: bool) -> Self {
+        self.display_fallback = display_fallback;
+        self
     }
 
     /// Returns whether a terminology server is configured.
@@ -77,17 +99,19 @@ impl Translator {
     ///
     /// A request that runs a mapping over several entries, such as a search
     /// page and its total, opens one session, so a code repeated across them
-    /// is translated once. The session is dropped with the request.
+    /// is asked once. The session is dropped with the request.
     #[must_use]
     pub fn session(&self) -> Session<'_> {
         Session {
             client: self.client.as_ref(),
+            display_fallback: self.display_fallback,
             answers: Mutex::new(BTreeMap::new()),
+            displays: Mutex::new(BTreeMap::new()),
         }
     }
 
-    /// Runs `run` with every code it translates resolved first, in a session
-    /// of its own ([`Session::run`]).
+    /// Runs `run` with every code it translates or looks up resolved first,
+    /// in a session of its own ([`Session::run`]).
     ///
     /// # Errors
     ///
@@ -103,29 +127,35 @@ impl Translator {
 
 /// The answers the runs of one request share.
 ///
-/// Every answer is keyed by the whole question: the concept map, the system,
-/// the code, its version and the direction. Nothing outlives the session.
+/// Every `$translate` answer is keyed by the whole question: the concept map,
+/// the system, the code, its version and the direction; every `$lookup`
+/// answer by the system, the code and the version. Nothing outlives the
+/// session.
 #[derive(Debug)]
 pub struct Session<'t> {
     /// The client of the `[terminology]` server, when one is configured.
     client: Option<&'t Client>,
-    /// Every answer this session received.
+    /// Whether a code the server does not know takes its code as display.
+    display_fallback: bool,
+    /// Every `$translate` answer this session received.
     answers: Mutex<BTreeMap<Translation, Answer>>,
+    /// Every `$lookup` answer this session received.
+    displays: Mutex<BTreeMap<Lookup, Displayed>>,
 }
 
 impl Session<'_> {
-    /// Runs `run` with every code it translates resolved first.
+    /// Runs `run` with every code it translates or looks up resolved first.
     ///
-    /// `run` is called again after each round of `$translate` calls, so it
-    /// must be a pure function of its input; only the result of the run that
-    /// met no unresolved code is returned. A code this session already holds
-    /// is not asked again. With no server `run` is called once over
+    /// `run` is called again after each round of calls, so it must be a pure
+    /// function of its input; only the result of the run that met no
+    /// unresolved question is returned. A question this session already
+    /// holds is not asked again. With no server `run` is called once over
     /// [`NoTerminology`].
     ///
     /// # Errors
     ///
-    /// Returns the error `run` returns. A code the server refused, or that
-    /// the call never reached an answer for, reaches the engine as
+    /// Returns the error `run` returns. A question the server refused, or
+    /// that the call never reached an answer for, reaches the engine as
     /// [`TerminologyError::Upstream`] carrying the client's error, so the run
     /// refuses with it.
     pub async fn run<R, E>(
@@ -139,7 +169,7 @@ impl Session<'_> {
         self.settle(client, direction, &mut run).await
     }
 
-    /// Resolves every code `probe` translates, for a final run over the
+    /// Resolves every question `probe` asks, for a final run over the
     /// [`Resolved`] seam this returns.
     ///
     /// This is [`Session::run`] for a run with a side effect of its own, such
@@ -159,8 +189,9 @@ impl Session<'_> {
         }
     }
 
-    /// Repeats `run` over the codes resolved so far, resolving the ones each
-    /// run meets, and returns the result of the first run that meets none.
+    /// Repeats `run` over the questions resolved so far, resolving the ones
+    /// each run meets, and returns the result of the first run that meets
+    /// none.
     async fn settle<R, E>(
         &self,
         client: &Client,
@@ -168,30 +199,38 @@ impl Session<'_> {
         run: &mut impl FnMut(&dyn Terminology) -> Result<R, E>,
     ) -> Result<R, E> {
         loop {
-            let missing = {
+            let (translations, lookups) = {
                 let answers = self.answers.lock().unwrap_or_else(PoisonError::into_inner);
+                let displays = self.displays.lock().unwrap_or_else(PoisonError::into_inner);
                 let prepared = Prepared {
                     direction,
+                    display_fallback: self.display_fallback,
                     answers: &answers,
+                    displays: &displays,
                     missing: Mutex::new(BTreeSet::new()),
+                    missing_lookups: Mutex::new(BTreeSet::new()),
                 };
                 let result = run(&prepared);
                 let missing = prepared.missing();
-                if missing.is_empty() {
+                if missing.0.is_empty() && missing.1.is_empty() {
                     return result;
                 }
                 missing
             };
-            let fetched = fetch(client, missing).await;
+            let (translated, looked_up) = fetch(client, translations, lookups).await;
             self.answers
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
-                .extend(fetched);
+                .extend(translated);
+            self.displays
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .extend(looked_up);
         }
     }
 }
 
-/// The codes [`Session::resolve`] resolved, as the seam of the final run.
+/// The questions [`Session::resolve`] resolved, as the seam of the final run.
 #[derive(Debug)]
 pub struct Resolved<'s> {
     /// The session holding the answers.
@@ -224,31 +263,70 @@ impl Terminology for Resolved<'_> {
             }),
         }
     }
+
+    fn lookup(
+        &self,
+        request: &CodeSystemLookupRequest,
+    ) -> Result<Option<CodeSystemLookupResponse>, TerminologyError> {
+        if self.session.client.is_none() {
+            return Err(TerminologyError::NotConfigured);
+        }
+        let lookup = lookup(request)?;
+        let displays = self
+            .session
+            .displays
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        match displays.get(&lookup) {
+            Some(Ok(response)) => Ok(response.clone()),
+            Some(Err(error)) => Err(TerminologyError::Upstream {
+                source: Box::new(Arc::clone(error)),
+            }),
+            None => Err(TerminologyError::Upstream {
+                source: Box::new(Unresolved),
+            }),
+        }
+    }
+
+    fn display_fallback(&self) -> bool {
+        self.session.display_fallback
+    }
 }
 
-/// A code the final run met that the probe runs never did.
+/// A question the final run met that the probe runs never did.
 #[derive(Debug, thiserror::Error)]
-#[error("the run translated a code its probe runs never met")]
+#[error("the run asked the terminology server a question its probe runs never met")]
 pub struct Unresolved;
 
-/// The seam one run reads: the codes resolved so far, and the codes the run
-/// met that are not.
+/// The seam one run reads: the questions resolved so far, and the questions
+/// the run met that are not.
 #[derive(Debug)]
 struct Prepared<'a> {
     /// The direction of the run.
     direction: Direction,
-    /// Every code resolved so far.
+    /// Whether a code the server does not know takes its code as display.
+    display_fallback: bool,
+    /// Every `$translate` answer so far.
     answers: &'a BTreeMap<Translation, Answer>,
-    /// The codes this run met that are not resolved yet.
+    /// Every `$lookup` answer so far.
+    displays: &'a BTreeMap<Lookup, Displayed>,
+    /// The `$translate` questions this run met that are not resolved yet.
     missing: Mutex<BTreeSet<Translation>>,
+    /// The `$lookup` questions this run met that are not resolved yet.
+    missing_lookups: Mutex<BTreeSet<Lookup>>,
 }
 
 impl Prepared<'_> {
-    /// Returns the codes this run met that are not resolved yet.
-    fn missing(self) -> BTreeSet<Translation> {
-        self.missing
-            .into_inner()
-            .unwrap_or_else(PoisonError::into_inner)
+    /// Returns the questions this run met that are not resolved yet.
+    fn missing(self) -> (BTreeSet<Translation>, BTreeSet<Lookup>) {
+        (
+            self.missing
+                .into_inner()
+                .unwrap_or_else(PoisonError::into_inner),
+            self.missing_lookups
+                .into_inner()
+                .unwrap_or_else(PoisonError::into_inner),
+        )
     }
 }
 
@@ -273,6 +351,32 @@ impl Terminology for Prepared<'_> {
                 Ok(unresolved())
             }
         }
+    }
+
+    fn lookup(
+        &self,
+        request: &CodeSystemLookupRequest,
+    ) -> Result<Option<CodeSystemLookupResponse>, TerminologyError> {
+        let lookup = lookup(request)?;
+        match self.displays.get(&lookup) {
+            Some(Ok(response)) => Ok(response.clone()),
+            Some(Err(error)) => Err(TerminologyError::Upstream {
+                source: Box::new(Arc::clone(error)),
+            }),
+            None => {
+                self.missing_lookups
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .insert(lookup);
+                // NOTE: no specification governs this: our own design; this run
+                // is discarded, and a found display lets it reach further codes.
+                Ok(Some(undisplayed()))
+            }
+        }
+    }
+
+    fn display_fallback(&self) -> bool {
+        self.display_fallback
     }
 }
 
@@ -342,9 +446,43 @@ fn uncarried(request: &ConceptMapTranslateRequest) -> Option<&'static str> {
     .find_map(|(parameter, set)| set.then_some(parameter))
 }
 
-/// A `$translate` parameter the engine set that this client does not send.
+/// Returns the `$lookup` question `request` asks.
+///
+/// # Errors
+///
+/// Returns [`TerminologyError::Uncoded`] when the request names no system or
+/// no code, and [`TerminologyError::Upstream`] when it carries a parameter
+/// this client does not send, which is refused rather than dropped.
+fn lookup(request: &CodeSystemLookupRequest) -> Result<Lookup, TerminologyError> {
+    let parameter = [
+        ("coding", request.coding.is_some()),
+        ("date", request.date.is_some()),
+        ("displayLanguage", request.display_language.is_some()),
+        ("property", !request.property.is_empty()),
+        ("useSupplement", !request.use_supplement.is_empty()),
+    ]
+    .into_iter()
+    .find_map(|(parameter, set)| set.then_some(parameter));
+    if let Some(parameter) = parameter {
+        return Err(TerminologyError::Upstream {
+            source: Box::new(Uncarried { parameter }),
+        });
+    }
+    let system = request.system.as_ref().and_then(|uri| uri.value.as_deref());
+    let code = request.code.as_ref().and_then(|code| code.value.as_deref());
+    let (Some(system), Some(code)) = (system, code) else {
+        return Err(TerminologyError::Uncoded);
+    };
+    Ok(Lookup {
+        system: String::from(system),
+        code: String::from(code),
+        version: request.version.as_ref().and_then(|text| text.value.clone()),
+    })
+}
+
+/// A parameter the engine set that this client does not send.
 #[derive(Debug, thiserror::Error)]
-#[error("the terminology client does not send the $translate parameter {parameter}")]
+#[error("the terminology client does not send the parameter {parameter}")]
 pub struct Uncarried {
     /// The parameter, as the operation names it.
     parameter: &'static str,
@@ -358,100 +496,15 @@ fn unresolved() -> ConceptMapTranslateResponse {
     }
 }
 
-/// Returns the answer to every code of `missing`.
-///
-/// One code is one call; several are one `batch`, answered by position. A
-/// batch that failed as a whole is the answer of every code it carried.
-async fn fetch(client: &Client, missing: BTreeSet<Translation>) -> Vec<(Translation, Answer)> {
-    let missing: Vec<Translation> = missing.into_iter().collect();
-    if let [one] = missing.as_slice() {
-        let answer = client
-            .translate(one)
-            .await
-            .map_err(shared)
-            .and_then(|outcome| response(&outcome));
-        return vec![(one.clone(), answer)];
-    }
-    let requests: Vec<Request> = missing.iter().cloned().map(Request::Translate).collect();
-    match client.batch(&requests).await {
-        Ok(entries) => missing
-            .into_iter()
-            .zip(entries)
-            .map(|(translation, entry)| {
-                let answer = match entry {
-                    Ok(BatchOutcome::Translate(outcome)) => response(&outcome),
-                    Ok(_) => Err(shared(UnexpectedAnswer)),
-                    Err(error) => Err(shared(error)),
-                };
-                (translation, answer)
-            })
-            .collect(),
-        Err(error) => {
-            let error = shared(error);
-            missing
-                .into_iter()
-                .map(|translation| (translation, Err(Arc::clone(&error))))
-                .collect()
-        }
+/// A display that stands in for an unresolved one, in a run that is
+/// discarded.
+fn undisplayed() -> CodeSystemLookupResponse {
+    CodeSystemLookupResponse {
+        name: FhirString::from("unresolved"),
+        display: FhirString::from("unresolved"),
+        ..CodeSystemLookupResponse::default()
     }
 }
-
-/// Returns `error` in the form every run that meets its code shares.
-fn shared(error: impl Error + Send + Sync + 'static) -> Arc<dyn Error + Send + Sync> {
-    Arc::new(error)
-}
-
-/// A batch entry answered with an outcome of another operation.
-#[derive(Debug, thiserror::Error)]
-#[error("the terminology server answered a $translate entry with another operation's outcome")]
-pub struct UnexpectedAnswer;
-
-/// Returns the R4 `$translate` answer `outcome` carries.
-///
-/// The client carries each match's equivalence, concept and source; `product`
-/// and the other `out` parts the client does not decode are absent here, and
-/// the engine reads none of them.
-fn response(outcome: &TranslateOutcome) -> Answer {
-    match outcome {
-        TranslateOutcome::Translated { matches, message } => Ok(ConceptMapTranslateResponse {
-            result: Boolean::from(true),
-            message: message.as_deref().map(FhirString::from),
-            r#match: matches.iter().map(matched).collect(),
-            ..ConceptMapTranslateResponse::default()
-        }),
-        TranslateOutcome::NoMatch { message } => Ok(ConceptMapTranslateResponse {
-            result: Boolean::from(false),
-            message: message.as_deref().map(FhirString::from),
-            ..ConceptMapTranslateResponse::default()
-        }),
-        _ => Err(shared(UnexpectedAnswer)),
-    }
-}
-
-/// Returns one R4 `match` part.
-fn matched(found: &Match) -> ConceptMapTranslateResponseMatch {
-    ConceptMapTranslateResponseMatch {
-        equivalence: found
-            .equivalence
-            .as_ref()
-            .map(|equivalence| Code::from(equivalence.as_str())),
-        concept: found.concept.as_ref().map(coding),
-        source: found.source.as_deref().map(Canonical::from),
-        ..ConceptMapTranslateResponseMatch::default()
-    }
-}
-
-/// Returns the R4 `Coding` of `concept`.
-fn coding(concept: &Concept) -> Coding {
-    Coding {
-        system: concept.system.as_deref().map(Uri::from),
-        version: concept.version.as_deref().map(FhirString::from),
-        code: concept.code.as_deref().map(Code::from),
-        display: concept.display.as_deref().map(FhirString::from),
-        ..Coding::default()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{Direction, Translator, translation};

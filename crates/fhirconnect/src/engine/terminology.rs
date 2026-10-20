@@ -21,6 +21,8 @@ use core::error::Error;
 use core::fmt;
 
 use fhir_types::r4::coding::Coding;
+use fhir_types::r4::operations::code_system_lookup::CodeSystemLookupRequest;
+use fhir_types::r4::operations::code_system_lookup::CodeSystemLookupResponse;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateRequest;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateResponse;
 use fhir_types::r4::primitives::Code;
@@ -40,6 +42,34 @@ pub trait Terminology: fmt::Debug + Send + Sync {
         &self,
         request: &ConceptMapTranslateRequest,
     ) -> Result<ConceptMapTranslateResponse, TerminologyError>;
+
+    /// Answers `CodeSystem/$lookup` for the request, `None` when the server does
+    /// not know the code.
+    ///
+    /// The engine asks for the display of a coding that carries none, because
+    /// "the value is mandatory in openEHR" and a terminology server is the
+    /// recommended source of it (`DV_CODED_TEXT.adoc`). The default refuses
+    /// as [`TerminologyError::NotConfigured`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TerminologyError`] when no server is configured or the
+    /// server did not answer, which is a failure and never an unknown code.
+    fn lookup(
+        &self,
+        _request: &CodeSystemLookupRequest,
+    ) -> Result<Option<CodeSystemLookupResponse>, TerminologyError> {
+        Err(TerminologyError::NotConfigured)
+    }
+
+    /// Returns whether a code the server does not know takes `coding.code`
+    /// as its display rather than refusing the unit.
+    ///
+    /// `DV_CODED_TEXT.adoc` offers the code "alternatively", so the choice is
+    /// the deployment's and the default refuses.
+    fn display_fallback(&self) -> bool {
+        false
+    }
 }
 
 /// The seam with no terminology server behind it.
@@ -110,6 +140,19 @@ pub fn request(url: &str, coding: &Coding) -> Result<ConceptMapTranslateRequest,
         version: text(coding.version.as_ref().map(|version| &version.value)).map(FhirString::from),
         ..ConceptMapTranslateRequest::default()
     })
+}
+
+/// Returns the `$lookup` request for the display of `code` in `system`, at
+/// `version` when the coding names one
+/// (<https://hl7.org/fhir/R4/codesystem-operation-lookup.html>).
+#[must_use]
+pub fn lookup_request(system: &str, code: &str, version: Option<&str>) -> CodeSystemLookupRequest {
+    CodeSystemLookupRequest {
+        system: Some(Uri::from(system)),
+        code: Some(Code::from(code)),
+        version: version.map(FhirString::from),
+        ..CodeSystemLookupRequest::default()
+    }
 }
 
 /// Returns the concept `response` translates to, `None` when it names none.

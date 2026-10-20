@@ -25,6 +25,19 @@ crates on crates.io.
 
 ### Added
 
+- Going into openEHR, a coding that carries no display now has its display
+  resolved through `CodeSystem/$lookup` on the `[terminology]` server
+  (#95), as the FHIRconnect `DV_CODED_TEXT` page recommends. A found
+  display becomes the `DV_CODED_TEXT` value. A code the server does not know
+  refuses the resource unless `[terminology] display_fallback = true`
+  (`FERROBRIDGE__TERMINOLOGY__DISPLAY_FALLBACK`) writes the code instead. A
+  failed call refuses either way, carrying the upstream status. With no
+  terminology server the code stands as before, the page's alternative "if
+  a term server is not an option". Lookups join the translations in one
+  call or one `batch` per round. The FHIRconnect terminology seam gains
+  `lookup` and `display_fallback`, both with refusing defaults. The engine
+  answers `EngineError::UnknownDisplay` and `EngineError::DisplayLookup`.
+  `fhirconnect` 0.1.170.
 - Five more `mappingCode` functions of the published FHIRconnect library
   are registered (#95). `timingToDaily` writes a frequency per one unit of
   time as the `1/<unit>` frequency of the daily timing cluster (or an

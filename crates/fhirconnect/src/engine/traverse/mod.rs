@@ -24,6 +24,7 @@
 pub mod build;
 pub mod convert;
 pub mod demographic;
+pub mod display;
 pub mod error;
 pub mod functions;
 pub mod links;

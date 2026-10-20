@@ -9,6 +9,7 @@
 //! move with the pin.
 
 mod answers;
+mod display;
 mod lane;
 mod refusals;
 mod round_trip;
