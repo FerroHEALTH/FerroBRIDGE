@@ -377,6 +377,7 @@ pub(crate) const fn loss_kind(loss: &Loss) -> &'static str {
             SkipReason::PreprocessorGate { .. } => "skipped-preprocessor-gate",
             SkipReason::UnresolvedReference { .. } => "skipped-unresolved-reference",
             SkipReason::EmptyReference => "skipped-empty-reference",
+            SkipReason::UnmappedLink { .. } => "skipped-unmapped-link",
             SkipReason::TermMappingMatch { .. } => "skipped-term-mapping-match",
             SkipReason::TermMappingUncarried { .. } => "skipped-term-mapping-uncarried",
             SkipReason::DefiningCodeUncarried { .. } => "skipped-defining-code-uncarried",

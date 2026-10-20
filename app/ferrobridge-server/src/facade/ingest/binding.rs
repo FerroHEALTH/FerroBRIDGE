@@ -6,6 +6,7 @@
 
 use fhir_types::codec::Value;
 use fhirconnect::engine::library::Library;
+use fhirconnect::engine::linked::LinkedCompositions;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::error::EngineError;
 use http::StatusCode;
@@ -148,6 +149,15 @@ pub(super) fn canonical_of(
     ))
 }
 
+/// Returns `seams` answering linked compositions through `linked`, when the
+/// run is handed one.
+fn linking<'s>(seams: Seams<'s>, linked: Option<&'s dyn LinkedCompositions>) -> Seams<'s> {
+    match linked {
+        Some(linked) => seams.with_linked(linked),
+        None => seams,
+    }
+}
+
 impl Ingest<'_> {
     /// Runs the engine over one inbound resource.
     pub(super) async fn build(
@@ -187,6 +197,19 @@ impl Ingest<'_> {
         inbound: &Inbound,
         provenance: &Provenance,
     ) -> Result<(CanonicalComposition, String, Vec<String>), EngineError> {
+        self.run_linking(program, inbound, provenance, None).await
+    }
+
+    /// Runs the engine as [`Ingest::run_consuming`] does, answering each
+    /// linked composition through `linked`; with none, a `link` that names a
+    /// resource refuses.
+    pub(super) async fn run_linking(
+        &self,
+        program: &Loaded,
+        inbound: &Inbound,
+        provenance: &Provenance,
+        linked: Option<&dyn LinkedCompositions>,
+    ) -> Result<(CanonicalComposition, String, Vec<String>), EngineError> {
         // NOTE: no specification governs this: our own design, one instant serves
         // every defaulted time of one ingest, so each resource reads the clock once.
         let now = jiff::Timestamp::now().to_string();
@@ -200,11 +223,14 @@ impl Ingest<'_> {
                     &now,
                     self.settings,
                     provenance.source_for(inbound.document()),
-                    &Seams::default()
-                        .with_functions(&Library)
-                        .with_terminology(terminology)
-                        .with_references(self.references)
-                        .with_demographics(self.demographics),
+                    &linking(
+                        Seams::default()
+                            .with_functions(&Library)
+                            .with_terminology(terminology)
+                            .with_references(self.references)
+                            .with_demographics(self.demographics),
+                        linked,
+                    ),
                 )
             })
             .await;

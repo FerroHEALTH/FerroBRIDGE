@@ -408,7 +408,7 @@ async fn resolve_from(
 ) -> Resolved {
     let mut resolved = Resolved::default();
     let policy = facade.references();
-    let wanted = facade.programs().referenced_types();
+    let wanted = facade.programs().resolved_types();
     if wanted.is_empty() {
         return resolved;
     }
@@ -565,6 +565,16 @@ async fn fetch(
                 Err(Reason::Mismatch)
             }
         }
+    }
+}
+
+/// Returns the type and id of this server's resource `literal` names, if any.
+#[must_use]
+pub fn local(literal: &str, own_base: &str) -> Option<(String, FhirResourceId)> {
+    // NOTE: a refusal IS the answer: a literal this server does not serve names none of its own.
+    match target(literal, &Policy::default(), own_base) {
+        Ok(Target::Local { resource_type, id }) => Some((resource_type, id)),
+        Ok(Target::Remote { .. }) | Err(_) => None,
     }
 }
 

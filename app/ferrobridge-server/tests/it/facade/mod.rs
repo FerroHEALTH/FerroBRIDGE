@@ -16,6 +16,7 @@ mod created;
 mod credentials;
 mod demographic;
 mod examples;
+mod linked;
 mod party;
 mod patient_ehr;
 mod person;
