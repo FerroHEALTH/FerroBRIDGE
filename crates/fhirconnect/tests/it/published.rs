@@ -118,7 +118,7 @@ struct Verdict {
     /// The files the loader refused, left out of the set, each with the
     /// first code raised against it.
     dropped: BTreeMap<String, String>,
-    /// The program, or the refusals as `file:line code` rows.
+    /// The program, or the refusals as `file:line severity code` rows.
     outcome: Result<OwnedChain, Vec<String>>,
 }
 
@@ -156,7 +156,8 @@ fn yaml_under(directory: &Path, found: &mut Vec<String>) -> Result<(), Box<dyn E
     Ok(())
 }
 
-/// Renders diagnostics as sorted, distinct `file:line code` rows.
+/// Renders diagnostics as sorted, distinct `file:line severity code` rows,
+/// so a warning never reads as a refusal.
 fn rows(diagnostics: &[Diagnostic]) -> Vec<String> {
     let found: BTreeSet<String> = diagnostics
         .iter()
@@ -165,8 +166,9 @@ fn rows(diagnostics: &[Diagnostic]) -> Vec<String> {
                 .position()
                 .map_or(0, openehr_mapping_core::position::Position::line);
             format!(
-                "{}:{line} {}",
+                "{}:{line} {} {}",
                 relative(diagnostic.file()),
+                diagnostic.severity(),
                 diagnostic.code()
             )
         })
