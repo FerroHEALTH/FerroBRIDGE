@@ -16,6 +16,7 @@
 //! id, which the Simplified Formats specification carries in its interface
 //! form for an archetype root.
 
+mod alternative;
 mod embedded;
 pub mod matching;
 pub mod paths;
@@ -482,6 +483,54 @@ impl WebTemplateIndex {
             .filter(|entry| matches_node(path, &entry.path, entry.name.as_deref()))
             .map(|entry| &entry.node)
             .collect()
+    }
+
+    /// Returns the value nodes of the polymorphic `ELEMENT` `node` belongs
+    /// to, in template order, `node` among them.
+    ///
+    /// A template that admits several data types for an `ELEMENT.value` gives
+    /// the element one value node per type under one parent, each with the
+    /// element's `aqlPath` (openEHR RM Release 1.1.0, data structures, the
+    /// `ELEMENT` class). Any other node has itself as its one alternative.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PathError::UnknownNode`] when the node belongs to another
+    /// template.
+    pub fn alternatives(&self, node: &ResolvedNode) -> Result<Vec<&ResolvedNode>, PathError> {
+        let parent = self.entry(&node.flat_id)?.parent;
+        Ok(self
+            .by_aql_path
+            .get(&node.aql_path)
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .filter_map(|&index| self.entries.get(index))
+            .filter(|entry| entry.parent == parent)
+            .map(|entry| &entry.node)
+            .collect())
+    }
+
+    /// Returns whether `value`, read at `node`'s path, belongs to `node`.
+    ///
+    /// The value of a polymorphic `ELEMENT` belongs to the one alternative
+    /// [`alternative::chosen`] picks by its `_type`; at every other node a
+    /// value belongs to the node.
+    pub(crate) fn belongs(
+        &self,
+        node: &ResolvedNode,
+        value: &serde_json::Value,
+    ) -> Result<bool, PathError> {
+        let alternatives = self.alternatives(node)?;
+        if alternatives.len() < 2 {
+            return Ok(true);
+        }
+        let chosen =
+            alternative::chosen(&alternatives, value).map_err(|alternative::Untyped| {
+                PathError::UntypedAlternative {
+                    aql_path: node.aql_path.as_str().to_owned(),
+                }
+            })?;
+        Ok(chosen.is_some_and(|chosen| chosen.flat_id == node.flat_id))
     }
 
     /// Returns the external terminology bindings of `node`.

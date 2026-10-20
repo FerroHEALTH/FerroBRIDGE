@@ -404,6 +404,17 @@ crates on crates.io.
   referenced resource and refused with an unknown element; they now read
   and write the resource the path climbs to, as every other mapping has
   since the worked `^^.use.coding` example ran. `fhirconnect` 0.1.173.
+- A value node of a polymorphic `ELEMENT` reads only a value of its own class
+  (#1100). `WebTemplateIndex::read` let every alternative read the element's
+  one value, so a `DV_INTERVAL` was also read at the `DV_QUANTITY` node. The
+  `_type` of the value now picks the alternative, the most specific class it
+  conforms to, and `WebTemplateIndex::alternatives` and
+  `WebTemplateIndex::holds` are new. A value with no `_type` at a polymorphic
+  `ELEMENT` is `PathError::UntypedAlternative`, a new variant. In
+  `fhirconnect`, a mapping whose type the compiler matched to one alternative
+  refuses an `ELEMENT` that holds another, and an instance that holds another
+  alternative still counts when the engine probes occurrences.
+  `openehr-mapping-core` 0.1.125, `fhirconnect` 0.1.175.
 - A FHIRconnect `DV_INTERVAL<DV_DATE_TIME>` whose present bound is excluded
   is refused going out to `Period` (#1076), because both R4 `Period` bounds
   are inclusive; it was written as an inclusive bound with no loss declared.

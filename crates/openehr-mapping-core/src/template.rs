@@ -456,6 +456,13 @@ pub enum PathError {
         /// The `aqlPath` of the node.
         aql_path: String,
     },
+    /// A value at a polymorphic `ELEMENT` names no `_type`, so the value node
+    /// it belongs to is unknown.
+    #[error("the value at `{aql_path}` names no `_type`, which picks its value node")]
+    UntypedAlternative {
+        /// The `aqlPath` the value nodes share.
+        aql_path: String,
+    },
 }
 
 impl PathError {
@@ -481,6 +488,7 @@ impl PathError {
             | Self::InstanceIndex { .. }
             | Self::CompositionFlatten { .. }
             | Self::InvalidComposition { .. }
+            | Self::UntypedAlternative { .. }
             | Self::TemplateMismatch { .. } => DiagnosticCode::InvalidComposition,
         }
     }
