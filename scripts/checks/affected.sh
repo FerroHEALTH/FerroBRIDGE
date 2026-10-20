@@ -194,6 +194,9 @@ classify() {
     scripts/vendor/ferropulse-schemas.sh) echo "packages ferrobridge-server" ;;
     # Writes only the agreement corpus's reference outcomes the validator's tests read.
     scripts/vendor/hl7-validator-agreement.sh) echo "packages ferrobridge-validator" ;;
+    # Write only the KDS templates under the testkit's fixtures: the testkit
+    # embeds them for every package testing with it, fhirconnect's tests too.
+    scripts/vendor/kds-*-opt.sh | scripts/vendor/lib/kds-opt.sh) echo "packages ferrobridge-testkit fhirconnect" ;;
     crates/* | app/* | tools/*) echo member ;;
     *) echo global ;;
   esac
@@ -568,6 +571,12 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   check "the agreement vendor script reaches the validator" \
     "scripts/vendor/hl7-validator-agreement.sh" false \
     "+ferrobridge-validator -fhir-codegen -ferrobridge-viewer"
+  check "a KDS vendor script reaches the testkit and fhirconnect" \
+    "scripts/vendor/kds-diagnose-opt.sh" false \
+    "+ferrobridge-testkit +fhirconnect +ferrobridge-server -fhir-codegen -fhir-types -hl7v2-types"
+  check "the shared KDS vendor library reaches the testkit and fhirconnect" \
+    "scripts/vendor/lib/kds-opt.sh" false \
+    "+ferrobridge-testkit +fhirconnect +ferrobridge-server -fhir-codegen -fhir-types -hl7v2-types"
   check "the console reaches itself and nothing it does not link" \
     "app/ferrobridge-viewer/src/lib.rs" false \
     "+ferrobridge-viewer -fhir-types -openehr-mapping-core -ferrobridge-server"
