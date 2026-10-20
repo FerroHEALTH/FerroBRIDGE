@@ -568,9 +568,11 @@ crates on crates.io.
 
 ### Security
 
-- `rustls-webpki` 0.103.16, `webpki-root-certs` 1.0.10 and `webpki-roots`
-  1.0.10 in the lock, past RUSTSEC-2026-0382 and RUSTSEC-2026-0383
-  (certificate paths through the distrusted emSign intermediates) (#1110).
+- The TLS stack the bridge calls the CDR, the terminology server and the
+  sending sites through no longer trusts the distrusted emSign
+  intermediates: `rustls-webpki` 0.103.16 rejects their public keys
+  (RUSTSEC-2026-0382), and `webpki-roots` and `webpki-root-certs` 1.0.10
+  drop the root that allowed them (RUSTSEC-2026-0381, RUSTSEC-2026-0383).
 
 ## [0.0.10] - 2026-10-19
 
