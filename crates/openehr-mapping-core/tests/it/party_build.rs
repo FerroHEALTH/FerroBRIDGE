@@ -195,6 +195,32 @@ fn a_composition_template_builds_no_party() {
 }
 
 #[test]
+fn values_the_builder_refuses_are_a_build_refusal() {
+    let index = index_of(PERSON_OPT);
+    let refused = index.build_party(&[]);
+    assert!(
+        matches!(refused, Err(PartyError::Build { ref template_id, .. }) if template_id == PERSON_TEMPLATE_ID),
+        "a party with no value built: {refused:?}"
+    );
+}
+
+#[test]
+fn a_built_role_names_release_1_1_0() {
+    let index = index_of(ROLE_OPT);
+    let built = index
+        .build_party(&role_values(&index, Some(performer())))
+        .expect("a ROLE with a performer builds");
+    assert_eq!(
+        built.value().pointer("/archetype_details/rm_version"),
+        Some(&Value::from("1.1.0"))
+    );
+    assert_eq!(
+        built.value().pointer("/identities/0/details/name/value"),
+        Some(&Value::from("Identity details"))
+    );
+}
+
+#[test]
 fn a_later_value_at_one_place_replaces_the_earlier() {
     let index = index_of(PERSON_OPT);
     let mut values = person_values(&index);
