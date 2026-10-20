@@ -119,7 +119,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
             | FhirValue::Time(_)
             | FhirValue::Duration(_)
             | FhirValue::Url(_)
-            | FhirValue::Attachment(_)) => return Ok(Some(other)),
+            | FhirValue::Attachment(_)
+            | FhirValue::Range(_)) => return Ok(Some(other)),
         };
         if translated.is_none() {
             self.untranslated(mapping, url, output)?;

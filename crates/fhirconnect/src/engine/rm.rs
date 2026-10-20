@@ -66,6 +66,8 @@ pub enum RmValue {
     DateTime(Box<DvDateTime>),
     /// A `DV_INTERVAL<DV_DATE_TIME>`.
     DateTimeInterval(Box<DvInterval<DvDateTime>>),
+    /// A `DV_INTERVAL<DV_QUANTITY>`.
+    QuantityInterval(Box<DvInterval<DvQuantity>>),
     /// A `PARTY_IDENTIFIED`, the composer and every participation.
     Party(PartyIdentifiedData),
     /// A `DV_IDENTIFIER`.
@@ -144,7 +146,7 @@ impl RmValue {
             Self::CodePhrase(_) => "CODE_PHRASE",
             Self::Date(_) => "DV_DATE",
             Self::DateTime(_) => "DV_DATE_TIME",
-            Self::DateTimeInterval(_) => "DV_INTERVAL",
+            Self::DateTimeInterval(_) | Self::QuantityInterval(_) => "DV_INTERVAL",
             Self::Party(_) => "PARTY_IDENTIFIED",
             Self::Identifier(_) => "DV_IDENTIFIER",
             Self::Proportion(_) => "DV_PROPORTION",
@@ -197,6 +199,11 @@ impl RmValue {
             "DV_DATE_TIME" => from_canonical_value(value)
                 .map(|date| Self::DateTime(Box::new(date)))
                 .map_err(refuse),
+            "DV_INTERVAL" if bound_class(value) == Some("DV_QUANTITY") => {
+                from_canonical_value(value)
+                    .map(|interval| Self::QuantityInterval(Box::new(interval)))
+                    .map_err(refuse)
+            }
             "DV_INTERVAL" => from_canonical_value(value)
                 .map(|interval| Self::DateTimeInterval(Box::new(interval)))
                 .map_err(refuse),
@@ -254,6 +261,7 @@ impl RmValue {
             Self::Boolean(ref boolean) => to_canonical_value(boolean),
             Self::DateTime(ref date) => to_canonical_value(date.as_ref()),
             Self::DateTimeInterval(ref interval) => to_canonical_value(interval.as_ref()),
+            Self::QuantityInterval(ref interval) => to_canonical_value(interval.as_ref()),
             Self::Party(ref party) => to_canonical_value(party),
             Self::Identifier(ref identifier) => to_canonical_value(identifier),
             Self::PartyRef(ref party) => to_canonical_value(party),
@@ -286,6 +294,18 @@ impl RmValue {
         };
         Ok(encoded)
     }
+}
+
+/// Returns the class a `DV_INTERVAL`'s bounds carry, read from the `_type` of
+/// whichever bound the document holds.
+///
+/// `DV_INTERVAL<T>` is generic in its bound class
+/// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_types.html#_dv_interval_class>),
+/// and the canonical JSON names the class on each bound only.
+fn bound_class(value: &Value) -> Option<&str> {
+    ["lower", "upper"]
+        .into_iter()
+        .find_map(|bound| value.get(bound)?.get("_type")?.as_str())
 }
 
 /// What the attribute a tail ends on holds.

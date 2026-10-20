@@ -31,6 +31,7 @@ use fhir_types::r4::primitives::String as FhirString;
 use fhir_types::r4::primitives::Time;
 use fhir_types::r4::primitives::Url;
 use fhir_types::r4::quantity::Quantity;
+use fhir_types::r4::range::Range;
 use fhir_types::r4::reference::Reference;
 use fhir_types::schema::ValueKind;
 
@@ -78,6 +79,8 @@ pub enum FhirKind {
     Url,
     /// An `Attachment`.
     Attachment,
+    /// A `Range`.
+    Range,
 }
 
 impl FhirKind {
@@ -123,6 +126,7 @@ impl FhirKind {
             "Duration" => Some(Self::Duration),
             "url" => Some(Self::Url),
             "Attachment" => Some(Self::Attachment),
+            "Range" => Some(Self::Range),
             _ => None,
         }
     }
@@ -145,6 +149,7 @@ impl FhirKind {
                 "Count" => Some(Self::Count),
                 "Duration" => Some(Self::Duration),
                 "Attachment" => Some(Self::Attachment),
+                "Range" => Some(Self::Range),
                 _ => None,
             },
             Location::Primitive(ValueKind::Text) | Location::Attribute => Some(Self::String),
@@ -177,6 +182,7 @@ impl FhirKind {
             Self::Duration => "Duration",
             Self::Url => "url",
             Self::Attachment => "Attachment",
+            Self::Range => "Range",
         }
     }
 }
@@ -218,6 +224,8 @@ pub enum FhirValue {
     Url(Url),
     /// An `Attachment`.
     Attachment(Box<Attachment>),
+    /// A `Range`.
+    Range(Box<Range>),
 }
 
 /// Why a FHIR element could not be read or written.
@@ -275,6 +283,7 @@ impl FhirValue {
             Self::Duration(_) => FhirKind::Duration,
             Self::Url(_) => FhirKind::Url,
             Self::Attachment(_) => FhirKind::Attachment,
+            Self::Range(_) => FhirKind::Range,
         }
     }
 
@@ -343,6 +352,9 @@ impl FhirValue {
             FhirKind::Attachment => object(value, element, kind)
                 .and_then(|object| Attachment::from_json(object, &mut path).map_err(refuse))
                 .map(|attachment| Self::Attachment(Box::new(attachment))),
+            FhirKind::Range => object(value, element, kind)
+                .and_then(|object| Range::from_json(object, &mut path).map_err(refuse))
+                .map(|range| Self::Range(Box::new(range))),
         }
     }
 
@@ -386,6 +398,7 @@ impl FhirValue {
             Self::Duration(ref duration) => complex(duration.to_json()),
             Self::Url(ref url) => primitive(url.value_json()),
             Self::Attachment(ref attachment) => complex(attachment.to_json()),
+            Self::Range(ref range) => complex(range.to_json()),
         }
     }
 }

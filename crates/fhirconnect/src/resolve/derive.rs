@@ -39,7 +39,7 @@ pub const PAIRS: &[(&str, &[&str])] = &[
     ("CODE_PHRASE", &["Coding"]),
     ("DV_DATE", &["date"]),
     ("DV_DATE_TIME", &["dateTime", "Period"]),
-    ("DV_INTERVAL", &["Period"]),
+    ("DV_INTERVAL", &["Period", "Range"]),
     ("PARTY_IDENTIFIED", &["Reference"]),
     ("PARTY_PROXY", &["Reference"]),
     ("DV_IDENTIFIER", &["Identifier"]),
