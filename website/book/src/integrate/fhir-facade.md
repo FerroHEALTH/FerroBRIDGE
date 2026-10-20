@@ -126,7 +126,7 @@ on the resource type in the path or in the entry:
 | delete (a party resource) | `d` |
 | search (`GET [base]/{type}`, `POST [base]/{type}/_search`) | `s` |
 | update | `u` |
-| `$validate` | `c` or `u`, or the operator scope (`[operator] scope`): the dry run commits nothing, so an operator console needs no clinical write scope |
+| `$validate` | `c` or `u`, or the operator scope (`[auth] product_scope`): the dry run commits nothing, so an operator console needs no clinical write scope |
 | transaction | the permission of each entry's `request.method`: `c` for `POST`, `u` for `PUT`, `r` for `GET`, `d` for `DELETE` |
 | batch | per entry, the permission of the interaction its `request` names: `c` for a create, `u` for an update, `r` for a read or vread, `s` for a search |
 | `$tofhir`, `$toopenehr` | a valid token, no clinical scope, the operator scope included: they transform the request body and reach no CDR |
@@ -169,9 +169,8 @@ arrived with as `via` (`bearer` or `basic`), the method, the matched route,
 what was addressed (`Condition/c-1`, or the type alone), the interaction,
 the status and the duration. Beside the log envelope its fields are exactly
 `at`, `request_id` (the `X-Request-Id` that ties the line to the request
-log), `principal`, `client`, `via`, `issuer`, `method`, `route`, `target`,
-`interaction`, `status` and `duration_ms`; the JSON rendering writes the
-line's `target` beside the envelope's key of the same name. A refused
+log), `principal`, `client`, `via`, `issuer`, `method`, `route`,
+`addressed`, `interaction`, `status` and `duration_ms`. A refused
 credential is recorded as `unauthenticated` with `via` `none`, and with
 `[auth]` off the principal reads `-` with `via` `open`. A batch leaves one
 line per entry, carrying the entry's interaction, what it addressed and its

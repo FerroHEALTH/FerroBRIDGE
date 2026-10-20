@@ -31,7 +31,7 @@ mapping_dir = "/var/lib/ferrobridge/mappings"
 Every route needs a bearer access token from the configured issuer, checked
 as the FHIR facade checks one, or the Basic credential of an
 `[[auth.basic.users]]` user. The token's `scope` claim, or the user's
-`scopes`, must carry the operator scope, `[operator] scope`, which is
+`scopes`, must carry the operator scope, `[auth] product_scope`, which is
 `__ferrobridge.operator` unless you set another. SMART scopes cover FHIR
 resources only, so the operator scope is FerroBRIDGE's own, in a form SMART
 App Launch 2.2.0 (Scopes and Launch Context, Extensibility) gives an

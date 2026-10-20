@@ -95,6 +95,40 @@ async fn the_smart_configuration_names_the_authorization_server_without_a_token(
 }
 
 #[tokio::test]
+async fn the_smart_configuration_lists_the_scopes_the_bridge_honours()
+-> Result<(), Box<dyn StdError>> {
+    let key = ec_key("k1", Algorithm::ES256);
+    let issuer = Issuer::start(&[&key]).await;
+    let harness = harness().await;
+    let silent = authority(issuer.settings()).await;
+    let (_, _, body) = read_open(
+        secured(&harness, &silent),
+        "/fhir/.well-known/smart-configuration",
+    )
+    .await?;
+    assert!(body.get("scopes_supported").is_none(), "{body}");
+    let mut settings = issuer.settings();
+    settings.options.scopes_supported = vec![
+        String::from("system/Condition.rs"),
+        String::from("__ferrobridge.operator"),
+    ];
+    let listing = authority(settings).await;
+    let (_, _, body) = read_open(
+        secured(&harness, &listing),
+        "/fhir/.well-known/smart-configuration",
+    )
+    .await?;
+    // NOTE: SMART App Launch 2.2.0 conformance.html, Metadata: "The server
+    // SHALL support all scopes listed here".
+    assert_eq!(
+        serde_json::json!(["system/Condition.rs", "__ferrobridge.operator"]),
+        body["scopes_supported"],
+        "{body}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn the_capability_statement_states_the_smart_service_without_a_token()
 -> Result<(), Box<dyn StdError>> {
     let key = ec_key("k1", Algorithm::ES256);

@@ -25,6 +25,15 @@ crates on crates.io.
 
 ### Added
 
+- The HL7 v2 face reads a batch file (#642). A frame that opens with FHS or
+  BHS is split by the HL7 v2 chapter 2 §2.10.3 structure into its batches
+  and messages, each message is answered as if it had arrived alone, and
+  the acknowledgments return in one response batch whose headers echo the
+  file's FHS-11 and BHS-11 and whose BTS-1 counts them (§2.10.3.2). A
+  trailer count the file contradicts is a logged warning, and a file whose
+  segments stand outside the structure is not answered.
+  `ferrobridge-hl7v2` gains the `batch` module. The ReportStream
+  `sample-batch-pdi-20210608-0001.hl7` file now passes the `hl7v2` corpus.
 - The HL7 v2 parser counts a valued repetition past a field's cardinality,
   a valued component past its data type's components and a valued
   subcomponent past its component's data type, as the new
@@ -60,6 +69,10 @@ crates on crates.io.
   where a caller's identity store does that. `OperationError` gains two
   variants, so a consumer that matches it exhaustively adds the arms.
   `fhirconnect` 0.1.156.
+- `[auth] scopes_supported`: the scopes the bridge honours, listed as
+  `scopes_supported` in the SMART discovery document, which "the server
+  SHALL support" (SMART App Launch 2.2.0, Conformance, Metadata); each
+  value is one scope token, checked at load (#1007).
 
 ### Changed
 
@@ -83,7 +96,7 @@ crates on crates.io.
     `ES256` and `ES384`, where it was `RS256` and `ES256`.
   - `auth.issuer` may be plain `http` on a loopback host; elsewhere it stays
     `https`.
-  - `auth.operator_scope` becomes `operator.scope`, and its default
+  - `auth.operator_scope` becomes `auth.product_scope`, and its default
     `ferrobridge.operator` becomes `__ferrobridge.operator`, the extension
     form SMART App Launch 2.2.0 gives a scope (a string starting with `__`
     or a full URI); any other value refuses the start. Grant the new scope
@@ -142,6 +155,21 @@ crates on crates.io.
   out (an `ITEM_TREE` under an entry, for example) by its term definition in
   the template, where it named it by its node id before (RM Common IM,
   `LOCATABLE.name`). The `openehr-sdt` 0.0.89 builder does this.
+- `ferrohealth-smart` 0.1.1 (#1007). The operator scope moves from
+  `[operator] scope` to `[auth] product_scope` (environment
+  `FERROBRIDGE__AUTH__PRODUCT_SCOPE`), default `__ferrobridge.operator`,
+  checked by the crate in the same two SMART extension forms. The audit
+  line's field for what a request addressed is `addressed`, where it was
+  `target`, so a JSON log keeps it beside the event's own `target`; a log
+  query that read `target` for the addressed resource reads `addressed`.
+  `[auth] capabilities` refuses at load a value SMART App Launch 2.2.0
+  does not define unless it is a full URI. The issuer and resource checks
+  of `[<lane>.credentials.oauth]` and the Basic password read are the
+  crate's now, with the same refusals at load.
+- `serve` warns that `[auth]` is off only when a surface it guards runs,
+  and names those surfaces (the facade, the operator API, the operations
+  lane); a server with only `/` and the health routes logs nothing
+  (#1005).
 
 ### Fixed
 
