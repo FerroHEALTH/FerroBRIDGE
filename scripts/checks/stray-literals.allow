@@ -9,3 +9,8 @@ skip app/ferrobridge-viewer/src/locale.rs   # the catalog mechanism: message ids
 allow ^(ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Home|End|Enter|Escape|Tab)$   # UI Events KeyboardEvent.key values
 allow ^Ferro(BRIDGE|FED|EHR|TERM|HEALTH)   # product names, the same in every language
 allow ^Cadasto B\.V\.$                      # the maker's legal name
+allow ^CARGO_PKG_VERSION$                   # the environment variable Cargo sets
+allow ^www\.cadasto\.com/contact$           # the maker's address, the same in every language
+allow ^L(\{number\})?$                      # an editor line's id prefix
+allow ^[a-z]+[A-Z][A-Za-z]*$                # a JSON member name (resourceType, valueString)
+allow ^[A-Z][a-z]+[A-Z][A-Za-z]+$           # a FHIR resource type name (OperationOutcome)

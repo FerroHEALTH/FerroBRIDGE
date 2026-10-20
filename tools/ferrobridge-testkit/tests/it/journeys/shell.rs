@@ -20,7 +20,7 @@ use crate::journeys::stack::Stack;
 const ENTRIES: [(&str, &str, &str); 8] = [
     ("Overview", "/mappings", "Mappings"),
     ("Files", "/files", "Mapping files"),
-    ("New file", "/edit", "Edit a mapping file"),
+    ("New file", "/edit", "New mapping file"),
     ("Playground", "/playground", "Transform playground"),
     ("Validation dry run", "/validate", "Validation dry run"),
     ("Capability", "/capability", "Capability"),

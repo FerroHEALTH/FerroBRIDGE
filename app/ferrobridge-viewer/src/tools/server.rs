@@ -14,6 +14,7 @@ use fhir_types::r4::primitives;
 use fhir_types::r4::reference::Reference;
 use leptos::context::use_context;
 
+use crate::locale::{Msg, tr_served};
 use crate::model::ViewError;
 use crate::tools::render;
 
@@ -66,7 +67,7 @@ pub async fn to_fhir(
     if composition.is_empty() {
         return Ok(render::invalid(
             "$tofhir",
-            "The composition is empty: enter a canonical or FLAT composition.",
+            &tr_served(Msg::CompositionEmptyEnterCanonicalFlatComposition),
         ));
     }
     let mut parameters = vec![parameter(
@@ -118,13 +119,16 @@ pub async fn to_openehr(
     if !FORMATS.contains(&format) {
         return Ok(render::invalid(
             "$toopenehr",
-            "The format is not canonical or flat.",
+            &tr_served(Msg::FormatNotCanonicalFlat),
         ));
     }
     // NOTE: no specification governs this: our own design; text that is no
     // JSON is the operator's input to correct, never sent.
     let Ok(bundle) = serde_json::from_str::<serde_json::Value>(bundle) else {
-        return Ok(render::invalid("$toopenehr", "The Bundle is not JSON."));
+        return Ok(render::invalid(
+            "$toopenehr",
+            &tr_served(Msg::BundleNotJson),
+        ));
     };
     if bundle
         .get("resourceType")
@@ -133,7 +137,7 @@ pub async fn to_openehr(
     {
         return Ok(render::invalid(
             "$toopenehr",
-            "The Bundle is not a resource whose resourceType is Bundle.",
+            &tr_served(Msg::BundleNotResourceWhoseResourcetypeBundle),
         ));
     }
     let mut parameter = vec![serde_json::json!({ "name": "bundle", "resource": bundle })];
@@ -159,7 +163,10 @@ pub async fn validate(resource_type: &str, resource: String) -> Result<String, V
     // NOTE: no specification governs this: our own design; text that is no
     // JSON is the operator's input to correct, never sent.
     let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&resource) else {
-        return Ok(render::invalid("$validate", "The resource is not JSON."));
+        return Ok(render::invalid(
+            "$validate",
+            &tr_served(Msg::ResourceNotJson),
+        ));
     };
     if parsed
         .get("resourceType")
@@ -168,7 +175,7 @@ pub async fn validate(resource_type: &str, resource: String) -> Result<String, V
     {
         return Ok(render::invalid(
             "$validate",
-            "The resource's resourceType is not the type chosen.",
+            &tr_served(Msg::ResourceSResourcetypeNotTypeChosen),
         ));
     }
     let answer = state

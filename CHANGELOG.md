@@ -143,6 +143,12 @@ crates on crates.io.
 
 ### Changed
 
+- The operator console takes FerroUI 0.2.0 and reads every word it hands
+  FerroUI from its catalog at run time (#956): table captions, column
+  headers, pager nouns with their plurals, navigation, fields, dialogs and
+  page titles come from `locales/en/ferrobridge-viewer.ftl`, and the
+  stray-literal baseline drops from 384 to 78 literals. English remains the
+  only locale.
 - `openehr-mapping-core` 0.1.121 parses a mapping header's
   `spec.openEhrConfig.archetype` through the `openehr-base` BASE 1.2.0
   `ArchetypeId` and drops its own copy of the grammar (#1026). The accepted
@@ -271,6 +277,9 @@ crates on crates.io.
 
 ### Fixed
 
+- The console's file editor names its mode in its header (#982): the New
+  file route reads "New mapping file" and an existing file reads "Edit
+  <file>", with the matching page title.
 - An HL7 v2 message sent under a code and trigger event that no v2.9.1
   message definition carries, and whose MSH-9.3 names no known structure, is
   parsed against the structure the interactions of its version's tables send

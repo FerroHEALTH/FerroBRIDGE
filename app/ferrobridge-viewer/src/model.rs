@@ -162,6 +162,7 @@ pub struct BridgeView {
 /// the console's fault.
 #[cfg(not(target_arch = "wasm32"))]
 pub mod server {
+    use crate::locale::{Msg, tr_served};
     use fhir_types::codec::{Json as _, Path, Value};
     use fhir_types::r4::operation_outcome::OperationOutcome;
     use http::StatusCode;
@@ -205,19 +206,13 @@ pub mod server {
                 })
             }
             BridgeError::Path => Ok(Refusal::Invalid {
-                reason: String::from(
-                    "the mapping file path is not plain names below a root, so it is not asked for",
-                ),
+                reason: tr_served(Msg::MappingFilePathNotPlainNames),
             }),
             BridgeError::ResourceType => Ok(Refusal::Invalid {
-                reason: String::from(
-                    "the resource type is not a FHIR resource type name, so it is not asked for",
-                ),
+                reason: tr_served(Msg::ResourceTypeNotFhirResourceType),
             }),
             BridgeError::Reason => Ok(Refusal::Invalid {
-                reason: String::from(
-                    "The reason must be one line of at most 200 printable ASCII characters, so the save is not sent.",
-                ),
+                reason: tr_served(Msg::ReasonMustOneLineMost200),
             }),
             BridgeError::Route { .. }
             | BridgeError::Token
