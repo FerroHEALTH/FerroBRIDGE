@@ -681,3 +681,67 @@ fn both_operations_answer_their_typed_losses_beside_the_outcome() -> Result<(), 
     assert_eq!(!warnings.is_empty(), reported);
     Ok(())
 }
+#[test]
+fn a_resource_claiming_two_profiles_selects_the_one_a_program_maps() -> Result<(), Box<dyn Error>> {
+    // R4 resource.html#Meta: `meta.profile` is a list, so a resource claims
+    // every profile it names and selection is membership (bundles.adoc).
+    let set = program_set(&["ferrobridge_diagnose_minimal"])?;
+    let mut resource = condition(MINIMAL_PROFILE)?;
+    resource["meta"]["profile"] = serde_json::json!([
+        "http://example.org/fhir/StructureDefinition/unknown",
+        MINIMAL_PROFILE
+    ]);
+    let request = ToOpenehrRequest::new(bundle(vec![resource])?);
+    let answer = run::to_openehr(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
+    assert!(
+        answer.composition().contains("Synthetic problem one"),
+        "the context of the second profile mapped the Condition"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_resource_claiming_two_mapped_profiles_is_refused_naming_both() -> Result<(), Box<dyn Error>> {
+    let set = program_set(&[
+        "ferrobridge_diagnose_minimal",
+        "ferrobridge_diagnose_required",
+    ])?;
+    let mut resource = condition(MINIMAL_PROFILE)?;
+    resource["meta"]["profile"] = serde_json::json!([MINIMAL_PROFILE, REQUIRED_PROFILE]);
+    let request = ToOpenehrRequest::new(bundle(vec![resource])?);
+    let error = run::to_openehr(&set, &SCHEMAS, &Seams::default(), &settings(), &request)
+        .err()
+        .ok_or("two contexts answer the resource")?;
+    assert_eq!(error.issue_type(), "multiple-matches");
+    let text = Error::source(&error)
+        .map(ToString::to_string)
+        .ok_or("the refusal carries the selection")?;
+    assert!(
+        text.contains("ferrobridge_diagnose_minimal.context")
+            && text.contains("ferrobridge_diagnose_required.context"),
+        "{text}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_bundle_splitting_into_two_compositions_is_refused() -> Result<(), Box<dyn Error>> {
+    // ToOpenEhr.fsh: the `composition` output has `max = "1"`.
+    let set = program_set(&["ferrobridge_diagnose_minimal"])?;
+    let request = ToOpenehrRequest::new(bundle(vec![
+        condition(MINIMAL_PROFILE)?,
+        condition(MINIMAL_PROFILE)?,
+    ])?);
+    let error = run::to_openehr(&set, &SCHEMAS, &Seams::default(), &settings(), &request)
+        .err()
+        .ok_or("one run answers one composition")?;
+    assert!(
+        matches!(
+            error,
+            OperationError::SeveralSubjectResources { count: 2, .. }
+        ),
+        "{error}"
+    );
+    assert_eq!(error.issue_type(), "business-rule");
+    Ok(())
+}

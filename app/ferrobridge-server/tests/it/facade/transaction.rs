@@ -19,6 +19,7 @@ use wiremock::matchers;
 use super::BASE_URL;
 use super::CONTAINER;
 use super::EHR_ID;
+use super::PROFILE;
 use super::VERSION_ONE;
 use super::call;
 use super::condition;
@@ -97,6 +98,40 @@ async fn a_transaction_that_maps_in_full_commits_one_contribution() -> Result<()
             .received("POST", &format!("/ehr/{EHR_ID}/contribution"))
             .await,
         "the whole Bundle commits as one contribution"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_transaction_entry_claiming_two_profiles_is_mapped_by_the_one_a_context_names()
+-> Result<(), Box<dyn StdError>> {
+    // FHIRconnect engine/bundles.adoc splits a Bundle by the context profile
+    // URLs; R4 resource.html#Meta makes `meta.profile` a list, so an entry
+    // that claims an unmapped profile beside a mapped one is selected by
+    // membership.
+    let harness = harness().await;
+    mount_ehr(&harness.cdr).await;
+    mount_echo(&harness.cdr, ECHOED, Echo::Sent).await;
+    let mut claiming = condition();
+    claiming["meta"] = serde_json::json!({ "profile": ["http://example.org/other", PROFILE] });
+    let bundle = serde_json::json!({
+        "resourceType": "Bundle",
+        "type": "transaction",
+        "entry": [
+            { "fullUrl": "urn:uuid:0000-two-profiles", "resource": claiming,
+              "request": { "method": "POST", "url": "Condition" } }
+        ]
+    });
+    let request = Request::post("/fhir")
+        .header(header::CONTENT_TYPE, "application/fhir+json")
+        .body(Body::from(bundle.to_string()))?;
+    let (status, body) = call(harness.app(), request).await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(
+        1,
+        harness
+            .received("POST", &format!("/ehr/{EHR_ID}/contribution"))
+            .await
     );
     Ok(())
 }

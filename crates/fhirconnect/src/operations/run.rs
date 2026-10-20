@@ -631,7 +631,8 @@ fn mapped_resource(entries: &[Object], program: &Program) -> Result<Value, Opera
             resource: String::from(wanted),
             context: String::from(program.context().as_str()),
         }),
-        // TODO(#94): split a bundle into one composition per mapped resource.
+        // NOTE: rest/input/fsh/operations/ToOpenEhr.fsh gives the `composition` output
+        // `max = "1"`, so a Bundle that splits into several compositions is refused here.
         ref several => Err(OperationError::SeveralSubjectResources {
             resource: String::from(wanted),
             count: several.len(),
