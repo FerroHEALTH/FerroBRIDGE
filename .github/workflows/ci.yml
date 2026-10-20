@@ -398,8 +398,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: bash scripts/checks/todo-issues.sh
 
-  # The tracker helpers, the release milestone script and the deployment probe,
-  # each with a self-test. The probe self-test drives a stub curl. The helpers' real branches run only
+  # The tracker helpers, the release milestone script, the deployment probe and
+  # the destructive-command hook, each with a self-test. The probe self-test drives a stub curl. The helpers' real branches run only
   # against the live tracker: the fallback of fields.sh needs a token that
   # cannot read the organisation's issue types, and the migration and the
   # label run write to every issue. Each drives itself against a stub gh on
@@ -423,6 +423,7 @@ jobs:
           bash scripts/gh/watch-prs.sh --self-test
           bash scripts/deploy-probe.sh --self-test
           bash scripts/release/milestone.sh --self-test
+          bash .claude/hooks/block_dangerous.sh --self-test
 
   # ---- Tier 2: the Rust lanes, gated on the workspace existing --------------
   # The one job that decides whether the cargo tier runs at all, and which of

@@ -28,6 +28,8 @@ use fhirconnect::model::semantic::StaticMappingCodes;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::loader::load_str;
 
+use crate::support::OwnedChain;
+
 /// The vendored mapping library, relative to this crate's manifest.
 const CORPUS: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -458,29 +460,38 @@ fn the_corpus_mapping_codes_pass_once_the_engine_registers_them() -> Result<(), 
 /// Returns every corpus file a program the suites compile reaches.
 ///
 /// A program reaches a model mapping it compiled and every extension it
-/// applied to one. The four programs are the diagnosis chain against the
-/// synthetic template and the KDS diagnosis, person and laboratory request
+/// applied to one. The programs are the diagnosis chain against the
+/// synthetic template, the KDS diagnosis, person and laboratory request
 /// project contexts against the published `KDS_Diagnose`, `KDS_Person` and
-/// `KDS_Laborauftrag` templates, and each
-/// template carries the archetypes the files it reaches map.
+/// `KDS_Laborauftrag` templates, and every published context that compiles
+/// verbatim against the template it names. Each template carries the
+/// archetypes the files it reaches map.
 fn compiled_reach() -> Result<BTreeSet<String>, Box<dyn Error>> {
     let mut reached = BTreeSet::new();
-    for (files, program) in [
-        crate::resolve::diagnosis_chain()?,
-        crate::roundtrip::kds_chain()?,
-        crate::person::kds_person_chain()?,
-        crate::laborauftrag::kds_laborauftrag_chain()?,
-    ] {
+    let owned = |(files, program): crate::support::Chain| {
+        (
+            files.iter().map(|file| (*file).to_owned()).collect(),
+            program,
+        )
+    };
+    let mut chains: Vec<OwnedChain> = vec![
+        owned(crate::resolve::diagnosis_chain()?),
+        owned(crate::roundtrip::kds_chain()?),
+        owned(crate::person::kds_person_chain()?),
+        owned(crate::laborauftrag::kds_laborauftrag_chain()?),
+    ];
+    chains.extend(crate::published::published_chains()?);
+    for (files, program) in chains {
         let mut names: Vec<&str> = vec![program.context().as_str()];
         for model in program.models() {
             names.push(model.name().as_str());
             names.extend(model.extensions().iter().map(MappingName::as_str));
         }
-        for file in files {
+        for file in &files {
             let source = fs::read_to_string(PathBuf::from(CORPUS).join(file))?;
-            let document = load_str(*file, &source)?;
+            let document = load_str(file.as_str(), &source)?;
             if names.contains(&document.header().name().value().as_str()) {
-                reached.insert((*file).to_owned());
+                reached.insert(file.clone());
             }
         }
     }

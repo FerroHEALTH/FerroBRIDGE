@@ -17,6 +17,15 @@ docs/specs/** linguist-vendored -text
 tools/ferrobridge-testkit/fixtures/opt/kds/** linguist-vendored -text
 tools/ferrobridge-testkit/fixtures/opt/kds-person/** linguist-vendored -text
 tools/ferrobridge-testkit/fixtures/opt/kds-laborauftrag/** linguist-vendored -text
+tools/ferrobridge-testkit/fixtures/opt/kds-fall-einfach/** linguist-vendored -text
+tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/** linguist-vendored -text
+tools/ferrobridge-testkit/fixtures/opt/kds-medikationseintrag/** linguist-vendored -text
+tools/ferrobridge-testkit/fixtures/opt/kds-medikamentenverabreichungen/** linguist-vendored -text
+tools/ferrobridge-testkit/fixtures/opt/kds-person-pseudonymisiert/** linguist-vendored -text
+tools/ferrobridge-testkit/fixtures/opt/kds-prozedur/** linguist-vendored -text
+tools/ferrobridge-testkit/fixtures/opt/kds-studienteilnahme/** linguist-vendored -text
+tools/ferrobridge-testkit/fixtures/opt/kds-todesursache/** linguist-vendored -text
+tools/ferrobridge-testkit/fixtures/opt/kds-vitalstatus/** linguist-vendored -text
 crates/ferrobridge-hl7v2/vendor/** linguist-vendored -text
 crates/ferrobridge-fhirpath/vendor/** linguist-vendored -text
 tools/ferrobridge-testkit/vendor/** linguist-vendored -text
