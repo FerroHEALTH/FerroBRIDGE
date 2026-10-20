@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that writes the untyped choice
+# Condition.onset[x] into the problem name ELEMENT, which the test turns into
+# an ELEMENT whose value admits DV_TEXT and DV_DATE_TIME: the shape the
+# published laboratory_test_analyte.v1.yml analyteMeasurement and
+# vital_status.v1.yml vitalStatus write.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_onset_choice
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "onset"
+    with:
+      fhir: "$resource.onset"
+      openehr: "$archetype/data[at0001]/items[at0002]"

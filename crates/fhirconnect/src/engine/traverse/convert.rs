@@ -7,6 +7,7 @@ use fhir_types::codec::Value;
 use fhir_types::r4::primitives::String as FhirString;
 use openehr_mapping_core::composition::RmPosition;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
+use openehr_rm::v1_2::model;
 
 use crate::engine::cell;
 use crate::engine::fhir::FhirKind;
@@ -121,85 +122,165 @@ impl<T: Table + ?Sized> Run<'_, T> {
         binding: &Binding,
     ) -> Result<(), EngineError> {
         match self.direction {
-            Direction::FhirToOpenehr => {
-                let Some(target) = mapping.fhir() else {
-                    return Ok(());
-                };
-                let Some(openehr) = converted(mapping) else {
-                    return Ok(());
-                };
-                let Some(view) = self.input_value(mapping, target, openehr, input)? else {
-                    return Ok(());
-                };
-                let node = openehr.node();
-                let Some(view) = self.translated(mapping, view, Output::openehr(openehr, input))?
-                else {
-                    return Ok(());
-                };
-                if !openehr.tail().segments.is_empty() {
-                    return self.convert_tail(mapping, target, openehr, &view, binding);
-                }
-                let held = self.held(&binding.openehr, node.flat_id());
-                let produced = cell::put(
-                    &view,
-                    node.rm_type(),
-                    held.as_ref(),
-                    self.binding_of(node).as_deref(),
-                )
-                .map_err(|source| EngineError::Cell {
-                    mapping: String::from(mapping.name()),
-                    element: String::from(target.expression().as_str()),
-                    source: Box::new(source),
-                })?;
-                for taken in &produced.fallbacks {
-                    self.warnings
-                        .push(Warning::fallback(taken, self.locate(mapping, input)));
-                }
-                let value = self.identified(mapping, &view, produced.value, Shape::at(node))?;
-                self.put_openehr_at(openehr, binding, value);
-                Ok(())
-            }
-            Direction::OpenehrToFhir => {
-                let Some(target) = mapping.fhir() else {
-                    return Ok(());
-                };
-                let Some(openehr) = converted(mapping) else {
-                    return Ok(());
-                };
-                let positions = Self::positions_of(mapping, input, openehr)?;
-                let Some(source) = self.value_at(mapping, openehr, &positions)? else {
-                    return Ok(());
-                };
-                let (target, kind) = Self::output_target(mapping, target)?;
-                let refuse = |source: LensError| EngineError::Cell {
-                    mapping: String::from(mapping.name()),
-                    element: String::from(target.expression().as_str()),
-                    source: Box::new(source),
-                };
-                let (view, dropped) = match source {
-                    Leaf::Value(ref value) if let RmValue::PartyRef(ref party) = **value => (
-                        self.reference_of_party(mapping, target, party)?,
-                        Dropped::default(),
-                    ),
-                    Leaf::Value(ref value) => {
-                        let terminology = self.binding_of(openehr.node());
-                        self.read_value(value, kind, terminology.as_deref())
-                            .map_err(refuse)?
-                    }
-                    Leaf::Scalar(ref text) => (
-                        Self::read_scalar(mapping, target, openehr, kind, text)?,
-                        Dropped::default(),
-                    ),
-                };
-                let output = Output::fhir(target, &binding.fhir);
-                let Some(view) = self.translated(mapping, view, output)? else {
-                    return Ok(());
-                };
-                self.put_fhir_at(mapping, target, binding, &view)?;
-                self.record_dropped(mapping, binding, &dropped);
-                Ok(())
-            }
+            Direction::FhirToOpenehr => self.convert_in(mapping, input, binding),
+            Direction::OpenehrToFhir => self.convert_out(mapping, input, binding),
         }
+    }
+
+    /// Runs one occurrence of a mapping from FHIR into openEHR.
+    fn convert_in(
+        &mut self,
+        mapping: &Mapping,
+        input: &Occurrence,
+        binding: &Binding,
+    ) -> Result<(), EngineError> {
+        let Some(target) = mapping.fhir() else {
+            return Ok(());
+        };
+        let found = match mapping.derived() {
+            Some(Derived::Polymorphic { read, pairings }) => {
+                self.polymorphic_in(mapping, read, pairings, input)?
+            }
+            _ => match converted(mapping) {
+                Some(openehr) => self
+                    .input_value(mapping, target, openehr, input)?
+                    .map(|view| (openehr, view)),
+                None => None,
+            },
+        };
+        let Some((openehr, view)) = found else {
+            return Ok(());
+        };
+        let node = openehr.node();
+        let Some(view) = self.translated(mapping, view, Output::openehr(openehr, input))? else {
+            return Ok(());
+        };
+        if !openehr.tail().segments.is_empty() {
+            return self.convert_tail(mapping, target, openehr, &view, binding);
+        }
+        let held = self.held(&binding.openehr, node.flat_id());
+        let produced = cell::put(
+            &view,
+            node.rm_type(),
+            held.as_ref(),
+            self.binding_of(node).as_deref(),
+        )
+        .map_err(|source| EngineError::Cell {
+            mapping: String::from(mapping.name()),
+            element: String::from(target.expression().as_str()),
+            source: Box::new(source),
+        })?;
+        for taken in &produced.fallbacks {
+            self.warnings
+                .push(Warning::fallback(taken, self.locate(mapping, input)));
+        }
+        let value = self.identified(mapping, &view, produced.value, Shape::at(node))?;
+        self.put_openehr_at(openehr, binding, value);
+        Ok(())
+    }
+
+    /// Runs one occurrence of a mapping from openEHR out to FHIR.
+    fn convert_out(
+        &mut self,
+        mapping: &Mapping,
+        input: &Occurrence,
+        binding: &Binding,
+    ) -> Result<(), EngineError> {
+        let Some(target) = mapping.fhir() else {
+            return Ok(());
+        };
+        let Some((openehr, source, target, kind)) = self.output_source(mapping, target, input)?
+        else {
+            return Ok(());
+        };
+        let refuse = |source: LensError| EngineError::Cell {
+            mapping: String::from(mapping.name()),
+            element: String::from(target.expression().as_str()),
+            source: Box::new(source),
+        };
+        let (view, dropped) = match source {
+            Leaf::Value(ref value) if let RmValue::PartyRef(ref party) = **value => (
+                self.reference_of_party(mapping, target, party)?,
+                Dropped::default(),
+            ),
+            Leaf::Value(ref value) => {
+                let terminology = self.binding_of(openehr.node());
+                self.read_value(value, kind, terminology.as_deref())
+                    .map_err(refuse)?
+            }
+            Leaf::Scalar(ref text) => (
+                Self::read_scalar(mapping, target, openehr, kind, text)?,
+                Dropped::default(),
+            ),
+        };
+        let output = Output::fhir(target, &binding.fhir);
+        let Some(view) = self.translated(mapping, view, output)? else {
+            return Ok(());
+        };
+        self.put_fhir_at(mapping, target, binding, &view)?;
+        self.record_dropped(mapping, binding, &dropped);
+        Ok(())
+    }
+
+    /// Returns the openEHR node one occurrence reads out of, what it holds
+    /// there, and the FHIR target and kind it writes, `None` when the node
+    /// holds nothing.
+    ///
+    /// A [`Derived::Polymorphic`] mapping reads the first value node, in the
+    /// order of its pairs, that holds a value, and writes the alternative that
+    /// node's first pair names.
+    fn output_source<'mapping>(
+        &self,
+        mapping: &'mapping Mapping,
+        target: &'mapping FhirTarget,
+        input: &Occurrence,
+    ) -> Result<Option<OutSource<'mapping>>, EngineError> {
+        if let Some(Derived::Polymorphic { pairings, .. }) = mapping.derived() {
+            // NOTE: openEHR RM data_structures §ELEMENT: the value alternatives share
+            // the `value` attribute, so the class the instance carries picks the pair.
+            let Some(first) = pairings.first() else {
+                return Ok(None);
+            };
+            let positions = Self::positions_of(mapping, input, first.target())?;
+            let Some(held) = self.node_value(mapping.name(), first.target(), &positions)? else {
+                return Ok(None);
+            };
+            let class = held
+                .get("_type")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            let chosen = pairings.iter().find(|pairing| {
+                let paired = pairing.target().node().rm_type();
+                paired == class || model::is_a(class, paired)
+            });
+            if let Some(pairing) = chosen {
+                let openehr = pairing.target();
+                let Some(source) = self.value_at(mapping, openehr, &positions)? else {
+                    return Ok(None);
+                };
+                let written = pairing.alternative();
+                let kind = FhirKind::of_code(written.code()).ok_or_else(|| {
+                    EngineError::UnknownElement {
+                        mapping: String::from(mapping.name()),
+                        element: String::from(written.target().resolved().leaf()),
+                    }
+                })?;
+                return Ok(Some((openehr, source, written.target(), kind)));
+            }
+            return Err(EngineError::UnknownElement {
+                mapping: String::from(mapping.name()),
+                element: format!("{} from a {class}", target.resolved().leaf()),
+            });
+        }
+        let Some(openehr) = converted(mapping) else {
+            return Ok(None);
+        };
+        let positions = Self::positions_of(mapping, input, openehr)?;
+        let Some(source) = self.value_at(mapping, openehr, &positions)? else {
+            return Ok(None);
+        };
+        let (target, kind) = Self::output_target(mapping, target)?;
+        Ok(Some((openehr, source, target, kind)))
     }
 
     /// Reads the text a scalar leaf holds as the FHIR element `kind` names.
@@ -296,7 +377,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
         input: &Occurrence,
     ) -> Result<Option<FhirValue>, EngineError> {
         match mapping.derived() {
-            Some(Derived::Choice { read, .. }) => self.choice_at(mapping, read, openehr, input),
+            Some(Derived::Choice { read, .. } | Derived::Polymorphic { read, .. }) => {
+                self.choice_at(mapping, read, openehr, input)
+            }
             Some(Derived::Declared(declared)) => {
                 let kind = Self::kind(mapping, declared.target())?;
                 self.element_at(mapping, declared.target(), input, kind)
@@ -330,10 +413,12 @@ impl<T: Table + ?Sized> Run<'_, T> {
             Some(Derived::Declared(declared)) => {
                 Ok((declared.target(), Self::kind(mapping, declared.target())?))
             }
-            Some(Derived::Choice { write: None, .. }) => Err(EngineError::UnknownElement {
-                mapping: String::from(mapping.name()),
-                element: String::from(target.resolved().leaf()),
-            }),
+            Some(Derived::Choice { write: None, .. } | Derived::Polymorphic { .. }) => {
+                Err(EngineError::UnknownElement {
+                    mapping: String::from(mapping.name()),
+                    element: String::from(target.resolved().leaf()),
+                })
+            }
             Some(Derived::Element(_) | Derived::Anchor | Derived::Value { .. }) | None => {
                 Ok((target, Self::kind(mapping, target)?))
             }
@@ -386,3 +471,12 @@ struct Dropped {
     /// The term mappings the element cannot carry.
     mappings: Vec<Withheld>,
 }
+
+/// The node an occurrence reads out of, what it holds, and the FHIR target
+/// and kind it writes.
+type OutSource<'mapping> = (
+    &'mapping OpenehrTarget,
+    Leaf,
+    &'mapping FhirTarget,
+    FhirKind,
+);

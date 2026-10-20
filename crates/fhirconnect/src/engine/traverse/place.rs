@@ -21,6 +21,7 @@ use crate::model::ast::keyword::Direction;
 use crate::resolve::derive;
 use crate::resolve::program::mapping::Derived;
 use crate::resolve::program::mapping::Mapping;
+use crate::resolve::program::mapping::Pairing;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
 use crate::tree::Occurrence;
@@ -95,6 +96,64 @@ impl<T: Table + ?Sized> Run<'_, T> {
             })?;
         FhirValue::read(kind, element, value)
             .map(Some)
+            .map_err(|source| EngineError::Fhir {
+                mapping: String::from(mapping.name()),
+                element: String::from(element),
+                source: Box::new(source),
+            })
+    }
+
+    /// Reads the choice element one input occurrence names against a
+    /// polymorphic `ELEMENT`, with the value node its alternative pairs with.
+    ///
+    /// The JSON key of a choice names its type
+    /// (<https://hl7.org/fhir/R4/formats.html#choice>), so the alternative the
+    /// document carries selects the pair: the one earliest in its class's
+    /// page of the data-type chapter, the first in template order on a tie
+    /// (no specification governs the tie-break: our own design). An
+    /// alternative no value node pairs with refuses.
+    pub(super) fn polymorphic_in<'mapping>(
+        &self,
+        mapping: &Mapping,
+        read_at: &FhirTarget,
+        pairings: &'mapping [Pairing],
+        occurrence: &Occurrence,
+    ) -> Result<Option<(&'mapping OpenehrTarget, FhirValue)>, EngineError> {
+        let matches = read(self.table, &self.fhir, read_at.expression()).map_err(|source| {
+            EngineError::Read {
+                mapping: String::from(mapping.name()),
+                expression: String::from(read_at.expression().as_str()),
+                source: Box::new(source),
+            }
+        })?;
+        let Some(found) = matches
+            .iter()
+            .find(|matched| matched.occurrence() == occurrence)
+        else {
+            return Ok(None);
+        };
+        let (Some(value), Some((suffix, _variant))) = (found.value(), found.alternative()) else {
+            return Ok(None);
+        };
+        let element = read_at.resolved().leaf();
+        let unknown = || EngineError::UnknownElement {
+            mapping: String::from(mapping.name()),
+            element: format!("{element} as {suffix}"),
+        };
+        let pairing = pairings
+            .iter()
+            .filter(|pairing| pairing.suffix() == suffix)
+            .reduce(|best, next| {
+                if next.rank() < best.rank() {
+                    next
+                } else {
+                    best
+                }
+            })
+            .ok_or_else(unknown)?;
+        let kind = FhirKind::of_code(pairing.alternative().code()).ok_or_else(unknown)?;
+        FhirValue::read(kind, element, value)
+            .map(|view| Some((pairing.target(), view)))
             .map_err(|source| EngineError::Fhir {
                 mapping: String::from(mapping.name()),
                 element: String::from(element),

@@ -123,7 +123,11 @@ carries decides). An `Extension` against a data value converts through its
 gives each admitted data type a child node) converts into the alternative
 whose class lists the FHIR type earliest in `PAIRS` (`Derived::Value`) and
 anchors its children at the `ELEMENT`, because `FollowedBy.adoc` runs the
-children after the parent "has been executed". Any other untyped mapping
+children after the parent "has been executed". A choice element onto a
+polymorphic `ELEMENT` keeps every pair of an alternative with a value node
+(`Derived::Polymorphic`): going in the document's alternative picks the value
+node, coming out the `_type` the composition holds picks the alternative, and
+an alternative or a class no pair names refuses. Any other untyped mapping
 onto a structural (`PATHABLE`) node anchors its children, and one with no
 child is a warning, never a silent nothing. Every
 pair in `PAIRS` must name a `FhirKind`; `engine::fhir` tests that.
