@@ -589,9 +589,32 @@ fn conformance_the_round_trip_chains_hold_their_pass_list() -> Result<(), Box<dy
             crate::laborauftrag::laborauftrag_getput(),
         )?,
     );
+    let observation_events = {
+        let index = crate::events::events_template()?;
+        let program = crate::events::events_program(&index)?;
+        let putget = laws::putget(
+            &program,
+            &index,
+            &crate::events::reading("2026-09-12T08:30:00+02:00", 70),
+            &laws::untouched,
+        );
+        let getput = crate::events::readings(&index, &[("2026-09-12T08:30:00+02:00", 70)])
+            .and_then(|composition| laws::getput(&program, &index, &composition, &laws::untouched));
+        chain_case(
+            "ferrobridge_observation_events",
+            holds("PutGet", "events__observation_events_putget", putget)?,
+            holds("GetPut", "events__observation_events_getput", getput)?,
+        )
+    };
     let outcome = record(
         Corpus::Roundtrip,
-        &[synthetic, kds, kds_person, kds_laborauftrag],
+        &[
+            synthetic,
+            kds,
+            kds_person,
+            kds_laborauftrag,
+            observation_events,
+        ],
     )?;
     assert!(
         outcome.regressed.is_empty(),

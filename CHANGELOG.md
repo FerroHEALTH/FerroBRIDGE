@@ -25,6 +25,17 @@ crates on crates.io.
 
 ### Added
 
+- A FHIRconnect mapping can now name the origin of an observation's
+  history, `$archetype/data/origin`, which no Web Template node carries
+  (#95). The engine writes it as the Simplified Formats `history_origin` of
+  the observation and reads it back from `HISTORY.origin`. An `OBSERVATION`
+  whose `HISTORY` carries events, each with an `ITEM_LIST`, now round-trips
+  under both lens laws against a synthetic template: going out each event
+  becomes its own resource (the FHIRconnect hierarchy split), and the origin
+  and each event's time keep their offset in both directions. The round-trip
+  pass list gains `ferrobridge_observation_events` (5 of 5). `fhirconnect`
+  0.1.171.
+
 - Going into openEHR, a coding that carries no display now has its display
   resolved through `CodeSystem/$lookup` on the `[terminology]` server
   (#95), as the FHIRconnect `DV_CODED_TEXT` page recommends. A found

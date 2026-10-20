@@ -336,6 +336,10 @@ pub enum Carried {
     /// node (`_provider` on an `ENTRY`) and the engine writes through
     /// [`crate::engine::family::provider`].
     Family,
+    /// The origin of an `OBSERVATION`'s `HISTORY`, a `DV_DATE_TIME` the Web
+    /// Template carries no node for, which FLAT writes as the
+    /// `history_origin` of the observation's node.
+    HistoryOrigin,
 }
 
 /// Returns the class a tail below a node of `rm_type` is written as, and what
@@ -354,6 +358,9 @@ pub enum Carried {
 #[must_use]
 pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> {
     let wanted = tail.join("/");
+    if wanted == HISTORY_ORIGIN.1 && model::is_a(rm_type, HISTORY_ORIGIN.0) {
+        return Some((HISTORY_ORIGIN.0, Carried::HistoryOrigin));
+    }
     if let Some(&(owner, _)) = FAMILIES
         .iter()
         .find(|&&(owner, path)| path == wanted && model::is_a(rm_type, owner))
@@ -452,6 +459,19 @@ pub const FAMILIES: &[(&str, &str)] = &[
     ("EVENT_CONTEXT", "health_care_facility"),
     ("EVENT_CONTEXT", "end_time"),
 ];
+
+/// The tail below an `OBSERVATION` that names its history's origin.
+///
+/// `HISTORY.origin` is a `DV_DATE_TIME`
+/// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_structures.html#_history_class>),
+/// a Web Template carries no node for it, and Simplified Formats spells
+/// it `history_origin` under the observation's node
+/// (`docs/specs/its-rest/docs/simplified_formats/master05-rm_mapping.adoc`,
+/// §OBSERVATION).
+pub const HISTORY_ORIGIN: (&str, &str) = ("OBSERVATION", "data/origin");
+
+/// The FLAT attribute [`HISTORY_ORIGIN`] is written under.
+pub const HISTORY_ORIGIN_KEY: &str = "history_origin";
 
 /// The attributes of a party root a party context maps although no template
 /// node holds them, which the party build places on the root.
@@ -655,5 +675,15 @@ mod tests {
             carried("EVENT_CONTEXT", &["end_time"]),
             Some(("EVENT_CONTEXT", Carried::Family))
         );
+    }
+
+    #[test]
+    fn the_history_origin_is_carried_on_an_observation_alone() {
+        assert_eq!(
+            carried("OBSERVATION", &["data", "origin"]),
+            Some(("OBSERVATION", Carried::HistoryOrigin))
+        );
+        assert_eq!(carried("EVALUATION", &["data", "origin"]), None);
+        assert_eq!(carried("OBSERVATION", &["data", "period"]), None);
     }
 }
