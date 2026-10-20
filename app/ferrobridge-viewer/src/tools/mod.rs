@@ -110,7 +110,7 @@ fn answer(value: Option<Result<String, ViewError>>) -> AnyView {
     match value {
         None => ().into_any(),
         Some(Ok(html)) => view! { <div inner_html=html></div> }.into_any(),
-        Some(Err(error)) => fault(error.to_string()).into_any(),
+        Some(Err(error)) => fault(error.text()).into_any(),
     }
 }
 
@@ -343,8 +343,8 @@ pub fn ValidatePage() -> impl IntoView {
                             fault(tr(Msg::BridgeDeclaresValidateNoResourceType)).into_any()
                         }
                         Ok(Outcome::Shown(types)) => validate_form(types),
-                        Ok(Outcome::Refused(refusal)) => fault(refusal.to_string()).into_any(),
-                        Err(error) => fault(error.to_string()).into_any(),
+                        Ok(Outcome::Refused(refusal)) => fault(refusal.text()).into_any(),
+                        Err(error) => fault(error.text()).into_any(),
                     }
                 })}
             </Suspense>

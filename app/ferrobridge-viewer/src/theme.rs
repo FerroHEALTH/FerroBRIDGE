@@ -89,6 +89,7 @@ pub mod server {
     use http::header::SET_COOKIE;
     use leptos::context::use_context;
 
+    use crate::locale::{Msg, tr_served};
     use crate::model::{Outcome, Refusal, ViewError};
     use crate::server::ViewerState;
     use crate::session::THEME_COOKIE;
@@ -104,7 +105,7 @@ pub mod server {
         let (state, _token) = crate::session::request::signed_in()?;
         let Some(theme) = Theme::parse(key) else {
             return Ok(Outcome::Refused(Refusal::Invalid {
-                reason: String::from("the theme is not light, dark or system"),
+                reason: tr_served(Msg::ThemeInvalid),
             }));
         };
         let response =

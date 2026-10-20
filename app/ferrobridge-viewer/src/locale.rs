@@ -472,6 +472,54 @@ messages! {
     NotFoundBody = "not-found-body",
     /// A refusal from the bridge with `$status`.
     BridgeRefusedStatus = "bridge-refused-status",
+    /// The fault of a view asked for with no live session.
+    ViewSignedOut = "view-signed-out",
+    /// The fault of a view whose answer, with `$status`, the console cannot read.
+    ViewUnreadable = "view-unreadable",
+    /// The fault of a view whose bridge gave no answer.
+    ViewUnreachable = "view-unreachable",
+    /// The fault of a tool sent as a plain form post before its page loaded.
+    ViewPlainPost = "view-plain-post",
+    /// The fault of a view the console could not serve.
+    ViewUnavailable = "view-unavailable",
+    /// The fault of a view its server function did not deliver, for `$cause`.
+    ViewFetch = "view-fetch",
+    /// The fault of an answer that lacks the field at `$path`.
+    ShapeMissing = "shape-missing",
+    /// The refusal of a theme the console does not offer.
+    ThemeInvalid = "theme-invalid",
+    /// The word of a diagnostic of severity error.
+    SeverityError = "severity-error",
+    /// The word of a diagnostic of severity warning.
+    SeverityWarning = "severity-warning",
+    /// The answer to a sign-in or sign-out on a console with no `[oidc]`.
+    SignInNotConfigured = "sign-in-not-configured",
+    /// The answer to a sign-out whose session could not be ended.
+    SessionNotEnded = "session-not-ended",
+    /// The answer to a sign-out whose redirect could not be written.
+    SignOutRedirectUnwritten = "sign-out-redirect-unwritten",
+    /// The answer to a sign-in whose redirect could not be written.
+    SignInRedirectUnwritten = "sign-in-redirect-unwritten",
+    /// The answer to a redirect back with no sign-in pending.
+    NoSignInPending = "no-sign-in-pending",
+    /// The answer to a redirect back whose `state` is not the sign-in's.
+    SignInStateMismatch = "sign-in-state-mismatch",
+    /// The answer to a redirect back that carries an error.
+    ProviderDidNotSignIn = "provider-did-not-sign-in",
+    /// The answer to a redirect back that carries no code.
+    RedirectCarriesNoCode = "redirect-carries-no-code",
+    /// The answer to a sign-in whose ID Token did not verify.
+    IdTokenDidNotVerify = "id-token-did-not-verify",
+    /// The answer to a sign-in the provider could not complete.
+    SignInNotCompleted = "sign-in-not-completed",
+    /// The answer to a sign-in whose session could not be begun.
+    SessionNotBegun = "session-not-begun",
+    /// The answer to a sign-in while the session pool is full.
+    SessionsFull = "sessions-full",
+    /// The answer to a sign-in whose pending session could not be begun.
+    SignInSessionNotBegun = "sign-in-session-not-begun",
+    /// The answer to a state-changing request from outside the console's pages.
+    ForeignRequestRefused = "foreign-request-refused",
 }
 
 /// The console's message `msg` in the page's locale.
@@ -548,16 +596,25 @@ pub fn requested() -> Locale {
     use leptos::context::use_context;
     let configured = use_context::<crate::server::ViewerState>()
         .map_or_else(Locale::english, |state| state.settings().locale.clone());
-    let header = use_context::<http::request::Parts>()
-        .and_then(|parts| {
-            parts
-                .headers
-                .get(http::header::ACCEPT_LANGUAGE)
-                .and_then(|value| value.to_str().ok())
-                .map(str::to_owned)
-        })
+    match use_context::<http::request::Parts>() {
+        Some(parts) => negotiated(&parts.headers, configured),
+        None => Locale::negotiate_with("", catalog(), configured),
+    }
+}
+
+/// The locale of a request with `headers`: the best language of its
+/// `Accept-Language` the catalog holds, else `configured`. For a plain axum
+/// handler, which runs outside the page tree.
+#[cfg(not(target_arch = "wasm32"))]
+#[must_use]
+pub fn negotiated(headers: &http::HeaderMap, configured: Locale) -> Locale {
+    // NOTE: RFC 9110 §12.5.4: a header that is no visible ASCII names no
+    // language, so the request falls to the configured one.
+    let header = headers
+        .get(http::header::ACCEPT_LANGUAGE)
+        .and_then(|value| value.to_str().ok())
         .unwrap_or_default();
-    Locale::negotiate_with(&header, catalog(), configured)
+    Locale::negotiate_with(header, catalog(), configured)
 }
 
 #[cfg(test)]

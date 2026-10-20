@@ -14,6 +14,8 @@ use leptos::server_fn::codec::JsonEncoding;
 use leptos::server_fn::error::{FromServerFnError, ServerFnErrorErr};
 use serde::{Deserialize, Serialize};
 
+use crate::locale::{Msg, tr, tr_with};
+
 /// What a server function answers when the console did its part.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Outcome<T> {
@@ -45,23 +47,28 @@ pub enum Refusal {
     },
 }
 
-impl std::fmt::Display for Refusal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Refusal {
+    /// The words of the refusal in the page's locale: its status and the
+    /// diagnostics the bridge carried, in order.
+    #[must_use]
+    pub fn text(&self) -> String {
         match self {
             Self::Bridge {
                 status,
                 diagnostics,
             } => {
-                write!(f, "{status}: the bridge refused the request.")?;
-                for text in diagnostics {
-                    write!(f, " {text}")?;
+                let mut text = tr_with(
+                    Msg::BridgeRefusedStatus,
+                    &[("status", status.to_string().into())],
+                );
+                for said in diagnostics {
+                    text.push(' ');
+                    text.push_str(said);
                 }
-                Ok(())
+                text
             }
-            Self::NotAuthenticated => {
-                f.write_str("401: the bridge did not accept your sign-in. Sign in again.")
-            }
-            Self::Invalid { reason } => f.write_str(reason),
+            Self::NotAuthenticated => tr(Msg::N401BridgeDidNotAcceptYour),
+            Self::Invalid { reason } => reason.clone(),
         }
     }
 }
@@ -96,6 +103,26 @@ pub enum ViewError {
         #[source]
         source: ServerFnErrorErr,
     },
+}
+
+impl ViewError {
+    /// The words of the fault in the page's locale; its `Display` is the log's.
+    #[must_use]
+    pub fn text(&self) -> String {
+        match self {
+            Self::SignedOut => tr(Msg::ViewSignedOut),
+            Self::Unreadable { status } => tr_with(
+                Msg::ViewUnreadable,
+                &[("status", status.to_string().into())],
+            ),
+            Self::Unreachable => tr(Msg::ViewUnreachable),
+            Self::PlainPost => tr(Msg::ViewPlainPost),
+            Self::Unavailable => tr(Msg::ViewUnavailable),
+            Self::Fetch { source } => {
+                tr_with(Msg::ViewFetch, &[("cause", source.to_string().into())])
+            }
+        }
+    }
 }
 
 impl FromServerFnError for ViewError {
@@ -253,68 +280,92 @@ pub mod server {
             })
             .unwrap_or_default()
     }
+}
 
-    #[cfg(test)]
-    mod tests {
-        use http::StatusCode;
+#[cfg(test)]
+mod tests {
+    use http::StatusCode;
 
-        use super::refusal;
-        use crate::bridge::BridgeError;
-        use crate::model::{Refusal, ViewError};
+    use crate::bridge::BridgeError;
+    use crate::model::server::refusal;
+    use crate::model::{Refusal, ViewError};
 
-        #[test]
-        fn a_401_asks_for_a_new_sign_in_and_another_refusal_keeps_its_status_and_diagnostics() {
-            let unauthorized = BridgeError::Refused {
-                status: StatusCode::UNAUTHORIZED,
-                body: String::new(),
-            };
-            assert_eq!(Ok(Refusal::NotAuthenticated), refusal(&unauthorized));
-            let forbidden = BridgeError::Refused {
-                status: StatusCode::FORBIDDEN,
-                body: String::from(
-                    r#"{"resourceType":"OperationOutcome","issue":[{"severity":"error","code":"forbidden","diagnostics":"the operator scope is missing"}]}"#,
-                ),
-            };
-            assert_eq!(
-                Ok(Refusal::Bridge {
-                    status: 403,
-                    diagnostics: vec![String::from("the operator scope is missing")],
-                }),
-                refusal(&forbidden)
-            );
-            let detailed = BridgeError::Refused {
-                status: StatusCode::SERVICE_UNAVAILABLE,
-                body: String::from(
-                    r#"{"resourceType":"OperationOutcome","issue":[{"severity":"error","code":"not-supported","details":{"text":"the operations are not served"},"diagnostics":"no mapping set"}]}"#,
-                ),
-            };
-            assert_eq!(
-                Ok(Refusal::Bridge {
-                    status: 503,
-                    diagnostics: vec![
-                        String::from("the operations are not served"),
-                        String::from("no mapping set"),
-                    ],
-                }),
-                refusal(&detailed),
-                "an issue's details.text is its words too"
-            );
-            let plain = BridgeError::Refused {
-                status: StatusCode::SERVICE_UNAVAILABLE,
-                body: String::from("down"),
-            };
-            assert_eq!(
-                Ok(Refusal::Bridge {
-                    status: 503,
-                    diagnostics: Vec::new(),
-                }),
-                refusal(&plain)
-            );
-            assert_eq!(Err(ViewError::Unavailable), refusal(&BridgeError::Token));
-            assert_eq!(
-                Err(ViewError::Unreadable { status: 200 }),
-                refusal(&BridgeError::NotAnObject)
-            );
-        }
+    #[test]
+    fn a_401_asks_for_a_new_sign_in_and_another_refusal_keeps_its_status_and_diagnostics() {
+        let unauthorized = BridgeError::Refused {
+            status: StatusCode::UNAUTHORIZED,
+            body: String::new(),
+        };
+        assert_eq!(Ok(Refusal::NotAuthenticated), refusal(&unauthorized));
+        let forbidden = BridgeError::Refused {
+            status: StatusCode::FORBIDDEN,
+            body: String::from(
+                r#"{"resourceType":"OperationOutcome","issue":[{"severity":"error","code":"forbidden","diagnostics":"the operator scope is missing"}]}"#,
+            ),
+        };
+        assert_eq!(
+            Ok(Refusal::Bridge {
+                status: 403,
+                diagnostics: vec![String::from("the operator scope is missing")],
+            }),
+            refusal(&forbidden)
+        );
+        let detailed = BridgeError::Refused {
+            status: StatusCode::SERVICE_UNAVAILABLE,
+            body: String::from(
+                r#"{"resourceType":"OperationOutcome","issue":[{"severity":"error","code":"not-supported","details":{"text":"the operations are not served"},"diagnostics":"no mapping set"}]}"#,
+            ),
+        };
+        assert_eq!(
+            Ok(Refusal::Bridge {
+                status: 503,
+                diagnostics: vec![
+                    String::from("the operations are not served"),
+                    String::from("no mapping set"),
+                ],
+            }),
+            refusal(&detailed),
+            "an issue's details.text is its words too"
+        );
+        let plain = BridgeError::Refused {
+            status: StatusCode::SERVICE_UNAVAILABLE,
+            body: String::from("down"),
+        };
+        assert_eq!(
+            Ok(Refusal::Bridge {
+                status: 503,
+                diagnostics: Vec::new(),
+            }),
+            refusal(&plain)
+        );
+        assert_eq!(Err(ViewError::Unavailable), refusal(&BridgeError::Token));
+        assert_eq!(
+            Err(ViewError::Unreadable { status: 200 }),
+            refusal(&BridgeError::NotAnObject)
+        );
+    }
+
+    #[test]
+    fn a_refusal_and_a_fault_draw_their_english_words_from_the_catalog() {
+        let refused = Refusal::Bridge {
+            status: 503,
+            diagnostics: vec![String::from("synthetic diagnostic")],
+        };
+        assert_eq!(
+            "503: the bridge refused the request. synthetic diagnostic",
+            refused.text()
+        );
+        assert_eq!(
+            "401: the bridge did not accept your sign-in. Sign in again.",
+            Refusal::NotAuthenticated.text()
+        );
+        assert_eq!(
+            "the bridge answered 502 with a body this console cannot read",
+            ViewError::Unreadable { status: 502 }.text()
+        );
+        assert_eq!(
+            "the tool runs once its page has loaded; reload the page and run it again",
+            ViewError::PlainPost.text()
+        );
     }
 }

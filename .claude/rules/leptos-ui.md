@@ -469,8 +469,14 @@ catalog file with no code change. What is particular here:
   so the console's words and the library's switch together, and the document
   writes it as `<html lang>`.
 - `scripts/checks/stray-literals.sh app/ferrobridge-viewer/src` runs in CI
-  against `scripts/checks/stray-literals.baseline`: a file may hold no more
-  stray literals than its count, and a change that moves strings into the
-  catalog lowers the count with `--update`. Most of the remaining strings
-  reach a component that takes a `&'static str`, which FerroHEALTH/FerroUI#114
-  widens.
+  against `scripts/checks/stray-literals.baseline`, which names no file: a
+  console string outside the catalog fails it. A literal no page draws (a
+  protocol token, a header value, the name of a document in a log line) is
+  allowed in `scripts/checks/stray-literals.allow` with its reason, and the
+  files that speak only to the terminal (`cli.rs`, `command.rs`, `config/`)
+  are skipped there.
+- A fault or a refusal the console draws reads its words from the catalog
+  (`ViewError::text`, `Refusal::text`, `Shape::text`), and a plain-text
+  answer of an axum route reads them in the locale `crate::locale::negotiated`
+  picks from the request's headers. An error's `Display` is for the log
+  alone, and never reaches a page.

@@ -29,6 +29,14 @@ pub struct Shape {
     pub path: &'static str,
 }
 
+impl Shape {
+    /// The words of the fault in the page's locale; its `Display` is the log's.
+    #[must_use]
+    pub fn text(&self) -> String {
+        tr_with(Msg::ShapeMissing, &[("path", self.path.into())])
+    }
+}
+
 /// The value at `path` of `value`, a `.`-separated run of object keys.
 ///
 /// # Errors
@@ -73,7 +81,7 @@ pub fn optional_text<'a>(
 pub fn failed(heading: &str, error: &BridgeError) -> AnyView {
     let said = match crate::model::server::refusal(error) {
         Ok(refusal) => refused(&refusal),
-        Err(failure) => fault(failure.to_string()).into_any(),
+        Err(failure) => fault(failure.text()).into_any(),
     };
     card(heading.to_owned(), said).into_any()
 }
@@ -82,7 +90,7 @@ pub fn failed(heading: &str, error: &BridgeError) -> AnyView {
 #[must_use]
 pub fn unreadable(heading: &str, shape: &Shape) -> AnyView {
     tracing::error!(%shape, "the bridge answered a document this console cannot read");
-    card(heading.to_owned(), fault(shape.to_string())).into_any()
+    card(heading.to_owned(), fault(shape.text())).into_any()
 }
 
 /// The words of `refusal`: its status and the diagnostics it carried.
@@ -117,15 +125,15 @@ pub fn refused(refusal: &Refusal) -> AnyView {
 /// The console's own fault `failure`, as an alert.
 #[must_use]
 pub fn faulted(failure: &ViewError) -> AnyView {
-    fault(failure.to_string()).into_any()
+    fault(failure.text()).into_any()
 }
 
 /// The word and the badge classes of `severity`.
 #[must_use]
-pub const fn severity(severity: Severity) -> (&'static str, &'static str) {
+pub fn severity(severity: Severity) -> (String, &'static str) {
     match severity {
-        Severity::Error => ("error", Tone::Bad.badge()),
-        Severity::Warning => ("warning", Tone::Warn.badge()),
+        Severity::Error => (tr(Msg::SeverityError), Tone::Bad.badge()),
+        Severity::Warning => (tr(Msg::SeverityWarning), Tone::Warn.badge()),
     }
 }
 
