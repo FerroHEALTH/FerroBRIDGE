@@ -321,6 +321,11 @@ crates on crates.io.
 
 ### Fixed
 
+- A FHIRconnect `DV_INTERVAL<DV_DATE_TIME>` whose present bound is excluded
+  is refused going out to `Period` (#1076), because both R4 `Period` bounds
+  are inclusive; it was written as an inclusive bound with no loss declared.
+  The refusal is a `LensError::Shape` naming `DV_INTERVAL.lower_included` or
+  `DV_INTERVAL.upper_included`. `fhirconnect` 0.1.169.
 - The console's file editor names its mode in its header (#982): the New
   file route reads "New mapping file" and an existing file reads "Edit
   <file>", with the matching page title.
