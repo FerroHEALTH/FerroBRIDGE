@@ -7,6 +7,7 @@
 #![allow(clippy::panic_in_result_fn, reason = "test assertions")]
 
 mod anchors;
+mod archetype_id;
 mod corpus;
 mod diagnostic;
 mod embedded;

@@ -5,8 +5,6 @@
 
 use core::str::FromStr;
 
-use openehr_mapping_core::header::archetype::ArchetypeId;
-use openehr_mapping_core::header::archetype::ArchetypeIdError;
 use openehr_mapping_core::header::grammar::GrammarSemVer;
 use openehr_mapping_core::header::grammar::GrammarVersion;
 use openehr_mapping_core::header::grammar::GrammarVersionError;
@@ -61,44 +59,6 @@ fn the_file_types_parse_case_exactly() {
     assert_eq!(MappingType::from_str("model"), Ok(MappingType::Model));
     assert_eq!(MappingType::from_str("context"), Ok(MappingType::Context));
     assert!(MappingType::from_str("Model").is_err());
-}
-
-#[test]
-fn an_archetype_id_follows_the_base_lexical_form() {
-    let id = ArchetypeId::from_str("openEHR-EHR-EVALUATION.problem_diagnosis.v1")
-        .expect("a well-formed archetype id");
-    assert_eq!(id.version_number(), 1);
-    assert_eq!(id.as_str(), "openEHR-EHR-EVALUATION.problem_diagnosis.v1");
-    assert!(ArchetypeId::from_str("openEHR-EHR-CLUSTER.imaging_exam-foetus.v1").is_ok());
-    assert!(ArchetypeId::from_str("openEHR-EHR-ACTION.informed_consent.v0").is_ok());
-}
-
-#[test]
-fn an_archetype_id_without_a_version_is_refused() {
-    assert_eq!(
-        ArchetypeId::from_str("openEHR-EHR-EVALUATION.problem_diagnosis"),
-        Err(ArchetypeIdError::Shape {
-            value: "openEHR-EHR-EVALUATION.problem_diagnosis".to_owned()
-        })
-    );
-    assert_eq!(
-        ArchetypeId::from_str("openEHR-EHR-EVALUATION.problem_diagnosis.1"),
-        Err(ArchetypeIdError::VersionId {
-            value: "1".to_owned()
-        })
-    );
-    assert_eq!(
-        ArchetypeId::from_str("openEHR-EHR-EVALUATION.problem_diagnosis.v01"),
-        Err(ArchetypeIdError::VersionId {
-            value: "v01".to_owned()
-        })
-    );
-    assert_eq!(
-        ArchetypeId::from_str("openEHR-EHR.problem_diagnosis.v1"),
-        Err(ArchetypeIdError::QualifiedRmEntity {
-            value: "openEHR-EHR".to_owned()
-        })
-    );
 }
 
 #[test]
