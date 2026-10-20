@@ -80,6 +80,7 @@ fhir-converter/data/SampleData/Hl7v2/SIU_12.hl7
 fhir-converter/data/SampleData/Hl7v2/VXU-V04-01.hl7
 fhir-converter/data/SampleData/Hl7v2/VXU-V04-02.hl7
 fhir-converter/data/SampleData/Hl7v2/VXU.hl7
+reportstream/prime-router/src/testIntegration/resources/datatests/CSV_to_HL7/sample-batch-pdi-20210608-0001.hl7
 reportstream/prime-router/src/testIntegration/resources/datatests/CSV_to_HL7/sample-single-pdi-20210608-0002.hl7
 reportstream/prime-router/src/testIntegration/resources/datatests/FHIR_to_HL7/mars_unwanted_condition_to_notes.hl7
 reportstream/prime-router/src/testIntegration/resources/datatests/FHIR_to_HL7/sample_AK_20240220-0001.hl7

@@ -9,7 +9,8 @@
 //! by the message structure the generated `hl7v2-types` tables define
 //! ([`parse`]), and answered with an original-mode acknowledgment ([`ack`]);
 //! [`inbound`] runs those steps and settles the `AR` and `AE` answers a
-//! message owes before it is mapped.
+//! message owes before it is mapped. [`batch`] splits an HL7 batch file into
+//! its messages and builds the response batch that acknowledges them.
 //! [`map`] runs the `ConceptMaps` of the HL7 v2-to-FHIR implementation guide
 //! over the parsed message and writes an R4 message `Bundle` through the
 //! `fhirconnect` path model.
@@ -20,6 +21,7 @@
 #![doc(test(attr(deny(warnings))))]
 
 pub mod ack;
+pub mod batch;
 pub mod decode;
 pub mod inbound;
 pub mod map;
