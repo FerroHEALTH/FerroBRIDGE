@@ -197,11 +197,14 @@ impl OperationError {
                 SelectError::NoMatch { .. } | SelectError::ProfileVersion { .. } => "not-found",
             },
             Self::SeveralSubjectResources { .. } | Self::SeveralSubjects { .. } => "business-rule",
-            Self::Mapping { .. }
-            | Self::Serialization { .. }
-            | Self::Unidentified { .. }
-            | Self::Identity { .. }
-            | Self::InvalidId { .. } => "processing",
+            Self::Mapping { .. } | Self::Serialization { .. } | Self::Unidentified { .. } => {
+                "processing"
+            }
+            // NOTE: valueset-issue-type.html: a refusing identity seam is "an
+            // unexpected internal error" (`exception`), and an id it answers
+            // outside the `id` grammar fails "a content validation rule" (`value`).
+            Self::Identity { .. } => "exception",
+            Self::InvalidId { .. } => "value",
         }
     }
 
