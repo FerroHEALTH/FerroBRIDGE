@@ -99,6 +99,21 @@ pub struct MessageRow {
     pub section: IgnoredAny,
 }
 
+/// A row of `interactions.json`: a structure sent under a trigger event, and
+/// the structure that answers it.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InteractionRow {
+    /// The trigger event, for example `I14`.
+    pub event_id: String,
+    /// The structure code the event sends, for example `REF_I12`.
+    pub sender_msg: String,
+    /// The structure code that answers it, for example `RRI_I12`.
+    pub receiver_msg: String,
+    /// Not read.
+    pub number: IgnoredAny,
+}
+
 /// A row of `groups.json`: the root or one segment group of a structure.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -233,6 +248,8 @@ pub struct VersionTables {
     pub data_elements: Vec<DataElementRow>,
     /// `datatypes.json`.
     pub data_types: Vec<DataTypeRow>,
+    /// `interactions.json`.
+    pub interactions: Vec<InteractionRow>,
 }
 
 impl VersionTables {
@@ -298,6 +315,7 @@ impl Tables {
                 fields: parse(&dir.join("fields.json"))?,
                 data_elements: parse(&dir.join("data_elements.json"))?,
                 data_types: parse(&dir.join("datatypes.json"))?,
+                interactions: parse(&dir.join("interactions.json"))?,
                 version,
             });
         }

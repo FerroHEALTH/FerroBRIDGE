@@ -112,7 +112,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
             | FhirValue::Period(_)
             | FhirValue::Reference(_)
             | FhirValue::Identifier(_)
-            | FhirValue::Quantity(_)) => return Ok(Some(other)),
+            | FhirValue::Quantity(_)
+            | FhirValue::Integer(_)
+            | FhirValue::Decimal(_)
+            | FhirValue::Count(_)
+            | FhirValue::Time(_)
+            | FhirValue::Duration(_)
+            | FhirValue::Url(_)
+            | FhirValue::Attachment(_)) => return Ok(Some(other)),
         };
         if translated.is_none() {
             self.untranslated(mapping, url, output)?;

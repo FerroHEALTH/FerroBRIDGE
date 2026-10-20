@@ -59,7 +59,10 @@ async fn the_smart_configuration_names_the_authorization_server_without_a_token(
         // be JSON".
         assert_eq!(Some("application/json"), media.as_deref(), "{path}");
         let uri = issuer.uri();
-        assert_eq!(Some(uri.as_str()), body["issuer"].as_str());
+        // NOTE: SMART App Launch 2.2.0 conformance.html, Metadata, `issuer` is
+        // "Required if the server's capabilities include `sso-openid-connect`;
+        // otherwise, omitted".
+        assert!(body.get("issuer").is_none(), "{path}: {body}");
         assert_eq!(
             Some(format!("{uri}/token").as_str()),
             body["token_endpoint"].as_str()
@@ -89,8 +92,73 @@ async fn the_smart_configuration_names_the_authorization_server_without_a_token(
             !capabilities.contains(&serde_json::json!("permission-v2")),
             "{body}"
         );
+        assert!(
+            !capabilities.contains(&serde_json::json!("sso-openid-connect")),
+            "{body}"
+        );
         assert!(body["grant_types_supported"].is_array(), "{body}");
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_smart_configuration_names_the_issuer_only_with_openid_connect_sign_in()
+-> Result<(), Box<dyn StdError>> {
+    let key = ec_key("k1", Algorithm::ES256);
+    let issuer = Issuer::start(&[&key]).await;
+    let harness = harness().await;
+    let mut settings = issuer.settings();
+    settings.options.capabilities = vec![String::from("sso-openid-connect")];
+    let signing_on = authority(settings).await;
+    let (_, _, body) = read_open(
+        secured(&harness, &signing_on),
+        "/fhir/.well-known/smart-configuration",
+    )
+    .await?;
+    // NOTE: SMART App Launch 2.2.0 conformance.html, Metadata, `issuer` and
+    // `jwks_uri` are required with `sso-openid-connect`.
+    let uri = issuer.uri();
+    assert_eq!(Some(uri.as_str()), body["issuer"].as_str(), "{body}");
+    assert!(body["jwks_uri"].is_string(), "{body}");
+    let capabilities = body["capabilities"].as_array().ok_or("capabilities")?;
+    assert!(
+        capabilities.contains(&serde_json::json!("sso-openid-connect")),
+        "{body}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_smart_configuration_lists_the_scopes_the_bridge_honours()
+-> Result<(), Box<dyn StdError>> {
+    let key = ec_key("k1", Algorithm::ES256);
+    let issuer = Issuer::start(&[&key]).await;
+    let harness = harness().await;
+    let silent = authority(issuer.settings()).await;
+    let (_, _, body) = read_open(
+        secured(&harness, &silent),
+        "/fhir/.well-known/smart-configuration",
+    )
+    .await?;
+    assert!(body.get("scopes_supported").is_none(), "{body}");
+    let mut settings = issuer.settings();
+    settings.options.scopes_supported = vec![
+        String::from("system/Condition.rs"),
+        String::from("__ferrobridge.operator"),
+    ];
+    let listing = authority(settings).await;
+    let (_, _, body) = read_open(
+        secured(&harness, &listing),
+        "/fhir/.well-known/smart-configuration",
+    )
+    .await?;
+    // NOTE: SMART App Launch 2.2.0 conformance.html, Metadata: "The server
+    // SHALL support all scopes listed here".
+    assert_eq!(
+        serde_json::json!(["system/Condition.rs", "__ferrobridge.operator"]),
+        body["scopes_supported"],
+        "{body}"
+    );
     Ok(())
 }
 
@@ -251,6 +319,7 @@ async fn a_second_trusted_issuer_is_admitted_beside_the_first() -> Result<(), Bo
     let harness = harness().await;
     let mut settings = first.settings();
     settings.issuers.push(second.issuer_settings());
+    settings.options.capabilities = vec![String::from("sso-openid-connect")];
     let authority = authority(settings).await;
     for (issuer, key) in [(&first, &first_key), (&second, &second_key)] {
         let token = mint(key, &issuer.claims("system/Condition.r"));
@@ -272,6 +341,11 @@ async fn a_second_trusted_issuer_is_admitted_beside_the_first() -> Result<(), Bo
         Some(first.uri().as_str()),
         body["issuer"].as_str(),
         "the first issuer is the one the document names"
+    );
+    assert_eq!(
+        Some(format!("{}/token", first.uri()).as_str()),
+        body["token_endpoint"].as_str(),
+        "the first issuer's token endpoint"
     );
     Ok(())
 }

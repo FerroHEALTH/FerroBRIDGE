@@ -34,6 +34,7 @@ use http::Extensions;
 use http::Method;
 use http::StatusCode;
 use http::Uri;
+use http::request::Parts;
 
 use crate::facade::BASE_PATH;
 use crate::facade::outcome::Issue;
@@ -312,7 +313,14 @@ pub struct Outcome {
 }
 
 impl Render for Outcome {
-    fn render(&self, refusal: &Refusal) -> Response {
+    fn render(&self, refusal: &Refusal, _parts: &Parts) -> Response {
+        self.respond(refusal)
+    }
+}
+
+impl Outcome {
+    /// Returns the `OperationOutcome` response of `refusal`.
+    fn respond(&self, refusal: &Refusal) -> Response {
         let issue = match refusal {
             Refusal::Missing(_) | Refusal::InvalidToken | Refusal::InvalidBasic => {
                 Issue::error(IssueType::Login)
@@ -360,7 +368,7 @@ pub struct OperatorScope(pub Option<String>);
 /// Returns the `403` of a token that does not permit the request.
 #[must_use]
 pub fn forbidden() -> reply::Refusal {
-    reply::Refusal::new(Outcome::default().render(&Refusal::Forbidden))
+    reply::Refusal::new(Outcome::default().respond(&Refusal::Forbidden))
 }
 
 /// Checks that `access` grants a permission `interaction` needs on

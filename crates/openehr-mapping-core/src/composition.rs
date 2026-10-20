@@ -15,7 +15,10 @@
 //! BASE Release 1.2.0 §Paths and Locators) and a FLAT instance index is
 //! 0-based (Simplified Formats, §Instance Indexing).
 
+use openehr_rm::v1_2::paths::PathSegment;
 use openehr_rm::v1_2::paths::RmPath;
+use openehr_sdt::flat::build::BuildOptions;
+use openehr_sdt::flat::build::build_composition_with;
 use openehr_sdt::flat::path::FlatKey;
 use openehr_sdt::flat::path::MAX_INSTANCE_INDEX;
 use openehr_sdt::flat::path::Segment;
@@ -335,7 +338,7 @@ impl WebTemplateIndex {
     ///
     /// Every value is keyed by its node's place in the template, the
     /// composition is built through the Simplified Formats builder of
-    /// `openehr-its`, and the result is validated against the same template
+    /// `openehr-sdt`, and the result is validated against the same template
     /// before it is returned, so a composition this function answers with is
     /// one the CDR's own validation admits. `now` is the caller's current
     /// timestamp, which the builder uses for the `ctx/time` default alone
@@ -361,35 +364,7 @@ impl WebTemplateIndex {
         for value in values {
             flat.insert(self.flat_key(value)?.to_string(), value.value.clone());
         }
-        let document = openehr_sdt::flat::sim::flat::parse_flat(&flat).map_err(|source| {
-            PathError::CompositionBuild {
-                template_id: self.template_id().to_owned(),
-                source: Box::new(source),
-            }
-        })?;
-        let mut built =
-            openehr_sdt::flat::build::build_composition(&document, self.web_template(), now)
-                .map_err(|source| PathError::CompositionBuild {
-                    template_id: self.template_id().to_owned(),
-                    source: Box::new(source),
-                })?;
-        // TODO(#901): pass the chosen release to the builder once openehr-sdt takes it.
-        crate::release::stamp(&mut built);
-        let messages = openehr_sdt::rm_instance::validate_composition(&built, self.web_template());
-        if !messages.is_empty() {
-            return Err(PathError::InvalidComposition {
-                template_id: self.template_id().to_owned(),
-                messages: messages
-                    .iter()
-                    .map(|message| format!("{}: {}", message.path, message.message))
-                    .collect(),
-            });
-        }
-        Ok(CanonicalComposition {
-            value: built,
-            template_id: self.template_id().to_owned(),
-            generation: self.generation(),
-        })
+        self.build_from_flat(&flat, now)
     }
 
     /// Builds a canonical composition from a FLAT document.
@@ -398,7 +373,7 @@ impl WebTemplateIndex {
     /// paths (Simplified Formats, §Flat format), the second form a composition
     /// is exchanged in. `now` is the caller's current timestamp, used for the
     /// `ctx/time` default alone; this crate reads no clock.
-    /// The `rm_version` stamp follows [`Self::build_composition`].
+    /// The `rm_version` follows [`Self::build_composition`].
     ///
     /// # Errors
     ///
@@ -416,14 +391,15 @@ impl WebTemplateIndex {
                 source: Box::new(source),
             }
         })?;
-        let mut built =
-            openehr_sdt::flat::build::build_composition(&document, self.web_template(), now)
-                .map_err(|source| PathError::CompositionBuild {
+        let built = crate::release::build(|release| {
+            let options = BuildOptions::default().with_rm_version(release.spec_version());
+            build_composition_with(&document, self.web_template(), now, &options).map_err(
+                |source| PathError::CompositionBuild {
                     template_id: self.template_id().to_owned(),
                     source: Box::new(source),
-                })?;
-        // TODO(#901): pass the chosen release to the builder once openehr-sdt takes it.
-        crate::release::stamp(&mut built);
+                },
+            )
+        })?;
         let messages = openehr_sdt::rm_instance::validate_composition(&built, self.web_template());
         if !messages.is_empty() {
             return Err(PathError::InvalidComposition {
@@ -527,11 +503,58 @@ impl WebTemplateIndex {
             });
         }
         let path = self.instance_path(node, occurrences)?;
-        // NOTE: no specification governs this: our own design, an absent
-        // optional node is a legitimate absence and never a defect, so it
-        // reads as `None` rather than as an error.
-        let mut current = composition.document();
-        for segment in &path.segments {
+        Ok(Self::walk(composition.document(), &path.segments))
+    }
+
+    /// Reads the `ELEMENT` a value node sits in out of a composition.
+    ///
+    /// The Web Template compacts an `ELEMENT` into the node of its value, whose
+    /// `aqlPath` ends in `/value`, so the `LOCATABLE` attributes of the element
+    /// (`links`, `null_flavour`, the openEHR RM `ELEMENT` and `LOCATABLE`
+    /// classes) sit one step above what [`WebTemplateIndex::read`] returns.
+    /// Simplified Formats writes both on one FLAT node ("there is no difference
+    /// between an ELEMENT and its value", master05 §ELEMENT).
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`WebTemplateIndex::read`], and
+    /// [`PathError::NotAnElementValue`] when the node's `aqlPath` does not end
+    /// in the `value` of an element.
+    pub fn read_element<D: CanonicalDocument + ?Sized>(
+        &self,
+        composition: &D,
+        node: &ResolvedNode,
+        occurrences: &[RmPosition],
+    ) -> Result<Option<Value>, PathError> {
+        if composition.document_template_id() != self.template_id() {
+            return Err(PathError::TemplateMismatch {
+                expected: self.template_id().to_owned(),
+                found: composition.document_template_id().to_owned(),
+            });
+        }
+        let path = self.instance_path(node, occurrences)?;
+        let element = match path.segments.split_last() {
+            Some((last, element))
+                if last.attribute == "value" && last.predicate.archetype_node_id.is_none() =>
+            {
+                element
+            }
+            _ => {
+                return Err(PathError::NotAnElementValue {
+                    aql_path: node.aql_path().as_str().to_owned(),
+                });
+            }
+        };
+        Ok(Self::walk(composition.document(), element))
+    }
+
+    /// Walks the instance path `segments` down a canonical document.
+    ///
+    /// NOTE: no specification governs this: our own design, an absent optional
+    /// node is a legitimate absence and never a defect, so it reads as `None`.
+    fn walk(document: &Value, segments: &[PathSegment]) -> Option<Value> {
+        let mut current = document;
+        for segment in segments {
             // An RM positional predicate counts every element of the container
             // (BASE Release 1.2.0 §Paths and Locators, positional parameters),
             // and an instance counts the node's own occurrences only, so the
@@ -543,16 +566,13 @@ impl WebTemplateIndex {
                 .predicate
                 .position
                 .map_or(0, |position| position.saturating_sub(1));
-            let Some(&found) = candidates.get(index) else {
-                return Ok(None);
-            };
-            current = found;
+            current = *candidates.get(index)?;
         }
-        Ok(Some(current.clone()))
+        Some(current.clone())
     }
 
     /// Returns the FLAT key one value is written under.
-    fn flat_key(&self, value: &NodeValue) -> Result<FlatKey, PathError> {
+    pub(crate) fn flat_key(&self, value: &NodeValue) -> Result<FlatKey, PathError> {
         let mut segments = Vec::new();
         let flat_id = match value.place {
             // NOTE: Simplified Formats master04 §Context, a context field is

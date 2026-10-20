@@ -18,6 +18,7 @@ mod model;
 mod operations;
 mod person;
 mod pins;
+mod published;
 mod resolve;
 mod roundtrip;
 mod support;

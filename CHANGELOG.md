@@ -25,6 +25,82 @@ crates on crates.io.
 
 ### Added
 
+- The FHIRconnect engine converts `DV_QUANTITY` against `Quantity`, `decimal`
+  and `integer`, and `DV_COUNT` against `integer`, `Quantity` and `Count`
+  (#93), each a lens with GetPut and PutGet property tests over the tables of
+  FHIRconnect `DV_QUANTITY.adoc` and `DV_COUNT.adoc`. Where a table is silent
+  or contradicts R4, the cell decides and refuses rather than drops: the UCUM
+  system is written beside a code (R4 `qty-3`), `units_display_name` is the
+  counterpart of `unit`, and a `magnitude_status` no comparator states, a
+  magnitude with more places than its `precision`, a count outside FHIR's
+  32-bit `integer` and a comparator into a count are typed refusals.
+  `FhirKind`, `FhirValue` and `RmValue` gain variants, so a consumer that
+  matches them exhaustively adds the arms. `fhirconnect` 0.1.163.
+- Every published FHIRconnect context now has its operational template in
+  the tree (#258). Nine KDS templates join the three already vendored, each
+  fetched by its own `scripts/vendor/kds-*-opt.sh` from the openFHIR commit
+  `docs/VERSIONS.md` pins, with a sha256 and a `PROVENANCE.md`: Fall einfach,
+  Laborbericht, Medikationseintrag, Medikamentenverabreichungen, Person
+  Pseudonymisiert, Prozedur, Studienteilnahme, Todesursache and Vitalstatus.
+  The `fhirconnect` suite compiles all 13 contexts verbatim against their
+  templates and pins each verdict. None compiles: ten stop at load on a
+  reference the library cannot resolve, three are refused at compile, and the
+  EHDS laboratory template the library ships does not parse. A context that
+  compiles joins the mapping-library pass list on its own. The list stays at
+  10 of 107.
+- The FHIRconnect engine converts `DV_TIME` against `time` and `DV_DURATION`
+  against `Duration` (#93). The duration cell runs the UCUM to ISO 8601
+  bridge of FHIRconnect `DV_DURATION.adoc`, the eight
+  `CommonUCUMCodesForDuration` rows as one committed table: a duration of
+  several components reads in its smallest one by the factors UCUM fixes, a
+  code outside the bridge, a comparator and a system other than UCUM are
+  typed refusals, and `ms` is a one-way row. The time cell moves the text
+  unchanged, gives the ISO 8601 basic form its separators, and refuses a time
+  with an offset or with no seconds, which R4 `time` cannot state.
+  `fhirconnect` 0.1.164.
+- The FHIRconnect engine converts `DV_URI` against `url`, and `DV_MULTIMEDIA`
+  and `DV_PARSABLE` against `Attachment` (#93), from FHIRconnect
+  `DV_URI.adoc`, `DV_MULTIMEDIA.adoc` and `DV_PARSABLE.adoc`. A parsable
+  value travels base64 encoded as `Attachment.data`, its formalism as the
+  content type only when it is itself a media type (the page gives no table),
+  and a multimedia `integrity_check` is `hash` only for SHA-1, the algorithm
+  R4 names. A compressed multimedia value is refused going out, since an
+  `Attachment` has no field for the algorithm, and an attachment with data and
+  no size takes the decoded length, a one-way row. `fhirconnect` now depends
+  on `base64`. `fhirconnect` 0.1.165.
+- The shipped `datatype-pl-to-location` supplement writes PL.11, the
+  assigning authority, into the `identifier.assigner` of each location level
+  the PL carries (#345). The guide's two PL.11 rows address all six levels
+  with a `[1-6].` prefix the guide's notation does not define, so the
+  interpreter still refuses them as `unsupported-target`; the supplement
+  spells them as one row per level under that level's condition. The
+  vendored `hl7v2` corpus loses 22 `unsupported-target` outcomes.
+- `ferrobridge-hl7v2` ships message maps for 18 HL7 v2 structures the
+  v2-to-FHIR guide has none for (#637): ADT_A15, ADT_A16, ADT_A21, ADT_A39,
+  ADT_A44, ADT_A45, ADT_A60, BAR_P02, BAR_P12, DFT_P03, DFT_P11, MDM_T01,
+  OMG_O19, OUL_R23, OUL_R24, PPR_PC1, RDE_O11 and REF_I12. Each takes the
+  rows of a guide message map (or the shipped OUL_R22 map) for the segments
+  it shares, at its own group paths, so the guide's segment maps apply, and
+  its description names the map it composes. A supplement for ADT_A06 names
+  the guide's `ADT_A01.PD1` row `ADT_A06.PD1`, so ADT_A06 messages map too.
+  The `hl7v2` corpus gains the 56 messages, to 510 of 511.
+- The HL7 v2 face reads a batch file (#642). A frame that opens with FHS or
+  BHS is split by the HL7 v2 chapter 2 §2.10.3 structure into its batches
+  and messages, each message is answered as if it had arrived alone, and
+  the acknowledgments return in one response batch whose headers echo the
+  file's FHS-11 and BHS-11 and whose BTS-1 counts them (§2.10.3.2). A
+  trailer count the file contradicts is a logged warning, and a file whose
+  segments stand outside the structure is not answered.
+  `ferrobridge-hl7v2` gains the `batch` module. The ReportStream
+  `sample-batch-pdi-20210608-0001.hl7` file now passes the `hl7v2` corpus.
+- The HL7 v2 parser counts a valued repetition past a field's cardinality,
+  a valued component past its data type's components and a valued
+  subcomponent past its component's data type, as the new
+  `extra-repetition`, `extra-component` and `extra-subcomponent` outcomes
+  (#295). HL7 v2 chapter 2 §2.6 tells a receiver to ignore such
+  constituents, so none refuses the message and each value stays in the
+  parsed message. Components are checked against the v2.9.1 data types
+  only, since the tables of earlier versions carry no component tables.
 - A FHIRconnect mapping with no `type` onto an `ELEMENT` whose value admits
   several data types converts the `ELEMENT`'s own value, then runs its
   `followedBy` children (#544), as FHIRconnect `FollowedBy.adoc` orders them
@@ -52,6 +128,10 @@ crates on crates.io.
   where a caller's identity store does that. `OperationError` gains two
   variants, so a consumer that matches it exhaustively adds the arms.
   `fhirconnect` 0.1.156.
+- `[auth] scopes_supported`: the scopes the bridge honours, listed as
+  `scopes_supported` in the SMART discovery document, which "the server
+  SHALL support" (SMART App Launch 2.2.0, Conformance, Metadata); each
+  value is one scope token, checked at load (#1007).
 
 ### Changed
 
@@ -61,6 +141,18 @@ crates on crates.io.
   page titles come from `locales/en/ferrobridge-viewer.ftl`, and the
   stray-literal baseline drops from 384 to 78 literals. English remains the
   only locale.
+- `openehr-mapping-core` 0.1.121 parses a mapping header's
+  `spec.openEhrConfig.archetype` through the `openehr-base` BASE 1.2.0
+  `ArchetypeId` and drops its own copy of the grammar (#1026). The accepted
+  form is unchanged: FHIRconnect v1.0.0 writes the header's archetype as
+  `openEHR-EHR-ACTION.informed_consent.v0` and never names a namespaced
+  ADL 2 id, so the namespaced form and a full version stay refused (our own
+  design). Breaking for a consumer that matches on `ArchetypeIdError`: its
+  `Shape`, `QualifiedRmEntity`, `DomainConcept` and `VersionId` variants are
+  gone, and a refusal is now `Lexical`, carrying the `openehr-base`
+  `IdError` as its source, or `VersionRange` for a version past `u32`.
+  `ArchetypeId::base` returns the `openehr-base` value. `fhirconnect`
+  0.1.163 renders the new requirement.
 - **Breaking:** the facade, the operator API and the CDR and terminology
   lanes authenticate through `ferrohealth-smart` 0.1.0, the FerroHEALTH
   family's SMART and OAuth 2.0 resource-server crate (#981). Its sections
@@ -81,7 +173,7 @@ crates on crates.io.
     `ES256` and `ES384`, where it was `RS256` and `ES256`.
   - `auth.issuer` may be plain `http` on a loopback host; elsewhere it stays
     `https`.
-  - `auth.operator_scope` becomes `operator.scope`, and its default
+  - `auth.operator_scope` becomes `auth.product_scope`, and its default
     `ferrobridge.operator` becomes `__ferrobridge.operator`, the extension
     form SMART App Launch 2.2.0 gives a scope (a string starting with `__`
     or a full URI); any other value refuses the start. Grant the new scope
@@ -113,16 +205,162 @@ crates on crates.io.
   `src/auth/` and `src/cdr/oauth/` are gone from the server (#977), and
   `ferrobridge_server::credentials::UpstreamToken` hands the crate's token to
   both upstream clients.
+- The HL7 v2 corpora count a message the face refuses correctly as a pass
+  (#639). `crates/ferrobridge-hl7v2/tests/it/corpus/expected-refusals.txt`
+  lists 167 messages with the acknowledgment code and the HL7 table 0357
+  error HL7 v2 chapter 2 owes them: 152 ReportStream mapping-inventory
+  fragments, 6 FHIR-Converter samples that break their declared structure,
+  4 AIRA examples built to omit the RXA, and 5 messages whose bytes leave
+  the declared character set or whose MSH-18 names no table 0211 code. A
+  listed case fails when the face takes the message or answers it
+  otherwise. The `hl7v2` badge moves from 290 to 453 of 511 and the
+  `hl7v2-smoke` badge from 375 to 379 of 379.
 - The release workflow refuses a tag whose milestone, titled exactly as the
   tag, is missing or still holds an open issue or pull request, and names
   each one; once every leg has succeeded, crates.io included, it closes that
   milestone (#983).
+- The `openehr-*` crates move from 0.0.87 to 0.0.89 (`openehr-base`,
+  `openehr-rm`, `openehr-its`, `openehr-sdt`, `openehr-am`, `openehr-query`
+  and `openehr-adl`). 0.0.89 adds the `openehr-sdt` party builder, the
+  builder option that names `ARCHETYPED.rm_version`, and the BASE 1.3.0
+  `ARCHETYPE_ID` grammar in `openehr_base::v1_3`, which now admits the
+  namespaced ADL 2 form and a full version. `openehr-mapping-core` 0.1.119
+  and `fhirconnect` 0.1.160 render the new requirements.
+- A composition the bridge builds names each structure the FLAT form leaves
+  out (an `ITEM_TREE` under an entry, for example) by its term definition in
+  the template, where it named it by its node id before (RM Common IM,
+  `LOCATABLE.name`). The `openehr-sdt` 0.0.89 builder does this.
+- `ferrohealth-smart` 0.2.0 (#1018). The SMART discovery document writes
+  `issuer` and `sso-openid-connect` only when `[auth] capabilities` names
+  `sso-openid-connect`; SMART App Launch 2.2.0 (Conformance, Metadata) omits
+  `issuer` otherwise. A client that read `issuer` from the document reads the
+  authorization endpoints it names, or the bridge advertises OpenID Connect
+  sign-in by configuration. The document declares `permission-v1`,
+  `permission-patient` and `permission-user`, the scopes the route table
+  and the patient compartment enforce.
+- `ferrohealth-smart` 0.1.1 (#1007). The operator scope moves from
+  `[operator] scope` to `[auth] product_scope` (environment
+  `FERROBRIDGE__AUTH__PRODUCT_SCOPE`), default `__ferrobridge.operator`,
+  checked by the crate in the same two SMART extension forms. The audit
+  line's field for what a request addressed is `addressed`, where it was
+  `target`, so a JSON log keeps it beside the event's own `target`; a log
+  query that read `target` for the addressed resource reads `addressed`.
+  `[auth] capabilities` refuses at load a value SMART App Launch 2.2.0
+  does not define unless it is a full URI. The issuer and resource checks
+  of `[<lane>.credentials.oauth]` and the Basic password read are the
+  crate's now, with the same refusals at load.
+- `serve` warns that `[auth]` is off only when a surface it guards runs,
+  and names those surfaces (the facade, the operator API, the operations
+  lane); a server with only `/` and the health routes logs nothing
+  (#1005).
+- `openehr-mapping-core` 0.1.120 passes the RM release it chooses to the
+  `openehr-sdt` composition builder (#901), so the builder writes
+  `ARCHETYPED.rm_version` and the walk that rewrote it afterwards is gone.
+  The choice is unchanged: Release 1.1.0, unless the composition holds a
+  `GENERIC_ENTRY` whose `data` is no `ITEM_TREE`.
+- `openehr-mapping-core` 0.1.120 builds a party through the `openehr-sdt`
+  template walk (#906) and drops its own party assembly with the OPT 1.4
+  structure index behind it. `ROLE.performer`, which no template node holds,
+  is still placed on the root after the walk (#1000). Breaking for a
+  consumer that matches on `PartyError`: `NoStructure`, `Unconstrained` and
+  `InstanceGap` are gone, and a value the builder refuses is the new
+  `PartyError::Build`, which carries the `openehr-sdt` `FlatError` as its
+  source. `fhirconnect` 0.1.161 renders the new requirement.
 
 ### Fixed
 
 - The console's file editor names its mode in its header (#982): the New
   file route reads "New mapping file" and an existing file reads "Edit
   <file>", with the matching page title.
+- An HL7 v2 message sent under a code and trigger event that no v2.9.1
+  message definition carries, and whose MSH-9.3 names no known structure, is
+  parsed against the structure the interactions of its version's tables send
+  under that event (#1016): `REF^I14^REF_I14` at 2.8 takes `REF_I12`, counted
+  as `other-structure`, where it was refused with AR. The HL7/v2ig
+  definitions carry no REF or RRI message, so `fhir-codegen` reads the
+  `interactions.json` table of the IGAMT export and `hl7v2-types` gains
+  `message::LEGACY_EVENTS` and `message::legacy_events`, every other code and
+  event a legacy version's interactions send one of its structures under.
+  FHIR-Converter's `REF-I14-01` now maps.
+- A FHIRconnect model mapping that names an archetype node the operational
+  template excludes now compiles: the method is left out of the program with
+  everything under it and an `fc-excluded-template-node` warning, where it
+  was refused with `fc-unknown-template-node` (#1040). FHIRconnect
+  `model-mappings.adoc` §Mapping 0..0 fields says such methods "are ignored
+  and not executed". The node counts as excluded only when the archetype
+  root of an OPT 1.4 defines its at-code and the template carries no node
+  for it at that place; a code the archetype never defined, a name the
+  template does not carry, and a method an extension contributes are still
+  refused. `WebTemplateIndex::archetype_defines` is the new
+  `openehr-mapping-core` call behind it.
+- A FHIRconnect mapping onto `$composition/context/end_time` now compiles and
+  round-trips (#1043). The engine writes `EVENT_CONTEXT.end_time` as the
+  `_end_time` family of the `context` node, as Simplified Formats master05
+  §EVENT_CONTEXT spells it, and reads it back from the context, where it was
+  refused with `fc-uncarried-tail`.
+- A FHIRconnect path that names an `ELEMENT` the Web Template compacts into
+  its value now reaches the element's `links` (#1042), as
+  `FHIRReference.adoc` §Dedicated Node writes `$openehrRoot/links` below an
+  element. A `link` there writes the element's `_link:i` family and reads it
+  back from the element, and a condition on `links` reads the element's list;
+  the resolver used to walk `links` on the value's class and refuse it.
+  `openehr-mapping-core` gains `WebTemplateIndex::read_element` and
+  `PathError::NotAnElementValue`.
+- Two sibling FHIRconnect mapping methods that share a name now compile with
+  an `fc-duplicate-method-name` warning, and the refusal moves to the
+  `overwrite` or `appendTo` that names the shared name (#1041). FHIRconnect
+  `basics/body.adoc` gives a mapping name no role outside those references.
+- The HL7 v2 interpreter removes every reference a kept resource holds to a
+  resource it left out of the Bundle and counts each as a
+  `dangling-reference` outcome naming the element and the resource left out
+  (#313). FHIR R4 resolves a Bundle reference against the entries'
+  `fullUrl`, so such a reference pointed at nothing. The referring resource
+  stays unless the removal leaves it without a required element, and the
+  corpus test asserts no Bundle keeps one. The vendored `hl7v2` corpus
+  carries 29 of them in 27 messages.
+- A Bundle entry member the HL7 v2 interpreter cannot write is a counted
+  `entry-unwritable` outcome naming the resource and the path, where it was
+  only a warning in the log (#316).
+- The `defining_code` of a `DV_CODED_TEXT` value read out to a FHIR `string`
+  is a declared loss (#1011). The chapter writes no `string` row for
+  `DV_CODED_TEXT` (FHIRconnect `DV_CODED_TEXT.adoc` §STRING calls the pairing
+  not possible), so the value converts as `DV_TEXT` and its code was dropped
+  with no trace; the run now reports it as a `Loss::Skipped` with the new
+  `SkipReason::DefiningCodeUncarried`, located at the element and the value's
+  `defining_code`. A consumer that matches `SkipReason` exhaustively adds the
+  arm. The facade's loss log labels it `skipped-defining-code-uncarried`.
+  `fhirconnect` 0.1.160.
+- `$toopenehr` resolves a `reference` mapping against the request Bundle by
+  the R4 rules for a reference inside a Bundle (R4 bundle.html §2.36.4.1),
+  the same resolver the subject check runs (#1010): a version-specific
+  reference matches the entry's `meta.versionId`, and a relative `<type>/<id>`
+  is read against the server base of the mapped entry's `fullUrl`. Before, the
+  seam matched only an exact `fullUrl` or `<type>/<id>`, so a versioned
+  reference fell through to the further source. A reference two entries
+  answer refuses the run with the new `ReferenceError::Ambiguous`, and
+  `BundleReferences::with_referrer` names the entry whose references it
+  resolves. A consumer that matches `ReferenceError` exhaustively adds the
+  arm. `fhirconnect` 0.1.161.
+- The FHIRconnect operations answer a refusing identity seam and an id it
+  answers outside the R4 `id` grammar as the server failures they are (#1012):
+  `500` with the issue code `exception` for `OperationError::Identity` and
+  `500` with `value` for `OperationError::InvalidId`, where both were a `400`
+  with `processing`. `OperationError::issue_type` changes for the two
+  variants, and the server's status table names every variant, so a new one
+  is a compile error until it is placed. `fhirconnect` 0.1.162.
+- A `TERM_MAPPING` that a `DV_TEXT` or `DV_CODED_TEXT` value carries out to a
+  FHIR `string`, or a `DV_CODED_TEXT` value carries out to a single `Coding`,
+  is a declared loss (#623). Those pairs give `mappings` no FHIR row
+  (FHIRconnect `DV_TEXT.adoc` §String, `DV_CODED_TEXT.adoc` §Coding), so the
+  engine writes none of them, as before, and now reports each one as a
+  `Loss::Skipped` with the new `SkipReason::TermMappingUncarried`, located at
+  the element and the value's `mappings`; `term_mapping::Withheld` gains
+  `cause()`. A consumer that matches `SkipReason` exhaustively adds the arm.
+  The facade's loss log labels it `skipped-term-mapping-uncarried`.
+- `SkipReason::EmptyReference` documents what the engine does (#511): a
+  `Reference` with no literal reference is skipped whatever else it carries,
+  because a `display` or an `identifier` alone names no resource to fetch
+  (R4 references.html §2.3.0.3 and §2.3.0.4). `fhirconnect` 0.1.159.
 - The HL7 v2 parser judges a segment group by placing every following
   segment with the same choice rule it applies to the segment itself, so a
   repeated `ORDER`'s ORC in an OML^O21 opens a new `ORDER` instead of an
@@ -148,6 +386,13 @@ crates on crates.io.
   relative reference in an entry with no RESTful `fullUrl`, which R4 gives no
   meaning, is read against each entry's type and id (our own design).
   `fhirconnect` 0.1.153.
+- `scripts/gh/watch-prs.sh` no longer writes a broken line when the default
+  branch and a pull request both changed the same version line (#1022). The
+  merge read its second capture after a nested match had overwritten it, so
+  `fhirconnect = { … version = "0.1.157" }` became `0.1.157` glued to the
+  next line. It now keeps the higher version at each position, leaves any
+  hunk that differs beyond its versions to stop the merge, and refuses a
+  manifest `cargo metadata` cannot read.
 
 ## [0.0.10] - 2026-10-19
 

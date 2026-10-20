@@ -288,6 +288,23 @@ pub fn provider(
     values
 }
 
+/// Returns the family of one `DV_DATE_TIME` written under `family` on
+/// `node`, the `_end_time` of an `EVENT_CONTEXT`.
+///
+/// Simplified Formats writes the family as the date-time text itself, with
+/// no attribute suffix (the `EVENT_CONTEXT` table, `/_end_time`).
+#[must_use]
+pub fn end_time(
+    node: &ResolvedNode,
+    positions: &[RmPosition],
+    family: &[Segment],
+    value: &str,
+) -> NodeValue {
+    NodeValue::new(node, serde_json::Value::String(String::from(value)))
+        .with_occurrences(positions.to_vec())
+        .under(family.to_vec())
+}
+
 /// Returns the refusal of a present list `attribute` that does not decode.
 ///
 /// Both lists are optional in the reference model (`LOCATABLE.links`,

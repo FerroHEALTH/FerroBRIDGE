@@ -315,14 +315,18 @@ fn admission(event: &str, control: &str) -> Vec<u8> {
     ])
 }
 
-// NOTE: the message maps the supplements add (ADT_A03, BAR_P01) and fix (ADT_A05 and ADT_A09
-// name ADT_A01.PD1) map their structures with the guide's segment maps.
+// NOTE: the message maps the supplements add (ADT_A03, ADT_A15, ADT_A16, ADT_A21, BAR_P01) and
+// fix (ADT_A05, ADT_A06 and ADT_A09 name ADT_A01.PD1) map their structures with the guide's maps.
 #[tokio::test]
 async fn the_supplemented_message_maps_carry_their_structures() {
     for (event, map_id, overrides) in [
         ("ADT^A03^ADT_A03", "message-adt-a03-to-bundle", false),
         ("ADT^A28^ADT_A05", "message-adt-a05-to-bundle", true),
+        ("ADT^A06^ADT_A06", "message-adt-a06-to-bundle", true),
         ("ADT^A09^ADT_A09", "message-adt-a09-to-bundle", true),
+        ("ADT^A15^ADT_A15", "message-adt-a15-to-bundle", false),
+        ("ADT^A16^ADT_A16", "message-adt-a16-to-bundle", false),
+        ("ADT^A21^ADT_A21", "message-adt-a21-to-bundle", false),
         ("BAR^P01^BAR_P01", "message-bar-p01-to-bundle", false),
     ] {
         let message = admission(event, "MSG00047");
@@ -441,5 +445,100 @@ async fn the_guides_mdm_t02_sample_maps_to_the_reviewed_bundle() {
     insta::assert_debug_snapshot!(
         "mdm_t02_sample_inventories",
         (inventory(mapped.bundle()), inventory(&expected))
+    );
+}
+
+/// The `identifier[0].assigner` of every `Location`, by its identifier value.
+fn location_assigners(bundle: &Value) -> Vec<(String, Option<String>)> {
+    let mut found: Vec<(String, Option<String>)> = resources(bundle, "Location")
+        .into_iter()
+        .filter_map(|location| {
+            let identifier = location
+                .get("identifier")
+                .and_then(Value::as_array)
+                .and_then(<[Value]>::first)?;
+            let value = identifier.get("value").and_then(Value::as_str)?;
+            let assigner = identifier
+                .get("assigner")
+                .and_then(|assigner| assigner.get("reference"))
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+            Some((value.to_owned(), assigner))
+        })
+        .collect();
+    found.sort();
+    found
+}
+
+/// An ADT^A01 whose PV1-3 is `location`.
+fn admission_with_location(location: &str) -> Vec<u8> {
+    let pv1 = format!("PV1|1|I|{location}");
+    fixtures::message(&[
+        b"MSH|^~\\&|ADMIT|NORTHHOSP|EHR|SOUTHCLINIC|20261019090000+0200||ADT^A01^ADT_A01|MSG00345|P|2.5.1",
+        b"EVN||20261019085900+0200",
+        b"PID|1||PAT-0345^^^NORTHHOSP^MR||Doe^Sam^^^^^L||19800101|M",
+        pv1.as_bytes(),
+    ])
+}
+
+// NOTE: mapping_guidelines.md §[n] Notation defines no `[a-b].` prefix, so the guide's PL.11
+// rows stay refused; the supplement spells them per level under the level's own condition.
+#[tokio::test]
+async fn pl_11_is_the_assigner_of_each_valued_level_s_identifier() {
+    let message = admission_with_location("WARD1^101^A^^^^^^^^NORTHHOSP");
+    let guide = run(&message, &support::corpus()).await;
+    let refused = guide
+        .outcomes()
+        .iter()
+        .filter(|outcome| {
+            matches!(
+                outcome,
+                Outcome::UnsupportedTarget { row, error, .. }
+                    if row.source == "PL.11"
+                        && *error == ferrobridge_hl7v2::map::notation::NotationError::Spread
+            )
+        })
+        .count();
+    assert_eq!(
+        refused,
+        2,
+        "both guide rows are refused: {:?}",
+        guide.outcomes()
+    );
+    let shipped = run(&message, &support::shipped()).await;
+    let assigners = location_assigners(shipped.bundle());
+    assert_eq!(
+        assigners
+            .iter()
+            .map(|(value, _)| value.as_str())
+            .collect::<Vec<_>>(),
+        ["101", "A", "WARD1"]
+    );
+    let organizations: Vec<&str> = entries(shipped.bundle())
+        .iter()
+        .filter(|entry| {
+            entry
+                .get("resource")
+                .and_then(|resource| resource.get("resourceType"))
+                .and_then(Value::as_str)
+                == Some("Organization")
+        })
+        .filter_map(|entry| entry.get("fullUrl").and_then(Value::as_str))
+        .collect();
+    for (value, assigner) in &assigners {
+        let assigner = assigner.as_deref().unwrap_or_default();
+        assert!(
+            organizations.contains(&assigner),
+            "the identifier {value} names an Organization of the Bundle as its assigner: {}",
+            pretty(shipped.bundle())
+        );
+    }
+    assert!(
+        !shipped.outcomes().iter().any(|outcome| matches!(
+            outcome,
+            Outcome::UnsupportedTarget { row, .. } if row.source == "PL.11"
+        )),
+        "{:?}",
+        shipped.outcomes()
     );
 }

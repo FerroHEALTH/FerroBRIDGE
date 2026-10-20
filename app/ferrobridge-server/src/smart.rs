@@ -17,6 +17,7 @@
 //! names the resource server it is for (RFC 9068 §4), and the CDR is reached
 //! with the bridge's own credential (`crate::credentials`).
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use axum::Router;
@@ -28,6 +29,8 @@ use ferrohealth_smart::resource::IssuerSet;
 use ferrohealth_smart::resource::ResourceError;
 use ferrohealth_smart::resource::ResourceServer;
 use ferrohealth_smart::resource::Settings;
+use ferrohealth_smart::resource::configuration::OpenIdConnect;
+use ferrohealth_smart::resource::configuration::PermissionCapability;
 use ferrohealth_smart::resource::configuration::SMART_CONFIGURATION;
 use ferrohealth_smart::resource::configuration::SmartOptions;
 use fhir_types::r4::schema::SCHEMAS;
@@ -43,6 +46,10 @@ use crate::facade::capability::Security;
 /// starting with `__`".
 pub const OPERATOR_SCOPE: &str = "__ferrobridge.operator";
 
+/// The capability of SMART's `OpenID` Connect profile (SMART App Launch
+/// 2.2.0, Conformance, §Single Sign-on).
+const SSO_OPENID_CONNECT: &str = "sso-openid-connect";
+
 /// What the deployment configured its resource server with, resolved.
 #[derive(Debug, Clone)]
 pub struct SmartSettings {
@@ -53,8 +60,9 @@ pub struct SmartSettings {
     pub basic: Option<Arc<PasswordStore>>,
     /// The realm every challenge names, when one is set.
     pub realm: Option<String>,
-    /// The SMART capabilities the discovery document adds.
-    pub capabilities: Vec<String>,
+    /// What the discovery document adds: the capabilities and the scopes
+    /// the bridge honours.
+    pub options: SmartOptions,
     /// The scope that guards the operator API and admits the operations that
     /// commit nothing.
     pub operator_scope: String,
@@ -62,15 +70,15 @@ pub struct SmartSettings {
 
 impl SmartSettings {
     /// Returns the settings of a resource server trusting `issuer` alone,
-    /// with no Basic user, no realm, no added capability and the default
-    /// operator scope.
+    /// with no Basic user, no realm, no added capability or listed scope,
+    /// and the default operator scope.
     #[must_use]
     pub fn new(issuer: Settings) -> Self {
         Self {
             issuers: vec![issuer],
             basic: None,
             realm: None,
-            capabilities: Vec::new(),
+            options: SmartOptions::default(),
             operator_scope: String::from(OPERATOR_SCOPE),
         }
     }
@@ -112,8 +120,8 @@ pub struct Smart {
     primary: Arc<ResourceServer>,
     /// The token endpoint that issuer's metadata names.
     token_endpoint: String,
-    /// The SMART capabilities the discovery document adds.
-    capabilities: Vec<String>,
+    /// What the discovery document adds.
+    options: SmartOptions,
     /// The operator scope.
     operator_scope: String,
 }
@@ -163,7 +171,7 @@ impl Smart {
             gate,
             primary,
             token_endpoint,
-            capabilities: settings.capabilities,
+            options: settings.options,
             operator_scope: settings.operator_scope,
         })
     }
@@ -180,16 +188,35 @@ impl Smart {
         &self.operator_scope
     }
 
-    /// Returns the SMART discovery document.
+    /// Returns the SMART discovery document, listing as `scopes_supported`
+    /// the scopes `[auth] scopes_supported` names, which "the server SHALL
+    /// support" (SMART App Launch 2.2.0, Conformance, §Metadata).
     ///
-    /// The bridge evaluates no granular scope, so it claims no
-    /// `permission-v2`: that capability is "support for `SMARTv2` granular
-    /// scope syntax" (SMART App Launch 2.2.0, Conformance, §Capabilities).
+    /// The document claims the permission capabilities the route table and
+    /// the patient compartment enforce: `patient/` and `user/` scopes in
+    /// the v1 syntax beside v2 (Conformance, §Permissions). The bridge
+    /// evaluates no granular scope, so it claims no `permission-v2`. It
+    /// advertises `sso-openid-connect`, and writes the `issuer` that
+    /// capability requires, only when `[auth] capabilities` names it.
     #[must_use]
     pub fn configuration(&self) -> serde_json::Value {
+        let sign_on = self
+            .options
+            .capabilities
+            .iter()
+            .any(|capability| capability == SSO_OPENID_CONNECT);
         self.primary.smart_configuration(&SmartOptions {
-            capabilities: self.capabilities.clone(),
-            ..SmartOptions::default()
+            permissions: BTreeSet::from([
+                PermissionCapability::V1,
+                PermissionCapability::Patient,
+                PermissionCapability::User,
+            ]),
+            openid_connect: if sign_on {
+                OpenIdConnect::Advertised
+            } else {
+                OpenIdConnect::Withheld
+            },
+            ..self.options.clone()
         })
     }
 

@@ -19,9 +19,10 @@
 mod embedded;
 pub mod matching;
 pub mod paths;
-mod structure;
+mod terms;
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use openehr_rm::v1_2::paths::RmPath;
 use openehr_sdt::flat::webtemplate::model::WebTemplate;
@@ -197,9 +198,9 @@ pub struct WebTemplateIndex {
     /// The template an operational template states it embeds at an archetype
     /// root, keyed by the root's `aqlPath`.
     embedded: BTreeMap<AqlPath, String>,
-    /// The RM object an OPT 1.4 constrains at each node-identified path,
-    /// keyed by `aqlPath`; empty for an OPT2.
-    structures: BTreeMap<AqlPath, structure::Structural>,
+    /// The node codes the archetype behind each archetype root defines, keyed
+    /// by the root's `aqlPath`.
+    archetype_terms: BTreeMap<AqlPath, BTreeSet<String>>,
 }
 
 impl WebTemplateIndex {
@@ -223,7 +224,7 @@ impl WebTemplateIndex {
         let mut index = Self::over(web_template, source.generation())?;
         if let TemplateSource::Opt14(ref template) = *source {
             index.embedded = embedded::embedded_templates(template);
-            index.structures = structure::structures(template);
+            index.archetype_terms = terms::archetype_terms(template);
         }
         Ok(index)
     }
@@ -300,7 +301,7 @@ impl WebTemplateIndex {
             by_aql_path,
             by_flat_id,
             embedded: BTreeMap::new(),
-            structures: BTreeMap::new(),
+            archetype_terms: BTreeMap::new(),
         })
     }
 
@@ -346,10 +347,21 @@ impl WebTemplateIndex {
         self.embedded.get(node.aql_path()).map(String::as_str)
     }
 
-    /// Returns the RM object the operational template constrains at `path`,
-    /// when the index was built from an OPT 1.4 that carries one there.
-    pub(crate) fn structure(&self, path: &AqlPath) -> Option<&structure::Structural> {
-        self.structures.get(path)
+    /// Returns whether the archetype rooted at `root` defines the node code
+    /// `code`.
+    ///
+    /// An OPT 1.4 `C_ARCHETYPE_ROOT` carries the `term_definitions` of its
+    /// archetype, which list every at-code the archetype defines, those of the
+    /// nodes the template excludes among them. A code the archetype defines
+    /// and the template carries no node for is therefore a node the template
+    /// excludes. This answers `None` when `root` is no archetype root, when
+    /// the template is an OPT2, and when the index was built by
+    /// [`WebTemplateIndex::over`], which has no operational template to read.
+    #[must_use]
+    pub fn archetype_defines(&self, root: &ResolvedNode, code: &str) -> Option<bool> {
+        self.archetype_terms
+            .get(root.aql_path())
+            .map(|codes| codes.contains(code))
     }
 
     /// Returns the root node of the template.

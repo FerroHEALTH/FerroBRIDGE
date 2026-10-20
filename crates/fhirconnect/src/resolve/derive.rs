@@ -44,6 +44,13 @@ pub const PAIRS: &[(&str, &[&str])] = &[
     ("PARTY_PROXY", &["Reference"]),
     ("DV_IDENTIFIER", &["Identifier"]),
     ("DV_PROPORTION", &["Quantity"]),
+    ("DV_QUANTITY", &["Quantity", "decimal", "integer"]),
+    ("DV_COUNT", &["integer", "Quantity", "Count"]),
+    ("DV_TIME", &["time"]),
+    ("DV_DURATION", &["Duration"]),
+    ("DV_URI", &["url"]),
+    ("DV_MULTIMEDIA", &["Attachment"]),
+    ("DV_PARSABLE", &["Attachment"]),
     ("DV_BOOLEAN", &["boolean"]),
     ("PARTY_REF", &["Reference"]),
 ];
@@ -99,9 +106,8 @@ pub fn element(class: &str, code: &'static str, text: bool) -> &'static str {
 /// code with the first letter raised (<https://hl7.org/fhir/R4/formats.html#choice>),
 /// so it is matched against the class's pairs without regard to case, and an
 /// alternative that travels as text and is no pair converts as a `string`.
-/// A primitive that travels as a JSON boolean converts only through a pair of
-/// the class, and one that travels as a JSON number through none, so either
-/// is `None` when no cell carries it.
+/// A primitive that travels as a JSON boolean or a JSON number converts only
+/// through a pair of the class, so it is `None` when no cell carries it.
 #[must_use]
 pub fn carried(class: &str, suffix: &str, kind: Kind) -> Option<&'static str> {
     match kind {
@@ -113,13 +119,13 @@ pub fn carried(class: &str, suffix: &str, kind: Kind) -> Option<&'static str> {
                 .copied()
                 .unwrap_or(TEXT),
         ),
-        Kind::Primitive(ValueKind::Boolean) => pairs(class)
-            .iter()
-            .find(|code| code.eq_ignore_ascii_case(suffix))
-            .copied(),
-        Kind::Primitive(ValueKind::Integer | ValueKind::Decimal)
-        | Kind::Resource
-        | Kind::Choice(_) => None,
+        Kind::Primitive(ValueKind::Boolean | ValueKind::Integer | ValueKind::Decimal) => {
+            pairs(class)
+                .iter()
+                .find(|code| code.eq_ignore_ascii_case(suffix))
+                .copied()
+        }
+        Kind::Resource | Kind::Choice(_) => None,
     }
 }
 
@@ -255,5 +261,36 @@ mod tests {
             carried("DV_TEXT", "Boolean", Kind::Primitive(ValueKind::Boolean)),
             None
         );
+    }
+
+    #[test]
+    fn a_number_alternative_converts_only_through_a_pair_of_the_class() {
+        // DV_QUANTITY.adoc §Primitives and DV_COUNT.adoc §Primitive.
+        assert_eq!(
+            carried("DV_COUNT", "Integer", Kind::Primitive(ValueKind::Integer)),
+            Some("integer")
+        );
+        assert_eq!(
+            carried(
+                "DV_QUANTITY",
+                "Decimal",
+                Kind::Primitive(ValueKind::Decimal)
+            ),
+            Some("decimal")
+        );
+        assert_eq!(
+            carried("DV_TEXT", "Integer", Kind::Primitive(ValueKind::Integer)),
+            None
+        );
+    }
+
+    #[test]
+    fn a_quantity_choice_is_written_in_the_order_of_its_page() {
+        let values: &[(&str, Kind)] = &[
+            ("Quantity", Kind::Complex("Quantity")),
+            ("Integer", Kind::Primitive(ValueKind::Integer)),
+        ];
+        assert_eq!(alternative("DV_QUANTITY", values), Some("Quantity"));
+        assert_eq!(alternative("DV_COUNT", values), Some("Integer"));
     }
 }

@@ -30,11 +30,10 @@
 //!
 //! The Demographic API rows, ITS-REST 1.1.0 DEVELOPMENT, are [`demographic`].
 
+mod client;
 pub mod demographic;
 
-use ferrohealth_smart::client::RenewalError;
 use http::StatusCode;
-use openehr_its::rest::client::ClientError;
 use openehr_its::rest::client::ErrorBody;
 
 use crate::cdr::error::CdrError;
@@ -373,8 +372,8 @@ pub fn diagnostics(status: StatusCode, body: &ErrorBody) -> String {
 #[must_use]
 pub fn of_client_error(error: &CdrError) -> Answer {
     match *error {
-        CdrError::Client { ref source, .. } => of_generated_error(source),
-        CdrError::Renewal { ref source, .. } => renewal_answer(source),
+        CdrError::Client { ref source, .. } => client::of_generated_error(source),
+        CdrError::Renewal { ref source, .. } => client::renewal_answer(source),
         _ => Answer::new(
             INTERNAL,
             format!("the openEHR client refused this call ({})", error.kind()),
@@ -397,76 +396,6 @@ pub fn of_query_refusal(upstream: &crate::cdr::error::Upstream) -> Answer {
     };
     let body = ErrorBody::from_bytes(upstream.body().as_bytes().to_vec());
     Answer::new(row, diagnostics(upstream.status(), &body))
-}
-
-/// Returns the answer one refusal of the generated client maps to, with the
-/// body the CDR sent when the call reached it.
-fn of_generated_error(error: &ClientError) -> Answer {
-    match *error {
-        ClientError::Unauthorized {
-            ref challenge,
-            ref body,
-            ..
-        } => Answer {
-            row: UNAUTHORIZED,
-            issue: Issue::error(UNAUTHORIZED.issue)
-                .diagnosing(diagnostics(StatusCode::UNAUTHORIZED, body)),
-            entity_tag: None,
-            challenge: challenge.clone(),
-        },
-        ClientError::ServiceFailure {
-            status, ref body, ..
-        } => Answer::new(UPSTREAM, diagnostics(status, body)),
-        // The diagnostics walk the provider's error chain, whose token
-        // errors carry the status and the OAuth error and never the secret.
-        ClientError::Credentials { ref source, .. } => Answer::new(
-            CREDENTIALS,
-            format!(
-                "no credential for the openEHR service could be obtained: {}",
-                crate::facade::outcome::chain(source)
-            ),
-        ),
-        ClientError::Transport { .. } => Answer::new(
-            UPSTREAM,
-            String::from("the openEHR service could not be reached"),
-        ),
-        ClientError::AnswerTooLarge { status, limit, .. } => Answer::new(
-            UPSTREAM,
-            format!(
-                "the openEHR service answered {status} with a body over the {limit}-byte limit"
-            ),
-        ),
-        ClientError::UndocumentedStatus {
-            status, ref body, ..
-        } => Answer::new(UNDOCUMENTED, diagnostics(status, body)),
-        // NOTE: ITS-REST 1.1.0 §Requests and responses/HTTP status codes lists
-        // `403` for every operation and no operation documents it, so the row is
-        // the one every status outside an operation's set takes.
-        ClientError::Forbidden { ref body, .. } => {
-            Answer::new(UNDOCUMENTED, diagnostics(StatusCode::FORBIDDEN, body))
-        }
-        _ => Answer::new(
-            INTERNAL,
-            format!(
-                "the openEHR client refused this call ({})",
-                crate::cdr::error::client_kind(error)
-            ),
-        ),
-    }
-}
-
-/// Returns the answer a refused CDR token that could not be renewed maps to.
-///
-/// The diagnostics walk the token error, which carries the status and the
-/// OAuth error and never the secret.
-fn renewal_answer(renewal: &RenewalError) -> Answer {
-    Answer::new(
-        CREDENTIALS,
-        format!(
-            "no credential for the openEHR service could be obtained: {}",
-            crate::facade::outcome::chain(renewal)
-        ),
-    )
 }
 
 #[cfg(test)]

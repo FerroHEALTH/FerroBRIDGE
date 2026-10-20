@@ -414,7 +414,17 @@ fn refused(usage: &Window, error: &OperationError) -> Response {
     if matches!(error, OperationError::Mapping { .. }) {
         usage.record_mapping_failure();
     }
-    let status = match *error {
+    outcome(status_of(error), &error.outcome())
+}
+
+/// Returns the status one refusal answers with.
+///
+/// The identity seam is the server's own collaborator, so its refusal and an
+/// id it answers outside the R4 `id` grammar are server failures the caller
+/// cannot correct: `500` (<https://hl7.org/fhir/R4/http.html#4.4.1.2>).
+/// No specification governs the statuses: our own design.
+const fn status_of(error: &OperationError) -> StatusCode {
+    match *error {
         OperationError::Mapping { .. }
         | OperationError::Serialization { .. }
         | OperationError::Mapped { .. }
@@ -423,9 +433,19 @@ fn refused(usage: &Window, error: &OperationError) -> Response {
         | OperationError::SeveralSubjects { .. }
         | OperationError::SeveralSubjectResources { .. }
         | OperationError::NoSubjectResource { .. } => StatusCode::UNPROCESSABLE_ENTITY,
-        _ => StatusCode::BAD_REQUEST,
-    };
-    outcome(status, &error.outcome())
+        OperationError::Identity { .. } | OperationError::InvalidId { .. } => {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+        OperationError::Parameters { .. }
+        | OperationError::Body { .. }
+        | OperationError::Payload { .. }
+        | OperationError::NotAnObject { .. }
+        | OperationError::FlatTemplate
+        | OperationError::CanonicalTemplate
+        | OperationError::TemplateDisagreement { .. }
+        | OperationError::UnknownTemplate { .. }
+        | OperationError::Select { .. } => StatusCode::BAD_REQUEST,
+    }
 }
 
 /// Returns the `503` a call takes when the lane is off, naming why.
@@ -505,5 +525,53 @@ fn fhir_resource(status: StatusCode, resource: &Resource) -> Response {
             ),
         )
             .into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fhirconnect::engine::seam::ReferenceError;
+    use fhirconnect::operations::error::OperationError;
+    use http::StatusCode;
+
+    use super::status_of;
+
+    /// Returns the refusal of an identity seam that could not assign an id.
+    fn identity() -> OperationError {
+        OperationError::Identity {
+            resource: String::from("Condition"),
+            source: ReferenceError::Identity {
+                resource_type: String::from("Condition"),
+                source: Box::new(std::io::Error::other("the synthetic store is closed")),
+            },
+        }
+    }
+
+    /// Returns the refusal of an id outside the R4 `id` grammar.
+    fn invalid_id() -> OperationError {
+        OperationError::InvalidId {
+            resource: String::from("Condition"),
+            id: String::from("not an id"),
+        }
+    }
+
+    #[test]
+    fn a_refusing_identity_seam_is_a_server_failure() {
+        assert_eq!(status_of(&identity()), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(identity().issue_type(), "exception");
+    }
+
+    #[test]
+    fn an_invalid_id_from_the_identity_seam_is_a_server_failure() {
+        assert_eq!(status_of(&invalid_id()), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(invalid_id().issue_type(), "value");
+    }
+
+    #[test]
+    fn a_request_the_caller_can_correct_stays_a_bad_request() {
+        assert_eq!(
+            status_of(&OperationError::FlatTemplate),
+            StatusCode::BAD_REQUEST
+        );
     }
 }

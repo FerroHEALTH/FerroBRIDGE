@@ -502,6 +502,37 @@ pub enum Outcome {
         /// Why.
         error: DecodeError,
     },
+    /// A reference to a resource left out of the Bundle, removed from the
+    /// resource that kept it, since a Bundle reference resolves against the
+    /// entries' `fullUrl` (<https://hl7.org/fhir/R4/bundle.html#references>)
+    /// and would point at nothing. The referring resource stays, unless the
+    /// removal leaves it without a required element ([`Outcome::MissingRequired`]).
+    DanglingReference {
+        /// The referring resource's type.
+        resource: String,
+        /// The referring resource's full url.
+        full_url: String,
+        /// The instance path of the `Reference` element, for example
+        /// `DiagnosticReport.result[1]`.
+        element: String,
+        /// The type of the resource left out.
+        target_resource: String,
+        /// The full url of the resource left out.
+        target: String,
+    },
+    /// A Bundle entry member the writer refused, which leaves the entry
+    /// without it.
+    EntryUnwritable {
+        /// The resource type.
+        resource: String,
+        /// The entry's full url.
+        full_url: String,
+        /// The Bundle path written, `$resource.entry.fullUrl` or
+        /// `$resource.entry.resource`.
+        path: &'static str,
+        /// Why.
+        error: WriteError,
+    },
 }
 
 impl Outcome {
@@ -552,6 +583,8 @@ impl Outcome {
             Self::InvalidValue { .. } => "invalid-value",
             Self::MissingRequired { .. } => "missing-required",
             Self::Undecodable { .. } => "undecodable",
+            Self::DanglingReference { .. } => "dangling-reference",
+            Self::EntryUnwritable { .. } => "entry-unwritable",
         }
     }
 }

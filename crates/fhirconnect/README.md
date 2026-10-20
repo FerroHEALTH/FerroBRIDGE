@@ -98,8 +98,12 @@ openEHR.
   against `string`, `Coding` and `CodeableConcept`, `DV_DATE_TIME` against
   `dateTime` and the one-way collapse of a `Period`,
   `DV_INTERVAL<DV_DATE_TIME>` against `Period`, `PARTY_IDENTIFIED` against
-  `Reference` with `DV_IDENTIFIER` against `Identifier` beside it, and
-  `DV_PROPORTION` against `Quantity` for a percentage.
+  `Reference` with `DV_IDENTIFIER` against `Identifier` beside it,
+  `DV_PROPORTION` against `Quantity` for a percentage, `DV_QUANTITY` against
+  `Quantity`, `decimal` and `integer`, `DV_COUNT` against `integer`,
+  `Quantity` and `Count`, `DV_TIME` against `time`, `DV_DURATION` against
+  `Duration` through the UCUM to ISO 8601 bridge, `DV_URI` against `url`, and
+  `DV_MULTIMEDIA` and `DV_PARSABLE` against `Attachment`.
 - **A date and time value keeps the text it came with.** Both sides hold a
   lexical string, so `Z`, `+00:00`, `+01:00` and fractional seconds survive;
   the engine parses no timestamp and adds no offset.

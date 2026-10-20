@@ -306,6 +306,132 @@ fn every_loss_coming_out_to_fhir_names_both_places() -> Result<(), Box<dyn Error
     Ok(())
 }
 
+// An uncarried TERM_MAPPING arises coming out to FHIR only: going in, a string
+// writes no mapping and the held ones stay in place.
+#[test]
+fn an_uncarried_term_mapping_names_the_element_and_the_mappings() -> Result<(), Box<dyn Error>> {
+    // DV_TEXT.adoc §String gives `mappings` no FHIRpath row.
+    let index = template()?;
+    let program = compiled("ferrobridge_diagnose_text")?;
+    let outbound = to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        &crate::term_mapping::annotated_composition(&index, '>')?,
+        &Seams::default(),
+        &CallContext::new(),
+    )?;
+    let mappings = format!("{}/mappings", crate::term_mapping::PROBLEM);
+    let uncarried = |terminology: &str, code: &str| {
+        located(
+            Loss::Skipped {
+                mapping: String::from("problemText"),
+                reason: SkipReason::TermMappingUncarried {
+                    terminology: String::from(terminology),
+                    code: String::from(code),
+                },
+            },
+            Some("Condition.code.text"),
+            Some(&mappings),
+        )
+    };
+    assert_eq!(
+        outbound.warnings(),
+        [
+            uncarried(
+                crate::term_mapping::BROADER_SYSTEM,
+                crate::term_mapping::BROADER_CODE
+            ),
+            uncarried("http://example.org/fhir/CodeSystem/synthetic", "SYN-001"),
+        ]
+    );
+    assert_rendered(outbound.warnings());
+    assert_no_value(
+        &serde_json::json!([
+            crate::term_mapping::BROADER_SYSTEM,
+            crate::term_mapping::BROADER_CODE,
+            "a synthetic problem name",
+        ]),
+        outbound.warnings(),
+    );
+    Ok(())
+}
+
+// An uncarried defining code arises coming out to FHIR only: going in, the
+// chapter has no string row for DV_CODED_TEXT and the cell refuses the pair.
+#[test]
+fn an_uncarried_defining_code_names_the_element_and_the_code() -> Result<(), Box<dyn Error>> {
+    // DV_CODED_TEXT.adoc §STRING: the pairing is not possible, so the value
+    // converts as DV_TEXT, whose table has no defining_code row.
+    let index = template()?;
+    let program = compiled("ferrobridge_diagnose_text")?;
+    let outbound = to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        &crate::term_mapping::coded_composition(&index, '>')?,
+        &Seams::default(),
+        &CallContext::new(),
+    )?;
+    let code = outbound
+        .value()
+        .to_serde_json(&mut fhir_types::codec::Path::root("Condition"))?
+        .get("code")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    assert_eq!(
+        code,
+        serde_json::json!({ "text": "a synthetic problem name" }),
+        "the string carries the rubric and nothing else"
+    );
+    let skipped = |reason: SkipReason, attribute: &str| {
+        located(
+            Loss::Skipped {
+                mapping: String::from("problemText"),
+                reason,
+            },
+            Some("Condition.code.text"),
+            Some(&format!("{}/{attribute}", crate::term_mapping::PROBLEM)),
+        )
+    };
+    let uncarried = |terminology: &str, code: &str| {
+        skipped(
+            SkipReason::TermMappingUncarried {
+                terminology: String::from(terminology),
+                code: String::from(code),
+            },
+            "mappings",
+        )
+    };
+    assert_eq!(
+        outbound.warnings(),
+        [
+            skipped(
+                SkipReason::DefiningCodeUncarried {
+                    terminology: String::from(crate::term_mapping::DEFINING_SYSTEM),
+                    code: String::from(crate::term_mapping::DEFINING_CODE),
+                },
+                "defining_code",
+            ),
+            uncarried(
+                crate::term_mapping::BROADER_SYSTEM,
+                crate::term_mapping::BROADER_CODE
+            ),
+            uncarried("http://example.org/fhir/CodeSystem/synthetic", "SYN-001"),
+        ]
+    );
+    assert_rendered(outbound.warnings());
+    assert_no_value(
+        &serde_json::json!([
+            crate::term_mapping::DEFINING_SYSTEM,
+            crate::term_mapping::DEFINING_CODE,
+            "a synthetic problem name",
+        ]),
+        outbound.warnings(),
+    );
+    Ok(())
+}
+
 // A withheld TERM_MAPPING arises coming out to FHIR only: going in, a Coding is
 // written back as an `=` mapping, which FHIR carries.
 #[test]

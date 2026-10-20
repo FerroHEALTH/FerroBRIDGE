@@ -4,7 +4,9 @@
 //! The walk over the mappings: the conditions, the input occurrences and the
 //! children a mapping runs.
 
+use openehr_mapping_core::composition::CanonicalDocument;
 use openehr_mapping_core::composition::RmPosition;
+use openehr_mapping_core::template::PathError;
 
 use crate::engine::condition;
 use crate::engine::condition::ConditionError;
@@ -202,8 +204,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             let mut positions: Vec<RmPosition> = instance.iter().take(depth).copied().collect();
             positions.resize(depth, RmPosition::first());
             let read = self
-                .index
-                .read(composition, target.node(), &positions)
+                .read_target(composition, target, &positions)
                 .map_err(|source| EngineError::Template {
                     mapping: String::from(name),
                     node: String::from(target.node().aql_path().as_str()),
@@ -352,6 +353,22 @@ impl<T: Table + ?Sized> Run<'_, T> {
         Ok(found)
     }
 
+    /// Reads one instance of a target's node, or of the `ELEMENT` the node is
+    /// the value of when the target's tail names the element's attributes.
+    fn read_target(
+        &self,
+        composition: &dyn CanonicalDocument,
+        target: &OpenehrTarget,
+        positions: &[RmPosition],
+    ) -> Result<Option<serde_json::Value>, PathError> {
+        if target.on_element() {
+            self.index
+                .read_element(composition, target.node(), positions)
+        } else {
+            self.index.read(composition, target.node(), positions)
+        }
+    }
+
     /// Returns the canonical JSON one instance of the target's node holds.
     pub(super) fn node_value(
         &self,
@@ -363,8 +380,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             return Ok(None);
         };
         let node = input.node();
-        self.index
-            .read(composition, node, positions)
+        self.read_target(composition, input, positions)
             .map_err(|source| EngineError::Template {
                 mapping: String::from(name),
                 node: String::from(node.aql_path().as_str()),

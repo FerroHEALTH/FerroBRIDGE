@@ -24,7 +24,8 @@
 //! definitions no longer carry), with 1532 trees of their own, 0 linked to the identical
 //! v2.9.1 tree and 181 to an earlier version's. The trees name 720 segments of their own
 //! (12954 fields), 446 references linked to the agreeing v2.9.1 segment and 327 to an earlier
-//! version's identical one, and 1713 legacy message entries index them.
+//! version's identical one, 1713 legacy message entries index them, and 2796 more give
+//! the other message codes and trigger events their interactions send them under.
 
 pub mod data_type;
 pub mod legacy;

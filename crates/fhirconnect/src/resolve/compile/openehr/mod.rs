@@ -2,6 +2,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The openEHR side of a mapping, located in the operational template.
+//!
+//! `locate` finds the template node a path names and the reference-model
+//! tail below it, and `excluded` tells a node the template excludes from one
+//! it never had.
+
+mod excluded;
+mod locate;
 
 use core::str::FromStr;
 use std::collections::BTreeMap;
@@ -15,7 +22,6 @@ use openehr_mapping_core::index::matching::node_id_matches;
 use openehr_mapping_core::path::MappingPath;
 use openehr_mapping_core::position::Located;
 use openehr_mapping_core::template::PathError;
-use openehr_rm::v1_2::model as rm_model;
 use openehr_rm::v1_2::paths::PathSegment;
 use openehr_rm::v1_2::paths::RmPath;
 
@@ -111,33 +117,12 @@ impl<'a> Compiler<'a> {
             return None;
         }
         match self.locate(&resolved) {
-            Ok((node, tail, leaf)) => {
-                let occurrences = match occurrences(self.template, node) {
-                    Ok(axes) => axes,
-                    Err(error) => {
-                        self.diagnostics.push(diagnostic(
-                            file,
-                            owner,
-                            ResolveCode::UnknownTemplateNode,
-                            written.position(),
-                            path,
-                            format!(
-                                "the occurrence axes of `{}` do not resolve: {error}",
-                                node.flat_id().as_str()
-                            ),
-                        ));
-                        return None;
-                    }
-                };
-                let target = OpenehrTarget::new(resolved, node.clone(), tail, occurrences);
-                Some(match leaf {
-                    Some(class) => target.with_leaf_class(class),
-                    None => target,
-                })
-            }
+            Ok(reached) => self.target_of(&site, resolved, reached),
             Err(error) => {
                 let (code, message) = match error {
-                    LocateError::Unknown(message) => (ResolveCode::UnknownTemplateNode, message),
+                    LocateError::Unknown(message) | LocateError::Excluded(message) => {
+                        (ResolveCode::UnknownTemplateNode, message)
+                    }
                     LocateError::Ambiguous(message) => {
                         (ResolveCode::AmbiguousTemplateNode, message)
                     }
@@ -153,6 +138,47 @@ impl<'a> Compiler<'a> {
                 None
             }
         }
+    }
+
+    /// Builds the target of a path the template reached, with the occurrence
+    /// axes of its node.
+    fn target_of(
+        &mut self,
+        site: &party::Site<'_>,
+        resolved: RmPath,
+        reached: Reached<'a>,
+    ) -> Option<OpenehrTarget> {
+        let Reached {
+            node,
+            tail,
+            leaf,
+            on_element,
+        } = reached;
+        let occurrences = match occurrences(self.template, node) {
+            Ok(axes) => axes,
+            Err(error) => {
+                self.diagnostics.push(diagnostic(
+                    site.file,
+                    site.owner,
+                    ResolveCode::UnknownTemplateNode,
+                    site.position,
+                    site.path,
+                    format!(
+                        "the occurrence axes of `{}` do not resolve: {error}",
+                        node.flat_id().as_str()
+                    ),
+                ));
+                return None;
+            }
+        };
+        let mut target = OpenehrTarget::new(resolved, node.clone(), tail, occurrences);
+        if on_element {
+            target = target.with_element_tail();
+        }
+        Some(match leaf {
+            Some(class) => target.with_leaf_class(class),
+            None => target,
+        })
     }
 
     /// Returns the path the variable an openEHR path opens with names.
@@ -214,96 +240,20 @@ impl<'a> Compiler<'a> {
             }
         }
     }
+}
 
-    /// Returns the deepest template node an openEHR path names, and the
-    /// reference-model attributes below it.
-    ///
-    /// A Web Template carries the archetype roots and the leaves and compacts
-    /// what lies between, so three forms resolve: a path that names an indexed
-    /// node, a path that names an `ELEMENT` the builder compacted into its
-    /// value node, and a path that reaches past the deepest indexed node into
-    /// the reference model or through a structure the template compacted away.
-    /// A segment the template carries nowhere and that constrains a node
-    /// identity is refused. No specification governs this: our own design.
-    pub(super) fn locate(
-        &self,
-        path: &RmPath,
-    ) -> Result<(&'a ResolvedNode, RmPath, Option<String>), LocateError> {
-        let total = path.segments.len();
-        for taken in (0..=total).rev() {
-            let head = path.segments.get(..taken).unwrap_or_default();
-            let tail = path.segments.get(taken..).unwrap_or_default();
-            let prefix = RmPath {
-                absolute: path.absolute,
-                segments: head.to_vec(),
-            };
-            let rest = RmPath {
-                absolute: false,
-                segments: tail.to_vec(),
-            };
-            let node = match self.template.at_rm_path(&prefix) {
-                Ok(node) => node,
-                Err(PathError::AmbiguousPath { .. }) => {
-                    return Err(self.ambiguity(&prefix, &self.template.all_at_rm_path(&prefix)));
-                }
-                Err(_) => {
-                    let found: Vec<&ResolvedNode> = self
-                        .compacted
-                        .iter()
-                        .filter(|entry| names_same_place(&prefix, &entry.0))
-                        .map(|&(_, node)| node)
-                        .collect();
-                    match *found.as_slice() {
-                        [only] => only,
-                        [] => continue,
-                        _ => return Err(self.ambiguity(&prefix, &found)),
-                    }
-                }
-            };
-            let constrained = rest.segments.iter().find(|segment| constrains(segment));
-            if let Some(segment) = constrained
-                && !self
-                    .interior
-                    .iter()
-                    .any(|interior| names_same_place(path, interior))
-            {
-                return Err(LocateError::Unknown(format!(
-                    "the template `{}` has no node at `{path}`; the deepest node it reaches is \
-                     `{}` and `{}` below it names a node identity the template does not carry",
-                    self.template.template_id(),
-                    node.aql_path().as_str(),
-                    segment.attribute
-                )));
-            }
-            let leaf = rm_tail(node.rm_type(), &rest).map_err(|message| {
-                LocateError::Unknown(format!(
-                    "the template `{}` reaches `{}` and `{path}` walks `{rest}` below it: \
-                     {message}",
-                    self.template.template_id(),
-                    node.aql_path().as_str()
-                ))
-            })?;
-            return Ok((node, rest, leaf));
-        }
-        Err(LocateError::Unknown(format!(
-            "the template `{}` has no node at `{path}`",
-            self.template.template_id()
-        )))
-    }
-
-    /// Builds the refusal for a path that names more than one template node.
-    fn ambiguity(&self, path: &RmPath, candidates: &[&ResolvedNode]) -> LocateError {
-        let named: Vec<&str> = candidates
-            .iter()
-            .map(|node| node.flat_id().as_str())
-            .collect();
-        LocateError::Ambiguous(format!(
-            "`{path}` names {} nodes of the template `{}`: {}",
-            named.len(),
-            self.template.template_id(),
-            named.join(", ")
-        ))
-    }
+/// What an openEHR path reaches in the operational template.
+#[derive(Debug)]
+pub(super) struct Reached<'a> {
+    /// The deepest template node the path names.
+    pub(super) node: &'a ResolvedNode,
+    /// The reference-model attributes the path walks below the node.
+    pub(super) tail: RmPath,
+    /// The class of the last attribute the tail names.
+    pub(super) leaf: Option<String>,
+    /// Whether the tail names attributes of the `ELEMENT` the template
+    /// compacted into the node.
+    pub(super) on_element: bool,
 }
 
 /// Why an openEHR path names no single node of the operational template.
@@ -313,6 +263,8 @@ pub(super) enum LocateError {
     Unknown(String),
     /// More than one node carries it, so nothing says which one is meant.
     Ambiguous(String),
+    /// The archetype defines the node and the template excludes it.
+    Excluded(String),
 }
 
 /// Whether `candidate` walks below `ancestor` in either path syntax.
@@ -320,98 +272,6 @@ pub(super) fn walks_below(candidate: &str, ancestor: &str) -> bool {
     candidate
         .strip_prefix(ancestor)
         .is_some_and(|tail| tail.starts_with(['.', '/', '[']))
-}
-
-/// Checks the reference-model attributes an openEHR path walks below the
-/// deepest template node it reaches.
-///
-/// A Web Template carries the nodes an archetype constrains and stops there, so
-/// everything below the deepest one is plain reference model. The attribute
-/// model `openehr-rm` generates from the RM BMM is the oracle for it
-/// (<https://docs.rs/openehr-rm/0.0.69/openehr_rm/v1_2/model/fn.attribute.html>):
-/// an attribute is looked up on the node's type and on the concrete subtypes of
-/// it, because a declared type may be abstract (`ELEMENT.value` is
-/// `DATA_VALUE`) and the attribute then belongs to one of its descendants.
-///
-/// A type the model does not carry stops the walk rather than refusing it: the
-/// mapping is then checked as far as the model reaches and no further.
-///
-/// Returns the class of the last attribute the tail names, `None` for an
-/// empty tail and for a walk the model stopped before its end. The class is
-/// the declared type, or its one concrete descendant when the declared type is
-/// abstract and has exactly one.
-fn rm_tail(rm_type: &str, tail: &RmPath) -> Result<Option<String>, String> {
-    let mut candidates = concrete_forms(rm_type);
-    if candidates.is_empty() {
-        return Ok(None);
-    }
-    let mut leaf: Option<&'static str> = None;
-    for (position, segment) in tail.segments.iter().enumerate() {
-        let attribute = segment.attribute.as_str();
-        let mut declared: Option<&'static str> = None;
-        let mut next: Vec<&'static str> = Vec::new();
-        for candidate in &candidates {
-            let Some(found) = rm_model::attribute(candidate, attribute) else {
-                continue;
-            };
-            declared.get_or_insert(found.declared_type);
-            for form in concrete_forms(found.declared_type) {
-                if !next.contains(&form) {
-                    next.push(form);
-                }
-            }
-        }
-        let Some(declared) = declared else {
-            return Err(format!(
-                "`{attribute}` is no attribute of `{}` in the openEHR reference model",
-                candidates.join("`, `")
-            ));
-        };
-        leaf = Some(declared);
-        if next.is_empty() {
-            let last = position.saturating_add(1) == tail.segments.len();
-            return Ok(last.then(|| String::from(declared)));
-        }
-        candidates = next;
-    }
-    Ok(leaf.map(concrete_leaf))
-}
-
-/// Returns the one concrete form of an abstract class, or the class itself.
-fn concrete_leaf(declared: &'static str) -> String {
-    let Some(class) = rm_model::class(declared) else {
-        return String::from(declared);
-    };
-    if !class.is_abstract {
-        return String::from(declared);
-    }
-    let concrete: Vec<&str> = class
-        .descendants
-        .iter()
-        .copied()
-        .filter(|name| rm_model::class(name).is_some_and(|found| !found.is_abstract))
-        .collect();
-    match *concrete.as_slice() {
-        [only] => String::from(only),
-        _ => String::from(declared),
-    }
-}
-
-/// Returns the reference-model class plus every concrete class below it.
-///
-/// An empty result means the reference model carries no class of that name,
-/// which is what stops [`rm_tail`] rather than refusing.
-fn concrete_forms(rm_type: &str) -> Vec<&'static str> {
-    let Some(class) = rm_model::class(rm_type) else {
-        return Vec::new();
-    };
-    let mut forms: Vec<&'static str> = vec![class.name];
-    for descendant in class.descendants {
-        if !forms.contains(descendant) {
-            forms.push(descendant);
-        }
-    }
-    forms
 }
 
 /// Whether a path segment constrains which node it selects.

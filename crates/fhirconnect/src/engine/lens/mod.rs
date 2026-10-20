@@ -42,14 +42,21 @@
 pub mod boolean;
 pub mod code_phrase;
 pub mod coded_text;
+pub mod count;
 pub mod date;
 pub mod date_time;
+pub mod duration;
+pub mod encapsulated;
 pub mod interval;
+pub mod number;
 pub mod party;
 pub mod party_ref;
 pub mod proportion;
+pub mod quantity;
 pub mod term_mapping;
 pub mod text;
+pub mod time;
+pub mod uri;
 
 use core::fmt;
 

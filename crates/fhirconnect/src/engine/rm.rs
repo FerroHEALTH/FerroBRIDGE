@@ -23,14 +23,21 @@ use openehr_its::json::to_canonical_value;
 use openehr_rm::v1_2::common::generic::party_identified::PartyIdentifiedData;
 use openehr_rm::v1_2::data_types::basic::dv_boolean::DvBoolean;
 use openehr_rm::v1_2::data_types::basic::dv_identifier::DvIdentifier;
+use openehr_rm::v1_2::data_types::encapsulated::dv_multimedia::DvMultimedia;
+use openehr_rm::v1_2::data_types::encapsulated::dv_parsable::DvParsable;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_date::DvDate;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_date_time::DvDateTime;
+use openehr_rm::v1_2::data_types::quantity::date_time::dv_duration::DvDuration;
+use openehr_rm::v1_2::data_types::quantity::date_time::dv_time::DvTime;
+use openehr_rm::v1_2::data_types::quantity::dv_count::DvCount;
 use openehr_rm::v1_2::data_types::quantity::dv_interval::DvInterval;
 use openehr_rm::v1_2::data_types::quantity::dv_proportion::DvProportion;
+use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
+use openehr_rm::v1_2::data_types::uri::dv_uri::DvUri;
 use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::model::Container;
 use openehr_sdt::flat::path::Segment;
@@ -65,6 +72,20 @@ pub enum RmValue {
     Identifier(DvIdentifier),
     /// A `DV_PROPORTION`.
     Proportion(Box<DvProportion>),
+    /// A `DV_QUANTITY`.
+    Quantity(Box<DvQuantity>),
+    /// A `DV_COUNT`.
+    Count(Box<DvCount>),
+    /// A `DV_TIME`.
+    Time(Box<DvTime>),
+    /// A `DV_DURATION`.
+    Duration(Box<DvDuration>),
+    /// A `DV_URI`, or the `DV_EHR_URI` the reference model admits in its place.
+    Uri(DvUri),
+    /// A `DV_MULTIMEDIA`.
+    Multimedia(Box<DvMultimedia>),
+    /// A `DV_PARSABLE`.
+    Parsable(Box<DvParsable>),
     /// A `DV_BOOLEAN`.
     Boolean(DvBoolean),
     /// A `PARTY_REF`, the party a `ROLE` names as its `performer`.
@@ -127,6 +148,13 @@ impl RmValue {
             Self::Party(_) => "PARTY_IDENTIFIED",
             Self::Identifier(_) => "DV_IDENTIFIER",
             Self::Proportion(_) => "DV_PROPORTION",
+            Self::Quantity(_) => "DV_QUANTITY",
+            Self::Count(_) => "DV_COUNT",
+            Self::Time(_) => "DV_TIME",
+            Self::Duration(_) => "DV_DURATION",
+            Self::Uri(_) => "DV_URI",
+            Self::Multimedia(_) => "DV_MULTIMEDIA",
+            Self::Parsable(_) => "DV_PARSABLE",
             Self::Boolean(_) => "DV_BOOLEAN",
             Self::PartyRef(_) => "PARTY_REF",
         }
@@ -181,6 +209,25 @@ impl RmValue {
             "DV_PROPORTION" => from_canonical_value(value)
                 .map(|proportion| Self::Proportion(Box::new(proportion)))
                 .map_err(refuse),
+            "DV_QUANTITY" => from_canonical_value(value)
+                .map(|quantity| Self::Quantity(Box::new(quantity)))
+                .map_err(refuse),
+            "DV_COUNT" => from_canonical_value(value)
+                .map(|count| Self::Count(Box::new(count)))
+                .map_err(refuse),
+            "DV_TIME" => from_canonical_value(value)
+                .map(|time| Self::Time(Box::new(time)))
+                .map_err(refuse),
+            "DV_DURATION" => from_canonical_value(value)
+                .map(|duration| Self::Duration(Box::new(duration)))
+                .map_err(refuse),
+            "DV_URI" => from_canonical_value(value).map(Self::Uri).map_err(refuse),
+            "DV_MULTIMEDIA" => from_canonical_value(value)
+                .map(|multimedia| Self::Multimedia(Box::new(multimedia)))
+                .map_err(refuse),
+            "DV_PARSABLE" => from_canonical_value(value)
+                .map(|parsable| Self::Parsable(Box::new(parsable)))
+                .map_err(refuse),
             "PARTY_REF" => from_canonical_value(value)
                 .map(Self::PartyRef)
                 .map_err(refuse),
@@ -195,7 +242,8 @@ impl RmValue {
     /// # Errors
     ///
     /// Returns [`RmError::Encode`] for a `DV_PROPORTION` whose numerator or
-    /// denominator is no finite number, which JSON has no form for
+    /// denominator, or a `DV_QUANTITY` whose magnitude, is no finite number,
+    /// which JSON has no form for
     /// (<https://www.rfc-editor.org/rfc/rfc8259#section-6>).
     pub fn to_canonical(&self) -> Result<Value, RmError> {
         let encoded = match *self {
@@ -220,6 +268,21 @@ impl RmValue {
                 }
                 to_canonical_value(proportion.as_ref())
             }
+            Self::Quantity(ref quantity) => {
+                if !quantity.magnitude.is_finite() {
+                    return Err(RmError::Encode {
+                        rm_type: "DV_QUANTITY",
+                        reason: format!("{} is not a finite JSON number", quantity.magnitude),
+                    });
+                }
+                to_canonical_value(quantity.as_ref())
+            }
+            Self::Count(ref count) => to_canonical_value(count.as_ref()),
+            Self::Time(ref time) => to_canonical_value(time.as_ref()),
+            Self::Duration(ref duration) => to_canonical_value(duration.as_ref()),
+            Self::Uri(ref uri) => to_canonical_value(uri),
+            Self::Multimedia(ref multimedia) => to_canonical_value(multimedia.as_ref()),
+            Self::Parsable(ref parsable) => to_canonical_value(parsable.as_ref()),
         };
         Ok(encoded)
     }
@@ -342,9 +405,10 @@ fn held(declared_type: &str) -> Option<Carried> {
     }
 }
 
-// TODO(#618): the `_provider` and `_health_care_facility` families are spelled
-// here and in `family::provider` until openehr-sdt honours `|raw` on
-// `_`-prefixed attribute families (sibling request S1).
+// TODO(#618): the `_provider`, `_health_care_facility` and `_end_time`
+// families are spelled here and in `family::provider` and `family::end_time`
+// until openehr-sdt honours `|raw` on `_`-prefixed attribute families
+// (sibling request S1).
 /// The attributes of a structural class FLAT writes as a `_`-prefixed family
 /// of the class's node.
 ///
@@ -356,10 +420,12 @@ fn held(declared_type: &str) -> Option<Carried> {
 /// `EVENT_CONTEXT.health_care_facility` is a `PARTY_IDENTIFIED`
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/ehr.html#_event_context_class>),
 /// spelled `_health_care_facility` under the `context` node (the same file,
-/// the `EVENT_CONTEXT` section).
+/// the `EVENT_CONTEXT` section), and `EVENT_CONTEXT.end_time` is an optional
+/// `DV_DATE_TIME` the same section spells `_end_time`.
 pub const FAMILIES: &[(&str, &str)] = &[
     ("ENTRY", "provider"),
     ("EVENT_CONTEXT", "health_care_facility"),
+    ("EVENT_CONTEXT", "end_time"),
 ];
 
 /// The attributes of a party root a party context maps although no template
@@ -556,5 +622,13 @@ mod tests {
             Some(("EVENT_CONTEXT", Carried::Family))
         );
         assert_eq!(carried("EVENT_CONTEXT", &["location"]), None);
+    }
+
+    #[test]
+    fn the_context_end_time_is_a_family() {
+        assert_eq!(
+            carried("EVENT_CONTEXT", &["end_time"]),
+            Some(("EVENT_CONTEXT", Carried::Family))
+        );
     }
 }

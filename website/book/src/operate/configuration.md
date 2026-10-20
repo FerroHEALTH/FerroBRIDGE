@@ -650,7 +650,9 @@ sends and what each refusal looks like.
 | `timeout_ms` | `10000` | How long one call to the authorization server may take |
 | `realm` | none | The `realm` every `WWW-Authenticate` challenge names |
 | `scopeless_subjects` | `[]` | The `sub` values whose token gets system-wide access when it names no SMART clinical scope, such as a backend service whose authorization server issues no scope; any other scopeless token is refused with `403` |
-| `capabilities` | `[]` | SMART capabilities the discovery document lists beside the three the facade enforces (`permission-v1`, `permission-patient`, `permission-user`) and the ones the issuer's metadata shows, such as `launch-ehr` or `context-ehr-patient` |
+| `capabilities` | `[]` | SMART capabilities the discovery document lists beside the three the facade enforces (`permission-v1`, `permission-patient`, `permission-user`) and the ones the issuer's metadata shows, such as `launch-ehr` or `context-ehr-patient`; each is one SMART App Launch 2.2.0 (Conformance, Capabilities) defines, or a full URI. `sso-openid-connect` also writes the issuer's `issuer`, which the document omits otherwise (Conformance, Metadata) |
+| `scopes_supported` | `[]` | The scopes the discovery document lists as `scopes_supported`; list only scopes the bridge honours, because "the server SHALL support all scopes listed here" (SMART App Launch 2.2.0, Conformance, Metadata). Empty omits the member |
+| `product_scope` | `__ferrobridge.operator` | The operator scope: it guards the operator API and admits `$validate`, `$tofhir` and `$toopenehr` on the facade, which commit nothing. SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own, in a form SMART App Launch 2.2.0 gives an extension scope: a string starting with `__` or a full URI; any other value refuses the start |
 
 Each `[[auth.issuer]]` table takes `issuer` and any of `audience`,
 `algorithms`, `token_profile`, `clock_skew_seconds`, `jwks_max_age_seconds`,
@@ -736,9 +738,8 @@ has the routes and the scope.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `enabled` | `false` | Whether the operator routes are mounted, each requiring a token that carries `scope` |
+| `enabled` | `false` | Whether the operator routes are mounted, each requiring a token that carries the operator scope, `[auth] product_scope` |
 | `mapping_dir` | none | The writable directory console saves go to (`<mapping_dir>/fhirconnect/`); unset, the API checks and saves nothing. Keep it on its own volume when the root file system is read-only |
-| `scope` | `__ferrobridge.operator` | The scope that guards the operator API and admits `$validate`, `$tofhir` and `$toopenehr` on the facade, which commit nothing. SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own, in a form SMART App Launch 2.2.0 gives an extension scope: a string starting with `__` or a full URI; any other value refuses the start |
 
 ### `[operations]`
 
@@ -805,8 +806,10 @@ exits 78, `EX_CONFIG`. Seven things are refused:
 - an `[auth]` section with no issuer or audience while a guarded surface is
   served, an algorithm that is symmetric or unknown, a clock skew over 300
   seconds, a `token_profile` other than `rfc9068` and `jwt`, a Basic user
-  whose hash is no Argon2id PHC string, a capability that is not one scope
-  token, and an `[operator] scope` outside the two SMART extension forms;
+  whose hash is no Argon2id PHC string, a capability SMART App Launch 2.2.0
+  does not define that is no full URI, a `scopes_supported` value that is
+  not one scope token, and a `product_scope` outside the two SMART
+  extension forms;
 - a `[cdm] url` that names no `sslmode`, or one that falls back to plaintext
   or is not a libpq mode, a `[cdm]` CA that holds no PEM certificate, and a
   `PGSSLROOTCERT`, `PGSSLCERT` or `PGSSLKEY` in the environment;

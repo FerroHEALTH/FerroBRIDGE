@@ -8,8 +8,8 @@
 # - BEHIND: updates the branch.
 # - DIRTY in CHANGELOG.md or only in version lines: merges origin/main
 #   (the branch's changelog entries by scripts/gh/changelog-merge.sh, the
-#   branch's higher versions, a fresh Cargo.lock, the crate bump guard
-#   passing), pushes, and keeps watching.
+#   higher of the two versions on each version line, a fresh Cargo.lock, the
+#   crate bump guard passing), pushes, and keeps watching.
 # - A clean merge that would file the branch's changelog entries under a
 #   released version (a release cut after the branch): merges the same way.
 # - Open and not queued: arms auto-merge again, since a push to the branch
@@ -19,8 +19,29 @@
 #   Only the newest run of each workflow on the head is judged, so a run a
 #   later push superseded or cancelled never stops it.
 #
-# scripts/gh/watch-prs.sh --self-test   judges fixture checks, with no gh call.
+# scripts/gh/watch-prs.sh --self-test   judges fixture checks and merges
+# fixture version conflicts, with no gh call.
 set -u
+# Resolves, in place, each conflict hunk of file $1 whose two sides differ
+# only in their x.y.z version numbers: the hunk becomes one side with the
+# higher version at each position. Any other hunk keeps its markers. Every
+# capture is copied before the next match, which would overwrite it.
+merge_versions() {
+  perl -0pi -e '
+    sub newer { my @a = split /\./, $_[0]; my @b = split /\./, $_[1];
+      for my $i (0 .. 2) { my $c = $a[$i] <=> $b[$i]; return $c if $c } 0 }
+    sub pick { my ($ours, $theirs, $hunk) = @_;
+      my @ov = $ours =~ /(\d+\.\d+\.\d+)/g;
+      my @tv = $theirs =~ /(\d+\.\d+\.\d+)/g;
+      (my $on = $ours) =~ s/\d+\.\d+\.\d+/V/g;
+      (my $tn = $theirs) =~ s/\d+\.\d+\.\d+/V/g;
+      return $hunk if $on ne $tn;
+      my $i = 0;
+      $ours =~ s{\d+\.\d+\.\d+}{ my ($o, $t) = ($ov[$i], $tv[$i]); $i++;
+        newer($o, $t) >= 0 ? $o : $t }ge;
+      $ours }
+    s{<<<<<<< HEAD\n(.*?)=======\n(.*?)>>>>>>> origin/main\n}{pick($1, $2, $&)}gse' "$1"
+}
 # The checks of the newest run of each workflow, from `gh pr checks --json
 # name,bucket,link,workflow`; a check whose link names no Actions run is kept.
 # Prints the pending count, a tab, and the red required checks.
@@ -72,6 +93,40 @@ EOF
     echo "watch-prs: self-test: a pending job or a check outside Actions was misread: [$got]" >&2
     failures=$((failures + 1))
   fi
+  local dir
+  dir=$(mktemp -d)
+  # Both sides bumped one requirement, main higher: main's line, whole.
+  printf '%s\n' 'a = 1' '<<<<<<< HEAD' 'x = { path = "x", version = "0.1.157" }' \
+    '=======' 'x = { path = "x", version = "0.1.161" }' '>>>>>>> origin/main' \
+    '# The next comment.' >"$dir/main-higher.toml"
+  merge_versions "$dir/main-higher.toml"
+  if [ "$(cat "$dir/main-higher.toml")" != "$(printf '%s\n' 'a = 1' \
+    'x = { path = "x", version = "0.1.161" }' '# The next comment.')" ]; then
+    echo "watch-prs: self-test: a both-sides bump kept the lower version or broke the line:" >&2
+    cat "$dir/main-higher.toml" >&2
+    failures=$((failures + 1))
+  fi
+  # The branch higher, at each position of a two-line hunk.
+  printf '%s\n' '<<<<<<< HEAD' 'version = "0.2.0"' 'y = "1.10.0"' '=======' \
+    'version = "0.1.9"' 'y = "1.9.3"' '>>>>>>> origin/main' >"$dir/branch-higher.toml"
+  merge_versions "$dir/branch-higher.toml"
+  if [ "$(cat "$dir/branch-higher.toml")" != "$(printf '%s\n' 'version = "0.2.0"' 'y = "1.10.0"')" ]; then
+    echo "watch-prs: self-test: the branch's higher versions were not kept:" >&2
+    cat "$dir/branch-higher.toml" >&2
+    failures=$((failures + 1))
+  fi
+  # Sides that differ beyond a version keep their markers, so the merge stops.
+  printf '%s\n' '<<<<<<< HEAD' 'x = { version = "0.1.157" }' '=======' \
+    'x = { path = "x", version = "0.1.161" }' '>>>>>>> origin/main' >"$dir/other.toml"
+  cp "$dir/other.toml" "$dir/other.expected"
+  merge_versions "$dir/other.toml"
+  if ! cmp -s "$dir/other.toml" "$dir/other.expected"; then
+    echo "watch-prs: self-test: a hunk differing beyond its versions was rewritten:" >&2
+    cat "$dir/other.toml" >&2
+    failures=$((failures + 1))
+  fi
+  rm -f "$dir/main-higher.toml" "$dir/branch-higher.toml" "$dir/other.toml" "$dir/other.expected"
+  rmdir "$dir"
   if [ "$failures" != 0 ]; then
     echo "watch-prs: self-test: $failures check(s) failed" >&2
     exit 1
@@ -91,8 +146,9 @@ merge_changelog="$(cd "$(dirname "$0")" && pwd)/changelog-merge.sh"
 # A conflict this script resolves on its own: CHANGELOG.md takes the branch's
 # entries into main's [Unreleased] whatever main released meanwhile, and a
 # version line (a crate manifest, the root manifest, the pin tables)
-# keeps the branch's side when the two sides differ only in their version
-# numbers. Cargo.lock is regenerated, and the crate bump guard must pass.
+# keeps the higher version when the two sides differ only in their version
+# numbers. Every manifest must still parse, Cargo.lock is regenerated, and
+# the crate bump guard must pass.
 resolve_merge() {
   local p=$1 b tmp
   b=$(gh pr view "$p" --json headRefName --jq .headRefName)
@@ -101,7 +157,7 @@ resolve_merge() {
   git -C "$repo" worktree add -q "$tmp" "origin/$b" 2>/dev/null || return 1
   (
     cd "$tmp" || exit 1
-    git merge --no-commit --no-ff origin/main >/dev/null 2>&1
+    git -c merge.conflictStyle=merge merge --no-commit --no-ff origin/main >/dev/null 2>&1
     mb=$(git merge-base HEAD origin/main) || { git merge --abort; exit 1; }
     if ! git diff --quiet "$mb" HEAD -- CHANGELOG.md; then
       "$merge_changelog" <(git show "$mb:CHANGELOG.md") <(git show HEAD:CHANGELOG.md) \
@@ -115,11 +171,12 @@ resolve_merge() {
         Cargo.lock)
           git checkout --theirs Cargo.lock ;;
         Cargo.toml | crates/*/Cargo.toml | docs/VERSIONS.md | docs/architecture.md)
-          perl -0pi -e 's{<<<<<<< HEAD\n(.*?)=======\n(.*?)>>>>>>> origin/main\n}{ (my $o = $1) =~ s/\d+\.\d+\.\d+/V/g; (my $t = $2) =~ s/\d+\.\d+\.\d+/V/g; $o eq $t ? $1 : $& }gse' "$f" ;;
+          merge_versions "$f" ;;
         *) git merge --abort; exit 1 ;;
       esac
       if grep -q '^<<<<<<<\|^>>>>>>>' "$f"; then git merge --abort; exit 1; fi
     done
+    cargo metadata --no-deps --format-version 1 >/dev/null 2>&1 || { git merge --abort; exit 1; }
     cargo update -w -q || { git merge --abort; exit 1; }
     git add -A
     scripts/checks/crate-version-guard.sh origin/main WORKTREE >/dev/null 2>&1 || { git merge --abort; exit 1; }

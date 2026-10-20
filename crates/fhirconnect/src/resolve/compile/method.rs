@@ -189,7 +189,8 @@ impl<'a> Compiler<'a> {
             return Method::Value;
         }
         let archetype = archetype_of(slotted).cloned();
-        if let (Some(archetype), Ok((node, _, _))) = (archetype, self.locate(&scope.openehr)) {
+        if let (Some(archetype), Ok(reached)) = (archetype, self.locate(&scope.openehr)) {
+            let node = reached.node;
             match node.node_id() {
                 Some(carried) if node_id_matches(archetype.as_str(), carried) => {
                     self.check_revision(slotted, Some(carried));
@@ -322,10 +323,11 @@ impl<'a> Compiler<'a> {
         let Some(declared) = sub.context().template.id.as_ref() else {
             return;
         };
-        let Ok((node, rest, _)) = self.locate(&scope.openehr) else {
+        let Ok(reached) = self.locate(&scope.openehr) else {
             return;
         };
-        if !rest.segments.is_empty() {
+        let node = reached.node;
+        if !reached.tail.segments.is_empty() {
             return;
         }
         let owner = file.header().name().value();

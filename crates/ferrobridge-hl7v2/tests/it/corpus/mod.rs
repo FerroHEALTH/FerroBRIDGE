@@ -21,6 +21,7 @@
 //! other converters, so they are a comparison and never the guide's answer.
 
 mod compare;
+mod refusals;
 mod sets;
 mod tables;
 
@@ -29,6 +30,7 @@ use std::error::Error;
 use std::path::Path;
 
 use bytes::BytesMut;
+use ferrobridge_hl7v2::batch;
 use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::inbound::{self, Received};
 use ferrobridge_hl7v2::map::{Mapped, Outcome, map};
@@ -41,6 +43,7 @@ use fhir_types::codec::{Json, Value};
 use tokio_util::codec::{Decoder, Encoder};
 
 use crate::corpus::compare::{Targets, compare, expected_bundle};
+use crate::corpus::refusals::Expected;
 use crate::corpus::sets::{
     Message, VENDOR, aira, converter, nist, normalised, reportstream, v2_to_fhir,
 };
@@ -53,6 +56,58 @@ const UNDECODABLE: &str = "the Bundle does not decode as R4";
 /// The reason a case fails when a `message` Bundle does not open with a
 /// `MessageHeader` (<https://hl7.org/fhir/R4/bundle.html#invs>, `bdl-12`).
 const HEADERLESS: &str = "the message Bundle breaks bdl-12";
+
+/// The reason a case fails when a resource of the Bundle references a
+/// `urn:uuid` no entry carries as its `fullUrl`
+/// (<https://hl7.org/fhir/R4/bundle.html#references>).
+const DANGLING: &str = "a Bundle reference names no entry";
+
+/// Every `reference` under `value` that is a `urn:uuid` not in `entries`.
+fn dangling<'a>(value: &'a Value, entries: &[&str], found: &mut Vec<&'a str>) {
+    match value {
+        Value::Object(object) => {
+            for (key, child) in object {
+                match child {
+                    Value::String(target)
+                        if key == "reference"
+                            && target.starts_with("urn:uuid:")
+                            && !entries.contains(&target.as_str()) =>
+                    {
+                        found.push(target);
+                    }
+                    _ => dangling(child, entries, found),
+                }
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                dangling(item, entries, found);
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+    }
+}
+
+/// Whether every `urn:uuid` reference in `bundle` names one of its entries.
+fn resolves(bundle: &Value) -> bool {
+    let entries: Vec<&Value> = bundle
+        .get("entry")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .collect();
+    let urls: Vec<&str> = entries
+        .iter()
+        .filter_map(|entry| entry.get("fullUrl").and_then(Value::as_str))
+        .collect();
+    let mut found = Vec::new();
+    for entry in entries {
+        if let Some(resource) = entry.get("resource") {
+            dangling(resource, &urls, &mut found);
+        }
+    }
+    found.is_empty()
+}
 
 /// Whether `bundle` keeps `bdl-12`: when `Bundle.type` is `message`, the
 /// first entry's resource is a `MessageHeader`.
@@ -162,10 +217,19 @@ async fn run(
     guide: &ferrobridge_hl7v2::map::corpus::Corpus,
     targets: &Targets,
     client: &Client,
+    expected: Option<&Expected>,
 ) -> Case {
     let normal = normalised(&message.bytes);
-    let mut case = verdict(message, &normal, guide, targets, client).await;
-    let (family, version) = declared(&normal);
+    let mut case = match expected {
+        Some(expected) => refused(&message.id, &normal, expected),
+        None => verdict(message, &normal, guide, targets, client).await,
+    };
+    // NOTE: no specification governs this: our own design; a batch file counts under the
+    // family and the version its first message declares.
+    let first = batch::split(&normal)
+        .ok()
+        .and_then(|file| file.messages().next().map(<[u8]>::to_vec));
+    let (family, version) = declared(first.as_deref().unwrap_or(&normal));
     if let Some(family) = family {
         case = case.with_family(family);
     }
@@ -173,6 +237,37 @@ async fn run(
         case = case.with_version(version);
     }
     case
+}
+
+/// The verdict on a message the expected-refusal list names: it passes when
+/// the face answers it with the listed code and an ERR carrying the listed
+/// table 0357 code, and fails when the face takes it or answers otherwise.
+fn refused(id: &str, normal: &[u8], expected: &Expected) -> Case {
+    let bytes = match framed(normal) {
+        Ok(bytes) => bytes,
+        Err(reason) => return Case::fail(id, reason),
+    };
+    let listed = format!("{:?} with ERR-3 {}", expected.code, expected.error);
+    match inbound::receive(&bytes, Charset::Ascii, structure_for, support::STAMP) {
+        Received::Answered { code, reply }
+            if code == expected.code && refusals::error_codes(&reply).contains(&expected.error) =>
+        {
+            let mut outcomes = BTreeMap::new();
+            outcomes.insert(String::from(expected.reason.kind()), 1);
+            Case::pass(id).with_outcomes(outcomes)
+        }
+        Received::Answered { code, reply } => Case::fail(
+            id,
+            format!(
+                "listed as refused {listed}, {}",
+                answer_reason(&format!("{code:?}"), &reply)
+            ),
+        ),
+        Received::Parsed(_) => Case::fail(id, format!("listed as refused {listed}, and parsed")),
+        Received::Unanswerable => {
+            Case::fail(id, format!("listed as refused {listed}, unanswerable"))
+        }
+    }
 }
 
 /// Runs one normalised message through the face and returns its verdict.
@@ -187,32 +282,91 @@ async fn verdict(
         Ok(bytes) => bytes,
         Err(reason) => return Case::fail(&message.id, reason),
     };
-    let inbound = match inbound::receive(&bytes, Charset::Ascii, structure_for, support::STAMP) {
+    if batch::is_batch(&bytes) {
+        return batch_verdict(&message.id, &bytes, guide, targets, client).await;
+    }
+    one(
+        &message.id,
+        &bytes,
+        message.expected.as_deref(),
+        guide,
+        targets,
+        client,
+    )
+    .await
+}
+
+/// Runs each message of a batch file through the face: the case passes when
+/// every message passes, and fails with the first failing message's reason,
+/// with the outcomes of every message run summed.
+async fn batch_verdict(
+    id: &str,
+    bytes: &[u8],
+    guide: &ferrobridge_hl7v2::map::corpus::Corpus,
+    targets: &Targets,
+    client: &Client,
+) -> Case {
+    let file = match batch::split(bytes) {
+        Ok(file) => file,
+        Err(error) => return Case::fail(id, format!("the batch file is refused: {error}")),
+    };
+    let mut outcomes: BTreeMap<String, usize> = BTreeMap::new();
+    let mut add = |kind: String, count: usize| {
+        let slot = outcomes.entry(kind).or_insert(0);
+        *slot = slot.saturating_add(count);
+    };
+    for discrepancy in file.discrepancies() {
+        add(String::from(discrepancy.kind()), 1);
+    }
+    let mut failure = None;
+    for message in file.messages() {
+        add(String::from("batch-message"), 1);
+        let case = one(id, message, None, guide, targets, client).await;
+        for (kind, count) in case.outcomes() {
+            add(kind.clone(), *count);
+        }
+        if failure.is_none() {
+            failure = case.failure().map(str::to_owned);
+        }
+    }
+    match failure {
+        Some(reason) => Case::fail(id, reason).with_outcomes(outcomes),
+        None => Case::pass(id).with_outcomes(outcomes),
+    }
+}
+
+/// Runs one framed message through the face and returns its verdict.
+async fn one(
+    id: &str,
+    bytes: &[u8],
+    expected: Option<&Path>,
+    guide: &ferrobridge_hl7v2::map::corpus::Corpus,
+    targets: &Targets,
+    client: &Client,
+) -> Case {
+    let inbound = match inbound::receive(bytes, Charset::Ascii, structure_for, support::STAMP) {
         Received::Parsed(inbound) => inbound,
         Received::Answered { code, reply } => {
-            return Case::fail(&message.id, answer_reason(&format!("{code:?}"), &reply));
+            return Case::fail(id, answer_reason(&format!("{code:?}"), &reply));
         }
         Received::Unanswerable => {
-            return Case::fail(&message.id, "unanswerable: no MSH header can be read");
+            return Case::fail(id, "unanswerable: no MSH header can be read");
         }
     };
     let parsed = inbound.parsed();
     if parsed.message().message_type(1) == Some("ACK") {
         let mut outcomes = BTreeMap::new();
         outcomes.insert(String::from("acknowledgment-not-mapped"), 1);
-        return Case::pass(&message.id).with_outcomes(outcomes);
+        return Case::pass(id).with_outcomes(outcomes);
     }
     let mapped = match map(parsed, guide, Some(client)).await {
         Ok(mapped) => mapped,
         Err(error) => {
-            return Case::fail(
-                &message.id,
-                format!("the map refuses it: {}", chain(&error)),
-            );
+            return Case::fail(id, format!("the map refuses it: {}", chain(&error)));
         }
     };
     let mut outcomes = counted(&mapped);
-    if let Some(path) = &message.expected {
+    if let Some(path) = expected {
         match expected_bundle(path) {
             Ok(expected) => compare(
                 mapped.bundle(),
@@ -227,18 +381,21 @@ async fn verdict(
         }
     }
     let Some(object) = mapped.bundle().as_object() else {
-        return Case::fail(&message.id, "the map wrote no Bundle object").with_outcomes(outcomes);
+        return Case::fail(id, "the map wrote no Bundle object").with_outcomes(outcomes);
     };
     if let Err(error) = fhir_types::r4::bundle::Bundle::from_json(
         object,
         &mut fhir_types::codec::Path::root("Bundle"),
     ) {
-        return Case::fail(&message.id, format!("{UNDECODABLE}: {error}")).with_outcomes(outcomes);
+        return Case::fail(id, format!("{UNDECODABLE}: {error}")).with_outcomes(outcomes);
     }
     if !keeps_bdl_12(mapped.bundle()) {
-        return Case::fail(&message.id, HEADERLESS).with_outcomes(outcomes);
+        return Case::fail(id, HEADERLESS).with_outcomes(outcomes);
     }
-    Case::pass(&message.id).with_outcomes(outcomes)
+    if !resolves(mapped.bundle()) {
+        return Case::fail(id, DANGLING).with_outcomes(outcomes);
+    }
+    Case::pass(id).with_outcomes(outcomes)
 }
 
 /// Runs every message through the guide with the crate's shipped supplements
@@ -252,9 +409,11 @@ async fn measure(corpus: Corpus, messages: &[Message]) -> Result<(), Box<dyn Err
     let shipped = support::shipped();
     let tables = GuideTables::load(&support::package())?;
     let (_server, client) = tables.serve().await?;
+    let listed = refusals::expected()?;
     let mut cases = Vec::with_capacity(messages.len());
     for message in messages {
-        cases.push(run(message, &shipped, &targets, &client).await);
+        let expected = listed.get(&message.id);
+        cases.push(run(message, &shipped, &targets, &client, expected).await);
     }
     let outcome = record(corpus, &cases)?;
     assert!(
@@ -281,6 +440,16 @@ async fn measure(corpus: Corpus, messages: &[Message]) -> Result<(), Box<dyn Err
         headerless,
         Vec::<&str>::new(),
         "every message Bundle the {corpus} corpus maps opens with its MessageHeader (bdl-12)"
+    );
+    let unresolved: Vec<&str> = cases
+        .iter()
+        .filter(|case| case.failure() == Some(DANGLING))
+        .map(Case::id)
+        .collect();
+    assert_eq!(
+        unresolved,
+        Vec::<&str>::new(),
+        "no reference in a Bundle the {corpus} corpus maps names a resource left out of it"
     );
     let left_out: usize = cases
         .iter()

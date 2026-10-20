@@ -261,7 +261,7 @@ fn render_lib(banner: &str, model: &Model, legacy: &LegacyModel) -> Result<Strin
     )?;
     writeln!(
         out,
-        "//!\n//! The legacy tables are the NIST IGAMT export of HL7's v2 database,\n//! `{REPOSITORY}` at commit `{}`, path `{TABLES_DIR}`:\n//! {} message structures of {} structure codes over {} versions ({} of {} codes the\n//! definitions no longer carry), with {} trees of their own, {} linked to the identical\n//! v2.9.1 tree and {} to an earlier version's. The trees name {} segments of their own\n//! ({} fields), {} references linked to the agreeing v2.9.1 segment and {} to an earlier\n//! version's identical one, and {} legacy message entries index them.\n",
+        "//!\n//! The legacy tables are the NIST IGAMT export of HL7's v2 database,\n//! `{REPOSITORY}` at commit `{}`, path `{TABLES_DIR}`:\n//! {} message structures of {} structure codes over {} versions ({} of {} codes the\n//! definitions no longer carry), with {} trees of their own, {} linked to the identical\n//! v2.9.1 tree and {} to an earlier version's. The trees name {} segments of their own\n//! ({} fields), {} references linked to the agreeing v2.9.1 segment and {} to an earlier\n//! version's identical one, {} legacy message entries index them, and {} more give\n//! the other message codes and trigger events their interactions send them under.\n",
         legacy.commit,
         legacy.structure_count(),
         legacy.code_count(),
@@ -276,6 +276,7 @@ fn render_lib(banner: &str, model: &Model, legacy: &LegacyModel) -> Result<Strin
         legacy.shared_count(),
         legacy.inherited_count(),
         legacy.messages.len(),
+        legacy.events.len(),
     )?;
     out.push_str(
         "pub mod data_type;\npub mod legacy;\npub mod message;\npub mod model;\npub mod segment;\npub mod structure;\n",

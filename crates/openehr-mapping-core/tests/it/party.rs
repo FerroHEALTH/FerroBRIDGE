@@ -3,13 +3,11 @@
 
 //! The build of a canonical `PARTY` from a party Web Template.
 //!
-//! Simplified Formats defines FLAT for compositions only, so whether the
-//! `openehr-sdt` composition builder builds a correct `PARTY` from a party
-//! template was unverified. These cases record the answer against the
-//! testkit's synthetic `PERSON` template: it does not, so the bridge builds the
-//! party through the `openehr-rm` types (#905), and the gap is the upstream
-//! request FerroHEALTH/FerroEHR#3810. No specification governs a party build:
-//! our own design.
+//! Simplified Formats defines FLAT for compositions only, so these cases
+//! record what the `openehr-sdt` party builder makes of the testkit's
+//! synthetic `PERSON` template: a `PERSON` that decodes strictly, with its
+//! list attributes as arrays and no composition attribute. No specification
+//! governs a party build: our own design.
 
 use ferrobridge_testkit::fixtures::PERSON_OPT;
 use ferrobridge_testkit::fixtures::PERSON_TEMPLATE_ID;
@@ -19,6 +17,7 @@ use openehr_mapping_core::index::paths::AqlPath;
 use openehr_mapping_core::template::PathError;
 use openehr_mapping_core::template::TemplateSource;
 use openehr_rm::v1_2::demographic::person::Person;
+use openehr_sdt::flat::build::BuildOptions;
 
 /// The timestamp the builder fills the `ctx/time` default from.
 const NOW: &str = "2026-10-19T08:00:00Z";
@@ -48,11 +47,12 @@ fn a_party_template_indexes_with_its_party_root() {
     assert_eq!(identity.rm_type(), "PARTY_IDENTITY");
 }
 
-/// What `openehr-sdt` 0.0.87 builds from a FLAT document of the party
-/// template, recorded so a fixed builder fails this case and the build moves
-/// to it (#906).
+/// What the `openehr-sdt` party builder builds from a FLAT document of the
+/// party template: `PARTY.identities` is a list (RM Demographic IM, the
+/// `PARTY` class), no `COMPOSITION` attribute reaches the root, and the
+/// result decodes strictly as a `PERSON`.
 #[test]
-fn openehr_sdt_builds_no_canonical_person_from_a_party_web_template() {
+fn openehr_sdt_builds_a_canonical_person_from_a_party_web_template() {
     let index = person_index();
     let name = index.node(&AqlPath::new(NAME)).expect("the name node");
     let mut flat = serde_json::Map::new();
@@ -60,29 +60,29 @@ fn openehr_sdt_builds_no_canonical_person_from_a_party_web_template() {
         format!("{}|value", name.flat_id().as_str()),
         serde_json::Value::from("Synthetic Person"),
     );
-    let document = openehr_sdt::flat::sim::flat::parse_flat(&flat).expect("the FLAT parses");
-    let built = openehr_sdt::flat::build::build_composition(&document, index.web_template(), NOW)
-        .expect("the builder returns an object");
+    let built = openehr_sdt::flat::convert::party_from_flat(
+        &flat,
+        index.web_template(),
+        &BuildOptions::default().with_rm_version("1.1.0"),
+    )
+    .expect("the party builder builds the person");
     assert_eq!(built.get("_type"), Some(&serde_json::Value::from("PERSON")));
-    // The composition builder writes `COMPOSITION.category` onto the root.
-    assert!(
-        built.get("category").is_some(),
-        "the builder no longer writes a category: {built}"
-    );
-    // `PARTY.identities` is a list (RM Demographic IM) and is built as one
-    // object, because the builder's multiple-attribute set is seeded from
-    // `COMPOSITION`, `EHR_STATUS` and `FOLDER` only.
     assert!(
         built
             .get("identities")
-            .is_some_and(serde_json::Value::is_object),
-        "the builder now builds the identities as a list: {built}"
+            .is_some_and(serde_json::Value::is_array),
+        "the identities are a list: {built}"
     );
-    let decoded = openehr_its::json::from_canonical_value::<Person>(&built);
-    assert!(
-        decoded.is_err(),
-        "the built PERSON decodes, so the build can move to openehr-sdt (#906)"
+    for field in ["category", "language", "territory", "composer", "context"] {
+        assert!(built.get(field).is_none(), "the party carries `{field}`");
+    }
+    assert_eq!(
+        built.pointer("/archetype_details/rm_version"),
+        Some(&serde_json::Value::from("1.1.0"))
     );
+    let person = openehr_its::json::from_canonical_value::<Person>(&built)
+        .expect("the built PERSON decodes");
+    assert_eq!(person.identities.len(), 1);
 }
 
 #[test]

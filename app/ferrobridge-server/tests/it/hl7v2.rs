@@ -480,6 +480,44 @@ async fn a_message_no_program_maps_is_answered_ae_naming_each_entry()
     running.stop().await
 }
 
+// HL7 v2 chapter 2 §2.10.3: [FHS] { [BHS] { MSH ... } [BTS] } [FTS]; §2.10.3.2 answers a
+// batch with a response batch, and BHS-11 is echoed in BHS-12 of the answering batch.
+#[tokio::test]
+async fn a_batch_file_is_answered_with_one_acknowledgment_per_message_in_a_response_batch()
+-> Result<(), Box<dyn StdError>> {
+    let running = Running::start(true, Duration::ZERO).await?;
+    let mut file = b"FHS|^~\\&|LAB|NORTHLAB|EHR|SOUTHCLINIC|20260925143000+0200||||F-1\r".to_vec();
+    file.extend_from_slice(b"BHS|^~\\&|LAB|NORTHLAB|EHR|SOUTHCLINIC|20260925143000+0200||||B-1\r");
+    file.extend_from_slice(&oru_r01("MSG-V2-B001"));
+    file.extend_from_slice(&oru_r01("MSG-V2-B002"));
+    file.extend_from_slice(b"BTS|2\rFTS|1\r");
+    let answer = running.send(&file).await?;
+    let lines: Vec<&str> = answer.split('\r').filter(|line| !line.is_empty()).collect();
+    assert!(
+        lines.first().is_some_and(|line| {
+            line.starts_with("FHS|^~\\&|EHR|SOUTHCLINIC|LAB|NORTHLAB|") && line.ends_with("|F-1")
+        }),
+        "the file header swaps the parties and references FHS-11: {answer}"
+    );
+    assert!(
+        lines.get(1).is_some_and(|line| {
+            line.starts_with("BHS|^~\\&|EHR|SOUTHCLINIC|LAB|NORTHLAB|") && line.ends_with("|B-1")
+        }),
+        "the batch header references BHS-11: {answer}"
+    );
+    let acknowledged: Vec<&str> = segments(&answer, "MSA")
+        .iter()
+        .filter_map(|msa| msa.split('|').nth(2))
+        .collect();
+    assert_eq!(vec!["MSG-V2-B001", "MSG-V2-B002"], acknowledged, "{answer}");
+    assert_eq!(
+        lines.iter().rev().take(2).copied().collect::<Vec<_>>(),
+        vec!["FTS|1", "BTS|2"],
+        "{answer}"
+    );
+    running.stop().await
+}
+
 #[tokio::test]
 async fn a_sending_facility_not_listed_is_answered_ar_at_msh_4_and_never_mapped()
 -> Result<(), Box<dyn StdError>> {

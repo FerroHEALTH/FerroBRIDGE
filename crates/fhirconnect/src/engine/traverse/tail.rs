@@ -37,6 +37,64 @@ use crate::engine::traverse::error::EngineError;
 pub(super) const PARTY_REF: &str = "PARTY_REF";
 
 impl<T: Table + ?Sized> Run<'_, T> {
+    /// Writes one FHIR element as the `_`-prefixed family a tail names below a
+    /// structural node: a `PARTY_IDENTIFIED` as `family::provider` spells it,
+    /// a `DV_DATE_TIME` as `family::end_time` does.
+    fn convert_family(
+        &mut self,
+        mapping: &Mapping,
+        target: &FhirTarget,
+        openehr: &OpenehrTarget,
+        view: &FhirValue,
+        binding: &Binding,
+    ) -> Result<(), EngineError> {
+        let node = openehr.node();
+        let segments = tail_segments(openehr);
+        let leaf = openehr
+            .leaf_class()
+            .ok_or_else(|| unsupported_tail(mapping, openehr))?;
+        let produced =
+            cell::put(view, leaf, None, self.binding_of(node).as_deref()).map_err(|source| {
+                EngineError::Cell {
+                    mapping: String::from(mapping.name()),
+                    element: String::from(target.expression().as_str()),
+                    source: Box::new(source),
+                }
+            })?;
+        for taken in &produced.fallbacks {
+            self.warnings.push(Warning::fallback(
+                taken,
+                self.locate(mapping, &binding.fhir),
+            ));
+        }
+        let value = self.identified(mapping, view, produced.value, Shape::Identifier)?;
+        let under = rm::family_of(&segments);
+        match value {
+            RmValue::Party(ref party) => {
+                self.families
+                    .extend(family::provider(node, &binding.openehr, &under, party));
+            }
+            RmValue::DateTime(ref date_time) => {
+                self.families.push(family::end_time(
+                    node,
+                    &binding.openehr,
+                    &under,
+                    &date_time.value,
+                ));
+            }
+            _ => {
+                return Err(EngineError::Rm {
+                    mapping: String::from(mapping.name()),
+                    node: String::from(node.aql_path().as_str()),
+                    source: Box::new(RmError::UnknownClass {
+                        rm_type: String::from(value.rm_type()),
+                    }),
+                });
+            }
+        }
+        Ok(())
+    }
+
     /// Writes one FHIR element into the attribute a tail names below a node.
     ///
     /// The tail's leaf class selects the cell when the leaf is a data value,
@@ -62,35 +120,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             source: Box::new(source),
         };
         if carried == Carried::Family {
-            let leaf = openehr
-                .leaf_class()
-                .ok_or_else(|| unsupported_tail(mapping, openehr))?;
-            let produced = cell::put(view, leaf, None, self.binding_of(node).as_deref()).map_err(
-                |source| EngineError::Cell {
-                    mapping: String::from(mapping.name()),
-                    element: String::from(target.expression().as_str()),
-                    source: Box::new(source),
-                },
-            )?;
-            for taken in &produced.fallbacks {
-                self.warnings.push(Warning::fallback(
-                    taken,
-                    self.locate(mapping, &binding.fhir),
-                ));
-            }
-            let value = self.identified(mapping, view, produced.value, Shape::Identifier)?;
-            let RmValue::Party(ref party) = value else {
-                return Err(refuse_rm(RmError::UnknownClass {
-                    rm_type: String::from(value.rm_type()),
-                }));
-            };
-            self.families.extend(family::provider(
-                node,
-                &binding.openehr,
-                &rm::family_of(&segments),
-                party,
-            ));
-            return Ok(());
+            return self.convert_family(mapping, target, openehr, view, binding);
         }
         let mut object = self
             .held_object(&binding.openehr, node.flat_id())

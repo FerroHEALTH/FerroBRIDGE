@@ -9,10 +9,19 @@
 //! names. This module is that lookup, and nothing more: every conversion
 //! lives in [`crate::engine::lens`] and runs both ways there.
 
+use fhir_types::r4::attachment::Attachment;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
+use openehr_rm::v1_2::data_types::encapsulated::dv_multimedia::DvMultimedia;
+use openehr_rm::v1_2::data_types::encapsulated::dv_parsable::DvParsable;
+use openehr_rm::v1_2::data_types::quantity::date_time::dv_duration::DvDuration;
+use openehr_rm::v1_2::data_types::quantity::date_time::dv_time::DvTime;
+use openehr_rm::v1_2::data_types::quantity::dv_count::DvCount;
+use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
+use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
+use openehr_rm::v1_2::data_types::uri::dv_uri::DvUri;
 
 use crate::engine::fhir::FhirKind;
 use crate::engine::fhir::FhirValue;
@@ -22,15 +31,21 @@ use crate::engine::lens::LensError;
 use crate::engine::lens::boolean::BooleanLens;
 use crate::engine::lens::code_phrase::CodePhraseLens;
 use crate::engine::lens::coded_text::CodedTextLens;
+use crate::engine::lens::count::CountLens;
 use crate::engine::lens::date::DateLens;
 use crate::engine::lens::date_time::DateTimeLens;
 use crate::engine::lens::date_time::PeriodStartLens;
+use crate::engine::lens::duration::DurationLens;
+use crate::engine::lens::encapsulated::EncapsulatedLens;
 use crate::engine::lens::interval::DateTimeIntervalLens;
 use crate::engine::lens::party::IdentifierLens;
 use crate::engine::lens::party::PartyLens;
 use crate::engine::lens::proportion::PercentLens;
+use crate::engine::lens::quantity::QuantityLens;
 use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::lens::text::TextLens;
+use crate::engine::lens::time::TimeLens;
+use crate::engine::lens::uri::UriLens;
 use crate::engine::rm::RmValue;
 use crate::model::ast::keyword::Direction;
 
@@ -97,6 +112,35 @@ pub fn get(
         (RmValue::Proportion(proportion), FhirKind::Quantity) => PercentLens
             .get(proportion.as_ref())
             .map(|quantity| FhirValue::Quantity(Box::new(quantity))),
+        (RmValue::Quantity(quantity), FhirKind::Quantity) => QuantityLens
+            .get(quantity.as_ref())
+            .map(|quantity| FhirValue::Quantity(Box::new(quantity))),
+        (RmValue::Quantity(quantity), FhirKind::Decimal) => {
+            QuantityLens.get(quantity.as_ref()).map(FhirValue::Decimal)
+        }
+        (RmValue::Quantity(quantity), FhirKind::Integer) => {
+            QuantityLens.get(quantity.as_ref()).map(FhirValue::Integer)
+        }
+        (RmValue::Count(count), FhirKind::Integer) => {
+            CountLens.get(count.as_ref()).map(FhirValue::Integer)
+        }
+        (RmValue::Count(count), FhirKind::Quantity) => CountLens
+            .get(count.as_ref())
+            .map(|quantity| FhirValue::Quantity(Box::new(quantity))),
+        (RmValue::Count(count), FhirKind::Count) => CountLens
+            .get(count.as_ref())
+            .map(|count| FhirValue::Count(Box::new(count))),
+        (RmValue::Time(time), FhirKind::Time) => TimeLens.get(time.as_ref()).map(FhirValue::Time),
+        (RmValue::Duration(duration), FhirKind::Duration) => DurationLens
+            .get(duration.as_ref())
+            .map(|duration| FhirValue::Duration(Box::new(duration))),
+        (RmValue::Uri(uri), FhirKind::Url) => UriLens.get(uri).map(FhirValue::Url),
+        (RmValue::Multimedia(multimedia), FhirKind::Attachment) => EncapsulatedLens
+            .get(multimedia.as_ref())
+            .map(|attachment| FhirValue::Attachment(Box::new(attachment))),
+        (RmValue::Parsable(parsable), FhirKind::Attachment) => EncapsulatedLens
+            .get(parsable.as_ref())
+            .map(|attachment| FhirValue::Attachment(Box::new(attachment))),
         (source, kind) => Err(no_cell(source, kind, Direction::OpenehrToFhir)),
     }
 }
@@ -104,12 +148,26 @@ pub fn get(
 /// Returns the term mappings [`get`] leaves out of the FHIR element `kind`
 /// names, in the order the value holds them.
 ///
-/// Only the cells that carry `mappings` withhold any: `DV_TEXT` against
-/// `Coding` and `CodeableConcept`, and `DV_CODED_TEXT` against
-/// `CodeableConcept`.
+/// The cells that carry `mappings` (`DV_TEXT` against `Coding` and
+/// `CodeableConcept`, `DV_CODED_TEXT` against `CodeableConcept`) withhold
+/// the ones whose `match` is not `=`. The cells whose FHIR element has no
+/// coding (`DV_TEXT` and `DV_CODED_TEXT` against `string`, `DV_CODED_TEXT`
+/// against `Coding`) withhold every one.
 #[must_use]
 pub fn withheld(source: &RmValue, kind: FhirKind, binding: Option<&str>) -> Vec<Withheld> {
     match (source, kind) {
+        (RmValue::Text(text), FhirKind::String) => {
+            Lens::<DvTextData, fhir_types::r4::primitives::String>::withheld(&TextLens, text)
+        }
+        (RmValue::CodedText(text), FhirKind::String) => {
+            Lens::<DvTextData, fhir_types::r4::primitives::String>::withheld(
+                &TextLens,
+                &plain(text.as_ref()),
+            )
+        }
+        (RmValue::CodedText(text), FhirKind::Coding) => {
+            Lens::<DvCodedText, Coding>::withheld(&coded_lens(binding), text.as_ref())
+        }
         (RmValue::Text(text), FhirKind::Coding) => {
             Lens::<DvTextData, Coding>::withheld(&TextLens, text)
         }
@@ -120,6 +178,21 @@ pub fn withheld(source: &RmValue, kind: FhirKind, binding: Option<&str>) -> Vec<
             Lens::<DvCodedText, CodeableConcept>::withheld(&coded_lens(binding), text.as_ref())
         }
         (_source, _kind) => Vec::new(),
+    }
+}
+
+/// Returns the `defining_code` [`get`] leaves out of the FHIR element `kind`
+/// names, `None` when the cell carries it.
+///
+/// Only `DV_CODED_TEXT` against `string` drops it. The chapter writes no
+/// `string` row for `DV_CODED_TEXT` (`DV_CODED_TEXT.adoc` §STRING calls the
+/// pairing not possible), so the cell is the `DV_TEXT` one of its supertype,
+/// whose table has no `defining_code` row, and the engine declares the code.
+#[must_use]
+pub fn uncarried_code(source: &RmValue, kind: FhirKind) -> Option<&CodePhrase> {
+    match (source, kind) {
+        (RmValue::CodedText(text), FhirKind::String) => Some(&text.defining_code),
+        (_source, _kind) => None,
     }
 }
 
@@ -182,6 +255,37 @@ pub fn put(
         ("DV_PROPORTION", FhirValue::Quantity(quantity)) => PercentLens
             .put(quantity.as_ref(), held_proportion(existing))
             .map(|proportion| RmValue::Proportion(Box::new(proportion))),
+        ("DV_QUANTITY", FhirValue::Quantity(quantity)) => QuantityLens
+            .put(quantity.as_ref(), held_quantity(existing))
+            .map(|quantity| RmValue::Quantity(Box::new(quantity))),
+        ("DV_QUANTITY", FhirValue::Decimal(decimal)) => QuantityLens
+            .put(decimal, held_quantity(existing))
+            .map(|quantity| RmValue::Quantity(Box::new(quantity))),
+        ("DV_QUANTITY", FhirValue::Integer(integer)) => QuantityLens
+            .put(integer, held_quantity(existing))
+            .map(|quantity| RmValue::Quantity(Box::new(quantity))),
+        ("DV_COUNT", FhirValue::Integer(integer)) => CountLens
+            .put(integer, held_count(existing))
+            .map(|count| RmValue::Count(Box::new(count))),
+        ("DV_COUNT", FhirValue::Quantity(quantity)) => CountLens
+            .put(quantity.as_ref(), held_count(existing))
+            .map(|count| RmValue::Count(Box::new(count))),
+        ("DV_COUNT", FhirValue::Count(count)) => CountLens
+            .put(count.as_ref(), held_count(existing))
+            .map(|count| RmValue::Count(Box::new(count))),
+        ("DV_TIME", FhirValue::Time(time)) => TimeLens
+            .put(time, held_time(existing))
+            .map(|time| RmValue::Time(Box::new(time))),
+        ("DV_DURATION", FhirValue::Duration(duration)) => DurationLens
+            .put(duration.as_ref(), held_duration(existing))
+            .map(|duration| RmValue::Duration(Box::new(duration))),
+        ("DV_URI", FhirValue::Url(url)) => UriLens.put(url, held_uri(existing)).map(RmValue::Uri),
+        ("DV_MULTIMEDIA", FhirValue::Attachment(attachment)) => EncapsulatedLens
+            .put(attachment.as_ref(), held_multimedia(existing))
+            .map(|multimedia| RmValue::Multimedia(Box::new(multimedia))),
+        ("DV_PARSABLE", FhirValue::Attachment(attachment)) => EncapsulatedLens
+            .put(attachment.as_ref(), held_parsable(existing))
+            .map(|parsable| RmValue::Parsable(Box::new(parsable))),
         (rm_type, view) => Err(LensError::NoCell {
             rm_type: String::from(rm_type),
             kind: view.kind().as_str(),
@@ -190,14 +294,30 @@ pub fn put(
     }?;
     Ok(Produced {
         value,
-        fallbacks: fallbacks(view, rm_type, binding),
+        fallbacks: fallbacks(view, rm_type, existing, binding),
     })
 }
 
-/// Returns the one-way rows the cell would take writing `view`.
-fn fallbacks(view: &FhirValue, rm_type: &str, binding: Option<&str>) -> Vec<Fallback> {
+/// Returns the one-way rows the cell would take writing `view` over
+/// `existing`.
+fn fallbacks(
+    view: &FhirValue,
+    rm_type: &str,
+    existing: Option<&RmValue>,
+    binding: Option<&str>,
+) -> Vec<Fallback> {
     let coded = coded_lens(binding);
+    // NOTE: DV_QUANTITY.adoc §Primitives hardcodes `units` as 1, which is a
+    // one-way row only where no held value supplies the units.
+    let unheld = held_quantity(existing).is_none();
     match (rm_type, view) {
+        ("DV_QUANTITY", FhirValue::Quantity(quantity)) => QuantityLens.fallbacks(quantity.as_ref()),
+        ("DV_DURATION", FhirValue::Duration(duration)) => DurationLens.fallbacks(duration.as_ref()),
+        ("DV_MULTIMEDIA", FhirValue::Attachment(attachment)) => {
+            Lens::<DvMultimedia, Attachment>::fallbacks(&EncapsulatedLens, attachment.as_ref())
+        }
+        ("DV_QUANTITY", FhirValue::Decimal(decimal)) if unheld => QuantityLens.fallbacks(decimal),
+        ("DV_QUANTITY", FhirValue::Integer(integer)) if unheld => QuantityLens.fallbacks(integer),
         ("DV_TEXT", FhirValue::String(text)) => TextLens.fallbacks(text),
         ("DV_TEXT", FhirValue::Coding(coding)) => TextLens.fallbacks(coding.as_ref()),
         ("DV_TEXT", FhirValue::CodeableConcept(concept)) => TextLens.fallbacks(concept.as_ref()),
@@ -271,9 +391,7 @@ fn held_coded(existing: Option<&RmValue>) -> Option<&DvCodedText> {
 }
 
 /// Returns the held `CODE_PHRASE`, when the target holds one.
-fn held_code_phrase(
-    existing: Option<&RmValue>,
-) -> Option<&openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase> {
+fn held_code_phrase(existing: Option<&RmValue>) -> Option<&CodePhrase> {
     match existing {
         Some(RmValue::CodePhrase(code)) => Some(code),
         _other => None,
@@ -344,6 +462,62 @@ fn held_identifier(
     }
 }
 
+/// Returns the held `DV_QUANTITY`, when the target holds one.
+fn held_quantity(existing: Option<&RmValue>) -> Option<&DvQuantity> {
+    match existing {
+        Some(RmValue::Quantity(quantity)) => Some(quantity.as_ref()),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_URI`, when the target holds one.
+fn held_uri(existing: Option<&RmValue>) -> Option<&DvUri> {
+    match existing {
+        Some(RmValue::Uri(uri)) => Some(uri),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_MULTIMEDIA`, when the target holds one.
+fn held_multimedia(existing: Option<&RmValue>) -> Option<&DvMultimedia> {
+    match existing {
+        Some(RmValue::Multimedia(multimedia)) => Some(multimedia.as_ref()),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_PARSABLE`, when the target holds one.
+fn held_parsable(existing: Option<&RmValue>) -> Option<&DvParsable> {
+    match existing {
+        Some(RmValue::Parsable(parsable)) => Some(parsable.as_ref()),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_TIME`, when the target holds one.
+fn held_time(existing: Option<&RmValue>) -> Option<&DvTime> {
+    match existing {
+        Some(RmValue::Time(time)) => Some(time.as_ref()),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_DURATION`, when the target holds one.
+fn held_duration(existing: Option<&RmValue>) -> Option<&DvDuration> {
+    match existing {
+        Some(RmValue::Duration(duration)) => Some(duration.as_ref()),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_COUNT`, when the target holds one.
+fn held_count(existing: Option<&RmValue>) -> Option<&DvCount> {
+    match existing {
+        Some(RmValue::Count(count)) => Some(count.as_ref()),
+        _other => None,
+    }
+}
+
 /// Returns the held `DV_PROPORTION`, when the target holds one.
 fn held_proportion(
     existing: Option<&RmValue>,
@@ -358,8 +532,10 @@ fn held_proportion(
 mod tests {
     use super::get;
     use super::put;
+    use super::withheld;
     use crate::engine::fhir::FhirKind;
     use crate::engine::fhir::FhirValue;
+    use crate::engine::lens::term_mapping::Cause;
     use crate::engine::rm::RmValue;
     use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
@@ -411,5 +587,150 @@ mod tests {
             produced.fallbacks.is_empty(),
             "the cell took no one-way row"
         );
+    }
+
+    #[test]
+    fn a_quantity_and_a_count_run_their_cells_both_ways() {
+        // DV_QUANTITY.adoc §Quantity and §Primitives, DV_COUNT.adoc §Primitive,
+        // §Quantity and §Count.
+        let quantity = RmValue::from_canonical(
+            "DV_QUANTITY",
+            "/synthetic",
+            &serde_json::json!({
+                "_type": "DV_QUANTITY", "magnitude": 7.25, "precision": 2, "units": "mg",
+            }),
+        )
+        .expect("a DV_QUANTITY");
+        let count = RmValue::from_canonical(
+            "DV_COUNT",
+            "/synthetic",
+            &serde_json::json!({ "_type": "DV_COUNT", "magnitude": 3 }),
+        )
+        .expect("a DV_COUNT");
+        for (value, kinds) in [
+            (
+                &quantity,
+                [FhirKind::Quantity, FhirKind::Decimal, FhirKind::Quantity],
+            ),
+            (
+                &count,
+                [FhirKind::Integer, FhirKind::Quantity, FhirKind::Count],
+            ),
+        ] {
+            for kind in kinds {
+                let view = get(value, kind, None).expect("the chapter has the row");
+                assert_eq!(view.kind(), kind);
+                let back =
+                    put(&view, value.rm_type(), Some(value), None).expect("the row runs back");
+                assert_eq!(&back.value, value, "{kind:?} round trips");
+            }
+        }
+        let error = get(&quantity, FhirKind::Integer, None).expect_err("7.25 is no integer");
+        assert!(error.to_string().contains("DV_QUANTITY"), "{error}");
+    }
+
+    #[test]
+    fn a_primitive_declares_the_unity_units_only_when_nothing_is_held() {
+        let view = FhirValue::Integer(fhir_types::r4::primitives::Integer::from(3));
+        let fresh = put(&view, "DV_QUANTITY", None, None).expect("the integer travels");
+        assert_eq!(fresh.fallbacks.len(), 1, "units is the specification's 1");
+        let held =
+            put(&view, "DV_QUANTITY", Some(&fresh.value), None).expect("the integer travels");
+        assert!(held.fallbacks.is_empty(), "the held units return");
+    }
+
+    /// Returns two synthetic `TERM_MAPPING`s, one `=` and one `>`.
+    fn mappings() -> serde_json::Value {
+        let term = |relation: &str, code: &str| {
+            serde_json::json!({
+                "_type": "TERM_MAPPING",
+                "match": relation,
+                "target": {
+                    "_type": "CODE_PHRASE",
+                    "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "http://example.org/fhir/CodeSystem/synthetic"},
+                    "code_string": code,
+                },
+            })
+        };
+        serde_json::json!([term("=", "SYN-001"), term(">", "SYN-002")])
+    }
+
+    /// Returns a synthetic `DV_TEXT` annotated with [`mappings`].
+    fn text() -> RmValue {
+        let value = serde_json::json!({
+            "_type": "DV_TEXT",
+            "value": "a synthetic rubric",
+            "mappings": mappings(),
+        });
+        RmValue::from_canonical("DV_TEXT", "/synthetic", &value).expect("a DV_TEXT")
+    }
+
+    /// Returns a synthetic `DV_CODED_TEXT` annotated with [`mappings`].
+    fn coded_text() -> RmValue {
+        let value = serde_json::json!({
+            "_type": "DV_CODED_TEXT",
+            "value": "a synthetic rubric",
+            "mappings": mappings(),
+            "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "local"},
+                "code_string": "at0017",
+            },
+        });
+        RmValue::from_canonical("DV_CODED_TEXT", "/synthetic", &value).expect("a DV_CODED_TEXT")
+    }
+
+    /// Returns the cause and code of every term `withheld` reports.
+    fn reported(source: &RmValue, kind: FhirKind) -> Vec<(Cause, String)> {
+        withheld(source, kind, None)
+            .iter()
+            .map(|taken| (taken.cause(), String::from(taken.code())))
+            .collect()
+    }
+
+    #[test]
+    fn a_cell_with_no_coding_withholds_every_term_mapping() {
+        // DV_TEXT.adoc §String and DV_CODED_TEXT.adoc §Coding give `mappings`
+        // no FHIRpath row.
+        let every = vec![
+            (Cause::Uncarried, String::from("SYN-001")),
+            (Cause::Uncarried, String::from("SYN-002")),
+        ];
+        assert_eq!(reported(&text(), FhirKind::String), every);
+        assert_eq!(reported(&coded_text(), FhirKind::String), every);
+        assert_eq!(reported(&coded_text(), FhirKind::Coding), every);
+    }
+
+    #[test]
+    fn a_coded_text_read_as_a_string_names_its_defining_code() {
+        // DV_CODED_TEXT.adoc §STRING: the chapter writes no string row, so the
+        // DV_TEXT cell carries the rubric and the code is declared.
+        let source = coded_text();
+        let dropped = super::uncarried_code(&source, FhirKind::String).map(|code| {
+            (
+                code.terminology_id.value.as_str(),
+                code.code_string.as_str(),
+            )
+        });
+        assert_eq!(dropped, Some(("local", "at0017")));
+        let produced = get(&source, FhirKind::String, None).expect("the DV_TEXT cell runs");
+        assert_eq!(produced.kind(), FhirKind::String);
+    }
+
+    #[test]
+    fn a_cell_with_a_coding_drops_no_defining_code() {
+        for kind in [FhirKind::Coding, FhirKind::CodeableConcept] {
+            assert_eq!(super::uncarried_code(&coded_text(), kind), None);
+        }
+        assert_eq!(super::uncarried_code(&text(), FhirKind::String), None);
+    }
+
+    #[test]
+    fn a_cell_with_codings_withholds_only_what_no_coding_states() {
+        // TERM_MAPPING.adoc: `match` is "hard coded to `=`".
+        let relation = vec![(Cause::Match, String::from("SYN-002"))];
+        assert_eq!(reported(&text(), FhirKind::Coding), relation);
+        assert_eq!(reported(&text(), FhirKind::CodeableConcept), relation);
+        assert_eq!(reported(&coded_text(), FhirKind::CodeableConcept), relation);
     }
 }

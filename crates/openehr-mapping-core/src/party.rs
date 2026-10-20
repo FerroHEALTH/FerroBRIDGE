@@ -4,22 +4,19 @@
 //! The build of a canonical demographic `PARTY` from node values.
 //!
 //! Simplified Formats defines FLAT for compositions only, and `openehr-sdt`
-//! 0.0.87 has no party builder: its composition builder writes
-//! `COMPOSITION.category` onto a party root and builds `PARTY.identities` as
-//! one object. So a party is built here, through the `openehr-rm` types. Each
-//! value is a whole canonical value at a template node; the objects between
-//! the root and the node are the ones the operational template constrains
-//! there, every list attribute of the `openehr_rm::v1_2::model` attribute table
-//! is an array, and the result is decoded strictly as the root's class before
-//! it is returned. No composition attribute is written. No specification
-//! governs a party build: our own design.
+//! extends its template walk to a party root. Each value is a whole canonical
+//! value at a template node, written under the `raw` suffix and built through
+//! that walk; a value at the root places its members on the root, and the
+//! result is decoded strictly as the root's class before it is returned. No
+//! composition attribute is written. No specification governs a party build:
+//! our own design.
 
 use openehr_its::json::JsonParseError;
 use openehr_rm::v1_2::demographic::organisation::Organisation;
 use openehr_rm::v1_2::demographic::person::Person;
 use openehr_rm::v1_2::demographic::role::Role;
-use openehr_rm::v1_2::model::Container;
-use openehr_rm::v1_2::paths::PathSegment;
+use openehr_sdt::flat::build::BuildOptions;
+use openehr_sdt::flat::error::FlatError;
 use serde_json::Map;
 use serde_json::Value;
 
@@ -27,7 +24,6 @@ use crate::composition::CanonicalDocument;
 use crate::composition::NodeValue;
 use crate::composition::Place;
 use crate::index::WebTemplateIndex;
-use crate::index::paths::AqlPath;
 use crate::template::PathError;
 
 /// The member that names an object's RM class in canonical JSON.
@@ -94,15 +90,6 @@ pub enum PartyError {
         /// The RM type of its root.
         rm_type: String,
     },
-    /// The index carries no operational template constraints to build from.
-    #[error(
-        "the template `{template_id}` was indexed without its OPT 1.4, so the objects between \
-         its nodes are unknown"
-    )]
-    NoStructure {
-        /// The template.
-        template_id: String,
-    },
     /// A value is of a form a party build does not take.
     #[error("the value at `{place}` is {reason}, which a party build does not take")]
     UnsupportedValue {
@@ -111,7 +98,7 @@ pub enum PartyError {
         /// What the value is.
         reason: &'static str,
     },
-    /// A path names an attribute its owner's class does not have.
+    /// A value at the root names an attribute the root's class does not have.
     #[error("`{path}` names `{attribute}`, which the class `{class}` does not have")]
     UnknownAttribute {
         /// The path being built.
@@ -121,22 +108,14 @@ pub enum PartyError {
         /// The attribute.
         attribute: String,
     },
-    /// The operational template constrains no object at a path the build
-    /// walks.
-    #[error("the template `{template_id}` constrains no object at `{path}`")]
-    Unconstrained {
+    /// The `openehr-sdt` builder refused the values.
+    #[error("the party values do not build against `{template_id}`")]
+    Build {
         /// The template.
         template_id: String,
-        /// The path.
-        path: String,
-    },
-    /// An instance is written before the instances that precede it.
-    #[error("`{path}` writes the instance {position} before the instances that precede it")]
-    InstanceGap {
-        /// The path.
-        path: String,
-        /// The 1-based instance.
-        position: usize,
+        /// Why the builder refused them.
+        #[source]
+        source: Box<FlatError>,
     },
     /// A node or an occurrence does not resolve against the template.
     #[error(transparent)]
@@ -223,51 +202,51 @@ impl WebTemplateIndex {
     ///
     /// Every value is a whole canonical value under the `raw` suffix at a
     /// node of the template (Simplified Formats master04 §Raw canonical
-    /// JSON). The objects on the way to each node are the ones the
-    /// operational template constrains there, named by their rubric, and the
-    /// root carries the archetype and template ids with `rm_version` 1.1.0.
+    /// JSON). The values below the root are built through the `openehr-sdt`
+    /// template walk, which names every object on the way to a node by its
+    /// rubric and writes the archetype and template ids with `rm_version`
+    /// 1.1.0 on the root; a value at the root places its members on the root.
     ///
     /// # Errors
     ///
     /// Returns [`PartyError::NotAParty`] for a template rooted at no party,
-    /// [`PartyError::NoStructure`] when the index was built without an OPT
-    /// 1.4, [`PartyError::UnsupportedValue`] for a `ctx/` value, a family
-    /// below a node or a value not under `raw`, [`PartyError::Path`] for a
-    /// node or an occurrence the template does not have,
-    /// [`PartyError::UnknownAttribute`], [`PartyError::Unconstrained`] and
-    /// [`PartyError::InstanceGap`] for a path the build cannot place,
+    /// [`PartyError::UnsupportedValue`] for a `ctx/` value, a family below a
+    /// node or a value not under `raw`, [`PartyError::Path`] for a node or an
+    /// occurrence the template does not have, [`PartyError::Build`] when the
+    /// builder refuses the values, [`PartyError::UnknownAttribute`] for a root
+    /// value naming an attribute the root's class does not have,
     /// [`PartyError::RoleWithoutPerformer`] for a `ROLE` with no `performer`,
     /// and [`PartyError::Invalid`] when the result does not decode as the
     /// root's class.
     pub fn build_party(&self, values: &[NodeValue]) -> Result<CanonicalParty, PartyError> {
-        // TODO(#906): move the build to openehr-sdt once it carries a party builder.
         let kind = self.party_kind()?;
-        let root = self
-            .structure(&AqlPath::new(String::new()))
-            .ok_or_else(|| PartyError::NoStructure {
-                template_id: self.template_id().to_owned(),
-            })?;
-        let mut party = Map::new();
-        party.insert(TYPE.to_owned(), Value::from(kind.rm_type()));
-        party.insert(
-            "name".to_owned(),
-            text(root.name.as_deref().unwrap_or(&root.node_id)),
-        );
-        party.insert(
-            "archetype_node_id".to_owned(),
-            Value::from(root.node_id.as_str()),
-        );
-        party.insert(
-            "archetype_details".to_owned(),
-            serde_json::json!({
-                "_type": "ARCHETYPED",
-                "archetype_id": {"_type": "ARCHETYPE_ID", "value": root.node_id},
-                "template_id": {"_type": "TEMPLATE_ID", "value": self.template_id()},
-                "rm_version": RM_RELEASE,
-            }),
-        );
+        let mut flat = Map::new();
+        let mut on_root = Vec::new();
         for value in values {
-            self.place(&mut party, value)?;
+            if self.party_value(value)? {
+                on_root.push(&value.value);
+            } else {
+                flat.insert(self.flat_key(value)?.to_string(), value.value.clone());
+            }
+        }
+        let refused = |source| PartyError::Build {
+            template_id: self.template_id().to_owned(),
+            source: Box::new(source),
+        };
+        let document = openehr_sdt::flat::sim::flat::parse_flat(&flat).map_err(refused)?;
+        let options = BuildOptions::default().with_rm_version(RM_RELEASE);
+        let built = openehr_sdt::flat::build::build_root(&document, self.web_template(), &options)
+            .map_err(refused)?;
+        let Value::Object(mut party) = built else {
+            return Err(refused(FlatError::Conversion(String::from(
+                "the party root built as no object",
+            ))));
+        };
+        for members in on_root {
+            root_members(&mut party, members).ok_or_else(|| PartyError::UnsupportedValue {
+                place: self.root().flat_id().as_str().to_owned(),
+                reason: "no object",
+            })??;
         }
         let built = Value::Object(party);
         self.performed(kind, &built)?;
@@ -332,13 +311,10 @@ impl WebTemplateIndex {
         })
     }
 
-    /// Places one value into `party`.
-    fn place(&self, party: &mut Map<String, Value>, value: &NodeValue) -> Result<(), PartyError> {
-        let Place::Node {
-            ref flat_id,
-            ref occurrences,
-        } = value.place
-        else {
+    /// Checks that `value` is of a form a party build takes, and answers
+    /// whether it is a value at the root.
+    fn party_value(&self, value: &NodeValue) -> Result<bool, PartyError> {
+        let Place::Node { ref flat_id, .. } = value.place else {
             return Err(PartyError::UnsupportedValue {
                 place: String::from("ctx"),
                 reason: "a context value",
@@ -355,66 +331,12 @@ impl WebTemplateIndex {
         {
             return Err(unsupported("not a whole value under `raw`"));
         }
-        let node = self.node_by_flat_id(flat_id)?;
-        let path = self.instance_path(node, occurrences)?;
-        if path.segments.is_empty() {
-            return root_members(party, &value.value).ok_or_else(|| unsupported("no object"))?;
-        }
-        let mut current = party;
-        let mut spelled = String::new();
-        let mut segments = path.segments.iter().peekable();
-        while let Some(segment) = segments.next() {
-            spelled.push_str(&spell(segment));
-            let class = current
-                .get(TYPE)
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned();
-            let attribute = openehr_rm::v1_2::model::attribute(&class, &segment.attribute)
-                .ok_or_else(|| PartyError::UnknownAttribute {
-                    path: spelled.clone(),
-                    class: class.clone(),
-                    attribute: segment.attribute.clone(),
-                })?;
-            let list = attribute.container != Container::None;
-            let ends = segments.peek().is_none();
-            let child = if ends {
-                value.value.clone()
-            } else {
-                self.structural(&spelled)?
-            };
-            let slot = insert(current, segment, list, ends, child, &spelled)?;
-            let Value::Object(next) = slot else {
-                return Ok(());
-            };
-            current = next;
-        }
-        Ok(())
-    }
-
-    /// Returns the empty object the operational template constrains at
-    /// `path`, typed and named.
-    fn structural(&self, path: &str) -> Result<Value, PartyError> {
-        let found = self
-            .structure(&AqlPath::new(path.to_owned()))
-            .ok_or_else(|| PartyError::Unconstrained {
-                template_id: self.template_id().to_owned(),
-                path: path.to_owned(),
-            })?;
-        let mut object = Map::new();
-        object.insert(TYPE.to_owned(), Value::from(found.rm_type.as_str()));
-        object.insert(
-            "name".to_owned(),
-            text(found.name.as_deref().unwrap_or(&found.node_id)),
-        );
-        object.insert(
-            "archetype_node_id".to_owned(),
-            Value::from(found.node_id.as_str()),
-        );
-        Ok(Value::Object(object))
+        Ok(self.node_by_flat_id(flat_id)?.flat_id() == self.root().flat_id())
     }
 }
 
+// TODO(#1000): pass the root's members to the openehr-sdt builder once it
+// takes a party root attribute, and build through `build_party`.
 /// Places the members of a value written at the party root onto the root,
 /// `None` when the value is no object.
 ///
@@ -444,86 +366,6 @@ fn root_members(party: &mut Map<String, Value>, value: &Value) -> Option<Result<
         party.insert(attribute.clone(), member.clone());
     }
     Some(Ok(()))
-}
-
-/// Puts `child` at `segment` of `owner`, or finds the instance already there,
-/// and returns the slot; the value a path ends on (`ends`) replaces the one
-/// held there, as a later write to one place does.
-fn insert<'a>(
-    owner: &'a mut Map<String, Value>,
-    segment: &PathSegment,
-    list: bool,
-    ends: bool,
-    child: Value,
-    path: &str,
-) -> Result<&'a mut Value, PartyError> {
-    let slot = owner.entry(segment.attribute.clone());
-    if !list {
-        return Ok(match slot {
-            serde_json::map::Entry::Occupied(mut held) if ends => {
-                held.insert(child);
-                held.into_mut()
-            }
-            held => held.or_insert(child),
-        });
-    }
-    let Value::Array(items) = slot.or_insert_with(|| Value::Array(Vec::new())) else {
-        return Err(PartyError::InstanceGap {
-            path: path.to_owned(),
-            position: 1,
-        });
-    };
-    let position = segment.predicate.position.unwrap_or(1);
-    let node_id = segment.predicate.archetype_node_id.as_deref();
-    let held: Vec<usize> = items
-        .iter()
-        .enumerate()
-        .filter(|(_, item)| {
-            node_id
-                .is_none_or(|id| item.get("archetype_node_id").and_then(Value::as_str) == Some(id))
-        })
-        .map(|(index, _)| index)
-        .collect();
-    let at = match held.get(position.saturating_sub(1)) {
-        Some(&index) => {
-            if let (true, Some(held)) = (ends, items.get_mut(index)) {
-                *held = child;
-            }
-            index
-        }
-        None if held.len().saturating_add(1) == position => {
-            items.push(child);
-            items.len().saturating_sub(1)
-        }
-        None => {
-            return Err(PartyError::InstanceGap {
-                path: path.to_owned(),
-                position,
-            });
-        }
-    };
-    items.get_mut(at).ok_or_else(|| PartyError::InstanceGap {
-        path: path.to_owned(),
-        position,
-    })
-}
-
-/// Spells one segment as the Web Template builder spells an `aqlPath` step,
-/// without its position.
-fn spell(segment: &PathSegment) -> String {
-    match (
-        segment.predicate.archetype_node_id.as_deref(),
-        segment.predicate.name_value.as_deref(),
-    ) {
-        (Some(id), Some(name)) => format!("/{}[{id},'{name}']", segment.attribute),
-        (Some(id), None) => format!("/{}[{id}]", segment.attribute),
-        (None, _) => format!("/{}", segment.attribute),
-    }
-}
-
-/// Returns a `DV_TEXT` carrying `value`.
-fn text(value: &str) -> Value {
-    serde_json::json!({"_type": "DV_TEXT", "value": value})
 }
 
 /// Decodes `value` strictly as `class` and encodes it back.

@@ -24,6 +24,7 @@ use http::Method;
 use http::StatusCode;
 use http::Uri;
 use http::header;
+use http::request::Parts;
 
 use crate::smart::Smart;
 
@@ -57,7 +58,7 @@ pub struct Body {
 }
 
 impl Render for Body {
-    fn render(&self, refused: &Refusal) -> Response {
+    fn render(&self, refused: &Refusal, _parts: &Parts) -> Response {
         let (error, message) = match refused {
             Refusal::Missing(_) | Refusal::InvalidToken | Refusal::InvalidBasic => (
                 "unauthorized",

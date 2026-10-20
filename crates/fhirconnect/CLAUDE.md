@@ -62,6 +62,18 @@ occurrence axis; it never sees a path string and never reads a mapping file. A
 mapping that cannot be resolved is a refusal at load, never a failure on the
 request that first touches it.
 
+The one exception is a model-mapping method that names a node the template
+excludes: `model-mappings.adoc` §Mapping 0..0 fields says it is "ignored and
+not executed", so it is left out of the program with everything under it and
+an `fc-excluded-template-node` warning. The node counts as excluded only when
+the archetype root it lies in defines its at-code
+(`WebTemplateIndex::archetype_defines`, the OPT 1.4 `term_definitions`), the
+template carries no node for it at that place under another name, and it sits
+in no single-valued attribute the template already fills. A method an
+extension contributes is still refused. A mapping name means nothing beyond
+the `overwrite` and `appendTo` that address it (`basics/body.adoc`), so two
+siblings sharing one are a warning and the edit that reaches them is refused.
+
 A `slotContext` is compiled where it stands: the entered context's `start`
 is slotted as a `slotArchetype` would slot it, with the compiler's extension
 set swapped for the entered context's for the duration, and the composition
@@ -194,7 +206,13 @@ engine writes them as the `_feeder_audit`, `_link:i` and
 `ENTRY.provider` is a tail of the entry node whose value the cell writes as
 the `_provider` family (`rm::Carried::Family`, `family::provider`), and
 `EVENT_CONTEXT.health_care_facility` the `_health_care_facility` family of
-the `context` node the same way. These
+the `context` node the same way; `EVENT_CONTEXT.end_time` is the
+`_end_time` family there, written as its date-time text
+(`family::end_time`). A path that names an `ELEMENT` the Web Template
+compacted into its value reaches the element's `links`
+(`OpenehrTarget::on_element`): the `_link:i` family sits on the one FLAT node
+the two share, and the engine reads it from the element
+(`WebTemplateIndex::read_element`). These
 families are the one place the engine still spells FLAT keys, because the
 builder takes no `|raw` on a `_`-prefixed family (the `TODO(#618)` in
 `engine::family`). Reading them back decodes typed `LINK` and

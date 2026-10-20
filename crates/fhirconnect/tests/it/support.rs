@@ -89,3 +89,7 @@ pub(crate) fn render(diagnostics: &[Diagnostic]) -> String {
 /// A compiled program with the published files of the library it loads,
 /// relative to the vendored library.
 pub(crate) type Chain = (&'static [&'static str], Arc<Program>);
+
+/// A compiled program with the library files its set loaded, owned, for a
+/// file list computed at run time.
+pub(crate) type OwnedChain = (Vec<String>, Arc<Program>);
