@@ -25,6 +25,17 @@ crates on crates.io.
 
 ### Added
 
+- The FHIRconnect engine converts `DV_QUANTITY` against `Quantity`, `decimal`
+  and `integer`, and `DV_COUNT` against `integer`, `Quantity` and `Count`
+  (#93), each a lens with GetPut and PutGet property tests over the tables of
+  FHIRconnect `DV_QUANTITY.adoc` and `DV_COUNT.adoc`. Where a table is silent
+  or contradicts R4, the cell decides and refuses rather than drops: the UCUM
+  system is written beside a code (R4 `qty-3`), `units_display_name` is the
+  counterpart of `unit`, and a `magnitude_status` no comparator states, a
+  magnitude with more places than its `precision`, a count outside FHIR's
+  32-bit `integer` and a comparator into a count are typed refusals.
+  `FhirKind`, `FhirValue` and `RmValue` gain variants, so a consumer that
+  matches them exhaustively adds the arms. `fhirconnect` 0.1.163.
 - Every published FHIRconnect context now has its operational template in
   the tree (#258). Nine KDS templates join the three already vendored, each
   fetched by its own `scripts/vendor/kds-*-opt.sh` from the openFHIR commit

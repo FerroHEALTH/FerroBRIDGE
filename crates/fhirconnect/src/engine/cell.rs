@@ -11,6 +11,8 @@
 
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
+use openehr_rm::v1_2::data_types::quantity::dv_count::DvCount;
+use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
@@ -23,6 +25,7 @@ use crate::engine::lens::LensError;
 use crate::engine::lens::boolean::BooleanLens;
 use crate::engine::lens::code_phrase::CodePhraseLens;
 use crate::engine::lens::coded_text::CodedTextLens;
+use crate::engine::lens::count::CountLens;
 use crate::engine::lens::date::DateLens;
 use crate::engine::lens::date_time::DateTimeLens;
 use crate::engine::lens::date_time::PeriodStartLens;
@@ -30,6 +33,7 @@ use crate::engine::lens::interval::DateTimeIntervalLens;
 use crate::engine::lens::party::IdentifierLens;
 use crate::engine::lens::party::PartyLens;
 use crate::engine::lens::proportion::PercentLens;
+use crate::engine::lens::quantity::QuantityLens;
 use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::lens::text::TextLens;
 use crate::engine::rm::RmValue;
@@ -98,6 +102,24 @@ pub fn get(
         (RmValue::Proportion(proportion), FhirKind::Quantity) => PercentLens
             .get(proportion.as_ref())
             .map(|quantity| FhirValue::Quantity(Box::new(quantity))),
+        (RmValue::Quantity(quantity), FhirKind::Quantity) => QuantityLens
+            .get(quantity.as_ref())
+            .map(|quantity| FhirValue::Quantity(Box::new(quantity))),
+        (RmValue::Quantity(quantity), FhirKind::Decimal) => {
+            QuantityLens.get(quantity.as_ref()).map(FhirValue::Decimal)
+        }
+        (RmValue::Quantity(quantity), FhirKind::Integer) => {
+            QuantityLens.get(quantity.as_ref()).map(FhirValue::Integer)
+        }
+        (RmValue::Count(count), FhirKind::Integer) => {
+            CountLens.get(count.as_ref()).map(FhirValue::Integer)
+        }
+        (RmValue::Count(count), FhirKind::Quantity) => CountLens
+            .get(count.as_ref())
+            .map(|quantity| FhirValue::Quantity(Box::new(quantity))),
+        (RmValue::Count(count), FhirKind::Count) => CountLens
+            .get(count.as_ref())
+            .map(|count| FhirValue::Count(Box::new(count))),
         (source, kind) => Err(no_cell(source, kind, Direction::OpenehrToFhir)),
     }
 }
@@ -212,6 +234,24 @@ pub fn put(
         ("DV_PROPORTION", FhirValue::Quantity(quantity)) => PercentLens
             .put(quantity.as_ref(), held_proportion(existing))
             .map(|proportion| RmValue::Proportion(Box::new(proportion))),
+        ("DV_QUANTITY", FhirValue::Quantity(quantity)) => QuantityLens
+            .put(quantity.as_ref(), held_quantity(existing))
+            .map(|quantity| RmValue::Quantity(Box::new(quantity))),
+        ("DV_QUANTITY", FhirValue::Decimal(decimal)) => QuantityLens
+            .put(decimal, held_quantity(existing))
+            .map(|quantity| RmValue::Quantity(Box::new(quantity))),
+        ("DV_QUANTITY", FhirValue::Integer(integer)) => QuantityLens
+            .put(integer, held_quantity(existing))
+            .map(|quantity| RmValue::Quantity(Box::new(quantity))),
+        ("DV_COUNT", FhirValue::Integer(integer)) => CountLens
+            .put(integer, held_count(existing))
+            .map(|count| RmValue::Count(Box::new(count))),
+        ("DV_COUNT", FhirValue::Quantity(quantity)) => CountLens
+            .put(quantity.as_ref(), held_count(existing))
+            .map(|count| RmValue::Count(Box::new(count))),
+        ("DV_COUNT", FhirValue::Count(count)) => CountLens
+            .put(count.as_ref(), held_count(existing))
+            .map(|count| RmValue::Count(Box::new(count))),
         (rm_type, view) => Err(LensError::NoCell {
             rm_type: String::from(rm_type),
             kind: view.kind().as_str(),
@@ -220,14 +260,26 @@ pub fn put(
     }?;
     Ok(Produced {
         value,
-        fallbacks: fallbacks(view, rm_type, binding),
+        fallbacks: fallbacks(view, rm_type, existing, binding),
     })
 }
 
-/// Returns the one-way rows the cell would take writing `view`.
-fn fallbacks(view: &FhirValue, rm_type: &str, binding: Option<&str>) -> Vec<Fallback> {
+/// Returns the one-way rows the cell would take writing `view` over
+/// `existing`.
+fn fallbacks(
+    view: &FhirValue,
+    rm_type: &str,
+    existing: Option<&RmValue>,
+    binding: Option<&str>,
+) -> Vec<Fallback> {
     let coded = coded_lens(binding);
+    // NOTE: DV_QUANTITY.adoc §Primitives hardcodes `units` as 1, which is a
+    // one-way row only where no held value supplies the units.
+    let unheld = held_quantity(existing).is_none();
     match (rm_type, view) {
+        ("DV_QUANTITY", FhirValue::Quantity(quantity)) => QuantityLens.fallbacks(quantity.as_ref()),
+        ("DV_QUANTITY", FhirValue::Decimal(decimal)) if unheld => QuantityLens.fallbacks(decimal),
+        ("DV_QUANTITY", FhirValue::Integer(integer)) if unheld => QuantityLens.fallbacks(integer),
         ("DV_TEXT", FhirValue::String(text)) => TextLens.fallbacks(text),
         ("DV_TEXT", FhirValue::Coding(coding)) => TextLens.fallbacks(coding.as_ref()),
         ("DV_TEXT", FhirValue::CodeableConcept(concept)) => TextLens.fallbacks(concept.as_ref()),
@@ -372,6 +424,22 @@ fn held_identifier(
     }
 }
 
+/// Returns the held `DV_QUANTITY`, when the target holds one.
+fn held_quantity(existing: Option<&RmValue>) -> Option<&DvQuantity> {
+    match existing {
+        Some(RmValue::Quantity(quantity)) => Some(quantity.as_ref()),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_COUNT`, when the target holds one.
+fn held_count(existing: Option<&RmValue>) -> Option<&DvCount> {
+    match existing {
+        Some(RmValue::Count(count)) => Some(count.as_ref()),
+        _other => None,
+    }
+}
+
 /// Returns the held `DV_PROPORTION`, when the target holds one.
 fn held_proportion(
     existing: Option<&RmValue>,
@@ -441,6 +509,56 @@ mod tests {
             produced.fallbacks.is_empty(),
             "the cell took no one-way row"
         );
+    }
+
+    #[test]
+    fn a_quantity_and_a_count_run_their_cells_both_ways() {
+        // DV_QUANTITY.adoc §Quantity and §Primitives, DV_COUNT.adoc §Primitive,
+        // §Quantity and §Count.
+        let quantity = RmValue::from_canonical(
+            "DV_QUANTITY",
+            "/synthetic",
+            &serde_json::json!({
+                "_type": "DV_QUANTITY", "magnitude": 7.25, "precision": 2, "units": "mg",
+            }),
+        )
+        .expect("a DV_QUANTITY");
+        let count = RmValue::from_canonical(
+            "DV_COUNT",
+            "/synthetic",
+            &serde_json::json!({ "_type": "DV_COUNT", "magnitude": 3 }),
+        )
+        .expect("a DV_COUNT");
+        for (value, kinds) in [
+            (
+                &quantity,
+                [FhirKind::Quantity, FhirKind::Decimal, FhirKind::Quantity],
+            ),
+            (
+                &count,
+                [FhirKind::Integer, FhirKind::Quantity, FhirKind::Count],
+            ),
+        ] {
+            for kind in kinds {
+                let view = get(value, kind, None).expect("the chapter has the row");
+                assert_eq!(view.kind(), kind);
+                let back =
+                    put(&view, value.rm_type(), Some(value), None).expect("the row runs back");
+                assert_eq!(&back.value, value, "{kind:?} round trips");
+            }
+        }
+        let error = get(&quantity, FhirKind::Integer, None).expect_err("7.25 is no integer");
+        assert!(error.to_string().contains("DV_QUANTITY"), "{error}");
+    }
+
+    #[test]
+    fn a_primitive_declares_the_unity_units_only_when_nothing_is_held() {
+        let view = FhirValue::Integer(fhir_types::r4::primitives::Integer::from(3));
+        let fresh = put(&view, "DV_QUANTITY", None, None).expect("the integer travels");
+        assert_eq!(fresh.fallbacks.len(), 1, "units is the specification's 1");
+        let held =
+            put(&view, "DV_QUANTITY", Some(&fresh.value), None).expect("the integer travels");
+        assert!(held.fallbacks.is_empty(), "the held units return");
     }
 
     /// Returns two synthetic `TERM_MAPPING`s, one `=` and one `>`.

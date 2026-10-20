@@ -25,8 +25,10 @@ use openehr_rm::v1_2::data_types::basic::dv_boolean::DvBoolean;
 use openehr_rm::v1_2::data_types::basic::dv_identifier::DvIdentifier;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_date::DvDate;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_date_time::DvDateTime;
+use openehr_rm::v1_2::data_types::quantity::dv_count::DvCount;
 use openehr_rm::v1_2::data_types::quantity::dv_interval::DvInterval;
 use openehr_rm::v1_2::data_types::quantity::dv_proportion::DvProportion;
+use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvText;
@@ -65,6 +67,10 @@ pub enum RmValue {
     Identifier(DvIdentifier),
     /// A `DV_PROPORTION`.
     Proportion(Box<DvProportion>),
+    /// A `DV_QUANTITY`.
+    Quantity(Box<DvQuantity>),
+    /// A `DV_COUNT`.
+    Count(Box<DvCount>),
     /// A `DV_BOOLEAN`.
     Boolean(DvBoolean),
     /// A `PARTY_REF`, the party a `ROLE` names as its `performer`.
@@ -127,6 +133,8 @@ impl RmValue {
             Self::Party(_) => "PARTY_IDENTIFIED",
             Self::Identifier(_) => "DV_IDENTIFIER",
             Self::Proportion(_) => "DV_PROPORTION",
+            Self::Quantity(_) => "DV_QUANTITY",
+            Self::Count(_) => "DV_COUNT",
             Self::Boolean(_) => "DV_BOOLEAN",
             Self::PartyRef(_) => "PARTY_REF",
         }
@@ -181,6 +189,12 @@ impl RmValue {
             "DV_PROPORTION" => from_canonical_value(value)
                 .map(|proportion| Self::Proportion(Box::new(proportion)))
                 .map_err(refuse),
+            "DV_QUANTITY" => from_canonical_value(value)
+                .map(|quantity| Self::Quantity(Box::new(quantity)))
+                .map_err(refuse),
+            "DV_COUNT" => from_canonical_value(value)
+                .map(|count| Self::Count(Box::new(count)))
+                .map_err(refuse),
             "PARTY_REF" => from_canonical_value(value)
                 .map(Self::PartyRef)
                 .map_err(refuse),
@@ -195,7 +209,8 @@ impl RmValue {
     /// # Errors
     ///
     /// Returns [`RmError::Encode`] for a `DV_PROPORTION` whose numerator or
-    /// denominator is no finite number, which JSON has no form for
+    /// denominator, or a `DV_QUANTITY` whose magnitude, is no finite number,
+    /// which JSON has no form for
     /// (<https://www.rfc-editor.org/rfc/rfc8259#section-6>).
     pub fn to_canonical(&self) -> Result<Value, RmError> {
         let encoded = match *self {
@@ -220,6 +235,16 @@ impl RmValue {
                 }
                 to_canonical_value(proportion.as_ref())
             }
+            Self::Quantity(ref quantity) => {
+                if !quantity.magnitude.is_finite() {
+                    return Err(RmError::Encode {
+                        rm_type: "DV_QUANTITY",
+                        reason: format!("{} is not a finite JSON number", quantity.magnitude),
+                    });
+                }
+                to_canonical_value(quantity.as_ref())
+            }
+            Self::Count(ref count) => to_canonical_value(count.as_ref()),
         };
         Ok(encoded)
     }

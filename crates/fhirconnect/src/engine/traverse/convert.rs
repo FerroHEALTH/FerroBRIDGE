@@ -263,7 +263,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
             | FhirKind::Period
             | FhirKind::Reference
             | FhirKind::Identifier
-            | FhirKind::Quantity => Err(EngineError::Cell {
+            | FhirKind::Quantity
+            | FhirKind::Integer
+            | FhirKind::Decimal
+            | FhirKind::Count => Err(EngineError::Cell {
                 mapping: String::from(mapping.name()),
                 element: String::from(target.expression().as_str()),
                 source: Box::new(LensError::NoCell {
