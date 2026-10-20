@@ -32,7 +32,6 @@ use crate::engine::traverse::Run;
 use crate::engine::traverse::Written;
 use crate::engine::traverse::demographic::Shape;
 use crate::engine::traverse::error::EngineError;
-use crate::engine::traverse::functions::MappingCodeError;
 use crate::engine::traverse::place::rm_positions;
 use crate::engine::traverse::translate::Output;
 
@@ -90,39 +89,6 @@ impl<T: Table + ?Sized> Run<'_, T> {
         };
         for (input, binding) in inputs.iter().zip(bindings.iter()) {
             self.convert(mapping, input, binding)?;
-        }
-        Ok(bindings)
-    }
-
-    /// Runs the registered function a `mappingCode` names.
-    pub(super) fn programmed(
-        &mut self,
-        mapping: &Mapping,
-        parent: &Binding,
-        inputs: &[Occurrence],
-        code: &str,
-    ) -> Result<Vec<Binding>, EngineError> {
-        let bindings = self.bindings(mapping, parent, inputs)?;
-        let refuse = |source: MappingCodeError| EngineError::MappingCode {
-            mapping: String::from(mapping.name()),
-            code: String::from(code),
-            source: Box::new(source),
-        };
-        for binding in &bindings {
-            match self.direction {
-                Direction::FhirToOpenehr => {
-                    let produced = self
-                        .seams
-                        .functions()
-                        .to_openehr(code, None)
-                        .map_err(refuse)?;
-                    self.put_openehr(mapping, binding, produced);
-                }
-                Direction::OpenehrToFhir => {
-                    let produced = self.seams.functions().to_fhir(code, None).map_err(refuse)?;
-                    self.put_fhir(mapping, binding, &produced)?;
-                }
-            }
         }
         Ok(bindings)
     }
@@ -380,7 +346,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
     }
 
     /// Returns the positions one input occurrence names for an openEHR node.
-    fn positions_of(
+    pub(super) fn positions_of(
         mapping: &Mapping,
         input: &Occurrence,
         target: &OpenehrTarget,

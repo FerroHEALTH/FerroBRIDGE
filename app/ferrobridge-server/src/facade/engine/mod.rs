@@ -13,6 +13,7 @@
 pub mod entry;
 
 use fhir_types::codec::Value;
+use fhirconnect::engine::library::Library;
 use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::demographics::Demographics;
 use fhirconnect::engine::origin::Origin;
@@ -74,6 +75,7 @@ pub fn inbound(
         settings,
         SourceItem::of(document),
         &Seams::default()
+            .with_functions(&Library)
             .with_terminology(terminology)
             .with_demographics(demographics),
     )
@@ -151,6 +153,7 @@ pub fn outbound(
         index,
         composition,
         &Seams::default()
+            .with_functions(&Library)
             .with_identities(identities)
             .with_terminology(terminology)
             .with_demographics(demographics),
@@ -179,6 +182,7 @@ pub fn party_inbound(
         index,
         document,
         &Seams::default()
+            .with_functions(&Library)
             .with_terminology(terminology)
             .with_demographics(demographics),
         &CallContext::new(),
@@ -203,6 +207,7 @@ pub fn party_outbound(
         index,
         party,
         &Seams::default()
+            .with_functions(&Library)
             .with_terminology(terminology)
             .with_demographics(demographics),
         &CallContext::new(),

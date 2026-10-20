@@ -178,6 +178,18 @@ resolves a reference against the request Bundle first and the seams'
 reference source after it; the server passes none, so it reads the Bundle
 only.
 
+The `mappingCode` registry the crate ships is `engine::library::Library`,
+one value that answers the loader and the compiler (`MappingCodeRegistry`:
+the name and the openEHR ports a function declares) and the run
+(`MappingFunctions`). A function sees the whole FHIR element its mapping's
+`with.fhir` names and the canonical JSON at its ports; the compiler resolves
+every port against the template at load (`resolve::compile::port`), so the
+engine never parses a path for one, and a polymorphic `ELEMENT` port holds
+one value node per class, which the class a function writes selects. A
+function is typed over the generated FHIR struct and the `openehr-rm` class,
+and refuses whatever it cannot carry; a new one is a row of
+`engine::library::FUNCTIONS` with tests both ways and both lens laws.
+
 The fifth seam is `engine::demographics::Demographics`, the demographics
 endpoint a party reference resolves through. The default `NoDemographics`
 refuses, so a reference with no endpoint fails closed; `IssuerDemographics`

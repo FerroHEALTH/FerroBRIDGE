@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use fhirconnect::model::ast::keyword::ContextScope;
 use fhirconnect::model::load::MappingSet;
-use fhirconnect::model::semantic::StaticMappingCodes;
+use fhirconnect::engine::library::Library;
 use fhirconnect::resolve::program::Program;
 use http::StatusCode;
 use openehr_mapping_core::diagnostic::Diagnostic;
@@ -150,7 +150,7 @@ impl Compiled {
 /// Returns every diagnostic of the loader, the schemas and the semantic
 /// rules when the set does not load.
 pub fn read(files: &[PathBuf]) -> Result<MappingSet, Vec<Diagnostic>> {
-    fhirconnect::model::load::load_set(files, &StaticMappingCodes::default())
+    fhirconnect::model::load::load_set(files, &Library)
 }
 
 /// Builds the index of every `.opt` file under `directory`.
@@ -319,7 +319,7 @@ pub fn compile(
             name,
             index,
             &fhir_types::r4::schema::SCHEMAS,
-            &StaticMappingCodes::default(),
+            &Library,
         ) {
             Ok(program) => {
                 compiled

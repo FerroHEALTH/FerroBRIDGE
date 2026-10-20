@@ -5,6 +5,7 @@
 //! and the identity record of one committed composition.
 
 use fhir_types::codec::Value;
+use fhirconnect::engine::library::Library;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::error::EngineError;
 use http::StatusCode;
@@ -200,6 +201,7 @@ impl Ingest<'_> {
                     self.settings,
                     provenance.source_for(inbound.document()),
                     &Seams::default()
+                        .with_functions(&Library)
                         .with_terminology(terminology)
                         .with_references(self.references)
                         .with_demographics(self.demographics),

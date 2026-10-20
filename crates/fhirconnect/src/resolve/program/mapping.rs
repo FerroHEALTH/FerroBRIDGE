@@ -18,6 +18,7 @@ use crate::resolve::program::hierarchy::Create;
 use crate::resolve::program::hierarchy::Preprocessor;
 use crate::resolve::program::manual::Manual;
 use crate::resolve::program::manual::render_manual;
+use crate::resolve::program::port::Port;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
 
@@ -75,6 +76,9 @@ pub enum Method {
     Programmed {
         /// The name of the function.
         code: String,
+        /// The openEHR ports its signature declares, resolved against the
+        /// template.
+        ports: Vec<Port>,
     },
     /// The mapping fills a participation function.
     Participation {
@@ -437,7 +441,16 @@ impl Mapping {
                     link_type.as_deref().unwrap_or("-")
                 )?;
             }
-            Method::Programmed { ref code } => writeln!(f, "{inner}mappingCode {code}")?,
+            Method::Programmed {
+                ref code,
+                ref ports,
+            } => {
+                write!(f, "{inner}mappingCode {code}")?;
+                for port in ports {
+                    write!(f, " port {port}")?;
+                }
+                writeln!(f)?;
+            }
             Method::Participation { ref function } => {
                 writeln!(f, "{inner}participationsFunction {function}")?;
             }

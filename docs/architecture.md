@@ -771,7 +771,15 @@ ours:
 - PROGRAMMED mappings (`mappingCode`) are first-party Rust functions in a
   registry with a typed interface over the canonical model; an unknown code is
   a load error. The library depends on eight codes, six of them the Dosage and
-  Timing gap the specification defers to its next version.
+  Timing gap the specification defers to its next version. **As built
+  (#95):** `fhirconnect::engine::library::Library` is the registry. A
+  function reads the whole FHIR element its mapping's `with.fhir` names and
+  the canonical JSON at the openEHR ports it declares below the mapping's
+  `with.openehr`; the compiler resolves every port against the template at
+  load, so the engine parses no path for one, and a port onto a polymorphic
+  `ELEMENT` holds one value node per admitted class. What each function reads
+  and writes is our own design, since no specification defines the functions
+  (`concept-mappings.adoc` §Programmed mappings leaves them to the vendor).
 - **A skipped element is a first-class outcome, never silence.** The
   reference engine now threads an issue collector through both engines and
   reports skipped elements as `warning` and `incomplete` issues. FerroBRIDGE's

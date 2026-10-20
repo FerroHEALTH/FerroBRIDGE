@@ -23,7 +23,7 @@ use std::path::PathBuf;
 
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::model::load::load_set;
-use fhirconnect::model::semantic::StaticMappingCodes;
+use fhirconnect::engine::library::Library;
 use fhirconnect::resolve::compile::compile;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::index::WebTemplateIndex;
@@ -214,7 +214,7 @@ fn verdict(context: &str, opt: Opt) -> Result<Verdict, Box<dyn Error>> {
     let set = loop {
         match load_set(
             files.iter().map(|file| library(file)),
-            &StaticMappingCodes::default(),
+            &Library,
         ) {
             Ok(set) => break set,
             Err(diagnostics) => {
@@ -261,7 +261,7 @@ fn verdict(context: &str, opt: Opt) -> Result<Verdict, Box<dyn Error>> {
         &name,
         &index,
         &SCHEMAS,
-        &StaticMappingCodes::default(),
+        &Library,
     )
     .map(|program| (files, program))
     .map_err(|diagnostics| rows(&diagnostics));

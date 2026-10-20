@@ -152,16 +152,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
             .find(|written| written.flat_id == *flat_id && written.positions == positions)
             .and_then(|written| match written.value {
                 Held::Value(ref value) => Some(value.clone()),
-                Held::Partial(_) => None,
+                Held::Partial(_) | Held::Canonical(_) => None,
             })
-    }
-
-    /// Writes one openEHR value, overwriting what the same place holds.
-    pub(super) fn put_openehr(&mut self, mapping: &Mapping, binding: &Binding, value: RmValue) {
-        let Some(target) = mapping.openehr() else {
-            return;
-        };
-        self.put_openehr_at(target, binding, value);
     }
 
     /// Writes one openEHR value at `target`, overwriting what the same place
@@ -177,19 +169,6 @@ impl<T: Table + ?Sized> Run<'_, T> {
             positions: binding.openehr.clone(),
             value: Held::Value(value),
         });
-    }
-
-    /// Writes one FHIR element at the occurrence its binding names.
-    pub(super) fn put_fhir(
-        &mut self,
-        mapping: &Mapping,
-        binding: &Binding,
-        view: &FhirValue,
-    ) -> Result<(), EngineError> {
-        let Some(target) = mapping.fhir() else {
-            return Ok(());
-        };
-        self.put_fhir_at(mapping, target, binding, view)
     }
 
     /// Writes one FHIR element through `target` at the occurrence its
