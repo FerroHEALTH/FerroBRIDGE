@@ -439,7 +439,7 @@ crates on crates.io.
   `Range`), an interval of any other parameter pairs with nothing and is
   refused at load, and the cells refuse a `Period` into a quantity interval
   and a `Range` into a date-time one. `PAIRS` gains two rows, so a consumer
-  that reads the table sees them. `fhirconnect` 0.1.174.
+  that reads the table sees them. `fhirconnect` 0.1.177.
 - A facade write, transaction or `$validate` whose mapping run fails because
   the terminology server failed (no answer, a timeout, a `5xx`, a refused
   `$translate` or `$lookup`, an answer that does not decode) now answers
