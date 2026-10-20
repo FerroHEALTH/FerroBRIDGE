@@ -307,6 +307,17 @@ crates on crates.io.
 - The console's file editor names its mode in its header (#982): the New
   file route reads "New mapping file" and an existing file reads "Edit
   <file>", with the matching page title.
+- An untyped FHIR choice element mapped onto an `ELEMENT` whose value admits
+  several data types converts (#1055), the shape the published
+  `laboratory_test_analyte.v1.yml` and `vital_status.v1.yml` write for
+  `Observation.value`. The compiler keeps every pair of a choice alternative
+  with a value alternative the data-type chapter defines
+  (`Derived::Polymorphic`); going into openEHR the alternative the document
+  carries selects the value node, and coming out the class the composition
+  holds selects the alternative written. An alternative or a class no pair
+  names refuses the run. Before, the mapping derived nothing and drew an
+  `fc-anchor-without-children` warning. `Derived` gains a variant, so a
+  consumer that matches it exhaustively adds the arm. `fhirconnect` 0.1.168.
 - An HL7 v2 message sent under a code and trigger event that no v2.9.1
   message definition carries, and whose MSH-9.3 names no known structure, is
   parsed against the structure the interactions of its version's tables send

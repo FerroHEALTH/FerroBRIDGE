@@ -154,9 +154,77 @@ pub enum Derived {
         /// The value alternative the cell reads and writes.
         target: OpenehrTarget,
     },
+    /// A choice element against an `ELEMENT` whose value admits several data
+    /// types: each pair of a choice alternative and a value alternative the
+    /// data-type chapter defines, in the order the engine prefers them.
+    ///
+    /// Going into openEHR the alternative the document carries selects the
+    /// value node; coming out the value node the composition holds selects
+    /// the alternative written.
+    Polymorphic {
+        /// The choice element the value is read at.
+        read: FhirTarget,
+        /// The pairs, value node by value node in template order, each node's
+        /// pairs in the order its page of the chapter lists them.
+        pairings: Vec<Pairing>,
+    },
     /// A choice element the `type` key resolves, read and written as the
     /// alternative of that type.
     Declared(Alternative),
+}
+
+/// One pair of a choice alternative and the `ELEMENT` value node it converts
+/// with, in a [`Derived::Polymorphic`] mapping.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pairing {
+    alternative: Alternative,
+    suffix: &'static str,
+    rank: usize,
+    target: OpenehrTarget,
+}
+
+impl Pairing {
+    /// Pairs the choice alternative written through `alternative`, whose JSON
+    /// suffix is `suffix`, with the value node `target`, at position `rank`
+    /// among the pairs of the node's class.
+    #[must_use]
+    pub const fn new(
+        alternative: Alternative,
+        suffix: &'static str,
+        rank: usize,
+        target: OpenehrTarget,
+    ) -> Self {
+        Self {
+            alternative,
+            suffix,
+            rank,
+            target,
+        }
+    }
+
+    /// Returns the choice alternative and the target that writes it.
+    #[must_use]
+    pub const fn alternative(&self) -> &Alternative {
+        &self.alternative
+    }
+
+    /// Returns the suffix the choice alternative carries in a document.
+    #[must_use]
+    pub const fn suffix(&self) -> &'static str {
+        self.suffix
+    }
+
+    /// Returns the position of the pair among the pairs of the node's class.
+    #[must_use]
+    pub const fn rank(&self) -> usize {
+        self.rank
+    }
+
+    /// Returns the value node the pair converts into and out of.
+    #[must_use]
+    pub const fn target(&self) -> &OpenehrTarget {
+        &self.target
+    }
 }
 
 impl fmt::Display for Derived {
@@ -179,6 +247,21 @@ impl fmt::Display for Derived {
             }
             Self::Declared(ref written) => {
                 write!(f, "{} as {}", written.code, written.target)
+            }
+            Self::Polymorphic {
+                ref read,
+                ref pairings,
+            } => {
+                write!(f, "choice read {read}")?;
+                for pairing in pairings {
+                    write!(
+                        f,
+                        " {} into {}",
+                        pairing.alternative.code,
+                        pairing.target.node().rm_type()
+                    )?;
+                }
+                Ok(())
             }
         }
     }

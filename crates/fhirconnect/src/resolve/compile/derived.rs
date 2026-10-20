@@ -19,6 +19,7 @@ use crate::resolve::error::ResolveCode;
 use crate::resolve::extensions::diagnostic;
 use crate::resolve::program::mapping::Alternative;
 use crate::resolve::program::mapping::Derived;
+use crate::resolve::program::mapping::Pairing;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
 use crate::tree::element::Location;
@@ -113,6 +114,9 @@ impl<'a> Compiler<'a> {
         } = sides;
         let class = openehr.leaf_class().unwrap_or(openehr.node().rm_type());
         if derive::is_structural(class) {
+            if let Some(polymorphic) = self.element_choice(file, fhir, openehr, position, path) {
+                return Some(polymorphic);
+            }
             if let Some(value) = self.element_value(fhir, openehr) {
                 return Some(value);
             }
@@ -241,6 +245,71 @@ impl<'a> Compiler<'a> {
             openehr.occurrences().to_vec(),
         );
         Some(Derived::Value { code: pair, target })
+    }
+
+    /// Returns the pairs a choice element converts through against a
+    /// polymorphic `ELEMENT`, when the node is one and an alternative pairs.
+    ///
+    /// The Web Template gives each data type an `ELEMENT` admits a child node,
+    /// and the data-type chapter pairs each class with FHIR types
+    /// ([`derive::PAIRS`]), so every alternative of the choice that pairs with
+    /// a child's class is kept, child by child in template order and each
+    /// child's pairs in its page's order (no specification governs the order:
+    /// our own design). The document's alternative or the composition's value
+    /// node picks one at run time.
+    fn element_choice(
+        &mut self,
+        file: &'a ModelMappingFile,
+        fhir: &FhirTarget,
+        openehr: &OpenehrTarget,
+        position: Position,
+        path: &ModelPath,
+    ) -> Option<Derived> {
+        if openehr.node().rm_type() != ELEMENT
+            || !openehr.tail().segments.is_empty()
+            || !matches!(*fhir.resolved().location(), Location::Choice(_))
+        {
+            return None;
+        }
+        let variants = match fhir.resolved().moves().last() {
+            Some(Move::Choice { schema, .. }) => match schema.kind {
+                Kind::Choice(variants) => variants,
+                _ => &[],
+            },
+            _ => &[],
+        };
+        let mut pairings = Vec::new();
+        for flat_id in openehr.node().children() {
+            let Ok(child) = self.template.node_by_flat_id(flat_id) else {
+                continue;
+            };
+            // NOTE: openEHR RM data_structures §ELEMENT: `value` holds one data value, so
+            // each value alternative repeats exactly where the `ELEMENT` does.
+            let target = OpenehrTarget::new(
+                child.rm_path().clone(),
+                child.clone(),
+                openehr.tail().clone(),
+                openehr.occurrences().to_vec(),
+            );
+            for (rank, code) in derive::pairs(child.rm_type()).iter().enumerate() {
+                let Some(suffix) = derive::suffix_of(code, variants) else {
+                    continue;
+                };
+                let written =
+                    self.derived_target(file, fhir, &format!("as({suffix})"), position, path)?;
+                let code = written.resolved().type_code().unwrap_or(code);
+                pairings.push(Pairing::new(
+                    Alternative::new(code, written),
+                    suffix,
+                    rank,
+                    target.clone(),
+                ));
+            }
+        }
+        (!pairings.is_empty()).then(|| Derived::Polymorphic {
+            read: fhir.clone(),
+            pairings,
+        })
     }
 
     /// Resolves the alternative of a choice element the `type` key names.

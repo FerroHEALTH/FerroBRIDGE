@@ -34,6 +34,14 @@ pub(crate) fn template() -> Result<WebTemplateIndex, Box<dyn Error>> {
 
 /// Compiles the context and model fixture pair named `fixture`.
 pub(crate) fn compiled(fixture: &str) -> Result<Arc<Program>, Box<dyn Error>> {
+    compiled_against(fixture, &template()?)
+}
+
+/// Compiles the context and model fixture pair named `fixture` against `index`.
+pub(crate) fn compiled_against(
+    fixture: &str,
+    index: &WebTemplateIndex,
+) -> Result<Arc<Program>, Box<dyn Error>> {
     let mut set = MappingSet::new();
     for (name, text) in [
         (
@@ -58,12 +66,11 @@ pub(crate) fn compiled(fixture: &str) -> Result<Arc<Program>, Box<dyn Error>> {
             set.insert_model(file).map_err(|error| error.to_string())?;
         }
     }
-    let index = template()?;
     let context = MappingName::new(format!("{fixture}.context"))?;
     compile(
         &set,
         &context,
-        &index,
+        index,
         &SCHEMAS,
         &StaticMappingCodes::default(),
     )

@@ -98,7 +98,6 @@ projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:153 fc-uncarried-tail
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:175 fc-uncarried-tail
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:197 fc-uncarried-tail
-    model/cluster/org.openehr/laboratory_test_analyte.v1.yml:214 fc-anchor-without-children
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:33 fc-uncarried-tail
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:65 fc-uncarried-tail
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:87 fc-uncarried-tail
@@ -325,7 +324,6 @@ projects/org.highmed/KDS/vitalstatus/KDS_Vitalstatus.context.yaml
     model/evaluation/org.openehr/vital_status.v1.yml:51 fc-unknown-template-node
     model/evaluation/org.openehr/vital_status.v1.yml:67 fc-uncarried-tail
     model/evaluation/org.openehr/vital_status.v1.yml:69 fc-uncarried-tail
-    model/evaluation/org.openehr/vital_status.v1.yml:74 fc-anchor-without-children
     model/evaluation/org.openehr/vital_status.v1.yml:97 fc-duplicate-method-name
 projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml
   left out model/action/org.openehr/informed_consent.v0.yml (fc-unknown-mapping-reference)
