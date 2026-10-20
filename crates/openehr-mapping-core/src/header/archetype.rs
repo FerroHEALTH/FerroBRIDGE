@@ -3,49 +3,52 @@
 
 //! The `spec.openEhrConfig.archetype` value.
 
+use core::cmp::Ordering;
 use core::fmt;
+use core::hash::{Hash, Hasher};
+use core::num::ParseIntError;
 use core::str::FromStr;
+
+use openehr_base::v1_2::base_types::identification::archetype_id;
+use openehr_base::v1_2::base_types::identification::lexical::IdError;
 
 /// Why a `spec.openEhrConfig.archetype` value was refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ArchetypeIdError {
-    /// The value is not `<qualified_rm_entity>.<domain_concept>.<version_id>`.
+    /// The value does not match the BASE 1.2.0 `archetype_id` production.
     #[error("`{value}` is not `rm_originator-rm_name-rm_entity.concept.vN`")]
-    Shape {
+    Lexical {
         /// The refused value.
         value: String,
+        /// The refusal `openehr-base` reports.
+        #[source]
+        source: IdError,
     },
-    /// The first part is not `rm_originator-rm_name-rm_entity`.
-    #[error("`{value}` is not `rm_originator-rm_name-rm_entity`")]
-    QualifiedRmEntity {
-        /// The refused first part.
+    /// The version number does not fit the range this crate counts in.
+    #[error("the version of `{value}` is out of range")]
+    VersionRange {
+        /// The refused value.
         value: String,
-    },
-    /// The second part is not a concept name with optional specialisations.
-    #[error("`{value}` is not `concept_name{{-specialisation}}`")]
-    DomainConcept {
-        /// The refused second part.
-        value: String,
-    },
-    /// The third part is not `v` followed by a version number.
-    #[error("`{value}` is not `v0` or `v` followed by a non-zero-leading number")]
-    VersionId {
-        /// The refused third part.
-        value: String,
+        /// Why the version number did not parse.
+        #[source]
+        source: ParseIntError,
     },
 }
 
-/// An openEHR archetype id.
+/// An openEHR archetype id, as a mapping header names it.
 ///
-/// The lexical form is `rm_originator '-' rm_name '-' rm_entity '.'
-/// concept_name {'-' specialisation}* '.v' number`, and the syntax appendix
-/// gives `version-id = 'v', ('0' | non-zero-digit, [number])` and
-/// `alphanum-str = letter, {letter | digit | '_'}` (openEHR BASE Release
-/// 1.2.0, §5.4.10 `ARCHETYPE_ID` Class and the Base Types syntax appendix,
+/// The FHIRconnect header gives `openEhrConfig.archetype` as the archetype the
+/// model mapping maps, in the form `openEHR-EHR-ACTION.informed_consent.v0`
+/// (FHIRconnect v1.0.0, Header §Spec), and the model-mapping schema types it
+/// as a plain string. The value is parsed by `openehr-base` against the
+/// `archetype_id` production of openEHR BASE Release 1.2.0 (§5.4.10
+/// `ARCHETYPE_ID` Class and the Base Types syntax appendix,
 /// <https://specifications.openehr.org/releases/BASE/Release-1.2.0/base_types.html>).
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// NOTE: FHIRconnect v1.0.0 never names a namespaced ADL 2 id in a header, so no
+// specification governs this: our own design keeps the BASE 1.2.0 form.
+#[derive(Debug, Clone)]
 pub struct ArchetypeId {
-    value: String,
+    id: archetype_id::ArchetypeId,
     version: u32,
 }
 
@@ -53,7 +56,7 @@ impl ArchetypeId {
     /// Returns the archetype id.
     #[must_use]
     pub fn as_str(&self) -> &str {
-        &self.value
+        &self.id.value
     }
 
     /// Returns the number of the `version_id` axis.
@@ -61,11 +64,43 @@ impl ArchetypeId {
     pub const fn version_number(&self) -> u32 {
         self.version
     }
+
+    /// Returns the `openehr-base` archetype id this value was parsed into.
+    #[must_use]
+    pub const fn base(&self) -> &archetype_id::ArchetypeId {
+        &self.id
+    }
+}
+
+impl PartialEq for ArchetypeId {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl Eq for ArchetypeId {}
+
+impl PartialOrd for ArchetypeId {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ArchetypeId {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_str().cmp(other.as_str())
+    }
+}
+
+impl Hash for ArchetypeId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_str().hash(state);
+    }
 }
 
 impl fmt::Display for ArchetypeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.value)
+        f.write_str(self.as_str())
     }
 }
 
@@ -73,61 +108,19 @@ impl FromStr for ArchetypeId {
     type Err = ArchetypeIdError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let mut parts = value.split('.');
-        let (Some(qualified_rm_entity), Some(domain_concept), Some(version_id), None) =
-            (parts.next(), parts.next(), parts.next(), parts.next())
-        else {
-            return Err(ArchetypeIdError::Shape {
+        let id = archetype_id::ArchetypeId::from_str(value).map_err(|source| {
+            ArchetypeIdError::Lexical {
                 value: value.to_owned(),
-            });
-        };
-
-        let axes: Vec<&str> = qualified_rm_entity.split('-').collect();
-        if axes.len() != 3 || !axes.iter().all(|axis| is_alphanum_str(axis)) {
-            return Err(ArchetypeIdError::QualifiedRmEntity {
-                value: qualified_rm_entity.to_owned(),
-            });
-        }
-
-        if !domain_concept.split('-').all(is_alphanum_str) {
-            return Err(ArchetypeIdError::DomainConcept {
-                value: domain_concept.to_owned(),
-            });
-        }
-
-        let version = parse_version_id(version_id).ok_or_else(|| ArchetypeIdError::VersionId {
-            value: version_id.to_owned(),
+                source,
+            }
         })?;
-
-        Ok(Self {
-            value: value.to_owned(),
-            version,
-        })
+        let version =
+            id.major_version()
+                .parse()
+                .map_err(|source| ArchetypeIdError::VersionRange {
+                    value: value.to_owned(),
+                    source,
+                })?;
+        Ok(Self { id, version })
     }
-}
-
-/// Whether a string is `letter, {letter | digit | '_'}`.
-fn is_alphanum_str(value: &str) -> bool {
-    let mut characters = value.chars();
-    let Some(first) = characters.next() else {
-        return false;
-    };
-    first.is_ascii_alphabetic() && characters.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
-
-/// Parses `version-id = 'v', ('0' | non-zero-digit, [number])`.
-fn parse_version_id(version_id: &str) -> Option<u32> {
-    let digits = version_id.strip_prefix('v')?;
-    if digits == "0" {
-        return Some(0);
-    }
-    let mut characters = digits.chars();
-    let first = characters.next()?;
-    if !first.is_ascii_digit() || first == '0' {
-        return None;
-    }
-    if !characters.all(|c| c.is_ascii_digit()) {
-        return None;
-    }
-    digits.parse().ok()
 }

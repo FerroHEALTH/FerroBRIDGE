@@ -92,6 +92,18 @@ crates on crates.io.
 
 ### Changed
 
+- `openehr-mapping-core` 0.1.121 parses a mapping header's
+  `spec.openEhrConfig.archetype` through the `openehr-base` BASE 1.2.0
+  `ArchetypeId` and drops its own copy of the grammar (#1026). The accepted
+  form is unchanged: FHIRconnect v1.0.0 writes the header's archetype as
+  `openEHR-EHR-ACTION.informed_consent.v0` and never names a namespaced
+  ADL 2 id, so the namespaced form and a full version stay refused (our own
+  design). Breaking for a consumer that matches on `ArchetypeIdError`: its
+  `Shape`, `QualifiedRmEntity`, `DomainConcept` and `VersionId` variants are
+  gone, and a refusal is now `Lexical`, carrying the `openehr-base`
+  `IdError` as its source, or `VersionRange` for a version past `u32`.
+  `ArchetypeId::base` returns the `openehr-base` value. `fhirconnect`
+  0.1.163 renders the new requirement.
 - **Breaking:** the facade, the operator API and the CDR and terminology
   lanes authenticate through `ferrohealth-smart` 0.1.0, the FerroHEALTH
   family's SMART and OAuth 2.0 resource-server crate (#981). Its sections
