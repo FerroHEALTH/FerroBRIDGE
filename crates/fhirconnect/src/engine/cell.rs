@@ -17,6 +17,7 @@ use openehr_rm::v1_2::data_types::encapsulated::dv_parsable::DvParsable;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_duration::DvDuration;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_time::DvTime;
 use openehr_rm::v1_2::data_types::quantity::dv_count::DvCount;
+use openehr_rm::v1_2::data_types::quantity::dv_interval::DvInterval;
 use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
@@ -42,6 +43,7 @@ use crate::engine::lens::party::IdentifierLens;
 use crate::engine::lens::party::PartyLens;
 use crate::engine::lens::proportion::PercentLens;
 use crate::engine::lens::quantity::QuantityLens;
+use crate::engine::lens::range::QuantityIntervalLens;
 use crate::engine::lens::string::StringLens;
 use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::lens::text::TextLens;
@@ -49,6 +51,7 @@ use crate::engine::lens::time::TimeLens;
 use crate::engine::lens::uri::UriLens;
 use crate::engine::rm::RmValue;
 use crate::model::ast::keyword::Direction;
+use crate::resolve::derive;
 
 /// What a cell produced, with the one-way rows it took.
 #[derive(Debug, Clone, PartialEq)]
@@ -136,6 +139,9 @@ pub fn get(
             .get(duration.as_ref())
             .map(|duration| FhirValue::Duration(Box::new(duration))),
         (RmValue::Uri(uri), FhirKind::Url) => UriLens.get(uri).map(FhirValue::Url),
+        (RmValue::QuantityInterval(interval), FhirKind::Range) => QuantityIntervalLens
+            .get(interval.as_ref())
+            .map(|range| FhirValue::Range(Box::new(range))),
         (RmValue::Multimedia(multimedia), FhirKind::Attachment) => EncapsulatedLens
             .get(multimedia.as_ref())
             .map(|attachment| FhirValue::Attachment(Box::new(attachment))),
@@ -270,7 +276,7 @@ pub fn put(
     binding: Option<&str>,
 ) -> Result<Produced<RmValue>, LensError> {
     let coded = coded_lens(binding);
-    let value = match (rm_type, view) {
+    let value = match (derive::base_class(rm_type), view) {
         ("DV_TEXT", FhirValue::String(text)) => {
             TextLens.put(text, held_text(existing)).map(RmValue::Text)
         }
@@ -338,6 +344,9 @@ pub fn put(
             .put(duration.as_ref(), held_duration(existing))
             .map(|duration| RmValue::Duration(Box::new(duration))),
         ("DV_URI", FhirValue::Url(url)) => UriLens.put(url, held_uri(existing)).map(RmValue::Uri),
+        ("DV_INTERVAL", FhirValue::Range(range)) => QuantityIntervalLens
+            .put(range.as_ref(), held_quantity_interval(existing))
+            .map(|interval| RmValue::QuantityInterval(Box::new(interval))),
         ("DV_MULTIMEDIA", FhirValue::Attachment(attachment)) => EncapsulatedLens
             .put(attachment.as_ref(), held_multimedia(existing))
             .map(|multimedia| RmValue::Multimedia(Box::new(multimedia))),
@@ -368,9 +377,10 @@ fn fallbacks(
     // NOTE: DV_QUANTITY.adoc §Primitives hardcodes `units` as 1, which is a
     // one-way row only where no held value supplies the units.
     let unheld = held_quantity(existing).is_none();
-    match (rm_type, view) {
+    match (derive::base_class(rm_type), view) {
         ("DV_QUANTITY", FhirValue::Quantity(quantity)) => QuantityLens.fallbacks(quantity.as_ref()),
         ("DV_DURATION", FhirValue::Duration(duration)) => DurationLens.fallbacks(duration.as_ref()),
+        ("DV_INTERVAL", FhirValue::Range(range)) => QuantityIntervalLens.fallbacks(range.as_ref()),
         ("DV_MULTIMEDIA", FhirValue::Attachment(attachment)) => {
             Lens::<DvMultimedia, Attachment>::fallbacks(&EncapsulatedLens, attachment.as_ref())
         }
@@ -489,11 +499,8 @@ fn held_date_time(
 /// Returns the held `DV_INTERVAL<DV_DATE_TIME>`, when the target holds one.
 fn held_interval(
     existing: Option<&RmValue>,
-) -> Option<
-    &openehr_rm::v1_2::data_types::quantity::dv_interval::DvInterval<
-        openehr_rm::v1_2::data_types::quantity::date_time::dv_date_time::DvDateTime,
-    >,
-> {
+) -> Option<&DvInterval<openehr_rm::v1_2::data_types::quantity::date_time::dv_date_time::DvDateTime>>
+{
     match existing {
         Some(RmValue::DateTimeInterval(interval)) => Some(interval.as_ref()),
         _other => None,
@@ -524,6 +531,14 @@ fn held_identifier(
 fn held_quantity(existing: Option<&RmValue>) -> Option<&DvQuantity> {
     match existing {
         Some(RmValue::Quantity(quantity)) => Some(quantity.as_ref()),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_INTERVAL<DV_QUANTITY>`, when the target holds one.
+fn held_quantity_interval(existing: Option<&RmValue>) -> Option<&DvInterval<DvQuantity>> {
+    match existing {
+        Some(RmValue::QuantityInterval(interval)) => Some(interval.as_ref()),
         _other => None,
     }
 }
@@ -645,6 +660,29 @@ mod tests {
             produced.fallbacks.is_empty(),
             "the cell took no one-way row"
         );
+    }
+
+    #[test]
+    fn a_generic_interval_node_runs_the_cell_of_its_bound_class() {
+        // RM 1.1.0 data_types §DV_INTERVAL: the Web Template names the node
+        // `DV_INTERVAL<DV_QUANTITY>`, and DV_INTERVAL.adoc §Range is its cell.
+        let held = RmValue::from_canonical(
+            "DV_INTERVAL<DV_QUANTITY>",
+            "/synthetic",
+            &serde_json::json!({
+                "_type": "DV_INTERVAL",
+                "lower_unbounded": true,
+                "upper_unbounded": true,
+                "lower_included": false,
+                "upper_included": false,
+            }),
+        )
+        .expect("a quantity interval with no bounds");
+        assert!(matches!(held, RmValue::QuantityInterval(_)));
+        let view = FhirValue::Range(Box::default());
+        let produced = put(&view, "DV_INTERVAL<DV_QUANTITY>", Some(&held), None)
+            .expect("the Range cell carries the node");
+        assert_eq!(produced.value, held);
     }
 
     #[test]

@@ -249,7 +249,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
             | FhirKind::Decimal
             | FhirKind::Count
             | FhirKind::Duration
-            | FhirKind::Attachment => Err(refuse(LensError::NoCell {
+            | FhirKind::Attachment
+            | FhirKind::Range => Err(refuse(LensError::NoCell {
                 rm_type: String::from(openehr.leaf_class().unwrap_or(cell::STRING)),
                 kind: kind.as_str(),
                 direction: Direction::OpenehrToFhir,
