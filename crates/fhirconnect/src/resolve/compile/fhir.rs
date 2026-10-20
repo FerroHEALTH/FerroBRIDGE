@@ -129,8 +129,9 @@ impl<'a> Compiler<'a> {
             ));
             return None;
         }
+        let level = scope.enclosing.len().saturating_sub(bound_in);
         match resolve_element(self.table, resource.as_str(), &anchored) {
-            Ok(resolved) => Some(FhirTarget::new(anchored, resolved)),
+            Ok(resolved) => Some(FhirTarget::new(anchored, resolved).at_level(level)),
             Err(error) => {
                 self.diagnostics.push(diagnostic(
                     file,

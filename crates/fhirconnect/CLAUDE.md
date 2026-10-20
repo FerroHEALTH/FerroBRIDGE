@@ -174,7 +174,12 @@ from, and the `IdentitySink` that names every resource a run creates;
 digest over the `IdentityRequest`, so the same composition yields the same
 ids. Every seam trait is `Send + Sync`, and a compile-time assertion keeps
 `Seams` `Send`, so an async caller holds the seams across an `.await`. A reference that resolves to nothing is a `Loss::Skipped` warning, never a
-silent nothing; a reference chain that reaches itself refuses. Created
+silent nothing; a reference chain that reaches itself refuses. A `^` run
+that climbs out of a referenced resource binds its target to the enclosing
+one (`FhirTarget::level`), and the engine keeps every document a `reference`
+left as a frame with the occurrence it was entered at, so the target reads
+and writes there; what is anchored under such a target is rooted there too
+(`Scope::anchored_at`). Created
 resources travel as `Outcome::created`: the operations lane answers them as
 Bundle entries and the facade binds each under an id of its own and serves it
 at `<Type>/<id>`. `operations::run` takes the caller's `Seams`, and `$toopenehr`

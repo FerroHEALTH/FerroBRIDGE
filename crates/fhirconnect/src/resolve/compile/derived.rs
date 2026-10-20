@@ -368,7 +368,11 @@ impl<'a> Compiler<'a> {
         let (code, reason) = match FhirPath::from_str(&written) {
             Ok(expression) => {
                 match resolve_element(self.table, target.resolved().resource(), &expression) {
-                    Ok(resolved) => return Some(FhirTarget::new(expression, resolved)),
+                    Ok(resolved) => {
+                        return Some(
+                            FhirTarget::new(expression, resolved).at_level(target.level()),
+                        );
+                    }
                     Err(error) => (ResolveCode::UnknownFhirElement, error.to_string()),
                 }
             }

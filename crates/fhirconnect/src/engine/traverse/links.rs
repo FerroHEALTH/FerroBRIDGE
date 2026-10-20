@@ -62,6 +62,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     let binding = Binding {
                         fhir: input.clone(),
                         openehr: parent.openehr.clone(),
+                        level: mapping.fhir().map_or(parent.level, FhirTarget::level),
                     };
                     let Some(literal) = self.reference_at(mapping, input)? else {
                         let location = self.locate(mapping, input);
@@ -158,6 +159,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     let binding = Binding {
                         fhir: input.clone(),
                         openehr: parent.openehr.clone(),
+                        level: mapping.fhir().map_or(parent.level, FhirTarget::level),
                     };
                     let value = self.fhir_value_at(mapping, input)?;
                     let literal = value

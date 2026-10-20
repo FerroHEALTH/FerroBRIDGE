@@ -21,16 +21,40 @@ use crate::tree::path::Writability;
 pub struct FhirTarget {
     expression: FhirPath,
     resolved: Resolved,
+    level: usize,
 }
 
 impl FhirTarget {
-    /// Pairs an anchored expression with its element-table resolution.
+    /// Pairs an anchored expression with its element-table resolution, rooted
+    /// at the program's own resource.
     #[must_use]
     pub const fn new(expression: FhirPath, resolved: Resolved) -> Self {
         Self {
             expression,
             resolved,
+            level: 0,
         }
+    }
+
+    /// Returns this target rooted at the resource `level` references deep.
+    ///
+    /// The program's own resource is level `0`, and each `reference` mapping
+    /// the expression is written inside adds one. A `^` run that climbs out
+    /// of a referenced resource binds the expression to an enclosing one,
+    /// which is what the worked `^^` example does
+    /// (`docs/specs/fhirconnect/modules/ROOT/pages/basics/path_operators.adoc`,
+    /// §Recurrence and parent elements).
+    #[must_use]
+    pub const fn at_level(mut self, level: usize) -> Self {
+        self.level = level;
+        self
+    }
+
+    /// Returns how many references deep the resource the expression is
+    /// rooted at lies.
+    #[must_use]
+    pub const fn level(&self) -> usize {
+        self.level
     }
 
     /// Returns the `$resource`-rooted expression.

@@ -345,6 +345,14 @@ crates on crates.io.
   are inclusive; it was written as an inclusive bound with no loss declared.
   The refusal is a `LensError::Shape` naming `DV_INTERVAL.lower_included` or
   `DV_INTERVAL.upper_included`. `fhirconnect` 0.1.169.
+- A `^` run that climbs out of a referenced resource now runs in both
+  directions (#94). The compiler accepted the worked `^^.use.coding`
+  example of `basics/path_operators.adoc`, and the engine then refused it,
+  reading the Encounter's path in the referenced Condition. Each FHIR
+  target now records the resource it is rooted in, the engine keeps the
+  document a `reference` mapping left with the occurrence it was entered
+  at, and a condition `targetRoot` and the children of such a mapping
+  anchor in that resource too. `fhirconnect` 0.1.170.
 - The console's file editor names its mode in its header (#982): the New
   file route reads "New mapping file" and an existing file reads "Edit
   <file>", with the matching page title.

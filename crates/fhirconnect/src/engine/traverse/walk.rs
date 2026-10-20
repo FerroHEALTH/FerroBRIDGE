@@ -144,12 +144,12 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 // `with` element filters that element's occurrences; the compiler
                 // decided the attachment over the anchored paths.
                 let attached = gate.attachment() == Attachment::Element;
-                let verdict = condition::evaluate(self.table, &self.fhir, gate, attached).map_err(
-                    |source| EngineError::Condition {
-                        mapping: String::from(mapping.name()),
-                        source: Box::new(source),
-                    },
-                )?;
+                let verdict =
+                    condition::evaluate(self.table, self.condition_document(gate), gate, attached)
+                        .map_err(|source| EngineError::Condition {
+                            mapping: String::from(mapping.name()),
+                            source: Box::new(source),
+                        })?;
                 match verdict {
                     Verdict::Gate(false) => Ok(None),
                     Verdict::Gate(true) => Ok(Some(inputs)),
@@ -250,17 +250,15 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 let Some(input) = mapping.fhir() else {
                     return Ok(vec![parent.fhir.clone()]);
                 };
-                let matches =
-                    read(self.table, &self.fhir, input.expression()).map_err(|source| {
-                        EngineError::Read {
-                            mapping: String::from(mapping.name()),
-                            expression: String::from(input.expression().as_str()),
-                            source: Box::new(source),
-                        }
+                let parent = &self.scoped(Some(input), parent);
+                let matches = read(self.table, self.document_for(input), input.expression())
+                    .map_err(|source| EngineError::Read {
+                        mapping: String::from(mapping.name()),
+                        expression: String::from(input.expression().as_str()),
+                        source: Box::new(source),
                     })?;
                 let pinned = self
-                    .fhir_pin
-                    .as_ref()
+                    .pin_for(input)
                     .filter(|&(axes, _)| fhir_axes(input).starts_with(axes))
                     .map(|(_, occurrence)| occurrence);
                 let mut occurrences = Vec::new();
@@ -543,7 +541,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             };
             let holds = match self.direction {
                 Direction::FhirToOpenehr => {
-                    condition::evaluate(self.table, &self.fhir, gate, false)
+                    condition::evaluate(self.table, self.condition_document(gate), gate, false)
                         .map(|verdict| verdict.admits_any())
                         .map_err(|source| EngineError::Condition {
                             mapping: String::from(mapping.name()),
