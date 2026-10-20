@@ -118,9 +118,10 @@ backon = "1.6.0"
 # The FerroHEALTH family's SMART App Launch and OAuth 2.0 resource-server
 # crate: the token check of the facade and the operator API, the scopes, the
 # audit line, and the client credentials token of the CDR and terminology
-# lanes. Pinned exactly; verified against crates.io on 2026-10-20 (0.1.1,
-# published 2026-10-20).
-ferrohealth-smart = { version = "=0.1.1", default-features = false, features = ["axum"] }
+# lanes. Pinned exactly; verified against crates.io on 2026-10-20 (0.2.0,
+# published 2026-10-20). `fetch` reads each issuer's metadata and key set
+# and runs the client credentials token client.
+ferrohealth-smart = { version = "=0.2.0", default-features = false, features = ["axum", "fetch"] }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off. Verified against crates.io on 2026-10-16 (11.1.0,

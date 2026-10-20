@@ -169,6 +169,14 @@ crates on crates.io.
   out (an `ITEM_TREE` under an entry, for example) by its term definition in
   the template, where it named it by its node id before (RM Common IM,
   `LOCATABLE.name`). The `openehr-sdt` 0.0.89 builder does this.
+- `ferrohealth-smart` 0.2.0 (#1018). The SMART discovery document writes
+  `issuer` and `sso-openid-connect` only when `[auth] capabilities` names
+  `sso-openid-connect`; SMART App Launch 2.2.0 (Conformance, Metadata) omits
+  `issuer` otherwise. A client that read `issuer` from the document reads the
+  authorization endpoints it names, or the bridge advertises OpenID Connect
+  sign-in by configuration. The document declares `permission-v1`,
+  `permission-patient` and `permission-user`, the scopes the route table
+  and the patient compartment enforce.
 - `ferrohealth-smart` 0.1.1 (#1007). The operator scope moves from
   `[operator] scope` to `[auth] product_scope` (environment
   `FERROBRIDGE__AUTH__PRODUCT_SCOPE`), default `__ferrobridge.operator`,
