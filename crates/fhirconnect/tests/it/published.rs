@@ -26,6 +26,7 @@ use fhirconnect::engine::library::Library;
 use fhirconnect::model::load::load_set;
 use fhirconnect::resolve::compile::compile;
 use openehr_mapping_core::diagnostic::Diagnostic;
+use openehr_mapping_core::diagnostic::Severity;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::loader::load_str;
 use openehr_mapping_core::template::TemplateSource;
@@ -116,7 +117,7 @@ struct Verdict {
     /// The context, relative to the library.
     context: String,
     /// The files the loader refused, left out of the set, each with the
-    /// first code raised against it.
+    /// first error code raised against it.
     dropped: BTreeMap<String, String>,
     /// The program, or the refusals as `file:line severity code` rows.
     outcome: Result<OwnedChain, Vec<String>>,
@@ -217,15 +218,15 @@ fn verdict(context: &str, opt: Opt) -> Result<Verdict, Box<dyn Error>> {
         match load_set(files.iter().map(|file| library(file)), &Library) {
             Ok(set) => break set,
             Err(diagnostics) => {
-                let refused: BTreeMap<String, String> =
-                    diagnostics
-                        .iter()
-                        .fold(BTreeMap::new(), |mut refused, diagnostic| {
-                            refused
-                                .entry(relative(diagnostic.file()))
-                                .or_insert_with(|| diagnostic.code().to_string());
-                            refused
-                        });
+                let refused: BTreeMap<String, String> = diagnostics
+                    .iter()
+                    .filter(|diagnostic| diagnostic.severity() == Severity::Error)
+                    .fold(BTreeMap::new(), |mut refused, diagnostic| {
+                        refused
+                            .entry(relative(diagnostic.file()))
+                            .or_insert_with(|| diagnostic.code().to_string());
+                        refused
+                    });
                 let stuck = refused.keys().any(|file| !files.contains(file));
                 let only_context = refused.keys().all(|file| file == context);
                 if only_context || stuck {
@@ -288,7 +289,7 @@ fn render(verdicts: &[Verdict]) -> Result<String, Box<dyn Error>> {
     for verdict in verdicts {
         writeln!(text, "{}", verdict.context)?;
         for (file, code) in &verdict.dropped {
-            writeln!(text, "  left out {file} ({code})")?;
+            writeln!(text, "  left out {file} (error {code})")?;
         }
         match &verdict.outcome {
             Ok((_, program)) => writeln!(

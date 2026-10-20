@@ -27,7 +27,6 @@ use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::composition::NodeValue;
-use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::index::paths::AqlPath;
@@ -37,6 +36,7 @@ use crate::laws;
 use crate::support::FIXTURES;
 use crate::support::compiled;
 use crate::support::render;
+use crate::support::rows;
 use crate::support::template;
 
 /// The vendored mapping library, relative to this crate's manifest.
@@ -170,26 +170,6 @@ fn refusals(files: &[String]) -> Result<Vec<String>, Box<dyn Error>> {
     }
 }
 
-/// Renders diagnostics as sorted `file:line code` rows, the file by its name.
-fn rows(diagnostics: &[Diagnostic]) -> Vec<String> {
-    let mut found: Vec<String> = diagnostics
-        .iter()
-        .map(|diagnostic| {
-            let file = diagnostic
-                .file()
-                .file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            let line = diagnostic
-                .position()
-                .map_or(0, openehr_mapping_core::position::Position::line);
-            format!("{file}:{line} {}", diagnostic.code())
-        })
-        .collect();
-    found.sort();
-    found
-}
-
 #[test]
 fn the_kds_project_context_compiles_against_the_published_template() -> Result<(), Box<dyn Error>> {
     let (program, _) = kds_program()?;
@@ -235,7 +215,7 @@ fn the_published_files_the_context_reaches_load_strictly() -> Result<(), Box<dyn
 fn the_published_kds_problem_diagnose_is_refused_at_its_line_100() -> Result<(), Box<dyn Error>> {
     assert_eq!(
         refusals(&[published(KDS_PROBLEM_DIAGNOSE)])?,
-        vec!["KDS_problem_diagnose.yml:100 yaml-syntax"]
+        vec!["KDS_problem_diagnose.yml:100 error yaml-syntax"]
     );
     Ok(())
 }
@@ -271,7 +251,7 @@ fn the_published_kds_composition_extends_a_name_no_model_carries() -> Result<(),
     };
     assert_eq!(
         rows(&diagnostics),
-        vec!["KDS_composition.yml:9 fc-unknown-mapping-reference"]
+        vec!["KDS_composition.yml:9 error fc-unknown-mapping-reference"]
     );
     assert!(
         diagnostics.iter().any(|diagnostic| diagnostic

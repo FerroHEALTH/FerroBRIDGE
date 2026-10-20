@@ -34,7 +34,6 @@ use fhirconnect::model::semantic::StaticMappingCodes;
 use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
 use openehr_mapping_core::composition::CanonicalComposition;
-use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::template::TemplateSource;
@@ -44,6 +43,7 @@ use ferrobridge_testkit::laws::declared;
 use crate::laws;
 use crate::support::FIXTURES;
 use crate::support::render;
+use crate::support::rows;
 
 /// The vendored mapping library, relative to this crate's manifest.
 const CORPUS: &str = concat!(
@@ -131,26 +131,6 @@ fn kds_laborauftrag_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dy
 pub(crate) fn kds_laborauftrag_chain() -> Result<crate::support::Chain, Box<dyn Error>> {
     let (program, _) = kds_laborauftrag_program()?;
     Ok((PUBLISHED, program))
-}
-
-/// Renders diagnostics as sorted `file:line code` rows, the file by its name.
-fn rows(diagnostics: &[Diagnostic]) -> Vec<String> {
-    let mut found: Vec<String> = diagnostics
-        .iter()
-        .map(|diagnostic| {
-            let file = diagnostic
-                .file()
-                .file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            let line = diagnostic
-                .position()
-                .map_or(0, openehr_mapping_core::position::Position::line);
-            format!("{file}:{line} {}", diagnostic.code())
-        })
-        .collect();
-    found.sort();
-    found
 }
 
 /// Returns the synthetic MII laboratory `ServiceRequest` of the testkit.
