@@ -36,6 +36,24 @@ crates on crates.io.
   32-bit `integer` and a comparator into a count are typed refusals.
   `FhirKind`, `FhirValue` and `RmValue` gain variants, so a consumer that
   matches them exhaustively adds the arms. `fhirconnect` 0.1.163.
+- A FHIRconnect PROGRAMMED mapping now runs a registered function (#95).
+  `fhirconnect::engine::library::Library` is the registry the crate ships,
+  and the server hands it to the loader, the compiler and every run. A
+  function declares the openEHR ports it reads and writes below the
+  mapping's `with.openehr`, and the compiler resolves each port against the
+  template at load: a port the template lacks is `fc-unknown-template-node`,
+  one below a repeating node `fc-repeating-function-port`, and ports under a
+  mapping with no openEHR side `fc-unanchored-function-port`. The first two
+  functions of the published library are registered:
+  `dosageDurationToAdministrationDuration` (`Timing.repeat.duration` and its
+  unit against the administration duration) and `timingNonDaily` (a timing
+  once per week, month or year against the interval of the non-daily
+  timing), both converting through the engine's `DV_DURATION` cell and
+  refusing what they cannot carry. The library's
+  `timing_non_daily.yml` now loads in every published context. Breaking for
+  consumers: `MappingFunctions` takes the FHIR element and the port values,
+  `Method::Programmed` carries its ports, and `MappingCodeRegistry` gains
+  `ports`. `fhirconnect` 0.1.166.
 - Every published FHIRconnect context now has its operational template in
   the tree (#258). Nine KDS templates join the three already vendored, each
   fetched by its own `scripts/vendor/kds-*-opt.sh` from the openFHIR commit

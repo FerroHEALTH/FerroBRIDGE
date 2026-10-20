@@ -24,6 +24,7 @@ pub mod mapping;
 pub mod method;
 pub mod openehr;
 pub mod party;
+pub mod port;
 
 use std::path::PathBuf;
 use std::sync::Arc;

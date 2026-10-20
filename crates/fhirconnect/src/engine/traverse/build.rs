@@ -295,6 +295,14 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
                 continue;
             }
             let value = match written.value {
+                Held::Canonical(ref value) => {
+                    values.push(
+                        NodeValue::new(node, value.clone())
+                            .with_occurrences(written.positions.clone())
+                            .with_datum(rm::RAW),
+                    );
+                    continue;
+                }
                 Held::Value(ref value) => value.clone(),
                 Held::Partial(ref object) => {
                     let rm_type = object

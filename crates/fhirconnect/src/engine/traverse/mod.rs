@@ -30,6 +30,7 @@ pub mod links;
 pub mod manual;
 pub mod party;
 pub mod place;
+pub mod programmed;
 pub mod reference;
 pub mod split;
 pub mod tail;
@@ -221,6 +222,9 @@ enum Held {
     /// A value written one tail attribute at a time, as canonical JSON, read
     /// as its class when the run builds the composition.
     Partial(serde_json::Map<String, serde_json::Value>),
+    /// The canonical JSON of a whole value a registered function produced,
+    /// which travels to the builder as written.
+    Canonical(serde_json::Value),
 }
 
 /// The value at the end of an openEHR target, the node's own or its tail's.

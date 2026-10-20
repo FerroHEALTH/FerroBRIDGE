@@ -39,6 +39,9 @@ serde_json.workspace = true
 # The base64 of FHIR `base64Binary`: a `DV_PARSABLE` value travels as an
 # `Attachment.data`, and a `DV_MULTIMEDIA` size is read from its data.
 base64.workspace = true
+# The bounds the `mappingCode` library decodes and encodes an `openehr-rm`
+# value under (`engine::library`).
+serde.workspace = true
 # The digest the default identity sink derives a created resource's id from.
 sha2.workspace = true
 # The generated FHIR model: the lexical `Value` tree the path model walks and

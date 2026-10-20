@@ -49,6 +49,8 @@ pub mod invariant;
 
 pub mod lens;
 
+pub mod library;
+
 pub mod origin;
 
 pub mod outcome;
