@@ -144,7 +144,6 @@ crates on crates.io.
   `src/auth/` and `src/cdr/oauth/` are gone from the server (#977), and
   `ferrobridge_server::credentials::UpstreamToken` hands the crate's token to
   both upstream clients.
-
 - The HL7 v2 corpora count a message the face refuses correctly as a pass
   (#639). `crates/ferrobridge-hl7v2/tests/it/corpus/expected-refusals.txt`
   lists 167 messages with the acknowledgment code and the HL7 table 0357
@@ -155,7 +154,6 @@ crates on crates.io.
   listed case fails when the face takes the message or answers it
   otherwise. The `hl7v2` badge moves from 290 to 453 of 511 and the
   `hl7v2-smoke` badge from 375 to 379 of 379.
-
 - The release workflow refuses a tag whose milestone, titled exactly as the
   tag, is missing or still holds an open issue or pull request, and names
   each one; once every leg has succeeded, crates.io included, it closes that
@@ -195,10 +193,10 @@ crates on crates.io.
   template walk (#906) and drops its own party assembly with the OPT 1.4
   structure index behind it. `ROLE.performer`, which no template node holds,
   is still placed on the root after the walk (#1000). Breaking for a
-  consumer that matches on `PartyError`: `NoStructure`, `Unconstrained` and `InstanceGap`
-  are gone, and a value the builder refuses is the new `PartyError::Build`,
-  which carries the `openehr-sdt` `FlatError` as its source. `fhirconnect`
-  0.1.161 renders the new requirement.
+  consumer that matches on `PartyError`: `NoStructure`, `Unconstrained` and
+  `InstanceGap` are gone, and a value the builder refuses is the new
+  `PartyError::Build`, which carries the `openehr-sdt` `FlatError` as its
+  source. `fhirconnect` 0.1.161 renders the new requirement.
 
 ### Fixed
 
