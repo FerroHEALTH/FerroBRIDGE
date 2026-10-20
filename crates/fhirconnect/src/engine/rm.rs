@@ -25,6 +25,8 @@ use openehr_rm::v1_2::data_types::basic::dv_boolean::DvBoolean;
 use openehr_rm::v1_2::data_types::basic::dv_identifier::DvIdentifier;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_date::DvDate;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_date_time::DvDateTime;
+use openehr_rm::v1_2::data_types::quantity::date_time::dv_duration::DvDuration;
+use openehr_rm::v1_2::data_types::quantity::date_time::dv_time::DvTime;
 use openehr_rm::v1_2::data_types::quantity::dv_count::DvCount;
 use openehr_rm::v1_2::data_types::quantity::dv_interval::DvInterval;
 use openehr_rm::v1_2::data_types::quantity::dv_proportion::DvProportion;
@@ -71,6 +73,10 @@ pub enum RmValue {
     Quantity(Box<DvQuantity>),
     /// A `DV_COUNT`.
     Count(Box<DvCount>),
+    /// A `DV_TIME`.
+    Time(Box<DvTime>),
+    /// A `DV_DURATION`.
+    Duration(Box<DvDuration>),
     /// A `DV_BOOLEAN`.
     Boolean(DvBoolean),
     /// A `PARTY_REF`, the party a `ROLE` names as its `performer`.
@@ -135,6 +141,8 @@ impl RmValue {
             Self::Proportion(_) => "DV_PROPORTION",
             Self::Quantity(_) => "DV_QUANTITY",
             Self::Count(_) => "DV_COUNT",
+            Self::Time(_) => "DV_TIME",
+            Self::Duration(_) => "DV_DURATION",
             Self::Boolean(_) => "DV_BOOLEAN",
             Self::PartyRef(_) => "PARTY_REF",
         }
@@ -195,6 +203,12 @@ impl RmValue {
             "DV_COUNT" => from_canonical_value(value)
                 .map(|count| Self::Count(Box::new(count)))
                 .map_err(refuse),
+            "DV_TIME" => from_canonical_value(value)
+                .map(|time| Self::Time(Box::new(time)))
+                .map_err(refuse),
+            "DV_DURATION" => from_canonical_value(value)
+                .map(|duration| Self::Duration(Box::new(duration)))
+                .map_err(refuse),
             "PARTY_REF" => from_canonical_value(value)
                 .map(Self::PartyRef)
                 .map_err(refuse),
@@ -245,6 +259,8 @@ impl RmValue {
                 to_canonical_value(quantity.as_ref())
             }
             Self::Count(ref count) => to_canonical_value(count.as_ref()),
+            Self::Time(ref time) => to_canonical_value(time.as_ref()),
+            Self::Duration(ref duration) => to_canonical_value(duration.as_ref()),
         };
         Ok(encoded)
     }

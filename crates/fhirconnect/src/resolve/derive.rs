@@ -46,6 +46,8 @@ pub const PAIRS: &[(&str, &[&str])] = &[
     ("DV_PROPORTION", &["Quantity"]),
     ("DV_QUANTITY", &["Quantity", "decimal", "integer"]),
     ("DV_COUNT", &["integer", "Quantity", "Count"]),
+    ("DV_TIME", &["time"]),
+    ("DV_DURATION", &["Duration"]),
     ("DV_BOOLEAN", &["boolean"]),
     ("PARTY_REF", &["Reference"]),
 ];
