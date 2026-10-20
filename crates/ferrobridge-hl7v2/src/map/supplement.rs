@@ -39,7 +39,7 @@ macro_rules! shipped {
 
 /// Every shipped supplement, as its file name and its text, in file name
 /// order.
-pub const SHIPPED: [(&str, &str); 17] = [
+pub const SHIPPED: [(&str, &str); 36] = [
     shipped!("ConceptMap-datatype-ce-to-codeableconcept.json"),
     shipped!("ConceptMap-datatype-cf-to-codeableconcept.json"),
     shipped!("ConceptMap-datatype-cwe-to-codeableconcept.json"),
@@ -49,10 +49,29 @@ pub const SHIPPED: [(&str, &str); 17] = [
     shipped!("ConceptMap-datatype-pl-to-location.json"),
     shipped!("ConceptMap-message-adt-a03-to-bundle.json"),
     shipped!("ConceptMap-message-adt-a05-to-bundle.json"),
+    shipped!("ConceptMap-message-adt-a06-to-bundle.json"),
     shipped!("ConceptMap-message-adt-a09-to-bundle.json"),
+    shipped!("ConceptMap-message-adt-a15-to-bundle.json"),
+    shipped!("ConceptMap-message-adt-a16-to-bundle.json"),
+    shipped!("ConceptMap-message-adt-a21-to-bundle.json"),
+    shipped!("ConceptMap-message-adt-a39-to-bundle.json"),
+    shipped!("ConceptMap-message-adt-a44-to-bundle.json"),
+    shipped!("ConceptMap-message-adt-a45-to-bundle.json"),
+    shipped!("ConceptMap-message-adt-a60-to-bundle.json"),
     shipped!("ConceptMap-message-bar-p01-to-bundle.json"),
+    shipped!("ConceptMap-message-bar-p02-to-bundle.json"),
+    shipped!("ConceptMap-message-bar-p12-to-bundle.json"),
+    shipped!("ConceptMap-message-dft-p03-to-bundle.json"),
+    shipped!("ConceptMap-message-dft-p11-to-bundle.json"),
+    shipped!("ConceptMap-message-mdm-t01-to-bundle.json"),
+    shipped!("ConceptMap-message-omg-o19-to-bundle.json"),
     shipped!("ConceptMap-message-orl-o22-to-bundle.json"),
     shipped!("ConceptMap-message-oul-r22-to-bundle.json"),
+    shipped!("ConceptMap-message-oul-r23-to-bundle.json"),
+    shipped!("ConceptMap-message-oul-r24-to-bundle.json"),
+    shipped!("ConceptMap-message-ppr-pc1-to-bundle.json"),
+    shipped!("ConceptMap-message-rde-o11-to-bundle.json"),
+    shipped!("ConceptMap-message-ref-i12-to-bundle.json"),
     shipped!("ConceptMap-segment-msh-to-messageheader.json"),
     shipped!("ConceptMap-segment-orc-to-diagnosticreport.json"),
     shipped!("ConceptMap-segment-pid-to-appointment.json"),

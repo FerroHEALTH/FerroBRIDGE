@@ -25,6 +25,15 @@ crates on crates.io.
 
 ### Added
 
+- `ferrobridge-hl7v2` ships message maps for 18 HL7 v2 structures the
+  v2-to-FHIR guide has none for (#637): ADT_A15, ADT_A16, ADT_A21, ADT_A39,
+  ADT_A44, ADT_A45, ADT_A60, BAR_P02, BAR_P12, DFT_P03, DFT_P11, MDM_T01,
+  OMG_O19, OUL_R23, OUL_R24, PPR_PC1, RDE_O11 and REF_I12. Each takes the
+  rows of a guide message map (or the shipped OUL_R22 map) for the segments
+  it shares, at its own group paths, so the guide's segment maps apply, and
+  its description names the map it composes. A supplement for ADT_A06 names
+  the guide's `ADT_A01.PD1` row `ADT_A06.PD1`, so ADT_A06 messages map too.
+  The `hl7v2` corpus gains the 56 messages, to 510 of 511.
 - The HL7 v2 face reads a batch file (#642). A frame that opens with FHS or
   BHS is split by the HL7 v2 chapter 2 §2.10.3 structure into its batches
   and messages, each message is answered as if it had arrived alone, and
