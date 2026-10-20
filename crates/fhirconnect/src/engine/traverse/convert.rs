@@ -244,9 +244,20 @@ impl<T: Table + ?Sized> Run<'_, T> {
         kind: FhirKind,
         text: &str,
     ) -> Result<FhirValue, EngineError> {
+        let refuse = |source: LensError| EngineError::Cell {
+            mapping: String::from(mapping.name()),
+            element: String::from(target.expression().as_str()),
+            source: Box::new(source),
+        };
         // NOTE: a scalar leaf carries text, so only an element that travels as
-        // text takes it; no specification governs this: our own design.
+        // text, or one `String.adoc` writes as text, takes it; no specification
+        // governs the rest: our own design.
         match kind {
+            FhirKind::Coding | FhirKind::Identifier | FhirKind::Reference
+                if openehr.leaf_class() == Some(cell::STRING) =>
+            {
+                cell::get_string(text, kind).map_err(refuse)
+            }
             FhirKind::String
             | FhirKind::Date
             | FhirKind::DateTime
@@ -272,15 +283,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
             | FhirKind::Decimal
             | FhirKind::Count
             | FhirKind::Duration
-            | FhirKind::Attachment => Err(EngineError::Cell {
-                mapping: String::from(mapping.name()),
-                element: String::from(target.expression().as_str()),
-                source: Box::new(LensError::NoCell {
-                    rm_type: String::from(openehr.leaf_class().unwrap_or("String")),
-                    kind: kind.as_str(),
-                    direction: Direction::OpenehrToFhir,
-                }),
-            }),
+            | FhirKind::Attachment => Err(refuse(LensError::NoCell {
+                rm_type: String::from(openehr.leaf_class().unwrap_or(cell::STRING)),
+                kind: kind.as_str(),
+                direction: Direction::OpenehrToFhir,
+            })),
         }
     }
 

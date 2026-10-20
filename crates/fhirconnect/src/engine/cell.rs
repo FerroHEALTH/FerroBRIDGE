@@ -42,6 +42,7 @@ use crate::engine::lens::party::IdentifierLens;
 use crate::engine::lens::party::PartyLens;
 use crate::engine::lens::proportion::PercentLens;
 use crate::engine::lens::quantity::QuantityLens;
+use crate::engine::lens::string::StringLens;
 use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::lens::text::TextLens;
 use crate::engine::lens::time::TimeLens;
@@ -143,6 +144,63 @@ pub fn get(
             .map(|attachment| FhirValue::Attachment(Box::new(attachment))),
         (source, kind) => Err(no_cell(source, kind, Direction::OpenehrToFhir)),
     }
+}
+
+/// The openEHR foundation class of a text attribute a tail ends on.
+pub const STRING: &str = "String";
+
+/// Reads an openEHR `String` attribute into the FHIR element `kind` names,
+/// through the `String.adoc` cells.
+///
+/// # Errors
+///
+/// Returns [`LensError::NoCell`] for a kind `String.adoc` writes no row for,
+/// and whatever the cell refuses otherwise.
+pub fn get_string(text: &str, kind: FhirKind) -> Result<FhirValue, LensError> {
+    let text = String::from(text);
+    match kind {
+        FhirKind::Coding => StringLens
+            .get(&text)
+            .map(|coding| FhirValue::Coding(Box::new(coding))),
+        FhirKind::Identifier => StringLens
+            .get(&text)
+            .map(|identifier| FhirValue::Identifier(Box::new(identifier))),
+        FhirKind::Reference => StringLens
+            .get(&text)
+            .map(|reference| FhirValue::Reference(Box::new(reference))),
+        other => Err(LensError::NoCell {
+            rm_type: String::from(STRING),
+            kind: other.as_str(),
+            direction: Direction::OpenehrToFhir,
+        }),
+    }
+}
+
+/// Writes a FHIR element into the text of an openEHR `String` attribute,
+/// through the `String.adoc` cells; `None` for an element those cells do not
+/// pair with text.
+///
+/// # Errors
+///
+/// Returns whatever the cell refuses.
+#[must_use]
+pub fn put_string(view: &FhirValue) -> Option<Result<Produced<String>, LensError>> {
+    let (value, fallbacks) = match *view {
+        FhirValue::Coding(ref coding) => (
+            StringLens.put(coding.as_ref(), None),
+            StringLens.fallbacks(coding.as_ref()),
+        ),
+        FhirValue::Identifier(ref identifier) => (
+            StringLens.put(identifier.as_ref(), None),
+            StringLens.fallbacks(identifier.as_ref()),
+        ),
+        FhirValue::Reference(ref reference) => (
+            StringLens.put(reference.as_ref(), None),
+            StringLens.fallbacks(reference.as_ref()),
+        ),
+        _ => return None,
+    };
+    Some(value.map(|value| Produced { value, fallbacks }))
 }
 
 /// Returns the term mappings [`get`] leaves out of the FHIR element `kind`

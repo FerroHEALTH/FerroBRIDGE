@@ -68,6 +68,14 @@ crates on crates.io.
   `Attachment` has no field for the algorithm, and an attachment with data and
   no size takes the decoded length, a one-way row. `fhirconnect` now depends
   on `base64`. `fhirconnect` 0.1.165.
+- A FHIRconnect mapping writes a `Coding`, an `Identifier` or a `Reference`
+  into an openEHR `String` attribute and reads it back (#93), the cells of
+  FHIRconnect `String.adoc`: a coding travels as `system::code`, an
+  identifier as `system::value`, and a reference as its identifier, or as its
+  `reference` string coming in when it has none, a one-way row. Text holding
+  `::` that would read back as another system and code is refused. Before, a
+  tail on a `String` attribute against those elements refused with no cell.
+  `fhirconnect` 0.1.166.
 - The shipped `datatype-pl-to-location` supplement writes PL.11, the
   assigning authority, into the `identifier.assigner` of each location level
   the PL carries (#345). The guide's two PL.11 rows address all six levels
