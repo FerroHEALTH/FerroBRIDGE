@@ -97,7 +97,7 @@ pub fn non_daily_to_openehr(element: &Value) -> Result<Ports, MappingCodeError> 
                 format!("`{unit}` is no unit of a non-daily period, which is `wk`, `mo` or `a`"),
             )
         })?;
-    let produced = duration::to_iso(amount, unit).map_err(|reason| refused(code, reason))?;
+    let produced = duration::to_iso(code, amount, unit)?;
     Ok(Ports::new().with(NON_DAILY_PERIOD, datum(DV_DURATION, &produced)))
 }
 
@@ -118,7 +118,7 @@ pub fn non_daily_to_fhir(ports: &Ports) -> Result<Option<Value>, MappingCodeErro
     let Some(held) = port_value::<DvDuration>(code, ports, NON_DAILY_PERIOD)? else {
         return Ok(None);
     };
-    let (amount, unit) = duration::from_iso(&held).map_err(|reason| refused(code, reason))?;
+    let (amount, unit) = duration::from_iso(code, &held)?;
     if !NON_DAILY_UNITS.contains(&unit) {
         return Err(refused(
             code,

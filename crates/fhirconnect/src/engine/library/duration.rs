@@ -1,40 +1,52 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The UCUM units of time and the ISO 8601 durations they stand for.
+//! The R4 units of time and the `DV_DURATION` an amount of one of them is.
 //!
-//! "openEHR uses the ISO duration meanwhile, FHIR uses UCUM codes", so the
-//! mapping transforms the UCUM code and its amount into
-//! `P[nnY][nnM][nnW][nnD][T[nnH][nnM][nnS]]` by the unit table of
-//! `docs/specs/fhirconnect/modules/ROOT/pages/types-of-mappings/data-type/DV_DURATION.adoc`.
-//! A FHIR amount carries one unit, so a duration written with more than one
-//! component has no FHIR form and is refused rather than converted.
+//! The conversion is the engine's own `DV_DURATION` cell
+//! ([`crate::engine::lens::duration::DurationLens`]), which carries the
+//! UCUM to ISO 8601 table of
+//! `docs/specs/fhirconnect/modules/ROOT/pages/types-of-mappings/data-type/DV_DURATION.adoc`,
+//! so a function converts a duration the way a data-type mapping does.
+//! `Timing.repeat` names its unit in `units-of-time`, a subset of that
+//! table, so this module adds which units a timing admits and holds the
+//! openEHR reader's own limits: a fraction stands on the seconds alone.
 
-use openehr_base::containers::present_nonempty;
+use fhir_types::r4::duration::Duration;
+use fhir_types::r4::primitives::Code;
+use fhir_types::r4::primitives::Decimal;
+use fhir_types::r4::primitives::Uri;
 use openehr_base::validate::Validate as _;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_duration::DvDuration;
+
+use crate::engine::lens::Lens;
+use crate::engine::lens::duration::DurationLens;
+use crate::engine::lens::quantity::UCUM;
+use crate::engine::library::cell;
+use crate::engine::library::refused;
+use crate::engine::traverse::functions::MappingCodeError;
 
 /// One unit of the R4 `units-of-time` value set
 /// (<https://hl7.org/fhir/R4/valueset-units-of-time.html>).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimeUnit {
-    /// `s`, ISO `TnnS`.
+    /// `s`.
     Second,
-    /// `min`, ISO `TnnM`.
+    /// `min`.
     Minute,
-    /// `h`, ISO `TnnH`.
+    /// `h`.
     Hour,
-    /// `d`, ISO `nnD`.
+    /// `d`.
     Day,
-    /// `wk`, ISO `nnW`.
+    /// `wk`.
     Week,
-    /// `mo`, ISO `nnM`.
+    /// `mo`.
     Month,
-    /// `a`, ISO `nnY`.
+    /// `a`.
     Year,
 }
 
-/// Every unit, in the order of the rows of `DV_DURATION.adoc`.
+/// Every unit, in the order of the value set.
 const UNITS: [TimeUnit; 7] = [
     TimeUnit::Second,
     TimeUnit::Minute,
@@ -65,117 +77,90 @@ impl TimeUnit {
             Self::Year => "a",
         }
     }
-
-    /// Returns the ISO 8601 designator of the unit, and whether it sits in
-    /// the time part after `T`.
-    const fn designator(self) -> (char, bool) {
-        match self {
-            Self::Second => ('S', true),
-            Self::Minute => ('M', true),
-            Self::Hour => ('H', true),
-            Self::Day => ('D', false),
-            Self::Week => ('W', false),
-            Self::Month => ('M', false),
-            Self::Year => ('Y', false),
-        }
-    }
 }
 
-/// Renders an amount of one unit as the ISO 8601 duration of a `DV_DURATION`.
+/// Writes an amount of one unit as a `DV_DURATION`, through the engine's
+/// `DV_DURATION` cell.
 ///
-/// The amount is the lexical text of a FHIR `decimal`. It keeps its text, so
+/// The amount is the lexical text of a FHIR `decimal`, kept as written, so
 /// the duration reads back to the same amount.
 ///
 /// # Errors
 ///
-/// Returns the reason when the amount is negative (R4 `tim-4` and `tim-5`
-/// hold a duration and a period non-negative), carries an exponent, which
-/// no ISO component can, or a fraction on any unit but the second, which is
-/// the one component an openEHR `Iso8601_duration` gives a fraction
-/// (openEHR BASE foundation types, `Iso8601_duration.fractional_second`).
-pub fn to_iso(amount: &str, unit: TimeUnit) -> Result<DvDuration, String> {
-    let fraction = plain_decimal(amount)
-        .ok_or_else(|| format!("the amount `{amount}` is no plain non-negative decimal"))?;
+/// Returns [`MappingCodeError`] when the amount is negative (R4 `tim-4` and
+/// `tim-5` hold a duration and a period non-negative) or carries an exponent,
+/// which no ISO component can; when it carries a fraction on any unit but
+/// the second, the one component an openEHR `Iso8601_duration` gives a
+/// fraction (openEHR BASE foundation types, `Iso8601_duration`); and when the
+/// cell refuses it.
+pub fn to_iso(code: &str, amount: &str, unit: TimeUnit) -> Result<DvDuration, MappingCodeError> {
+    let fraction = plain_decimal(amount).ok_or_else(|| {
+        refused(
+            code,
+            format!("the amount `{amount}` is no plain non-negative decimal"),
+        )
+    })?;
     if fraction && unit != TimeUnit::Second {
-        return Err(format!(
-            "the amount `{amount}` carries a fraction, and only a duration in seconds keeps one"
+        return Err(refused(
+            code,
+            format!(
+                "the amount `{amount}` carries a fraction, and only a duration in seconds keeps \
+                 one"
+            ),
         ));
     }
-    let (designator, time) = unit.designator();
-    let value = if time {
-        format!("PT{amount}{designator}")
-    } else {
-        format!("P{amount}{designator}")
+    let view = Duration {
+        value: Some(Decimal::from(amount)),
+        system: Some(Uri::from(UCUM)),
+        code: Some(Code::from(unit.ucum())),
+        ..Duration::default()
     };
-    let duration = DvDuration {
-        normal_status: None,
-        normal_range: None,
-        other_reference_ranges: present_nonempty(Vec::new()),
-        magnitude_status: None,
-        accuracy: None,
-        accuracy_is_percent: None,
-        value,
-    };
+    let duration = Lens::<DvDuration, Duration>::put(&DurationLens, &view, None)
+        .map_err(|source| cell(code, source))?;
     if !duration.invariants().is_empty() {
-        return Err(format!("`{}` is no ISO 8601 duration", duration.value));
+        return Err(refused(
+            code,
+            format!("`{}` is no ISO 8601 duration", duration.value),
+        ));
     }
     Ok(duration)
 }
 
-/// Reads the ISO 8601 duration of a `DV_DURATION` as an amount of one unit.
+/// Reads a `DV_DURATION` as an amount of one unit of time, through the
+/// engine's `DV_DURATION` cell.
+///
+/// A duration of several components reads in the smallest one present, as
+/// the cell reads it.
 ///
 /// # Errors
 ///
-/// Returns the reason when the value is no valid duration, is negative,
-/// carries more than one component, or carries anything beside its value
-/// that the FHIR amount has no place for.
-pub fn from_iso(duration: &DvDuration) -> Result<(String, TimeUnit), String> {
-    if !duration.invariants().is_empty() {
-        return Err(format!("`{}` is no valid DV_DURATION", duration.value));
-    }
+/// Returns [`MappingCodeError`] when the duration carries a range, a status
+/// or an accuracy, which a FHIR amount of time has no place for, when the
+/// cell refuses it, and when it reads in a unit outside `units-of-time`
+/// (`ms`).
+pub fn from_iso(code: &str, duration: &DvDuration) -> Result<(String, TimeUnit), MappingCodeError> {
     if duration.normal_status.is_some()
         || duration.normal_range.is_some()
         || duration.other_reference_ranges.is_some()
         || duration.accuracy.is_some()
         || duration.accuracy_is_percent.is_some()
-        || duration
-            .magnitude_status
-            .as_deref()
-            .is_some_and(|status| status != "=")
     {
-        return Err(String::from(
+        return Err(refused(
+            code,
             "the duration carries a range, a status or an accuracy, which a FHIR amount of time \
              has no place for",
         ));
     }
-    let text = duration.value.as_str();
-    let (time, rest) = match text.strip_prefix("PT") {
-        Some(rest) => (true, rest),
-        None => (
-            false,
-            text.strip_prefix('P')
-                .ok_or_else(|| format!("`{text}` is no positive ISO 8601 duration"))?,
-        ),
-    };
-    let designator = rest
-        .chars()
-        .last()
-        .ok_or_else(|| format!("`{text}` names no component"))?;
-    let amount = rest
-        .strip_suffix(designator)
-        .ok_or_else(|| format!("`{text}` names no component"))?;
-    let unit = UNITS
-        .into_iter()
-        .find(|unit| unit.designator() == (designator, time))
-        .ok_or_else(|| format!("`{text}` ends on no unit of time"))?;
-    let fraction = plain_decimal(amount).ok_or_else(|| {
-        format!("`{text}` carries more than one component, and a FHIR amount carries one unit")
-    })?;
-    if fraction && unit != TimeUnit::Second {
-        return Err(format!(
-            "`{text}` carries a fraction on a unit other than the second"
+    let view = Lens::<DvDuration, Duration>::get(&DurationLens, duration)
+        .map_err(|source| cell(code, source))?;
+    let amount = view.value.as_ref().and_then(|value| value.value.as_deref());
+    let units = view.code.as_ref().and_then(|units| units.value.as_deref());
+    let (Some(amount), Some(unit)) = (amount, units.and_then(TimeUnit::from_ucum)) else {
+        return Err(refused(
+            code,
+            format!("`{}` reads in no unit of `units-of-time`", duration.value),
         ));
-    }
+    };
     Ok((String::from(amount), unit))
 }
 
@@ -185,7 +170,7 @@ pub fn from_iso(duration: &DvDuration) -> Result<(String, TimeUnit), String> {
 /// Plain means the FHIR `decimal` grammar with no sign and no exponent
 /// (<https://hl7.org/fhir/R4/datatypes.html#decimal>): no leading zero but a
 /// lone one, and digits on both sides of a point.
-fn plain_decimal(text: &str) -> Option<bool> {
+pub(crate) fn plain_decimal(text: &str) -> Option<bool> {
     let (whole, fraction) = match text.split_once('.') {
         Some((whole, fraction)) => (whole, Some(fraction)),
         None => (text, None),
@@ -205,6 +190,9 @@ fn plain_decimal(text: &str) -> Option<bool> {
 mod tests {
     use super::*;
 
+    /// The name the test calls carry.
+    const CODE: &str = "test";
+
     #[test]
     fn every_unit_of_time_renders_its_row_of_the_table_and_reads_back() {
         for (unit, ucum, iso) in [
@@ -218,47 +206,49 @@ mod tests {
         ] {
             assert_eq!(TimeUnit::from_ucum(ucum), Some(unit));
             assert_eq!(unit.ucum(), ucum);
-            let duration = to_iso("8", unit).expect("a whole amount renders");
+            let duration = to_iso(CODE, "8", unit).expect("a whole amount renders");
             assert_eq!(duration.value, iso);
-            assert_eq!(from_iso(&duration), Ok((String::from("8"), unit)));
+            assert_eq!(from_iso(CODE, &duration), Ok((String::from("8"), unit)));
         }
     }
 
     #[test]
     fn only_seconds_keep_a_fraction() {
-        let seconds = to_iso("1.5", TimeUnit::Second).expect("seconds keep a fraction");
+        let seconds = to_iso(CODE, "1.5", TimeUnit::Second).expect("seconds keep a fraction");
         assert_eq!(seconds.value, "PT1.5S");
         assert_eq!(
-            from_iso(&seconds),
+            from_iso(CODE, &seconds),
             Ok((String::from("1.5"), TimeUnit::Second))
         );
-        assert!(to_iso("1.5", TimeUnit::Hour).is_err());
+        assert!(to_iso(CODE, "1.5", TimeUnit::Hour).is_err());
     }
 
     #[test]
     fn an_amount_outside_the_plain_grammar_is_refused() {
         for amount in ["-1", "1e2", "01", ".5", "5.", "", "x"] {
-            assert!(to_iso(amount, TimeUnit::Day).is_err(), "{amount}");
+            assert!(to_iso(CODE, amount, TimeUnit::Day).is_err(), "{amount}");
         }
     }
 
     #[test]
-    fn a_duration_with_two_components_or_a_sign_is_refused() {
-        for value in ["PT1H30M", "P1DT2H", "-PT1H", "P", "PT", "10 hours"] {
-            let duration = to_iso("1", TimeUnit::Hour)
-                .map(|mut duration| {
-                    duration.value = String::from(value);
-                    duration
-                })
-                .expect("a duration builds");
-            assert!(from_iso(&duration).is_err(), "{value}");
-        }
+    fn a_duration_of_several_components_reads_in_the_smallest() {
+        let mut duration = to_iso(CODE, "1", TimeUnit::Hour).expect("a duration builds");
+        duration.value = String::from("PT1H30M");
+        assert_eq!(
+            from_iso(CODE, &duration),
+            Ok((String::from("90"), TimeUnit::Minute))
+        );
     }
 
     #[test]
-    fn a_duration_that_carries_an_accuracy_is_refused() {
-        let mut duration = to_iso("1", TimeUnit::Hour).expect("a duration builds");
+    fn a_duration_that_is_none_or_carries_an_accuracy_is_refused() {
+        for value in ["-PT1H", "P", "PT", "10 hours"] {
+            let mut duration = to_iso(CODE, "1", TimeUnit::Hour).expect("a duration builds");
+            duration.value = String::from(value);
+            assert!(from_iso(CODE, &duration).is_err(), "{value}");
+        }
+        let mut duration = to_iso(CODE, "1", TimeUnit::Hour).expect("a duration builds");
         duration.accuracy = Some(0.0);
-        assert!(from_iso(&duration).is_err());
+        assert!(from_iso(CODE, &duration).is_err());
     }
 }

@@ -31,6 +31,7 @@ use openehr_its::json::to_canonical_value;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use crate::engine::lens::LensError;
 use crate::engine::traverse::functions::Datum;
 use crate::engine::traverse::functions::MappingCodeError;
 use crate::engine::traverse::functions::MappingFunctions;
@@ -198,4 +199,12 @@ fn port_value<T: DeserializeOwned>(
 /// Returns the datum of a value of `class`, as its canonical JSON.
 fn datum<T: Serialize>(class: &str, value: &T) -> Datum {
     Datum::new(class, to_canonical_value(value))
+}
+
+/// Returns the refusal of `code` for a cell's refusal.
+fn cell(code: &str, source: LensError) -> MappingCodeError {
+    MappingCodeError::Cell {
+        code: String::from(code),
+        source: Box::new(source),
+    }
 }

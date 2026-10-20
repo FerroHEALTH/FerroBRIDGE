@@ -155,11 +155,26 @@ fn an_element_that_is_no_timing_repeat_is_refused_as_a_decode() {
 }
 
 #[test]
-fn an_administration_duration_of_two_components_is_refused() {
+fn an_administration_duration_of_two_components_reads_in_the_smallest() -> Result<(), Box<dyn Error>>
+{
+    // As the DV_DURATION cell reads it: one hour and thirty minutes is ninety minutes.
+    let produced = Library.to_fhir(DURATION, &duration_at(SELF_PORT, "PT1H30M"))?;
+    assert_eq!(
+        written(produced)?,
+        serde_json::json!({"duration": 90, "durationUnit": "min"})
+    );
+    Ok(())
+}
+
+#[test]
+fn an_administration_duration_with_no_single_unit_is_refused() {
     let error = Library
-        .to_fhir(DURATION, &duration_at(SELF_PORT, "PT1H30M"))
-        .expect_err("a FHIR amount carries one unit");
-    assert!(refused_by(&error, DURATION), "{error:?}");
+        .to_fhir(DURATION, &duration_at(SELF_PORT, "P1M2D"))
+        .expect_err("months and days share no unit");
+    assert!(
+        matches!(error, MappingCodeError::Cell { ref code, .. } if code == DURATION),
+        "{error:?}"
+    );
 }
 
 #[test]

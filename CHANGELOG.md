@@ -48,8 +48,8 @@ crates on crates.io.
   `dosageDurationToAdministrationDuration` (`Timing.repeat.duration` and its
   unit against the administration duration) and `timingNonDaily` (a timing
   once per week, month or year against the interval of the non-daily
-  timing), both converting by the unit table of the FHIRconnect
-  `DV_DURATION` page and refusing what they cannot carry. The library's
+  timing), both converting through the engine's `DV_DURATION` cell and
+  refusing what they cannot carry. The library's
   `timing_non_daily.yml` now loads in every published context. Breaking for
   consumers: `MappingFunctions` takes the FHIR element and the port values,
   `Method::Programmed` carries its ports, and `MappingCodeRegistry` gains

@@ -84,7 +84,7 @@ pub fn administration_duration_to_openehr(element: &Value) -> Result<Ports, Mapp
         .ok_or_else(|| refused(code, "a duration has a unit (R4 `tim-1`)"))?;
     let unit = TimeUnit::from_ucum(unit)
         .ok_or_else(|| refused(code, format!("`{unit}` is no unit of `units-of-time`")))?;
-    let produced = duration::to_iso(amount, unit).map_err(|reason| refused(code, reason))?;
+    let produced = duration::to_iso(code, amount, unit)?;
     Ok(Ports::new().with(SELF_PORT, datum(DV_DURATION, &produced)))
 }
 
@@ -103,7 +103,7 @@ pub fn administration_duration_to_fhir(ports: &Ports) -> Result<Option<Value>, M
     let Some(held) = port_value::<DvDuration>(code, ports, SELF_PORT)? else {
         return Ok(None);
     };
-    let (amount, unit) = duration::from_iso(&held).map_err(|reason| refused(code, reason))?;
+    let (amount, unit) = duration::from_iso(code, &held)?;
     let repeat = TimingRepeat {
         duration: Some(Decimal::from(amount)),
         duration_unit: Some(Code::from(unit.ucum())),

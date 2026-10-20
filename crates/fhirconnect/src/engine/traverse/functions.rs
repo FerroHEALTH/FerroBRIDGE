@@ -20,6 +20,8 @@ use fhir_types::codec::EncodeError;
 use fhir_types::codec::Value;
 use openehr_its::json::JsonParseError;
 
+use crate::engine::lens::LensError;
+
 /// The port that names the node the mapping's `with.openehr` resolves to.
 pub const SELF_PORT: &str = "";
 
@@ -195,6 +197,15 @@ pub enum MappingCodeError {
         /// The refusal of the ITS-JSON reader.
         #[source]
         source: Box<JsonParseError>,
+    },
+    /// The data-type cell a function converts a value through refused it.
+    #[error("the function {code} could not convert a value")]
+    Cell {
+        /// The name the mapping wrote.
+        code: String,
+        /// The refusal of the cell.
+        #[source]
+        source: Box<LensError>,
     },
     /// The function wrote a port its signature does not declare.
     #[error("the function {code} wrote the port `{port}` its signature does not declare")]
