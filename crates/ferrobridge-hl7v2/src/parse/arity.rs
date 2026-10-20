@@ -7,17 +7,20 @@
 //!
 //! HL7 v2 chapter 2 §2.6, "Rules for the recipient", tells a receiver to
 //! "ignore segments, fields, components, subcomponents, and extra
-//! repetitions of a field that are present but were not expected", and its
-//! version compatibility rules say the receiver "SHALL ignore any message
-//! or message constituent it is not expecting without generating an
-//! application failure" (HL7 v2+ 2021Jan, Control). So none of these
+//! repetitions of a field that are present but were not expected", and
+//! §2.8.1, "Adding messages or message constituents", says the receiver
+//! "SHALL ignore any message or message constituent it is not expecting
+//! without generating an application failure" (both in the 2021Jan edition
+//! of the chapter, `HL7/v2plus` commit `1a8fbb7e`). So none of these
 //! refuses: each valued one is counted on the result and stays in the
 //! parsed message, where a map can still read it.
 //!
 //! Components and subcomponents are checked only against a field whose data
-//! type the v2.9.1 definitions define: the legacy tables a message of an
-//! earlier version is read with carry no component tables, so for those
-//! fields only the repetitions are checked.
+//! type the v2.9.1 definitions define. A message of an earlier version is
+//! read with the legacy tables, emitted from the IGAMT export of HL7's v2
+//! database, whose `components.json` is empty for every version from 2.1 to
+//! 2.8.2; with no component source for those fields, only their repetitions
+//! are checked.
 
 use hl7v2_types::model::{DataType, DataTypeRef, Field, Max, SegmentRef};
 
