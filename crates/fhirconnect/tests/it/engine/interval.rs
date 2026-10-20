@@ -165,3 +165,53 @@ fn an_attribute_the_interval_parameter_lacks_is_refused_at_load() -> Result<(), 
     );
     Ok(())
 }
+
+#[test]
+fn a_quantity_interval_picks_the_range_alternative() -> Result<(), Box<dyn Error>> {
+    // DV_INTERVAL.adoc §Range: a DV_INTERVAL<DV_QUANTITY> pairs with Range,
+    // so the untyped Condition.onset[x] is written as onsetRange.
+    let range = serde_json::json!({
+        "low": {"value": 2, "unit": "a", "system": "http://unitsofmeasure.org", "code": "a"},
+        "high": {"value": 5, "unit": "a", "system": "http://unitsofmeasure.org", "code": "a"},
+    });
+    let (written, resource) = round_trip(
+        "ferrobridge_onset_choice",
+        "DV_QUANTITY",
+        &condition("onsetRange", range.clone())?,
+    )?;
+    assert_eq!(
+        written
+            .pointer("/lower/_type")
+            .and_then(serde_json::Value::as_str),
+        Some("DV_QUANTITY"),
+        "{written}"
+    );
+    assert_eq!(resource.get("onsetRange"), Some(&range), "{resource}");
+    assert_eq!(resource.get("onsetPeriod"), None);
+    Ok(())
+}
+
+#[test]
+fn a_date_time_interval_picks_the_period_alternative() -> Result<(), Box<dyn Error>> {
+    // data-mappings.adoc: "if a period is provided FHIRconnect maps this
+    // period to an interval".
+    let period = serde_json::json!({
+        "start": "2026-09-01T08:00:00+02:00",
+        "end": "2026-09-02T08:00:00+02:00",
+    });
+    let (written, resource) = round_trip(
+        "ferrobridge_onset_choice",
+        "DV_DATE_TIME",
+        &condition("onsetPeriod", period.clone())?,
+    )?;
+    assert_eq!(
+        written
+            .pointer("/upper/value")
+            .and_then(serde_json::Value::as_str),
+        Some("2026-09-02T08:00:00+02:00"),
+        "{written}"
+    );
+    assert_eq!(resource.get("onsetPeriod"), Some(&period), "{resource}");
+    assert_eq!(resource.get("onsetRange"), None);
+    Ok(())
+}

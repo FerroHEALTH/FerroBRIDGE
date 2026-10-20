@@ -321,9 +321,11 @@ pub fn put(
         ("DV_DATE_TIME", FhirValue::Period(period)) => PeriodStartLens
             .put(period.as_ref(), held_date_time(existing))
             .map(|date| RmValue::DateTime(Box::new(date))),
-        ("DV_INTERVAL", FhirValue::Period(period)) => DateTimeIntervalLens
-            .put(period.as_ref(), held_interval(existing))
-            .map(|interval| RmValue::DateTimeInterval(Box::new(interval))),
+        ("DV_INTERVAL", FhirValue::Period(period)) if bounded_by(rm_type, DATE_TIME) => {
+            DateTimeIntervalLens
+                .put(period.as_ref(), held_interval(existing))
+                .map(|interval| RmValue::DateTimeInterval(Box::new(interval)))
+        }
         ("PARTY_IDENTIFIED" | "PARTY_PROXY", FhirValue::Reference(reference)) => PartyLens
             .put(reference.as_ref(), held_party(existing))
             .map(RmValue::Party),
@@ -358,9 +360,11 @@ pub fn put(
             .put(duration.as_ref(), held_duration(existing))
             .map(|duration| RmValue::Duration(Box::new(duration))),
         ("DV_URI", FhirValue::Url(url)) => UriLens.put(url, held_uri(existing)).map(RmValue::Uri),
-        ("DV_INTERVAL", FhirValue::Range(range)) => QuantityIntervalLens
-            .put(range.as_ref(), held_quantity_interval(existing))
-            .map(|interval| RmValue::QuantityInterval(Box::new(interval))),
+        ("DV_INTERVAL", FhirValue::Range(range)) if bounded_by(rm_type, QUANTITY) => {
+            QuantityIntervalLens
+                .put(range.as_ref(), held_quantity_interval(existing))
+                .map(|interval| RmValue::QuantityInterval(Box::new(interval)))
+        }
         ("DV_MULTIMEDIA", FhirValue::Attachment(attachment)) => EncapsulatedLens
             .put(attachment.as_ref(), held_multimedia(existing))
             .map(|multimedia| RmValue::Multimedia(Box::new(multimedia))),
@@ -394,7 +398,9 @@ fn fallbacks(
     match (derive::base_class(rm_type), view) {
         ("DV_QUANTITY", FhirValue::Quantity(quantity)) => QuantityLens.fallbacks(quantity.as_ref()),
         ("DV_DURATION", FhirValue::Duration(duration)) => DurationLens.fallbacks(duration.as_ref()),
-        ("DV_INTERVAL", FhirValue::Range(range)) => QuantityIntervalLens.fallbacks(range.as_ref()),
+        ("DV_INTERVAL", FhirValue::Range(range)) if bounded_by(rm_type, QUANTITY) => {
+            QuantityIntervalLens.fallbacks(range.as_ref())
+        }
         ("DV_MULTIMEDIA", FhirValue::Attachment(attachment)) => {
             Lens::<DvMultimedia, Attachment>::fallbacks(&EncapsulatedLens, attachment.as_ref())
         }
@@ -410,7 +416,7 @@ fn fallbacks(
         ("DV_BOOLEAN", FhirValue::Boolean(boolean)) => BooleanLens.fallbacks(boolean),
         ("DV_DATE_TIME", FhirValue::DateTime(date)) => DateTimeLens.fallbacks(date),
         ("DV_DATE_TIME", FhirValue::Period(period)) => PeriodStartLens.fallbacks(period.as_ref()),
-        ("DV_INTERVAL", FhirValue::Period(period)) => {
+        ("DV_INTERVAL", FhirValue::Period(period)) if bounded_by(rm_type, DATE_TIME) => {
             DateTimeIntervalLens.fallbacks(period.as_ref())
         }
         ("PARTY_IDENTIFIED" | "PARTY_PROXY", FhirValue::Reference(reference)) => {
@@ -424,6 +430,23 @@ fn fallbacks(
         }
         (_rm_type, _view) => Vec::new(),
     }
+}
+
+/// The bound class of the `DV_INTERVAL` the `Period` cell writes.
+const DATE_TIME: &str = "DV_DATE_TIME";
+
+/// The bound class of the `DV_INTERVAL` the `Range` cell writes.
+const QUANTITY: &str = "DV_QUANTITY";
+
+/// Returns whether a `DV_INTERVAL` node of `rm_type` may hold bounds of
+/// `class`: its parameter is `class`, or it names none.
+///
+/// `DV_INTERVAL<T>` is generic in its bound class
+/// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_types.html#_dv_interval_class>),
+/// so a `Period` written into a quantity interval would build the wrong
+/// value; the parameter decides the cell.
+fn bounded_by(rm_type: &str, class: &str) -> bool {
+    derive::type_argument(rm_type).is_none_or(|argument| argument == class)
 }
 
 /// Returns the coded-text lens for an element with or without a binding.
@@ -538,6 +561,23 @@ mod tests {
         let produced = put(&view, "DV_INTERVAL<DV_QUANTITY>", Some(&held), None)
             .expect("the Range cell carries the node");
         assert_eq!(produced.value, held);
+    }
+
+    #[test]
+    fn the_interval_parameter_refuses_the_other_cell() {
+        // RM 1.1.0 data_types §DV_INTERVAL: the bound class is the parameter.
+        let period = FhirValue::Period(Box::default());
+        let error = put(&period, "DV_INTERVAL<DV_QUANTITY>", None, None)
+            .expect_err("a Period builds no quantity interval");
+        assert!(error.to_string().contains("Period"), "{error}");
+        let range = FhirValue::Range(Box::default());
+        let error = put(&range, "DV_INTERVAL<DV_DATE_TIME>", None, None)
+            .expect_err("a Range builds no date-time interval");
+        assert!(error.to_string().contains("Range"), "{error}");
+        assert!(
+            put(&period, "DV_INTERVAL<DV_DATE_TIME>", None, None).is_ok(),
+            "a Period builds a date-time interval"
+        );
     }
 
     #[test]

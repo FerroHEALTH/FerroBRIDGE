@@ -113,7 +113,9 @@ instances" (`data-mappings.adoc` §Deprecated), so the compiler derives it once
 and the program carries it as `Mapping::derived`; the engine never looks at a
 type code or a class name to decide a cell. `resolve::derive::PAIRS` is the one
 table: per openEHR class, the FHIR type codes a cell of the engine carries,
-in the order the class's page of the data-type chapter lists them. That order
+in the order the class's page of the data-type chapter lists them; an
+interval row is keyed by its parameter (`DV_INTERVAL<DV_QUANTITY>` with
+`Range`), because the bound class decides the cell. That order
 is our own design, and it is the whole tie-break: an element's own type wins
 when the class pairs with it, a text primitive that is no pair converts as a
 `string`, and a choice element with no type filter is written as the first
