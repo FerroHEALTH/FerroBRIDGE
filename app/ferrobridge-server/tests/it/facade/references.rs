@@ -371,14 +371,118 @@ async fn a_depth_of_zero_fetches_nothing() -> Result<(), Box<dyn StdError>> {
     Ok(())
 }
 
+/// Returns whether one issue of `outcome` has `severity` and `code` and
+/// names every word of `words` in its diagnostics.
+fn names(outcome: &serde_json::Value, severity: &str, code: &str, words: &[&str]) -> bool {
+    outcome["issue"].as_array().is_some_and(|issues| {
+        issues.iter().any(|issue| {
+            issue["severity"] == severity
+                && issue["code"] == code
+                && issue["diagnostics"]
+                    .as_str()
+                    .is_some_and(|text| words.iter().all(|word| text.contains(word)))
+        })
+    })
+}
+
+/// The status and body of one answer.
+type Answer = (StatusCode, serde_json::Value);
+
+/// Posts `resource` as a create and as a `$validate`, and returns both
+/// answers.
+async fn create_and_validate(
+    harness: &Harness,
+    resource: &serde_json::Value,
+) -> Result<(Answer, Answer), Box<dyn StdError>> {
+    mount_ehr(&harness.cdr).await;
+    let created = call(
+        harness.app(),
+        Request::post("/fhir/Condition")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(resource.to_string()))?,
+    )
+    .await?;
+    let validated = call(
+        harness.app(),
+        Request::post("/fhir/Condition/$validate")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(resource.to_string()))?,
+    )
+    .await?;
+    Ok((created, validated))
+}
+
 #[tokio::test]
-async fn a_failed_fetch_is_a_skip_that_carries_the_upstream_status() -> Result<(), Box<dyn StdError>>
-{
-    // engine/references.adoc: "If not possible, the engine proceeds with the
-    // mapping", and the dry run names the status the sending site answered.
+async fn a_failed_fetch_refuses_the_request_with_the_upstream_status()
+-> Result<(), Box<dyn StdError>> {
+    // engine/Fail.adoc: "either all data should be mapped, or the mapping
+    // should fail"; a sending site that fails is an upstream failure, never an
+    // absence, and answers the facade's UPSTREAM row (R4 http.html, 502).
     let sender = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .respond_with(ResponseTemplate::new(503))
+        .mount(&sender)
+        .await;
+    let base = format!("{}/fhir", sender.uri());
+    let harness = referencing(allowing(&base, 2)).await;
+    let resource = citing(&[&format!("{base}/Observation/obs-1")]);
+    let ((status, outcome), (validated, dry)) = create_and_validate(&harness, &resource).await?;
+    assert_eq!(StatusCode::BAD_GATEWAY, status, "{outcome}");
+    assert!(
+        names(
+            &outcome,
+            "error",
+            "transient",
+            &["503", "Observation/obs-1"]
+        ),
+        "the refusal names the reference and the status: {outcome}"
+    );
+    assert_eq!(
+        None,
+        harness
+            .sent("POST", &format!("/ehr/{EHR_ID}/composition"))
+            .await,
+        "nothing was committed"
+    );
+    assert_eq!(StatusCode::BAD_GATEWAY, validated, "{dry}");
+    assert!(
+        names(&dry, "error", "transient", &["503", "Observation/obs-1"]),
+        "{dry}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_body_that_is_not_the_referenced_resource_refuses_the_request()
+-> Result<(), Box<dyn StdError>> {
+    let sender = MockServer::start().await;
+    Mock::given(matchers::method("GET"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(observation("obs-other", "Remote evidence one")),
+        )
+        .mount(&sender)
+        .await;
+    let base = format!("{}/fhir", sender.uri());
+    let harness = referencing(allowing(&base, 2)).await;
+    let resource = citing(&[&format!("{base}/Observation/obs-1")]);
+    let ((status, outcome), _) = create_and_validate(&harness, &resource).await?;
+    assert_eq!(StatusCode::BAD_GATEWAY, status, "{outcome}");
+    assert!(
+        names(&outcome, "error", "transient", &["Observation/obs-1"]),
+        "{outcome}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_resource_the_sending_site_does_not_hold_is_a_skip_that_names_the_status()
+-> Result<(), Box<dyn StdError>> {
+    // engine/references.adoc: "If not possible, the engine proceeds with the
+    // mapping"; a 404 says the resource is absent (R4 http.html §read).
+    let sender = MockServer::start().await;
+    Mock::given(matchers::method("GET"))
+        .respond_with(ResponseTemplate::new(404))
         .mount(&sender)
         .await;
     let base = format!("{}/fhir", sender.uri());
@@ -399,19 +503,87 @@ async fn a_failed_fetch_is_a_skip_that_carries_the_upstream_status() -> Result<(
     )
     .await?;
     assert_eq!(StatusCode::OK, status, "{outcome}");
-    let named = outcome["issue"]
-        .as_array()
-        .ok_or("the outcome carries issues")?
-        .iter()
-        .any(|issue| {
-            issue["severity"] == "warning"
-                && issue["diagnostics"]
-                    .as_str()
-                    .is_some_and(|text| text.contains("503") && text.contains("Observation/obs-1"))
-        });
     assert!(
-        named,
+        names(
+            &outcome,
+            "warning",
+            "not-found",
+            &["404", "Observation/obs-1"]
+        ),
         "the skip names the reference and the status: {outcome}"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_transaction_whose_reference_fetch_fails_is_refused_whole_with_502()
+-> Result<(), Box<dyn StdError>> {
+    let sender = MockServer::start().await;
+    Mock::given(matchers::method("GET"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&sender)
+        .await;
+    let base = format!("{}/fhir", sender.uri());
+    let harness = referencing(allowing(&base, 2)).await;
+    mount_ehr(&harness.cdr).await;
+    let bundle = serde_json::json!({
+        "resourceType": "Bundle",
+        "type": "transaction",
+        "entry": [
+            { "fullUrl": "urn:uuid:5e3c0000-0000-4000-8000-0000000000c2",
+              "resource": citing(&[&format!("{base}/Observation/obs-1")]),
+              "request": { "method": "POST", "url": "Condition" } }
+        ]
+    });
+    let (status, outcome) = call(
+        harness.app(),
+        Request::post("/fhir")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(bundle.to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::BAD_GATEWAY, status, "{outcome}");
+    assert!(
+        names(
+            &outcome,
+            "error",
+            "transient",
+            &["500", "Observation/obs-1"]
+        ),
+        "{outcome}"
+    );
+    assert_eq!(
+        None,
+        harness
+            .sent("POST", &format!("/ehr/{EHR_ID}/contribution"))
+            .await,
+        "nothing was committed"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_reference_cycle_fetches_each_literal_once() -> Result<(), Box<dyn StdError>> {
+    // engine/references.adoc: the engine "should either stop at a given level
+    // of references or keep track of which ones are already resolved"; both
+    // hold here, so a cycle inside the depth ends at its first repeat.
+    let sender = MockServer::start().await;
+    let base = format!("{}/fhir", sender.uri());
+    for (id, member) in [("obs-1", "obs-2"), ("obs-2", "obs-1")] {
+        let mut found = observation(id, "Remote evidence one");
+        found["hasMember"] =
+            serde_json::json!([{ "reference": format!("{base}/Observation/{member}") }]);
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path(format!("/fhir/Observation/{id}")))
+            .respond_with(ResponseTemplate::new(200).set_body_json(found))
+            .mount(&sender)
+            .await;
+    }
+    let harness = referencing(allowing(&base, 8)).await;
+    let resource = citing(&[&format!("{base}/Observation/obs-1")]);
+    let stored = composition_of(&harness, &resource);
+    let (status, _) = post(&harness, &resource, &stored).await?;
+    assert_eq!(StatusCode::CREATED, status);
+    assert_eq!(2, received(&sender).await, "each literal of the cycle once");
     Ok(())
 }

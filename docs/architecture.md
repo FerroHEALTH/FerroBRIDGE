@@ -862,10 +862,16 @@ expression is a load error: the reference CDR's connector let `where()` and
   membership, not equality. A resource two mappings both need is a LINKED
   mapping. A reference a transaction entry makes to another entry resolves
   to that entry by `fullUrl` or `<Type>/<id>` first (#753). A reference the
-  request does not carry is resolved as the references chapter recommends, and one that cannot be resolved is a
-  declared skip: "If not possible, the engine proceeds with the mapping"
-  (`engine/references.adoc`), which the engine records as a
-  `Loss::Skipped` warning, never a silent nothing (#224). A relative
+  request does not carry is resolved as the references chapter recommends, and one whose resource is
+  absent (off the allow-list, unknown to the identity map, or answered
+  `404` or `410`) is a declared skip: "If not possible, the engine proceeds
+  with the mapping" (`engine/references.adoc`), which the engine records as
+  a `Loss::Skipped` warning, never a silent nothing (#224). A fetch that
+  failed (no answer, another status, or a body that is not the referenced
+  resource) refuses a request whose mapping reads the reference with a
+  `502` carrying the upstream status, because `engine/Fail.adoc` asks that
+  "either all data should be mapped, or the mapping should fail" and an
+  upstream failure is never an absence (#94). A relative
   reference, or one under the facade's own base, is read through the
   identity map and the CDR; an absolute one is fetched only from a base on
   the `[facade.references] fetch_bases` allow-list (empty by default, so by

@@ -294,7 +294,12 @@ impl Ingest<'_> {
             .run_consuming(program, &inbound, provenance)
             .await
             .map_err(|error| {
-                Issue::error(IssueType::Processing)
+                let code = if crate::facade::references::unfetched(&error).is_some() {
+                    crate::facade::status::UPSTREAM.issue()
+                } else {
+                    IssueType::Processing
+                };
+                Issue::error(code)
                     .diagnosing(chain(&error))
                     .at(String::from(full_url))
             })?;
