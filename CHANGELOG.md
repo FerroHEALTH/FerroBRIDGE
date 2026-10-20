@@ -162,6 +162,15 @@ crates on crates.io.
 
 ### Fixed
 
+- The `defining_code` of a `DV_CODED_TEXT` value read out to a FHIR `string`
+  is a declared loss (#1011). The chapter writes no `string` row for
+  `DV_CODED_TEXT` (FHIRconnect `DV_CODED_TEXT.adoc` §STRING calls the pairing
+  not possible), so the value converts as `DV_TEXT` and its code was dropped
+  with no trace; the run now reports it as a `Loss::Skipped` with the new
+  `SkipReason::DefiningCodeUncarried`, located at the element and the value's
+  `defining_code`. A consumer that matches `SkipReason` exhaustively adds the
+  arm. The facade's loss log labels it `skipped-defining-code-uncarried`.
+  `fhirconnect` 0.1.160.
 - A `TERM_MAPPING` that a `DV_TEXT` or `DV_CODED_TEXT` value carries out to a
   FHIR `string`, or a `DV_CODED_TEXT` value carries out to a single `Coding`,
   is a declared loss (#623). Those pairs give `mappings` no FHIR row
