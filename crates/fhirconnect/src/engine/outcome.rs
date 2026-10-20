@@ -10,7 +10,8 @@
 //! `unidirectional` marker, a reference that resolves to nothing, or an
 //! optional code its concept map does not translate), a
 //! `TERM_MAPPING` whose `match` is not `=` and so has no FHIR form, a
-//! `TERM_MAPPING` of a value written into an element with no coding, a
+//! `TERM_MAPPING` of a value written into an element with no coding, the
+//! `defining_code` of a coded text written into a `string`, a
 //! composition field the engine defaulted, the occurrences a `0..n` into a
 //! `0..1` dropped, a one-way row a data-type cell took, and a reference whose
 //! resolution belongs to the facade. Nothing else is a warning, and the
@@ -20,6 +21,7 @@
 use core::fmt;
 
 use fhir_types::codec::Value;
+use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 
 use crate::engine::lens::Fallback;
 use crate::engine::lens::term_mapping::Cause;
@@ -253,6 +255,22 @@ impl Warning {
         )
     }
 
+    /// Records the `defining_code` a data-type cell of `mapping` left out of
+    /// the FHIR `string` it wrote, at `location`.
+    #[must_use]
+    pub fn uncarried_code(mapping: &str, code: &CodePhrase, location: Location) -> Self {
+        Self::new(
+            Loss::Skipped {
+                mapping: String::from(mapping),
+                reason: SkipReason::DefiningCodeUncarried {
+                    terminology: code.terminology_id.value.clone(),
+                    code: code.code_string.clone(),
+                },
+            },
+            location,
+        )
+    }
+
     /// Returns what was lost.
     #[must_use]
     pub const fn loss(&self) -> &Loss {
@@ -397,6 +415,20 @@ pub enum SkipReason {
         /// The `code_string` of the mapping's target.
         code: String,
     },
+    /// The `defining_code` of a `DV_CODED_TEXT` has no place in the FHIR
+    /// `string` the mapping wrote.
+    ///
+    /// The chapter writes no `string` row for `DV_CODED_TEXT`
+    /// (`types-of-mappings/data-type/DV_CODED_TEXT.adoc` §STRING calls the
+    /// pairing not possible), so the value converts as its supertype
+    /// `DV_TEXT`, whose table has no `defining_code` row: the rubric was
+    /// written and the code was not.
+    DefiningCodeUncarried {
+        /// The `terminology_id` value of the defining code.
+        terminology: String,
+        /// The `code_string` of the defining code.
+        code: String,
+    },
 }
 
 impl fmt::Display for SkipReason {
@@ -437,6 +469,14 @@ impl fmt::Display for SkipReason {
                 f,
                 "its TERM_MAPPING to {code} of {terminology} has no place in an element \
                  that carries no coding"
+            ),
+            Self::DefiningCodeUncarried {
+                ref terminology,
+                ref code,
+            } => write!(
+                f,
+                "its defining_code {code} of {terminology} has no place in a string, \
+                 which carries the rubric only"
             ),
         }
     }

@@ -1,0 +1,545 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "message-adt-a45-to-bundle",
+  "url": "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/message-adt-a45-to-bundle",
+  "name": "FerroBRIDGEAdtA45ToBundle",
+  "title": "FerroBRIDGE supplement: ADT_A45 to Bundle",
+  "status": "active",
+  "experimental": true,
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
+  "description": "Adds a message map for the HL7 v2 ADT_A45 structure (A45, move visit information; http://hl7.org/v2/StructureDefinition/ADT_A45), for which hl7.fhir.uv.v2mappings 1.0.0 ships none. The rows are those of ConceptMap/message-adt-a06-to-bundle for MSH, SFT, EVN, PID, PD1, MRG and PV1, the last two at their ADT_A45 paths under MERGE_INFO, so the guide segment maps they name apply unchanged. FerroBRIDGE #637.",
+  "group": [
+    {
+      "element": [
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.MSH",
+          "display": "Message Header",
+          "target": [
+            {
+              "code": "Bundle",
+              "display": "Bundle",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.MSH",
+          "display": "Message Header",
+          "target": [
+            {
+              "code": "MessageHeader[1]",
+              "display": "MessageHeader[1]",
+              "equivalence": "equivalent",
+              "comment": "Processing of the MSH segment results in the creation of a new MessageHeader resource."
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.MSH",
+          "display": "Message Header",
+          "target": [
+            {
+              "code": "Provenance[1]",
+              "display": "Provenance[1]",
+              "equivalence": "equivalent",
+              "comment": "If the FHIR transformation does not yield a FHIR message, but only a set of resource (APIs, repository, etc.) than one should consider attaching this Provenance resource instance to the relevant FHIR resources generated.",
+              "dependsOn": [
+                {
+                  "property": "Narrative-Condition",
+                  "value": "If there is a source in MSH-4, or known based on the configuration."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.MSH",
+          "display": "Message Header",
+          "target": [
+            {
+              "code": "Provenance[2]",
+              "display": "Provenance[2]",
+              "equivalence": "equivalent",
+              "comment": "If the FHIR transformation does not yield a FHIR Bunlde, but only a set of resource (APIs, repository, etc.) than one should consider attaching this Provenance resource instance to the relevant FHIR resources generated."
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 0
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": -1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.SFT",
+          "display": "Software Segment",
+          "target": [
+            {
+              "code": "Provenance[1].entity.what(Device)",
+              "display": "Provenance[1].entity.what(Device)",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Narrative-Condition",
+                  "value": "If the software does represent not the original source system"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 0
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": -1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.SFT",
+          "display": "Software Segment",
+          "target": [
+            {
+              "code": "Provenance[1].entity.what(Device)",
+              "display": "Provenance[1].entity.what(Device)",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Narrative-Condition",
+                  "value": "If the software represents the original source system"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.EVN",
+          "display": "Event Type",
+          "target": [
+            {
+              "code": "Provenance[3]",
+              "display": "Provenance[3]",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.EVN",
+          "display": "Event Type",
+          "target": [
+            {
+              "code": "Provenance[3]",
+              "display": "Provenance[3]",
+              "equivalence": "equivalent",
+              "comment": "If EVN-5 is not valued, then the MSH may have either the sending responsible organization (MSH-22) or the sending facility (MSH-4) to reasonable approximate the agent relevant for this Provenance instance.",
+              "dependsOn": [
+                {
+                  "property": "Computable-ANTLR",
+                  "value": "IF EVN-5 NOT VALUED AND (MSH-22 IS VALUED OR MSH-4 IS VALUED)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.PID",
+          "display": "Patient Identification",
+          "target": [
+            {
+              "code": "Patient[1]",
+              "display": "Patient[1]",
+              "equivalence": "equivalent",
+              "comment": "Processing of the PID segment results in the creation of a new Patient resource"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.PID",
+          "display": "Patient Identification",
+          "target": [
+            {
+              "code": "Account[1]",
+              "display": "Account[1]",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.PID",
+          "display": "Patient Identification",
+          "target": [
+            {
+              "code": "Provenance[4]",
+              "display": "Provenance[4]",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Computable-ANTLR",
+                  "value": "IF PID-33 AND PID-34 VALUED"
+                },
+                {
+                  "property": "Narrative-Condition",
+                  "value": "One  may drop PID-33 from the condition if PID-34 Last Update Facility is still sufficient without a date."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 0
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.PD1",
+          "display": "Additional Demographics",
+          "target": [
+            {
+              "code": "Patient[1]",
+              "display": "Patient[1]",
+              "equivalence": "equivalent",
+              "comment": "Incorporate PD1 content into the Patient created from the PID segment."
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 0
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.PD1",
+          "display": "Additional Demographics",
+          "target": [
+            {
+              "code": "Observation[1]",
+              "display": "Observation[1]",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Computable-ANTLR",
+                  "value": "IF PD1-7 VALUED"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 0
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.MERGE_INFO.MRG",
+          "display": "Merge Information",
+          "target": [
+            {
+              "code": "Account[2]",
+              "display": "Account[2]",
+              "equivalence": "equivalent",
+              "comment": "It will be left to implementation negotiation to determine whether disparate systems merely change the patient class, or close and open a new account.  The current active account number should appear in field PID-18 - Patient Account Number; the prior account number can be included optionally in MRG-3 - Prior Patient Account Number. \nDepending on the relationship between the old and new account, the implementer should consider whether Account.partOf should be used as well to link the two accounts appropriately.\\"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.MERGE_INFO.PV1",
+          "display": "Patient Visit",
+          "target": [
+            {
+              "code": "Encounter[1]",
+              "display": "Encounter[1]",
+              "equivalence": "equivalent",
+              "comment": "Processing of the PV1 segment results in the creation of a new Encounter resource.  Note also that per A06 and A07 trigger event definitions PV1-19 - Visit Number may also be changed during this event."
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.MERGE_INFO.PV1",
+          "display": "Patient Visit",
+          "target": [
+            {
+              "code": "Basic",
+              "display": "Basic",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Computable-ANTLR",
+                  "value": "IF PV1-43 VALUED"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.MERGE_INFO.PV1",
+          "display": "Patient Visit",
+          "target": [
+            {
+              "code": "Patient[1]",
+              "display": "Patient[1]",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 1
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "ADT_A45.MERGE_INFO.PV1",
+          "display": "Patient Visit",
+          "target": [
+            {
+              "code": "Coverage[1]",
+              "display": "Coverage[1]",
+              "equivalence": "equivalent",
+              "dependsOn": [
+                {
+                  "property": "Computable-ANTLR",
+                  "value": "IF PV1-20 VALUE"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

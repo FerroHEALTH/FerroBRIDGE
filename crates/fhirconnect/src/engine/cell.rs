@@ -11,6 +11,7 @@
 
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
+use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
 
@@ -134,6 +135,21 @@ pub fn withheld(source: &RmValue, kind: FhirKind, binding: Option<&str>) -> Vec<
             Lens::<DvCodedText, CodeableConcept>::withheld(&coded_lens(binding), text.as_ref())
         }
         (_source, _kind) => Vec::new(),
+    }
+}
+
+/// Returns the `defining_code` [`get`] leaves out of the FHIR element `kind`
+/// names, `None` when the cell carries it.
+///
+/// Only `DV_CODED_TEXT` against `string` drops it. The chapter writes no
+/// `string` row for `DV_CODED_TEXT` (`DV_CODED_TEXT.adoc` §STRING calls the
+/// pairing not possible), so the cell is the `DV_TEXT` one of its supertype,
+/// whose table has no `defining_code` row, and the engine declares the code.
+#[must_use]
+pub fn uncarried_code(source: &RmValue, kind: FhirKind) -> Option<&CodePhrase> {
+    match (source, kind) {
+        (RmValue::CodedText(text), FhirKind::String) => Some(&text.defining_code),
+        (_source, _kind) => None,
     }
 }
 
@@ -285,9 +301,7 @@ fn held_coded(existing: Option<&RmValue>) -> Option<&DvCodedText> {
 }
 
 /// Returns the held `CODE_PHRASE`, when the target holds one.
-fn held_code_phrase(
-    existing: Option<&RmValue>,
-) -> Option<&openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase> {
+fn held_code_phrase(existing: Option<&RmValue>) -> Option<&CodePhrase> {
     match existing {
         Some(RmValue::CodePhrase(code)) => Some(code),
         _other => None,
@@ -489,6 +503,30 @@ mod tests {
         assert_eq!(reported(&text(), FhirKind::String), every);
         assert_eq!(reported(&coded_text(), FhirKind::String), every);
         assert_eq!(reported(&coded_text(), FhirKind::Coding), every);
+    }
+
+    #[test]
+    fn a_coded_text_read_as_a_string_names_its_defining_code() {
+        // DV_CODED_TEXT.adoc §STRING: the chapter writes no string row, so the
+        // DV_TEXT cell carries the rubric and the code is declared.
+        let source = coded_text();
+        let dropped = super::uncarried_code(&source, FhirKind::String).map(|code| {
+            (
+                code.terminology_id.value.as_str(),
+                code.code_string.as_str(),
+            )
+        });
+        assert_eq!(dropped, Some(("local", "at0017")));
+        let produced = get(&source, FhirKind::String, None).expect("the DV_TEXT cell runs");
+        assert_eq!(produced.kind(), FhirKind::String);
+    }
+
+    #[test]
+    fn a_cell_with_a_coding_drops_no_defining_code() {
+        for kind in [FhirKind::Coding, FhirKind::CodeableConcept] {
+            assert_eq!(super::uncarried_code(&coded_text(), kind), None);
+        }
+        assert_eq!(super::uncarried_code(&text(), FhirKind::String), None);
     }
 
     #[test]

@@ -315,14 +315,18 @@ fn admission(event: &str, control: &str) -> Vec<u8> {
     ])
 }
 
-// NOTE: the message maps the supplements add (ADT_A03, BAR_P01) and fix (ADT_A05 and ADT_A09
-// name ADT_A01.PD1) map their structures with the guide's segment maps.
+// NOTE: the message maps the supplements add (ADT_A03, ADT_A15, ADT_A16, ADT_A21, BAR_P01) and
+// fix (ADT_A05, ADT_A06 and ADT_A09 name ADT_A01.PD1) map their structures with the guide's maps.
 #[tokio::test]
 async fn the_supplemented_message_maps_carry_their_structures() {
     for (event, map_id, overrides) in [
         ("ADT^A03^ADT_A03", "message-adt-a03-to-bundle", false),
         ("ADT^A28^ADT_A05", "message-adt-a05-to-bundle", true),
+        ("ADT^A06^ADT_A06", "message-adt-a06-to-bundle", true),
         ("ADT^A09^ADT_A09", "message-adt-a09-to-bundle", true),
+        ("ADT^A15^ADT_A15", "message-adt-a15-to-bundle", false),
+        ("ADT^A16^ADT_A16", "message-adt-a16-to-bundle", false),
+        ("ADT^A21^ADT_A21", "message-adt-a21-to-bundle", false),
         ("BAR^P01^BAR_P01", "message-bar-p01-to-bundle", false),
     ] {
         let message = admission(event, "MSG00047");

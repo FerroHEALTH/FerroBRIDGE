@@ -268,7 +268,7 @@ impl Config {
                 None
             },
             auth: if serves && self.guards_a_surface() {
-                auth::resolve_auth(&self.auth, &self.operator)?
+                auth::resolve_auth(&self.auth)?
             } else {
                 None
             },
