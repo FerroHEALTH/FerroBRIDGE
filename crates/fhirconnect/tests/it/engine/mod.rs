@@ -18,6 +18,7 @@ mod display;
 mod element_links;
 mod end_time;
 mod functions;
+mod interval;
 mod links;
 mod party;
 mod polymorphic;

@@ -77,6 +77,47 @@ pub fn base_class(rm_type: &str) -> &str {
     rm_type.split_once('<').map_or(rm_type, |(class, _)| class)
 }
 
+/// Returns the generic parameter a Web Template type name carries
+/// (`DV_QUANTITY` of `DV_INTERVAL<DV_QUANTITY>`), `None` for a plain class.
+#[must_use]
+pub fn type_argument(rm_type: &str) -> Option<&str> {
+    rm_type
+        .split_once('<')
+        .and_then(|(_, argument)| argument.strip_suffix('>'))
+}
+
+/// Returns the class an attribute of a node of `rm_type` holds: the node's
+/// generic parameter where the attribute is typed by the class's formal
+/// parameter, the attribute's declared type otherwise.
+///
+/// The attribute model resolves a formal parameter to its bound
+/// (`DV_INTERVAL.lower` is `DV_ORDERED`), while `DV_INTERVAL<T>` types both
+/// bounds `T` (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_types.html#_dv_interval_class>),
+/// so a bound below a `DV_INTERVAL<DV_QUANTITY>` node is a `DV_QUANTITY`. An
+/// attribute declared as the parameter's bound with no type arguments of its
+/// own is read as typed by the parameter, and the argument replaces it only
+/// when it conforms to that bound.
+#[must_use]
+pub fn attribute_class(rm_type: &str, attribute: &model::RmAttribute) -> &'static str {
+    let declared = attribute.declared_type;
+    let Some(argument) = type_argument(rm_type) else {
+        return declared;
+    };
+    let parameterised = attribute.type_params.is_empty()
+        && model::class(base_class(rm_type)).is_some_and(|class| {
+            class
+                .generic_params
+                .iter()
+                .any(|parameter| parameter.conforms_to == Some(declared))
+        });
+    if !parameterised {
+        return declared;
+    }
+    model::class(argument)
+        .filter(|class| model::is_a(class.name, declared))
+        .map_or(declared, |class| class.name)
+}
+
 /// Returns the FHIR type codes `class` converts with, empty for a class no
 /// cell carries.
 #[must_use]
@@ -188,9 +229,12 @@ mod tests {
     use fhir_types::schema::ValueKind;
 
     use super::alternative;
+    use super::attribute_class;
     use super::carried;
     use super::element;
     use super::is_structural;
+    use super::type_argument;
+    use openehr_rm::v1_2::model;
 
     #[test]
     fn a_date_time_element_against_a_date_time_node_converts_as_a_date_time() {
@@ -303,5 +347,33 @@ mod tests {
         ];
         assert_eq!(alternative("DV_QUANTITY", values), Some("Quantity"));
         assert_eq!(alternative("DV_COUNT", values), Some("Integer"));
+    }
+
+    #[test]
+    fn a_generic_node_names_its_parameter() {
+        assert_eq!(
+            type_argument("DV_INTERVAL<DV_QUANTITY>"),
+            Some("DV_QUANTITY")
+        );
+        assert_eq!(type_argument("DV_QUANTITY"), None);
+    }
+
+    #[test]
+    fn a_bound_of_a_generic_interval_is_its_parameter() {
+        let lower = model::attribute("DV_INTERVAL", "lower").expect("the model has the bound");
+        assert_eq!(
+            attribute_class("DV_INTERVAL<DV_QUANTITY>", lower),
+            "DV_QUANTITY"
+        );
+        assert_eq!(attribute_class("DV_INTERVAL", lower), "DV_ORDERED");
+        let flag =
+            model::attribute("DV_INTERVAL", "lower_included").expect("the model has the flag");
+        assert_eq!(attribute_class("DV_INTERVAL<DV_QUANTITY>", flag), "Boolean");
+    }
+
+    #[test]
+    fn an_argument_outside_the_bound_keeps_the_declared_type() {
+        let lower = model::attribute("DV_INTERVAL", "lower").expect("the model has the bound");
+        assert_eq!(attribute_class("DV_INTERVAL<DV_TEXT>", lower), "DV_ORDERED");
     }
 }
