@@ -570,6 +570,14 @@ crates on crates.io.
   hunk that differs beyond its versions to stop the merge, and refuses a
   manifest `cargo metadata` cannot read.
 
+### Security
+
+- The TLS stack the bridge calls the CDR, the terminology server and the
+  sending sites through no longer trusts the distrusted emSign
+  intermediates: `rustls-webpki` 0.103.16 rejects their public keys
+  (RUSTSEC-2026-0382), and `webpki-roots` and `webpki-root-certs` 1.0.10
+  drop the root that allowed them (RUSTSEC-2026-0381, RUSTSEC-2026-0383).
+
 ## [0.0.10] - 2026-10-19
 
 The openEHR demographics release. The FHIR facade serves `Patient`,
