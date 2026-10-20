@@ -156,8 +156,8 @@ done <<< "$WATCHED"
 
 # One "matrix label<TAB>upstream repository<TAB>branch" record per line: a
 # corpus pinned by commit on a repository that publishes no releases, read
-# against the newest commit of the branch the pin follows. The two KDS fixture
-# rows pin one file each, and the UCUM row a release tag, so neither is read
+# against the newest commit of the branch the pin follows. Each KDS fixture
+# row pins one file, and the UCUM row a release tag, so none of them is read
 # here.
 readonly WATCHED_COMMITS="\
 FHIRconnect specification source	SevKohler/FHIRconnect-spec	main
