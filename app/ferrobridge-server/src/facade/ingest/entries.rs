@@ -295,7 +295,9 @@ impl Ingest<'_> {
             .run_linking(program, &inbound, provenance, Some(&InBundle))
             .await
             .map_err(|error| {
-                let code = if crate::facade::references::unfetched(&error).is_some() {
+                let code = if crate::facade::references::unfetched(&error).is_some()
+                    || crate::terminology::failed_upstream(&error)
+                {
                     crate::facade::status::UPSTREAM.issue()
                 } else {
                     IssueType::Processing

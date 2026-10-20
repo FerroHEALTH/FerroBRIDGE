@@ -128,9 +128,12 @@ pub(crate) async fn validate(
         .await
     {
         Ok(outcome) => outcome,
-        // NOTE: R4 operation-resource-validate.html: the outcome judges the resource, so a
-        // reference that could not be fetched is an upstream failure and never "invalid".
-        Err(error) if crate::facade::references::unfetched(&error).is_some() => {
+        // NOTE: R4 operation-resource-validate.html: the outcome judges the resource, so an
+        // unfetched reference or a failed terminology server is upstream and never "invalid".
+        Err(error)
+            if crate::facade::references::unfetched(&error).is_some()
+                || crate::terminology::failed_upstream(&error) =>
+        {
             return Err(crate::facade::ingest::engine_refusal(&error).into());
         }
         Err(error) => return Ok(invalid(&crate::facade::outcome::chain(&error))),
