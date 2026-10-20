@@ -1205,14 +1205,19 @@ jobs:
   # request that changes a crate's packaged content moves that crate's version
   # in the same change, because a published version is immutable. The
   # `no-crate-bump` label is the escape for a diff that provably alters no
-  # packaged bytes.
+  # packaged bytes. The merge group runs it again against the queue base, so a
+  # change whose version main reached while it waited fails before it merges
+  # (#1096).
   crate-version-guard:
     name: crate-version-guard
-    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'no-crate-bump')
+    if: >-
+      (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'no-crate-bump'))
+      || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1222,10 +1227,34 @@ jobs:
       # `base.sha`, and the guard diffs from its merge base with the head, so a
       # crate change main gained after the fork is not counted (#969).
       - name: Packaged crate content moved with its version
+        if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: bash scripts/checks/crate-version-guard.sh "origin/$BASE_REF" "$HEAD"
+      # The queue builds each entry onto the one ahead of it and names that as
+      # the base, so the diff is this entry's change alone. The group ref names
+      # the pull request (`gh-readonly-queue/main/pr-<n>-<sha>`), whose label
+      # is the same escape; a ref that names none runs the guard.
+      - name: The queued change moves each version above the queue base
+        if: github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GROUP_REF: ${{ github.event.merge_group.head_ref }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          pr="$(sed -nE 's|.*/pr-([0-9]+)-[0-9a-f]+$|\1|p' <<<"$GROUP_REF")"
+          if [[ -n "$pr" ]]; then
+            labels="$(gh pr view "$pr" --json labels --jq '.labels[].name')"
+            if grep -qx 'no-crate-bump' <<<"$labels"; then
+              echo "crate-version-guard: #$pr carries no-crate-bump."
+              exit 0
+            fi
+          fi
+          bash scripts/checks/crate-version-guard.sh "$BASE_SHA" "$HEAD_SHA"
 
   # Every publishable crate packages and verifies as crates.io would build it,
   # so a release's crates leg finds no surprise. No cache: the dry run checks

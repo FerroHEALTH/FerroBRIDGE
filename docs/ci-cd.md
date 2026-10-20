@@ -244,8 +244,9 @@ the committed `crates/fhir-types` tree always matches what the emitter produces
 from the vendored HL7 packages. `publish-dry-run` runs `cargo publish
 --workspace --dry-run --locked` with no cache, so a packaging failure surfaces
 on the pull request instead of in a release. `crate-version-guard` runs on pull
-requests only and fails a change that alters a crate's packaged content without
-moving that crate's version, which a published version's immutability makes a
+requests and again on the merge group against the queue base, and fails a
+change that alters a crate's packaged content without moving that crate's
+version above the base's, which a published version's immutability makes a
 hard rule (`.claude/rules/crates-publishing.md`); the `no-crate-bump` label is
 its escape.
 
