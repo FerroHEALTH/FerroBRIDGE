@@ -43,6 +43,19 @@ crates on crates.io.
   `engine::linked::LinkedCompositions` seam (`Seams::with_linked`),
   `SkipReason::UnmappedLink` and `ReferenceError::Link`; a run with no seam
   refuses as before. `fhirconnect` 0.1.174.
+- The FHIRconnect engine converts `ELEMENT.null_flavour` against the code
+  of the R4 `data-absent-reason` extension both ways (#93), through
+  `engine::lens::null_flavour` with GetPut and PutGet property tests and a
+  test per entry of its committed table. A tail on the element reaches
+  `null_flavour` as the `_null_flavour` family of the node the element
+  shares with its value, with `_null_reason` beside it. FHIRconnect
+  `NULL_FLAVOUR.adoc`'s table is no function; the cell reads it with the
+  openEHR terminology's null flavours (271 "no information", 253
+  "unknown"), keeps a FHIR code with no flavour of its own in
+  `null_reason`, and refuses a code outside either set. **Breaking:**
+  `SkipReason` gains `NullReasonUncarried`, the declared loss of a
+  `null_reason` that names no code, so a consumer that matches `SkipReason`
+  exhaustively adds the arm. `fhirconnect` 0.1.176.
 - A FHIRconnect mapping can now name the origin of an observation's
   history, `$archetype/data/origin`, which no Web Template node carries
   (#95). The engine writes it as the Simplified Formats `history_origin` of
@@ -84,8 +97,8 @@ crates on crates.io.
   reads only the value node whose `_type` matches. The library's
   `dosage.v2.yml`, `dosage.v2.BackboneElement.yml` and
   `timing_daily.v1.yml` now load, so the medication statement context gets
-  to compile. Its refusals there are recorded on #101. `fhirconnect`
-  0.1.169.
+  to compile. Its refusals there are recorded on #101. It landed in
+  `fhirconnect` 0.1.169 beside #1076, with no version of its own.
 - The FHIRconnect engine converts a scalar `Integer` or `Integer64` tail
   against FHIR `integer` and a scalar `Real` tail against `decimal` both
   ways (#1081), through `engine::lens::scalar` with GetPut and PutGet
@@ -267,7 +280,8 @@ crates on crates.io.
 - The FHIRconnect engine's data-type cell dispatch is a module folder,
   `engine::cell` with the held-value readers in a child module (#1079),
   under the file-length threshold. Behaviour and public API are unchanged.
-  `fhirconnect` 0.1.170.
+  It landed in `fhirconnect` 0.1.170 beside the display lookup (#95), with no
+  version of its own.
 - The operator console takes FerroUI 0.2.0 and reads every word it hands
   FerroUI from its catalog at run time (#956): table captions, column
   headers, pager nouns with their plurals, navigation, fields, dialogs and
