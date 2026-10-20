@@ -167,9 +167,10 @@ the testkit tool crate. Beside it:
 - `crates/ferrobridge-hl7v2`: the HL7 v2 face (#254). `mllp` is the MLLP
   Release 1 frame codec and listener, `decode` the MSH-18 character sets,
   `parse` the positional split grouped by the `hl7v2-types` structure tree,
-  `ack` the original-mode acknowledgment and `inbound` one message through
-  them. `map` runs the v2-to-FHIR guide's ConceptMaps, read from a directory
-  at run time, writing FHIR R4 through `fhirconnect::tree` and translating
+  `ack` the original-mode acknowledgment, `inbound` one message through
+  them and `batch` the FHS and BHS batch file with its response batch
+  (#642). `map` runs the v2-to-FHIR guide's ConceptMaps, read from a
+  directory at run time, writing FHIR R4 through `fhirconnect::tree` and translating
   every table value through `ferrobridge-term`, with every condition, target
   or value it cannot carry a counted outcome.
 - `crates/ferrobridge-fhirpath`: the FHIRPath evaluator (#436), FHIRPath

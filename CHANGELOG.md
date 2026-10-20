@@ -32,6 +32,15 @@ crates on crates.io.
   interpreter still refuses them as `unsupported-target`; the supplement
   spells them as one row per level under that level's condition. The
   vendored `hl7v2` corpus loses 22 `unsupported-target` outcomes.
+- The HL7 v2 face reads a batch file (#642). A frame that opens with FHS or
+  BHS is split by the HL7 v2 chapter 2 §2.10.3 structure into its batches
+  and messages, each message is answered as if it had arrived alone, and
+  the acknowledgments return in one response batch whose headers echo the
+  file's FHS-11 and BHS-11 and whose BTS-1 counts them (§2.10.3.2). A
+  trailer count the file contradicts is a logged warning, and a file whose
+  segments stand outside the structure is not answered.
+  `ferrobridge-hl7v2` gains the `batch` module. The ReportStream
+  `sample-batch-pdi-20210608-0001.hl7` file now passes the `hl7v2` corpus.
 - The HL7 v2 parser counts a valued repetition past a field's cardinality,
   a valued component past its data type's components and a valued
   subcomponent past its component's data type, as the new
