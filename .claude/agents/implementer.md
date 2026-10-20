@@ -90,6 +90,12 @@ Non-negotiables (violations are rejected at review):
 - No AI or Claude attribution anywhere. You do not commit unless the prompt
   says to, and then on a conventional-type branch with a descriptive subject.
 - Do NOT spawn your own subagents; do the work directly.
+- Write every scratch file (a PR body, an issue comment, notes) under your
+  own subfolder of the session scratchpad, named for your task, never at the
+  scratchpad root: other workers share it. Before any `--body-file`, check
+  the file is one you wrote for this task, and after setting a PR body,
+  re-read it with `gh pr view <n> --json body,closingIssuesReferences`
+  (`.claude/memory/worker-scratch-subfolders.md`).
 - Never branch from another open PR's branch, and never open a second PR
   that touches files your open PR changes: that next issue waits for the
   first PR to merge (`.claude/memory/pr-backlog-discipline.md`).
