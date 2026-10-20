@@ -153,6 +153,17 @@ crates on crates.io.
   tag, is missing or still holds an open issue or pull request, and names
   each one; once every leg has succeeded, crates.io included, it closes that
   milestone (#983).
+- The `openehr-*` crates move from 0.0.87 to 0.0.89 (`openehr-base`,
+  `openehr-rm`, `openehr-its`, `openehr-sdt`, `openehr-am`, `openehr-query`
+  and `openehr-adl`). 0.0.89 adds the `openehr-sdt` party builder, the
+  builder option that names `ARCHETYPED.rm_version`, and the BASE 1.3.0
+  `ARCHETYPE_ID` grammar in `openehr_base::v1_3`, which now admits the
+  namespaced ADL 2 form and a full version. `openehr-mapping-core` 0.1.119
+  and `fhirconnect` 0.1.160 render the new requirements.
+- A composition the bridge builds names each structure the FLAT form leaves
+  out (an `ITEM_TREE` under an entry, for example) by its term definition in
+  the template, where it named it by its node id before (RM Common IM,
+  `LOCATABLE.name`). The `openehr-sdt` 0.0.89 builder does this.
 - `ferrohealth-smart` 0.1.1 (#1007). The operator scope moves from
   `[operator] scope` to `[auth] product_scope` (environment
   `FERROBRIDGE__AUTH__PRODUCT_SCOPE`), default `__ferrobridge.operator`,
