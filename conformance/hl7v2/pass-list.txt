@@ -116,6 +116,7 @@ fhir-converter/data/SampleData/Hl7v2/RDS-O13-01.hl7
 fhir-converter/data/SampleData/Hl7v2/RDS-O13-02.hl7
 fhir-converter/data/SampleData/Hl7v2/REF-I12-01.hl7
 fhir-converter/data/SampleData/Hl7v2/REF-I12-02.hl7
+fhir-converter/data/SampleData/Hl7v2/REF-I14-01.hl7
 fhir-converter/data/SampleData/Hl7v2/REF-I14-02.hl7
 fhir-converter/data/SampleData/Hl7v2/SIU-S12-01.hl7
 fhir-converter/data/SampleData/Hl7v2/SIU-S12-02.hl7

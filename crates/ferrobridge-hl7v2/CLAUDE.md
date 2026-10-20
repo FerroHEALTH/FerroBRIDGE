@@ -166,7 +166,10 @@ carry in variants, and the caller names the variant. An MSH-9.3 naming no
 structure falls back to the message index, counted as `other-structure`, and
 then to a structure v2.9.1 withdrew (`ORM_O01`) from `hl7v2_types::legacy` by
 MSH-12 (#303), counted as `withdrawn-structure`; a legacy tree is never
-written here. A legacy field's type code the guide has no data type map
+written here. When neither carries it, the code and event the legacy
+interactions send a structure under select it
+(`hl7v2_types::message::legacy_events`, #1016: `REF^I14` sends `REF_I12`),
+counted as `other-structure`. A legacy field's type code the guide has no data type map
 for (`CM_MSG`, `CE_0051`) takes the base type the generated
 `LegacyDataType` links it to before the map lookup, counted as
 `base-typed`; a code the guide maps keeps its map (`TS` keeps

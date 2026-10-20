@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
-use crate::v2::legacy::lower::LegacyModel;
+use crate::v2::legacy::lower::{LegacyMessage, LegacyModel};
 use crate::v2::lower::Model;
 use crate::v2::render::RenderError;
 use crate::v2::render::version_module;
@@ -114,18 +114,36 @@ pub(super) fn render_message_index(
         "\n/// Every legacy message structure by the message code and trigger event its\n/// tables give it, in `(code, event, version)` order with the versions\n/// ordered numerically.\npub static LEGACY: [crate::model::LegacyMessage; {}] = [",
         legacy.messages.len()
     )?;
-    for entry in &legacy.messages {
-        let Some(version) = legacy
+    legacy_entries(&mut out, legacy, &legacy.messages)?;
+    out.push_str(
+        "];\n\n/// Returns the legacy entries sent as `code^event` (`MSH-9.1` and\n/// `MSH-9.2`), for example `ORM` and `O01`, one per version in version order.\n#[must_use]\npub fn legacy(code: &str, event: &str) -> &'static [crate::model::LegacyMessage] {\n    let start = LEGACY.partition_point(|entry| (entry.code, entry.event) < (code, event));\n    let end = LEGACY.partition_point(|entry| (entry.code, entry.event) <= (code, event));\n    LEGACY.get(start..end).unwrap_or(&[])\n}\n\n/// Returns the legacy entry sent as `code^event` in the tables of `version`\n/// (`MSH-12`), for example `ORM`, `O01` and `2.5.1`.\n#[must_use]\npub fn find_legacy(\n    code: &str,\n    event: &str,\n    version: &str,\n) -> Option<&'static crate::model::LegacyMessage> {\n    legacy(code, event)\n        .iter()\n        .find(|entry| entry.version == version)\n}\n",
+    );
+    writeln!(
+        out,
+        "\n/// Every other message code and trigger event a legacy version's\n/// interactions send one of its structures under.\n///\n/// `REF^I14` sends `REF_I12` at 2.8. The entries are in `(code, event,\n/// version)` order with the versions ordered numerically, and none repeats a\n/// code, event and version [`LEGACY`] holds.\npub static LEGACY_EVENTS: [crate::model::LegacyMessage; {}] = [",
+        legacy.events.len()
+    )?;
+    legacy_entries(&mut out, legacy, &legacy.events)?;
+    out.push_str(
+        "];\n\n/// Returns the [`LEGACY_EVENTS`] entries sent as `code^event` (`MSH-9.1`\n/// and `MSH-9.2`), for example `REF` and `I14`, one per version in version\n/// order.\n#[must_use]\npub fn legacy_events(code: &str, event: &str) -> &'static [crate::model::LegacyMessage] {\n    let start = LEGACY_EVENTS.partition_point(|entry| (entry.code, entry.event) < (code, event));\n    let end = LEGACY_EVENTS.partition_point(|entry| (entry.code, entry.event) <= (code, event));\n    LEGACY_EVENTS.get(start..end).unwrap_or(&[])\n}\n",
+    );
+    Ok(out)
+}
+
+/// Writes one `LegacyMessage` initializer per entry, refusing an entry whose
+/// structure the legacy model does not emit at its version.
+fn legacy_entries(
+    out: &mut String,
+    legacy: &LegacyModel,
+    entries: &[LegacyMessage],
+) -> Result<(), RenderError> {
+    for entry in entries {
+        let emitted = legacy
             .versions
             .iter()
             .find(|version| version.version == entry.version)
-        else {
-            return Err(RenderError::MissingStructure {
-                message: format!("{}^{} {}", entry.code, entry.event, entry.version),
-                structure: entry.structure.clone(),
-            });
-        };
-        if !version.structures.contains_key(&entry.structure) {
+            .is_some_and(|version| version.structures.contains_key(&entry.structure));
+        if !emitted {
             return Err(RenderError::MissingStructure {
                 message: format!("{}^{} {}", entry.code, entry.event, entry.version),
                 structure: entry.structure.clone(),
@@ -141,8 +159,5 @@ pub(super) fn render_message_index(
             version_module(&entry.version)
         )?;
     }
-    out.push_str(
-        "];\n\n/// Returns the legacy entries sent as `code^event` (`MSH-9.1` and\n/// `MSH-9.2`), for example `ORM` and `O01`, one per version in version order.\n#[must_use]\npub fn legacy(code: &str, event: &str) -> &'static [crate::model::LegacyMessage] {\n    let start = LEGACY.partition_point(|entry| (entry.code, entry.event) < (code, event));\n    let end = LEGACY.partition_point(|entry| (entry.code, entry.event) <= (code, event));\n    LEGACY.get(start..end).unwrap_or(&[])\n}\n\n/// Returns the legacy entry sent as `code^event` in the tables of `version`\n/// (`MSH-12`), for example `ORM`, `O01` and `2.5.1`.\n#[must_use]\npub fn find_legacy(\n    code: &str,\n    event: &str,\n    version: &str,\n) -> Option<&'static crate::model::LegacyMessage> {\n    legacy(code, event)\n        .iter()\n        .find(|entry| entry.version == version)\n}\n",
-    );
-    Ok(out)
+    Ok(())
 }

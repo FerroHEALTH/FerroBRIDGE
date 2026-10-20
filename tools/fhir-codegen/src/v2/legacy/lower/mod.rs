@@ -24,6 +24,7 @@
 //! Each defect of the export is tolerated only where it was found
 //! ([`LegacyDefect::tolerated_in`]); the same defect anywhere else is refused.
 
+mod interactions;
 mod listing;
 mod lowering;
 mod segment;
@@ -31,6 +32,7 @@ mod segment;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::v2::legacy::datatype::{LegacyDataType, lower_data_types};
+use crate::v2::legacy::lower::interactions::event_entries;
 use crate::v2::legacy::lower::listing::base_code;
 use crate::v2::legacy::lower::listing::listing;
 use crate::v2::legacy::lower::listing::placed_segments;
@@ -305,6 +307,10 @@ pub struct LegacyModel {
     /// The message index in `(code, event, version)` order, versions ordered
     /// numerically.
     pub messages: Vec<LegacyMessage>,
+    /// The `code^event` pairs each version's interactions send a structure
+    /// under that [`Self::messages`] does not give for that version, in the
+    /// same order.
+    pub events: Vec<LegacyMessage>,
     /// Every tolerated defect the lowering met, with where.
     pub tolerated: BTreeSet<(LegacyDefect, String)>,
 }
@@ -327,6 +333,7 @@ impl LegacyModel {
         let withdrawn = withdrawals(tables, &listed, &rooted, table, &mut hits)?;
         let mut versions: Vec<LegacyVersion> = Vec::new();
         let mut messages = Vec::new();
+        let mut events = Vec::new();
         for (index, version) in tables.versions().iter().enumerate() {
             let Some(roots) = rooted.get(index) else {
                 continue;
@@ -365,6 +372,7 @@ impl LegacyModel {
             if structures.is_empty() {
                 continue;
             }
+            events.extend(event_entries(version, &structures)?);
             let (segments, links) = lowering.segments(current, &versions)?;
             let data_types = lower_data_types(version, &segments, &current.data_types)?;
             let mut lowered = LegacyVersion {
@@ -386,17 +394,20 @@ impl LegacyModel {
             lowered.trees = trees;
             versions.push(lowered);
         }
-        messages.sort_by(|left, right| {
-            (&left.code, &left.event, version_key(&left.version)).cmp(&(
-                &right.code,
-                &right.event,
-                version_key(&right.version),
-            ))
-        });
+        for index in [&mut messages, &mut events] {
+            index.sort_by(|left, right| {
+                (&left.code, &left.event, version_key(&left.version)).cmp(&(
+                    &right.code,
+                    &right.event,
+                    version_key(&right.version),
+                ))
+            });
+        }
         Ok(Self {
             commit: tables.commit().to_owned(),
             versions,
             messages,
+            events,
             tolerated: hits,
         })
     }

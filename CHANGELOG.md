@@ -189,6 +189,16 @@ crates on crates.io.
 
 ### Fixed
 
+- An HL7 v2 message sent under a code and trigger event that no v2.9.1
+  message definition carries, and whose MSH-9.3 names no known structure, is
+  parsed against the structure the interactions of its version's tables send
+  under that event (#1016): `REF^I14^REF_I14` at 2.8 takes `REF_I12`, counted
+  as `other-structure`, where it was refused with AR. The HL7/v2ig
+  definitions carry no REF or RRI message, so `fhir-codegen` reads the
+  `interactions.json` table of the IGAMT export and `hl7v2-types` gains
+  `message::LEGACY_EVENTS` and `message::legacy_events`, every other code and
+  event a legacy version's interactions send one of its structures under.
+  FHIR-Converter's `REF-I14-01` now maps.
 - The HL7 v2 interpreter removes every reference a kept resource holds to a
   resource it left out of the Bundle and counts each as a
   `dangling-reference` outcome naming the element and the resource left out

@@ -37,6 +37,66 @@ fn the_message_index_links_each_legacy_entry_to_its_versioned_structure() {
     assert_eq!(keys, sorted, "the index is in (code, event, version) order");
 }
 
+#[test]
+fn the_interactions_index_gives_each_other_code_and_event_a_version_sends() {
+    let raw_rows = crate::v2_legacy::raw("2.8", "interactions");
+    let row = raw_rows
+        .iter()
+        .find(|row| row["event_id"] == "I14")
+        .expect("2.8 interactions carry I14");
+    assert_eq!(row["sender_msg"], "REF_I12");
+    assert_eq!(row["receiver_msg"], "RRI_I12");
+    let sent: Vec<(&str, &str)> = hl7v2_types::message::legacy_events("REF", "I14")
+        .iter()
+        .map(|entry| (entry.version, entry.structure.id))
+        .collect();
+    assert!(sent.contains(&("2.8", "REF_I12")), "{sent:?}");
+    let entry = hl7v2_types::message::legacy_events("REF", "I14")
+        .iter()
+        .find(|entry| entry.version == "2.8")
+        .expect("REF^I14 2.8");
+    assert!(std::ptr::eq(
+        entry.structure,
+        hl7v2_types::legacy::find("REF_I12", "2.8").expect("REF_I12 2.8")
+    ));
+    assert!(
+        hl7v2_types::message::legacy_events("RRI", "I14")
+            .iter()
+            .any(|entry| entry.version == "2.8" && entry.structure.id == "RRI_I12")
+    );
+    assert!(hl7v2_types::message::legacy_events("REF", "I12").is_empty());
+    assert_eq!(
+        hl7v2_types::message::LEGACY_EVENTS.len(),
+        LEGACY.events.len()
+    );
+    let keys: Vec<(&str, &str, Vec<u32>)> = hl7v2_types::message::LEGACY_EVENTS
+        .iter()
+        .map(|entry| {
+            (
+                entry.code,
+                entry.event,
+                version_key(entry.version).expect("a dotted version"),
+            )
+        })
+        .collect();
+    let mut sorted = keys.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(
+        keys, sorted,
+        "the index is in strict (code, event, version) order"
+    );
+    for entry in &hl7v2_types::message::LEGACY_EVENTS {
+        assert!(
+            hl7v2_types::message::find_legacy(entry.code, entry.event, entry.version).is_none(),
+            "{}^{} {} is in both indexes",
+            entry.code,
+            entry.event,
+            entry.version
+        );
+    }
+}
+
 /// Every segment reference in `nodes`, depth first.
 pub(super) fn references(
     nodes: &'static [Node],
