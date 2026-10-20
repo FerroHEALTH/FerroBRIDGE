@@ -441,6 +441,12 @@ pub enum SkipReason {
         /// The `code_string` of the defining code.
         code: String,
     },
+    /// The `null_reason` of an `ELEMENT` names no `data-absent-reason` code.
+    ///
+    /// `types-of-mappings/data-type/NULL_FLAVOUR.adoc` reads `null_reason`
+    /// back only "if exists and matches fhir code", and the extension carries
+    /// a `code` alone, so the reason's text was not written; the code was.
+    NullReasonUncarried,
 }
 
 impl fmt::Display for SkipReason {
@@ -492,6 +498,10 @@ impl fmt::Display for SkipReason {
                 f,
                 "its defining_code {code} of {terminology} has no place in a string, \
                  which carries the rubric only"
+            ),
+            Self::NullReasonUncarried => f.write_str(
+                "its null_reason names no data-absent-reason code, and the extension has no \
+                 place for text",
             ),
         }
     }
