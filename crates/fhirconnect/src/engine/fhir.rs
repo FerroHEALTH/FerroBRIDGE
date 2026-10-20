@@ -18,6 +18,7 @@ use fhir_types::codec::Value;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::count::Count;
+use fhir_types::r4::duration::Duration;
 use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::period::Period;
 use fhir_types::r4::primitives::Boolean;
@@ -26,6 +27,7 @@ use fhir_types::r4::primitives::DateTime;
 use fhir_types::r4::primitives::Decimal;
 use fhir_types::r4::primitives::Integer;
 use fhir_types::r4::primitives::String as FhirString;
+use fhir_types::r4::primitives::Time;
 use fhir_types::r4::quantity::Quantity;
 use fhir_types::r4::reference::Reference;
 use fhir_types::schema::ValueKind;
@@ -66,6 +68,10 @@ pub enum FhirKind {
     Decimal,
     /// A `Count`.
     Count,
+    /// A `time`.
+    Time,
+    /// A `Duration`.
+    Duration,
 }
 
 impl FhirKind {
@@ -107,6 +113,8 @@ impl FhirKind {
             "integer" => Some(Self::Integer),
             "decimal" => Some(Self::Decimal),
             "Count" => Some(Self::Count),
+            "time" => Some(Self::Time),
+            "Duration" => Some(Self::Duration),
             _ => None,
         }
     }
@@ -127,6 +135,7 @@ impl FhirKind {
                 "Identifier" => Some(Self::Identifier),
                 "Quantity" => Some(Self::Quantity),
                 "Count" => Some(Self::Count),
+                "Duration" => Some(Self::Duration),
                 _ => None,
             },
             Location::Primitive(ValueKind::Text) | Location::Attribute => Some(Self::String),
@@ -155,6 +164,8 @@ impl FhirKind {
             Self::Integer => "integer",
             Self::Decimal => "decimal",
             Self::Count => "Count",
+            Self::Time => "time",
+            Self::Duration => "Duration",
         }
     }
 }
@@ -188,6 +199,10 @@ pub enum FhirValue {
     Decimal(Decimal),
     /// A `Count`.
     Count(Box<Count>),
+    /// A `time`.
+    Time(Time),
+    /// A `Duration`.
+    Duration(Box<Duration>),
 }
 
 /// Why a FHIR element could not be read or written.
@@ -241,6 +256,8 @@ impl FhirValue {
             Self::Integer(_) => FhirKind::Integer,
             Self::Decimal(_) => FhirKind::Decimal,
             Self::Count(_) => FhirKind::Count,
+            Self::Time(_) => FhirKind::Time,
+            Self::Duration(_) => FhirKind::Duration,
         }
     }
 
@@ -297,6 +314,12 @@ impl FhirValue {
             FhirKind::Count => object(value, element, kind)
                 .and_then(|object| Count::from_json(object, &mut path).map_err(refuse))
                 .map(|count| Self::Count(Box::new(count))),
+            FhirKind::Time => Time::from_json_parts(Some(value), None, &mut path)
+                .map(Self::Time)
+                .map_err(refuse),
+            FhirKind::Duration => object(value, element, kind)
+                .and_then(|object| Duration::from_json(object, &mut path).map_err(refuse))
+                .map(|duration| Self::Duration(Box::new(duration))),
         }
     }
 
@@ -336,6 +359,8 @@ impl FhirValue {
             Self::Integer(ref integer) => primitive(integer.value_json()),
             Self::Decimal(ref decimal) => primitive(decimal.value_json()),
             Self::Count(ref count) => complex(count.to_json()),
+            Self::Time(ref time) => primitive(time.value_json()),
+            Self::Duration(ref duration) => complex(duration.to_json()),
         }
     }
 }

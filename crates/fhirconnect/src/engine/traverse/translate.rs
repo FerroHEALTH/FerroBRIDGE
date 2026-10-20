@@ -115,7 +115,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
             | FhirValue::Quantity(_)
             | FhirValue::Integer(_)
             | FhirValue::Decimal(_)
-            | FhirValue::Count(_)) => return Ok(Some(other)),
+            | FhirValue::Count(_)
+            | FhirValue::Time(_)
+            | FhirValue::Duration(_)) => return Ok(Some(other)),
         };
         if translated.is_none() {
             self.untranslated(mapping, url, output)?;

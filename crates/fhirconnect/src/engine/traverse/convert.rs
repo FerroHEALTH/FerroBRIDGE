@@ -247,7 +247,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         // NOTE: a scalar leaf carries text, so only an element that travels as
         // text takes it; no specification governs this: our own design.
         match kind {
-            FhirKind::String | FhirKind::Date | FhirKind::DateTime => {
+            FhirKind::String | FhirKind::Date | FhirKind::DateTime | FhirKind::Time => {
                 let element = target.resolved().leaf();
                 FhirValue::read(kind, element, &Value::String(String::from(text))).map_err(
                     |source| EngineError::Fhir {
@@ -266,7 +266,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
             | FhirKind::Quantity
             | FhirKind::Integer
             | FhirKind::Decimal
-            | FhirKind::Count => Err(EngineError::Cell {
+            | FhirKind::Count
+            | FhirKind::Duration => Err(EngineError::Cell {
                 mapping: String::from(mapping.name()),
                 element: String::from(target.expression().as_str()),
                 source: Box::new(LensError::NoCell {

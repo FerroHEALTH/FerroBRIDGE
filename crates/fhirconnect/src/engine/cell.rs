@@ -11,6 +11,8 @@
 
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
+use openehr_rm::v1_2::data_types::quantity::date_time::dv_duration::DvDuration;
+use openehr_rm::v1_2::data_types::quantity::date_time::dv_time::DvTime;
 use openehr_rm::v1_2::data_types::quantity::dv_count::DvCount;
 use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
@@ -29,6 +31,7 @@ use crate::engine::lens::count::CountLens;
 use crate::engine::lens::date::DateLens;
 use crate::engine::lens::date_time::DateTimeLens;
 use crate::engine::lens::date_time::PeriodStartLens;
+use crate::engine::lens::duration::DurationLens;
 use crate::engine::lens::interval::DateTimeIntervalLens;
 use crate::engine::lens::party::IdentifierLens;
 use crate::engine::lens::party::PartyLens;
@@ -36,6 +39,7 @@ use crate::engine::lens::proportion::PercentLens;
 use crate::engine::lens::quantity::QuantityLens;
 use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::lens::text::TextLens;
+use crate::engine::lens::time::TimeLens;
 use crate::engine::rm::RmValue;
 use crate::model::ast::keyword::Direction;
 
@@ -120,6 +124,10 @@ pub fn get(
         (RmValue::Count(count), FhirKind::Count) => CountLens
             .get(count.as_ref())
             .map(|count| FhirValue::Count(Box::new(count))),
+        (RmValue::Time(time), FhirKind::Time) => TimeLens.get(time.as_ref()).map(FhirValue::Time),
+        (RmValue::Duration(duration), FhirKind::Duration) => DurationLens
+            .get(duration.as_ref())
+            .map(|duration| FhirValue::Duration(Box::new(duration))),
         (source, kind) => Err(no_cell(source, kind, Direction::OpenehrToFhir)),
     }
 }
@@ -252,6 +260,12 @@ pub fn put(
         ("DV_COUNT", FhirValue::Count(count)) => CountLens
             .put(count.as_ref(), held_count(existing))
             .map(|count| RmValue::Count(Box::new(count))),
+        ("DV_TIME", FhirValue::Time(time)) => TimeLens
+            .put(time, held_time(existing))
+            .map(|time| RmValue::Time(Box::new(time))),
+        ("DV_DURATION", FhirValue::Duration(duration)) => DurationLens
+            .put(duration.as_ref(), held_duration(existing))
+            .map(|duration| RmValue::Duration(Box::new(duration))),
         (rm_type, view) => Err(LensError::NoCell {
             rm_type: String::from(rm_type),
             kind: view.kind().as_str(),
@@ -278,6 +292,7 @@ fn fallbacks(
     let unheld = held_quantity(existing).is_none();
     match (rm_type, view) {
         ("DV_QUANTITY", FhirValue::Quantity(quantity)) => QuantityLens.fallbacks(quantity.as_ref()),
+        ("DV_DURATION", FhirValue::Duration(duration)) => DurationLens.fallbacks(duration.as_ref()),
         ("DV_QUANTITY", FhirValue::Decimal(decimal)) if unheld => QuantityLens.fallbacks(decimal),
         ("DV_QUANTITY", FhirValue::Integer(integer)) if unheld => QuantityLens.fallbacks(integer),
         ("DV_TEXT", FhirValue::String(text)) => TextLens.fallbacks(text),
@@ -428,6 +443,22 @@ fn held_identifier(
 fn held_quantity(existing: Option<&RmValue>) -> Option<&DvQuantity> {
     match existing {
         Some(RmValue::Quantity(quantity)) => Some(quantity.as_ref()),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_TIME`, when the target holds one.
+fn held_time(existing: Option<&RmValue>) -> Option<&DvTime> {
+    match existing {
+        Some(RmValue::Time(time)) => Some(time.as_ref()),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_DURATION`, when the target holds one.
+fn held_duration(existing: Option<&RmValue>) -> Option<&DvDuration> {
+    match existing {
+        Some(RmValue::Duration(duration)) => Some(duration.as_ref()),
         _other => None,
     }
 }
