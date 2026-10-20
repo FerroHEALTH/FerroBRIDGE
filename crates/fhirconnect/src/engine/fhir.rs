@@ -17,11 +17,14 @@ use fhir_types::codec::Primitive;
 use fhir_types::codec::Value;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
+use fhir_types::r4::count::Count;
 use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::period::Period;
 use fhir_types::r4::primitives::Boolean;
 use fhir_types::r4::primitives::Date;
 use fhir_types::r4::primitives::DateTime;
+use fhir_types::r4::primitives::Decimal;
+use fhir_types::r4::primitives::Integer;
 use fhir_types::r4::primitives::String as FhirString;
 use fhir_types::r4::quantity::Quantity;
 use fhir_types::r4::reference::Reference;
@@ -57,6 +60,12 @@ pub enum FhirKind {
     Identifier,
     /// A `Quantity`.
     Quantity,
+    /// An `integer`.
+    Integer,
+    /// A `decimal`.
+    Decimal,
+    /// A `Count`.
+    Count,
 }
 
 impl FhirKind {
@@ -95,6 +104,9 @@ impl FhirKind {
             "Reference" => Some(Self::Reference),
             "Identifier" => Some(Self::Identifier),
             "Quantity" => Some(Self::Quantity),
+            "integer" => Some(Self::Integer),
+            "decimal" => Some(Self::Decimal),
+            "Count" => Some(Self::Count),
             _ => None,
         }
     }
@@ -114,6 +126,7 @@ impl FhirKind {
                 "Reference" => Some(Self::Reference),
                 "Identifier" => Some(Self::Identifier),
                 "Quantity" => Some(Self::Quantity),
+                "Count" => Some(Self::Count),
                 _ => None,
             },
             Location::Primitive(ValueKind::Text) | Location::Attribute => Some(Self::String),
@@ -139,6 +152,9 @@ impl FhirKind {
             Self::Reference => "Reference",
             Self::Identifier => "Identifier",
             Self::Quantity => "Quantity",
+            Self::Integer => "integer",
+            Self::Decimal => "decimal",
+            Self::Count => "Count",
         }
     }
 }
@@ -166,6 +182,12 @@ pub enum FhirValue {
     Identifier(Box<Identifier>),
     /// A `Quantity`.
     Quantity(Box<Quantity>),
+    /// An `integer`.
+    Integer(Integer),
+    /// A `decimal`.
+    Decimal(Decimal),
+    /// A `Count`.
+    Count(Box<Count>),
 }
 
 /// Why a FHIR element could not be read or written.
@@ -216,6 +238,9 @@ impl FhirValue {
             Self::Reference(_) => FhirKind::Reference,
             Self::Identifier(_) => FhirKind::Identifier,
             Self::Quantity(_) => FhirKind::Quantity,
+            Self::Integer(_) => FhirKind::Integer,
+            Self::Decimal(_) => FhirKind::Decimal,
+            Self::Count(_) => FhirKind::Count,
         }
     }
 
@@ -263,6 +288,15 @@ impl FhirValue {
             FhirKind::Quantity => object(value, element, kind)
                 .and_then(|object| Quantity::from_json(object, &mut path).map_err(refuse))
                 .map(|quantity| Self::Quantity(Box::new(quantity))),
+            FhirKind::Integer => Integer::from_json_parts(Some(value), None, &mut path)
+                .map(Self::Integer)
+                .map_err(refuse),
+            FhirKind::Decimal => Decimal::from_json_parts(Some(value), None, &mut path)
+                .map(Self::Decimal)
+                .map_err(refuse),
+            FhirKind::Count => object(value, element, kind)
+                .and_then(|object| Count::from_json(object, &mut path).map_err(refuse))
+                .map(|count| Self::Count(Box::new(count))),
         }
     }
 
@@ -299,6 +333,9 @@ impl FhirValue {
             Self::Reference(ref reference) => complex(reference.to_json()),
             Self::Identifier(ref identifier) => complex(identifier.to_json()),
             Self::Quantity(ref quantity) => complex(quantity.to_json()),
+            Self::Integer(ref integer) => primitive(integer.value_json()),
+            Self::Decimal(ref decimal) => primitive(decimal.value_json()),
+            Self::Count(ref count) => complex(count.to_json()),
         }
     }
 }
