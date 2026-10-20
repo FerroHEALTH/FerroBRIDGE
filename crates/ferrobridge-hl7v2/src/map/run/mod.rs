@@ -11,6 +11,7 @@
 //! key receives its array index: in the order a value first reaches it.
 
 mod alternative;
+mod dangling;
 mod datatype;
 mod datum;
 mod endpoint;

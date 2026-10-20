@@ -37,6 +37,13 @@ crates on crates.io.
   EHDS laboratory template the library ships does not parse. A context that
   compiles joins the mapping-library pass list on its own. The list stays at
   10 of 107.
+- The shipped `datatype-pl-to-location` supplement writes PL.11, the
+  assigning authority, into the `identifier.assigner` of each location level
+  the PL carries (#345). The guide's two PL.11 rows address all six levels
+  with a `[1-6].` prefix the guide's notation does not define, so the
+  interpreter still refuses them as `unsupported-target`; the supplement
+  spells them as one row per level under that level's condition. The
+  vendored `hl7v2` corpus loses 22 `unsupported-target` outcomes.
 - `ferrobridge-hl7v2` ships message maps for 18 HL7 v2 structures the
   v2-to-FHIR guide has none for (#637): ADT_A15, ADT_A16, ADT_A21, ADT_A39,
   ADT_A44, ADT_A45, ADT_A60, BAR_P02, BAR_P12, DFT_P03, DFT_P11, MDM_T01,
@@ -191,9 +198,33 @@ crates on crates.io.
   and names those surfaces (the facade, the operator API, the operations
   lane); a server with only `/` and the health routes logs nothing
   (#1005).
+- `openehr-mapping-core` 0.1.120 passes the RM release it chooses to the
+  `openehr-sdt` composition builder (#901), so the builder writes
+  `ARCHETYPED.rm_version` and the walk that rewrote it afterwards is gone.
+  The choice is unchanged: Release 1.1.0, unless the composition holds a
+  `GENERIC_ENTRY` whose `data` is no `ITEM_TREE`.
+- `openehr-mapping-core` 0.1.120 builds a party through the `openehr-sdt`
+  template walk (#906) and drops its own party assembly with the OPT 1.4
+  structure index behind it. `ROLE.performer`, which no template node holds,
+  is still placed on the root after the walk (#1000). Breaking for a
+  consumer that matches on `PartyError`: `NoStructure`, `Unconstrained` and `InstanceGap`
+  are gone, and a value the builder refuses is the new `PartyError::Build`,
+  which carries the `openehr-sdt` `FlatError` as its source. `fhirconnect`
+  0.1.161 renders the new requirement.
 
 ### Fixed
 
+- The HL7 v2 interpreter removes every reference a kept resource holds to a
+  resource it left out of the Bundle and counts each as a
+  `dangling-reference` outcome naming the element and the resource left out
+  (#313). FHIR R4 resolves a Bundle reference against the entries'
+  `fullUrl`, so such a reference pointed at nothing. The referring resource
+  stays unless the removal leaves it without a required element, and the
+  corpus test asserts no Bundle keeps one. The vendored `hl7v2` corpus
+  carries 29 of them in 27 messages.
+- A Bundle entry member the HL7 v2 interpreter cannot write is a counted
+  `entry-unwritable` outcome naming the resource and the path, where it was
+  only a warning in the log (#316).
 - The `defining_code` of a `DV_CODED_TEXT` value read out to a FHIR `string`
   is a declared loss (#1011). The chapter writes no `string` row for
   `DV_CODED_TEXT` (FHIRconnect `DV_CODED_TEXT.adoc` §STRING calls the pairing
@@ -203,6 +234,17 @@ crates on crates.io.
   `defining_code`. A consumer that matches `SkipReason` exhaustively adds the
   arm. The facade's loss log labels it `skipped-defining-code-uncarried`.
   `fhirconnect` 0.1.160.
+- `$toopenehr` resolves a `reference` mapping against the request Bundle by
+  the R4 rules for a reference inside a Bundle (R4 bundle.html §2.36.4.1),
+  the same resolver the subject check runs (#1010): a version-specific
+  reference matches the entry's `meta.versionId`, and a relative `<type>/<id>`
+  is read against the server base of the mapped entry's `fullUrl`. Before, the
+  seam matched only an exact `fullUrl` or `<type>/<id>`, so a versioned
+  reference fell through to the further source. A reference two entries
+  answer refuses the run with the new `ReferenceError::Ambiguous`, and
+  `BundleReferences::with_referrer` names the entry whose references it
+  resolves. A consumer that matches `ReferenceError` exhaustively adds the
+  arm. `fhirconnect` 0.1.161.
 - A `TERM_MAPPING` that a `DV_TEXT` or `DV_CODED_TEXT` value carries out to a
   FHIR `string`, or a `DV_CODED_TEXT` value carries out to a single `Coding`,
   is a declared loss (#623). Those pairs give `mappings` no FHIR row
