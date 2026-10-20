@@ -440,3 +440,71 @@ async fn an_empty_batch_answers_an_empty_batch_response() -> Result<(), Box<dyn 
     assert!(body["entry"].is_null(), "{body}");
     Ok(())
 }
+#[test]
+fn a_batch_with_one_failing_entry_answers_200_and_counts_the_failure()
+-> Result<(), Box<dyn StdError>> {
+    // R4 http.html §3.1.0.11.1: a batch answers 200 whatever its entries'
+    // outcomes, each entry carrying its own status and outcome. R4 gives a
+    // batch-response no element for a count (bundle.html, bdl-1 keeps `total`
+    // to a searchset or history), so the count of failed entries is the
+    // field of the batch's log line: no specification governs this, our own
+    // design.
+    let logs = crate::support::Logs::default();
+    let capture = ferrobridge_server::telemetry::subscriber(
+        ferrobridge_server::telemetry::Rendering::Json,
+        "info",
+        false,
+        logs.clone(),
+    );
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let (status, body) = tracing::subscriber::with_default(capture, || {
+        runtime.block_on(async {
+            let harness = harness().await;
+            mount_ehr(&harness.cdr).await;
+            let id = created(&harness).await?;
+            Mock::given(matchers::method("POST"))
+                .and(matchers::path(format!("/ehr/{EHR_ID}/composition")))
+                .respond_with(ferrobridge_testkit::stubs::its_rest::unprocessable(
+                    "synthetic validation failure",
+                    &["/content[0]: synthetic"],
+                ))
+                .mount(&harness.cdr)
+                .await;
+            mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
+            post_transaction(
+                &harness,
+                &batch_of(&[
+                    entry(
+                        "POST",
+                        "Condition",
+                        Some(condition_as("ferrobridge-synthetic-condition-4")),
+                    ),
+                    entry("GET", &format!("Condition/{id}"), None),
+                ]),
+            )
+            .await
+        })
+    })?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(
+        vec!["422 Unprocessable Entity", "200 OK"],
+        statuses(&body),
+        "{body}"
+    );
+    assert_eq!(
+        Some("OperationOutcome"),
+        body["entry"][0]["response"]["outcome"]["resourceType"].as_str(),
+        "the failed entry carries its outcome: {body}"
+    );
+    let text = logs.text();
+    let answered = text
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .find(|line| line["message"].as_str() == Some("a batch Bundle was answered"))
+        .ok_or("the batch logged its answer")?;
+    assert_eq!(Some(2), answered["entries"].as_u64(), "{answered}");
+    assert_eq!(Some(1), answered["failed"].as_u64(), "{answered}");
+    Ok(())
+}
