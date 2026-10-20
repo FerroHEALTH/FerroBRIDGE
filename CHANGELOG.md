@@ -58,6 +58,16 @@ crates on crates.io.
   unchanged, gives the ISO 8601 basic form its separators, and refuses a time
   with an offset or with no seconds, which R4 `time` cannot state.
   `fhirconnect` 0.1.164.
+- The FHIRconnect engine converts `DV_URI` against `url`, and `DV_MULTIMEDIA`
+  and `DV_PARSABLE` against `Attachment` (#93), from FHIRconnect
+  `DV_URI.adoc`, `DV_MULTIMEDIA.adoc` and `DV_PARSABLE.adoc`. A parsable
+  value travels base64 encoded as `Attachment.data`, its formalism as the
+  content type only when it is itself a media type (the page gives no table),
+  and a multimedia `integrity_check` is `hash` only for SHA-1, the algorithm
+  R4 names. A compressed multimedia value is refused going out, since an
+  `Attachment` has no field for the algorithm, and an attachment with data and
+  no size takes the decoded length, a one-way row. `fhirconnect` now depends
+  on `base64`. `fhirconnect` 0.1.165.
 - The shipped `datatype-pl-to-location` supplement writes PL.11, the
   assigning authority, into the `identifier.assigner` of each location level
   the PL carries (#345). The guide's two PL.11 rows address all six levels

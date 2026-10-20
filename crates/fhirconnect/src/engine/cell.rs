@@ -9,8 +9,11 @@
 //! names. This module is that lookup, and nothing more: every conversion
 //! lives in [`crate::engine::lens`] and runs both ways there.
 
+use fhir_types::r4::attachment::Attachment;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
+use openehr_rm::v1_2::data_types::encapsulated::dv_multimedia::DvMultimedia;
+use openehr_rm::v1_2::data_types::encapsulated::dv_parsable::DvParsable;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_duration::DvDuration;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_time::DvTime;
 use openehr_rm::v1_2::data_types::quantity::dv_count::DvCount;
@@ -18,6 +21,7 @@ use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
+use openehr_rm::v1_2::data_types::uri::dv_uri::DvUri;
 
 use crate::engine::fhir::FhirKind;
 use crate::engine::fhir::FhirValue;
@@ -32,6 +36,7 @@ use crate::engine::lens::date::DateLens;
 use crate::engine::lens::date_time::DateTimeLens;
 use crate::engine::lens::date_time::PeriodStartLens;
 use crate::engine::lens::duration::DurationLens;
+use crate::engine::lens::encapsulated::EncapsulatedLens;
 use crate::engine::lens::interval::DateTimeIntervalLens;
 use crate::engine::lens::party::IdentifierLens;
 use crate::engine::lens::party::PartyLens;
@@ -40,6 +45,7 @@ use crate::engine::lens::quantity::QuantityLens;
 use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::lens::text::TextLens;
 use crate::engine::lens::time::TimeLens;
+use crate::engine::lens::uri::UriLens;
 use crate::engine::rm::RmValue;
 use crate::model::ast::keyword::Direction;
 
@@ -128,6 +134,13 @@ pub fn get(
         (RmValue::Duration(duration), FhirKind::Duration) => DurationLens
             .get(duration.as_ref())
             .map(|duration| FhirValue::Duration(Box::new(duration))),
+        (RmValue::Uri(uri), FhirKind::Url) => UriLens.get(uri).map(FhirValue::Url),
+        (RmValue::Multimedia(multimedia), FhirKind::Attachment) => EncapsulatedLens
+            .get(multimedia.as_ref())
+            .map(|attachment| FhirValue::Attachment(Box::new(attachment))),
+        (RmValue::Parsable(parsable), FhirKind::Attachment) => EncapsulatedLens
+            .get(parsable.as_ref())
+            .map(|attachment| FhirValue::Attachment(Box::new(attachment))),
         (source, kind) => Err(no_cell(source, kind, Direction::OpenehrToFhir)),
     }
 }
@@ -266,6 +279,13 @@ pub fn put(
         ("DV_DURATION", FhirValue::Duration(duration)) => DurationLens
             .put(duration.as_ref(), held_duration(existing))
             .map(|duration| RmValue::Duration(Box::new(duration))),
+        ("DV_URI", FhirValue::Url(url)) => UriLens.put(url, held_uri(existing)).map(RmValue::Uri),
+        ("DV_MULTIMEDIA", FhirValue::Attachment(attachment)) => EncapsulatedLens
+            .put(attachment.as_ref(), held_multimedia(existing))
+            .map(|multimedia| RmValue::Multimedia(Box::new(multimedia))),
+        ("DV_PARSABLE", FhirValue::Attachment(attachment)) => EncapsulatedLens
+            .put(attachment.as_ref(), held_parsable(existing))
+            .map(|parsable| RmValue::Parsable(Box::new(parsable))),
         (rm_type, view) => Err(LensError::NoCell {
             rm_type: String::from(rm_type),
             kind: view.kind().as_str(),
@@ -293,6 +313,9 @@ fn fallbacks(
     match (rm_type, view) {
         ("DV_QUANTITY", FhirValue::Quantity(quantity)) => QuantityLens.fallbacks(quantity.as_ref()),
         ("DV_DURATION", FhirValue::Duration(duration)) => DurationLens.fallbacks(duration.as_ref()),
+        ("DV_MULTIMEDIA", FhirValue::Attachment(attachment)) => {
+            Lens::<DvMultimedia, Attachment>::fallbacks(&EncapsulatedLens, attachment.as_ref())
+        }
         ("DV_QUANTITY", FhirValue::Decimal(decimal)) if unheld => QuantityLens.fallbacks(decimal),
         ("DV_QUANTITY", FhirValue::Integer(integer)) if unheld => QuantityLens.fallbacks(integer),
         ("DV_TEXT", FhirValue::String(text)) => TextLens.fallbacks(text),
@@ -443,6 +466,30 @@ fn held_identifier(
 fn held_quantity(existing: Option<&RmValue>) -> Option<&DvQuantity> {
     match existing {
         Some(RmValue::Quantity(quantity)) => Some(quantity.as_ref()),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_URI`, when the target holds one.
+fn held_uri(existing: Option<&RmValue>) -> Option<&DvUri> {
+    match existing {
+        Some(RmValue::Uri(uri)) => Some(uri),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_MULTIMEDIA`, when the target holds one.
+fn held_multimedia(existing: Option<&RmValue>) -> Option<&DvMultimedia> {
+    match existing {
+        Some(RmValue::Multimedia(multimedia)) => Some(multimedia.as_ref()),
+        _other => None,
+    }
+}
+
+/// Returns the held `DV_PARSABLE`, when the target holds one.
+fn held_parsable(existing: Option<&RmValue>) -> Option<&DvParsable> {
+    match existing {
+        Some(RmValue::Parsable(parsable)) => Some(parsable.as_ref()),
         _other => None,
     }
 }
