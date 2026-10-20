@@ -11,9 +11,9 @@
 
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
-use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::quantity::dv_count::DvCount;
 use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
+use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
 
