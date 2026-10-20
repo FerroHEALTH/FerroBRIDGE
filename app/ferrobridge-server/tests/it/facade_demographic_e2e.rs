@@ -38,7 +38,7 @@ use crate::facade_e2e::upload_published;
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures_demographic");
 
 /// Sends a request with a FHIR JSON body.
-fn with_body(
+pub(crate) fn with_body(
     method: http::Method,
     uri: &str,
     body: &serde_json::Value,

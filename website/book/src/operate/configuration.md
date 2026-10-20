@@ -536,8 +536,9 @@ usually holds a patient number, not an EHR id. The facade looks the
 identifier up in the CDR's demographic data with an AQL query rooted at a
 demographic class, the way Cadasto's experimental AQL demographic extension
 documents it. AQL 1.1.0 defines no demographic semantics, so both queries
-are configuration, and the CDR must serve the extension. The reference CDR
-refuses demographic sources today.
+are configuration, and the CDR must serve the extension. The reference CDR,
+FerroEHR, serves the `PERSON`, `ORGANISATION` and `ROLE` roots from version
+5.1.0.
 
 A query's first column is the party's `uid/value`, and a versioned uid
 counts as its party. The facade treats each party's uid as a patient's
@@ -570,7 +571,9 @@ API has no search, so for `identifier` and `name` the facade runs an AQL
 query rooted at a demographic class, the Cadasto experimental AQL
 demographic extension, and reads each party it names over the Demographic
 API. `_id` needs no query: the facade reads the party the id names. The
-reference CDR refuses demographic sources today.
+reference CDR, FerroEHR, serves the `PERSON`, `ORGANISATION` and `ROLE`
+roots from version 5.1.0 and answers `400` to a query rooted at `GROUP`,
+`AGENT` or `PARTY_RELATIONSHIP`, which the search answers as `501`.
 
 Each type has its own queries and none has a default, because the archetypes
 a tenant stores and the dialect both move. A query's first column is the
