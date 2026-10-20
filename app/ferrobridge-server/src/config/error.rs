@@ -145,7 +145,7 @@ pub enum Error {
     Auth {
         /// The rule, naming its key.
         #[source]
-        source: ferrohealth_smart::config::ConfigError,
+        source: Box<ferrohealth_smart::config::ConfigError>,
     },
     /// A `[<lane>.credentials]` table breaks a rule of `ferrohealth-smart`.
     #[error("[{section}] is refused")]
@@ -154,27 +154,7 @@ pub enum Error {
         section: String,
         /// The rule, naming its key under the table.
         #[source]
-        source: ferrohealth_smart::config::ConfigError,
-    },
-    /// An issuer is not an `https` URL free of a query and a fragment, the
-    /// form RFC 8414 §2 gives an issuer identifier, or plain `http` on a
-    /// loopback host.
-    #[error("{key} is not an https URL without a query or a fragment (RFC 8414 §2)")]
-    Issuer {
-        /// The key that holds it.
-        key: String,
-    },
-    /// A resource indicator carries a fragment, which RFC 8707 §2 forbids.
-    #[error("{key} carries a fragment, which a resource indicator may not (RFC 8707 §2)")]
-    Resource {
-        /// The key that holds it.
-        key: String,
-    },
-    /// A scope is not a space-delimited list of scope tokens (RFC 6749 §3.3).
-    #[error("{key} is not a space-delimited list of scope tokens (RFC 6749 §3.3)")]
-    Scope {
-        /// The key that holds it.
-        key: String,
+        source: Box<ferrohealth_smart::config::ConfigError>,
     },
     /// A reference fetch base is no http or https base.
     #[error("{key} holds `{value}`, which is no http or https base without a query or a fragment")]

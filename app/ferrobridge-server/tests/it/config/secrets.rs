@@ -80,10 +80,9 @@ fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn 
         .resolve()
         .expect_err("a secret set twice is a boot error");
     match &error {
-        Error::Credentials {
-            section,
-            source: ConfigError::Secret { key },
-        } => {
+        Error::Credentials { section, source }
+            if let ConfigError::Secret { key } = source.as_ref() =>
+        {
             assert_eq!("cdr.credentials", section);
             assert_eq!(&"credentials.password", key);
         }
@@ -103,10 +102,9 @@ fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn Std
         .resolve()
         .expect_err("an unreadable secret is a boot error");
     match &error {
-        Error::Credentials {
-            section,
-            source: ConfigError::SecretFile { path, .. },
-        } => {
+        Error::Credentials { section, source }
+            if let ConfigError::SecretFile { path, .. } = source.as_ref() =>
+        {
             assert_eq!("cdr.credentials", section);
             assert_eq!(std::path::Path::new("/nonexistent/password"), path);
             assert!(
@@ -130,10 +128,9 @@ fn a_user_without_a_password_refuses_to_boot() -> Result<(), Box<dyn StdError>> 
         .resolve()
         .expect_err("basic authentication needs both halves");
     match &error {
-        Error::Credentials {
-            section,
-            source: ConfigError::Secret { key },
-        } => {
+        Error::Credentials { section, source }
+            if let ConfigError::Secret { key } = source.as_ref() =>
+        {
             assert_eq!("cdr.credentials", section);
             assert_eq!(&"credentials.password", key);
         }
@@ -175,12 +172,13 @@ fn a_password_without_a_user_refuses_to_boot() -> Result<(), Box<dyn StdError>> 
     assert!(
         matches!(
             &error,
-            Error::Credentials {
-                source: ConfigError::Missing {
-                    key: "credentials.user"
-                },
-                ..
-            }
+            Error::Credentials { source, .. }
+                if matches!(
+                    source.as_ref(),
+                    ConfigError::Missing {
+                        key: "credentials.user"
+                    }
+                )
         ),
         "{error:?}"
     );

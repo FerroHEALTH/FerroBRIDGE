@@ -52,8 +52,12 @@ fn term(relation: char, system: &str, code: &str) -> serde_json::Value {
     })
 }
 
-/// Puts `mappings` on the value of the element `node_id` names.
-fn annotate(document: &mut serde_json::Value, node_id: &str, mappings: &serde_json::Value) -> bool {
+/// Merges `fields` into the value of the element `node_id` names.
+fn annotate(
+    document: &mut serde_json::Value,
+    node_id: &str,
+    fields: &serde_json::Map<String, serde_json::Value>,
+) -> bool {
     match *document {
         serde_json::Value::Object(ref mut members) => {
             if members
@@ -62,16 +66,16 @@ fn annotate(document: &mut serde_json::Value, node_id: &str, mappings: &serde_js
                 == Some(node_id)
                 && let Some(serde_json::Value::Object(value)) = members.get_mut("value")
             {
-                value.insert(String::from("mappings"), mappings.clone());
+                value.extend(fields.clone());
                 return true;
             }
             members
                 .values_mut()
-                .any(|member| annotate(member, node_id, mappings))
+                .any(|member| annotate(member, node_id, fields))
         }
-        serde_json::Value::Array(ref mut items) => items
-            .iter_mut()
-            .any(|item| annotate(item, node_id, mappings)),
+        serde_json::Value::Array(ref mut items) => {
+            items.iter_mut().any(|item| annotate(item, node_id, fields))
+        }
         serde_json::Value::Null
         | serde_json::Value::Bool(_)
         | serde_json::Value::Number(_)
@@ -79,11 +83,24 @@ fn annotate(document: &mut serde_json::Value, node_id: &str, mappings: &serde_js
     }
 }
 
-/// Builds the synthetic composition whose problem name carries a mapping
-/// with `relation` to the withheld term, then an `=` mapping to `SYN-001`.
-pub(crate) fn annotated_composition(
+/// Returns the mappings the problem name carries: one with `relation` to the
+/// withheld term, then an `=` mapping to `SYN-001`.
+fn problem_mappings(relation: char) -> serde_json::Value {
+    serde_json::json!([
+        term(relation, BROADER_SYSTEM, BROADER_CODE),
+        term(
+            '=',
+            "http://example.org/fhir/CodeSystem/synthetic",
+            "SYN-001"
+        ),
+    ])
+}
+
+/// Builds the synthetic composition whose problem name value carries
+/// `fields` beside its text.
+fn composition_with(
     index: &WebTemplateIndex,
-    relation: char,
+    fields: &serde_json::Map<String, serde_json::Value>,
 ) -> Result<CanonicalComposition, Box<dyn Error>> {
     let values = vec![
         NodeValue::new(
@@ -100,18 +117,48 @@ pub(crate) fn annotated_composition(
         .with_datum("value"),
     ];
     let mut document = index.build_composition(&values, laws::NOW)?.into_value();
-    let mappings = serde_json::json!([
-        term(relation, BROADER_SYSTEM, BROADER_CODE),
-        term(
-            '=',
-            "http://example.org/fhir/CodeSystem/synthetic",
-            "SYN-001"
-        ),
-    ]);
-    if !annotate(&mut document, "at0002", &mappings) {
+    if !annotate(&mut document, "at0002", fields) {
         return Err("the composition holds no problem name".into());
     }
     Ok(index.accept(document)?)
+}
+
+/// Builds the synthetic composition whose problem name carries a mapping
+/// with `relation` to the withheld term, then an `=` mapping to `SYN-001`.
+pub(crate) fn annotated_composition(
+    index: &WebTemplateIndex,
+    relation: char,
+) -> Result<CanonicalComposition, Box<dyn Error>> {
+    let mut fields = serde_json::Map::new();
+    fields.insert(String::from("mappings"), problem_mappings(relation));
+    composition_with(index, &fields)
+}
+
+/// The synthetic terminology of the problem name's defining code.
+pub(crate) const DEFINING_SYSTEM: &str = "http://example.org/fhir/CodeSystem/synthetic-problem";
+
+/// The synthetic code of the problem name's defining code.
+pub(crate) const DEFINING_CODE: &str = "SYN-PROB-3";
+
+/// Builds the synthetic composition whose problem name is a `DV_CODED_TEXT`
+/// coded as [`DEFINING_CODE`], carrying the mappings of
+/// [`annotated_composition`].
+pub(crate) fn coded_composition(
+    index: &WebTemplateIndex,
+    relation: char,
+) -> Result<CanonicalComposition, Box<dyn Error>> {
+    let mut fields = serde_json::Map::new();
+    fields.insert(String::from("_type"), "DV_CODED_TEXT".into());
+    fields.insert(
+        String::from("defining_code"),
+        serde_json::json!({
+            "_type": "CODE_PHRASE",
+            "terminology_id": { "_type": "TERMINOLOGY_ID", "value": DEFINING_SYSTEM },
+            "code_string": DEFINING_CODE,
+        }),
+    );
+    fields.insert(String::from("mappings"), problem_mappings(relation));
+    composition_with(index, &fields)
 }
 
 /// Returns the `Condition.code` a run out of openEHR wrote.

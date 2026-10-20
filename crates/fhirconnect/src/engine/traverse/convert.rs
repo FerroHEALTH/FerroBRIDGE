@@ -6,6 +6,7 @@
 use fhir_types::codec::Value;
 use fhir_types::r4::primitives::String as FhirString;
 use openehr_mapping_core::composition::RmPosition;
+use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 
 use crate::engine::cell;
 use crate::engine::fhir::FhirKind;
@@ -133,14 +134,17 @@ impl<T: Table + ?Sized> Run<'_, T> {
         value: &RmValue,
         kind: FhirKind,
         terminology: Option<&str>,
-    ) -> Result<(FhirValue, Vec<Withheld>), LensError> {
+    ) -> Result<(FhirValue, Dropped), LensError> {
         let (value, reference) = self.minted(value);
-        let withheld = cell::withheld(&value, kind, terminology);
+        let dropped = Dropped {
+            code: cell::uncarried_code(&value, kind).cloned(),
+            mappings: cell::withheld(&value, kind, terminology),
+        };
         let mut view = cell::get(&value, kind, terminology)?;
         if let (Some(reference), FhirValue::Reference(held)) = (reference, &mut view) {
             held.reference = Some(FhirString::from(reference));
         }
-        Ok((view, withheld))
+        Ok((view, dropped))
     }
 
     /// Runs one occurrence of a mapping through its data-type cell.
@@ -206,75 +210,96 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     element: String::from(target.expression().as_str()),
                     source: Box::new(source),
                 };
-                let (view, withheld) = match source {
-                    Leaf::Value(ref value) if let RmValue::PartyRef(ref party) = **value => {
-                        (self.reference_of_party(mapping, target, party)?, Vec::new())
-                    }
+                let (view, dropped) = match source {
+                    Leaf::Value(ref value) if let RmValue::PartyRef(ref party) = **value => (
+                        self.reference_of_party(mapping, target, party)?,
+                        Dropped::default(),
+                    ),
                     Leaf::Value(ref value) => {
                         let terminology = self.binding_of(openehr.node());
                         self.read_value(value, kind, terminology.as_deref())
                             .map_err(refuse)?
                     }
-                    // NOTE: a scalar leaf carries text, so only an element that
-                    // travels as text takes it; no specification governs this:
-                    // our own design.
-                    Leaf::Scalar(ref text) => match kind {
-                        FhirKind::String | FhirKind::Date | FhirKind::DateTime => {
-                            let element = target.resolved().leaf();
-                            let read = FhirValue::read(kind, element, &Value::String(text.clone()))
-                                .map_err(|source| EngineError::Fhir {
-                                    mapping: String::from(mapping.name()),
-                                    element: String::from(element),
-                                    source: Box::new(source),
-                                })?;
-                            (read, Vec::new())
-                        }
-                        FhirKind::Boolean
-                        | FhirKind::Coding
-                        | FhirKind::CodeableConcept
-                        | FhirKind::Period
-                        | FhirKind::Reference
-                        | FhirKind::Identifier
-                        | FhirKind::Quantity => {
-                            return Err(refuse(LensError::NoCell {
-                                rm_type: String::from(openehr.leaf_class().unwrap_or("String")),
-                                kind: kind.as_str(),
-                                direction: Direction::OpenehrToFhir,
-                            }));
-                        }
-                    },
+                    Leaf::Scalar(ref text) => (
+                        Self::read_scalar(mapping, target, openehr, kind, text)?,
+                        Dropped::default(),
+                    ),
                 };
                 let output = Output::fhir(target, &binding.fhir);
                 let Some(view) = self.translated(mapping, view, output)? else {
                     return Ok(());
                 };
                 self.put_fhir_at(mapping, target, binding, &view)?;
-                self.record_withheld(mapping, binding, &withheld);
+                self.record_dropped(mapping, binding, &dropped);
                 Ok(())
             }
         }
     }
 
-    /// Records each term mapping a cell of `mapping` left out of the FHIR
-    /// element it wrote under `binding`.
-    fn record_withheld(&mut self, mapping: &Mapping, binding: &Binding, withheld: &[Withheld]) {
-        if withheld.is_empty() {
+    /// Reads the text a scalar leaf holds as the FHIR element `kind` names.
+    fn read_scalar(
+        mapping: &Mapping,
+        target: &FhirTarget,
+        openehr: &OpenehrTarget,
+        kind: FhirKind,
+        text: &str,
+    ) -> Result<FhirValue, EngineError> {
+        // NOTE: a scalar leaf carries text, so only an element that travels as
+        // text takes it; no specification governs this: our own design.
+        match kind {
+            FhirKind::String | FhirKind::Date | FhirKind::DateTime => {
+                let element = target.resolved().leaf();
+                FhirValue::read(kind, element, &Value::String(String::from(text))).map_err(
+                    |source| EngineError::Fhir {
+                        mapping: String::from(mapping.name()),
+                        element: String::from(element),
+                        source: Box::new(source),
+                    },
+                )
+            }
+            FhirKind::Boolean
+            | FhirKind::Coding
+            | FhirKind::CodeableConcept
+            | FhirKind::Period
+            | FhirKind::Reference
+            | FhirKind::Identifier
+            | FhirKind::Quantity => Err(EngineError::Cell {
+                mapping: String::from(mapping.name()),
+                element: String::from(target.expression().as_str()),
+                source: Box::new(LensError::NoCell {
+                    rm_type: String::from(openehr.leaf_class().unwrap_or("String")),
+                    kind: kind.as_str(),
+                    direction: Direction::OpenehrToFhir,
+                }),
+            }),
+        }
+    }
+
+    /// Records the defining code and each term mapping a cell of `mapping`
+    /// left out of the FHIR element it wrote under `binding`.
+    fn record_dropped(&mut self, mapping: &Mapping, binding: &Binding, dropped: &Dropped) {
+        if dropped.code.is_none() && dropped.mappings.is_empty() {
             return;
         }
         let location = self.locate(mapping, &binding.fhir);
-        // NOTE: no specification governs this: our own design, the loss
-        // concerns the value's `mappings` attribute, so the openEHR side
-        // names it below the node's path.
-        let location = match location.openehr() {
-            Some(path) => {
-                let below = format!("{path}/mappings");
-                location.with_openehr(below)
-            }
-            None => location,
+        // NOTE: no specification governs this: our own design, each loss
+        // concerns one attribute of the value, so the openEHR side names that
+        // attribute below the node's path.
+        let below = |attribute: &str| match location.openehr() {
+            Some(path) => location.clone().with_openehr(format!("{path}/{attribute}")),
+            None => location.clone(),
         };
-        for taken in withheld {
+        if let Some(ref code) = dropped.code {
+            self.warnings.push(Warning::uncarried_code(
+                mapping.name(),
+                code,
+                below("defining_code"),
+            ));
+        }
+        let mappings = below("mappings");
+        for taken in &dropped.mappings {
             self.warnings
-                .push(Warning::withheld(mapping.name(), taken, location.clone()));
+                .push(Warning::withheld(mapping.name(), taken, mappings.clone()));
         }
     }
 
@@ -368,4 +393,13 @@ fn converted(mapping: &Mapping) -> Option<&OpenehrTarget> {
         Some(Derived::Value { target, .. }) => Some(target),
         _ => mapping.openehr(),
     }
+}
+
+/// What a cell read out of openEHR left out of the FHIR element it wrote.
+#[derive(Debug, Default)]
+struct Dropped {
+    /// The `defining_code` a `string` cannot carry.
+    code: Option<CodePhrase>,
+    /// The term mappings the element cannot carry.
+    mappings: Vec<Withheld>,
 }

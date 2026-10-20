@@ -53,8 +53,9 @@ pub struct SmartSettings {
     pub basic: Option<Arc<PasswordStore>>,
     /// The realm every challenge names, when one is set.
     pub realm: Option<String>,
-    /// The SMART capabilities the discovery document adds.
-    pub capabilities: Vec<String>,
+    /// What the discovery document adds: the capabilities and the scopes
+    /// the bridge honours.
+    pub options: SmartOptions,
     /// The scope that guards the operator API and admits the operations that
     /// commit nothing.
     pub operator_scope: String,
@@ -62,15 +63,15 @@ pub struct SmartSettings {
 
 impl SmartSettings {
     /// Returns the settings of a resource server trusting `issuer` alone,
-    /// with no Basic user, no realm, no added capability and the default
-    /// operator scope.
+    /// with no Basic user, no realm, no added capability or listed scope,
+    /// and the default operator scope.
     #[must_use]
     pub fn new(issuer: Settings) -> Self {
         Self {
             issuers: vec![issuer],
             basic: None,
             realm: None,
-            capabilities: Vec::new(),
+            options: SmartOptions::default(),
             operator_scope: String::from(OPERATOR_SCOPE),
         }
     }
@@ -112,8 +113,8 @@ pub struct Smart {
     primary: Arc<ResourceServer>,
     /// The token endpoint that issuer's metadata names.
     token_endpoint: String,
-    /// The SMART capabilities the discovery document adds.
-    capabilities: Vec<String>,
+    /// What the discovery document adds.
+    options: SmartOptions,
     /// The operator scope.
     operator_scope: String,
 }
@@ -163,7 +164,7 @@ impl Smart {
             gate,
             primary,
             token_endpoint,
-            capabilities: settings.capabilities,
+            options: settings.options,
             operator_scope: settings.operator_scope,
         })
     }
@@ -180,7 +181,9 @@ impl Smart {
         &self.operator_scope
     }
 
-    /// Returns the SMART discovery document.
+    /// Returns the SMART discovery document, listing as `scopes_supported`
+    /// the scopes `[auth] scopes_supported` names, which "the server SHALL
+    /// support" (SMART App Launch 2.2.0, Conformance, §Metadata).
     ///
     /// The bridge evaluates no granular scope, so it claims no
     /// `permission-v2`: that capability is "support for `SMARTv2` granular
@@ -188,8 +191,8 @@ impl Smart {
     #[must_use]
     pub fn configuration(&self) -> serde_json::Value {
         self.primary.smart_configuration(&SmartOptions {
-            capabilities: self.capabilities.clone(),
-            ..SmartOptions::default()
+            granular: false,
+            ..self.options.clone()
         })
     }
 

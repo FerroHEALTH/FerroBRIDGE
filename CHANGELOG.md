@@ -32,6 +32,15 @@ crates on crates.io.
   interpreter still refuses them as `unsupported-target`; the supplement
   spells them as one row per level under that level's condition. The
   vendored `hl7v2` corpus loses 22 `unsupported-target` outcomes.
+- `ferrobridge-hl7v2` ships message maps for 18 HL7 v2 structures the
+  v2-to-FHIR guide has none for (#637): ADT_A15, ADT_A16, ADT_A21, ADT_A39,
+  ADT_A44, ADT_A45, ADT_A60, BAR_P02, BAR_P12, DFT_P03, DFT_P11, MDM_T01,
+  OMG_O19, OUL_R23, OUL_R24, PPR_PC1, RDE_O11 and REF_I12. Each takes the
+  rows of a guide message map (or the shipped OUL_R22 map) for the segments
+  it shares, at its own group paths, so the guide's segment maps apply, and
+  its description names the map it composes. A supplement for ADT_A06 names
+  the guide's `ADT_A01.PD1` row `ADT_A06.PD1`, so ADT_A06 messages map too.
+  The `hl7v2` corpus gains the 56 messages, to 510 of 511.
 - The HL7 v2 face reads a batch file (#642). A frame that opens with FHS or
   BHS is split by the HL7 v2 chapter 2 §2.10.3 structure into its batches
   and messages, each message is answered as if it had arrived alone, and
@@ -76,6 +85,10 @@ crates on crates.io.
   where a caller's identity store does that. `OperationError` gains two
   variants, so a consumer that matches it exhaustively adds the arms.
   `fhirconnect` 0.1.156.
+- `[auth] scopes_supported`: the scopes the bridge honours, listed as
+  `scopes_supported` in the SMART discovery document, which "the server
+  SHALL support" (SMART App Launch 2.2.0, Conformance, Metadata); each
+  value is one scope token, checked at load (#1007).
 
 ### Changed
 
@@ -99,7 +112,7 @@ crates on crates.io.
     `ES256` and `ES384`, where it was `RS256` and `ES256`.
   - `auth.issuer` may be plain `http` on a loopback host; elsewhere it stays
     `https`.
-  - `auth.operator_scope` becomes `operator.scope`, and its default
+  - `auth.operator_scope` becomes `auth.product_scope`, and its default
     `ferrobridge.operator` becomes `__ferrobridge.operator`, the extension
     form SMART App Launch 2.2.0 gives a scope (a string starting with `__`
     or a full URI); any other value refuses the start. Grant the new scope
@@ -147,9 +160,33 @@ crates on crates.io.
   tag, is missing or still holds an open issue or pull request, and names
   each one; once every leg has succeeded, crates.io included, it closes that
   milestone (#983).
+- `ferrohealth-smart` 0.1.1 (#1007). The operator scope moves from
+  `[operator] scope` to `[auth] product_scope` (environment
+  `FERROBRIDGE__AUTH__PRODUCT_SCOPE`), default `__ferrobridge.operator`,
+  checked by the crate in the same two SMART extension forms. The audit
+  line's field for what a request addressed is `addressed`, where it was
+  `target`, so a JSON log keeps it beside the event's own `target`; a log
+  query that read `target` for the addressed resource reads `addressed`.
+  `[auth] capabilities` refuses at load a value SMART App Launch 2.2.0
+  does not define unless it is a full URI. The issuer and resource checks
+  of `[<lane>.credentials.oauth]` and the Basic password read are the
+  crate's now, with the same refusals at load.
+- `serve` warns that `[auth]` is off only when a surface it guards runs,
+  and names those surfaces (the facade, the operator API, the operations
+  lane); a server with only `/` and the health routes logs nothing
+  (#1005).
 
 ### Fixed
 
+- The `defining_code` of a `DV_CODED_TEXT` value read out to a FHIR `string`
+  is a declared loss (#1011). The chapter writes no `string` row for
+  `DV_CODED_TEXT` (FHIRconnect `DV_CODED_TEXT.adoc` §STRING calls the pairing
+  not possible), so the value converts as `DV_TEXT` and its code was dropped
+  with no trace; the run now reports it as a `Loss::Skipped` with the new
+  `SkipReason::DefiningCodeUncarried`, located at the element and the value's
+  `defining_code`. A consumer that matches `SkipReason` exhaustively adds the
+  arm. The facade's loss log labels it `skipped-defining-code-uncarried`.
+  `fhirconnect` 0.1.160.
 - A `TERM_MAPPING` that a `DV_TEXT` or `DV_CODED_TEXT` value carries out to a
   FHIR `string`, or a `DV_CODED_TEXT` value carries out to a single `Coding`,
   is a declared loss (#623). Those pairs give `mappings` no FHIR row

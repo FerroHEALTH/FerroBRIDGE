@@ -1638,9 +1638,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eec9b6abf7df19dbc6ee0e2c6581e69b62e843935aa28e7baa8c3d735cfe9076"
+checksum = "c5e4eca24af02604130b64bb40f69054338475764d053a77e63bbfaab334420e"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -1714,7 +1714,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.159"
+version = "0.1.160"
 dependencies = [
  "ferrobridge-testkit",
  "fhir-types",
