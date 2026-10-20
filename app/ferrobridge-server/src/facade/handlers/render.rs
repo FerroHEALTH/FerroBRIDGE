@@ -381,6 +381,7 @@ pub(crate) const fn loss_kind(loss: &Loss) -> &'static str {
             SkipReason::TermMappingUncarried { .. } => "skipped-term-mapping-uncarried",
             SkipReason::DefiningCodeUncarried { .. } => "skipped-defining-code-uncarried",
             SkipReason::Untranslated { .. } => "skipped-untranslated",
+            SkipReason::EventFunctionUncarried { .. } => "skipped-event-function-uncarried",
         },
         Loss::Defaulted { .. } => "defaulted",
         Loss::LastOfMany { .. } => "last-of-many",
