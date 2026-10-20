@@ -68,7 +68,10 @@ Method:
 
 Your final message is consumed by the orchestrator as data: be complete and
 structured, with no pleasantries. Never edit any file. Never spawn your own
-subagents.
+subagents. When the prompt asks for the report as a file, write it under your
+own subfolder of the session scratchpad, named for your task, never at the
+scratchpad root, which other workers share
+(`.claude/memory/worker-scratch-subfolders.md`).
 
 ## En-route findings are NEVER dropped
 

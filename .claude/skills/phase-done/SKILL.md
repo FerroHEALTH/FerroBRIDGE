@@ -66,7 +66,12 @@ records, and it does not decide the work is done on your behalf.
     so the merge into `main` auto-closes the issue; never close the issue by
     hand when a PR carries the work. One `Closes` keyword per issue. Confirm
     auto-merge is armed (`gh pr view --json autoMergeRequest`); arm it if not,
-    as its own command (`.claude/memory/pr-auto-merge.md`).
+    as its own command (`.claude/memory/pr-auto-merge.md`). Write any body
+    file under your own subfolder of the session scratchpad, never its root,
+    which other workers share; check the file is yours before `--body-file`
+    and re-read the body after setting it
+    (`gh pr view <n> --json body,closingIssuesReferences`,
+    `.claude/memory/worker-scratch-subfolders.md`).
 11. **Roadmap-board check** (`.claude/rules/project-board.md`): `Done` is set
     by the built-in workflow when the merge closes the issue, never by hand.
     After the merge, `scripts/gh/project.sh show <n>` should say `Done`; if the
