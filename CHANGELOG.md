@@ -25,6 +25,18 @@ crates on crates.io.
 
 ### Added
 
+- Every published FHIRconnect context now has its operational template in
+  the tree (#258). Nine KDS templates join the three already vendored, each
+  fetched by its own `scripts/vendor/kds-*-opt.sh` from the openFHIR commit
+  `docs/VERSIONS.md` pins, with a sha256 and a `PROVENANCE.md`: Fall einfach,
+  Laborbericht, Medikationseintrag, Medikamentenverabreichungen, Person
+  Pseudonymisiert, Prozedur, Studienteilnahme, Todesursache and Vitalstatus.
+  The `fhirconnect` suite compiles all 13 contexts verbatim against their
+  templates and pins each verdict. None compiles: ten stop at load on a
+  reference the library cannot resolve, three are refused at compile, and the
+  EHDS laboratory template the library ships does not parse. A context that
+  compiles joins the mapping-library pass list on its own. The list stays at
+  10 of 107.
 - `ferrobridge-hl7v2` ships message maps for 18 HL7 v2 structures the
   v2-to-FHIR guide has none for (#637): ADT_A15, ADT_A16, ADT_A21, ADT_A39,
   ADT_A44, ADT_A45, ADT_A60, BAR_P02, BAR_P12, DFT_P03, DFT_P11, MDM_T01,
