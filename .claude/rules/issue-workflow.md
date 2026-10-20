@@ -56,7 +56,7 @@ between issues live in `issue-relationships.md`; the public board is
    work). One `Closes` keyword closes one issue: "Closes #1, #2" closes only
    #1, so repeat the keyword per issue and verify after the merge. Arm
    auto-merge the moment the PR is open, as its own command
-   (`gh pr merge <n> --auto --squash`,
+   (`gh pr merge <n> --auto`,
    `.claude/memory/pr-auto-merge.md`).
 6. **Close out** with `/phase-done`: verify the acceptance criteria are met,
    write the close narrative into the PR description, and post the handoff
