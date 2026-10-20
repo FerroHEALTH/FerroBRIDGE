@@ -15,6 +15,7 @@ use fhir_types::codec::Json;
 use fhir_types::codec::Path;
 use fhir_types::codec::Primitive;
 use fhir_types::codec::Value;
+use fhir_types::r4::attachment::Attachment;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::count::Count;
@@ -28,6 +29,7 @@ use fhir_types::r4::primitives::Decimal;
 use fhir_types::r4::primitives::Integer;
 use fhir_types::r4::primitives::String as FhirString;
 use fhir_types::r4::primitives::Time;
+use fhir_types::r4::primitives::Url;
 use fhir_types::r4::quantity::Quantity;
 use fhir_types::r4::reference::Reference;
 use fhir_types::schema::ValueKind;
@@ -72,6 +74,10 @@ pub enum FhirKind {
     Time,
     /// A `Duration`.
     Duration,
+    /// A `url`.
+    Url,
+    /// An `Attachment`.
+    Attachment,
 }
 
 impl FhirKind {
@@ -115,6 +121,8 @@ impl FhirKind {
             "Count" => Some(Self::Count),
             "time" => Some(Self::Time),
             "Duration" => Some(Self::Duration),
+            "url" => Some(Self::Url),
+            "Attachment" => Some(Self::Attachment),
             _ => None,
         }
     }
@@ -136,6 +144,7 @@ impl FhirKind {
                 "Quantity" => Some(Self::Quantity),
                 "Count" => Some(Self::Count),
                 "Duration" => Some(Self::Duration),
+                "Attachment" => Some(Self::Attachment),
                 _ => None,
             },
             Location::Primitive(ValueKind::Text) | Location::Attribute => Some(Self::String),
@@ -166,6 +175,8 @@ impl FhirKind {
             Self::Count => "Count",
             Self::Time => "time",
             Self::Duration => "Duration",
+            Self::Url => "url",
+            Self::Attachment => "Attachment",
         }
     }
 }
@@ -203,6 +214,10 @@ pub enum FhirValue {
     Time(Time),
     /// A `Duration`.
     Duration(Box<Duration>),
+    /// A `url`.
+    Url(Url),
+    /// An `Attachment`.
+    Attachment(Box<Attachment>),
 }
 
 /// Why a FHIR element could not be read or written.
@@ -258,6 +273,8 @@ impl FhirValue {
             Self::Count(_) => FhirKind::Count,
             Self::Time(_) => FhirKind::Time,
             Self::Duration(_) => FhirKind::Duration,
+            Self::Url(_) => FhirKind::Url,
+            Self::Attachment(_) => FhirKind::Attachment,
         }
     }
 
@@ -320,6 +337,12 @@ impl FhirValue {
             FhirKind::Duration => object(value, element, kind)
                 .and_then(|object| Duration::from_json(object, &mut path).map_err(refuse))
                 .map(|duration| Self::Duration(Box::new(duration))),
+            FhirKind::Url => Url::from_json_parts(Some(value), None, &mut path)
+                .map(Self::Url)
+                .map_err(refuse),
+            FhirKind::Attachment => object(value, element, kind)
+                .and_then(|object| Attachment::from_json(object, &mut path).map_err(refuse))
+                .map(|attachment| Self::Attachment(Box::new(attachment))),
         }
     }
 
@@ -361,6 +384,8 @@ impl FhirValue {
             Self::Count(ref count) => complex(count.to_json()),
             Self::Time(ref time) => primitive(time.value_json()),
             Self::Duration(ref duration) => complex(duration.to_json()),
+            Self::Url(ref url) => primitive(url.value_json()),
+            Self::Attachment(ref attachment) => complex(attachment.to_json()),
         }
     }
 }

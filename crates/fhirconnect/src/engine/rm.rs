@@ -23,6 +23,8 @@ use openehr_its::json::to_canonical_value;
 use openehr_rm::v1_2::common::generic::party_identified::PartyIdentifiedData;
 use openehr_rm::v1_2::data_types::basic::dv_boolean::DvBoolean;
 use openehr_rm::v1_2::data_types::basic::dv_identifier::DvIdentifier;
+use openehr_rm::v1_2::data_types::encapsulated::dv_multimedia::DvMultimedia;
+use openehr_rm::v1_2::data_types::encapsulated::dv_parsable::DvParsable;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_date::DvDate;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_date_time::DvDateTime;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_duration::DvDuration;
@@ -35,6 +37,7 @@ use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
+use openehr_rm::v1_2::data_types::uri::dv_uri::DvUri;
 use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::model::Container;
 use openehr_sdt::flat::path::Segment;
@@ -77,6 +80,12 @@ pub enum RmValue {
     Time(Box<DvTime>),
     /// A `DV_DURATION`.
     Duration(Box<DvDuration>),
+    /// A `DV_URI`, or the `DV_EHR_URI` the reference model admits in its place.
+    Uri(DvUri),
+    /// A `DV_MULTIMEDIA`.
+    Multimedia(Box<DvMultimedia>),
+    /// A `DV_PARSABLE`.
+    Parsable(Box<DvParsable>),
     /// A `DV_BOOLEAN`.
     Boolean(DvBoolean),
     /// A `PARTY_REF`, the party a `ROLE` names as its `performer`.
@@ -143,6 +152,9 @@ impl RmValue {
             Self::Count(_) => "DV_COUNT",
             Self::Time(_) => "DV_TIME",
             Self::Duration(_) => "DV_DURATION",
+            Self::Uri(_) => "DV_URI",
+            Self::Multimedia(_) => "DV_MULTIMEDIA",
+            Self::Parsable(_) => "DV_PARSABLE",
             Self::Boolean(_) => "DV_BOOLEAN",
             Self::PartyRef(_) => "PARTY_REF",
         }
@@ -209,6 +221,13 @@ impl RmValue {
             "DV_DURATION" => from_canonical_value(value)
                 .map(|duration| Self::Duration(Box::new(duration)))
                 .map_err(refuse),
+            "DV_URI" => from_canonical_value(value).map(Self::Uri).map_err(refuse),
+            "DV_MULTIMEDIA" => from_canonical_value(value)
+                .map(|multimedia| Self::Multimedia(Box::new(multimedia)))
+                .map_err(refuse),
+            "DV_PARSABLE" => from_canonical_value(value)
+                .map(|parsable| Self::Parsable(Box::new(parsable)))
+                .map_err(refuse),
             "PARTY_REF" => from_canonical_value(value)
                 .map(Self::PartyRef)
                 .map_err(refuse),
@@ -261,6 +280,9 @@ impl RmValue {
             Self::Count(ref count) => to_canonical_value(count.as_ref()),
             Self::Time(ref time) => to_canonical_value(time.as_ref()),
             Self::Duration(ref duration) => to_canonical_value(duration.as_ref()),
+            Self::Uri(ref uri) => to_canonical_value(uri),
+            Self::Multimedia(ref multimedia) => to_canonical_value(multimedia.as_ref()),
+            Self::Parsable(ref parsable) => to_canonical_value(parsable.as_ref()),
         };
         Ok(encoded)
     }
