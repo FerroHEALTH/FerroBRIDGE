@@ -160,12 +160,12 @@ pub struct Hl7v2Profile {
 }
 
 /// The operator API: the engine state and the mapping files, read under the
-/// operator scope.
+/// operator scope, `[auth] product_scope`.
 ///
 /// Off until `enabled` is set, and refused at boot while `[auth]` is off, so
 /// the API is never served to an unauthenticated caller. No specification
 /// governs the operator surface: our own design.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Operator {
     /// Whether the operator routes are mounted under `/operator`.
@@ -173,19 +173,6 @@ pub struct Operator {
     /// The writable directory console saves go to; unset, the API saves
     /// nothing.
     pub mapping_dir: Option<PathBuf>,
-    /// The scope that guards the operator API and admits `$validate`,
-    /// `$tofhir` and `$toopenehr` on the facade, which commit nothing.
-    pub scope: String,
-}
-
-impl Default for Operator {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            mapping_dir: None,
-            scope: String::from(crate::smart::OPERATOR_SCOPE),
-        }
-    }
 }
 
 /// The FHIRconnect operations lane.

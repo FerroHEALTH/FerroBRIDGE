@@ -73,12 +73,7 @@ fn an_admitted_request_leaves_one_audit_line_without_the_token() {
     assert_eq!(Some("GET"), fields["method"].as_str());
     assert_eq!(Some("read"), fields["interaction"].as_str());
     assert_eq!(Some("/fhir/{resource_type}/{id}"), fields["route"].as_str());
-    // NOTE: no specification governs this: our own design; the line's `target`
-    // field shares its key with the JSON envelope's, so it is read from the text.
-    assert!(
-        text.contains("\"target\":\"Condition/c-audit-1\""),
-        "{text}"
-    );
+    assert_eq!(Some("Condition/c-audit-1"), fields["addressed"].as_str());
     assert_eq!(Some(404), fields["status"].as_u64());
     assert!(fields["duration_ms"].is_number(), "{line}");
     assert!(fields["at"].is_string(), "{line}");
@@ -168,10 +163,7 @@ fn a_batch_audits_each_entry_and_the_batch_without_any_content() {
         .find(|line| line["entry"].as_u64() == Some(0))
         .expect("the first entry's line");
     assert_eq!(Some("read"), read["interaction"].as_str());
-    assert!(
-        text.contains("\"target\":\"Condition/c-audit-4\""),
-        "{text}"
-    );
+    assert_eq!(Some("Condition/c-audit-4"), read["addressed"].as_str());
     assert_eq!(Some(404), read["status"].as_u64());
     let create = lines
         .iter()
@@ -186,9 +178,9 @@ fn a_batch_audits_each_entry_and_the_batch_without_any_content() {
 }
 
 /// The fields every audit line carries beside the log envelope (`timestamp`,
-/// `level`, `target` and `message`), in sorted order; its own `target` field
-/// shares the envelope's key and is asserted from the text.
-const REQUEST_FIELDS: [&str; 11] = [
+/// `level`, `target` and `message`), in sorted order.
+const REQUEST_FIELDS: [&str; 12] = [
+    "addressed",
     "at",
     "client",
     "duration_ms",

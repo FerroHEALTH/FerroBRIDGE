@@ -68,9 +68,11 @@ fn the_operator_api_without_an_issuer_refuses_to_boot() -> Result<(), Box<dyn St
     assert!(
         matches!(
             &error,
-            Error::Auth {
-                source: ferrohealth_smart::config::ConfigError::Missing { key: "auth.issuer" }
-            }
+            Error::Auth { source }
+                if matches!(
+                    source.as_ref(),
+                    ferrohealth_smart::config::ConfigError::Missing { key: "auth.issuer" }
+                )
         ),
         "{error:?}"
     );
@@ -94,7 +96,7 @@ fn the_operator_scope_is_read_from_the_file_and_the_environment() -> Result<(), 
             String::from("true"),
         ),
         (
-            String::from("FERROBRIDGE__OPERATOR__SCOPE"),
+            String::from("FERROBRIDGE__AUTH__PRODUCT_SCOPE"),
             String::from("__console.operator"),
         ),
     ]);

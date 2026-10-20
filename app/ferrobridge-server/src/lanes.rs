@@ -59,9 +59,17 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             .context("reading the authorization server")?;
         state = state.with_auth(Arc::new(smart));
     } else {
-        tracing::warn!(
-            "[auth] is off: the FHIR facade authenticates no caller and serves every request"
+        let open = guarded_surfaces(
+            settings.facade.is_some(),
+            settings.operator.is_some(),
+            settings.operations.enabled && settings.mapping_directory.is_some(),
         );
+        if !open.is_empty() {
+            tracing::warn!(
+                surfaces = open.join(","),
+                "[auth] is off: these surfaces authenticate no caller and serve every request"
+            );
+        }
     }
     let mut lanes = startup::lanes(settings);
     if let Some(lane) = settings.facade.as_ref() {
@@ -383,4 +391,36 @@ async fn build_facade(
             .with_party_search(lane.party_search.clone()),
         counts,
     ))
+}
+
+/// Returns the names of the surfaces `[auth]` guards that run: the facade,
+/// the operator API, and the FHIRconnect operations over a mapping set.
+///
+/// A server with none of them serves only `/` and the health routes, so an
+/// `[auth]` that is off leaves nothing open and warrants no warning (no
+/// specification governs this: our own design).
+fn guarded_surfaces(facade: bool, operator: bool, operations: bool) -> Vec<&'static str> {
+    [
+        (facade, "facade"),
+        (operator, "operator"),
+        (operations, "operations"),
+    ]
+    .into_iter()
+    .filter_map(|(runs, name)| runs.then_some(name))
+    .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::guarded_surfaces;
+
+    #[test]
+    fn only_a_running_guarded_surface_is_named() {
+        assert!(guarded_surfaces(false, false, false).is_empty());
+        assert_eq!(vec!["facade"], guarded_surfaces(true, false, false));
+        assert_eq!(
+            vec!["operator", "operations"],
+            guarded_surfaces(false, true, true)
+        );
+    }
 }

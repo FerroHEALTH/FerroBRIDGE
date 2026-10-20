@@ -49,7 +49,7 @@ fn refusal(text: &str) -> Result<Error, Box<dyn StdError>> {
 /// Returns the rule of `ferrohealth-smart` an `[auth]` refusal names.
 fn rule(error: &Error) -> Option<&ConfigError> {
     match error {
-        Error::Auth { source } => Some(source),
+        Error::Auth { source } => Some(source.as_ref()),
         _ => None,
     }
 }
@@ -121,7 +121,8 @@ fn a_minimal_section_takes_the_defaults() -> Result<(), Box<dyn StdError>> {
     assert!(issuer.scopeless_subjects.is_empty());
     assert!(issuer.jwks_file.is_none());
     assert_eq!(OPERATOR_SCOPE, auth.operator_scope);
-    assert!(auth.capabilities.is_empty());
+    assert!(auth.options.capabilities.is_empty());
+    assert!(auth.options.scopes_supported.is_empty());
     assert!(auth.basic.is_none());
     assert!(auth.realm.is_none());
     Ok(())
@@ -141,7 +142,8 @@ fn every_key_reads() -> Result<(), Box<dyn StdError>> {
             "scopeless_subjects = [\"svc-ferrofed\"]\n",
             "realm = \"ferrobridge\"\n",
             "capabilities = [\"launch-standalone\", \"client-confidential-asymmetric\"]\n",
-            "\n[operator]\nscope = \"__bridge.operator\"\n",
+            "scopes_supported = [\"system/Condition.rs\", \"__bridge.operator\"]\n",
+            "product_scope = \"__bridge.operator\"\n",
         ),
         MINIMAL
     );
@@ -156,7 +158,14 @@ fn every_key_reads() -> Result<(), Box<dyn StdError>> {
     assert!(issuer.scopeless_subjects.contains("svc-ferrofed"));
     assert_eq!(Some("ferrobridge"), auth.realm.as_deref());
     assert_eq!("__bridge.operator", auth.operator_scope);
-    assert_eq!(2, auth.capabilities.len());
+    assert_eq!(2, auth.options.capabilities.len());
+    assert_eq!(
+        vec![
+            String::from("system/Condition.rs"),
+            String::from("__bridge.operator")
+        ],
+        auth.options.scopes_supported
+    );
     Ok(())
 }
 
@@ -341,15 +350,15 @@ fn a_clock_skew_over_five_minutes_is_refused() -> Result<(), Box<dyn StdError>> 
 fn an_operator_scope_or_capability_that_is_no_scope_token_is_refused()
 -> Result<(), Box<dyn StdError>> {
     for scope in ["two words", "__two words"] {
-        let error = refusal(&format!("{MINIMAL}\n[operator]\nscope = \"{scope}\"\n"))?;
+        let error = refusal(&format!("{MINIMAL}product_scope = \"{scope}\"\n"))?;
         assert!(
-            matches!(&error, Error::Scope { key } if key == "operator.scope"),
+            matches!(rule(&error), Some(ConfigError::ProductScope { .. })),
             "{scope}: {error:?}"
         );
     }
     let error = refusal(&format!("{MINIMAL}capabilities = [\"bad\\\"quote\"]\n"))?;
     assert!(
-        matches!(&error, Error::Scope { key } if key == "auth.capabilities"),
+        matches!(rule(&error), Some(ConfigError::Capability { .. })),
         "{error:?}"
     );
     Ok(())
@@ -361,14 +370,14 @@ fn an_operator_scope_outside_the_smart_extension_forms_is_refused() -> Result<()
     // NOTE: SMART App Launch 2.2.0 scopes-and-launch-context.html,
     // Extensibility: an extension scope is a full URI or starts with `__`.
     for scope in ["ferrobridge.operator", "bridge:operator"] {
-        let error = refusal(&format!("{MINIMAL}\n[operator]\nscope = \"{scope}\"\n"))?;
+        let error = refusal(&format!("{MINIMAL}product_scope = \"{scope}\"\n"))?;
         assert!(
-            matches!(&error, Error::Scope { key } if key == "operator.scope"),
+            matches!(rule(&error), Some(ConfigError::ProductScope { .. })),
             "{scope}: {error:?}"
         );
     }
     let uri = settings(&format!(
-        "{MINIMAL}\n[operator]\nscope = \"https://bridge.example.org/scope/operator\"\n"
+        "{MINIMAL}product_scope = \"https://bridge.example.org/scope/operator\"\n"
     ))?
     .ok_or("auth is on")?;
     assert_eq!(
@@ -388,5 +397,10 @@ fn an_unknown_key_is_refused() -> Result<(), Box<dyn StdError>> {
         let error = refusal(&format!("{MINIMAL}{key}\n"))?;
         assert!(matches!(error, Error::Parse { .. }), "{key}: {error:?}");
     }
+    let error = refusal(&format!("{MINIMAL}\n[operator]\nscope = \"__x\"\n"))?;
+    assert!(
+        matches!(error, Error::Parse { .. }),
+        "the operator scope is [auth] product_scope: {error:?}"
+    );
     Ok(())
 }
