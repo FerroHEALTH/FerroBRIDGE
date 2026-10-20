@@ -410,7 +410,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
             let Some(found) = attribute_at(&value, input) else {
                 return Ok(None);
             };
-            if !matches!(carried, Carried::Value | Carried::Family) {
+            if !matches!(
+                carried,
+                Carried::Value | Carried::Family | Carried::HistoryOrigin
+            ) {
                 return Ok(scalar(found).map(Leaf::Scalar));
             }
             let leaf = input

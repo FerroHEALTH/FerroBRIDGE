@@ -233,8 +233,11 @@ the `context` node the same way; `EVENT_CONTEXT.end_time` is the
 compacted into its value reaches the element's `links`
 (`OpenehrTarget::on_element`): the `_link:i` family sits on the one FLAT node
 the two share, and the engine reads it from the element
-(`WebTemplateIndex::read_element`). These
-families are the one place the engine still spells FLAT keys, because the
+(`WebTemplateIndex::read_element`). `HISTORY.origin` has no Web Template
+node either: a mapping names it as `$archetype/data/origin`, which
+`rm::HISTORY_ORIGIN` carries as `Carried::HistoryOrigin`, and the engine
+writes it as the observation's `history_origin` (master05 §OBSERVATION).
+These families are the one place the engine still spells FLAT keys, because the
 builder takes no `|raw` on a `_`-prefixed family (the `TODO(#618)` in
 `engine::family`). Reading them back decodes typed `LINK` and
 `PARTICIPATION` values, and a list that does not decode refuses the run. A

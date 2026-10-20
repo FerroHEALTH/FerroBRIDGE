@@ -1,5 +1,6 @@
 ferrobridge_diagnose_minimal
+ferrobridge_observation_events
 kds_diagnose
 kds_laborauftrag
 kds_person
-total 4
+total 5

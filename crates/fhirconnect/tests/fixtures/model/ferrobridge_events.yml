@@ -1,0 +1,72 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping over an OBSERVATION whose HISTORY
+# carries any number of EVENTs, each holding one quantity in an ITEM_LIST.
+# Going out of openEHR each event becomes its own Observation
+# (HierarchyMappings.adoc, split); the history's origin and the event's time
+# are the start and the end of effectivePeriod, so the offset of each event
+# from the origin travels both ways.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_events
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-OBSERVATION.ferrobridge_reading.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+preprocessor:
+  hierarchy:
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0001]/events[at0002]"
+    split:
+      fhir:
+        create: "resource"
+
+mappings:
+  - name: "origin"
+    with:
+      fhir: "$resource.effective.as(Period).start"
+      openehr: "$archetype/data/origin"
+
+  - name: "reading"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0001]/events[at0002]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "time"
+          with:
+            fhir: "effective.as(Period).end"
+            openehr: "time"
+
+        - name: "amount"
+          with:
+            fhir: "value.as(Quantity)"
+            openehr: "data[at0003]/items[at0004]"
+
+  - name: "status"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "final"
+        fhir:
+          - path: "status"
+            value: "final"
+
+  - name: "code"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "text"
+        fhir:
+          - path: "code.text"
+            value: "Synthetic reading"

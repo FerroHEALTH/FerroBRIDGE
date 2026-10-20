@@ -5,11 +5,13 @@
 //! attribute at a time.
 
 use fhir_types::codec::Value;
+use openehr_mapping_core::composition::NodeValue;
 use openehr_mapping_core::composition::RmPosition;
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::index::paths::FlatId;
 use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::paths::item_at_path;
+use openehr_sdt::flat::path::Segment;
 
 use crate::engine::cell;
 use crate::engine::family;
@@ -35,6 +37,9 @@ use crate::engine::traverse::error::EngineError;
 /// The class of a tail the [`crate::engine::lens::party_ref::PartyRefLens`]
 /// carries through the demographics endpoint.
 pub(super) const PARTY_REF: &str = "PARTY_REF";
+
+/// The class of a history's origin.
+const DV_DATE_TIME: &str = "DV_DATE_TIME";
 
 impl<T: Table + ?Sized> Run<'_, T> {
     /// Writes one FHIR element as the `_`-prefixed family a tail names below a
@@ -119,6 +124,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
             node: String::from(node.aql_path().as_str()),
             source: Box::new(source),
         };
+        if carried == Carried::HistoryOrigin {
+            return self.history_origin(mapping, target, node, view, binding);
+        }
         if carried == Carried::Family {
             return self.convert_family(mapping, target, openehr, view, binding);
         }
@@ -220,6 +228,52 @@ impl<T: Table + ?Sized> Run<'_, T> {
             node: String::from(node.aql_path().as_str()),
             source: Box::new(source),
         })
+    }
+
+    /// Writes the origin of an observation's history as the `history_origin`
+    /// FLAT attribute of the observation's node.
+    ///
+    /// Simplified Formats sets the origin "to the time of the earliest event
+    /// if not explicitly set" (master05 §OBSERVATION), so a mapping that names
+    /// it sets it explicitly; the FLAT form carries the time alone.
+    fn history_origin(
+        &mut self,
+        mapping: &Mapping,
+        target: &FhirTarget,
+        node: &ResolvedNode,
+        view: &FhirValue,
+        binding: &Binding,
+    ) -> Result<(), EngineError> {
+        let produced =
+            cell::put(view, DV_DATE_TIME, None, None).map_err(|source| EngineError::Cell {
+                mapping: String::from(mapping.name()),
+                element: String::from(target.expression().as_str()),
+                source: Box::new(source),
+            })?;
+        for taken in &produced.fallbacks {
+            self.warnings.push(Warning::fallback(
+                taken,
+                self.locate(mapping, &binding.fhir),
+            ));
+        }
+        let RmValue::DateTime(ref time) = produced.value else {
+            return Err(EngineError::Rm {
+                mapping: String::from(mapping.name()),
+                node: String::from(node.aql_path().as_str()),
+                source: Box::new(RmError::UnknownClass {
+                    rm_type: String::from(produced.value.rm_type()),
+                }),
+            });
+        };
+        self.families.push(
+            NodeValue::new(node, serde_json::Value::String(time.value.clone()))
+                .with_occurrences(binding.openehr.clone())
+                .under(vec![Segment {
+                    name: String::from(rm::HISTORY_ORIGIN_KEY),
+                    index: None,
+                }]),
+        );
+        Ok(())
     }
 
     /// Returns the canonical JSON the run holds at one place, empty when it
@@ -348,7 +402,9 @@ fn scalar_json(
     };
     match carried {
         Carried::Text if written.as_str().is_some() => Ok(serde_json::Value::String(text)),
-        Carried::Text | Carried::Value | Carried::Family => Err(refuse("text")),
+        Carried::Text | Carried::Value | Carried::Family | Carried::HistoryOrigin => {
+            Err(refuse("text"))
+        }
         Carried::Real => serde_json::from_str::<serde_json::Number>(&text)
             .map(serde_json::Value::Number)
             .map_err(|_refused| refuse("a real number")),
