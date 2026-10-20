@@ -559,6 +559,15 @@ crates on crates.io.
   hunk that differs beyond its versions to stop the merge, and refuses a
   manifest `cargo metadata` cannot read.
 
+### Security
+
+- The lock moves `rustls-webpki` to 0.103.16 and `webpki-roots` and
+  `webpki-root-certs` to 1.0.10, which close RUSTSEC-2026-0381,
+  RUSTSEC-2026-0382 and RUSTSEC-2026-0383: certificate verification that
+  could accept distrusted intermediates, and bundled roots that trusted the
+  distrusted emSign intermediates. The TLS clients of the CDR, the
+  terminology server and the CDM database link these crates.
+
 ## [0.0.10] - 2026-10-19
 
 The openEHR demographics release. The FHIR facade serves `Patient`,
