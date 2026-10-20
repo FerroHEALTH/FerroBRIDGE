@@ -359,3 +359,33 @@ async fn with_auth_off_the_facade_is_open() -> Result<(), Box<dyn StdError>> {
     assert_eq!(StatusCode::NOT_FOUND, response.status());
     Ok(())
 }
+
+// NOTE: RFC 9068 §2.2 requires `sub`, and RFC 7519 §4.1.2 has it identify a
+// principal, which an empty or whitespace-only value does not.
+#[tokio::test]
+async fn a_token_with_a_blank_sub_is_the_generic_401() -> Result<(), Box<dyn StdError>> {
+    let key = ec_key("k1", Algorithm::ES256);
+    let issuer = Issuer::start(&[&key]).await;
+    let harness = harness().await;
+    for blank in ["", "  "] {
+        let app = secured(&harness, &authority(issuer.settings()).await);
+        let mut claims = issuer.claims("system/Condition.r");
+        claims["sub"] = serde_json::json!(blank);
+        assert_refused(&read_with(app, Some(&mint(&key, &claims))).await?);
+    }
+    Ok(())
+}
+
+// NOTE: RFC 6750 §2.1 fixes the `b64token` syntax, and §3.1 answers a token
+// that is "malformed" with `invalid_token`.
+#[tokio::test]
+async fn a_bearer_value_outside_b64token_is_the_generic_401() -> Result<(), Box<dyn StdError>> {
+    let key = ec_key("k1", Algorithm::ES256);
+    let issuer = Issuer::start(&[&key]).await;
+    let harness = harness().await;
+    for value in ["a,b", "a=b", "=abc"] {
+        let app = secured(&harness, &authority(issuer.settings()).await);
+        assert_refused(&read_with(app, Some(value)).await?);
+    }
+    Ok(())
+}

@@ -404,3 +404,23 @@ fn an_unknown_key_is_refused() -> Result<(), Box<dyn StdError>> {
     );
     Ok(())
 }
+
+#[test]
+fn a_basic_only_section_is_refused_because_the_facade_names_an_issuer()
+-> Result<(), Box<dyn StdError>> {
+    // NOTE: SMART App Launch 2.2.0, Conformance, Metadata, `token_endpoint` is
+    // required, and only an issuer's metadata names it for the facade.
+    let error = refusal(concat!(
+        "[auth]\nenabled = true\n",
+        "[[auth.basic.users]]\nuser = \"etl\"\n",
+        "password_hash = \"$argon2id$v=19$m=19456,t=2,p=1$c3ludGhldGljLXNhbHQtMTY$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\n",
+    ))?;
+    assert!(
+        matches!(
+            rule(&error),
+            Some(ConfigError::Missing { key: "auth.issuer" })
+        ),
+        "{error:?}"
+    );
+    Ok(())
+}
