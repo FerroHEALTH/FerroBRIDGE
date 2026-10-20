@@ -54,6 +54,7 @@ pub mod party_ref;
 pub mod proportion;
 pub mod quantity;
 pub mod range;
+pub mod scalar;
 pub mod string;
 pub mod term_mapping;
 pub mod text;

@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that writes the value and the unit of
+# the quantity alternative of Observation.value[x] into the magnitude and the
+# units of the problem name value, which the test turns into a DV_QUANTITY: a
+# scalar Real leaf against FHIR decimal.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_scalar_real
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+mappings:
+  - name: "magnitude"
+    with:
+      fhir: "$resource.value.as(Quantity).value"
+      openehr: "$archetype/data[at0001]/items[at0002]/value/magnitude"
+  - name: "units"
+    with:
+      fhir: "$resource.value.as(Quantity).unit"
+      openehr: "$archetype/data[at0001]/items[at0002]/value/units"

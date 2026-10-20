@@ -24,6 +24,7 @@ mod party;
 mod polymorphic;
 mod reference;
 mod role;
+mod scalar;
 mod split;
 mod sub_context;
 mod tail;

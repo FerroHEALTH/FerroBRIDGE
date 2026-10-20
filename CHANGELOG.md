@@ -68,6 +68,14 @@ crates on crates.io.
   `timing_daily.v1.yml` now load, so the medication statement context gets
   to compile. Its refusals there are recorded on #101. `fhirconnect`
   0.1.169.
+- The FHIRconnect engine converts a scalar `Integer` or `Integer64` tail
+  against FHIR `integer` and a scalar `Real` tail against `decimal` both
+  ways (#1081), through `engine::lens::scalar` with GetPut and PutGet
+  property tests; going out these refused with no cell. A value outside
+  FHIR's 32-bit `integer` is refused going out, and a decimal whose text
+  the `Real` cannot render back (`5.40`, `1e3`) is refused going in, where
+  it was rounded to the nearest binary number with no loss declared.
+  `fhirconnect` 0.1.173.
 - The FHIRconnect engine converts `DV_QUANTITY` against `Quantity`, `decimal`
   and `integer`, and `DV_COUNT` against `integer`, `Quantity` and `Count`
   (#93), each a lens with GetPut and PutGet property tests over the tables of
