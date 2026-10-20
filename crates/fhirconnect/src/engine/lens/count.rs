@@ -14,7 +14,8 @@
 //! count outside that range is refused going out, and a `decimal` that is not
 //! a whole number is refused coming in. None of the three tables carries
 //! `magnitude_status`, so a count whose status is not a point value is
-//! refused rather than written as one.
+//! refused rather than written as one, and a `comparator` coming in is
+//! refused rather than dropped.
 
 use fhir_types::r4::count::Count;
 use fhir_types::r4::primitives::Code;
@@ -89,6 +90,7 @@ impl Lens<DvCount, Quantity> for CountLens {
     }
 
     fn put(&self, view: &Quantity, existing: Option<&DvCount>) -> Result<DvCount, LensError> {
+        unbounded(view.comparator.as_ref(), QUANTITY_CELL)?;
         let text = decimal_text(view.value.as_ref(), QUANTITY_CELL, "DV_COUNT.magnitude")?;
         Ok(counted(
             whole(text, QUANTITY_CELL, "Quantity.value")?,
@@ -117,6 +119,7 @@ impl Lens<DvCount, Count> for CountLens {
     }
 
     fn put(&self, view: &Count, existing: Option<&DvCount>) -> Result<DvCount, LensError> {
+        unbounded(view.comparator.as_ref(), COUNT_CELL)?;
         let code = text_of(view.code.as_ref().map(|code| &code.value));
         if let Some(other) = code.filter(|&code| code != UNITY) {
             return Err(LensError::Shape {
@@ -133,6 +136,21 @@ impl Lens<DvCount, Count> for CountLens {
 
     fn fallbacks(&self, _view: &Count) -> Vec<Fallback> {
         Vec::new()
+    }
+}
+
+/// Refuses a comparator, which none of the tables gives an openEHR row, so
+/// writing the count without it would state a bounded value as exact.
+fn unbounded(comparator: Option<&Code>, cell: &'static str) -> Result<(), LensError> {
+    match text_of(comparator.map(|code| &code.value)) {
+        Some(found) => Err(LensError::Shape {
+            cell,
+            attribute: "Quantity.comparator",
+            found: String::from(found),
+            reason: "DV_COUNT.adoc gives comparator no openEHR row",
+            direction: Direction::FhirToOpenehr,
+        }),
+        None => Ok(()),
     }
 }
 
@@ -294,6 +312,22 @@ mod tests {
             matches!(error, LensError::Shape { attribute, .. } if attribute == "Count.code"),
             "the refusal names the code: {error}"
         );
+    }
+
+    #[test]
+    fn a_comparator_going_in_is_refused() {
+        let view = Quantity {
+            value: Some(Decimal::from("2")),
+            comparator: Some(Code::from("<")),
+            ..Quantity::default()
+        };
+        assert!(CountLens.put(&view, None).is_err());
+        let count = Count {
+            value: Some(Decimal::from("2")),
+            comparator: Some(Code::from(">=")),
+            ..Count::default()
+        };
+        assert!(CountLens.put(&count, None).is_err());
     }
 
     #[test]
