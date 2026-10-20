@@ -122,6 +122,7 @@ pub struct OpenehrTarget {
     tail: RmPath,
     occurrences: Vec<FlatId>,
     leaf_class: Option<String>,
+    on_element: bool,
 }
 
 impl OpenehrTarget {
@@ -139,7 +140,27 @@ impl OpenehrTarget {
             tail,
             occurrences,
             leaf_class: None,
+            on_element: false,
         }
+    }
+
+    /// Returns this target with its tail naming attributes of the `ELEMENT`
+    /// the Web Template compacted into the node, its value.
+    ///
+    /// An `ELEMENT` is a `LOCATABLE` (openEHR RM, the `LOCATABLE` class), so a
+    /// path that names one reaches its `links` although the template carries
+    /// only the node of its value.
+    #[must_use]
+    pub const fn with_element_tail(mut self) -> Self {
+        self.on_element = true;
+        self
+    }
+
+    /// Returns whether the tail names attributes of the `ELEMENT` the node
+    /// is the value of, rather than attributes of the node.
+    #[must_use]
+    pub const fn on_element(&self) -> bool {
+        self.on_element
     }
 
     /// Returns this target with `class` as the reference-model class of the

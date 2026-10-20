@@ -31,7 +31,6 @@ expression: rows(&diagnostics)
   "problem_qualifier.v2.yml:82 fc-uncarried-tail",
   "report.v1.Condition.yml:113 fc-uncarried-tail",
   "report.v1.Condition.yml:115 fc-uncarried-tail",
-  "report.v1.Condition.yml:29 fc-uncarried-tail",
   "report.v1.Condition.yml:62 fc-unknown-template-node",
   "report.v1.Condition.yml:64 fc-unknown-template-node",
   "report.v1.Condition.yml:66 fc-unknown-template-node",

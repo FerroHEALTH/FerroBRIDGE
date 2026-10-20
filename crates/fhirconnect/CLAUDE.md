@@ -206,7 +206,13 @@ engine writes them as the `_feeder_audit`, `_link:i` and
 `ENTRY.provider` is a tail of the entry node whose value the cell writes as
 the `_provider` family (`rm::Carried::Family`, `family::provider`), and
 `EVENT_CONTEXT.health_care_facility` the `_health_care_facility` family of
-the `context` node the same way. These
+the `context` node the same way; `EVENT_CONTEXT.end_time` is the
+`_end_time` family there, written as its date-time text
+(`family::end_time`). A path that names an `ELEMENT` the Web Template
+compacted into its value reaches the element's `links`
+(`OpenehrTarget::on_element`): the `_link:i` family sits on the one FLAT node
+the two share, and the engine reads it from the element
+(`WebTemplateIndex::read_element`). These
 families are the one place the engine still spells FLAT keys, because the
 builder takes no `|raw` on a `_`-prefixed family (the `TODO(#618)` in
 `engine::family`). Reading them back decodes typed `LINK` and
