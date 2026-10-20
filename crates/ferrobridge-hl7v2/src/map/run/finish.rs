@@ -15,6 +15,7 @@ use fhirconnect::tree::path::FhirPath;
 use fhirconnect::tree::write::write;
 
 use crate::map::constraint;
+use crate::map::run::dangling::{Unlinked, unlink};
 use crate::map::run::resource::document_of;
 use crate::map::run::write::repeating;
 use crate::map::run::{Identity, Part, Pending, Resource, Run, Write};
@@ -112,6 +113,7 @@ impl Run<'_> {
             }
             entries.push((resource, document));
         }
+        self.unlink(&resources, &mut entries);
         entries.sort_by_key(|(resource, _)| resource.type_name != "MessageHeader");
         let mut bundle = envelope.unwrap_or_else(|| document_of("Bundle"));
         let message = bundle.get("type").and_then(Value::as_str) == Some("message");
@@ -136,25 +138,73 @@ impl Run<'_> {
                 .map(Box::new);
             return Err(MapError::NoMessageHeader { dropped });
         }
-        for (index, (resource, document)) in entries.into_iter().enumerate() {
-            let occurrence = Occurrence::new([index]);
-            for (path, value) in [
+        let entries = entries
+            .into_iter()
+            .map(|(resource, document)| {
                 (
-                    "$resource.entry.fullUrl",
-                    Value::String(resource.full_url.clone()),
-                ),
-                ("$resource.entry.resource", document),
-            ] {
-                let written = path
-                    .parse::<FhirPath>()
-                    .ok()
-                    .map(|path| write(&SCHEMAS, &mut bundle, &path, &occurrence, value));
-                if let Some(Err(error)) = written {
-                    tracing::warn!(error = %error, "a Bundle entry could not be written");
+                    resource.type_name.clone(),
+                    resource.full_url.clone(),
+                    document,
+                )
+            })
+            .collect();
+        enter(&mut bundle, entries, &mut self.outcomes);
+        Ok((bundle, self.outcomes))
+    }
+
+    /// Removes every reference a kept entry holds to a resource left out of
+    /// the Bundle, counting each, and leaves out an entry the removal makes
+    /// incomplete, until no reference dangles.
+    ///
+    /// NOTE: no specification governs this: our own design; the reference goes and the
+    /// referring resource stays, so the Bundle resolves (R4 Bundle §Resolving references).
+    fn unlink(&mut self, resources: &[Resource], entries: &mut Vec<(&Resource, Value)>) {
+        let mut dropped: BTreeMap<String, String> = resources
+            .iter()
+            .filter(|resource| resource.identity != Identity::Envelope)
+            .filter(|resource| {
+                !entries
+                    .iter()
+                    .any(|(kept, _)| kept.full_url == resource.full_url)
+            })
+            .map(|resource| (resource.full_url.clone(), resource.type_name.clone()))
+            .collect();
+        loop {
+            let mut incomplete = Vec::new();
+            for (position, (resource, document)) in entries.iter_mut().enumerate() {
+                let mut found = Vec::new();
+                unlink(document, &resource.type_name, &dropped, &mut found);
+                if found.is_empty() {
+                    continue;
+                }
+                for Unlinked {
+                    element,
+                    target,
+                    target_resource,
+                } in found
+                {
+                    self.outcomes.push(Outcome::DanglingReference {
+                        resource: resource.type_name.clone(),
+                        full_url: resource.full_url.clone(),
+                        element,
+                        target_resource,
+                        target,
+                    });
+                }
+                if !self.complete(resource, document) {
+                    incomplete.push(position);
+                }
+            }
+            if incomplete.is_empty() {
+                return;
+            }
+            for position in incomplete.into_iter().rev() {
+                if position < entries.len() {
+                    let (resource, _) = entries.remove(position);
+                    dropped.insert(resource.full_url.clone(), resource.type_name.clone());
                 }
             }
         }
-        Ok((bundle, self.outcomes))
     }
 
     /// Drops from `document` every element that lacks one its definition
@@ -333,6 +383,38 @@ impl Run<'_> {
     }
 }
 
+/// The Bundle paths of an entry's members.
+const ENTRY_PATHS: [&str; 2] = ["$resource.entry.fullUrl", "$resource.entry.resource"];
+
+/// Writes each entry's `fullUrl` and resource into `bundle` at its index,
+/// counting every member the writer refuses as [`Outcome::EntryUnwritable`].
+fn enter(bundle: &mut Value, entries: Vec<(String, String, Value)>, outcomes: &mut Vec<Outcome>) {
+    for (index, (resource, full_url, document)) in entries.into_iter().enumerate() {
+        let occurrence = Occurrence::new([index]);
+        let [url_path, resource_path] = ENTRY_PATHS;
+        for (path, value) in [
+            (url_path, Value::String(full_url.clone())),
+            (resource_path, document),
+        ] {
+            #[expect(
+                clippy::expect_used,
+                reason = "ENTRY_PATHS are literals in the FHIRPath grammar, which the test below parses"
+            )]
+            let parsed = path
+                .parse::<FhirPath>()
+                .expect("an entry path should parse");
+            if let Err(error) = write(&SCHEMAS, bundle, &parsed, &occurrence, value) {
+                outcomes.push(Outcome::EntryUnwritable {
+                    resource: resource.clone(),
+                    full_url: full_url.clone(),
+                    path,
+                    error,
+                });
+            }
+        }
+    }
+}
+
 /// The choice elements a write steps through, each keyed by its instance
 /// (the members before it, the stem and the occurrence indices spent so far)
 /// with the alternative the write takes.
@@ -395,8 +477,55 @@ fn refusal(
 
 #[cfg(test)]
 mod tests {
-    use super::alternatives;
+    use fhir_types::codec::Value;
+    use fhirconnect::tree::path::FhirPath;
+
+    use super::{ENTRY_PATHS, alternatives, enter};
+    use crate::map::Outcome;
     use crate::map::run::write::resolve_path;
+
+    #[test]
+    fn the_entry_paths_parse() {
+        for path in ENTRY_PATHS {
+            assert!(path.parse::<FhirPath>().is_ok(), "{path} parses");
+        }
+    }
+
+    #[test]
+    fn an_entry_the_writer_refuses_is_counted_naming_the_resource() {
+        let mut bundle: Value = serde_json::from_str(
+            r#"{"resourceType":"Bundle","type":"message","entry":"not an array"}"#,
+        )
+        .expect("a JSON document");
+        let patient: Value =
+            serde_json::from_str(r#"{"resourceType":"Patient"}"#).expect("a JSON document");
+        let mut outcomes = Vec::new();
+        enter(
+            &mut bundle,
+            vec![(String::from("Patient"), String::from("urn:uuid:p"), patient)],
+            &mut outcomes,
+        );
+        let refused: Vec<(&str, &str, &str)> = outcomes
+            .iter()
+            .filter_map(|outcome| match outcome {
+                Outcome::EntryUnwritable {
+                    resource,
+                    full_url,
+                    path,
+                    ..
+                } => Some((resource.as_str(), full_url.as_str(), *path)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            refused,
+            [
+                ("Patient", "urn:uuid:p", "$resource.entry.fullUrl"),
+                ("Patient", "urn:uuid:p", "$resource.entry.resource"),
+            ]
+        );
+        assert_eq!(outcomes.len(), 2, "each refused member is one outcome");
+    }
 
     #[test]
     fn two_alternatives_of_one_extension_value_share_the_choice_instance() {
