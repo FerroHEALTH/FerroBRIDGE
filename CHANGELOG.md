@@ -25,6 +25,25 @@ crates on crates.io.
 
 ### Added
 
+- Five more `mappingCode` functions of the published FHIRconnect library
+  are registered (#95). `timingToDaily` writes a frequency per one unit of
+  time as the `1/<unit>` frequency of the daily timing cluster (or an
+  interval of them with `frequencyMax`), one event per longer period as the
+  interval between doses, and the one time of day. `dosageQuantityToRange`
+  writes a dose `Range` as an included `DV_INTERVAL<DV_QUANTITY>`.
+  `rangeToText` writes a rate `Range` as the text `<low> <code> - <high>
+  <code>`, the only form the rate element admits beside a quantity.
+  `ratio_to_dosage` and `ratio_to_dosage_action` write a rate `Ratio` (R4's
+  "500ml over 2 hours") as the rate per unit of time and the administration
+  duration. Every quantity and range converts through the engine's
+  `DV_QUANTITY` and `DV_INTERVAL<DV_QUANTITY>` cells, a rate divides and
+  multiplies exactly or is refused, and each function refuses what it
+  cannot carry. A port onto a polymorphic `ELEMENT` now
+  reads only the value node whose `_type` matches. The library's
+  `dosage.v2.yml`, `dosage.v2.BackboneElement.yml` and
+  `timing_daily.v1.yml` now load, so the medication statement context gets
+  to compile. Its refusals there are recorded on #101. `fhirconnect`
+  0.1.169.
 - The FHIRconnect engine converts `DV_QUANTITY` against `Quantity`, `decimal`
   and `integer`, and `DV_COUNT` against `integer`, `Quantity` and `Count`
   (#93), each a lens with GetPut and PutGet property tests over the tables of

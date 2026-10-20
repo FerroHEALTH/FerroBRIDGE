@@ -163,6 +163,62 @@ fn a_programmed_mapping_round_trips_the_timing_through_its_ports() -> Result<(),
 }
 
 #[test]
+fn a_port_onto_a_polymorphic_element_writes_the_class_the_function_chose()
+-> Result<(), Box<dyn Error>> {
+    // The dose ELEMENT admits DV_QUANTITY and DV_INTERVAL<DV_QUANTITY>, so a
+    // range is written at its interval node and the rate ratio at the rate
+    // and duration nodes, and both read back.
+    let index = medication_template()?;
+    let program = dosage_program(&index)?;
+    let ucum = |value: u32, code: &str| {
+        serde_json::json!({"value": value, "unit": code,
+            "system": "http://unitsofmeasure.org", "code": code})
+    };
+    let dose_and_rate = serde_json::json!([{
+        "doseRange": {"low": ucum(1, "mg"), "high": ucum(2, "mg")},
+        "rateRatio": {"numerator": ucum(500, "ml"), "denominator": ucum(2, "h")}
+    }]);
+    let document = Value::from_serde_json(serde_json::json!({
+        "resourceType": "MedicationStatement",
+        "medicationCodeableConcept": {"text": "synthetic medication"},
+        "dosage": [{"doseAndRate": dose_and_rate}]
+    }));
+    let seams = Seams::default().with_functions(&Library);
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &document,
+        &seams,
+        &defaults(),
+        &CallContext::new(),
+    )?;
+    let written = serde_json::to_string(inbound.value().value())?;
+    assert!(written.contains("\"DV_INTERVAL\""), "{written}");
+    assert!(written.contains("\"ml/h\""), "{written}");
+    let outbound = to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        inbound.value(),
+        &seams,
+        &CallContext::new(),
+    )?;
+    let read = outbound
+        .value()
+        .get("dosage")
+        .and_then(|dosage| match dosage {
+            Value::Array(items) => items.first(),
+            _ => None,
+        })
+        .and_then(|dosage| dosage.get("doseAndRate"))
+        .ok_or("the dosage carries a dose and rate")?
+        .to_serde_json(&mut Path::root("Dosage.doseAndRate"))?;
+    assert_eq!(read, dose_and_rate);
+    Ok(())
+}
+
+#[test]
 fn a_program_compiled_against_the_library_resolves_every_port() -> Result<(), Box<dyn Error>> {
     let index = medication_template()?;
     let rendered = dosage_program(&index)?.to_string();
@@ -173,6 +229,19 @@ fn a_program_compiled_against_the_library_resolves_every_port() -> Result<(), Bo
     );
     assert!(
         rendered.contains("mappingCode timingNonDaily port items[at0002] [DV_DURATION]"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains(
+            "mappingCode dosageQuantityToRange port . [DV_QUANTITY, DV_INTERVAL<DV_QUANTITY>]"
+        ),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains(
+            "mappingCode ratio_to_dosage port items[at0134] [DV_QUANTITY, DV_TEXT] port \
+             items[at0102] [DV_DURATION]"
+        ),
         "{rendered}"
     );
     Ok(())
@@ -224,8 +293,12 @@ fn a_function_that_refuses_its_input_refuses_the_unit() -> Result<(), Box<dyn Er
 fn a_registry_of_names_alone_compiles_the_function_with_no_port() -> Result<(), Box<dyn Error>> {
     let index = medication_template()?;
     let context = MappingName::new("ferrobridge_dosage.context")?;
-    let codes =
-        StaticMappingCodes::new(["dosageDurationToAdministrationDuration", "timingNonDaily"]);
+    let codes = StaticMappingCodes::new([
+        "dosageDurationToAdministrationDuration",
+        "dosageQuantityToRange",
+        "ratio_to_dosage",
+        "timingNonDaily",
+    ]);
     let program = compile(&dosage_set()?, &context, &index, &SCHEMAS, &codes)
         .map_err(|diagnostics| render(&diagnostics))?;
     let rendered = program.to_string();

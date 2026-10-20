@@ -4,7 +4,7 @@
 name = "fhirconnect"
 description = "The FHIRconnect mapping language for Rust: the mapping file model and its validation, context resolution into an immutable program, and the bidirectional interpreter between openEHR compositions and FHIR resources"
 # On the crate line, the fhir-types line, since its first publish (docs/VERSIONS.md).
-version = "0.1.168"
+version = "0.1.169"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -42,6 +42,9 @@ base64.workspace = true
 # The bounds the `mappingCode` library decodes and encodes an `openehr-rm`
 # value under (`engine::library`).
 serde.workspace = true
+# Exact decimal arithmetic for the rate a ratio function divides and
+# multiplies, so no amount passes through a binary float (`engine::library`).
+rust_decimal.workspace = true
 # The digest the default identity sink derives a created resource's id from.
 sha2.workspace = true
 # The generated FHIR model: the lexical `Value` tree the path model walks and
