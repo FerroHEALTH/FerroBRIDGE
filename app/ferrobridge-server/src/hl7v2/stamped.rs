@@ -1,0 +1,38 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
+//! The control id and the time an answer of the face carries of its own.
+
+use ferrobridge_hl7v2::ack::Stamp;
+
+/// The acknowledgment's own MSH-10 and MSH-7.
+#[derive(Debug, Clone)]
+pub(super) struct Stamped {
+    /// MSH-10: twenty hexadecimal digits of a random UUID.
+    pub(super) control_id: String,
+    /// MSH-7: the instant in UTC, as a v2 `DTM` with its offset.
+    pub(super) timestamp: String,
+}
+
+impl Stamped {
+    /// Returns the stamp of an acknowledgment written now.
+    pub(super) fn now() -> Self {
+        let uuid = uuid::Uuid::new_v4().simple().to_string();
+        // NOTE: no specification governs this: our own design; twenty characters
+        // fit the MSH-10 of every 2.x version the face reads.
+        let control_id = uuid.get(..20).map_or_else(|| uuid.clone(), str::to_owned);
+        let timestamp = format!("{}+0000", jiff::Timestamp::now().strftime("%Y%m%d%H%M%S"));
+        Self {
+            control_id,
+            timestamp,
+        }
+    }
+
+    /// Returns the stamp the acknowledgment renders.
+    pub(super) fn stamp(&self) -> Stamp<'_> {
+        Stamp {
+            control_id: &self.control_id,
+            timestamp: &self.timestamp,
+        }
+    }
+}
