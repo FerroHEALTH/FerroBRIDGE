@@ -3,6 +3,8 @@
 
 //! The data-type cell of one mapping, run over its input values.
 
+use core::str::FromStr;
+
 use fhir_types::codec::Value;
 use fhir_types::r4::primitives::String as FhirString;
 use openehr_mapping_core::composition::RmPosition;
@@ -12,9 +14,15 @@ use openehr_rm::v1_2::model;
 use crate::engine::cell;
 use crate::engine::fhir::FhirKind;
 use crate::engine::fhir::FhirValue;
+use crate::engine::lens::Lens;
 use crate::engine::lens::LensError;
+use crate::engine::lens::scalar;
+use crate::engine::lens::scalar::IntegerLens;
+use crate::engine::lens::scalar::RealLens;
 use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::outcome::Warning;
+use crate::engine::rm;
+use crate::engine::rm::Carried;
 use crate::engine::rm::RmValue;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::manual::Manual;
@@ -34,6 +42,7 @@ use crate::engine::traverse::Written;
 use crate::engine::traverse::demographic::Shape;
 use crate::engine::traverse::error::EngineError;
 use crate::engine::traverse::place::rm_positions;
+use crate::engine::traverse::tail::tail_segments;
 use crate::engine::traverse::translate::Output;
 
 impl<T: Table + ?Sized> Run<'_, T> {
@@ -306,6 +315,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
             {
                 cell::get_string(text, kind).map_err(refuse)
             }
+            FhirKind::Integer | FhirKind::Decimal
+                if let Some(read) = scalar_number(openehr, kind, text) =>
+            {
+                read.map_err(refuse)
+            }
             FhirKind::String
             | FhirKind::Date
             | FhirKind::DateTime
@@ -461,6 +475,40 @@ fn converted(mapping: &Mapping) -> Option<&OpenehrTarget> {
     match mapping.derived() {
         Some(Derived::Value { target, .. }) => Some(target),
         _ => mapping.openehr(),
+    }
+}
+
+/// Reads the number a scalar `Integer` or `Real` leaf holds as a FHIR
+/// `integer` or `decimal`, `None` when the leaf and the kind are no such
+/// pair.
+fn scalar_number(
+    openehr: &OpenehrTarget,
+    kind: FhirKind,
+    text: &str,
+) -> Option<Result<FhirValue, LensError>> {
+    let carried =
+        rm::carried(openehr.node().rm_type(), &tail_segments(openehr)).map(|(_, carried)| carried);
+    let unreadable = |cell: &'static str, attribute: &'static str| LensError::Shape {
+        cell,
+        attribute,
+        found: String::from(text),
+        reason: "the composition holds no number there",
+        direction: Direction::OpenehrToFhir,
+    };
+    match (carried, kind) {
+        (Some(Carried::Integer), FhirKind::Integer) => Some(
+            text.parse::<i64>()
+                .map_err(|_refused| unreadable(scalar::INTEGER_CELL, "Integer"))
+                .and_then(|number| IntegerLens.get(&number))
+                .map(FhirValue::Integer),
+        ),
+        (Some(Carried::Real), FhirKind::Decimal) => Some(
+            serde_json::Number::from_str(text)
+                .map_err(|_refused| unreadable(scalar::REAL_CELL, "Real"))
+                .and_then(|number| RealLens.get(&number))
+                .map(FhirValue::Decimal),
+        ),
+        _ => None,
     }
 }
 

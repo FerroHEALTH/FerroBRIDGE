@@ -16,6 +16,9 @@ use openehr_sdt::flat::path::Segment;
 use crate::engine::cell;
 use crate::engine::family;
 use crate::engine::fhir::FhirValue;
+use crate::engine::lens::Lens;
+use crate::engine::lens::scalar::IntegerLens;
+use crate::engine::lens::scalar::RealLens;
 use crate::engine::outcome::Warning;
 use crate::engine::rm;
 use crate::engine::rm::Carried;
@@ -216,6 +219,24 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 ));
             }
             return Ok(serde_json::Value::String(produced.value));
+        }
+        let number = match (carried, view) {
+            (Carried::Integer, FhirValue::Integer(integer)) => Some(
+                IntegerLens
+                    .put(integer, None)
+                    .map(|number| serde_json::Value::Number(number.into())),
+            ),
+            (Carried::Real, FhirValue::Decimal(decimal)) => {
+                Some(RealLens.put(decimal, None).map(serde_json::Value::Number))
+            }
+            _ => None,
+        };
+        if let Some(number) = number {
+            return number.map_err(|source| EngineError::Cell {
+                mapping: String::from(mapping.name()),
+                element: String::from(target.expression().as_str()),
+                source: Box::new(source),
+            });
         }
         let element = String::from(target.resolved().leaf());
         let text = view.write(&element).map_err(|source| EngineError::Fhir {
