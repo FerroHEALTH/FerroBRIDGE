@@ -389,6 +389,12 @@ crates on crates.io.
   document a `reference` mapping left with the occurrence it was entered
   at, and a condition `targetRoot` and the children of such a mapping
   anchor in that resource too. `fhirconnect` 0.1.170.
+- A FHIRconnect tail below a `DV_INTERVAL<T>` node, such as `/lower` below
+  `DV_INTERVAL<DV_QUANTITY>`, compiles and runs (#1077): the tail is looked
+  up on the interval class and a bound is read as the node's parameter, so
+  `/lower` converts through the `DV_QUANTITY` cell. It was refused at load
+  with `fc-uncarried-tail`, and a tail the parameter does not declare is
+  still refused. `fhirconnect` 0.1.172.
 - The console's file editor names its mode in its header (#982): the New
   file route reads "New mapping file" and an existing file reads "Edit
   <file>", with the matching page title.

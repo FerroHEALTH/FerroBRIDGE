@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that writes the bounds of the range
+# alternative of Condition.onset[x] into the bounds of the problem name value,
+# which the test turns into a DV_INTERVAL<DV_QUANTITY>: a tail below a generic
+# interval node.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_interval_tail
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "low"
+    with:
+      fhir: "$resource.onset.as(Range).low"
+      openehr: "$archetype/data[at0001]/items[at0002]/value/lower"
+  - name: "high"
+    with:
+      fhir: "$resource.onset.as(Range).high"
+      openehr: "$archetype/data[at0001]/items[at0002]/value/upper"

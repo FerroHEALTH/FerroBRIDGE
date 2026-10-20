@@ -263,7 +263,9 @@ canonical JSON with `paths::item_at_path` and writes it by merging into the
 value the place holds. `engine::rm::carried` looks the tail up in the
 attribute model: it is carried when every attribute exists on the node's
 class or a concrete descendant, no step is a list, and the node is a data
-value (or the tail is a `FAMILIES` entry such as `ENTRY.provider`). A `manual`
+value (or the tail is a `FAMILIES` entry such as `ENTRY.provider`). A generic
+node (`DV_INTERVAL<DV_QUANTITY>`) is looked up by its class, and a bound
+below it is its parameter (`resolve::derive::attribute_class`). A `manual`
 path must also end on a `String` attribute, because `merge` writes text. A
 tail outside that is refused at load (`fc-uncarried-tail`, naming the mapping,
 the class and the tail); `EngineError::UnsupportedTail` in both directions is
