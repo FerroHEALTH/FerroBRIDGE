@@ -33,7 +33,16 @@ crates on crates.io.
   it shares, at its own group paths, so the guide's segment maps apply, and
   its description names the map it composes. A supplement for ADT_A06 names
   the guide's `ADT_A01.PD1` row `ADT_A06.PD1`, so ADT_A06 messages map too.
-  The `hl7v2` corpus gains the 56 messages, to 509 of 511.
+  The `hl7v2` corpus gains the 56 messages, to 510 of 511.
+- The HL7 v2 face reads a batch file (#642). A frame that opens with FHS or
+  BHS is split by the HL7 v2 chapter 2 §2.10.3 structure into its batches
+  and messages, each message is answered as if it had arrived alone, and
+  the acknowledgments return in one response batch whose headers echo the
+  file's FHS-11 and BHS-11 and whose BTS-1 counts them (§2.10.3.2). A
+  trailer count the file contradicts is a logged warning, and a file whose
+  segments stand outside the structure is not answered.
+  `ferrobridge-hl7v2` gains the `batch` module. The ReportStream
+  `sample-batch-pdi-20210608-0001.hl7` file now passes the `hl7v2` corpus.
 - The HL7 v2 parser counts a valued repetition past a field's cardinality,
   a valued component past its data type's components and a valued
   subcomponent past its component's data type, as the new
@@ -143,6 +152,19 @@ crates on crates.io.
 
 ### Fixed
 
+- A `TERM_MAPPING` that a `DV_TEXT` or `DV_CODED_TEXT` value carries out to a
+  FHIR `string`, or a `DV_CODED_TEXT` value carries out to a single `Coding`,
+  is a declared loss (#623). Those pairs give `mappings` no FHIR row
+  (FHIRconnect `DV_TEXT.adoc` §String, `DV_CODED_TEXT.adoc` §Coding), so the
+  engine writes none of them, as before, and now reports each one as a
+  `Loss::Skipped` with the new `SkipReason::TermMappingUncarried`, located at
+  the element and the value's `mappings`; `term_mapping::Withheld` gains
+  `cause()`. A consumer that matches `SkipReason` exhaustively adds the arm.
+  The facade's loss log labels it `skipped-term-mapping-uncarried`.
+- `SkipReason::EmptyReference` documents what the engine does (#511): a
+  `Reference` with no literal reference is skipped whatever else it carries,
+  because a `display` or an `identifier` alone names no resource to fetch
+  (R4 references.html §2.3.0.3 and §2.3.0.4). `fhirconnect` 0.1.159.
 - The HL7 v2 parser judges a segment group by placing every following
   segment with the same choice rule it applies to the segment itself, so a
   repeated `ORDER`'s ORC in an OML^O21 opens a new `ORDER` instead of an

@@ -205,6 +205,27 @@ message is still in flight is `AE` naming the entries, and commits nothing.
 Resend it after the first delivery answered. The ERR-8 text is printable ASCII,
 so it encodes in every character set a message can declare.
 
+### A batch file
+
+A frame that opens with FHS or BHS is read as an HL7 batch file (HL7 v2
+chapter 2 §2.10.3): an optional file header, one or more batches each with an
+optional BHS and BTS around their messages, and an optional file trailer.
+Each message is decoded, mapped and committed as if it had arrived alone, and
+the face answers with one response batch that acknowledges every message, in
+order (§2.10.3.2). The response carries an FHS and an FTS when the file did,
+a BHS for each batch that had one, and a BTS for every batch whose BTS-1
+counts the acknowledgments in it. Each response header swaps the sending and
+receiving application and facility and echoes the file's FHS-11 or BHS-11 in
+its FHS-12 or BHS-12.
+
+A file whose segments stand outside that structure (a second FHS, a segment
+before a batch's first MSH other than its BHS, anything after the FTS) is not
+answered, since no header addresses an answer, and a warning names the
+segment. A BTS-1 or FTS-1 count that disagrees with the file is logged as a
+warning, and the messages are answered all the same. A message in the batch
+that cannot be answered (no readable MSH) is left out of the response and
+counted in the batch's log event as `unanswered`.
+
 ## What is logged
 
 Each connection runs in an `mllp_connection` span naming the peer, with the
@@ -234,8 +255,6 @@ acknowledged, and the connection closes, within the same
 - The face runs in one process. The claims that hold a message in flight and
   the identity map that recognises a resent one live in that process, so run
   one process per identity store and point every sender of a feed at it.
-- A batch envelope (FHS, BHS) is read only as far as the parser accepts it.
-  The face answers one acknowledgment per frame and does not split a batch.
 - MLLP Release 2's commit acknowledgment is not spoken, and enhanced-mode
   acknowledgments are not sent.
 - The allow list matches MSH-4 alone; the sending application (MSH-3) is not

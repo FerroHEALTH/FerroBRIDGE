@@ -372,3 +372,45 @@ fn a_skipped_reference_is_located_at_the_element_holding_it_and_never_by_its_tex
     }
     Ok(())
 }
+
+#[test]
+fn a_reference_without_a_literal_is_skipped_whatever_else_it_carries() -> Result<(), Box<dyn Error>>
+{
+    // R4 references.html §2.3.0.3 and §2.3.0.4: an `identifier` is a logical
+    // reference and a `display` a description, and engine/references.adoc
+    // fetches a resource only a literal reference addresses.
+    let program = compiled("ferrobridge_reference")?;
+    let index = template()?;
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &condition_with(serde_json::json!({
+            "evidence": [
+                {"detail": [{
+                    "identifier": {"system": "urn:oid:2.999.1", "value": "synthetic-0001"},
+                    "display": "Synthetic evidence"
+                }]},
+                {"detail": [{
+                    "identifier": {"system": "urn:oid:2.999.1", "value": "synthetic-0002"}
+                }]}
+            ]
+        }))?,
+        &Seams::default().with_references(&MapReferences::default()),
+        &defaults(),
+        &CallContext::new(),
+    )?;
+    let skipped: Vec<&SkipReason> = inbound
+        .warnings()
+        .iter()
+        .filter_map(|warning| match *warning.loss() {
+            Loss::Skipped { ref reason, .. } => Some(reason),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        skipped,
+        [&SkipReason::EmptyReference, &SkipReason::EmptyReference]
+    );
+    Ok(())
+}

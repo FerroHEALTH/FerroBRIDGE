@@ -15,6 +15,11 @@
 //! declared loss, and the rest of the value converts. Going back,
 //! [`mappings_of`] keeps every such mapping the target already holds in its
 //! place, because FHIR has no counterpart for it.
+//!
+//! The `DV_TEXT` against `string` and `DV_CODED_TEXT` against `Coding` pairs
+//! give `mappings` no FHIR row at all (`DV_TEXT.adoc` §String,
+//! `DV_CODED_TEXT.adoc` §Coding), so those cells write none of them and
+//! report each one through [`uncarried`].
 
 use fhir_types::r4::coding::Coding;
 use openehr_rm::v1_2::data_types::text::term_mapping::TermMapping;
@@ -27,16 +32,27 @@ use crate::model::ast::keyword::Direction;
 /// The `match` operator a mapping FHIR can carry writes.
 pub const EQUIVALENT: char = '=';
 
+/// Why a cell left a `TERM_MAPPING` out of the FHIR element it wrote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Cause {
+    /// The `match` is `>`, `<` or `?`, which no `Coding` can state.
+    Match,
+    /// The FHIR element has no `coding` list, so no mapping is written.
+    Uncarried,
+}
+
 /// One `TERM_MAPPING` a cell left out of the FHIR element it wrote.
 ///
-/// Its `match` is `>`, `<` or `?` (openEHR RM 1.1.0 `TERM_MAPPING.match`).
-/// The term is named by its terminology and its code, as the value holds
-/// them, so a consumer can act on it.
+/// Either its `match` is `>`, `<` or `?` (openEHR RM 1.1.0
+/// `TERM_MAPPING.match`), or the element the cell writes carries no coding
+/// at all. The term is named by its terminology and its code, as the value
+/// holds them, so a consumer can act on it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Withheld {
     match_code: char,
     terminology: String,
     code: String,
+    cause: Cause,
 }
 
 impl Withheld {
@@ -44,17 +60,36 @@ impl Withheld {
     /// `=` and FHIR carries it.
     #[must_use]
     pub fn of(mapping: &TermMapping) -> Option<Self> {
-        (mapping.r#match != EQUIVALENT).then(|| Self {
+        (mapping.r#match != EQUIVALENT).then(|| Self::with_cause(mapping, Cause::Match))
+    }
+
+    /// Returns the term of `mapping` a cell whose FHIR element has no
+    /// `coding` list leaves out, whatever its `match`.
+    #[must_use]
+    pub fn uncarried(mapping: &TermMapping) -> Self {
+        Self::with_cause(mapping, Cause::Uncarried)
+    }
+
+    /// Returns the term of `mapping` left out for `cause`.
+    fn with_cause(mapping: &TermMapping, cause: Cause) -> Self {
+        Self {
             match_code: mapping.r#match,
             terminology: mapping.target.terminology_id.value.clone(),
             code: mapping.target.code_string.clone(),
-        })
+            cause,
+        }
     }
 
     /// Returns the `match` operator of the mapping.
     #[must_use]
     pub const fn match_code(&self) -> char {
         self.match_code
+    }
+
+    /// Returns why the cell left the mapping out.
+    #[must_use]
+    pub const fn cause(&self) -> Cause {
+        self.cause
     }
 
     /// Returns the `terminology_id` value of the mapping's target.
@@ -84,6 +119,13 @@ pub fn equivalents<'held>(
 #[must_use]
 pub fn withheld<'held>(mappings: impl IntoIterator<Item = &'held TermMapping>) -> Vec<Withheld> {
     mappings.into_iter().filter_map(Withheld::of).collect()
+}
+
+/// Returns every term of `mappings`, in the order the value holds them, for
+/// a cell whose FHIR element carries no coding.
+#[must_use]
+pub fn uncarried<'held>(mappings: impl IntoIterator<Item = &'held TermMapping>) -> Vec<Withheld> {
+    mappings.into_iter().map(Withheld::uncarried).collect()
 }
 
 /// Reads one `TERM_MAPPING` into the `Coding` it stands for.

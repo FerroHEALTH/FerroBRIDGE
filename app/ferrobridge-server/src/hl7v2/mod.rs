@@ -21,6 +21,8 @@
 //! acknowledgment code, nothing of its content.
 
 pub mod answer;
+mod envelope;
+mod stamped;
 
 use std::collections::BTreeMap;
 use std::future::Future;
@@ -28,7 +30,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use ferrobridge_hl7v2::ack::{self, Code, Header, Stamp};
+use ferrobridge_hl7v2::ack::{self, Code, Header};
 use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::inbound::{self, Inbound, Received};
 use ferrobridge_hl7v2::map::corpus::{Corpus, CorpusError};
@@ -44,6 +46,7 @@ use crate::config::Hl7v2Settings;
 use crate::facade::Facade;
 use crate::facade::ingest::{Provenance, UnmappedEntries};
 use crate::hl7v2::answer::{Settled, Tally};
+use crate::hl7v2::stamped::Stamped;
 use crate::usage_report::window::Window;
 
 /// Loads the guide's `ConceptMaps`, the supplements `ferrobridge-hl7v2`
@@ -170,12 +173,24 @@ impl Face {
         self
     }
 
+    /// Answers one frame's bytes: the acknowledgment's bytes, or `None` when
+    /// no header can be read to address one.
+    ///
+    /// A frame that opens with FHS or BHS is a batch file
+    /// ([`ferrobridge_hl7v2::batch`]): each message is answered as a message
+    /// alone, and the answers travel back in one response batch. A message
+    /// from a sending facility the face does not accept is counted as
+    /// refused on `connection` and is never mapped.
+    pub async fn answer(&self, message: &[u8], connection: &Connection) -> Option<Vec<u8>> {
+        if ferrobridge_hl7v2::batch::is_batch(message) {
+            return self.answer_batch(message, connection).await;
+        }
+        self.answer_message(message, connection).await
+    }
+
     /// Answers one message's bytes: the acknowledgment's bytes, or `None`
     /// when no header can be read to address one.
-    ///
-    /// A message from a sending facility the face does not accept is counted
-    /// as refused on `connection` and is never mapped.
-    pub async fn answer(&self, message: &[u8], connection: &Connection) -> Option<Vec<u8>> {
+    async fn answer_message(&self, message: &[u8], connection: &Connection) -> Option<Vec<u8>> {
         let header = Header::from_bytes(message);
         let span = tracing::info_span!(
             "hl7v2_message",
@@ -326,38 +341,6 @@ impl Handler for Face {
             self.usage.record_acknowledgment(Code::Reject);
         }
         reply
-    }
-}
-
-/// The acknowledgment's own MSH-10 and MSH-7.
-#[derive(Debug, Clone)]
-struct Stamped {
-    /// MSH-10: twenty hexadecimal digits of a random UUID.
-    control_id: String,
-    /// MSH-7: the instant in UTC, as a v2 `DTM` with its offset.
-    timestamp: String,
-}
-
-impl Stamped {
-    /// Returns the stamp of an acknowledgment written now.
-    fn now() -> Self {
-        let uuid = uuid::Uuid::new_v4().simple().to_string();
-        // NOTE: no specification governs this: our own design; twenty characters
-        // fit the MSH-10 of every 2.x version the face reads.
-        let control_id = uuid.get(..20).map_or_else(|| uuid.clone(), str::to_owned);
-        let timestamp = format!("{}+0000", jiff::Timestamp::now().strftime("%Y%m%d%H%M%S"));
-        Self {
-            control_id,
-            timestamp,
-        }
-    }
-
-    /// Returns the stamp the acknowledgment renders.
-    fn stamp(&self) -> Stamp<'_> {
-        Stamp {
-            control_id: &self.control_id,
-            timestamp: &self.timestamp,
-        }
     }
 }
 
