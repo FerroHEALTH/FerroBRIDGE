@@ -271,6 +271,13 @@ crates on crates.io.
   relative reference in an entry with no RESTful `fullUrl`, which R4 gives no
   meaning, is read against each entry's type and id (our own design).
   `fhirconnect` 0.1.153.
+- `scripts/gh/watch-prs.sh` no longer writes a broken line when the default
+  branch and a pull request both changed the same version line (#1022). The
+  merge read its second capture after a nested match had overwritten it, so
+  `fhirconnect = { … version = "0.1.157" }` became `0.1.157` glued to the
+  next line. It now keeps the higher version at each position, leaves any
+  hunk that differs beyond its versions to stop the merge, and refuses a
+  manifest `cargo metadata` cannot read.
 
 ## [0.0.10] - 2026-10-19
 
