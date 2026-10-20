@@ -72,6 +72,9 @@ pub enum ResolveCode {
     /// A `with.openehr` path names more than one node of the operational
     /// template, so nothing says which one it means.
     AmbiguousTemplateNode,
+    /// A `with.openehr` path names a node the archetype defines and the
+    /// operational template excludes, so the mapping is ignored.
+    ExcludedTemplateNode,
     /// A path opens with a variable that names nothing here.
     UnboundPathVariable,
     /// The archetype a model mapping declares is not the archetype of the
@@ -162,6 +165,7 @@ impl ResolveCode {
             Self::MalformedOpenehrPath => "fc-malformed-openehr-path",
             Self::UnknownTemplateNode => "fc-unknown-template-node",
             Self::AmbiguousTemplateNode => "fc-ambiguous-template-node",
+            Self::ExcludedTemplateNode => "fc-excluded-template-node",
             Self::UnboundPathVariable => "fc-unbound-path-variable",
             Self::ArchetypeMismatch => "fc-archetype-mismatch",
             Self::ArchetypeRevisionMismatch => "fc-archetype-revision-mismatch",
@@ -216,6 +220,7 @@ impl ResolveCode {
             Self::MalformedOpenehrPath,
             Self::UnknownTemplateNode,
             Self::AmbiguousTemplateNode,
+            Self::ExcludedTemplateNode,
             Self::UnboundPathVariable,
             Self::ArchetypeMismatch,
             Self::ArchetypeRevisionMismatch,

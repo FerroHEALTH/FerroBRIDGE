@@ -12,6 +12,7 @@ use fhirconnect::resolve::program::manual::ManualValue;
 use fhirconnect::resolve::program::mapping::Method;
 use fhirconnect::resolve::program::target::Attachment;
 use openehr_mapping_core::diagnostic::Diagnostic;
+use openehr_mapping_core::diagnostic::Severity;
 
 use crate::resolve::PROBLEM;
 use crate::resolve::borrow;
@@ -272,53 +273,136 @@ fn the_preprocessor_of_an_extension_reaches_the_program() -> Result<(), Box<dyn 
     Ok(())
 }
 
-/// `overwrite` "overwrites the mapping method with the same name"
-/// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/extension-methods.adoc`),
-/// so two top-level methods sharing a name leave an overwrite no single
-/// target, and the refusal names where both are.
+/// Mapping names, "apart from being used when referenced in extension
+/// methods, … serve no deeper meaning"
+/// (`docs/specs/fhirconnect/modules/ROOT/pages/basics/body.adoc`), so two
+/// top-level methods sharing a name compile, with a warning naming where both
+/// are.
 #[test]
-fn two_methods_of_one_file_sharing_a_name_are_refused_naming_both() -> Result<(), Box<dyn Error>> {
-    let body = "mappings:\n  - name: \"problem\"\n    with:\n      fhir: \"$resource.code\"\n      \
-                openehr: \"$archetype/data[at0001]/items[at0002]\"\n  - name: \"problem\"\n    \
-                with:\n      fhir: \"$resource.note.text\"\n      openehr: \
-                \"$archetype/data[at0001]/items[at0069]\"\n";
+fn two_methods_of_one_file_sharing_a_name_compile_with_a_warning_naming_both()
+-> Result<(), Box<dyn Error>> {
     let files = [
-        ("model.yml", start_model(body)),
+        ("model.yml", start_model(SHARED_TOP)),
         (
             "context.yml",
             context("synthetic.context", &start_context(&[])),
         ),
     ];
-    let diagnostics = refusals(&borrow(&files), "synthetic.context")?;
-    assert_eq!(codes(&diagnostics), vec!["fc-duplicate-method-name"]);
-    let message = diagnostics
+    let set = set_of(&borrow(&files))?;
+    let program =
+        program_of(&set, "synthetic.context").map_err(|diagnostics| render(&diagnostics))?;
+    assert_eq!(codes(program.warnings()), vec!["fc-duplicate-method-name"]);
+    let message = program
+        .warnings()
         .first()
         .map(Diagnostic::message)
-        .ok_or("a refusal")?;
+        .ok_or("a warning")?;
     assert!(
         message.contains("line 14 column 11") && message.contains("line 18 column 11"),
-        "the refusal names both positions: {message}"
+        "the warning names both positions: {message}"
     );
     Ok(())
 }
 
-/// `appendTo` reaches a child by its dotted name, so two siblings of one
-/// `followedBy` sharing a name are refused the same way.
+/// Two siblings of one `followedBy` sharing a name compile the same way.
 #[test]
-fn two_sibling_children_sharing_a_name_are_refused() -> Result<(), Box<dyn Error>> {
-    let body = "mappings:\n  - name: \"problem\"\n    with:\n      fhir: \"$resource\"\n      \
-                openehr: \"$archetype\"\n      type: \"NONE\"\n    followedBy:\n      mappings:\n        \
-                - name: \"code\"\n          with:\n            fhir: \"code\"\n            openehr: \
-                \"data[at0001]/items[at0002]\"\n        - name: \"code\"\n          with:\n            \
-                fhir: \"note.text\"\n            openehr: \"data[at0001]/items[at0069]\"\n";
+fn two_sibling_children_sharing_a_name_compile_with_a_warning() -> Result<(), Box<dyn Error>> {
     let files = [
-        ("model.yml", start_model(body)),
+        ("model.yml", start_model(SHARED_CHILD)),
         (
             "context.yml",
             context("synthetic.context", &start_context(&[])),
         ),
     ];
-    let diagnostics = refusals(&borrow(&files), "synthetic.context")?;
-    assert_eq!(codes(&diagnostics), vec!["fc-duplicate-method-name"]);
+    let set = set_of(&borrow(&files))?;
+    let program =
+        program_of(&set, "synthetic.context").map_err(|diagnostics| render(&diagnostics))?;
+    assert_eq!(codes(program.warnings()), vec!["fc-duplicate-method-name"]);
     Ok(())
 }
+
+/// `overwrite` "overwrites the mapping method with the same name"
+/// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/extension-methods.adoc`),
+/// so an overwrite of a name two methods share has no single target, and the
+/// refusal names where both are.
+#[test]
+fn an_overwrite_of_a_name_two_methods_share_is_refused_naming_both() -> Result<(), Box<dyn Error>> {
+    let overwrite = "mappings:\n  - name: \"problem\"\n    extension: \"overwrite\"\n    with:\n      \
+                     fhir: \"$resource.code\"\n      openehr: \
+                     \"$archetype/data[at0001]/items[at0002]\"\n";
+    let files = [
+        ("model.yml", start_model(SHARED_TOP)),
+        (
+            "extension.yml",
+            extension("synthetic.extension", "EVALUATION.synthetic.v1", overwrite),
+        ),
+        (
+            "context.yml",
+            context(
+                "synthetic.context",
+                &start_context(&["synthetic.extension"]),
+            ),
+        ),
+    ];
+    let diagnostics = refusals(&borrow(&files), "synthetic.context")?;
+    let refused: Vec<&Diagnostic> = diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity() == Severity::Error)
+        .collect();
+    let [only] = refused.as_slice() else {
+        return Err(format!("one refusal: {}", render(&diagnostics)).into());
+    };
+    assert_eq!(only.code().to_string(), "fc-duplicate-method-name");
+    assert!(
+        only.message().contains("line 14 column 11")
+            && only.message().contains("line 18 column 11"),
+        "the refusal names both positions: {}",
+        only.message()
+    );
+    Ok(())
+}
+
+/// `appendTo` reaches a child by its dotted name, so an append to a child
+/// name two siblings share is refused the same way.
+#[test]
+fn an_append_to_a_child_name_two_siblings_share_is_refused() -> Result<(), Box<dyn Error>> {
+    let append = "mappings:\n  - name: \"more\"\n    extension: \"append\"\n    appendTo: \
+                  \"problem.code\"\n    followedBy:\n      mappings:\n        - name: \"extra\"\n          \
+                  with:\n            fhir: \"$resource.note.text\"\n            openehr: \
+                  \"$archetype/data[at0001]/items[at0069]\"\n";
+    let files = [
+        ("model.yml", start_model(SHARED_CHILD)),
+        (
+            "extension.yml",
+            extension("synthetic.extension", "EVALUATION.synthetic.v1", append),
+        ),
+        (
+            "context.yml",
+            context(
+                "synthetic.context",
+                &start_context(&["synthetic.extension"]),
+            ),
+        ),
+    ];
+    let diagnostics = refusals(&borrow(&files), "synthetic.context")?;
+    let refused: Vec<String> = diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity() == Severity::Error)
+        .map(|diagnostic| diagnostic.code().to_string())
+        .collect();
+    assert_eq!(refused, vec!["fc-duplicate-method-name"]);
+    Ok(())
+}
+
+/// Two top-level methods sharing the name `problem`.
+const SHARED_TOP: &str = "mappings:\n  - name: \"problem\"\n    with:\n      fhir: \"$resource.code\"\n      \
+                          openehr: \"$archetype/data[at0001]/items[at0002]\"\n  - name: \"problem\"\n    \
+                          with:\n      fhir: \"$resource.note.text\"\n      openehr: \
+                          \"$archetype/data[at0001]/items[at0069]\"\n";
+
+/// One method whose two children share the name `code`.
+const SHARED_CHILD: &str = "mappings:\n  - name: \"problem\"\n    with:\n      fhir: \"$resource\"\n      \
+                            openehr: \"$archetype\"\n      type: \"NONE\"\n    followedBy:\n      mappings:\n        \
+                            - name: \"code\"\n          with:\n            fhir: \"code\"\n            openehr: \
+                            \"data[at0001]/items[at0002]\"\n        - name: \"code\"\n          with:\n            \
+                            fhir: \"note.text\"\n            openehr: \"data[at0001]/items[at0069]\"\n";

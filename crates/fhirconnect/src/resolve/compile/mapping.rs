@@ -3,7 +3,9 @@
 
 //! One mapping and its conditions.
 
+use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::ModelPath;
+use openehr_mapping_core::header::metadata::MappingType;
 use openehr_mapping_core::position::Position;
 
 use crate::model::ast::Condition;
@@ -39,16 +41,68 @@ impl<'a> Compiler<'a> {
     /// refusal names its own depth rather than the index of the top-level
     /// method it hangs under.
     pub(super) fn mappings(&mut self, nodes: &[Node<'a>], scope: &Scope) -> Vec<Mapping> {
-        nodes
-            .iter()
+        let mut compiled = Vec::with_capacity(nodes.len());
+        for node in nodes {
             // NOTE: composition-element.adoc: a context entered via `slotContext` "maps into the
             // parent composition; if its `start` slots a composition model, that mapping is skipped".
-            .filter(|node| !(scope.nested && slots_composition(node.mapping)))
-            .map(|node| {
-                let path = node.path.clone();
-                self.mapping(node, scope, &path)
-            })
-            .collect()
+            if (scope.nested && slots_composition(node.mapping))
+                || self.ignores_excluded(node, scope)
+            {
+                continue;
+            }
+            let path = node.path.clone();
+            compiled.push(self.mapping(node, scope, &path));
+        }
+        compiled
+    }
+
+    /// Returns whether a mapping method names a node the template excludes,
+    /// and records the warning that says it is ignored.
+    ///
+    /// Model mappings "contain some mappings that are not part of the
+    /// corresponding Profile/Templates, as they have (0..0) occurrences. These
+    /// are ignored and not executed"
+    /// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/model-mappings.adoc`,
+    /// §Mapping 0..0 fields), so the method and everything under it are left
+    /// out of the program. The rule is the model mapping's, which is written
+    /// for every template of its archetype; an extension is written for one
+    /// template, so a method it contributes is still refused.
+    fn ignores_excluded(&mut self, node: &Node<'a>, scope: &Scope) -> bool {
+        let from_model = node
+            .origin
+            .header()
+            .mapping_type()
+            .map(|kind| *kind.value())
+            == Some(MappingType::Model);
+        if !from_model {
+            return false;
+        }
+        let Some(written) = node
+            .mapping
+            .with
+            .as_ref()
+            .and_then(|with| with.openehr.as_ref())
+        else {
+            return false;
+        };
+        let Some(message) = self.excluded(written, scope) else {
+            return false;
+        };
+        let file = node.origin;
+        self.diagnostics.push(
+            Diagnostic::warning(
+                file.file().to_path_buf(),
+                ResolveCode::ExcludedTemplateNode.into(),
+                format!(
+                    "`{}` is ignored with everything under it: {message}",
+                    node.name()
+                ),
+            )
+            .with_position(written.position())
+            .with_mapping_name(file.header().name().value().clone())
+            .with_model_path(node.path.field("with").field("openehr")),
+        );
+        true
     }
 
     /// Compiles one mapping method and everything under it.

@@ -62,6 +62,18 @@ occurrence axis; it never sees a path string and never reads a mapping file. A
 mapping that cannot be resolved is a refusal at load, never a failure on the
 request that first touches it.
 
+The one exception is a model-mapping method that names a node the template
+excludes: `model-mappings.adoc` §Mapping 0..0 fields says it is "ignored and
+not executed", so it is left out of the program with everything under it and
+an `fc-excluded-template-node` warning. The node counts as excluded only when
+the archetype root it lies in defines its at-code
+(`WebTemplateIndex::archetype_defines`, the OPT 1.4 `term_definitions`), the
+template carries no node for it at that place under another name, and it sits
+in no single-valued attribute the template already fills. A method an
+extension contributes is still refused. A mapping name means nothing beyond
+the `overwrite` and `appendTo` that address it (`basics/body.adoc`), so two
+siblings sharing one are a warning and the edit that reaches them is refused.
+
 A `slotContext` is compiled where it stands: the entered context's `start`
 is slotted as a `slotArchetype` would slot it, with the compiler's extension
 set swapped for the entered context's for the duration, and the composition

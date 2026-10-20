@@ -242,6 +242,21 @@ crates on crates.io.
   `message::LEGACY_EVENTS` and `message::legacy_events`, every other code and
   event a legacy version's interactions send one of its structures under.
   FHIR-Converter's `REF-I14-01` now maps.
+- A FHIRconnect model mapping that names an archetype node the operational
+  template excludes now compiles: the method is left out of the program with
+  everything under it and an `fc-excluded-template-node` warning, where it
+  was refused with `fc-unknown-template-node` (#1040). FHIRconnect
+  `model-mappings.adoc` §Mapping 0..0 fields says such methods "are ignored
+  and not executed". The node counts as excluded only when the archetype
+  root of an OPT 1.4 defines its at-code and the template carries no node
+  for it at that place; a code the archetype never defined, a name the
+  template does not carry, and a method an extension contributes are still
+  refused. `WebTemplateIndex::archetype_defines` is the new
+  `openehr-mapping-core` call behind it.
+- Two sibling FHIRconnect mapping methods that share a name now compile with
+  an `fc-duplicate-method-name` warning, and the refusal moves to the
+  `overwrite` or `appendTo` that names the shared name (#1041). FHIRconnect
+  `basics/body.adoc` gives a mapping name no role outside those references.
 - The HL7 v2 interpreter removes every reference a kept resource holds to a
   resource it left out of the Bundle and counts each as a
   `dangling-reference` outcome naming the element and the resource left out

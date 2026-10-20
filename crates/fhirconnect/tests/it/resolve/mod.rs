@@ -9,6 +9,7 @@
 //! version rules the specification leaves open each get their own isolated
 //! case over small synthetic files written in the test.
 
+mod excluded;
 mod extensions;
 mod methods;
 pub(crate) mod party;
