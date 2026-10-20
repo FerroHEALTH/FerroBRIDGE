@@ -59,7 +59,11 @@ pub enum StructureError {
 /// (`ORM_O01`), which no message definition names, is selected from the
 /// legacy tables ([`hl7v2_types::legacy::versions`], and
 /// [`hl7v2_types::message::legacy`] when MSH-9.3 is empty) by the version
-/// MSH-12 declares, or the nearest earlier version that carries it.
+/// MSH-12 declares, or the nearest earlier version that carries it. When no
+/// index and no legacy table carries the structure MSH-9.3 names, the code
+/// and event the legacy interactions send a structure under select it
+/// ([`hl7v2_types::message::legacy_events`]): `REF^I14^REF_I14` at 2.8 takes
+/// `REF_I12`, and [`group`] counts [`Unplaced::OtherStructure`].
 ///
 /// A structure the definitions carry is then taken from the tables of the
 /// version MSH-12 declares ([`hl7v2_types::legacy::find`] by the id without
@@ -110,12 +114,11 @@ fn definitions_structure(message: &Message) -> Result<&'static Structure, Struct
         let Some((code, event)) = code_event else {
             return Err(StructureError::Unnamed);
         };
-        let entries = hl7v2_types::message::legacy(code, event);
-        let Some(first) = entries.first() else {
+        let trees = event_trees(code, event);
+        let Some(first) = trees.first() else {
             return Err(StructureError::Unnamed);
         };
-        let trees: Vec<&'static Structure> = entries.iter().map(|entry| entry.structure).collect();
-        return legacy_tree(first.structure.id, &trees, message.version());
+        return legacy_tree(first.id, &trees, message.version());
     };
     if let Some(structure) = hl7v2_types::structure::find(name) {
         return Ok(structure);
@@ -133,18 +136,42 @@ fn definitions_structure(message: &Message) -> Result<&'static Structure, Struct
             return Ok(structure);
         }
         let trees = hl7v2_types::legacy::versions(name);
-        if trees.is_empty() {
+        if !trees.is_empty() {
+            return legacy_tree(name, trees, message.version());
+        }
+        // NOTE: HL7 v2.5.1 chapter 2 §2.15.9.9; the legacy interactions, which bind events to
+        // structures as the v2.9.1 message definitions do, answer as `REF^I14` sends `REF_I12`.
+        let trees: Vec<&'static Structure> = code_event
+            .map(|(code, event)| hl7v2_types::message::legacy_events(code, event))
+            .unwrap_or_default()
+            .iter()
+            .map(|entry| entry.structure)
+            .collect();
+        let Some(first) = trees.first() else {
             return Err(StructureError::Unknown {
                 name: String::from(name),
             });
-        }
-        return legacy_tree(name, trees, message.version());
+        };
+        return legacy_tree(first.id, &trees, message.version());
     }
     let named = indexed.filter(|structure| candidates.contains(&structure.id));
     named.ok_or_else(|| StructureError::Variant {
         name: String::from(name),
         candidates,
     })
+}
+
+/// The legacy trees sent as `code^event`, from both legacy message indexes
+/// ([`hl7v2_types::message::legacy`] and
+/// [`hl7v2_types::message::legacy_events`]), in version order.
+fn event_trees(code: &str, event: &str) -> Vec<&'static Structure> {
+    let mut trees: Vec<&'static Structure> = hl7v2_types::message::legacy(code, event)
+        .iter()
+        .chain(hl7v2_types::message::legacy_events(code, event))
+        .map(|entry| entry.structure)
+        .collect();
+    trees.sort_by_key(|tree| version_key(tree.version));
+    trees
 }
 
 /// Picks, from the legacy `trees` of one structure in version order, the

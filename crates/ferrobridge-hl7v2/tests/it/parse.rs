@@ -499,6 +499,42 @@ fn a_withdrawn_structure_before_its_first_tree_is_refused_with_the_versions() {
     ));
 }
 
+// NOTE: HL7 v2.5.1 chapter 2 §2.15.9.9; the 2.8 interactions of the IGAMT export send REF_I12
+// under the event I14, and HL7/v2ig input/sourceOfTruth defines no REF message.
+#[test]
+fn a_code_and_event_only_the_legacy_interactions_send_select_their_structure() {
+    let selected = |message_type: &str| {
+        let bytes = with_type_at(message_type, "2.8");
+        let decoded =
+            ferrobridge_hl7v2::decode::decode(&bytes, Charset::Ascii).expect("the message decodes");
+        let lexed = lex(&decoded.text, decoded.charset).expect("it lexes");
+        structure_for(&lexed.message).map(|structure| (structure.id, structure.version))
+    };
+    assert!(hl7v2_types::message::find("REF", "I14").is_none());
+    assert_eq!(selected("REF^I14^REF_I14"), Ok(("REF_I12", "2.8")));
+    assert_eq!(selected("REF^I14"), Ok(("REF_I12", "2.8")));
+    assert_eq!(selected("RRI^I14^RRI_I14"), Ok(("RRI_I12", "2.8")));
+    let parsed = support::parsed(&with_type_at("REF^I14^REF_I14", "2.8"));
+    assert!(
+        parsed.unplaced().contains(&Unplaced::OtherStructure {
+            declared: String::from("REF_I14"),
+            structure: "REF_I12",
+        }),
+        "{:?}",
+        parsed.unplaced()
+    );
+}
+
+#[test]
+fn a_code_and_event_no_index_sends_leaves_an_unknown_structure_unknown() {
+    assert_eq!(
+        select(&with_type_at("REF^I99^REF_I99", "2.8")),
+        Err(StructureError::Unknown {
+            name: String::from("REF_I99"),
+        })
+    );
+}
+
 #[test]
 fn a_structure_neither_the_definitions_nor_the_legacy_tables_carry_is_unknown() {
     assert_eq!(
