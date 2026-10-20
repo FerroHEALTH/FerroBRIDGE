@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that writes the data-absent-reason
+# extension of Condition.code into the null flavour of the problem name
+# element, and the code's text into the element's value.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_null_flavour
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "absent"
+    with:
+      fhir: "$resource.code.extension('http://hl7.org/fhir/StructureDefinition/data-absent-reason').value.ofType(code)"
+      openehr: "$archetype/data[at0001]/items[at0002]/null_flavour"

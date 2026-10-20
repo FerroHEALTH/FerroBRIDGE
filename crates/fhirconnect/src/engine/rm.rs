@@ -43,6 +43,7 @@ use openehr_rm::v1_2::model::Container;
 use openehr_sdt::flat::path::Segment;
 use serde_json::Value;
 
+use crate::engine::lens::null_flavour::NullFlavour;
 use crate::resolve::derive;
 
 /// The suffix a whole canonical value travels under in a FLAT key.
@@ -442,9 +443,45 @@ fn held(declared_type: &str) -> Option<Carried> {
     }
 }
 
-// TODO(#618): the `_provider`, `_health_care_facility` and `_end_time`
-// families are spelled here and in `family::provider` and `family::end_time`
-// until openehr-sdt honours `|raw` on `_`-prefixed attribute families
+/// The `ELEMENT` attribute that holds its null flavour.
+pub const NULL_FLAVOUR: &str = "null_flavour";
+
+/// The `ELEMENT` attribute that holds why its value is absent.
+pub const NULL_REASON: &str = "null_reason";
+
+/// Reads the null flavour and the reason an `ELEMENT`'s canonical JSON
+/// holds, `None` when it holds no null flavour.
+///
+/// Both are optional attributes of `ELEMENT`
+/// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_structures.html#_element_class>).
+///
+/// # Errors
+///
+/// Returns [`RmError::Decode`] when either attribute does not read as its
+/// class.
+pub fn null_flavour_of(element: &Value, node: &str) -> Result<Option<NullFlavour>, RmError> {
+    let refuse = |rm_type: &str| {
+        let node = String::from(node);
+        let rm_type = String::from(rm_type);
+        move |source: JsonParseError| RmError::Decode {
+            node,
+            rm_type,
+            source,
+        }
+    };
+    let Some(flavour) = element.get(NULL_FLAVOUR) else {
+        return Ok(None);
+    };
+    let flavour = from_canonical_value::<DvCodedText>(flavour).map_err(refuse("DV_CODED_TEXT"))?;
+    let reason = element
+        .get(NULL_REASON)
+        .map(|reason| from_canonical_value::<DvText>(reason).map_err(refuse("DV_TEXT")))
+        .transpose()?;
+    Ok(Some(NullFlavour { flavour, reason }))
+}
+
+// TODO(#618): the `_provider`, `_health_care_facility`, `_end_time` and
+// `_null_flavour` families are spelled here and in `family` until openehr-sdt honours `|raw` on `_`-prefixed attribute families
 // (sibling request S1).
 /// The attributes of a structural class FLAT writes as a `_`-prefixed family
 /// of the class's node.
@@ -459,10 +496,16 @@ fn held(declared_type: &str) -> Option<Carried> {
 /// spelled `_health_care_facility` under the `context` node (the same file,
 /// the `EVENT_CONTEXT` section), and `EVENT_CONTEXT.end_time` is an optional
 /// `DV_DATE_TIME` the same section spells `_end_time`.
+/// `ELEMENT.null_flavour` is a `DV_CODED_TEXT`
+/// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_structures.html#_element_class>)
+/// the same file spells `_null_flavour` on the node the element shares with
+/// its value, beside `_null_reason` (§ELEMENT); a tail reaches it through
+/// [`crate::resolve::program::target::OpenehrTarget::tail_class`].
 pub const FAMILIES: &[(&str, &str)] = &[
     ("ENTRY", "provider"),
     ("EVENT_CONTEXT", "health_care_facility"),
     ("EVENT_CONTEXT", "end_time"),
+    ("ELEMENT", NULL_FLAVOUR),
 ];
 
 /// The tail below an `OBSERVATION` that names its history's origin.

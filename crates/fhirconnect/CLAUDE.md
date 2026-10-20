@@ -229,7 +229,10 @@ the `_provider` family (`rm::Carried::Family`, `family::provider`), and
 `EVENT_CONTEXT.health_care_facility` the `_health_care_facility` family of
 the `context` node the same way; `EVENT_CONTEXT.end_time` is the
 `_end_time` family there, written as its date-time text
-(`family::end_time`). A path that names an `ELEMENT` the Web Template
+(`family::end_time`). `ELEMENT.null_flavour` is the `_null_flavour` family of
+the node the element shares with its value, with `_null_reason` beside it
+(`family::null_flavour`), reached by a tail on the element
+(`OpenehrTarget::tail_class`) and converted by `lens::null_flavour`. A path that names an `ELEMENT` the Web Template
 compacted into its value reaches the element's `links`
 (`OpenehrTarget::on_element`): the `_link:i` family sits on the one FLAT node
 the two share, and the engine reads it from the element

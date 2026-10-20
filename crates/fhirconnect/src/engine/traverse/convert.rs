@@ -16,10 +16,15 @@ use crate::engine::fhir::FhirKind;
 use crate::engine::fhir::FhirValue;
 use crate::engine::lens::Lens;
 use crate::engine::lens::LensError;
+use crate::engine::lens::null_flavour;
+use crate::engine::lens::null_flavour::NullFlavour;
+use crate::engine::lens::null_flavour::NullFlavourLens;
 use crate::engine::lens::scalar;
 use crate::engine::lens::scalar::IntegerLens;
 use crate::engine::lens::scalar::RealLens;
 use crate::engine::lens::term_mapping::Withheld;
+use crate::engine::outcome::Loss;
+use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
 use crate::engine::rm;
 use crate::engine::rm::Carried;
@@ -115,6 +120,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let dropped = Dropped {
             code: cell::uncarried_code(&value, kind).cloned(),
             mappings: cell::withheld(&value, kind, terminology),
+            reason: false,
         };
         let mut view = cell::get(&value, kind, terminology)?;
         if let (Some(reference), FhirValue::Reference(held)) = (reference, &mut view) {
@@ -221,6 +227,13 @@ impl<T: Table + ?Sized> Run<'_, T> {
             Leaf::Scalar(ref text) => (
                 Self::read_scalar(mapping, target, openehr, kind, text)?,
                 Dropped::default(),
+            ),
+            Leaf::NullFlavour(ref flavour) => (
+                read_null_flavour(flavour, kind).map_err(refuse)?,
+                Dropped {
+                    reason: null_flavour::uncarried_reason(flavour).is_some(),
+                    ..Dropped::default()
+                },
             ),
         };
         let output = Output::fhir(target, &binding.fhir);
@@ -357,7 +370,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
     /// Records the defining code and each term mapping a cell of `mapping`
     /// left out of the FHIR element it wrote under `binding`.
     fn record_dropped(&mut self, mapping: &Mapping, binding: &Binding, dropped: &Dropped) {
-        if dropped.code.is_none() && dropped.mappings.is_empty() {
+        if dropped.code.is_none() && dropped.mappings.is_empty() && !dropped.reason {
             return;
         }
         let location = self.locate(mapping, &binding.fhir);
@@ -379,6 +392,15 @@ impl<T: Table + ?Sized> Run<'_, T> {
         for taken in &dropped.mappings {
             self.warnings
                 .push(Warning::withheld(mapping.name(), taken, mappings.clone()));
+        }
+        if dropped.reason {
+            self.warnings.push(Warning::new(
+                Loss::Skipped {
+                    mapping: String::from(mapping.name()),
+                    reason: SkipReason::NullReasonUncarried,
+                },
+                location.clone(),
+            ));
         }
     }
 
@@ -487,7 +509,7 @@ fn scalar_number(
     text: &str,
 ) -> Option<Result<FhirValue, LensError>> {
     let carried =
-        rm::carried(openehr.node().rm_type(), &tail_segments(openehr)).map(|(_, carried)| carried);
+        rm::carried(openehr.tail_class(), &tail_segments(openehr)).map(|(_, carried)| carried);
     let unreadable = |cell: &'static str, attribute: &'static str| LensError::Shape {
         cell,
         attribute,
@@ -512,6 +534,23 @@ fn scalar_number(
     }
 }
 
+/// Reads an `ELEMENT`'s null flavour as the `code` of a `data-absent-reason`
+/// extension.
+///
+/// The extension's value is a `code`
+/// (<https://hl7.org/fhir/R4/extension-data-absent-reason.html>), which
+/// travels as text, so the cell pairs only with a FHIR element that does.
+fn read_null_flavour(flavour: &NullFlavour, kind: FhirKind) -> Result<FhirValue, LensError> {
+    match kind {
+        FhirKind::String => NullFlavourLens.get(flavour).map(FhirValue::String),
+        other => Err(LensError::NoCell {
+            rm_type: String::from("ELEMENT.null_flavour"),
+            kind: other.as_str(),
+            direction: Direction::OpenehrToFhir,
+        }),
+    }
+}
+
 /// What a cell read out of openEHR left out of the FHIR element it wrote.
 #[derive(Debug, Default)]
 struct Dropped {
@@ -519,6 +558,8 @@ struct Dropped {
     code: Option<CodePhrase>,
     /// The term mappings the element cannot carry.
     mappings: Vec<Withheld>,
+    /// Whether a `null_reason` that names no code was left out.
+    reason: bool,
 }
 
 /// The node an occurrence reads out of, what it holds, and the FHIR target
@@ -529,3 +570,23 @@ type OutSource<'mapping> = (
     &'mapping FhirTarget,
     FhirKind,
 );
+
+#[cfg(test)]
+mod tests {
+    use super::read_null_flavour;
+    use crate::engine::fhir::FhirKind;
+    use crate::engine::lens::Lens;
+    use crate::engine::lens::null_flavour::NullFlavourLens;
+
+    #[test]
+    fn a_null_flavour_pairs_only_with_an_element_that_travels_as_text() {
+        // R4 extension-data-absent-reason: the value is a `code`.
+        let flavour = NullFlavourLens
+            .put(&fhir_types::r4::primitives::String::from("masked"), None)
+            .expect("masked is in the value set");
+        assert!(read_null_flavour(&flavour, FhirKind::String).is_ok());
+        let error = read_null_flavour(&flavour, FhirKind::Coding)
+            .expect_err("no cell pairs a null flavour with a Coding");
+        assert!(error.to_string().contains("null_flavour"), "{error}");
+    }
+}

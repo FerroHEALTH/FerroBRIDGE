@@ -53,6 +53,7 @@ use openehr_mapping_core::index::paths::FlatId;
 use crate::engine::context::CallContext;
 use crate::engine::family;
 use crate::engine::invariant;
+use crate::engine::lens::null_flavour::NullFlavour;
 use crate::engine::origin::Origin;
 use crate::engine::outcome::Location;
 use crate::engine::outcome::Outcome;
@@ -256,6 +257,8 @@ enum Leaf {
     Value(Box<RmValue>),
     /// A scalar attribute, as its text.
     Scalar(String),
+    /// An `ELEMENT`'s null flavour with its reason.
+    NullFlavour(Box<NullFlavour>),
 }
 
 /// Runs `program` over a FHIR document, producing a composition.
