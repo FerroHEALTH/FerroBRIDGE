@@ -1390,7 +1390,7 @@ rests on: **documented** (the guide, or the demographic link page
 | 4 | Which structures `CONTAINS` reaches inside a party | `PERSON p CONTAINS CLUSTER id[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]` works; tenants store `person_details.v2` and `person_name.v2`. The guide's examples contain `ITEM_TREE`, `ADDRESS` and `PARTY_RELATIONSHIP` under a party, with no rule for what each reaches | the identifier `CLUSTER` observed; the examples documented |
 | 5 | Versioning | `uid/value` is always the versioned id (`uuid::ns::v`), so a bare uid matches only through `LIKE 'uuid*'` (F5). Which version a root selects is not stated; Cadasto's scope is the latest, logically deleted parties left out | observed; the version rule planned |
 | 6 | `ORGANISATION`, `GROUP` and `AGENT` as roots | `ORGANISATION` is a documented root with no example. `FROM PERSON`, `ROLE` and `GROUP` run, with `WHERE`, `ORDER BY`, `LIMIT` and `OFFSET`, `LIKE` and query parameters; `AGENT` is not shown | `ORGANISATION` documented; the rest observed |
-| 7 | What a CDR without the extension answers | Not stated by the guide or by ITS-REST. The reference CDR answers `400` to a demographic root (its `UnsupportedSourceClass` refusal) | neither; one reference observation |
+| 7 | What a CDR without the extension answers | Not stated by the guide or by ITS-REST. The reference CDR answers `400` naming the construct to a root outside the part it serves (`GROUP`, `AGENT`, `PARTY_RELATIONSHIP`, from FerroEHR 5.1.0), and before 5.1.0 answered `400` to every demographic root (its `UnsupportedSourceClass` refusal) | neither; reference observations |
 
 The open findings Cadasto plans to change, which the bridge must not build
 on: F1 (`CONTAINS` crossing references in an undocumented direction), F2 (the
@@ -1457,9 +1457,12 @@ a versioned uid names its party.
   `cadasto-person-uid` link names is not found that way, so a deployment on
   Cadasto's platform sets both, as the link page allows.
 
-The reference CDR refuses demographic sources today, so the party search is
-tested against a `wiremock` CDR that serves the extension. The container test
-waits on a CDR that serves it.
+The party search is tested twice. A `wiremock` CDR covers every case of the
+search, the refusals among them. The container lane runs `identifier`, `name`,
+`_id` and `_count` on the four types against the reference CDR, which serves
+a subset of the extension from FerroEHR 5.1.0: `PERSON`, `ORGANISATION` and
+`ROLE` roots over the latest version of each party, with a `400` naming the
+construct for `GROUP`, `AGENT` and `PARTY_RELATIONSHIP`.
 
 ## 5. The OMOP side
 

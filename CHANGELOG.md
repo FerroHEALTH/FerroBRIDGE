@@ -179,6 +179,14 @@ crates on crates.io.
   it, and the `OperationOutcome` names the reference and the upstream
   status. A resource the sending site or this server does not hold stays a
   declared skip.
+- The container lane runs the reference CDR at FerroEHR 5.1.0, which serves
+  demographic AQL rooted at `PERSON`, `ORGANISATION` and `ROLE` (#965). The
+  facade's party search runs `identifier`, `name`, `_id` and `_count` on
+  `Patient`, `Practitioner`, `Organization` and `PractitionerRole` against it
+  and finds the parties the test created, paged and with a deleted party
+  left out. A search configured over `GROUP`, `AGENT` or
+  `PARTY_RELATIONSHIP`, which the CDR refuses, answers `501 not-supported`
+  naming the Cadasto experimental AQL demographic extension.
 - The operator console takes FerroUI 0.2.0 and reads every word it hands
   FerroUI from its catalog at run time (#956): table captions, column
   headers, pager nouns with their plurals, navigation, fields, dialogs and

@@ -121,8 +121,8 @@ pub const POSTGRES: PinnedImage = PinnedImage {
 /// The reference openEHR CDR, which speaks ITS-REST 1.1.0.
 pub const CDR: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr",
-    tag: "4.3.6",
-    digest: "sha256:cd29d6526084c84e9a7fe2c9d7058bd4fe67abbfab51d07b124d84dc9805e5bb",
+    tag: "5.1.0",
+    digest: "sha256:d5d28c3473ba46107e0bced4af995020366dcaea7da450fcf8126ff7604a4fb9",
 };
 
 /// The PostgreSQL the reference CDR image documents as its database.
@@ -132,8 +132,8 @@ pub const CDR: PinnedImage = PinnedImage {
 /// rather than against a bare PostgreSQL.
 pub const CDR_POSTGRES: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr-postgres",
-    tag: "4.3.6",
-    digest: "sha256:fc93ccffba5e1dc266169e3d22b7a2c57cbe35e1266b42ff6c819ca323c204c3",
+    tag: "5.1.0",
+    digest: "sha256:1b10c0e11acceb26d9afa878c123279dfb7e1b20d63073ac4a9cdd36b8394908",
 };
 
 /// The reference FHIR terminology server.

@@ -141,8 +141,8 @@ in code is the matching constant in
 | Item | Pin | Repeated in |
 |---|---|---|
 | PostgreSQL image | `postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280` | the `POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, the `sqlx-offline` service in `.github/workflows/ci.yml` |
-| FerroEHR CDR image | `ghcr.io/ferrohealth/ferroehr:4.3.6@sha256:cd29d6526084c84e9a7fe2c9d7058bd4fe67abbfab51d07b124d84dc9805e5bb` | the `CDR` constant in `tools/ferrobridge-testkit/src/containers.rs` |
-| FerroEHR CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:4.3.6@sha256:fc93ccffba5e1dc266169e3d22b7a2c57cbe35e1266b42ff6c819ca323c204c3` | the `CDR_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs` |
+| FerroEHR CDR image | `ghcr.io/ferrohealth/ferroehr:5.1.0@sha256:d5d28c3473ba46107e0bced4af995020366dcaea7da450fcf8126ff7604a4fb9` | the `CDR` constant in `tools/ferrobridge-testkit/src/containers.rs` |
+| FerroEHR CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:5.1.0@sha256:1b10c0e11acceb26d9afa878c123279dfb7e1b20d63073ac4a9cdd36b8394908` | the `CDR_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs` |
 | FerroTERM terminology server image | `ghcr.io/ferrohealth/ferroterm:0.1.6@sha256:7ec4c9622e88e3028faf7c74a2384fb02e57dc3163c282b21274121a26aa3d5b` | the `TERMINOLOGY` constant in `tools/ferrobridge-testkit/src/containers.rs` |
 
 The CDR runs against its own published database image rather than the plain
