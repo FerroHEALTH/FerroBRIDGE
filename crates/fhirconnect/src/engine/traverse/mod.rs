@@ -61,6 +61,7 @@ use crate::engine::outcome::Outcome;
 use crate::engine::outcome::Warning;
 use crate::engine::rm::RmValue;
 use crate::engine::seam::Seams;
+use crate::engine::subject::SubjectIdentifier;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::Program;
 use crate::resolve::program::mapping::Mapping;
@@ -322,7 +323,9 @@ pub fn to_openehr<T: Table + ?Sized>(
         })?;
     let built = run.amend_intervals(built)?;
     run.carried_whole(&built, &routed)?;
-    Ok(Outcome::new(built, run.warnings).with_consumed(run.consumed))
+    Ok(Outcome::new(built, run.warnings)
+        .with_consumed(run.consumed)
+        .with_subject(run.subject))
 }
 
 /// Runs `program` over a composition, producing a FHIR resource.
@@ -457,6 +460,8 @@ struct Run<'a, T: Table + ?Sized> {
     /// The concept each distinct code translated to, so the seam is asked
     /// once per code in a run.
     translations: BTreeMap<translate::TranslationKey, Option<Coding>>,
+    /// The identifiers a `mappingCode` function offered as the subject of the EHR.
+    subject: Vec<SubjectIdentifier>,
     /// The interval events the run wrote, set on the built composition.
     intervals: Vec<event::Interval>,
 }
@@ -500,6 +505,7 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             pins: Vec::new(),
             fhir_pin: None,
             translations: BTreeMap::new(),
+            subject: Vec::new(),
             intervals: Vec::new(),
         }
     }

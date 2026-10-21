@@ -24,6 +24,7 @@ use fhir_types::codec::Value;
 use fhirconnect::engine::linked::Linked;
 use fhirconnect::engine::linked::LinkedCompositions;
 use fhirconnect::engine::seam::ReferenceError;
+use fhirconnect::engine::subject::SubjectIdentifier;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_mapping_core::composition::CanonicalComposition;
@@ -118,6 +119,9 @@ pub(super) struct Built {
     pub(super) composition: CanonicalComposition,
     /// The linked compositions this write committed, in the order met.
     pub(super) committed: Vec<CommittedLink>,
+    /// The identifiers the run offered as the subject of the EHR
+    /// (`fhirconnect::engine::subject`).
+    pub(super) subject: Vec<SubjectIdentifier>,
 }
 
 impl Ingest<'_> {
@@ -147,7 +151,7 @@ impl Ingest<'_> {
         // NOTE: ITS-REST 1.1.0 `UpdateVersion` carries no `uid`, so a linked composition's
         // id exists only after its commit, and the linking run waits for it (our own design).
         let probe = Linker::probing();
-        let (probed, _, _) = self
+        let (probed, _, _, offered) = self
             .run_linking(program, inbound, provenance, Some(&probe))
             .await
             .map_err(|error| engine_refusal(&error))?;
@@ -156,6 +160,7 @@ impl Ingest<'_> {
             return Ok(Built {
                 composition: probed,
                 committed: Vec::new(),
+                subject: offered,
             });
         }
         let mut answers = BTreeMap::new();
@@ -174,7 +179,7 @@ impl Ingest<'_> {
             answers.insert(reference, linked);
         }
         let last = Linker::answering(answers);
-        let (composition, _, _) = self
+        let (composition, _, _, subject) = self
             .run_linking(program, inbound, provenance, Some(&last))
             .await
             .map_err(|error| with_committed(engine_refusal(&error), &committed))?;
@@ -192,6 +197,7 @@ impl Ingest<'_> {
         Ok(Built {
             composition,
             committed,
+            subject,
         })
     }
 

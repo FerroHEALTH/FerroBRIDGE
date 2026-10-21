@@ -204,7 +204,11 @@ engine never parses a path for one, and a polymorphic `ELEMENT` port holds
 one value node per class, which the class a function writes selects. A
 function is typed over the generated FHIR struct and the `openehr-rm` class,
 and refuses whatever it cannot carry; a new one is a row of
-`engine::library::FUNCTIONS` with tests both ways and both lens laws.
+`engine::library::FUNCTIONS` with tests both ways and both lens laws. One
+function writes no template node: `ehrStatusAddExternalREF`
+(`engine::library::ehr_status`) offers its identifiers as the subject of the
+EHR on `Outcome::subject` (`engine::subject`), and the caller that commits
+writes the `EHR_STATUS`; coming out it is `SkipReason::EhrStatusSubject`.
 
 The fifth seam is `engine::demographics::Demographics`, the demographics
 endpoint a party reference resolves through. The default `NoDemographics`

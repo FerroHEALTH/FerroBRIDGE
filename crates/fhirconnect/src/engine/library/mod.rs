@@ -20,6 +20,7 @@
 pub mod daily;
 pub mod dosage;
 pub mod duration;
+pub mod ehr_status;
 pub mod range;
 pub mod ratio;
 pub mod timing;
@@ -47,11 +48,15 @@ use crate::engine::lens::LensError;
 use crate::engine::lens::quantity::QuantityLens;
 use crate::engine::lens::quantity::UCUM;
 use crate::engine::lens::range::QuantityIntervalLens;
+use crate::engine::subject::SubjectIdentifier;
 use crate::engine::traverse::functions::Datum;
 use crate::engine::traverse::functions::MappingCodeError;
 use crate::engine::traverse::functions::MappingFunctions;
 use crate::engine::traverse::functions::Ports;
 use crate::model::semantic::MappingCodeRegistry;
+
+/// The direction into openEHR of a function that writes the subject of the EHR.
+type ToSubject = fn(&Value) -> Result<Vec<SubjectIdentifier>, MappingCodeError>;
 
 /// One registered function: its name, its ports and its two directions.
 #[derive(Debug, Clone, Copy)]
@@ -64,6 +69,9 @@ struct Function {
     to_fhir: fn(&Ports) -> Result<Option<Value>, MappingCodeError>,
     /// The direction into openEHR.
     to_openehr: fn(&Value) -> Result<Ports, MappingCodeError>,
+    /// The direction into openEHR of a function that writes the subject
+    /// reference of the EHR, `None` for one that writes template nodes.
+    subject: Option<ToSubject>,
 }
 
 /// Every function the library registers, by name.
@@ -73,42 +81,56 @@ const FUNCTIONS: &[Function] = &[
         ports: dosage::ADMINISTRATION_DURATION_PORTS,
         to_fhir: dosage::administration_duration_to_fhir,
         to_openehr: dosage::administration_duration_to_openehr,
+        subject: None,
     },
     Function {
         code: timing::NON_DAILY,
         ports: timing::NON_DAILY_PORTS,
         to_fhir: timing::non_daily_to_fhir,
         to_openehr: timing::non_daily_to_openehr,
+        subject: None,
     },
     Function {
         code: daily::DAILY,
         ports: daily::PORTS,
         to_fhir: daily::to_fhir,
         to_openehr: daily::to_openehr,
+        subject: None,
     },
     Function {
         code: range::DOSE_RANGE,
         ports: range::PORTS,
         to_fhir: range::dose_range_to_fhir,
         to_openehr: range::dose_range_to_openehr,
+        subject: None,
     },
     Function {
         code: range::RANGE_TEXT,
         ports: range::PORTS,
         to_fhir: range::range_text_to_fhir,
         to_openehr: range::range_text_to_openehr,
+        subject: None,
     },
     Function {
         code: ratio::DOSAGE_RATE,
         ports: ratio::PORTS,
         to_fhir: ratio::dosage_rate_to_fhir,
         to_openehr: ratio::dosage_rate_to_openehr,
+        subject: None,
     },
     Function {
         code: ratio::ACTION_RATE,
         ports: ratio::PORTS,
         to_fhir: ratio::action_rate_to_fhir,
         to_openehr: ratio::action_rate_to_openehr,
+        subject: None,
+    },
+    Function {
+        code: ehr_status::EXTERNAL_REF,
+        ports: &[],
+        to_fhir: ehr_status::to_fhir,
+        to_openehr: ehr_status::to_openehr,
+        subject: Some(ehr_status::to_subject),
     },
 ];
 
@@ -158,6 +180,23 @@ impl MappingFunctions for Library {
 
     fn to_openehr(&self, code: &str, element: &Value) -> Result<Ports, MappingCodeError> {
         (function(code)?.to_openehr)(element)
+    }
+
+    fn writes_subject(&self, code: &str) -> bool {
+        function(code).is_ok_and(|function| function.subject.is_some())
+    }
+
+    fn to_subject(
+        &self,
+        code: &str,
+        element: &Value,
+    ) -> Result<Vec<SubjectIdentifier>, MappingCodeError> {
+        let subject = function(code)?
+            .subject
+            .ok_or_else(|| MappingCodeError::Unknown {
+                code: String::from(code),
+            })?;
+        subject(element)
     }
 }
 

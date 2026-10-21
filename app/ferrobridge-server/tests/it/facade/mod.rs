@@ -15,6 +15,7 @@ mod conditional;
 mod created;
 mod credentials;
 mod demographic;
+mod ehr_status;
 mod examples;
 mod linked;
 mod party;
@@ -224,6 +225,7 @@ pub(crate) fn settings() -> Settings {
         system_id: String::from("ferrobridge.test"),
         language: String::from("en"),
         territory: String::from("GB"),
+        ehr_status_system: None,
     }
 }
 

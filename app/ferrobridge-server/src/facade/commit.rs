@@ -96,6 +96,18 @@ pub enum CommitError {
     },
 }
 
+/// Returns the commit headers one `EHR_STATUS` write carries: a modification
+/// by `system_id` in the lifecycle a composition write takes, and no
+/// template, since an `EHR_STATUS` is built from none.
+#[must_use]
+pub fn status_context(system_id: &str) -> CommitContext {
+    CommitContext {
+        lifecycle_state: Some(lifecycle()),
+        audit: Some(audit_data(Change::Modification, system_id)),
+        template_id: None,
+    }
+}
+
 /// Returns the commit headers one composition write carries.
 ///
 /// The audit is the one [`audit`] puts into a CONTRIBUTION entry, so a single

@@ -105,8 +105,6 @@ pub fn inbound_from(
     source: Option<SourceItem>,
     seams: &Seams<'_>,
 ) -> Result<Outcome<CanonicalComposition>, EngineError> {
-    // TODO(#95): resolve the displays the concept mappings need here, before
-    // any value is built, once the PROGRAMMED registry lands.
     let mut origin = Origin::new(&settings.system_id);
     if let Some(source) = source {
         origin = origin.with_source(source);

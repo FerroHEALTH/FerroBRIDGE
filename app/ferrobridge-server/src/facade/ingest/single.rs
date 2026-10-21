@@ -4,6 +4,7 @@
 //! The single create and update: what the identity map knows of one
 //! resource, the first version of its composition, and a later one.
 
+use fhirconnect::engine::subject::SubjectIdentifier;
 use http::StatusCode;
 use openehr_its::rest::generated::ehr::client::CompositionCreateOutcome;
 use openehr_its::rest::generated::ehr::client::CompositionUpdateOutcome;
@@ -104,7 +105,7 @@ impl Ingest<'_> {
             .map_err(|error| store_refusal(&error))?;
         let known = if let Some(known) = exact {
             if source.version_id().is_some() {
-                let (built, _, _) = self
+                let (built, _, _, _) = self
                     .run_linking(program, inbound, provenance, Some(&Linker::probing()))
                     .await
                     .map_err(|error| engine_refusal(&error))?;
@@ -139,7 +140,7 @@ impl Ingest<'_> {
         };
         // NOTE: no specification governs this: our own design, recognition commits
         // nothing, so a link reads as the probe URI and a LINKED resource is revised.
-        let (built, instant, _) = self
+        let (built, instant, _, _) = self
             .run_linking(program, inbound, provenance, Some(&Linker::probing()))
             .await
             .map_err(|error| engine_refusal(&error))?;
@@ -285,26 +286,34 @@ impl Ingest<'_> {
         .map_err(|error| ehr_refusal(&error))?;
         let built = match linking {
             Linking::Commit => self.build_linked(program, inbound, provenance).await?,
-            Linking::Refuse => Built {
-                composition: self.build(program, inbound, provenance).await?,
-                committed: Vec::new(),
-            },
+            Linking::Refuse => {
+                let (composition, subject) =
+                    self.build_offering(program, inbound, provenance).await?;
+                Built {
+                    composition,
+                    committed: Vec::new(),
+                    subject,
+                }
+            }
         };
-        self.create(program, inbound, &ehr_id, built.composition)
+        self.create(program, inbound, &ehr_id, built.composition, &built.subject)
             .await
             .map_err(|refused| with_committed(refused, &built.committed))
     }
 
     /// Commits `composition` as the first version of a composition in
-    /// `ehr_id`, and records the identity of `inbound`.
+    /// `ehr_id`, after writing the subject `offered` names into its
+    /// `EHR_STATUS`, and records the identity of `inbound`.
     async fn create(
         &self,
         program: &Loaded,
         inbound: &Inbound,
         ehr_id: &EhrId,
         composition: CanonicalComposition,
+        offered: &[SubjectIdentifier],
     ) -> Result<Written, Refused> {
         let rm = strict_read(&composition)?;
+        Box::pin(self.write_subject(ehr_id, offered)).await?;
         let context = self.commit_context(commit::Change::Creation, &composition)?;
         let answered = self
             .client
@@ -383,20 +392,23 @@ impl Ingest<'_> {
         provenance: &Provenance,
     ) -> Result<Written, Refused> {
         let linked = self.build_linked(program, inbound, provenance).await?;
-        self.revise(inbound, program, revision, &linked.composition)
+        self.revise(inbound, program, revision, &linked)
             .await
             .map_err(|refused| with_committed(refused, &linked.committed))
     }
 
     /// Commits the version of the composition `revision` names that splices
-    /// in `built`, and records the identity of `inbound`.
+    /// in the composition of `linked`, after writing the subject it offers
+    /// into the `EHR_STATUS`, and records the identity of `inbound`.
     async fn revise(
         &self,
         inbound: &Inbound,
         program: &Loaded,
         revision: &Revision<'_>,
-        built: &CanonicalComposition,
+        linked: &Built,
     ) -> Result<Written, Refused> {
+        let built = &linked.composition;
+        let offered = linked.subject.as_slice();
         let Revision {
             ehr_id,
             container,
@@ -405,6 +417,7 @@ impl Ingest<'_> {
         } = *revision;
         let composition = splice(program, built, revision)?;
         let rm = strict_read(&composition)?;
+        Box::pin(self.write_subject(ehr_id, offered)).await?;
         let context = self.commit_context(commit::Change::Modification, &composition)?;
         let answered = self
             .client

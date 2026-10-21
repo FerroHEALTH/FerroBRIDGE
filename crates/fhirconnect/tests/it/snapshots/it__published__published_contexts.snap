@@ -195,10 +195,8 @@ projects/org.highmed/KDS/person/person.context.yaml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
-  left out projects/org.highmed/KDS/person/KDS_admin_entry_person.yml (error fc-unknown-mapping-code)
   refused
     projects/org.highmed/KDS/person/person.context.yaml:29 error fc-unknown-mapping-reference
-    projects/org.highmed/KDS/person/person.context.yaml:34 error fc-unknown-mapping-reference
 projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml
   left out model/action/org.openehr/informed_consent.v0.yml (error fc-unknown-mapping-reference)
   left out model/action/org.openehr/procedure.v1.yml (error fc-condition-target-root-mismatch)

@@ -25,6 +25,22 @@ crates on crates.io.
 
 ### Added
 
+- The eighth `mappingCode` function of the published FHIRconnect library,
+  `ehrStatusAddExternalREF`, is registered (#1065), so
+  `KDS_admin_entry_person.yml` loads in the published person context. It
+  writes no template node: it offers each `Identifier` the mapping reads as
+  the subject of the EHR, on the new `Outcome::subject` channel
+  (`fhirconnect::engine::subject::SubjectIdentifier`), and coming out of
+  openEHR it is declared skipped (`SkipReason::EhrStatusSubject`). The
+  facade writes it into `EHR_STATUS.subject.external_ref` through ITS-REST
+  1.1.0 `ehr_status_update` with `If-Match` on the version it read, before
+  the composition is committed, for the identifier of the new
+  `[facade] ehr_status_identifier_system` key. An `EHR_STATUS` that names
+  another subject answers `409`, a CDR refusal answers through the status
+  table with nothing committed, and with the key unset a write whose mapping
+  offers identifiers answers `422` naming the key. New for a consumer of
+  `fhirconnect`: `MappingFunctions::writes_subject` and `to_subject`, with
+  defaults, and the `SkipReason` variant. `fhirconnect` 0.1.180.
 - A FHIRconnect mapping that names an `EVENT` node itself, with a FHIR time
   on the other side, writes and reads the event's time (#1059), as
   `types-of-mappings/data-type/EVENT.adoc` §POINT_EVENT and INTERVAL_EVENT

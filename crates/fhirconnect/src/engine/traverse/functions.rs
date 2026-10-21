@@ -21,6 +21,7 @@ use fhir_types::codec::Value;
 use openehr_its::json::JsonParseError;
 
 use crate::engine::lens::LensError;
+use crate::engine::subject::SubjectIdentifier;
 
 /// The port that names the node the mapping's `with.openehr` resolves to.
 pub const SELF_PORT: &str = "";
@@ -128,6 +129,37 @@ pub trait MappingFunctions: fmt::Debug + Send + Sync {
     /// Returns [`MappingCodeError`] when the registry does not hold `code` or
     /// the function refuses its input.
     fn to_openehr(&self, code: &str, element: &Value) -> Result<Ports, MappingCodeError>;
+
+    /// Returns whether the function `code` names writes the subject
+    /// reference of the EHR rather than template nodes
+    /// ([`crate::engine::subject`]).
+    ///
+    /// Such a function runs into openEHR through
+    /// [`MappingFunctions::to_subject`] and has nothing to read coming out,
+    /// since a run reads a composition and never the `EHR_STATUS`.
+    fn writes_subject(&self, _code: &str) -> bool {
+        false
+    }
+
+    /// Runs a function that writes the subject reference of the EHR over the
+    /// FHIR element the mapping's `with.fhir` names.
+    ///
+    /// Returns the identifiers the element offers, in the order it holds
+    /// them.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MappingCodeError::Unknown`] when the registry holds no such
+    /// function, and the function's refusal of its input otherwise.
+    fn to_subject(
+        &self,
+        code: &str,
+        _element: &Value,
+    ) -> Result<Vec<SubjectIdentifier>, MappingCodeError> {
+        Err(MappingCodeError::Unknown {
+            code: String::from(code),
+        })
+    }
 }
 
 /// A registry that holds no function, so every call is refused.

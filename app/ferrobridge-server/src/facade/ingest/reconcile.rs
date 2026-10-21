@@ -201,6 +201,7 @@ impl Ingest<'_> {
             composition: Box::new(rm),
             instant,
             consumed: Vec::new(),
+            offered: Vec::new(),
         }];
         let found = self
             .committed_versions(

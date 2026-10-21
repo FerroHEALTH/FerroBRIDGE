@@ -18,6 +18,7 @@
 
 mod binding;
 mod claim;
+mod ehr_status;
 mod entries;
 pub(crate) mod linked;
 mod pairing;
@@ -32,6 +33,7 @@ use fhirconnect::engine::demographics::NoDemographics;
 use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::seam::NoReferences;
 use fhirconnect::engine::seam::ReferenceSource;
+use fhirconnect::engine::subject::SubjectIdentifier;
 use fhirconnect::engine::traverse::error::EngineError;
 use fhirconnect::resolve::program::binding::TemplateId;
 use http::StatusCode;
@@ -445,6 +447,8 @@ struct Mapped {
     instant: String,
     /// The literal references whose resources a `slotContext` consumed.
     consumed: Vec<String>,
+    /// The identifiers the entry offers as the subject of the EHR.
+    offered: Vec<SubjectIdentifier>,
 }
 
 /// Which versions of a committed contribution the entries being bound

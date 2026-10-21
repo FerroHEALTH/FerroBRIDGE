@@ -13,6 +13,9 @@
 
 use fhir_types::codec::Value;
 
+use crate::engine::outcome::Loss;
+use crate::engine::outcome::SkipReason;
+use crate::engine::outcome::Warning;
 use crate::engine::traverse::functions::Datum;
 use crate::engine::traverse::functions::MappingCodeError;
 use crate::engine::traverse::functions::Ports;
@@ -73,6 +76,15 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let Some(element) = self.fhir_element(mapping, target, input)? else {
             return Ok(());
         };
+        if self.seams.functions().writes_subject(code) {
+            let offered = self
+                .seams
+                .functions()
+                .to_subject(code, &element)
+                .map_err(|source| refusal(mapping, code, source))?;
+            self.subject.extend(offered);
+            return Ok(());
+        }
         let produced = self
             .seams
             .functions()
@@ -122,6 +134,19 @@ impl<T: Table + ?Sized> Run<'_, T> {
         input: &Occurrence,
         binding: &Binding,
     ) -> Result<(), EngineError> {
+        if self.seams.functions().writes_subject(code) {
+            // NOTE: RM EHR IM Release 1.1.0 §EHR_STATUS: the subject lives in the EHR_STATUS, which
+            // a run over a composition never reads, so the mapping is declared skipped.
+            let location = self.locate(mapping, input);
+            self.warnings.push(Warning::new(
+                Loss::Skipped {
+                    mapping: String::from(mapping.name()),
+                    reason: SkipReason::EhrStatusSubject,
+                },
+                location,
+            ));
+            return Ok(());
+        }
         let mut values = Ports::new();
         if let Some(anchor) = mapping.openehr() {
             let positions = Self::positions_of(mapping, input, anchor)?;

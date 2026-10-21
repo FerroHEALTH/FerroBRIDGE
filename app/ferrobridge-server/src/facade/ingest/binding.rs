@@ -8,6 +8,7 @@ use fhir_types::codec::Value;
 use fhirconnect::engine::library::Library;
 use fhirconnect::engine::linked::LinkedCompositions;
 use fhirconnect::engine::seam::Seams;
+use fhirconnect::engine::subject::SubjectIdentifier;
 use fhirconnect::engine::traverse::error::EngineError;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
@@ -158,17 +159,29 @@ fn linking<'s>(seams: Seams<'s>, linked: Option<&'s dyn LinkedCompositions>) -> 
     }
 }
 
+/// What one engine run answers: the composition, the instant every
+/// defaulted time was taken from, the literal references a `slotContext`
+/// consumed, and the identifiers offered as the subject of the EHR.
+pub(super) type Engined = (
+    CanonicalComposition,
+    String,
+    Vec<String>,
+    Vec<SubjectIdentifier>,
+);
+
 impl Ingest<'_> {
-    /// Runs the engine over one inbound resource.
-    pub(super) async fn build(
+    /// Runs the engine over one inbound resource, and returns the composition
+    /// with the identifiers it offers as the subject of the EHR
+    /// (`fhirconnect::engine::subject`).
+    pub(super) async fn build_offering(
         &self,
         program: &Loaded,
         inbound: &Inbound,
         provenance: &Provenance,
-    ) -> Result<CanonicalComposition, Refused> {
-        self.run(program, inbound, provenance)
+    ) -> Result<(CanonicalComposition, Vec<SubjectIdentifier>), Refused> {
+        self.run_consuming(program, inbound, provenance)
             .await
-            .map(|(composition, _instant)| composition)
+            .map(|(composition, _instant, _consumed, subject)| (composition, subject))
             .map_err(|error| engine_refusal(&error))
     }
 
@@ -185,7 +198,7 @@ impl Ingest<'_> {
     ) -> Result<(CanonicalComposition, String), EngineError> {
         self.run_consuming(program, inbound, provenance)
             .await
-            .map(|(composition, instant, _consumed)| (composition, instant))
+            .map(|(composition, instant, _consumed, _subject)| (composition, instant))
     }
 
     /// Runs the engine as [`Ingest::run`] does, and also returns the literal
@@ -196,7 +209,7 @@ impl Ingest<'_> {
         program: &Loaded,
         inbound: &Inbound,
         provenance: &Provenance,
-    ) -> Result<(CanonicalComposition, String, Vec<String>), EngineError> {
+    ) -> Result<Engined, EngineError> {
         self.run_linking(program, inbound, provenance, None).await
     }
 
@@ -209,7 +222,7 @@ impl Ingest<'_> {
         inbound: &Inbound,
         provenance: &Provenance,
         linked: Option<&dyn LinkedCompositions>,
-    ) -> Result<(CanonicalComposition, String, Vec<String>), EngineError> {
+    ) -> Result<Engined, EngineError> {
         // NOTE: no specification governs this: our own design, one instant serves
         // every defaulted time of one ingest, so each resource reads the clock once.
         let now = jiff::Timestamp::now().to_string();
@@ -240,7 +253,8 @@ impl Ingest<'_> {
             }
         })?;
         let consumed = built.consumed().to_vec();
-        Ok((built.into_value(), now, consumed))
+        let subject = built.subject().to_vec();
+        Ok((built.into_value(), now, consumed, subject))
     }
 
     /// Returns the commit headers one composition write carries.
