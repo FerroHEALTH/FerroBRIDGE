@@ -418,7 +418,7 @@ mod tests {
 
     #[test]
     fn only_a_running_guarded_surface_is_named() {
-        assert!(guarded_surfaces(false, false, false).is_empty());
+        assert_eq!(guarded_surfaces(false, false, false), Vec::<&str>::new());
         assert_eq!(vec!["facade"], guarded_surfaces(true, false, false));
         assert_eq!(
             vec!["operator", "operations"],

@@ -111,5 +111,5 @@ fn the_mode_is_off_by_default() {
     // N1 §3.1: refusing is an implementation's choice; the default answers in document order.
     let patient = patient();
     let result = lenient("Patient.children().skip(1)", &patient).expect("evaluates");
-    assert!(!result.is_empty());
+    assert_ne!(result, Vec::<ferrobridge_fhirpath::value::Item<'_>>::new());
 }

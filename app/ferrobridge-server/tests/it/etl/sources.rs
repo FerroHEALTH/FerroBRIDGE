@@ -113,7 +113,10 @@ fn without_the_operator_api_only_the_provisioned_tree_is_read() -> Result<(), Bo
             .map(ferrobridge_server::operator::files::Root::owner)
     );
     let bare = Config::from_sources(Some(""), &BTreeMap::new())?.resolve()?;
-    assert!(omocl_roots(&bare).is_empty());
+    assert_eq!(
+        omocl_roots(&bare),
+        Vec::<ferrobridge_server::operator::files::Root>::new()
+    );
     assert_eq!(Some("an [etl] section"), missing_section(&bare));
     Ok(())
 }

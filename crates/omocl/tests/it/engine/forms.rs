@@ -81,7 +81,7 @@ async fn a_concept_map_refuses_an_at_code_it_does_not_list() -> Result<(), Box<d
         &stub,
     )
     .await?;
-    assert!(graph.rows().is_empty());
+    assert_eq!(graph.rows(), []);
     assert_eq!(refused(&refusals, RefusalKind::UnlistedAtCode), 2);
     Ok(())
 }

@@ -480,7 +480,10 @@ mod tests {
     #[test]
     fn milliseconds_are_a_one_way_row() {
         assert_eq!(DurationLens.fallbacks(&fhir("500", "ms")).len(), 1);
-        assert!(DurationLens.fallbacks(&fhir("5", "s")).is_empty());
+        assert_eq!(
+            DurationLens.fallbacks(&fhir("5", "s")),
+            Vec::<crate::engine::lens::Fallback>::new()
+        );
         assert_eq!(shifted("500", 3).as_deref(), Some("0.5"));
         assert_eq!(shifted("5", 3).as_deref(), Some("0.005"));
         assert_eq!(shifted("1000", 3).as_deref(), Some("1"));

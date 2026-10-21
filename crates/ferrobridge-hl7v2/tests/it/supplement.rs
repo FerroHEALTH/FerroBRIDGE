@@ -298,7 +298,10 @@ async fn a_placer_order_number_is_the_identifier_the_report_is_based_on() {
         "{based_on:?}"
     );
     assert_eq!(based_on.get("reference"), None);
-    assert!(resources(shipped.bundle(), "ServiceRequest").is_empty());
+    assert_eq!(
+        resources(shipped.bundle(), "ServiceRequest"),
+        Vec::<&Value>::new()
+    );
 }
 
 /// A message of `event` whose structure the guide maps with no message map
@@ -360,7 +363,7 @@ async fn the_supplemented_message_maps_carry_their_structures() {
 #[tokio::test]
 async fn each_supplement_a_run_uses_is_counted_once() {
     let guide = run(&fixtures::oru_r01(), &support::corpus()).await;
-    assert!(supplemented(&guide).is_empty());
+    assert_eq!(supplemented(&guide), Vec::<(&str, bool)>::new());
     let shipped = run(&fixtures::oru_r01(), &support::shipped()).await;
     let used = supplemented(&shipped);
     let mut unique = used.clone();

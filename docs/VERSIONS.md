@@ -329,13 +329,15 @@ published binary on this toolchain, with no cache.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| Rust toolchain | 1.98.1 | `rust-toolchain.toml` `channel` (stable) |
+| Rust toolchain | 1.99.1 | `rust-toolchain.toml` `channel` (stable) |
 | Edition | 2024 | root `Cargo.toml` `[workspace.package]` `edition` |
 | Cargo resolver | 3 | root `Cargo.toml` `[workspace]` `resolver` |
 | MSRV | 1.98 | root `Cargo.toml` `[workspace.package]` `rust-version` |
 
-The deliverable is a server binary, so the MSRV tracks the pinned stable
-toolchain.
+The toolchain is the newest stable Rust release and the MSRV is the
+toolchain minus one minor release, the rule every FerroHEALTH repository
+follows. Both move in one pull request when a new stable release ships, and
+an MSRV is only ever raised.
 
 ## Product and citation version
 

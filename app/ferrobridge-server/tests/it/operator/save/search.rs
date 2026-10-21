@@ -94,7 +94,7 @@ async fn a_console_declaration_checks_against_its_context_and_serves_search()
         .mount(&case.cdr)
         .await;
     case.map_observation().await?;
-    assert!(case.observation_parameters().await?.is_empty());
+    assert_eq!(case.observation_parameters().await?, Vec::<String>::new());
     let before = case.search_observation().await?.status();
     assert_ne!(StatusCode::OK, before, "Observation declares no search yet");
 
@@ -159,7 +159,7 @@ async fn a_declaration_that_does_not_bind_is_refused_and_changes_nothing()
     );
     assert!(!case.console("ferrobridge_console.search.yml").exists());
     assert!(case.staging_left().is_empty(), "{:?}", case.staging_left());
-    assert!(case.observation_parameters().await?.is_empty());
+    assert_eq!(case.observation_parameters().await?, Vec::<String>::new());
     let types = case.declared_types().await?;
     assert!(types.contains(&String::from("Observation")), "{types:?}");
     Ok(())

@@ -69,7 +69,10 @@ fn a_this_resolve_path_resolves_a_contained_resource() -> TestResult {
         "{:#?}",
         report.issues()
     );
-    assert!(unevaluated_discriminators(&report).is_empty());
+    assert_eq!(
+        unevaluated_discriminators(&report),
+        Vec::<(Constraint, Reason, String)>::new()
+    );
     let report = against(&[practitioner_profile()], &patient_naming("#p1"), &url)?;
     assert_eq!(
         locations(&report, MessageId::UnmatchedSliceItem),
@@ -124,7 +127,10 @@ fn a_reference_outside_the_resource_is_named_unevaluated() -> TestResult {
             "Patient.generalPractitioner[0]".to_owned()
         )]
     );
-    assert!(locations(&report, MessageId::UnmatchedSliceItem).is_empty());
+    assert_eq!(
+        locations(&report, MessageId::UnmatchedSliceItem),
+        Vec::<String>::new()
+    );
     Ok(())
 }
 
@@ -203,7 +209,10 @@ fn a_path_outside_the_subset_is_named_unevaluated_never_a_non_match() -> TestRes
             "Patient.identifier[0]".to_owned()
         )]
     );
-    assert!(locations(&report, MessageId::UnmatchedSliceItem).is_empty());
+    assert_eq!(
+        locations(&report, MessageId::UnmatchedSliceItem),
+        Vec::<String>::new()
+    );
     Ok(())
 }
 

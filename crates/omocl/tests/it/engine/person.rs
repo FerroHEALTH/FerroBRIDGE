@@ -159,7 +159,10 @@ async fn a_person_mapping_that_omits_a_key_it_could_write_is_refused() -> Result
     // has a key, so a mapping that leaves it out cannot write the row.
     let source = gendered(false);
     let (graph, refusals) = person(&[], &[("synthetic_person.yml", &source)]).await?;
-    assert!(rows(&graph, "person").is_empty());
+    assert_eq!(
+        rows(&graph, "person"),
+        Vec::<&omop_cdm::graph::row::Row>::new()
+    );
     let [refusal] = refusals.as_slice() else {
         panic!("one refusal, got {refusals:?}");
     };

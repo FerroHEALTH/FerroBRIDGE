@@ -502,7 +502,7 @@ mod tests {
             outcome.regressed,
             vec![(String::from("b.yml"), String::from("refused"))]
         );
-        assert!(outcome.newly_passing.is_empty());
+        assert_eq!(outcome.newly_passing, Vec::<String>::new());
     }
 
     #[test]
@@ -522,7 +522,7 @@ mod tests {
         let cases = [Case::pass("a.yml"), Case::pass("c.yml")];
         let listed: BTreeSet<String> = ["a.yml"].map(String::from).into();
         let outcome = compare(&verdicts(&cases), &listed);
-        assert!(outcome.regressed.is_empty());
+        assert_eq!(outcome.regressed, Vec::<(String, String)>::new());
         assert_eq!(outcome.newly_passing, vec![String::from("c.yml")]);
     }
 

@@ -56,7 +56,7 @@ impl Snapshot {
         let shown = |path: &Path| shown(roots, path);
         let set = self.report.fhirconnect_set();
         let file_of = |name: &openehr_mapping_core::header::metadata::MappingName| {
-            set.and_then(|set| set.file_of(name)).map(&shown)
+            set.and_then(|set| set.file_of(name)).map(shown)
         };
         let contexts = self
             .report

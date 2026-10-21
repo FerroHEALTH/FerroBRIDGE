@@ -72,7 +72,7 @@ async fn an_identifier_no_subject_is_keyed_by_matches_nothing() -> Result<(), Bo
         assert_eq!(StatusCode::OK, status, "{query}: {body}");
         assert!(matches(&body).is_empty(), "{query}: {body}");
     }
-    assert!(queries(&harness).await.is_empty());
+    assert_eq!(queries(&harness).await, Vec::<serde_json::Value>::new());
     Ok(())
 }
 
@@ -89,7 +89,7 @@ async fn a_subject_rendered_as_a_literal_reference_carries_no_identifier()
     .await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     assert!(matches(&body).is_empty(), "{body}");
-    assert!(queries(&harness).await.is_empty());
+    assert_eq!(queries(&harness).await, Vec::<serde_json::Value>::new());
     Ok(())
 }
 
@@ -106,6 +106,6 @@ async fn an_identifier_without_a_system_or_a_value_is_refused() -> Result<(), Bo
         assert_eq!(Some("not-supported"), issue["code"].as_str(), "{query}");
         assert_eq!(Some("patient"), issue["location"][0].as_str(), "{query}");
     }
-    assert!(queries(&harness).await.is_empty());
+    assert_eq!(queries(&harness).await, Vec::<serde_json::Value>::new());
     Ok(())
 }

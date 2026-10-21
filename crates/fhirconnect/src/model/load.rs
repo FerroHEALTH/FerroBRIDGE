@@ -299,6 +299,9 @@ mod tests {
     fn an_empty_set_validates() {
         let set = MappingSet::new();
         assert!(set.is_empty());
-        assert!(validate(&set, &StaticMappingCodes::default()).is_empty());
+        assert_eq!(
+            validate(&set, &StaticMappingCodes::default()),
+            Vec::<openehr_mapping_core::diagnostic::Diagnostic>::new()
+        );
     }
 }

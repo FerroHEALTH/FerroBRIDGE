@@ -136,7 +136,7 @@ fn by_default_the_facade_fetches_no_absolute_reference() -> Result<(), Box<dyn S
     // mapping", so an empty allow-list is a deployment that fetches nothing.
     let settings = Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve()?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
-    assert!(facade.references.fetch_bases().is_empty());
+    assert_eq!(facade.references.fetch_bases(), []);
     assert_eq!(
         ferrobridge_server::facade::references::DEFAULT_MAX_DEPTH,
         facade.references.max_depth()

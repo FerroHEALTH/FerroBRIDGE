@@ -25,7 +25,10 @@ fn bdl_7_reports_a_repeated_full_url() -> TestResult {
     let entry = |id: &str| json!({"fullUrl": format!("urn:uuid:4a1e8f9e-0000-4000-8000-00000000004{id}"), "resource": patient()});
     let distinct =
         json!({"resourceType": "Bundle", "type": "collection", "entry": [entry("1"), entry("2")]});
-    assert!(failed_at(&against_core(&distinct)?, "bdl-7").is_empty());
+    assert_eq!(
+        failed_at(&against_core(&distinct)?, "bdl-7"),
+        Vec::<String>::new()
+    );
     let repeated =
         json!({"resourceType": "Bundle", "type": "collection", "entry": [entry("1"), entry("1")]});
     assert_eq!(failed_at(&against_core(&repeated)?, "bdl-7"), ["Bundle"]);

@@ -70,7 +70,10 @@ fn patient_test() -> String {
 fn a_target_conforming_to_its_target_profile_passes() -> TestResult {
     let report = against(&with_contained(patient()), &[patient_test()], &[])?;
     assert!(report.is_valid(), "{:#?}", report.issues());
-    assert!(target_reasons(&report, "Observation.subject").is_empty());
+    assert_eq!(
+        target_reasons(&report, "Observation.subject"),
+        Vec::<Reason>::new()
+    );
     Ok(())
 }
 
@@ -230,6 +233,9 @@ fn a_target_breaking_a_profile_on_domain_resource_is_refused() -> TestResult {
         "{}",
         found[0].message
     );
-    assert!(target_reasons(&report, "Observation.subject").is_empty());
+    assert_eq!(
+        target_reasons(&report, "Observation.subject"),
+        Vec::<Reason>::new()
+    );
     Ok(())
 }

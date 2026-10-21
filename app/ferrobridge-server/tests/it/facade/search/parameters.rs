@@ -165,7 +165,7 @@ async fn sort_on_a_parameter_read_under_a_repeated_node_is_refused() -> Result<(
     let (status, body) = get(&harness, "Condition?_sort=code").await?;
     assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");
     assert_eq!(Some("not-supported"), first_issue(&body)["code"].as_str());
-    assert!(queries(&harness).await.is_empty());
+    assert_eq!(queries(&harness).await, Vec::<serde_json::Value>::new());
     Ok(())
 }
 
@@ -249,7 +249,7 @@ async fn an_unsupported_modifier_is_refused_even_under_lenient_handling()
             "{query}"
         );
     }
-    assert!(queries(&harness).await.is_empty());
+    assert_eq!(queries(&harness).await, Vec::<serde_json::Value>::new());
     Ok(())
 }
 

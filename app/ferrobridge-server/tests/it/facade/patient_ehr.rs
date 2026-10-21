@@ -162,7 +162,10 @@ async fn under_the_existing_policy_a_patient_create_sends_no_ehr_call()
     )
     .await?;
     assert_eq!(StatusCode::CREATED, status, "{body}");
-    assert!(ehr_calls(&cdr).await.is_empty());
+    assert_eq!(
+        ehr_calls(&cdr).await,
+        Vec::<(String, String, serde_json::Value)>::new()
+    );
     Ok(())
 }
 
@@ -181,7 +184,10 @@ async fn a_practitioner_create_sends_no_ehr_call() -> Result<(), Box<dyn StdErro
     )
     .await?;
     assert_eq!(StatusCode::CREATED, status, "{body}");
-    assert!(ehr_calls(&cdr).await.is_empty());
+    assert_eq!(
+        ehr_calls(&cdr).await,
+        Vec::<(String, String, serde_json::Value)>::new()
+    );
     Ok(())
 }
 

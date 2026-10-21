@@ -96,7 +96,10 @@ fn a_child_of_a_complex_extension_is_matched_by_its_relative_url() -> TestResult
         url,
     )?;
     assert!(report.is_valid(), "{:#?}", report.issues());
-    assert!(locations(&report, MessageId::RelativeExtensionUrl).is_empty());
+    assert_eq!(
+        locations(&report, MessageId::RelativeExtensionUrl),
+        Vec::<String>::new()
+    );
     Ok(())
 }
 

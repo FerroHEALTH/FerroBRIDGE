@@ -522,7 +522,7 @@ async fn a_modifier_on_the_chain_is_refused() -> Result<(), Box<dyn StdError>> {
             "{query}"
         );
     }
-    assert!(queries(&harness).await.is_empty());
+    assert_eq!(queries(&harness).await, Vec::<serde_json::Value>::new());
     Ok(())
 }
 
@@ -532,7 +532,7 @@ async fn a_chain_through_another_target_type_matches_nothing() -> Result<(), Box
     let (status, body) = get(&harness, "Condition?subject:Group.identifier=G-1").await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     assert!(matches(&body).is_empty(), "{body}");
-    assert!(queries(&harness).await.is_empty());
+    assert_eq!(queries(&harness).await, Vec::<serde_json::Value>::new());
     Ok(())
 }
 

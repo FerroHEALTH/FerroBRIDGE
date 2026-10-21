@@ -136,7 +136,7 @@ async fn count_zero_for_an_unknown_subject_needs_no_cdr_call() -> Result<(), Box
     let (status, body) = get(&harness, "Condition?patient=nobody&_count=0").await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     assert_eq!(Some(0), body["total"].as_u64());
-    assert!(queries(&harness).await.is_empty());
+    assert_eq!(queries(&harness).await, Vec::<serde_json::Value>::new());
     Ok(())
 }
 
@@ -295,7 +295,7 @@ async fn a_cursor_of_another_search_is_refused() -> Result<(), Box<dyn StdError>
     assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");
     let issue = first_issue(&body);
     assert_eq!(Some("invalid"), issue["code"].as_str());
-    assert!(queries(&harness).await.is_empty());
+    assert_eq!(queries(&harness).await, Vec::<serde_json::Value>::new());
     let (status, _) = get(&harness, "Condition?patient=p-1&_cursor=nonsense").await?;
     assert_eq!(StatusCode::BAD_REQUEST, status);
     Ok(())
