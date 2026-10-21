@@ -104,11 +104,9 @@ projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:64 error fc-unknown-template-node
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:70 error fc-unknown-template-node
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:98 error fc-unknown-fhir-element
-    model/observation/org.openehr/laboratory_test_result.v1.yml:120 warning fc-anchor-without-children
     model/observation/org.openehr/laboratory_test_result.v1.yml:142 error fc-unknown-fhir-element
     model/observation/org.openehr/laboratory_test_result.v1.yml:156 error fc-unknown-fhir-element
     model/observation/org.openehr/laboratory_test_result.v1.yml:178 warning fc-excluded-template-node
-    model/observation/org.openehr/laboratory_test_result.v1.yml:448 warning fc-anchor-without-children
     model/observation/org.openehr/laboratory_test_result.v1.yml:47 error fc-uncarried-tail
     model/observation/org.openehr/laboratory_test_result.v1.yml:49 error fc-uncarried-tail
     model/observation/org.openehr/laboratory_test_result.v1.yml:61 error fc-unknown-template-node

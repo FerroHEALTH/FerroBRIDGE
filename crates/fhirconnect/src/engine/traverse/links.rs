@@ -11,10 +11,14 @@ use openehr_rm::v1_2::paths::EhrUri;
 use crate::engine::demographics::MARKER;
 use crate::engine::family;
 use crate::engine::fhir::FhirKind;
+use crate::engine::linked::Linked;
+use crate::engine::linked::LinkedCompositions;
 use crate::engine::outcome::Loss;
 use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
+use crate::engine::seam::ReferenceError;
 use crate::model::ast::keyword::Direction;
+use crate::resolve::program::binding::ResourceType;
 use crate::resolve::program::mapping::Mapping;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
@@ -34,10 +38,12 @@ impl<T: Table + ?Sized> Run<'_, T> {
     ///
     /// The openEHR side names the `links` of a `LOCATABLE`, and each link is
     /// written as one `_link:i` family on the node (Simplified Formats, the
-    /// `LINK` table). The FHIR side is the reference the link targets; a side
-    /// that is no reference is the linked composition of
-    /// `concept-mappings.adoc` §Linked mappings, which one run does not
-    /// produce, and is refused.
+    /// `LINK` table). The FHIR side is the reference the link targets: an
+    /// `ehr:` URI is written as it stands, and a reference to a resource is
+    /// the linked composition of `concept-mappings.adoc` §Linked mappings,
+    /// whose URI the [`LinkedCompositions`] seam answers. A run with no such
+    /// seam, or a side that is no reference, produces one composition and
+    /// refuses.
     pub(super) fn link(
         &mut self,
         mapping: &Mapping,
@@ -76,14 +82,34 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         bindings.push(binding);
                         continue;
                     };
-                    {
-                        if let Err(source) = literal.parse::<EhrUri>() {
-                            return Err(EngineError::LinkTarget {
-                                mapping: String::from(mapping.name()),
-                                target: literal,
-                                source,
-                            });
+                    let literal = match literal.parse::<EhrUri>() {
+                        Ok(_) => literal,
+                        Err(source) => {
+                            let Some(linked) = self.seams.linked() else {
+                                return Err(EngineError::LinkTarget {
+                                    mapping: String::from(mapping.name()),
+                                    target: literal,
+                                    source,
+                                });
+                            };
+                            match self.linked_target(mapping, linked, &literal)? {
+                                Ok(uri) => uri,
+                                Err(reason) => {
+                                    let location = self.locate(mapping, input);
+                                    self.warnings.push(Warning::new(
+                                        Loss::Skipped {
+                                            mapping: String::from(mapping.name()),
+                                            reason,
+                                        },
+                                        location,
+                                    ));
+                                    bindings.push(binding);
+                                    continue;
+                                }
+                            }
                         }
+                    };
+                    {
                         let positions = self.family_positions(openehr, &binding.openehr);
                         let index = self.next_family(openehr, &positions, "_link");
                         self.families.extend(family::link(
@@ -122,6 +148,50 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 Ok(bindings)
             }
         }
+    }
+
+    /// Returns the `ehr:` URI of the composition the resource `literal` names
+    /// was committed as, or why the link is skipped.
+    ///
+    /// The resource is read through the reference seam, as a `reference`
+    /// mapping reads one, and a reference that resolves to nothing is the
+    /// same declared skip (`engine/references.adoc`). A resource no context
+    /// maps is skipped too (`concept-mappings.adoc` §Linked mappings).
+    fn linked_target(
+        &self,
+        mapping: &Mapping,
+        linked: &dyn LinkedCompositions,
+        literal: &str,
+    ) -> Result<Result<String, SkipReason>, EngineError> {
+        let refuse = |source: ReferenceError| EngineError::Reference {
+            mapping: String::from(mapping.name()),
+            source: Box::new(source),
+        };
+        // NOTE: R4 references.html §2.3.0.1: a relative literal is `<type>/<id>`, so the
+        // segment before the id names the type; any other literal names none here.
+        let kind = literal
+            .rsplit('/')
+            .nth(1)
+            .filter(|kind| kind.chars().next().is_some_and(|c| c.is_ascii_uppercase()))
+            .unwrap_or("Resource");
+        let Some(resource) = self
+            .seams
+            .references()
+            .fetch(literal, &ResourceType::new(kind))
+            .map_err(refuse)?
+        else {
+            return Ok(Err(SkipReason::UnresolvedReference {
+                reference: String::from(literal),
+            }));
+        };
+        Ok(
+            match linked.composition(literal, &resource).map_err(refuse)? {
+                Linked::At(uri) => Ok(uri.to_string()),
+                Linked::Unmapped => Err(SkipReason::UnmappedLink {
+                    reference: String::from(literal),
+                }),
+            },
+        )
     }
 
     /// Runs a `participationsFunction` mapping.

@@ -6,6 +6,7 @@
 
 use fhir_types::codec::Value;
 use fhirconnect::engine::library::Library;
+use fhirconnect::engine::linked::LinkedCompositions;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::subject::SubjectIdentifier;
 use fhirconnect::engine::traverse::error::EngineError;
@@ -149,20 +150,26 @@ pub(super) fn canonical_of(
     ))
 }
 
-impl Ingest<'_> {
-    /// Runs the engine over one inbound resource.
-    pub(super) async fn build(
-        &self,
-        program: &Loaded,
-        inbound: &Inbound,
-        provenance: &Provenance,
-    ) -> Result<CanonicalComposition, Refused> {
-        self.run(program, inbound, provenance)
-            .await
-            .map(|(composition, _instant)| composition)
-            .map_err(|error| engine_refusal(&error))
+/// Returns `seams` answering linked compositions through `linked`, when the
+/// run is handed one.
+fn linking<'s>(seams: Seams<'s>, linked: Option<&'s dyn LinkedCompositions>) -> Seams<'s> {
+    match linked {
+        Some(linked) => seams.with_linked(linked),
+        None => seams,
     }
+}
 
+/// What one engine run answers: the composition, the instant every
+/// defaulted time was taken from, the literal references a `slotContext`
+/// consumed, and the identifiers offered as the subject of the EHR.
+pub(super) type Engined = (
+    CanonicalComposition,
+    String,
+    Vec<String>,
+    Vec<SubjectIdentifier>,
+);
+
+impl Ingest<'_> {
     /// Runs the engine over one inbound resource, and returns the composition
     /// with the identifiers it offers as the subject of the EHR
     /// (`fhirconnect::engine::subject`).
@@ -202,15 +209,20 @@ impl Ingest<'_> {
         program: &Loaded,
         inbound: &Inbound,
         provenance: &Provenance,
-    ) -> Result<
-        (
-            CanonicalComposition,
-            String,
-            Vec<String>,
-            Vec<SubjectIdentifier>,
-        ),
-        EngineError,
-    > {
+    ) -> Result<Engined, EngineError> {
+        self.run_linking(program, inbound, provenance, None).await
+    }
+
+    /// Runs the engine as [`Ingest::run_consuming`] does, answering each
+    /// linked composition through `linked`; with none, a `link` that names a
+    /// resource refuses.
+    pub(super) async fn run_linking(
+        &self,
+        program: &Loaded,
+        inbound: &Inbound,
+        provenance: &Provenance,
+        linked: Option<&dyn LinkedCompositions>,
+    ) -> Result<Engined, EngineError> {
         // NOTE: no specification governs this: our own design, one instant serves
         // every defaulted time of one ingest, so each resource reads the clock once.
         let now = jiff::Timestamp::now().to_string();
@@ -224,11 +236,14 @@ impl Ingest<'_> {
                     &now,
                     self.settings,
                     provenance.source_for(inbound.document()),
-                    &Seams::default()
-                        .with_functions(&Library)
-                        .with_terminology(terminology)
-                        .with_references(self.references)
-                        .with_demographics(self.demographics),
+                    &linking(
+                        Seams::default()
+                            .with_functions(&Library)
+                            .with_terminology(terminology)
+                            .with_references(self.references)
+                            .with_demographics(self.demographics),
+                        linked,
+                    ),
                 )
             })
             .await;

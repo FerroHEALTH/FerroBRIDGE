@@ -32,6 +32,7 @@ use super::Refused;
 use super::SkipReason;
 use super::Skipped;
 use super::UnmappedEntries;
+use super::linked::InBundle;
 
 /// Returns the subject a Bundle-local reference of `inbound` names: the
 /// person the entry it references is, as [`patient_person`] keys a Patient
@@ -291,10 +292,12 @@ impl Ingest<'_> {
                 .at(String::from(full_url))
         })?;
         let (composition, instant, consumed, offered) = self
-            .run_consuming(program, &inbound, provenance)
+            .run_linking(program, &inbound, provenance, Some(&InBundle))
             .await
             .map_err(|error| {
-                let code = if crate::facade::references::unfetched(&error).is_some() {
+                let code = if crate::facade::references::unfetched(&error).is_some()
+                    || crate::terminology::failed_upstream(&error)
+                {
                     crate::facade::status::UPSTREAM.issue()
                 } else {
                     IssueType::Processing

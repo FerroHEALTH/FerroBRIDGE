@@ -26,6 +26,7 @@ pub mod convert;
 pub mod demographic;
 pub mod display;
 pub mod error;
+pub mod event;
 pub mod functions;
 pub mod links;
 pub mod manual;
@@ -53,6 +54,7 @@ use openehr_mapping_core::index::paths::FlatId;
 use crate::engine::context::CallContext;
 use crate::engine::family;
 use crate::engine::invariant;
+use crate::engine::lens::null_flavour::NullFlavour;
 use crate::engine::origin::Origin;
 use crate::engine::outcome::Location;
 use crate::engine::outcome::Outcome;
@@ -257,6 +259,8 @@ enum Leaf {
     Value(Box<RmValue>),
     /// A scalar attribute, as its text.
     Scalar(String),
+    /// An `ELEMENT`'s null flavour with its reason.
+    NullFlavour(Box<NullFlavour>),
 }
 
 /// Runs `program` over a FHIR document, producing a composition.
@@ -317,6 +321,7 @@ pub fn to_openehr<T: Table + ?Sized>(
         .map_err(|source| EngineError::Build {
             source: Box::new(source),
         })?;
+    let built = run.amend_intervals(built)?;
     run.carried_whole(&built, &routed)?;
     Ok(Outcome::new(built, run.warnings)
         .with_consumed(run.consumed)
@@ -457,6 +462,8 @@ struct Run<'a, T: Table + ?Sized> {
     translations: BTreeMap<translate::TranslationKey, Option<Coding>>,
     /// The identifiers a `mappingCode` function offered as the subject of the EHR.
     subject: Vec<SubjectIdentifier>,
+    /// The interval events the run wrote, set on the built composition.
+    intervals: Vec<event::Interval>,
 }
 
 impl<'a, T: Table + ?Sized> Run<'a, T> {
@@ -499,6 +506,7 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             fhir_pin: None,
             translations: BTreeMap::new(),
             subject: Vec::new(),
+            intervals: Vec::new(),
         }
     }
 }

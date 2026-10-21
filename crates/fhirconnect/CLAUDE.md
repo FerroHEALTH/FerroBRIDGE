@@ -113,7 +113,9 @@ instances" (`data-mappings.adoc` §Deprecated), so the compiler derives it once
 and the program carries it as `Mapping::derived`; the engine never looks at a
 type code or a class name to decide a cell. `resolve::derive::PAIRS` is the one
 table: per openEHR class, the FHIR type codes a cell of the engine carries,
-in the order the class's page of the data-type chapter lists them. That order
+in the order the class's page of the data-type chapter lists them; an
+interval row is keyed by its parameter (`DV_INTERVAL<DV_QUANTITY>` with
+`Range`), because the bound class decides the cell. That order
 is our own design, and it is the whole tie-break: an element's own type wins
 when the class pairs with it, a text primitive that is no pair converts as a
 `string`, and a choice element with no type filter is written as the first
@@ -127,7 +129,12 @@ children after the parent "has been executed". A choice element onto a
 polymorphic `ELEMENT` keeps every pair of an alternative with a value node
 (`Derived::Polymorphic`): going in the document's alternative picks the value
 node, coming out the `_type` the composition holds picks the alternative, and
-an alternative or a class no pair names refuses. Any other untyped mapping
+an alternative or a class no pair names refuses. An untyped mapping of a
+FHIR time onto an `EVENT` node itself is `Derived::Event` (`EVENT.adoc`):
+going in the type picks a `POINT_EVENT` time or an `INTERVAL_EVENT`
+(`engine::traverse::event`), whose `_type`, `width` and `math_function` the
+builder cannot spell on an `EVENT` node, so the engine sets them on the
+built composition (`WebTemplateIndex::amend`). Any other untyped mapping
 onto a structural (`PATHABLE`) node anchors its children, and one with no
 child is a warning, never a silent nothing. Every
 pair in `PAIRS` must name a `FhirKind`; `engine::fhir` tests that.
@@ -233,7 +240,10 @@ the `_provider` family (`rm::Carried::Family`, `family::provider`), and
 `EVENT_CONTEXT.health_care_facility` the `_health_care_facility` family of
 the `context` node the same way; `EVENT_CONTEXT.end_time` is the
 `_end_time` family there, written as its date-time text
-(`family::end_time`). A path that names an `ELEMENT` the Web Template
+(`family::end_time`). `ELEMENT.null_flavour` is the `_null_flavour` family of
+the node the element shares with its value, with `_null_reason` beside it
+(`family::null_flavour`), reached by a tail on the element
+(`OpenehrTarget::tail_class`) and converted by `lens::null_flavour`. A path that names an `ELEMENT` the Web Template
 compacted into its value reaches the element's `links`
 (`OpenehrTarget::on_element`): the `_link:i` family sits on the one FLAT node
 the two share, and the engine reads it from the element
@@ -249,9 +259,13 @@ run whose `Defaults` carry
 an `engine::origin::Origin` records the originating system, the source
 resource and every defaulted field in the composition's
 `FEEDER_AUDIT`, in the same order as the `Loss::Defaulted` warnings. A
-`link` target must be an `ehr:` URI, because `LINK.target` is a `DV_EHR_URI`;
-the linked composition of a `link` whose FHIR side is no reference is
-refused, since one run produces one composition.
+`link` target is a `DV_EHR_URI`: an `ehr:` URI is written as it stands, and a
+reference to a resource is the linked composition, read through the
+reference seam and answered by the `engine::linked::LinkedCompositions`
+seam (`Seams::with_linked`) as the `ehr:` URI of the composition the caller
+committed it as, or `Linked::Unmapped`, a `SkipReason::UnmappedLink`. A run
+with no such seam, or a `link` whose FHIR side is no reference, refuses,
+since one run produces one composition.
 
 ## A value travels whole, and the attribute model decides a tail
 

@@ -15,6 +15,10 @@ use crate::tree::element::Resolved;
 use crate::tree::path::FhirPath;
 use crate::tree::path::Writability;
 
+/// The reference-model class of a leaf of an item structure, whose attributes a
+/// tail on the element names.
+const ELEMENT: &str = "ELEMENT";
+
 /// A `with.fhir` expression, bound to its anchor and resolved against the
 /// element table.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -185,6 +189,18 @@ impl OpenehrTarget {
     #[must_use]
     pub const fn on_element(&self) -> bool {
         self.on_element
+    }
+
+    /// Returns the reference-model class the tail's first attribute is looked
+    /// up on: `ELEMENT` when the tail names the element's attributes, the
+    /// node's class otherwise.
+    #[must_use]
+    pub fn tail_class(&self) -> &str {
+        if self.on_element {
+            ELEMENT
+        } else {
+            self.node.rm_type()
+        }
     }
 
     /// Returns this target with `class` as the reference-model class of the

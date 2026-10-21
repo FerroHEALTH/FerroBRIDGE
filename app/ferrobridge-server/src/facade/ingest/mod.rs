@@ -20,6 +20,7 @@ mod binding;
 mod claim;
 mod ehr_status;
 mod entries;
+pub(crate) mod linked;
 mod pairing;
 mod reconcile;
 pub(crate) mod refusal;

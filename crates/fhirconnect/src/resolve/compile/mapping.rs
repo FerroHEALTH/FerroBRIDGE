@@ -237,7 +237,7 @@ impl<'a> Compiler<'a> {
             (true, true) => &["value"],
             (false, _) => &segments,
         };
-        let class = target.node().rm_type();
+        let class = target.tail_class();
         let carried = crate::engine::rm::carried(class, written)
             .is_some_and(|(_, held)| !manual || held == crate::engine::rm::Carried::Text);
         if carried {

@@ -403,6 +403,18 @@ pub enum SkipReason {
     /// §2.3.0.4), so neither alone names a resource the mapping can fetch,
     /// and a `Reference` holding only those is skipped the same way.
     EmptyReference,
+    /// A `link` names a resource that no context mapping maps, so no linked
+    /// composition is committed and no `LINK` is written.
+    ///
+    /// "If a context mapping for this `meta.url` is found, it is executed and
+    /// saved as a separate composition"
+    /// (`types-of-mappings/concept-type/concept-mappings.adoc`, §Linked
+    /// mappings), and a resource whose `meta.profile` no context names has
+    /// none.
+    UnmappedLink {
+        /// The reference as the document wrote it.
+        reference: String,
+    },
     /// The concept map the mapping names translates the input code to no
     /// equivalent concept, so the optional output element is not written.
     Untranslated {
@@ -453,6 +465,23 @@ pub enum SkipReason {
     /// `EHR_STATUS` holds and a run over a composition never reads (openEHR
     /// RM EHR IM Release 1.1.0, the `EHR_STATUS` class).
     EhrStatusSubject,
+    /// The `math_function` of an `INTERVAL_EVENT` has no place in the FHIR
+    /// `Period` the mapping wrote.
+    ///
+    /// A `Period` carries the interval alone, and an interval event whose
+    /// function is not `640|actual|` records a function of its data over the
+    /// interval (openEHR RM data structures, `INTERVAL_EVENT.math_function`),
+    /// so the period was written and the function was not.
+    EventFunctionUncarried {
+        /// The openEHR `event math function` code the event holds.
+        code: String,
+    },
+    /// The `null_reason` of an `ELEMENT` names no `data-absent-reason` code.
+    ///
+    /// `types-of-mappings/data-type/NULL_FLAVOUR.adoc` reads `null_reason`
+    /// back only "if exists and matches fhir code", and the extension carries
+    /// a `code` alone, so the reason's text was not written; the code was.
+    NullReasonUncarried,
 }
 
 impl fmt::Display for SkipReason {
@@ -471,6 +500,9 @@ impl fmt::Display for SkipReason {
                 write!(f, "the reference {reference} resolves to no resource")
             }
             Self::EmptyReference => f.write_str("the Reference names no resource"),
+            Self::UnmappedLink { ref reference } => {
+                write!(f, "no context mapping maps the resource {reference} links")
+            }
             Self::Untranslated { ref conceptmap } => {
                 write!(
                     f,
@@ -504,6 +536,14 @@ impl fmt::Display for SkipReason {
             ),
             Self::EhrStatusSubject => f.write_str(
                 "it writes the subject of the EHR, which the EHR_STATUS holds and no composition does",
+            ),
+            Self::EventFunctionUncarried { ref code } => write!(
+                f,
+                "the math_function {code} of its interval event has no place in a Period"
+            ),
+            Self::NullReasonUncarried => f.write_str(
+                "its null_reason names no data-absent-reason code, and the extension has no \
+                 place for text",
             ),
         }
     }

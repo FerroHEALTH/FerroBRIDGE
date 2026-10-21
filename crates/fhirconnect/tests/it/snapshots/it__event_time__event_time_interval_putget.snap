@@ -1,0 +1,19 @@
+---
+source: crates/fhirconnect/tests/it/event_time.rs
+expression: interval
+---
+{
+  "first_leg": [
+    "the mapping status did not run: its unidirectional marker names the other direction",
+    "the mapping code did not run: its unidirectional marker names the other direction",
+    "the engine filled /composer",
+    "the engine filled /context/start_time",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "second_leg": [],
+  "lost": [],
+  "added": [],
+  "changed": []
+}

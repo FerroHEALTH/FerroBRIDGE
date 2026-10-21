@@ -48,6 +48,7 @@ pub mod date_time;
 pub mod duration;
 pub mod encapsulated;
 pub mod interval;
+pub mod null_flavour;
 pub mod number;
 pub mod party;
 pub mod party_ref;
