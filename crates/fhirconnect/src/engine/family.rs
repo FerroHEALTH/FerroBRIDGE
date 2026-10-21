@@ -36,6 +36,7 @@ use openehr_rm::v1_2::data_types::text::dv_text::DvText;
 use openehr_sdt::flat::path::Segment;
 
 use crate::engine::demographics::PartyIdentity;
+use crate::engine::lens::null_flavour::NullFlavour;
 use crate::engine::origin::Origin;
 use crate::engine::origin::UNKNOWN_SOURCE;
 
@@ -303,6 +304,45 @@ pub fn end_time(
     NodeValue::new(node, serde_json::Value::String(String::from(value)))
         .with_occurrences(positions.to_vec())
         .under(family.to_vec())
+}
+
+/// Returns the `_null_flavour` family of an `ELEMENT`, on the node the
+/// element shares with its value, with `_null_reason` beside it.
+///
+/// Simplified Formats spells the flavour `|code`, `|value` and
+/// `|terminology` under `_null_flavour` and the reason as the text of
+/// `_null_reason` (`master05-rm_mapping.adoc`, §ELEMENT).
+#[must_use]
+pub fn null_flavour(
+    node: &ResolvedNode,
+    positions: &[RmPosition],
+    flavour: &NullFlavour,
+) -> Vec<NodeValue> {
+    let code = &flavour.flavour.defining_code;
+    let mut values: Vec<NodeValue> = [
+        ("code", code.code_string.as_str()),
+        ("value", flavour.flavour.value.as_str()),
+        ("terminology", code.terminology_id.value.as_str()),
+    ]
+    .into_iter()
+    .map(|(datum, value)| {
+        NodeValue::new(node, serde_json::Value::String(String::from(value)))
+            .with_occurrences(positions.to_vec())
+            .under(vec![plain("_null_flavour")])
+            .with_datum(datum)
+    })
+    .collect();
+    if let Some(ref reason) = flavour.reason {
+        values.push(
+            NodeValue::new(
+                node,
+                serde_json::Value::String(String::from(text_of(reason))),
+            )
+            .with_occurrences(positions.to_vec())
+            .under(vec![plain("_null_reason")]),
+        );
+    }
+    values
 }
 
 /// Returns the refusal of a present list `attribute` that does not decode.

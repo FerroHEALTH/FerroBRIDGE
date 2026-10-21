@@ -109,6 +109,12 @@ pub struct SaveView {
     pub etag: Option<String>,
 }
 
+/// The form value of a save the operator confirmed.
+const CONFIRMED: &str = "yes";
+
+/// The form value of a save the operator has not confirmed.
+const DECLINED: &str = "no";
+
 /// Saves `draft` as the console file at `path`, read at `etag` (empty for a
 /// new file), with `reason`, once `confirmed` is `yes`.
 ///
@@ -225,7 +231,7 @@ pub mod server {
         let (state, token) = crate::tools::server::admitted()?;
         // NOTE: no specification governs this: our own design; the server
         // checks the confirmation again, so no call can save without it.
-        if confirmed != "yes" {
+        if confirmed != super::CONFIRMED {
             return Ok(SaveView {
                 html: crate::tools::render::invalid(
                     &tr_served(Msg::NotSaved),
@@ -271,7 +277,7 @@ fn drawn(value: Option<Result<String, ViewError>>) -> AnyView {
     match value {
         None => ().into_any(),
         Some(Ok(html)) => view! { <div inner_html=html></div> }.into_any(),
-        Some(Err(error)) => fault(error.to_string()).into_any(),
+        Some(Err(error)) => fault(error.text()).into_any(),
     }
 }
 
@@ -345,12 +351,11 @@ fn save_form(editing: Editing) -> AnyView {
             draft: editing.draft.get_untracked(),
             etag: editing.current(),
             reason: reason.get_untracked(),
-            confirmed: if confirmed.get_untracked() {
-                "yes"
+            confirmed: String::from(if confirmed.get_untracked() {
+                CONFIRMED
             } else {
-                "no"
-            }
-            .to_owned(),
+                DECLINED
+            }),
         });
     };
     view! {
@@ -606,8 +611,8 @@ pub fn EditPage() -> impl IntoView {
             {move || Suspend::new(async move {
                 match source.await {
                     Ok(Outcome::Shown(source)) => editor(source),
-                    Ok(Outcome::Refused(refusal)) => fault(refusal.to_string()).into_any(),
-                    Err(error) => fault(error.to_string()).into_any(),
+                    Ok(Outcome::Refused(refusal)) => fault(refusal.text()).into_any(),
+                    Err(error) => fault(error.text()).into_any(),
                 }
             })}
         </Suspense>

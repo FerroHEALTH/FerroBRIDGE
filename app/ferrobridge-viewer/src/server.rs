@@ -35,6 +35,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::bridge::{Bridge, BridgeError};
 use crate::config::settings::{OidcSettings, Settings};
+use crate::locale::{Msg, catalog, negotiated, tr_in};
 use crate::session::Sessions;
 
 /// The path of the console's own liveness route.
@@ -176,10 +177,11 @@ async fn same_origin_only(
         method = %request.method(),
         "a request that did not come from the console's own pages was refused"
     );
+    let locale = negotiated(request.headers(), state.settings().locale.clone());
     (
         StatusCode::FORBIDDEN,
         [(CACHE_CONTROL, "no-store")],
-        "the console takes this request only from its own pages",
+        tr_in(catalog(), &locale, Msg::ForeignRequestRefused),
     )
         .into_response()
 }

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that writes the integer alternative of
+# Observation.value[x] into the magnitude of the problem name value, which the
+# test turns into a DV_COUNT: a scalar Integer64 leaf against FHIR integer.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_scalar_integer
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+mappings:
+  - name: "count"
+    with:
+      fhir: "$resource.value.as(Integer)"
+      openehr: "$archetype/data[at0001]/items[at0002]/value/magnitude"

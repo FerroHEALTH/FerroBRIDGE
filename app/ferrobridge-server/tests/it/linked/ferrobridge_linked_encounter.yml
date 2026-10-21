@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The linked model of the LINKED suite: the Encounter's reason as the problem
+# name of a composition of its own.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_linked_encounter
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Encounter
+
+mappings:
+  - name: "reason"
+    with:
+      fhir: "$resource.reasonCode"
+      openehr: "$archetype/data[at0001]/items[at0002]"
+      type: "CODEABLECONCEPT"

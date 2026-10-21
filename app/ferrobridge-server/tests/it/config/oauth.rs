@@ -180,11 +180,33 @@ fn an_unknown_oauth_key_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 fn an_unknown_client_auth_method_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+    // NOTE: RFC 7523 §2.2's symmetric `client_secret_jwt` is no method the crate
+    // supports, so the table does not parse.
     let error = refusal(&text(
         "",
-        "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\nclient_auth = \"tls_client_auth\"\n",
+        "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\nclient_auth = \"client_secret_jwt\"\n",
     ))?;
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
+    Ok(())
+}
+
+#[test]
+fn a_mutual_tls_client_needs_its_certificate() -> Result<(), Box<dyn StdError>> {
+    // NOTE: RFC 8705 §2, the client authenticates with the certificate the TLS
+    // handshake carries.
+    let error = refusal(&text(
+        "",
+        "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_auth = \"tls_client_auth\"\n",
+    ))?;
+    assert!(
+        matches!(
+            rule(&error, "cdr.credentials"),
+            Some(ConfigError::Missing {
+                key: "credentials.oauth.client_certificate_file"
+            })
+        ),
+        "{error:?}"
+    );
     Ok(())
 }
 

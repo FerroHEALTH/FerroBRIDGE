@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping: an Encounter diagnosis whose
+# Condition is referenced, and inside the reference a slot that climbs back
+# to the diagnosis use codings with two carets (basics/path_operators.adoc,
+# Recurrence and parent elements) into a file whose preprocessor splits them.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_caret_split
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Encounter
+
+mappings:
+  - name: "problemDiagnosis"
+    with:
+      fhir: "$resource.diagnosis"
+      openehr: "$archetype"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "referencedDiagnose"
+          with:
+            fhir: "condition.reference"
+            openehr: "$reference"
+          reference:
+            resourceType: "Condition"
+            mappings:
+              - name: "diagnosisName"
+                with:
+                  fhir: "$fhirRoot.code"
+                  openehr: "$archetype/data[at0001]/items[at0002]"
+                  type: "CODEABLECONCEPT"
+              - name: "useLocations"
+                with:
+                  fhir: "^^.use.coding"
+                  openehr: "$archetype/data[at0001]/items[openEHR-EHR-CLUSTER.anatomical_location.v1]"
+                slotArchetype: "ferrobridge_caret_split_location"

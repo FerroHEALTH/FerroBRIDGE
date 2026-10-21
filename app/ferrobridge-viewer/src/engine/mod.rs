@@ -133,7 +133,7 @@ fn drawn_screen(title: String, drawn: Resource<Result<String, ViewError>>) -> im
                 match drawn.await {
                     Ok(html) => view! { <div inner_html=html></div> }.into_any(),
                     Err(error) => {
-                        ferrohealth_ui::view::refusal::fault(error.to_string()).into_any()
+                        ferrohealth_ui::view::refusal::fault(error.text()).into_any()
                     }
                 }
             })}

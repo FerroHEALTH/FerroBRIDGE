@@ -104,8 +104,10 @@ openEHR.
   `Quantity` and `Count`, `DV_TIME` against `time`, `DV_DURATION` against
   `Duration` through the UCUM to ISO 8601 bridge, `DV_URI` against `url`,
   `DV_MULTIMEDIA` and `DV_PARSABLE` against `Attachment`, an openEHR
-  `String` attribute against `Coding`, `Identifier` and `Reference`, and
-  `DV_INTERVAL<DV_QUANTITY>` against `Range`.
+  `String` attribute against `Coding`, `Identifier` and `Reference`, a scalar
+  `Integer` or `Real` attribute against `integer` and `decimal`,
+  `DV_INTERVAL<DV_QUANTITY>` against `Range`, and `ELEMENT.null_flavour`
+  against the code of the `data-absent-reason` extension.
 - **A date and time value keeps the text it came with.** Both sides hold a
   lexical string, so `Z`, `+00:00`, `+01:00` and fractional seconds survive;
   the engine parses no timestamp and adds no offset.

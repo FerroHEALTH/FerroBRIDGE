@@ -3,18 +3,29 @@
 
 //! The data-type cell of one mapping, run over its input values.
 
+use core::str::FromStr;
+
 use fhir_types::codec::Value;
-use fhir_types::r4::primitives::String as FhirString;
 use openehr_mapping_core::composition::RmPosition;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
-use openehr_rm::v1_2::model;
 
 use crate::engine::cell;
 use crate::engine::fhir::FhirKind;
 use crate::engine::fhir::FhirValue;
+use crate::engine::lens::Lens;
 use crate::engine::lens::LensError;
+use crate::engine::lens::null_flavour;
+use crate::engine::lens::null_flavour::NullFlavour;
+use crate::engine::lens::null_flavour::NullFlavourLens;
+use crate::engine::lens::scalar;
+use crate::engine::lens::scalar::IntegerLens;
+use crate::engine::lens::scalar::RealLens;
 use crate::engine::lens::term_mapping::Withheld;
+use crate::engine::outcome::Loss;
+use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
+use crate::engine::rm;
+use crate::engine::rm::Carried;
 use crate::engine::rm::RmValue;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::manual::Manual;
@@ -34,6 +45,7 @@ use crate::engine::traverse::Written;
 use crate::engine::traverse::demographic::Shape;
 use crate::engine::traverse::error::EngineError;
 use crate::engine::traverse::place::rm_positions;
+use crate::engine::traverse::tail::tail_segments;
 use crate::engine::traverse::translate::Output;
 
 impl<T: Table + ?Sized> Run<'_, T> {
@@ -106,10 +118,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let dropped = Dropped {
             code: cell::uncarried_code(&value, kind).cloned(),
             mappings: cell::withheld(&value, kind, terminology),
+            reason: false,
         };
         let mut view = cell::get(&value, kind, terminology)?;
         if let (Some(reference), FhirValue::Reference(held)) = (reference, &mut view) {
-            held.reference = Some(FhirString::from(reference));
+            held.reference = Some(fhir_types::r4::primitives::String::from(reference));
         }
         Ok((view, dropped))
     }
@@ -219,6 +232,13 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 Self::read_scalar(mapping, target, openehr, kind, text)?,
                 Dropped::default(),
             ),
+            Leaf::NullFlavour(ref flavour) => (
+                read_null_flavour(flavour, kind).map_err(refuse)?,
+                Dropped {
+                    reason: null_flavour::uncarried_reason(flavour).is_some(),
+                    ..Dropped::default()
+                },
+            ),
         };
         let output = Output::fhir(target, &binding.fhir);
         let Some(view) = self.translated(mapping, view, output)? else {
@@ -234,8 +254,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
     /// holds nothing.
     ///
     /// A [`Derived::Polymorphic`] mapping reads the first value node, in the
-    /// order of its pairs, that holds a value, and writes the alternative that
-    /// node's first pair names.
+    /// order of its pairs, that holds a value of its own class, and writes the
+    /// alternative that node's first pair names. A polymorphic `ELEMENT` that
+    /// holds a value no pair reads refuses, and so does a [`Derived::Value`]
+    /// mapping whose `ELEMENT` holds another alternative than its own.
     fn output_source<'mapping>(
         &self,
         mapping: &'mapping Mapping,
@@ -249,21 +271,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 return Ok(None);
             };
             let positions = Self::positions_of(mapping, input, first.target())?;
-            let Some(held) = self.node_value(mapping.name(), first.target(), &positions)? else {
-                return Ok(None);
-            };
-            let class = held
-                .get("_type")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default();
-            let chosen = pairings.iter().find(|pairing| {
-                let paired = pairing.target().node().rm_type();
-                paired == class || model::is_a(class, paired)
-            });
-            if let Some(pairing) = chosen {
+            for pairing in pairings {
                 let openehr = pairing.target();
                 let Some(source) = self.value_at(mapping, openehr, &positions)? else {
-                    return Ok(None);
+                    continue;
                 };
                 let written = pairing.alternative();
                 let kind = FhirKind::of_code(written.code()).ok_or_else(|| {
@@ -274,16 +285,21 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 })?;
                 return Ok(Some((openehr, source, written.target(), kind)));
             }
-            return Err(EngineError::UnknownElement {
-                mapping: String::from(mapping.name()),
-                element: format!("{} from a {class}", target.resolved().leaf()),
-            });
+            if self.node_held(mapping.name(), first.target(), &positions)? {
+                return Err(other_alternative(mapping, target, first.target()));
+            }
+            return Ok(None);
         }
         let Some(openehr) = converted(mapping) else {
             return Ok(None);
         };
         let positions = Self::positions_of(mapping, input, openehr)?;
         let Some(source) = self.value_at(mapping, openehr, &positions)? else {
+            if matches!(mapping.derived(), Some(Derived::Value { .. }))
+                && self.node_held(mapping.name(), openehr, &positions)?
+            {
+                return Err(other_alternative(mapping, target, openehr));
+            }
             return Ok(None);
         };
         let (target, kind) = Self::output_target(mapping, target)?;
@@ -311,6 +327,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 if openehr.leaf_class() == Some(cell::STRING) =>
             {
                 cell::get_string(text, kind).map_err(refuse)
+            }
+            FhirKind::Integer | FhirKind::Decimal
+                if let Some(read) = scalar_number(openehr, kind, text) =>
+            {
+                read.map_err(refuse)
             }
             FhirKind::String
             | FhirKind::Date
@@ -349,7 +370,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
     /// Records the defining code and each term mapping a cell of `mapping`
     /// left out of the FHIR element it wrote under `binding`.
     fn record_dropped(&mut self, mapping: &Mapping, binding: &Binding, dropped: &Dropped) {
-        if dropped.code.is_none() && dropped.mappings.is_empty() {
+        if dropped.code.is_none() && dropped.mappings.is_empty() && !dropped.reason {
             return;
         }
         let location = self.locate(mapping, &binding.fhir);
@@ -371,6 +392,15 @@ impl<T: Table + ?Sized> Run<'_, T> {
         for taken in &dropped.mappings {
             self.warnings
                 .push(Warning::withheld(mapping.name(), taken, mappings.clone()));
+        }
+        if dropped.reason {
+            self.warnings.push(Warning::new(
+                Loss::Skipped {
+                    mapping: String::from(mapping.name()),
+                    reason: SkipReason::NullReasonUncarried,
+                },
+                location.clone(),
+            ));
         }
     }
 
@@ -474,6 +504,70 @@ fn converted(mapping: &Mapping) -> Option<&OpenehrTarget> {
     }
 }
 
+/// Reads the number a scalar `Integer` or `Real` leaf holds as a FHIR
+/// `integer` or `decimal`, `None` when the leaf and the kind are no such
+/// pair.
+fn scalar_number(
+    openehr: &OpenehrTarget,
+    kind: FhirKind,
+    text: &str,
+) -> Option<Result<FhirValue, LensError>> {
+    let carried =
+        rm::carried(openehr.tail_class(), &tail_segments(openehr)).map(|(_, carried)| carried);
+    let unreadable = |cell: &'static str, attribute: &'static str| LensError::Shape {
+        cell,
+        attribute,
+        found: String::from(text),
+        reason: "the composition holds no number there",
+        direction: Direction::OpenehrToFhir,
+    };
+    match (carried, kind) {
+        (Some(Carried::Integer), FhirKind::Integer) => Some(
+            text.parse::<i64>()
+                .map_err(|_refused| unreadable(scalar::INTEGER_CELL, "Integer"))
+                .and_then(|number| IntegerLens.get(&number))
+                .map(FhirValue::Integer),
+        ),
+        (Some(Carried::Real), FhirKind::Decimal) => Some(
+            serde_json::Number::from_str(text)
+                .map_err(|_refused| unreadable(scalar::REAL_CELL, "Real"))
+                .and_then(|number| RealLens.get(&number))
+                .map(FhirValue::Decimal),
+        ),
+        _ => None,
+    }
+}
+
+/// Returns the refusal of a polymorphic `ELEMENT` that holds a value of an
+/// alternative the mapping does not read.
+fn other_alternative(mapping: &Mapping, target: &FhirTarget, node: &OpenehrTarget) -> EngineError {
+    EngineError::UnknownElement {
+        mapping: String::from(mapping.name()),
+        element: format!(
+            "{} from another value alternative at `{}`",
+            target.resolved().leaf(),
+            node.node().aql_path().as_str()
+        ),
+    }
+}
+
+/// Reads an `ELEMENT`'s null flavour as the `code` of a `data-absent-reason`
+/// extension.
+///
+/// The extension's value is a `code`
+/// (<https://hl7.org/fhir/R4/extension-data-absent-reason.html>), which
+/// travels as text, so the cell pairs only with a FHIR element that does.
+fn read_null_flavour(flavour: &NullFlavour, kind: FhirKind) -> Result<FhirValue, LensError> {
+    match kind {
+        FhirKind::String => NullFlavourLens.get(flavour).map(FhirValue::String),
+        other => Err(LensError::NoCell {
+            rm_type: String::from("ELEMENT.null_flavour"),
+            kind: other.as_str(),
+            direction: Direction::OpenehrToFhir,
+        }),
+    }
+}
+
 /// What a cell read out of openEHR left out of the FHIR element it wrote.
 #[derive(Debug, Default)]
 struct Dropped {
@@ -481,6 +575,8 @@ struct Dropped {
     code: Option<CodePhrase>,
     /// The term mappings the element cannot carry.
     mappings: Vec<Withheld>,
+    /// Whether a `null_reason` that names no code was left out.
+    reason: bool,
 }
 
 /// The node an occurrence reads out of, what it holds, and the FHIR target
@@ -491,3 +587,23 @@ type OutSource<'mapping> = (
     &'mapping FhirTarget,
     FhirKind,
 );
+
+#[cfg(test)]
+mod tests {
+    use super::read_null_flavour;
+    use crate::engine::fhir::FhirKind;
+    use crate::engine::lens::Lens;
+    use crate::engine::lens::null_flavour::NullFlavourLens;
+
+    #[test]
+    fn a_null_flavour_pairs_only_with_an_element_that_travels_as_text() {
+        // R4 extension-data-absent-reason: the value is a `code`.
+        let flavour = NullFlavourLens
+            .put(&fhir_types::r4::primitives::String::from("masked"), None)
+            .expect("masked is in the value set");
+        assert!(read_null_flavour(&flavour, FhirKind::String).is_ok());
+        let error = read_null_flavour(&flavour, FhirKind::Coding)
+            .expect_err("no cell pairs a null flavour with a Coding");
+        assert!(error.to_string().contains("null_flavour"), "{error}");
+    }
+}

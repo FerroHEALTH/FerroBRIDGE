@@ -19,6 +19,7 @@
 mod binding;
 mod claim;
 mod entries;
+pub(crate) mod linked;
 mod pairing;
 mod reconcile;
 pub(crate) mod refusal;

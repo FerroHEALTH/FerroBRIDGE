@@ -54,6 +54,7 @@ use openehr_mapping_core::index::paths::FlatId;
 use crate::engine::context::CallContext;
 use crate::engine::family;
 use crate::engine::invariant;
+use crate::engine::lens::null_flavour::NullFlavour;
 use crate::engine::origin::Origin;
 use crate::engine::outcome::Location;
 use crate::engine::outcome::Outcome;
@@ -257,6 +258,8 @@ enum Leaf {
     Value(Box<RmValue>),
     /// A scalar attribute, as its text.
     Scalar(String),
+    /// An `ELEMENT`'s null flavour with its reason.
+    NullFlavour(Box<NullFlavour>),
 }
 
 /// Runs `program` over a FHIR document, producing a composition.
@@ -563,6 +566,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
         self.frames
             .get(target.level())
             .map_or(self.fhir_pin.as_ref(), |frame| frame.pin.as_ref())
+    }
+
+    /// Returns the split pin of the document of `level`, to set.
+    fn pin_at(&mut self, level: usize) -> &mut Option<(Vec<String>, Occurrence)> {
+        match self.frames.get_mut(level) {
+            Some(frame) => &mut frame.pin,
+            None => &mut self.fhir_pin,
+        }
     }
 
     /// Returns the instance counters of the document of `level`.

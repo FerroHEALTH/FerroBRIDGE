@@ -261,10 +261,15 @@ impl<T: Table + ?Sized> Run<'_, T> {
         })
     }
 
-    /// Returns the next free instance of one axis under one prefix.
-    pub(super) fn next_index(&mut self, axis: &str, prefix: &[usize]) -> usize {
+    /// Returns the next free instance of one axis under one prefix, in the
+    /// document of `level` coming out of openEHR.
+    pub(super) fn next_index(&mut self, level: usize, axis: &str, prefix: &[usize]) -> usize {
         let key = (String::from(axis), render(prefix));
-        let next = self.counters.entry(key).or_insert(0);
+        let counters = match self.direction {
+            Direction::FhirToOpenehr => &mut self.counters,
+            Direction::OpenehrToFhir => self.counters_at(level),
+        };
+        let next = counters.entry(key).or_insert(0);
         let taken = *next;
         *next = next.saturating_add(1);
         taken

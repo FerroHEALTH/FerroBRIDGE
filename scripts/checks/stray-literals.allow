@@ -14,3 +14,17 @@ allow ^www\.cadasto\.com/contact$           # the maker's address, the same in e
 allow ^L(\{number\})?$                      # an editor line's id prefix
 allow ^[a-z]+[A-Z][A-Za-z]*$                # a JSON member name (resourceType, valueString)
 allow ^[A-Z][a-z]+[A-Z][A-Za-z]+$           # a FHIR resource type name (OperationOutcome)
+
+skip app/ferrobridge-viewer/src/cli.rs      # the command line's help, which a terminal shows and no page draws
+skip app/ferrobridge-viewer/src/command.rs  # the process's terminal output and log lines, which no page draws
+skip app/ferrobridge-viewer/src/config/     # configuration refusals at start, on the terminal before any page exists
+
+allow ^(Bearer|Basic) \{\}$                  # HTTP authentication schemes (RFC 7617 §2, RFC 6750 §2.1)
+allow ^S256$                                # the PKCE code_challenge_method (RFC 7636 §4.3)
+allow ^__Host-$                             # the cookie name prefix (RFC 6265bis §4.1.3.2)
+allow ^(Bundle|Parameters)$                 # a FHIR R4 resource type name of one word
+allow ^text/css; charset=utf-8$             # a media type (RFC 9110 §8.3)
+allow ^DENY$                                # the X-Frame-Options value (RFC 7034 §2.1)
+allow ^no-(cache|store)$                    # Cache-Control directives (RFC 9111 §5.2.2)
+allow ^default-src 'self'; \\$              # the Content-Security-Policy directive list (CSP Level 3)
+allow ^(load report|health info|readiness report|engine state|SMART discovery document|mapping listing)$   # the bridge document a log line names
