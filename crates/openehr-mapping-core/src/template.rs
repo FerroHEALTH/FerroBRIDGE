@@ -456,6 +456,12 @@ pub enum PathError {
         /// The `aqlPath` of the node.
         aql_path: String,
     },
+    /// The composition holds no object at the node instance an edit names.
+    #[error("the composition holds no object at the instance of `{aql_path}` to edit")]
+    AbsentInstance {
+        /// The `aqlPath` of the node.
+        aql_path: String,
+    },
     /// A value at a polymorphic `ELEMENT` names no `_type`, so the value node
     /// it belongs to is unknown.
     #[error("the value at `{aql_path}` names no `_type`, which picks its value node")]
@@ -483,6 +489,7 @@ impl PathError {
             | Self::UnknownNode { .. }
             | Self::NotADescendant { .. }
             | Self::NotAnElementValue { .. }
+            | Self::AbsentInstance { .. }
             | Self::OccurrenceCount { .. } => DiagnosticCode::UnknownTemplatePath,
             Self::CompositionBuild { .. }
             | Self::InstanceIndex { .. }

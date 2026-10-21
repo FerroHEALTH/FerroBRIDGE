@@ -134,6 +134,12 @@ impl<T: Table + ?Sized> Run<'_, T> {
         input: &Occurrence,
         binding: &Binding,
     ) -> Result<(), EngineError> {
+        if let Some(Derived::Event(event)) = mapping.derived() {
+            return match self.direction {
+                Direction::FhirToOpenehr => self.event_in(mapping, event, input, binding),
+                Direction::OpenehrToFhir => self.event_out(mapping, event, input, binding),
+            };
+        }
         match self.direction {
             Direction::FhirToOpenehr => self.convert_in(mapping, input, binding),
             Direction::OpenehrToFhir => self.convert_out(mapping, input, binding),
@@ -415,7 +421,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 let kind = Self::kind(mapping, declared.target())?;
                 self.element_at(mapping, declared.target(), input, kind)
             }
-            Some(Derived::Element(_) | Derived::Anchor | Derived::Value { .. }) | None => {
+            Some(
+                Derived::Element(_) | Derived::Anchor | Derived::Value { .. } | Derived::Event(_),
+            )
+            | None => {
                 let kind = Self::kind(mapping, target)?;
                 self.element_at(mapping, target, input, kind)
             }
@@ -450,9 +459,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     element: String::from(target.resolved().leaf()),
                 })
             }
-            Some(Derived::Element(_) | Derived::Anchor | Derived::Value { .. }) | None => {
-                Ok((target, Self::kind(mapping, target)?))
-            }
+            Some(
+                Derived::Element(_) | Derived::Anchor | Derived::Value { .. } | Derived::Event(_),
+            )
+            | None => Ok((target, Self::kind(mapping, target)?)),
         }
     }
 

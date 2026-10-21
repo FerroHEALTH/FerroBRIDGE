@@ -441,6 +441,17 @@ pub enum SkipReason {
         /// The `code_string` of the defining code.
         code: String,
     },
+    /// The `math_function` of an `INTERVAL_EVENT` has no place in the FHIR
+    /// `Period` the mapping wrote.
+    ///
+    /// A `Period` carries the interval alone, and an interval event whose
+    /// function is not `640|actual|` records a function of its data over the
+    /// interval (openEHR RM data structures, `INTERVAL_EVENT.math_function`),
+    /// so the period was written and the function was not.
+    EventFunctionUncarried {
+        /// The openEHR `event math function` code the event holds.
+        code: String,
+    },
     /// The `null_reason` of an `ELEMENT` names no `data-absent-reason` code.
     ///
     /// `types-of-mappings/data-type/NULL_FLAVOUR.adoc` reads `null_reason`
@@ -498,6 +509,10 @@ impl fmt::Display for SkipReason {
                 f,
                 "its defining_code {code} of {terminology} has no place in a string, \
                  which carries the rubric only"
+            ),
+            Self::EventFunctionUncarried { ref code } => write!(
+                f,
+                "the math_function {code} of its interval event has no place in a Period"
             ),
             Self::NullReasonUncarried => f.write_str(
                 "its null_reason names no data-absent-reason code, and the extension has no \

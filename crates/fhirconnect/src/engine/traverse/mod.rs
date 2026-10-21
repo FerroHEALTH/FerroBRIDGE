@@ -26,6 +26,7 @@ pub mod convert;
 pub mod demographic;
 pub mod display;
 pub mod error;
+pub mod event;
 pub mod functions;
 pub mod links;
 pub mod manual;
@@ -319,6 +320,7 @@ pub fn to_openehr<T: Table + ?Sized>(
         .map_err(|source| EngineError::Build {
             source: Box::new(source),
         })?;
+    let built = run.amend_intervals(built)?;
     run.carried_whole(&built, &routed)?;
     Ok(Outcome::new(built, run.warnings).with_consumed(run.consumed))
 }
@@ -455,6 +457,8 @@ struct Run<'a, T: Table + ?Sized> {
     /// The concept each distinct code translated to, so the seam is asked
     /// once per code in a run.
     translations: BTreeMap<translate::TranslationKey, Option<Coding>>,
+    /// The interval events the run wrote, set on the built composition.
+    intervals: Vec<event::Interval>,
 }
 
 impl<'a, T: Table + ?Sized> Run<'a, T> {
@@ -496,6 +500,7 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             pins: Vec::new(),
             fhir_pin: None,
             translations: BTreeMap::new(),
+            intervals: Vec::new(),
         }
     }
 }

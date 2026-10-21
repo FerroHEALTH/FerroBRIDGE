@@ -17,6 +17,7 @@
 //! form for an archetype root.
 
 mod alternative;
+mod amend;
 mod embedded;
 pub mod matching;
 pub mod paths;

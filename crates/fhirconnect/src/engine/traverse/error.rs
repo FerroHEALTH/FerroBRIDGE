@@ -156,6 +156,17 @@ pub enum EngineError {
         #[source]
         source: PositionError,
     },
+    /// A FHIR time and an `EVENT` node cannot carry each other
+    /// (`types-of-mappings/data-type/EVENT.adoc`).
+    #[error("{mapping} cannot carry {element} as an event time: {reason}")]
+    EventTime {
+        /// The mapping being run.
+        mapping: String,
+        /// The FHIR element the time is read at or written to.
+        element: String,
+        /// Why the time cannot be carried.
+        reason: EventRefusal,
+    },
     /// Neither the mapping nor the element table says which element to write.
     #[error("{mapping} names no FHIR data type for {element}, and the table fixes none")]
     UnknownElement {
@@ -396,6 +407,39 @@ pub enum EngineError {
         #[source]
         breach: Breach,
     },
+}
+
+/// Why an event time cannot be carried between a FHIR time and an `EVENT`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventRefusal {
+    /// The FHIR element is of a type `EVENT.adoc` pairs with no event class.
+    Type,
+    /// A FHIR `time` has no date, and `EVENT.time` is a `DV_DATE_TIME`.
+    NoDate,
+    /// The period misses a bound, so it has no trailing edge or no width.
+    OpenPeriod,
+    /// The period ends before it starts, or a bound is partial, so it has no
+    /// exact width.
+    NoWidth,
+    /// The event is of the class the FHIR element has no target for.
+    OtherClass,
+    /// The `INTERVAL_EVENT` holds no readable `time` or `width`.
+    Unreadable,
+}
+
+impl fmt::Display for EventRefusal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match *self {
+            Self::Type => "its type is paired with no event class",
+            Self::NoDate => "a time has no date, and an event's time is a date and time",
+            Self::OpenPeriod => "the period misses a bound",
+            Self::NoWidth => {
+                "the period has no exact width: it ends before it starts or a bound is partial"
+            }
+            Self::OtherClass => "the event is of the class the element has no alternative for",
+            Self::Unreadable => "the interval event holds no readable time or width",
+        })
+    }
 }
 
 /// Why a `hierarchy.split` cannot run.
