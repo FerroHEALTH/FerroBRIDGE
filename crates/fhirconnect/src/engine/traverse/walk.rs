@@ -324,7 +324,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             prefix.truncate(depth);
             // NOTE: no specification governs this: our own design, a node the
             // composition does not hold is no input occurrence, so nothing below it runs.
-            if self.node_value(name, input, &prefix)?.is_none() {
+            if !self.node_held(name, input, &prefix)? {
                 return Ok(Vec::new());
             }
             return Ok(vec![prefix]);
@@ -342,7 +342,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             for axis in axes.iter().skip(positions.len()) {
                 positions.push(self.pin(axis).unwrap_or_else(RmPosition::first));
             }
-            if self.node_value(name, input, &positions)?.is_none() {
+            if !self.node_held(name, input, &positions)? {
                 break;
             }
             found.push(positions);
@@ -365,6 +365,33 @@ impl<T: Table + ?Sized> Run<'_, T> {
         } else {
             self.index.read(composition, target.node(), positions)
         }
+    }
+
+    /// Returns whether the composition holds one instance of the target's
+    /// node, counting a value of another alternative of a polymorphic
+    /// `ELEMENT` ([`openehr_mapping_core::index::WebTemplateIndex::holds`]).
+    pub(super) fn node_held(
+        &self,
+        name: &str,
+        input: &OpenehrTarget,
+        positions: &[RmPosition],
+    ) -> Result<bool, EngineError> {
+        let Some(composition) = self.composition else {
+            return Ok(false);
+        };
+        let node = input.node();
+        let held = if input.on_element() {
+            self.index
+                .read_element(composition, node, positions)
+                .map(|element| element.is_some())
+        } else {
+            self.index.holds(composition, node, positions)
+        };
+        held.map_err(|source| EngineError::Template {
+            mapping: String::from(name),
+            node: String::from(node.aql_path().as_str()),
+            source: Box::new(source),
+        })
     }
 
     /// Returns the canonical JSON one instance of the target's node holds.
