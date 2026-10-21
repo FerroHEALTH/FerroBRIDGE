@@ -13,7 +13,8 @@ The owner ordered a redesign of every console on a shared FerroUI design languag
 1. FerroPIX's console (approved 2026-10-21).
 2. FerroFED (FerroHEALTH/FerroFED#1218).
 3. FerroBRIDGE.
-4. FerroEHR and FerroTERM.
+4. FerroTERM.
+5. FerroEHR, last.
 
 Each step is high-fidelity mockups of every screen and every interactive state, as HTML and PNG at 1440 light, 1440 dark and 390 light, kept in `~/Downloads/<Product>-ontwerp/`. When every design is settled, FerroUI ships one breaking release (0.3.0) with all the shared components. Then every console moves to it in lockstep.
 
