@@ -31,7 +31,10 @@ fn a_value_discriminator_matches_the_fixed_value_of_the_slice() -> TestResult {
     );
     let report = patient_with(&[definition], &json!([{"system": "urn:mrn", "value": "1"}]))?;
     assert!(report.is_valid(), "{:#?}", report.issues());
-    assert!(unevaluated_discriminators(&report).is_empty());
+    assert_eq!(
+        unevaluated_discriminators(&report),
+        Vec::<(Constraint, Reason, String)>::new()
+    );
     Ok(())
 }
 
@@ -349,7 +352,10 @@ fn a_type_discriminator_matches_a_resource_that_specializes_the_slice_type() -> 
         &bundle_of(&json!({"resourceType": "Patient"})),
         &url,
     )?;
-    assert!(locations(&report, MessageId::UnmatchedSliceItem).is_empty());
+    assert_eq!(
+        locations(&report, MessageId::UnmatchedSliceItem),
+        Vec::<String>::new()
+    );
     Ok(())
 }
 

@@ -143,7 +143,7 @@ fn a_bare_code_with_no_system_to_send_is_named() -> TestResult {
             .collect::<Vec<_>>(),
         [Reason::NoCodeSystem]
     );
-    assert!(report.pending_bindings().is_empty());
+    assert_eq!(report.pending_bindings(), []);
     Ok(())
 }
 
@@ -159,7 +159,7 @@ async fn a_valid_answer_lifts_the_listing() -> TestResult {
         "{:#?}",
         report.unevaluated()
     );
-    assert!(report.pending_bindings().is_empty());
+    assert_eq!(report.pending_bindings(), []);
     Ok(())
 }
 

@@ -115,7 +115,7 @@ async fn a_path_matching_several_nodes_outside_an_iteration_refuses_the_record()
         &stub,
     )
     .await?;
-    assert!(graph.rows().is_empty());
+    assert_eq!(graph.rows(), []);
     assert_eq!(refused(&refusals, RefusalKind::Multiple), 1);
     assert_eq!(refusals.first().and_then(|r| r.column), Some("value"));
     Ok(())

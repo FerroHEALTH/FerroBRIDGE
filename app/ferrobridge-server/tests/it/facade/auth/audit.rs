@@ -77,7 +77,7 @@ fn an_admitted_request_leaves_one_audit_line_without_the_token() {
     assert_eq!(Some(404), fields["status"].as_u64());
     assert!(fields["duration_ms"].is_number(), "{line}");
     assert!(fields["at"].is_string(), "{line}");
-    assert!(!token.is_empty());
+    assert_ne!(token, "");
     assert!(!text.contains(&token), "the token never reaches the log");
     let signature = token.rsplit('.').next().expect("a signature");
     assert!(!text.contains(signature), "nor its signature");

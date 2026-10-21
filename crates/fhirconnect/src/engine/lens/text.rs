@@ -528,7 +528,10 @@ mod tests {
         ]);
         let view: CodeableConcept = TextLens.get(&source).expect("both mappings travel");
         assert_eq!(codes(&view.coding), [Some("386661006"), Some("LP74849-8")]);
-        assert!(Lens::<DvTextData, CodeableConcept>::withheld(&TextLens, &source).is_empty());
+        assert_eq!(
+            Lens::<DvTextData, CodeableConcept>::withheld(&TextLens, &source),
+            Vec::<crate::engine::lens::term_mapping::Withheld>::new()
+        );
     }
     /// A `CodeableConcept` with no `text` whose first coding carries `display`
     /// and `code` as given, followed by a second, fully described coding.

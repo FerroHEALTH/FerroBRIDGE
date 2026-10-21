@@ -449,7 +449,10 @@ fn an_agreeing_template_pin_is_accepted() -> Result<(), Box<dyn Error>> {
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?)
         .with_template_id(TemplateId::new(TEMPLATE));
     let answer = run::to_fhir(&set, &SCHEMAS, &Seams::default(), &settings(), &request)?;
-    assert!(!answer.bundle().entry.is_empty());
+    assert_ne!(
+        answer.bundle().entry,
+        Vec::<fhir_types::r4::bundle::BundleEntry>::new()
+    );
     Ok(())
 }
 

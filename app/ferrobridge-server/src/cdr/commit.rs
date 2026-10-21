@@ -370,7 +370,10 @@ mod tests {
 
     #[test]
     fn an_empty_context_renders_no_header() {
-        assert!(rendered(&CommitContext::default()).is_empty());
+        assert_eq!(
+            rendered(&CommitContext::default()),
+            Vec::<(&str, String)>::new()
+        );
     }
 
     #[test]

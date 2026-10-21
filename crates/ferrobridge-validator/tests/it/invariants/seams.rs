@@ -120,7 +120,7 @@ fn resolve_outside_the_resources_held_is_listed() -> TestResult {
     let observation = json!({"resourceType": "Observation", "status": "final",
         "code": {"text": "synthetic"}, "subject": {"reference": "Patient/p1"}});
     let report = checked(&observation, Some("observation-subject"))?;
-    assert!(failed_at(&report, "test-subject").is_empty());
+    assert_eq!(failed_at(&report, "test-subject"), Vec::<String>::new());
     let entries = listed(&report, "test-subject");
     assert_eq!(entries.len(), 1, "{:#?}", report.unevaluated());
     assert!(
@@ -199,7 +199,7 @@ fn member_of_reads_a_value_set_the_package_set_carries() -> TestResult {
 fn member_of_a_value_set_the_package_set_lacks_is_listed() -> TestResult {
     let female = json!({"resourceType": "Patient", "gender": "female"});
     let report = checked(&female, Some("patient-seams"))?;
-    assert!(failed_at(&report, "test-absent-set").is_empty());
+    assert_eq!(failed_at(&report, "test-absent-set"), Vec::<String>::new());
     let entries = listed(&report, "test-absent-set");
     assert_eq!(entries.len(), 1, "{:#?}", report.unevaluated());
     assert!(
@@ -214,7 +214,10 @@ fn member_of_a_value_set_the_package_set_lacks_is_listed() -> TestResult {
 #[test]
 fn conforms_to_validates_against_a_profile_of_the_package_set() -> TestResult {
     let named = json!({"resourceType": "Patient", "name": [{"family": "Doe"}]});
-    assert!(failed_at(&checked(&named, Some("patient-seams"))?, "test-conforms").is_empty());
+    assert_eq!(
+        failed_at(&checked(&named, Some("patient-seams"))?, "test-conforms"),
+        Vec::<String>::new()
+    );
     let unnamed = json!({"resourceType": "Patient", "gender": "female"});
     let report = checked(&unnamed, Some("patient-seams"))?;
     assert_eq!(failed_at(&report, "test-conforms"), ["Patient"]);

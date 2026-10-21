@@ -61,7 +61,10 @@ fn ait_1_reports_an_allergy_without_a_clinical_status() -> TestResult {
         }
     );
     assert!(!report.is_valid());
-    assert!(failed_at(&against_core(&allergy(true))?, "ait-1").is_empty());
+    assert_eq!(
+        failed_at(&against_core(&allergy(true))?, "ait-1"),
+        Vec::<String>::new()
+    );
     Ok(())
 }
 
@@ -103,7 +106,7 @@ fn cmp_2_reports_a_section_with_entries_and_an_empty_reason() -> TestResult {
         "emptyReason": {"text": "nothing"}
     }])))?;
     assert_eq!(failed_at(&report, "cmp-2"), ["Composition.section[0]"]);
-    assert!(failed_at(&report, "cmp-1").is_empty());
+    assert_eq!(failed_at(&report, "cmp-1"), Vec::<String>::new());
     Ok(())
 }
 
@@ -177,12 +180,12 @@ fn named_over(start: &str, end: &str) -> serde_json::Value {
 
 #[test]
 fn per_1_passes_an_ordered_period_and_reports_a_reversed_one() -> TestResult {
-    assert!(
+    assert_eq!(
         failed_at(
             &against_core(&named_over("2020-01-01", "2020-02-01"))?,
             "per-1"
-        )
-        .is_empty()
+        ),
+        Vec::<String>::new()
     );
     let report = against_core(&named_over("2020-02-01", "2020-01-01"))?;
     assert_eq!(failed_at(&report, "per-1"), ["Patient.name[0].period"]);
@@ -223,7 +226,10 @@ fn ranged(low: &str, high: &str, unit: &str) -> serde_json::Value {
 
 #[test]
 fn rng_2_compares_low_and_high_across_ucum_units() -> TestResult {
-    assert!(failed_at(&against_core(&ranged("500", "1", "g"))?, "rng-2").is_empty());
+    assert_eq!(
+        failed_at(&against_core(&ranged("500", "1", "g"))?, "rng-2"),
+        Vec::<String>::new()
+    );
     let report = against_core(&ranged("1500", "1", "g"))?;
     assert_eq!(
         failed_at(&report, "rng-2"),

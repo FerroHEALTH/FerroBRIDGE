@@ -227,7 +227,7 @@ async fn a_composition_the_cdr_reports_deleted_loses_its_rows_and_a_rerun_change
 
     let third = run_under(&mut harness, DeletionPolicy::Remove, "run-3").await??;
     assert_eq!(0, third.deletions.checked, "no watermark is left to check");
-    assert!(third.deletions.removed.is_empty());
+    assert_eq!(third.deletions.removed, Vec::<String>::new());
     assert_eq!(before, super::dump(&harness.postgres).await?);
     Ok(())
 }
@@ -242,7 +242,7 @@ async fn a_composition_the_cdr_still_holds_keeps_its_rows() -> Result<(), Box<dy
     let second = run_under(&mut harness, DeletionPolicy::Remove, "run-2").await??;
     assert_eq!(1, second.deletions.checked, "{second}");
     assert_eq!(1, second.deletions.extant);
-    assert!(second.deletions.removed.is_empty());
+    assert_eq!(second.deletions.removed, Vec::<String>::new());
     assert_eq!(3, third_rows(&harness).await?);
     Ok(())
 }
@@ -257,7 +257,7 @@ async fn a_composition_the_cdr_does_not_know_keeps_its_rows_and_is_listed()
     answer(&harness.cdr, COMPOSITIONS_UIDS[2], 404).await;
     let second = run_under(&mut harness, DeletionPolicy::Remove, "run-2").await??;
     assert_eq!(vec![COMPOSITIONS_UIDS[2]], second.deletions.unknown);
-    assert!(second.deletions.removed.is_empty());
+    assert_eq!(second.deletions.removed, Vec::<String>::new());
     assert_eq!(3, third_rows(&harness).await?);
     Ok(())
 }
@@ -271,7 +271,7 @@ async fn the_report_policy_lists_a_deletion_and_keeps_its_rows() -> Result<(), B
     answer(&harness.cdr, COMPOSITIONS_UIDS[2], 204).await;
     let second = run_under(&mut harness, DeletionPolicy::Report, "run-2").await??;
     assert_eq!(vec![COMPOSITIONS_UIDS[2]], second.deletions.kept);
-    assert!(second.deletions.removed.is_empty());
+    assert_eq!(second.deletions.removed, Vec::<String>::new());
     assert_eq!(3, third_rows(&harness).await?);
     assert!(
         second.to_string().contains(COMPOSITIONS_UIDS[2]),

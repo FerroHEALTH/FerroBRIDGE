@@ -59,7 +59,7 @@ async fn the_fixture_declaration_loads_and_the_mapping_loader_skips_it() {
     let catalog = search::load(Path::new(FIXTURES), &harness.facade.programs())
         .expect("the fixture declaration loads");
     assert_eq!(1, catalog.of_type("Condition").len());
-    assert!(catalog.of_type("Observation").is_empty());
+    assert_eq!(catalog.of_type("Observation"), []);
     let files = programs::mapping_files(Path::new(FIXTURES)).expect("the fixtures list");
     assert!(
         files

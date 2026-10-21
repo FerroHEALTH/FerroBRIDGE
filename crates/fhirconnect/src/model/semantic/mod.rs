@@ -664,7 +664,10 @@ mod tests {
                  openehr: \"$archetype\"\n",
             ),
         )]);
-        assert!(validate(&set, &StaticMappingCodes::default()).is_empty());
+        assert_eq!(
+            validate(&set, &StaticMappingCodes::default()),
+            Vec::<openehr_mapping_core::diagnostic::Diagnostic>::new()
+        );
     }
 
     #[test]
@@ -682,7 +685,10 @@ mod tests {
         assert_eq!(diagnostic.code(), &ModelCode::UnknownMappingCode.into());
         let registry = StaticMappingCodes::new(["timingToDaily_NonDaily"]);
         assert_eq!(registry.names().count(), 1);
-        assert!(validate(&set, &registry).is_empty());
+        assert_eq!(
+            validate(&set, &registry),
+            Vec::<openehr_mapping_core::diagnostic::Diagnostic>::new()
+        );
     }
 
     #[test]

@@ -263,7 +263,7 @@ mod tests {
             fill_subject(&mut body, "Condition", Some(&subject))
         );
         assert_eq!(Some(&subject), body.get("subject"));
-        assert!(absent_required(&body, "Condition").is_empty());
+        assert_eq!(absent_required(&body, "Condition"), Vec::<String>::new());
     }
 
     #[test]
@@ -346,7 +346,7 @@ mod tests {
             "_status": { "extension": [{ "url": "http://example.org/x", "valueString": "y" }] },
             "code": { "text": "synthetic" }
         }));
-        assert!(absent_required(&body, "Observation").is_empty());
+        assert_eq!(absent_required(&body, "Observation"), Vec::<String>::new());
     }
 
     #[test]

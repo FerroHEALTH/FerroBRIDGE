@@ -121,8 +121,8 @@ fn a_minimal_section_takes_the_defaults() -> Result<(), Box<dyn StdError>> {
     assert!(issuer.scopeless_subjects.is_empty());
     assert!(issuer.jwks_file.is_none());
     assert_eq!(OPERATOR_SCOPE, auth.operator_scope);
-    assert!(auth.options.capabilities.is_empty());
-    assert!(auth.options.scopes_supported.is_empty());
+    assert_eq!(auth.options.capabilities, Vec::<String>::new());
+    assert_eq!(auth.options.scopes_supported, Vec::<String>::new());
     assert!(auth.basic.is_none());
     assert!(auth.realm.is_none());
     Ok(())
