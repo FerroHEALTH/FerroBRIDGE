@@ -64,7 +64,7 @@ fn the_interactions_index_gives_each_other_code_and_event_a_version_sends() {
             .iter()
             .any(|entry| entry.version == "2.8" && entry.structure.id == "RRI_I12")
     );
-    assert!(hl7v2_types::message::legacy_events("REF", "I12").is_empty());
+    assert_eq!(hl7v2_types::message::legacy_events("REF", "I12"), []);
     assert_eq!(
         hl7v2_types::message::LEGACY_EVENTS.len(),
         LEGACY.events.len()

@@ -69,7 +69,10 @@ fn an_eps_code_outside_the_ips_value_set_is_refused() -> TestResult {
 fn an_eps_binding_over_a_loinc_filter_waits_for_a_terminology_server() -> TestResult {
     let Some(set) = eu_set()? else { return Ok(()) };
     let report = validate(&set, &observation("11884-4"), Some(GESTATIONAL_AGE))?;
-    assert!(locations(&report, MessageId::NotInValueSet).is_empty());
+    assert_eq!(
+        locations(&report, MessageId::NotInValueSet),
+        Vec::<String>::new()
+    );
     assert!(
         report
             .unevaluated()

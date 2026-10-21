@@ -114,7 +114,7 @@ reads what the banner shows:
     "commit": "0123456789abcdef0123456789abcdef01234567",
     "commit_short": "0123456789ab",
     "built_at": "2026-01-01T00:00:00Z",
-    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)"
+    "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)"
   },
   "pins": [
     { "name": "FHIRconnect", "version": "v1.0.0" },

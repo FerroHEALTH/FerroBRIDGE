@@ -180,7 +180,7 @@ async fn a_provider_that_fails_on_its_side_leaves_the_session_to_try_again()
     let (provider, state, service, cookie) = due_session("").await?;
     provider.refuse(503, "temporarily_unavailable").await;
     let (response, _body) = send(&service, get_with(PAGE, &cookie)?).await?;
-    assert!(set_cookies(&response).is_empty());
+    assert_eq!(set_cookies(&response), Vec::<String>::new());
     assert_eq!(1, state.sessions().occupancy()?.sessions);
     provider.reset().await?;
     provider

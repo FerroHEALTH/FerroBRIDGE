@@ -49,7 +49,10 @@ fn a_resource_id_outside_the_id_form_is_refused() -> TestResult {
     let mut resource = patient();
     resource["id"] = json!(format!("{}-.", "A1".repeat(31)));
     let report = against_patient(&resource)?;
-    assert!(locations(&report, MessageId::LexicalForm).is_empty());
+    assert_eq!(
+        locations(&report, MessageId::LexicalForm),
+        Vec::<String>::new()
+    );
     Ok(())
 }
 

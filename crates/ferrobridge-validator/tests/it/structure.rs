@@ -284,7 +284,10 @@ fn an_element_typed_domain_resource_accepts_a_resource_that_specializes_it() -> 
         &bundle_of(&json!({"resourceType": "Patient"})),
         Some(&url),
     )?;
-    assert!(locations(&report, MessageId::ResourceTypeNotAllowed).is_empty());
+    assert_eq!(
+        locations(&report, MessageId::ResourceTypeNotAllowed),
+        Vec::<String>::new()
+    );
     Ok(())
 }
 
@@ -306,7 +309,10 @@ fn an_element_typed_domain_resource_refuses_a_resource_that_does_not_specialize_
 fn an_element_typed_resource_accepts_any_resource() -> TestResult {
     let set = PackageSet::load([core()])?;
     let report = validate(&set, &bundle_of(&json!({"resourceType": "Patient"})), None)?;
-    assert!(locations(&report, MessageId::ResourceTypeNotAllowed).is_empty());
+    assert_eq!(
+        locations(&report, MessageId::ResourceTypeNotAllowed),
+        Vec::<String>::new()
+    );
     assert!(report.is_valid(), "{:#?}", report.issues());
     Ok(())
 }

@@ -242,7 +242,7 @@ async fn a_linked_resource_is_committed_first_and_its_composition_linked()
         encounter.to_string().contains("Synthetic encounter reason"),
         "the Encounter's composition went first: {encounter}"
     );
-    assert!(link_targets(encounter).is_empty());
+    assert_eq!(link_targets(encounter), Vec::<String>::new());
     assert_eq!(
         link_targets(linking),
         [format!("ehr:/{EHR_ID}/compositions/{}", CONTAINERS[0])],

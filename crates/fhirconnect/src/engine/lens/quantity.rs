@@ -475,7 +475,10 @@ mod tests {
             code: Some(Code::from("mg")),
             ..view
         };
-        assert!(QuantityLens.fallbacks(&coded).is_empty());
+        assert_eq!(
+            QuantityLens.fallbacks(&coded),
+            Vec::<crate::engine::lens::Fallback>::new()
+        );
     }
 
     #[test]

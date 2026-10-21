@@ -216,7 +216,7 @@ fn a_listed_code_of_an_stu3_value_set_is_decided_from_the_package_set() -> TestR
     let report = local(&[listed()], &status("married"))?;
     assert!(report.issues().is_empty(), "{:#?}", report.issues());
     assert!(listings(&report).is_empty(), "{:#?}", report.unevaluated());
-    assert!(report.pending_bindings().is_empty());
+    assert_eq!(report.pending_bindings(), []);
     Ok(())
 }
 
@@ -227,7 +227,7 @@ fn a_code_an_stu3_value_set_does_not_list_is_an_error_of_the_required_binding() 
         locations(&report, MessageId::NotInValueSet),
         ["Patient.maritalStatus"]
     );
-    assert!(report.pending_bindings().is_empty());
+    assert_eq!(report.pending_bindings(), []);
     Ok(())
 }
 

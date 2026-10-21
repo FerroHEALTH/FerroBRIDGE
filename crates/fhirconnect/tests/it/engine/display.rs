@@ -271,6 +271,9 @@ fn a_coding_that_carries_a_display_asks_the_server_nothing() -> Result<(), Box<d
         &stub,
     )?;
     assert_eq!(certainty_value(outcome.value())?, "Shown");
-    assert!(stub.asked().is_empty());
+    assert_eq!(
+        stub.asked(),
+        Vec::<(Option<String>, Option<String>, Option<String>)>::new()
+    );
     Ok(())
 }

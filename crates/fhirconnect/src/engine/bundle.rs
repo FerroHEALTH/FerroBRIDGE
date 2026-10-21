@@ -186,13 +186,13 @@ mod tests {
             ),
             vec![0]
         );
-        assert!(
+        assert_eq!(
             resolve(
                 &entries,
                 None,
                 "http://example.net/fhir/Patient/synthetic-1"
-            )
-            .is_empty()
+            ),
+            Vec::<usize>::new()
         );
     }
 
@@ -231,7 +231,10 @@ mod tests {
             resolve(&entries, referrer, "Patient/synthetic-1/_history/3"),
             vec![0]
         );
-        assert!(resolve(&entries, referrer, "Patient/synthetic-1/_history/2").is_empty());
+        assert_eq!(
+            resolve(&entries, referrer, "Patient/synthetic-1/_history/2"),
+            Vec::<usize>::new()
+        );
         assert_eq!(
             resolve(
                 &entries,

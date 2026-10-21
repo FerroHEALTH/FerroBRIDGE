@@ -698,6 +698,9 @@ mod tests {
 
     #[test]
     fn an_absent_operations_lane_declares_no_system_level_operation() {
-        assert!(system_operations(Operations::Absent).is_empty());
+        assert_eq!(
+            system_operations(Operations::Absent),
+            Vec::<(String, String)>::new()
+        );
     }
 }

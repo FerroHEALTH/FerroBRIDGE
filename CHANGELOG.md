@@ -286,6 +286,13 @@ crates on crates.io.
 
 ### Changed
 
+- The workspace builds with Rust 1.99.1 in place of 1.98.1, and the MSRV
+  stays at 1.98: the FerroHEALTH family builds with the latest stable
+  toolchain and declares the release before it as its MSRV. Clippy 1.99's
+  new `assert_is_empty` lint is answered in the tests it names, which moves
+  `fhirconnect` to 0.1.179 with no API change, since its unit tests live
+  under `src/`.
+
 - Every word the operator console shows now comes from its catalog
   (#956): the faults and refusals it draws in a page, the severity of a
   diagnostic, and the plain-text answers of sign-in, sign-out and a

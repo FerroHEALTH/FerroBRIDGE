@@ -137,7 +137,7 @@ async fn an_unknown_patient_is_an_empty_searchset_and_never_a_404() -> Result<()
     assert_eq!(StatusCode::OK, status, "{body}");
     assert_eq!(Some("searchset"), body["type"].as_str());
     assert_eq!(Some(0), body["total"].as_u64());
-    assert!(matches(&body).is_empty());
+    assert_eq!(matches(&body), Vec::<&serde_json::Value>::new());
     assert!(
         queries(&harness).await.is_empty(),
         "an unknown subject reached the CDR"

@@ -113,7 +113,10 @@ fn a_required_primitive_array_carried_by_its_sibling_alone_is_present() {
 fn a_lenient_path_reads_an_absent_required_array_as_empty() {
     let decoded = decode::<R4Provenance>(&provenance("target", ""), Path::lenient("Provenance"))
         .expect("the lenient reader keeps the rest of the resource");
-    assert!(decoded.target.is_empty());
+    assert_eq!(
+        decoded.target,
+        Vec::<fhir_types::r4::reference::Reference>::new()
+    );
 }
 
 /// The same refusal in every version, over that version's own `Provenance`,

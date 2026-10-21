@@ -170,7 +170,7 @@ fn a_link_to_a_resource_no_context_maps_is_a_declared_skip() -> Result<(), Box<d
     // (§Linked mappings): with none, no composition exists to link.
     let (ran, index) = run(&holding_encounter(), &Answering::new(Ok(Linked::Unmapped)))?;
     let inbound = ran?;
-    assert!(link_targets(&index, inbound.value())?.is_empty());
+    assert_eq!(link_targets(&index, inbound.value())?, Vec::<String>::new());
     let reasons: Vec<&SkipReason> = inbound
         .warnings()
         .iter()

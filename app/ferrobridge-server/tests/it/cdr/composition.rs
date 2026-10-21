@@ -219,7 +219,7 @@ async fn create_composition_reads_a_prose_shape_400_from_the_outcome() -> Result
     match answered.outcome {
         CompositionCreateOutcome::BadRequest { body } => {
             assert_eq!(Some("the composition body does not parse"), body.message());
-            assert!(body.validation_errors().is_empty());
+            assert_eq!(body.validation_errors(), Vec::<String>::new());
             assert_eq!(
                 Some(
                     r#"{"message":"the composition body does not parse","code":90000,"errors":[]}"#

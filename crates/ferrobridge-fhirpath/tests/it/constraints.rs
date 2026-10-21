@@ -700,7 +700,7 @@ fn a_path_over_a_choice_ignores_the_type_of_each_value() {
         .expect("the expression should parse")
         .evaluate(&Environment::new(&R4), Focus::resource(&observation))
         .expect("the path should evaluate");
-    assert!(unit.is_empty());
+    assert_eq!(unit, Vec::<ferrobridge_fhirpath::value::Item<'_>>::new());
     let typo = Expression::parse("Observation.value.unitt")
         .expect("the expression should parse")
         .evaluate(&Environment::new(&R4), Focus::resource(&observation));

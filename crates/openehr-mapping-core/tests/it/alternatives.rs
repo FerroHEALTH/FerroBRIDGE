@@ -217,7 +217,7 @@ fn an_interval_reads_at_the_node_of_its_limit_class() -> Result<(), Box<dyn Erro
 fn a_class_no_alternative_admits_reads_nowhere_but_is_held() -> Result<(), Box<dyn Error>> {
     let index = polymorphic_index()?;
     let value = json!({"_type": "DV_BOOLEAN", "value": true});
-    assert!(readers(&index, &value)?.is_empty());
+    assert_eq!(readers(&index, &value)?, Vec::<String>::new());
     Ok(())
 }
 

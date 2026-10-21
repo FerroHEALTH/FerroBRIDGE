@@ -57,7 +57,7 @@ fn a_profile_invariant_naming_a_member_only_a_removed_type_defines_is_refused() 
         narrowed("test-coding", "coding.exists()", &url()),
         &json!({"value": 1}),
     )?;
-    assert!(failed_at(&report, "test-coding").is_empty());
+    assert_eq!(failed_at(&report, "test-coding"), Vec::<String>::new());
     let entries = listed(&report, "test-coding");
     assert_eq!(entries.len(), 1, "{:#?}", report.unevaluated());
     assert!(

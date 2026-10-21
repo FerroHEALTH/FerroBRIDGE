@@ -180,7 +180,7 @@ async fn a_removal_keeps_the_person_while_another_composition_remains_and_then_r
         return Err(format!("expected a removal, got {last:?}").into());
     };
     assert_eq!(Some(&1), rows.get("person"), "no row of the person remains");
-    assert!(births(&client).await?.is_empty());
+    assert_eq!(births(&client).await?, Vec::<i32>::new());
     assert_eq!(
         1,
         count(&client, "ferrobridge.person_map").await?,
@@ -336,7 +336,7 @@ async fn the_existing_policy_refuses_a_person_whose_row_is_gone() -> Result<(), 
         .ok_or("the composition that wrote the person")?;
     database.writer.remove(&committed).await?;
     let client = reader(&database.postgres).await?;
-    assert!(births(&client).await?.is_empty());
+    assert_eq!(births(&client).await?, Vec::<i32>::new());
     assert_eq!(1, count(&client, "ferrobridge.person_map").await?);
 
     let error = database
@@ -464,7 +464,7 @@ async fn removing_either_writer_keeps_the_person_and_removing_both_removes_it()
             return Err(format!("expected a removal, got {removal:?}").into());
         };
         assert_eq!(Some(&1), rows.get("person"), "no writer and no row remain");
-        assert!(births(&client).await?.is_empty());
+        assert_eq!(births(&client).await?, Vec::<i32>::new());
         assert_eq!(0, person_writers(&client).await?);
     }
     Ok(())
@@ -580,7 +580,10 @@ async fn removing_the_newest_writer_hands_the_person_row_to_the_newest_writer_th
         return Err(format!("expected a removal, got {removal:?}").into());
     };
     assert_eq!(Some(&1), rows.get("person"), "no writer and no row remain");
-    assert!(person_rows(&client).await?.is_empty());
+    assert_eq!(
+        person_rows(&client).await?,
+        Vec::<(i32, i32, i32, i32, Option<String>)>::new()
+    );
     assert_eq!(0, person_writers(&client).await?);
     Ok(())
 }

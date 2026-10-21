@@ -87,7 +87,7 @@ fn split_answers_every_part_between_separators() {
     assert_eq!(texts("('A,B,C').split(',')"), ["A", "B", "C"]);
     assert_eq!(texts("('ABC').split(',')"), ["ABC"]);
     assert_eq!(texts("'A,,C'.split(',')"), ["A", "", "C"]);
-    assert!(texts("{}.split(',')").is_empty());
+    assert_eq!(texts("{}.split(',')"), Vec::<String>::new());
 }
 
 #[test]

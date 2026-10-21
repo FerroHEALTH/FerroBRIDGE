@@ -105,7 +105,10 @@ fn the_default_slice_takes_an_item_in_no_other_slice_and_holds_it_to_its_constra
     )?;
     assert!(report.is_valid(), "{:#?}", report.issues());
     let report = patient_with(&[definition], &json!([{"system": "urn:other"}]))?;
-    assert!(locations(&report, MessageId::UnmatchedSliceItem).is_empty());
+    assert_eq!(
+        locations(&report, MessageId::UnmatchedSliceItem),
+        Vec::<String>::new()
+    );
     assert_eq!(
         locations(&report, MessageId::MinCardinality),
         ["Patient.identifier[0]"]
