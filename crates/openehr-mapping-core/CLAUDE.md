@@ -47,6 +47,13 @@ the language crate applies its own grammar to them.
   built or accepted, is `PartyError::RoleWithoutPerformer` (RM Demographic
   IM, the `ROLE` class).
 
+- **A polymorphic `ELEMENT` value node reads only its own class.** The
+  alternatives share the element's `aqlPath` under one parent
+  (`WebTemplateIndex::alternatives`), and `read` answers a value only at
+  the alternative its `_type` picks (`index::alternative`), the most
+  specific class it conforms to. `holds` answers whether the element holds
+  any value, which is what an occurrence probe asks.
+
 The Web Template index, relative path derivation, and composition build and
 read (the other half of this crate's role in `docs/architecture.md` §7) are
 #75.

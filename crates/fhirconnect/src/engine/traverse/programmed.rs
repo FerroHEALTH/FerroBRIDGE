@@ -127,10 +127,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             let positions = Self::positions_of(mapping, input, anchor)?;
             for port in ports {
                 for (class, node) in port.values() {
-                    if let Some(value) = self
-                        .node_value(mapping.name(), node, &positions)?
-                        .filter(|value| of_class(value, class))
-                    {
+                    if let Some(value) = self.node_value(mapping.name(), node, &positions)? {
                         values = values.with(port.name(), Datum::new(class, value));
                         break;
                     }
@@ -207,21 +204,6 @@ impl<T: Table + ?Sized> Run<'_, T> {
             source: Box::new(source),
         })
     }
-}
-
-/// Returns whether the canonical JSON a value node read holds a value of
-/// `class`.
-///
-/// The value nodes of a polymorphic `ELEMENT` read the one value the element
-/// holds, so the `_type` the canonical JSON carries (openEHR ITS-JSON) says
-/// which of them it is; a generic class is named without its parameter
-/// there. A value that names no `_type` is taken as the node's own class.
-fn of_class(value: &serde_json::Value, class: &str) -> bool {
-    let base = class.split_once('<').map_or(class, |(base, _)| base);
-    value
-        .get("_type")
-        .and_then(serde_json::Value::as_str)
-        .is_none_or(|named| named == base)
 }
 
 /// Wraps a function's refusal with the mapping that called it.

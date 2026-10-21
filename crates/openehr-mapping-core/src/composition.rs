@@ -484,13 +484,46 @@ impl WebTemplateIndex {
     /// the target, outermost first, and become the positional predicates of
     /// the path the canonical JSON is navigated with.
     ///
+    /// A value node of a polymorphic `ELEMENT` reads only a value of its own
+    /// class ([`WebTemplateIndex::alternatives`]).
+    ///
     /// # Errors
     ///
     /// Returns [`PathError::TemplateMismatch`] when the composition was built
     /// against another template, [`PathError::UnknownNode`] when the node
-    /// belongs to another template, and [`PathError::OccurrenceCount`] when
-    /// the occurrences do not match the repeating nodes above it.
+    /// belongs to another template, [`PathError::OccurrenceCount`] when the
+    /// occurrences do not match the repeating nodes above it, and
+    /// [`PathError::UntypedAlternative`] when the value of a polymorphic
+    /// `ELEMENT` names no `_type`.
     pub fn read<D: CanonicalDocument + ?Sized>(
+        &self,
+        composition: &D,
+        node: &ResolvedNode,
+        occurrences: &[RmPosition],
+    ) -> Result<Option<Value>, PathError> {
+        let Some(value) = self.read_any(composition, node, occurrences)? else {
+            return Ok(None);
+        };
+        Ok(self.belongs(node, &value)?.then_some(value))
+    }
+
+    /// Returns whether a composition holds a value at one instance of a node's
+    /// path, of the node's class or of another alternative of its `ELEMENT`.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`WebTemplateIndex::read`], less the untyped value.
+    pub fn holds<D: CanonicalDocument + ?Sized>(
+        &self,
+        composition: &D,
+        node: &ResolvedNode,
+        occurrences: &[RmPosition],
+    ) -> Result<bool, PathError> {
+        Ok(self.read_any(composition, node, occurrences)?.is_some())
+    }
+
+    /// Reads what a composition holds at one instance of a node's path.
+    fn read_any<D: CanonicalDocument + ?Sized>(
         &self,
         composition: &D,
         node: &ResolvedNode,

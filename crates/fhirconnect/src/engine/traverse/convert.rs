@@ -8,7 +8,6 @@ use core::str::FromStr;
 use fhir_types::codec::Value;
 use openehr_mapping_core::composition::RmPosition;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
-use openehr_rm::v1_2::model;
 
 use crate::engine::cell;
 use crate::engine::fhir::FhirKind;
@@ -249,8 +248,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
     /// holds nothing.
     ///
     /// A [`Derived::Polymorphic`] mapping reads the first value node, in the
-    /// order of its pairs, that holds a value, and writes the alternative that
-    /// node's first pair names.
+    /// order of its pairs, that holds a value of its own class, and writes the
+    /// alternative that node's first pair names. A polymorphic `ELEMENT` that
+    /// holds a value no pair reads refuses, and so does a [`Derived::Value`]
+    /// mapping whose `ELEMENT` holds another alternative than its own.
     fn output_source<'mapping>(
         &self,
         mapping: &'mapping Mapping,
@@ -264,21 +265,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 return Ok(None);
             };
             let positions = Self::positions_of(mapping, input, first.target())?;
-            let Some(held) = self.node_value(mapping.name(), first.target(), &positions)? else {
-                return Ok(None);
-            };
-            let class = held
-                .get("_type")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default();
-            let chosen = pairings.iter().find(|pairing| {
-                let paired = pairing.target().node().rm_type();
-                paired == class || model::is_a(class, paired)
-            });
-            if let Some(pairing) = chosen {
+            for pairing in pairings {
                 let openehr = pairing.target();
                 let Some(source) = self.value_at(mapping, openehr, &positions)? else {
-                    return Ok(None);
+                    continue;
                 };
                 let written = pairing.alternative();
                 let kind = FhirKind::of_code(written.code()).ok_or_else(|| {
@@ -289,16 +279,21 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 })?;
                 return Ok(Some((openehr, source, written.target(), kind)));
             }
-            return Err(EngineError::UnknownElement {
-                mapping: String::from(mapping.name()),
-                element: format!("{} from a {class}", target.resolved().leaf()),
-            });
+            if self.node_held(mapping.name(), first.target(), &positions)? {
+                return Err(other_alternative(mapping, target, first.target()));
+            }
+            return Ok(None);
         }
         let Some(openehr) = converted(mapping) else {
             return Ok(None);
         };
         let positions = Self::positions_of(mapping, input, openehr)?;
         let Some(source) = self.value_at(mapping, openehr, &positions)? else {
+            if matches!(mapping.derived(), Some(Derived::Value { .. }))
+                && self.node_held(mapping.name(), openehr, &positions)?
+            {
+                return Err(other_alternative(mapping, target, openehr));
+            }
             return Ok(None);
         };
         let (target, kind) = Self::output_target(mapping, target)?;
@@ -530,6 +525,19 @@ fn scalar_number(
                 .map(FhirValue::Decimal),
         ),
         _ => None,
+    }
+}
+
+/// Returns the refusal of a polymorphic `ELEMENT` that holds a value of an
+/// alternative the mapping does not read.
+fn other_alternative(mapping: &Mapping, target: &FhirTarget, node: &OpenehrTarget) -> EngineError {
+    EngineError::UnknownElement {
+        mapping: String::from(mapping.name()),
+        element: format!(
+            "{} from another value alternative at `{}`",
+            target.resolved().leaf(),
+            node.node().aql_path().as_str()
+        ),
     }
 }
 

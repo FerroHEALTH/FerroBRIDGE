@@ -197,3 +197,77 @@ fn an_alternative_no_value_node_pairs_with_refuses() -> Result<(), Box<dyn Error
     assert!(refused.is_err(), "no value node pairs with an Age");
     Ok(())
 }
+
+#[test]
+fn a_date_time_reads_at_no_other_value_node() -> Result<(), Box<dyn Error>> {
+    // RM data structures §ELEMENT: the element holds one value, of one class.
+    let (index, composition, _) =
+        round_trip(&condition("onsetDateTime", "2026-09-01T08:00:00+02:00")?)?;
+    assert_eq!(problem_value(&index, &composition, "DV_TEXT")?, None);
+    Ok(())
+}
+
+#[test]
+fn a_text_reads_at_no_other_value_node() -> Result<(), Box<dyn Error>> {
+    let (index, composition, _) = round_trip(&condition("onsetString", "a synthetic onset")?)?;
+    assert_eq!(problem_value(&index, &composition, "DV_DATE_TIME")?, None);
+    Ok(())
+}
+
+#[test]
+fn a_typed_mapping_converts_its_own_alternative_and_back() -> Result<(), Box<dyn Error>> {
+    let index = polymorphic_template()?;
+    let program = compiled_against("ferrobridge_onset_value", &index)?;
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &condition("onsetString", "a synthetic onset")?,
+        &Seams::default(),
+        &defaults(),
+        &CallContext::new(),
+    )?;
+    let composition = inbound.into_value();
+    assert_eq!(problem_value(&index, &composition, "DV_DATE_TIME")?, None);
+    let outbound = to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        &composition,
+        &Seams::default(),
+        &CallContext::new(),
+    )?;
+    let resource = outbound
+        .value()
+        .to_serde_json(&mut fhir_types::codec::Path::root("Condition"))?;
+    assert_eq!(
+        resource.get("onsetString"),
+        Some(&serde_json::json!("a synthetic onset"))
+    );
+    Ok(())
+}
+
+#[test]
+fn a_typed_mapping_refuses_an_element_holding_another_alternative() -> Result<(), Box<dyn Error>> {
+    // The date and time alternative is no string, so the mapping cannot carry
+    // it: the value is refused, never read at the text node.
+    let (index, composition, _) =
+        round_trip(&condition("onsetDateTime", "2026-09-01T08:00:00+02:00")?)?;
+    let program = compiled_against("ferrobridge_onset_value", &index)?;
+    let refused = to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        &composition,
+        &Seams::default(),
+        &CallContext::new(),
+    );
+    let error = refused
+        .err()
+        .ok_or("the date and time alternative is refused")?;
+    assert!(
+        error.to_string().contains("another value alternative"),
+        "{error}"
+    );
+    Ok(())
+}
