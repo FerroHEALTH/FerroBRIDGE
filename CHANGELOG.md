@@ -256,7 +256,7 @@ crates on crates.io.
   stays at 1.98: the FerroHEALTH family builds with the latest stable
   toolchain and declares the release before it as its MSRV. Clippy 1.99's
   new `assert_is_empty` lint is answered in the tests it names, which moves
-  `fhirconnect` to 0.1.178 with no API change, since its unit tests live
+  `fhirconnect` to 0.1.179 with no API change, since its unit tests live
   under `src/`.
 
 - Every word the operator console shows now comes from its catalog
