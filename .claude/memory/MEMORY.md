@@ -83,3 +83,4 @@
 - [One milestone at a time](one-milestone-at-a-time.md) — every worker on the current milestone until it is cut; an externally blocked straggler moves to the next
 - [Release closes milestone](release-closes-milestone.md): release.yml refuses a tag whose milestone is missing or not empty and closes it after every leg; check it after a manual or recovery release; owner 2026-10-19 (#983)
 - [Worker scratch subfolders](worker-scratch-subfolders.md): each worker writes scratch files under its own scratchpad subfolder, never the root; check a file is yours before `--body-file` and re-read the PR body after; 2026-10-20 (#1021)
+- [Admin bypass stays](admin-bypass-stays.md) — the org-admin bypass on main stays in every family repo; never remove it, and no worker merges through it; owner 2026-10-21
