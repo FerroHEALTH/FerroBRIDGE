@@ -87,7 +87,7 @@ fn a_resource_with_no_identifier_offers_no_subject() -> Result<(), Box<dyn Error
         &defaults(),
         &CallContext::new(),
     )?;
-    assert!(inbound.subject().is_empty());
+    assert_eq!(inbound.subject().to_vec(), Vec::<SubjectIdentifier>::new());
     Ok(())
 }
 
