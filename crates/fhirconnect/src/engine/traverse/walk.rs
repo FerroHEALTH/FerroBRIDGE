@@ -432,8 +432,17 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let node = input.node();
         if !input.tail().segments.is_empty() {
             let segments = tail_segments(input);
-            let (_class, carried) = rm::carried(node.rm_type(), &segments)
+            let (_class, carried) = rm::carried(input.tail_class(), &segments)
                 .ok_or_else(|| unsupported_tail(mapping, input))?;
+            if input.on_element() && segments == [rm::NULL_FLAVOUR] {
+                return rm::null_flavour_of(&value, node.aql_path().as_str())
+                    .map(|found| found.map(|flavour| Leaf::NullFlavour(Box::new(flavour))))
+                    .map_err(|source| EngineError::Rm {
+                        mapping: String::from(mapping.name()),
+                        node: String::from(node.aql_path().as_str()),
+                        source: Box::new(source),
+                    });
+            }
             let Some(found) = attribute_at(&value, input) else {
                 return Ok(None);
             };

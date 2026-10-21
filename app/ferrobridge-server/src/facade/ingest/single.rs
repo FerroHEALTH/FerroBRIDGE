@@ -11,6 +11,7 @@ use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::cdr::Prefer;
+use crate::cdr::ids::EhrId;
 use crate::facade::commit;
 use crate::facade::ehr;
 use crate::facade::engine;
@@ -35,6 +36,9 @@ use super::binding::resource_source;
 use super::binding::strict_read;
 use super::claim::unclaimed;
 use super::engine_refusal;
+use super::linked::Built;
+use super::linked::Linker;
+use super::linked::with_committed;
 use super::pairing::same_content;
 use super::reconcile::one_composition;
 use super::refusal::cdr_refusal;
@@ -100,7 +104,10 @@ impl Ingest<'_> {
             .map_err(|error| store_refusal(&error))?;
         let known = if let Some(known) = exact {
             if source.version_id().is_some() {
-                let built = self.build(program, inbound, provenance).await?;
+                let (built, _, _) = self
+                    .run_linking(program, inbound, provenance, Some(&Linker::probing()))
+                    .await
+                    .map_err(|error| engine_refusal(&error))?;
                 let standing = self.standing(&known).await?;
                 let written = match self.standing_entry(program, inbound, &standing, &built)? {
                     Some((whole, entry)) => standing.replayed(entry.isolate(&whole)),
@@ -130,8 +137,10 @@ impl Ingest<'_> {
             }
             known
         };
-        let (built, instant) = self
-            .run(program, inbound, provenance)
+        // NOTE: no specification governs this: our own design, recognition commits
+        // nothing, so a link reads as the probe URI and a LINKED resource is revised.
+        let (built, instant, _) = self
+            .run_linking(program, inbound, provenance, Some(&Linker::probing()))
             .await
             .map_err(|error| engine_refusal(&error))?;
         let sent = strict_read(&built)?;
@@ -218,6 +227,34 @@ impl Ingest<'_> {
         program: &Loaded,
         provenance: &Provenance,
     ) -> Result<Written, Refused> {
+        self.ingest_linking(claim, inbound, program, provenance, Linking::Commit)
+            .await
+    }
+
+    /// Commits the first version of a composition for a linked resource, as
+    /// [`Ingest::ingest_resource`] does with its own `link` mappings left
+    /// unfollowed.
+    pub(super) async fn ingest_unlinked(
+        &self,
+        claim: &Claim<'_>,
+        inbound: &Inbound,
+        program: &Loaded,
+        provenance: &Provenance,
+    ) -> Result<Written, Refused> {
+        self.ingest_linking(claim, inbound, program, provenance, Linking::Refuse)
+            .await
+    }
+
+    /// Commits the first version of a composition for `inbound`, following
+    /// its `link` mappings as `linking` says.
+    async fn ingest_linking(
+        &self,
+        claim: &Claim<'_>,
+        inbound: &Inbound,
+        program: &Loaded,
+        provenance: &Provenance,
+        linking: Linking,
+    ) -> Result<Written, Refused> {
         if let Some(source) = resource_source(inbound)
             && !claim.holds(&source.storage_key())
         {
@@ -246,12 +283,32 @@ impl Ingest<'_> {
         )
         .await
         .map_err(|error| ehr_refusal(&error))?;
-        let composition = self.build(program, inbound, provenance).await?;
+        let built = match linking {
+            Linking::Commit => self.build_linked(program, inbound, provenance).await?,
+            Linking::Refuse => Built {
+                composition: self.build(program, inbound, provenance).await?,
+                committed: Vec::new(),
+            },
+        };
+        self.create(program, inbound, &ehr_id, built.composition)
+            .await
+            .map_err(|refused| with_committed(refused, &built.committed))
+    }
+
+    /// Commits `composition` as the first version of a composition in
+    /// `ehr_id`, and records the identity of `inbound`.
+    async fn create(
+        &self,
+        program: &Loaded,
+        inbound: &Inbound,
+        ehr_id: &EhrId,
+        composition: CanonicalComposition,
+    ) -> Result<Written, Refused> {
         let rm = strict_read(&composition)?;
         let context = self.commit_context(commit::Change::Creation, &composition)?;
         let answered = self
             .client
-            .create_composition(&ehr_id, &rm, &context, Prefer::Representation)
+            .create_composition(ehr_id, &rm, &context, Prefer::Representation)
             .await
             .map_err(|error| cdr_refusal(&error))?;
         let (version, stored) = match answered.outcome {
@@ -296,7 +353,7 @@ impl Ingest<'_> {
                 ));
             }
         };
-        self.record(program, inbound, &ehr_id, &version, &stored)
+        self.record(program, inbound, ehr_id, &version, &stored)
     }
 
     /// Commits a later version of the composition `revision` names, in which
@@ -325,14 +382,28 @@ impl Ingest<'_> {
         revision: &Revision<'_>,
         provenance: &Provenance,
     ) -> Result<Written, Refused> {
+        let linked = self.build_linked(program, inbound, provenance).await?;
+        self.revise(inbound, program, revision, &linked.composition)
+            .await
+            .map_err(|refused| with_committed(refused, &linked.committed))
+    }
+
+    /// Commits the version of the composition `revision` names that splices
+    /// in `built`, and records the identity of `inbound`.
+    async fn revise(
+        &self,
+        inbound: &Inbound,
+        program: &Loaded,
+        revision: &Revision<'_>,
+        built: &CanonicalComposition,
+    ) -> Result<Written, Refused> {
         let Revision {
             ehr_id,
             container,
             preceding,
             ..
         } = *revision;
-        let built = self.build(program, inbound, provenance).await?;
-        let composition = splice(program, &built, revision)?;
+        let composition = splice(program, built, revision)?;
         let rm = strict_read(&composition)?;
         let context = self.commit_context(commit::Change::Modification, &composition)?;
         let answered = self
@@ -491,4 +562,14 @@ fn would_commit(
         return Ok(None);
     };
     strict_read(&entry.replaced(whole, item)).map(Some)
+}
+
+/// Whether a create follows the `link` mappings of the resource it maps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Linking {
+    /// Each linked resource is committed first and its URI written.
+    Commit,
+    /// A `link` that names a resource refuses: the resource is itself a
+    /// linked one, and one link level is followed per write.
+    Refuse,
 }

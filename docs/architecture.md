@@ -861,7 +861,15 @@ expression is a load error: the reference CDR's connector let `where()` and
   chapter, with one correction: the chapter keys on `meta.url`, which does not
   exist in R4; the element is `meta.profile`, a list, so matching is set
   membership, not equality. A resource two mappings both need is a LINKED
-  mapping. A reference a transaction entry makes to another entry resolves
+  mapping. Its composition is committed before the composition that links
+  it, because ITS-REST 1.1.0 gives a `CONTRIBUTION` version
+  (`UPDATE_VERSION`) no `uid` and the CDR assigns a new composition's id:
+  a probe run finds the linked resources, each is committed through the
+  single-create path and selected by `meta.profile`, and the final run
+  writes `ehr:/<ehr_id>/compositions/<versioned_object_uid>` into
+  `LINK.target`; a refused linking commit names the linked composition it
+  left, and a Bundle entry's link to a resource is refused, since a
+  transaction is one `CONTRIBUTION` (#94; our own design). A reference a transaction entry makes to another entry resolves
   to that entry by `fullUrl` or `<Type>/<id>` first (#753). A reference the
   request does not carry is resolved as the references chapter recommends, and one whose resource is
   absent (off the allow-list, unknown to the identity map, or answered

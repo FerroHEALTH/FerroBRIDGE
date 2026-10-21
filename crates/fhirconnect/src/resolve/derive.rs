@@ -26,8 +26,12 @@ use crate::model::ast::keyword::DataType;
 /// class's page of the data-type chapter lists them.
 ///
 /// A row holds only the pairs a data-type cell of the engine carries both
-/// ways, so a derived pair is always one the engine runs. `DV_INTERVAL`
-/// against `Period` is the engine's `DV_INTERVAL<DV_DATE_TIME>` cell.
+/// ways, so a derived pair is always one the engine runs. A `DV_INTERVAL` row
+/// is keyed by its parameter, because the bound class decides the cell:
+/// `DV_INTERVAL<DV_DATE_TIME>` pairs with `Period` and
+/// `DV_INTERVAL<DV_QUANTITY>` with `Range` (`DV_INTERVAL.adoc` §Range,
+/// `data-mappings.adoc`), and the bare `DV_INTERVAL` row is the fallback for a
+/// class name that carries no parameter.
 /// `DV_BOOLEAN` against `boolean` is a primitive pair the chapter leaves out
 /// as "straight forward" (`data-mappings.adoc`).
 /// `PARTY_REF` against `Reference` is no row of the chapter: it carries
@@ -39,6 +43,8 @@ pub const PAIRS: &[(&str, &[&str])] = &[
     ("CODE_PHRASE", &["Coding"]),
     ("DV_DATE", &["date"]),
     ("DV_DATE_TIME", &["dateTime", "Period"]),
+    ("DV_INTERVAL<DV_DATE_TIME>", &["Period"]),
+    ("DV_INTERVAL<DV_QUANTITY>", &["Range"]),
     ("DV_INTERVAL", &["Period", "Range"]),
     ("PARTY_IDENTIFIED", &["Reference"]),
     ("PARTY_PROXY", &["Reference"]),
@@ -120,12 +126,25 @@ pub fn attribute_class(rm_type: &str, attribute: &model::RmAttribute) -> &'stati
 
 /// Returns the FHIR type codes `class` converts with, empty for a class no
 /// cell carries.
+///
+/// A generic class name is looked up whole, so an interval whose parameter
+/// no row names pairs with nothing; a bare class name falls back to its row.
 #[must_use]
 pub fn pairs(class: &str) -> &'static [&'static str] {
-    PAIRS
-        .iter()
-        .find(|&&(name, _)| name == base_class(class))
-        .map_or(&[], |&(_, codes)| codes)
+    let row = |wanted: &str| {
+        PAIRS
+            .iter()
+            .find(|&&(name, _)| name == wanted)
+            .map(|&(_, codes)| codes)
+    };
+    row(class)
+        .or_else(|| {
+            type_argument(class)
+                .is_none()
+                .then(|| row(base_class(class)))
+                .flatten()
+        })
+        .unwrap_or(&[])
 }
 
 /// Returns whether `class` is a structural node, which holds other nodes and
@@ -375,5 +394,33 @@ mod tests {
     fn an_argument_outside_the_bound_keeps_the_declared_type() {
         let lower = model::attribute("DV_INTERVAL", "lower").expect("the model has the bound");
         assert_eq!(attribute_class("DV_INTERVAL<DV_TEXT>", lower), "DV_ORDERED");
+    }
+
+    #[test]
+    fn an_interval_choice_is_picked_by_the_parameter() {
+        // DV_INTERVAL.adoc §Range pairs a quantity interval with Range;
+        // data-mappings.adoc pairs a Period with a date-time interval.
+        let onset: &[(&str, Kind)] = &[
+            ("Period", Kind::Complex("Period")),
+            ("Range", Kind::Complex("Range")),
+        ];
+        assert_eq!(
+            alternative("DV_INTERVAL<DV_QUANTITY>", onset),
+            Some("Range")
+        );
+        assert_eq!(
+            alternative("DV_INTERVAL<DV_DATE_TIME>", onset),
+            Some("Period")
+        );
+        assert_eq!(alternative("DV_INTERVAL", onset), Some("Period"));
+    }
+
+    #[test]
+    fn an_interval_of_a_class_no_cell_carries_has_no_pair() {
+        assert!(
+            super::pairs("DV_INTERVAL<DV_COUNT>").is_empty(),
+            "no cell carries a count interval"
+        );
+        assert_eq!(super::pairs("DV_INTERVAL<DV_QUANTITY>"), &["Range"]);
     }
 }

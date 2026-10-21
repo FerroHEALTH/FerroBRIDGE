@@ -272,6 +272,25 @@ impl Programs {
         referenced_by
     }
 
+    /// Returns every resource type a reference in an inbound resource is
+    /// resolved for: the [`Self::referenced_types`], and every type a program
+    /// maps when a program writes a `link`, whose resource is committed by
+    /// the context its profile names
+    /// (`types-of-mappings/concept-type/concept-mappings.adoc`, §Linked
+    /// mappings).
+    #[must_use]
+    pub fn resolved_types(&self) -> BTreeSet<String> {
+        let mut wanted = self.referenced_types();
+        if self
+            .loaded
+            .iter()
+            .any(|entry| links(entry.program.mappings()))
+        {
+            wanted.extend(self.resource_types());
+        }
+        wanted
+    }
+
     /// Whether `resource_type` is mapped by a program or created by one, so a
     /// read of it can answer.
     #[must_use]
@@ -356,6 +375,21 @@ fn referenced(mappings: &[Mapping], created: &mut BTreeSet<String>) {
         }
         referenced(mapping.followed_by(), created);
     }
+}
+
+/// Returns whether any of `mappings`, or a mapping under one, writes a
+/// `link`.
+fn links(mappings: &[Mapping]) -> bool {
+    mappings.iter().any(|mapping| {
+        let inner = match *mapping.method() {
+            Method::Link { .. } => return true,
+            Method::Reference { ref mappings, .. }
+            | Method::Slot { ref mappings, .. }
+            | Method::SlotContext { ref mappings, .. } => links(mappings),
+            Method::Value | Method::Programmed { .. } | Method::Participation { .. } => false,
+        };
+        inner || links(mapping.followed_by())
+    })
 }
 
 /// Checks the party programs of a load against the Demographic API gate.

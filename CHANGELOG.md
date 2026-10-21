@@ -25,6 +25,37 @@ crates on crates.io.
 
 ### Added
 
+- FHIRconnect LINKED mappings (#94): a `link` whose FHIR side names a
+  resource, such as a Condition's `encounter`, now commits that resource as a
+  composition of its own through the context its `meta.profile` names, and
+  writes `ehr:/<ehr_id>/compositions/<versioned_object_uid>` into the
+  linking composition's `LINK.target`. A facade create or update runs in two
+  passes, because ITS-REST 1.1.0 lets the CDR, not the client, assign a new
+  composition's id: a probe run finds the linked resources, each is
+  committed as a `POST` would commit it (a replay links the composition the
+  first delivery produced, and a resource this server already serves links
+  where it stands), and the final run writes their URIs. A resource no
+  context maps is a declared loss, `skipped-unmapped-link`. A linking commit
+  the CDR refuses answers its refusal with a warning naming each linked
+  composition it left. A transaction or batch entry that links a resource is
+  refused, since a transaction is one `CONTRIBUTION`, and `$validate` runs
+  the link without committing. The engine gains the
+  `engine::linked::LinkedCompositions` seam (`Seams::with_linked`),
+  `SkipReason::UnmappedLink` and `ReferenceError::Link`; a run with no seam
+  refuses as before. `fhirconnect` 0.1.174.
+- The FHIRconnect engine converts `ELEMENT.null_flavour` against the code
+  of the R4 `data-absent-reason` extension both ways (#93), through
+  `engine::lens::null_flavour` with GetPut and PutGet property tests and a
+  test per entry of its committed table. A tail on the element reaches
+  `null_flavour` as the `_null_flavour` family of the node the element
+  shares with its value, with `_null_reason` beside it. FHIRconnect
+  `NULL_FLAVOUR.adoc`'s table is no function; the cell reads it with the
+  openEHR terminology's null flavours (271 "no information", 253
+  "unknown"), keeps a FHIR code with no flavour of its own in
+  `null_reason`, and refuses a code outside either set. **Breaking:**
+  `SkipReason` gains `NullReasonUncarried`, the declared loss of a
+  `null_reason` that names no code, so a consumer that matches `SkipReason`
+  exhaustively adds the arm. `fhirconnect` 0.1.176.
 - A FHIRconnect mapping can now name the origin of an observation's
   history, `$archetype/data/origin`, which no Web Template node carries
   (#95). The engine writes it as the Simplified Formats `history_origin` of
@@ -66,8 +97,8 @@ crates on crates.io.
   reads only the value node whose `_type` matches. The library's
   `dosage.v2.yml`, `dosage.v2.BackboneElement.yml` and
   `timing_daily.v1.yml` now load, so the medication statement context gets
-  to compile. Its refusals there are recorded on #101. `fhirconnect`
-  0.1.169.
+  to compile. Its refusals there are recorded on #101. It landed in
+  `fhirconnect` 0.1.169 beside #1076, with no version of its own.
 - The FHIRconnect engine converts a scalar `Integer` or `Integer64` tail
   against FHIR `integer` and a scalar `Real` tail against `decimal` both
   ways (#1081), through `engine::lens::scalar` with GetPut and PutGet
@@ -249,7 +280,8 @@ crates on crates.io.
 - The FHIRconnect engine's data-type cell dispatch is a module folder,
   `engine::cell` with the held-value readers in a child module (#1079),
   under the file-length threshold. Behaviour and public API are unchanged.
-  `fhirconnect` 0.1.170.
+  It landed in `fhirconnect` 0.1.170 beside the display lookup (#95), with no
+  version of its own.
 - The operator console takes FerroUI 0.2.0 and reads every word it hands
   FerroUI from its catalog at run time (#956): table captions, column
   headers, pager nouns with their plurals, navigation, fields, dialogs and
@@ -345,6 +377,13 @@ crates on crates.io.
   out (an `ITEM_TREE` under an entry, for example) by its term definition in
   the template, where it named it by its node id before (RM Common IM,
   `LOCATABLE.name`). The `openehr-sdt` 0.0.89 builder does this.
+- `ferrohealth-smart` 0.4.0 (#1110). Every `[<lane>.credentials.oauth]`
+  table takes the keys the crate adds: `client_auth = "tls_client_auth"` or
+  `"self_signed_tls_client_auth"` with `client_certificate_file` and
+  `client_key_file` for RFC 8705 §2 mutual TLS to the token endpoint,
+  `ca_file` for trust roots added to the built-in ones, and
+  `assertion_audience = "issuer"` for a `private_key_jwt` assertion that
+  names the issuer (RFC 7523 §3) in place of the token endpoint.
 - `ferrohealth-smart` 0.3.1 and the `openehr-*` crates 0.0.90 (#1062),
   which `ferrohealth-smart` 0.3.1 pins; `fhirconnect` 0.1.168 and
   `openehr-mapping-core` 0.1.124 build on them. The facade and the operator
@@ -392,6 +431,15 @@ crates on crates.io.
 
 ### Fixed
 
+- A FHIRconnect untyped choice element that admits both `Period` and
+  `Range`, mapped onto a `DV_INTERVAL<DV_QUANTITY>` node, is written as
+  `Range` (#1080); it picked `Period` and the run refused with no cell.
+  `resolve::derive::PAIRS` keys the interval rows by parameter
+  (`DV_INTERVAL<DV_DATE_TIME>` with `Period`, `DV_INTERVAL<DV_QUANTITY>` with
+  `Range`), an interval of any other parameter pairs with nothing and is
+  refused at load, and the cells refuse a `Period` into a quantity interval
+  and a `Range` into a date-time one. `PAIRS` gains two rows, so a consumer
+  that reads the table sees them. `fhirconnect` 0.1.177.
 - A facade write, transaction or `$validate` whose mapping run fails because
   the terminology server failed (no answer, a timeout, a `5xx`, a refused
   `$translate` or `$lookup`, an answer that does not decode) now answers
@@ -414,7 +462,7 @@ crates on crates.io.
   `fhirconnect`, a mapping whose type the compiler matched to one alternative
   refuses an `ELEMENT` that holds another, and an instance that holds another
   alternative still counts when the engine probes occurrences.
-  `openehr-mapping-core` 0.1.125, `fhirconnect` 0.1.175.
+  `openehr-mapping-core` 0.1.125, `fhirconnect` 0.1.178.
 - A FHIRconnect `DV_INTERVAL<DV_DATE_TIME>` whose present bound is excluded
   is refused going out to `Period` (#1076), because both R4 `Period` bounds
   are inclusive; it was written as an inclusive bound with no loss declared.
@@ -569,6 +617,14 @@ crates on crates.io.
   next line. It now keeps the higher version at each position, leaves any
   hunk that differs beyond its versions to stop the merge, and refuses a
   manifest `cargo metadata` cannot read.
+
+### Security
+
+- The TLS stack the bridge calls the CDR, the terminology server and the
+  sending sites through no longer trusts the distrusted emSign
+  intermediates: `rustls-webpki` 0.103.16 rejects their public keys
+  (RUSTSEC-2026-0382), and `webpki-roots` and `webpki-root-certs` 1.0.10
+  drop the root that allowed them (RUSTSEC-2026-0381, RUSTSEC-2026-0383).
 
 ## [0.0.10] - 2026-10-19
 
