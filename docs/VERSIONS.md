@@ -160,7 +160,7 @@ back against this row, and Dependabot (`docker`, over `/docker` and
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| Container base image | `gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3` | the `FROM` of `docker/Dockerfile` and of `docker/viewer/Dockerfile`, and each one's `org.opencontainers.image.base.name` label without the digest |
+| Container base image | `gcr.io/distroless/static-debian13:nonroot@sha256:d62067879de890a1def9da0e7766b7d20810a5e5555cef8506b752437d7a3e88` | the `FROM` of `docker/Dockerfile` and of `docker/viewer/Dockerfile`, and each one's `org.opencontainers.image.base.name` label without the digest |
 
 The quickstart `compose.yaml` pulls `ghcr.io/ferrohealth/ferrobridge` and,
 under its `viewer` profile, `ghcr.io/ferrohealth/ferrobridge-viewer` at the
