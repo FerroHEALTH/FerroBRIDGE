@@ -127,7 +127,10 @@ the testkit tool crate. Beside it:
   links only `openehr-mapping-core`, `fhir-types` and
   `ferrobridge-operator-api` of the workspace and its browser half none, held by `tests/it/boundary.rs`; the CI `viewer` lane
   lints the wasm32 half and builds the site bundle against its budget
-  (`.claude/rules/leptos-ui.md`).
+  (`.claude/rules/leptos-ui.md`). FerroUI (`ferrohealth-ui`, pinned exactly)
+  leads its UI: its components, design and component rules come from the
+  FerroUI repository at the tag of the pin, and a missing part is a FerroUI
+  issue, never a local copy.
 
 - `crates/fhir-types`: the generated FHIR model, Apache-2.0, emitted whole by
   the generator below and never hand-edited: one module per version, STU3,
@@ -473,7 +476,9 @@ apply always. Read the relevant one before working in that area.
 - `.claude/rules/vendored-inputs.md`: every external corpus is fetched by a
   committed `scripts/vendor/*.sh`, vendored verbatim, provenance-stamped.
 - `.claude/rules/leptos-ui.md`: the operator console's Leptos discipline,
-  scoped to `app/ferrobridge-viewer/**`.
+  scoped to `app/ferrobridge-viewer/**`. FerroUI leads the UI: the rule opens
+  with FerroUI's consumer guide and component rules and keeps only what is
+  particular to this console.
 - `.claude/rules/ci-cd.md`, `ai-code-review.md`, `crates-publishing.md`: the
   workflow-security discipline, the advisory-analyzer policy (SonarQube Cloud,
   CodeQL), and the crates.io bump and publish rules.
