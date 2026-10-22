@@ -666,6 +666,12 @@ crates on crates.io.
   intermediates: `rustls-webpki` 0.103.16 rejects their public keys
   (RUSTSEC-2026-0382), and `webpki-roots` and `webpki-root-certs` 1.0.10
   drop the root that allowed them (RUSTSEC-2026-0381, RUSTSEC-2026-0383).
+- The bridge and operator console images no longer trust the compromised
+  eMudhra (emSign) intermediates in the system trust store (Debian
+  DSA-6572-1, #1140). The distroless base
+  `gcr.io/distroless/static-debian13:nonroot` moves to index digest
+  `d620678`, which ships `ca-certificates` 20250419+deb13u1, in the `FROM`
+  of `docker/Dockerfile` and `docker/viewer/Dockerfile` and in the pin row.
 
 ## [0.0.10] - 2026-10-19
 
