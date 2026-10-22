@@ -86,4 +86,4 @@
 - [Admin bypass stays](admin-bypass-stays.md) — the org-admin bypass on main stays in every family repo; never remove it, and no worker merges through it; owner 2026-10-21
 - [Family toolchain](family-toolchain.md): newest stable Rust as toolchain, the toolchain minus one as MSRV (1.99.1 and 1.98 on 2026-10-21); check the Rust blog first; never lower an MSRV; owner 2026-10-21
 - [Worktrees in the repo](worktrees-in-repo.md): every worktree at <repo>/.claude/worktrees/<name>, never a sibling folder; owner 2026-10-21
-- [Console redesign program](console-redesign-program.md): design-first, PIX, FED, BRIDGE, TERM, then EHR, the orchestrator reviews and moves on, then one breaking FerroUI 0.3.0 and a lockstep rollout; owner 2026-10-21
+- [Console redesign program](console-redesign-program.md): design-first, PIX, FED, BRIDGE, TERM, then EHR, the orchestrator reviews and moves on, then FerroUI finished across 0.3.0 to 0.3.2 before one lockstep console rollout (FerroUI#161, v0.4.0); owner 2026-10-21 and 2026-10-22
