@@ -50,6 +50,7 @@ fn drawn(info: &Loaded<Info>, readiness: &Loaded<Ready>) -> AnyView {
     let header = Header {
         title: tr(Msg::OmopEtl).into(),
         subtitle: Some(tr(Msg::OmopSubtitle).into()),
+        subtitle_view: None,
         crumbs: Vec::new(),
         mono: false,
         badge: Some(

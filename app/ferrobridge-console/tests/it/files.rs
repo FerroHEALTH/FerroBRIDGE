@@ -38,6 +38,12 @@ async fn a_context_file_shows_its_lines_its_digest_and_edit() -> Result<(), Box<
         "{page}"
     );
     assert!(page.contains("Program"), "the context's tabs: {page}");
+    assert!(
+        page.contains(
+            r#"Context of <strong>Observation</strong> on <a href="/mappings/templates/synthetic.vital_signs.v1"><code>synthetic.vital_signs.v1</code></a>"#
+        ),
+        "the subtitle bolds the resource and links the template: {page}"
+    );
     Ok(())
 }
 

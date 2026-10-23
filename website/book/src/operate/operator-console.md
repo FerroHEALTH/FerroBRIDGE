@@ -369,7 +369,7 @@ upgrade, change each old name to the new one:
 The cookies change with the name, so every operator signs in again after
 the upgrade.
 
-The 0.0.11 console is also drawn anew on FerroUI 0.3.2, and its addresses
+The 0.0.11 console is also drawn anew on FerroUI 0.3.3, and its addresses
 moved with it. A bookmark to an old address answers the page-not-found
 page; follow its links, or use the new address:
 

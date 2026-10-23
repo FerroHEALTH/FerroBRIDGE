@@ -17,6 +17,7 @@ use ferrohealth_ui::table::view::{
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::notice::{Announce, notice};
+use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::surface::{
     Crumb, Header, definitions, page_heading, panel_sections_card,
 };
@@ -32,7 +33,7 @@ use crate::locale::tr;
 use crate::model::{Loaded, Outcome};
 use crate::pages::dashboard::{UPSTREAMS, indicator_name};
 use crate::pages::facade::indicator;
-use crate::pages::parts::{faulted, quiet, refused, section, state};
+use crate::pages::parts::{faulted, quiet, refused, section};
 
 /// The lanes that use the upstream `name`, as `GET /health/info` names
 /// them, each its words.
@@ -64,7 +65,7 @@ fn upstream_state(readiness: &Readiness, name: &str) -> AnyView {
     if readiness.indicators.contains_key(name) {
         indicator(readiness, name)
     } else {
-        state(Tone::Neutral, &tr(Msg::StateNotConfigured), None)
+        state(Mark::Neutral, tr(Msg::StateNotConfigured), None)
     }
 }
 
@@ -137,7 +138,7 @@ fn list(info: &Loaded<Info>, readiness: &Loaded<Ready>) -> AnyView {
     .into_any();
     let card = list_card(ListCard {
         title: tr(Msg::Connections),
-        count: Some(u64::try_from(UPSTREAMS.len()).unwrap_or(u64::MAX)),
+        count: Some(u64::try_from(UPSTREAMS.len()).unwrap_or(u64::MAX).into()),
         order: None,
         tabs: None,
         actions: None,
@@ -198,9 +199,9 @@ fn detail(name: &str, info: &Loaded<Info>, readiness: &Loaded<Ready>) -> AnyView
     };
     let found = readiness.indicators.get(name);
     let badge = match found {
-        Some(found) if found.state == State::Up => state(Tone::Ok, &tr(Msg::StateUp), None),
-        Some(_) => state(Tone::Bad, &tr(Msg::StateUnreachable), None),
-        None => state(Tone::Neutral, &tr(Msg::StateNotConfigured), None),
+        Some(found) if found.state == State::Up => state(Mark::Ok, tr(Msg::StateUp), None),
+        Some(_) => state(Mark::Bad, tr(Msg::StateUnreachable), None),
+        None => state(Mark::Neutral, tr(Msg::StateNotConfigured), None),
     };
     let warning = found
         .filter(|found| found.state == State::Down)
@@ -245,6 +246,7 @@ fn detail(name: &str, info: &Loaded<Info>, readiness: &Loaded<Ready>) -> AnyView
         header: Header {
             title: indicator_name(name).into(),
             subtitle: Some(subtitle(name).into()),
+            subtitle_view: None,
             crumbs: vec![Crumb::new(tr(Msg::Connections), CONNECTIONS)],
             mono: false,
             badge: Some(badge),

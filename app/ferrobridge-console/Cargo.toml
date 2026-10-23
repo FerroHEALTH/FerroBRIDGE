@@ -38,7 +38,11 @@ leptos = { workspace = true, features = ["islands"] }
 serde.workspace = true
 # The FerroHEALTH components, stylesheet and role tokens, in both halves;
 # the stylesheet and the FerroBRIDGE theme are served from it as they stand.
-ferrohealth-ui.workspace = true
+# `split` keeps the lazy islands in chunks of their own, which only a site
+# built with `cargo leptos build --split` may turn on (FerroUI
+# `docs/consoles.md`, "How a console builds"); scripts/release/console-site.sh
+# is the one build and always splits.
+ferrohealth-ui = { workspace = true, features = ["split"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 leptos = { workspace = true, features = ["hydrate"] }

@@ -144,7 +144,7 @@ pub fn MappingEditor(
         panel_section(
             Some(SectionHead {
                 title: text.diagnostics,
-                count: Some(count),
+                count: Some(count.into()),
                 actions: None,
             }),
             body,

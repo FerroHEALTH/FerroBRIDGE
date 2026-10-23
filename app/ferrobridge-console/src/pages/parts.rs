@@ -3,7 +3,7 @@
 
 //! What several pages draw alike.
 //!
-//! A state as its mark and word, a file's owner and language as tags, a
+//! A file's diagnostics as a state, a file's owner and language as tags, a
 //! load's diagnostics as the library's findings, a quiet line, a section of
 //! a tab panel, and the console's fault or the bridge's refusal in the place
 //! of what failed.
@@ -11,15 +11,15 @@
 use std::collections::BTreeMap;
 
 use ferrobridge_operator_api::operator::{Language, Owner};
+use ferrohealth_ui::i18n::Phrase;
 use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::code::{Gravity, LineDiagnostic};
 use ferrohealth_ui::view::diagnostics::{FileFindings, Finding, Position};
 use ferrohealth_ui::view::refusal::fault;
-use ferrohealth_ui::view::status::status;
+use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::surface::{SectionHead, panel_section};
 use ferrohealth_ui::view::tag::{Tag, tag};
-use ferrohealth_ui::view::template::list::list_empty;
+use ferrohealth_ui::view::template::list::{HeadingCount, list_empty};
 use leptos::prelude::*;
 use openehr_mapping_core::diagnostic::{Diagnostic, Severity};
 
@@ -46,23 +46,33 @@ pub fn edit_href(path: &str) -> String {
     format!("{EDIT}/{path}")
 }
 
-/// The glyph a state in `tone` is drawn with.
-const fn glyph_of(tone: Tone) -> Glyph {
-    match tone {
-        Tone::Ok => Glyph::CIRCLE_CHECK,
-        Tone::Warn => Glyph::TRIANGLE_ALERT,
-        Tone::Bad => Glyph::CIRCLE_X,
-        Tone::Info | Tone::Accent => Glyph::INFO,
-        Tone::Neutral => Glyph::MINUS,
-    }
-}
-
-/// Returns a state as a mark and its word in `tone`, so it never rests on
-/// colour alone (FerroUI family rule 12), with a quiet `detail` after it.
+/// Returns `text`, a message looked up with `Phrase::open` for each name in
+/// `parts`, with each open placeable drawn as the view `parts` gives it, such
+/// as a bold word or a code link in a page subtitle.
 #[must_use]
-pub fn state(tone: Tone, word: &str, detail: Option<String>) -> AnyView {
-    // TODO(#1146): the F12 state mark once FerroUI carries its public view (FerroHEALTH/FerroUI#322).
-    status(tone, glyph_of(tone), word, detail).into_any()
+pub fn with_markup(text: &str, mut parts: Vec<(&str, AnyView)>) -> AnyView {
+    let mut rest = text.to_owned();
+    let mut drawn = Vec::new();
+    loop {
+        let next = parts
+            .iter()
+            .enumerate()
+            .filter_map(|(at, (name, _))| {
+                rest.find(&Phrase::open_mark(name)).map(|found| (found, at))
+            })
+            .min();
+        let Some((found, at)) = next else {
+            drawn.push(view! { {rest} }.into_any());
+            break;
+        };
+        let (name, part) = parts.swap_remove(at);
+        let mut marked = rest.split_off(found);
+        let after = marked.split_off(Phrase::open_mark(name).len().min(marked.len()));
+        drawn.push(view! { {rest} }.into_any());
+        drawn.push(part);
+        rest = after;
+    }
+    drawn.into_iter().collect_view().into_any()
 }
 
 /// Returns the state of a file or a context with `errors` and `warnings`.
@@ -70,18 +80,18 @@ pub fn state(tone: Tone, word: &str, detail: Option<String>) -> AnyView {
 pub fn diagnostics_state(errors: usize, warnings: usize, clean: Msg) -> AnyView {
     if errors > 0 {
         state(
-            Tone::Bad,
-            &tr_with(Msg::CountErrors, &[("count", errors.into())]),
+            Mark::Bad,
+            tr_with(Msg::CountErrors, &[("count", errors.into())]),
             None,
         )
     } else if warnings > 0 {
         state(
-            Tone::Warn,
-            &tr_with(Msg::CountWarnings, &[("count", warnings.into())]),
+            Mark::Warn,
+            tr_with(Msg::CountWarnings, &[("count", warnings.into())]),
             None,
         )
     } else {
-        state(Tone::Ok, &tr(clean), None)
+        state(Mark::Ok, tr(clean), None)
     }
 }
 
@@ -223,7 +233,7 @@ pub fn section(title: String, count: Option<u64>, body: AnyView) -> AnyView {
     panel_section(
         Some(SectionHead {
             title,
-            count,
+            count: count.map(HeadingCount::All),
             actions: None,
         }),
         body,

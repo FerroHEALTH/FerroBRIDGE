@@ -14,7 +14,9 @@ use std::borrow::Cow;
 
 use ferrobridge_operator_api::operator::{EngineState, Language, Listed, Owner, Program, Template};
 use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::table::filter::{Find, find_form};
+use ferrohealth_ui::table::filter::{
+    FilterChoice, FilterMenu, Find, MenuForm, filter_menu, find_form,
+};
 use ferrohealth_ui::table::model::{Paging, StateSource, Window};
 use ferrohealth_ui::table::pager::{Listing, link_pager};
 use ferrohealth_ui::table::view::{
@@ -32,9 +34,7 @@ use ferrohealth_ui::view::tabs::{Tab, TabRow};
 use ferrohealth_ui::view::template::list::{
     ActiveFilters, FilterChip, ListCard, active_filters, list_card,
 };
-use ferrohealth_ui::widget::action_menu::{
-    Act, Action, Choice, Item, Listbox, Menu, Pick, listbox, row_menu,
-};
+use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu, row_menu};
 use leptos::prelude::*;
 use leptos_router::hooks::{use_params_map, use_query_map};
 
@@ -126,7 +126,7 @@ fn heading() -> AnyView {
     .more(more);
     let dialog = confirm_dialog(
         Confirmation {
-            id: RELOAD_DIALOG,
+            id: RELOAD_DIALOG.into(),
             title: tr(Msg::ReloadDialogTitle).into(),
             message: tr(Msg::ReloadDialogBody).into(),
         },
@@ -546,15 +546,21 @@ fn templates_table(state: &EngineState) -> AnyView {
     .into_any()
 }
 
+/// The languages the Files tab filters by, in the order its menu lists them.
+const LANGUAGES: [Language; 2] = [Language::Fhirconnect, Language::Omocl];
+
+/// The owners the Files tab filters by, in the order its menu lists them.
+const OWNERS: [Owner; 2] = [Owner::Provisioned, Owner::Console];
+
 /// The filters of the Files tab, as its query carries them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct FileFilters {
     /// The words of the find field.
     words: String,
-    /// The language chosen.
-    language: Option<Language>,
-    /// The owner chosen.
-    owner: Option<Owner>,
+    /// The languages kept; none while every language is.
+    languages: Vec<Language>,
+    /// The owners kept; none while every owner is.
+    owners: Vec<Owner>,
 }
 
 impl FileFilters {
@@ -562,24 +568,15 @@ impl FileFilters {
     fn read(query: &leptos_router::params::ParamsMap) -> Self {
         Self {
             words: query.get("q").unwrap_or_default().trim().to_owned(),
-            language: match query.get("language").as_deref() {
-                Some("fhirconnect") => Some(Language::Fhirconnect),
-                Some("omocl") => Some(Language::Omocl),
-                _ => None,
-            },
-            owner: match query.get("owner").as_deref() {
-                Some("provisioned") => Some(Owner::Provisioned),
-                Some("console") => Some(Owner::Console),
-                _ => None,
-            },
+            languages: kept(query, "language", &LANGUAGES, language_key),
+            owners: kept(query, "owner", &OWNERS, owner_key),
         }
     }
 
     /// Whether `file` passes every filter.
     fn keeps(&self, file: &Listed) -> bool {
-        self.language
-            .is_none_or(|language| file.language == language)
-            && self.owner.is_none_or(|owner| file.owner == owner)
+        (self.languages.is_empty() || self.languages.contains(&file.language))
+            && (self.owners.is_empty() || self.owners.contains(&file.owner))
             && (self.words.is_empty()
                 || file
                     .path
@@ -593,11 +590,19 @@ impl FileFilters {
         if !self.words.is_empty() && without != Some("q") {
             pairs.push(format!("q={}", encoded(&self.words)));
         }
-        if let Some(language) = self.language.filter(|_| without != Some("language")) {
-            pairs.push(format!("language={}", language_key(language)));
+        if without != Some("language") {
+            pairs.extend(
+                self.languages
+                    .iter()
+                    .map(|language| format!("language={}", language_key(*language))),
+            );
         }
-        if let Some(owner) = self.owner.filter(|_| without != Some("owner")) {
-            pairs.push(format!("owner={}", owner_key(owner)));
+        if without != Some("owner") {
+            pairs.extend(
+                self.owners
+                    .iter()
+                    .map(|owner| format!("owner={}", owner_key(*owner))),
+            );
         }
         if let Some(paging) = paging {
             pairs.push(format!("page={}&size={}", paging.page, paging.size));
@@ -608,6 +613,27 @@ impl FileFilters {
         } else {
             format!("{base}?{}", pairs.join("&"))
         }
+    }
+}
+
+/// The choices of `all` the query names under `key`, by `key_of`: none
+/// when it names every choice or none of them, since both keep every row.
+fn kept<T: Copy + PartialEq>(
+    query: &leptos_router::params::ParamsMap,
+    key: &str,
+    all: &[T],
+    key_of: fn(T) -> &'static str,
+) -> Vec<T> {
+    let named = query.get_all(key).unwrap_or_default();
+    let kept = all
+        .iter()
+        .copied()
+        .filter(|choice| named.iter().any(|name| name == key_of(*choice)))
+        .collect::<Vec<_>>();
+    if kept.len() == all.len() {
+        Vec::new()
+    } else {
+        kept
     }
 }
 
@@ -632,95 +658,64 @@ fn encoded(words: &str) -> String {
     url::form_urlencoded::byte_serialize(words.as_bytes()).collect()
 }
 
-/// The filter menu of one filter: a select button whose choices are links.
-fn filter_menu(
-    id: &str,
-    label: String,
-    any: String,
-    current: Option<String>,
-    choices: Vec<(String, String, bool)>,
-    clear: String,
-) -> AnyView {
-    let mut options = vec![Choice {
-        label: any.clone().into(),
-        note: None,
-        lang: None,
-        selected: current.is_none(),
-        pick: Pick::Link(clear),
-    }];
-    options.extend(choices.into_iter().map(|(words, href, selected)| Choice {
-        label: words.into(),
-        note: None,
-        lang: None,
-        selected,
-        pick: Pick::Link(href),
-    }));
-    listbox(Listbox {
-        id: id.to_owned(),
-        label,
-        value: current.unwrap_or(any).into(),
-        choices: options,
-    })
-}
-
 /// The Files tab's toolbar: the find field and the Language and Owner
-/// filters, each carrying the others.
-fn files_toolbar(filters: &FileFilters) -> AnyView {
-    let language_menu = filter_menu(
-        "filter-language",
-        tr(Msg::ColLanguage),
-        tr(Msg::FilterAnyLanguage),
-        filters
-            .language
-            .map(|language| language_name(language).to_owned()),
-        [Language::Fhirconnect, Language::Omocl]
-            .into_iter()
-            .map(|language| {
-                let chosen = FileFilters {
-                    language: Some(language),
-                    ..filters.clone()
-                };
-                (
-                    language_name(language).to_owned(),
-                    chosen.href(None, None),
-                    filters.language == Some(language),
-                )
-            })
-            .collect(),
-        filters.href(Some("language"), None),
-    );
-    let owner_menu = filter_menu(
-        "filter-owner",
-        tr(Msg::ColOwner),
-        tr(Msg::FilterAnyOwner),
-        filters.owner.map(owner_word),
-        [Owner::Provisioned, Owner::Console]
-            .into_iter()
-            .map(|owner| {
-                let chosen = FileFilters {
-                    owner: Some(owner),
-                    ..filters.clone()
-                };
-                (
-                    owner_word(owner),
-                    chosen.href(None, None),
-                    filters.owner == Some(owner),
-                )
-            })
-            .collect(),
-        filters.href(Some("owner"), None),
-    );
-    let carried: Vec<(String, String)> = [
-        filters
-            .language
-            .map(|language| (String::from("language"), language_key(language).to_owned())),
-        filters
-            .owner
-            .map(|owner| (String::from("owner"), owner_key(owner).to_owned())),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
+/// filter menus, whose checkboxes its form sends with the find words, each
+/// choice counting the files it keeps among `listing` under the other
+/// filters.
+fn files_toolbar(filters: &FileFilters, listing: &[Listed]) -> AnyView {
+    let counted = |with: &FileFilters| {
+        u64::try_from(listing.iter().filter(|file| with.keeps(file)).count()).unwrap_or(u64::MAX)
+    };
+    let languages = LANGUAGES
+        .into_iter()
+        .map(|language| {
+            let with = FileFilters {
+                languages: vec![language],
+                ..filters.clone()
+            };
+            FilterChoice::new(
+                language_key(language),
+                language_name(language),
+                counted(&with),
+                filters.languages.is_empty() || filters.languages.contains(&language),
+            )
+        })
+        .collect();
+    let owners = OWNERS
+        .into_iter()
+        .map(|owner| {
+            let with = FileFilters {
+                owners: vec![owner],
+                ..filters.clone()
+            };
+            FilterChoice::new(
+                owner_key(owner),
+                owner_word(owner),
+                counted(&with),
+                filters.owners.is_empty() || filters.owners.contains(&owner),
+            )
+        })
+        .collect();
+    let language_menu = filter_menu(FilterMenu {
+        id: "filter-language",
+        name: "language",
+        glyph: Glyph::LIST_FILTER,
+        label: tr(Msg::ColLanguage).into(),
+        title: tr(Msg::FilterShowLanguages),
+        choices: languages,
+        note: None,
+        form: MenuForm::Enclosing,
+    });
+    let owner_menu = filter_menu(FilterMenu {
+        id: "filter-owner",
+        name: "owner",
+        glyph: Glyph::LIST_FILTER,
+        label: tr(Msg::ColOwner).into(),
+        title: tr(Msg::FilterShowOwners),
+        choices: owners,
+        note: None,
+        form: MenuForm::Enclosing,
+    });
     find_form(
         Find {
             id: "find-files",
@@ -729,7 +724,7 @@ fn files_toolbar(filters: &FileFilters) -> AnyView {
             value: &filters.words,
             source: StateSource::Url,
             action: None,
-            fields: &carried,
+            fields: &[],
         },
         view! { {language_menu} {owner_menu} },
     )
@@ -739,18 +734,27 @@ fn files_toolbar(filters: &FileFilters) -> AnyView {
 /// nothing while no filter is set.
 fn files_chips(filters: &FileFilters, total: u32, all: usize) -> Option<AnyView> {
     let mut chips = Vec::new();
-    if let Some(language) = filters.language {
+    if !filters.languages.is_empty() {
+        let value = filters
+            .languages
+            .iter()
+            .map(|language| language_name(*language))
+            .collect::<Vec<_>>()
+            .join(", ");
         chips.push(FilterChip {
-            label: tr_with(
-                Msg::ChipLanguage,
-                &[("value", language_name(language).into())],
-            ),
+            label: tr_with(Msg::ChipLanguage, &[("value", value.into())]),
             remove: filters.href(Some("language"), None),
         });
     }
-    if let Some(owner) = filters.owner {
+    if !filters.owners.is_empty() {
+        let value = filters
+            .owners
+            .iter()
+            .map(|owner| owner_word(*owner))
+            .collect::<Vec<_>>()
+            .join(", ");
         chips.push(FilterChip {
-            label: tr_with(Msg::ChipOwner, &[("value", owner_word(owner).into())]),
+            label: tr_with(Msg::ChipOwner, &[("value", value.into())]),
             remove: filters.href(Some("owner"), None),
         });
     }
@@ -788,7 +792,7 @@ fn files_body(
     let paging = Paging::from_query(query);
     let window = Window::over(total, paging);
     let shown = window.slice(&kept);
-    let toolbar = files_toolbar(&filters);
+    let toolbar = files_toolbar(&filters, listing);
     let chips = files_chips(&filters, total, listing.len());
     let table = if shown.is_empty() {
         quiet(

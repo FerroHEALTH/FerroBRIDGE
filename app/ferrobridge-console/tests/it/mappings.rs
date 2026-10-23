@@ -67,6 +67,20 @@ async fn the_files_tab_filters_by_the_query_and_says_what_it_shows() -> Result<(
     assert!(console_files.contains(CONTEXT), "{console_files}");
     assert!(!console_files.contains(MODEL), "{console_files}");
     assert!(console_files.contains("Owner: console"), "{console_files}");
+    assert!(
+        console_files.contains("Owner · 1 of 2"),
+        "the filter menu says what it keeps: {console_files}"
+    );
+    let (_response, both) = send(
+        &service,
+        get_with("/mappings/files?owner=console&owner=provisioned", &cookie)?,
+    )
+    .await?;
+    assert!(
+        both.contains(MODEL),
+        "every owner kept is no filter: {both}"
+    );
+    assert!(!both.contains("Owner: "), "{both}");
     let (_response, none) = send(
         &service,
         get_with("/mappings/files?q=nothing-matches", &cookie)?,

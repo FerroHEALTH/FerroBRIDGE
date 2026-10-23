@@ -19,6 +19,7 @@ use ferrohealth_ui::table::view::{
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::code::{Code, code_viewer};
+use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::{Header, definitions, facts_row, panel_sections};
 use ferrohealth_ui::view::tabs::{Tab, TabRow};
@@ -32,7 +33,7 @@ use crate::load::{Capability, Ready};
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::model::{Loaded, Outcome};
-use crate::pages::parts::{faulted, quiet, refused, section, state};
+use crate::pages::parts::{faulted, quiet, refused, section};
 
 /// The tabs of a facade that is on, each its key and its words.
 const TABS: [(&str, Msg); 3] = [
@@ -117,10 +118,11 @@ fn drawn(
             })
             .into(),
         ),
+        subtitle_view: None,
         crumbs: Vec::new(),
         mono: false,
         badge: Some(if on {
-            state(Tone::Ok, &tr(Msg::StateOn), None)
+            state(Mark::Ok, tr(Msg::StateOn), None)
         } else {
             badge(Tone::Neutral, tr(Msg::StateOff)).into_any()
         }),
@@ -274,7 +276,7 @@ fn overview(
 
 /// The state "On", as a lane's facts say it.
 fn state_on() -> AnyView {
-    state(Tone::Ok, &tr(Msg::StateOn), None)
+    state(Mark::Ok, tr(Msg::StateOn), None)
 }
 
 /// The identity store's facts from the readiness of `readiness`.
@@ -290,9 +292,9 @@ fn identity(readiness: &Loaded<Ready>) -> AnyView {
 #[must_use]
 pub fn indicator(readiness: &Readiness, name: &str) -> AnyView {
     match readiness.indicators.get(name) {
-        Some(found) if found.state == State::Up => state(Tone::Ok, &tr(Msg::StateUp), None),
-        Some(found) => state(Tone::Bad, &tr(Msg::StateUnreachable), found.detail.clone()),
-        None => state(Tone::Neutral, &tr(Msg::StateNotChecked), None),
+        Some(found) if found.state == State::Up => state(Mark::Ok, tr(Msg::StateUp), None),
+        Some(found) => state(Mark::Bad, tr(Msg::StateUnreachable), found.detail.clone()),
+        None => state(Mark::Neutral, tr(Msg::StateNotChecked), None),
     }
 }
 
