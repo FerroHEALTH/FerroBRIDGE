@@ -18,18 +18,26 @@
 #       `git ls-remote` of origin: a pushed tag counts whether or not its
 #       release published, and ancestry plays no part.
 #   plan.sh notes <tag> <file>
-#       Writes the release notes for <tag>: its changelog section and the
-#       support period.
+#       Writes the release notes for <tag>: its changelog section, the
+#       support period and the link to the CRA user information in the book.
 #   plan.sh support-end <YYYY-MM-DD>
 #       Prints the month the support period of a release of that date ends.
 #   plan.sh --self-test
-#       Proves prev-tag's ordering and support-end's arithmetic offline.
+#       Proves prev-tag's ordering, support-end's arithmetic and the notes
+#       composition offline.
 #
 # The milestone check reads the tracker through gh (GH_TOKEN in CI, the
 # logged-in gh locally). Exit 2 on a usage error.
 set -euo pipefail
 
 readonly TAG_RE='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+
+# The CRA Annex II user information, as a path under website/book/src and as
+# the address it is published at: the book is served under /docs/
+# (website/book/book.toml site-url) from main, not frozen per tag, so every
+# release links the same page.
+readonly CRA_PAGE='evaluate/cra-user-information.md'
+readonly CRA_URL='https://ferrobridge.eu/docs/evaluate/cra-user-information.html'
 
 usage() {
   echo "usage: plan.sh checks <tag> [--notes <file>] | prev-tag <tag> | notes <tag> <file> | support-end <YYYY-MM-DD> | --self-test" >&2
@@ -118,6 +126,18 @@ notes() {
     echo
     echo "Only the newest release is supported. When a new release is published, every earlier release stops receiving fixes: there are no maintenance branches, no long-term-support line and no backports. If you are not on the newest release, upgrade; upgrading is free. Under the Cyber Resilience Act, Cadasto B.V. commits to keep publishing security fixes for at least five years after each release (Art 13(8)) and ships them only in the newest release (Art 13(10)). For this release that commitment runs until the end of $end (Regulation (EU) 2024/2847 Art 13(19)); see [SECURITY.md](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/SECURITY.md#supported-versions)."
   } >>"$out"
+  # CRA Art 13(18): the Annex II information and instructions to the user. The
+  # notes link the page only while the book builds it.
+  if [[ ! -f "website/book/src/$CRA_PAGE" ]] || ! grep -qF "]($CRA_PAGE)" website/book/src/SUMMARY.md 2>/dev/null; then
+    echo "::error::website/book/src/$CRA_PAGE is missing or website/book/src/SUMMARY.md does not list it, so the notes would link a page the book does not publish (Regulation (EU) 2024/2847 Art 13(18))." >&2
+    return 1
+  fi
+  {
+    echo
+    echo "### Information and instructions to the user (CRA Annex II)"
+    echo
+    echo "[CRA information and instructions to the user for $1]($CRA_URL): the manufacturer, the vulnerability contact, the support period, secure use, updates and decommissioning (Regulation (EU) 2024/2847 Art 13(18) and Annex II)."
+  } >>"$out"
 }
 
 # ── The checks, one function each, run in the order of `list` ───────────────
@@ -202,7 +222,7 @@ check_version The tag matches the declared product version
 check_changelog_structure Changelog structure (no duplicate subsections, canonical types)
 check_changelog_security The Security section of the cut names its advisories and its reason
 check_prev_tag The previous release resolves from the pushed tags
-check_notes The changelog section for this tag becomes the release notes, with the support period
+check_notes The changelog section for this tag becomes the release notes, with the support period and the CRA user information link
 EOF
 }
 
@@ -235,6 +255,41 @@ checks() {
   echo "plan: every release fact for $TAG verified at this tree"
 }
 
+# The notes composed in a scratch tree: the changelog section and the support
+# period exactly as before, the CRA user information link after them, and a
+# refusal when the book does not publish the page.
+self_test_notes() {
+  local tmp want
+  tmp="$(mktemp -d)"
+  mkdir -p "$tmp/website/book/src/evaluate"
+  printf '%s\n' "# Changelog" "" "## [Unreleased]" "" "## [1.2.3] - 2026-10-23" "" "### Fixed" "" "- a fix" "" \
+    "## [1.2.2] - 2026-10-01" "" "- older" "" "[1.2.3]: https://example.org" >"$tmp/CHANGELOG.md"
+  printf '%s\n' "# Summary" "" "- [CRA information for users]($CRA_PAGE)" >"$tmp/website/book/src/SUMMARY.md"
+  printf '%s\n' "# CRA information for users" >"$tmp/website/book/src/$CRA_PAGE"
+  want="$(printf '%s\n' "" "### Fixed" "" "- a fix" "" "" "### Support period" "")"
+  if ! (cd "$tmp" && notes v1.2.3 "$tmp/notes.md") 2>/dev/null; then
+    expect "the notes compose" "refused" "composed"
+    rm -rf "$tmp"
+    return
+  fi
+  expect "the changelog section and the support period are unchanged" \
+    "$(sed -n '1,/^### Support period$/p' "$tmp/notes.md"; echo)" "$want"
+  expect "the support period names its end month" \
+    "$(grep -c 'until the end of October 2031' "$tmp/notes.md")" "1"
+  expect "the CRA section follows the support period" \
+    "$(grep '^### ' "$tmp/notes.md" | tail -n2 | tr '\n' '|')" "### Support period|### Information and instructions to the user (CRA Annex II)|"
+  expect "the notes end with the CRA user information link" \
+    "$(tail -n1 "$tmp/notes.md" | grep -cF "[CRA information and instructions to the user for v1.2.3]($CRA_URL)")" "1"
+  : >"$tmp/website/book/src/SUMMARY.md"
+  expect "a page the book does not list is refused" \
+    "$( (cd "$tmp" && notes v1.2.3 "$tmp/notes.md") 2>/dev/null && echo composed || echo refused)" "refused"
+  printf '%s\n' "- [CRA information for users]($CRA_PAGE)" >"$tmp/website/book/src/SUMMARY.md"
+  rm "$tmp/website/book/src/$CRA_PAGE"
+  expect "a missing page is refused" \
+    "$( (cd "$tmp" && notes v1.2.3 "$tmp/notes.md") 2>/dev/null && echo composed || echo refused)" "refused"
+  rm -rf "$tmp"
+}
+
 self_test() {
   local fails=0 got
   expect() {
@@ -260,6 +315,7 @@ self_test() {
   expect "an empty date" "$(support_end "" || echo refused)" "refused"
   expect "a month out of range" "$(support_end 2026-13-01 || echo refused)" "refused"
   expect "a day out of range" "$(support_end 2026-04-31 || echo refused)" "refused"
+  self_test_notes
   if [[ "$fails" -gt 0 ]]; then
     echo "plan.sh self-test FAILED ($fails case(s))" >&2
     exit 1

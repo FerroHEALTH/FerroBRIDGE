@@ -54,6 +54,6 @@ LABEL org.opencontainers.image.title="FerroBRIDGE" \
       org.opencontainers.image.url="https://ferrobridge.eu" \
       org.opencontainers.image.documentation="https://ferrobridge.eu/docs/operate/container.html" \
       org.opencontainers.image.source="https://github.com/FerroHEALTH/FerroBRIDGE" \
-      org.opencontainers.image.vendor="FerroBRIDGE" \
+      org.opencontainers.image.vendor="Cadasto B.V." \
       org.opencontainers.image.licenses="BUSL-1.1" \
       org.opencontainers.image.base.name="gcr.io/distroless/static-debian13:nonroot"

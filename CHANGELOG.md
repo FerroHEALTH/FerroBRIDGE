@@ -25,6 +25,16 @@ crates on crates.io.
 
 ### Added
 
+- The book has a [CRA information for users](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)
+  page (#1152): the information and instructions Annex II of the Cyber
+  Resilience Act (Regulation (EU) 2024/2847) has accompany each release,
+  point by point, from the manufacturer and the vulnerability contact to the
+  support period, secure use, updates, decommissioning and the SBOMs. The
+  release notes `scripts/release/plan.sh` composes now end with a link to it,
+  and the composition refuses when the book does not list the page.
+  `SECURITY.md` names the operator console's release tarballs and site
+  bundle among the supported artefacts.
+
 - The eighth `mappingCode` function of the published FHIRconnect library,
   `ehrStatusAddExternalREF`, is registered (#1065), so
   `KDS_admin_entry_person.yml` loads in the published person context. It
@@ -285,6 +295,11 @@ crates on crates.io.
   value is one scope token, checked at load (#1007).
 
 ### Changed
+
+- Both container images name their manufacturer: the
+  `org.opencontainers.image.vendor` label and index annotation of
+  `ghcr.io/ferrohealth/ferrobridge` and `ghcr.io/ferrohealth/ferrobridge-console`
+  read `Cadasto B.V.` where they read `FerroBRIDGE` (#1152).
 
 - A release's notes end with its support period (#1149): the month and year
   until which Cadasto B.V. keeps publishing security fixes, five years from

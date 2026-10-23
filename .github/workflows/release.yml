@@ -124,7 +124,8 @@ jobs:
       # product version in every file that declares it, the changelog's
       # structure and Security rules for this section, the previous release
       # taken by version from `git ls-remote`, and the changelog section as
-      # the release notes with the support period appended. The list is
+      # the release notes with the support period and the link to the book's
+      # CRA Annex II user information page appended. The list is
       # scripts/release/plan.sh; scripts/release/preflight.sh runs the same
       # list before the tag is pushed, so the two cannot drift. It names every
       # refused check, and writes release-notes.md for github-release. A
