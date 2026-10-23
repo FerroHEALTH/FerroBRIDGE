@@ -170,7 +170,7 @@ classify() {
     scripts/checks/affected.sh | scripts/checks/fast.sh) echo ci ;;
     .github/*) echo inert ;;
     .claude/* | website/* | assets/* | docker/* | fuzz/* | scripts/gh/* | scripts/release/*) echo inert ;;
-    docs/ci-cd.md | docs/release.md) echo inert ;;
+    docs/ci-cd.md | docs/release.md | docs/post-market.md) echo inert ;;
     AI_STATEMENT.md | CHANGELOG.md | CITATION.cff | CLAUDE.md | CODE_OF_CONDUCT.md) echo inert ;;
     CONTRIBUTING.md | GOVERNANCE.md | MAINTAINERS.md | SECURITY.md | SUPPORT.md) echo inert ;;
     LICENSE | NOTICE | llms.txt | compose.yaml | sonar-project.properties) echo inert ;;
@@ -179,7 +179,8 @@ classify() {
     scripts/checks/crate-version-guard.sh | scripts/checks/favicon-sync.sh) echo inert ;;
     scripts/checks/file-length.sh | scripts/checks/file-length-allow.txt) echo inert ;;
     scripts/checks/pin-freshness.sh | scripts/checks/versions.sh) echo inert ;;
-    scripts/checks/changelog-released.sh) echo inert ;;
+    scripts/checks/changelog-released.sh | scripts/checks/changelog-structure.sh) echo inert ;;
+    scripts/checks/changelog-security.sh | scripts/lib/guard-args.sh) echo inert ;;
     scripts/checks/todo-issues.sh | scripts/checks/usage-report-off.sh) echo inert ;;
     scripts/deploy-probe.sh) echo inert ;;
     # The pass lists, the badges and the README badge block are read by the

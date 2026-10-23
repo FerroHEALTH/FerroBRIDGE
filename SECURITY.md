@@ -25,6 +25,18 @@ B.V. commits to keep publishing security fixes for at least five years after
 each release (Regulation (EU) 2024/2847 Art 13(8)) and ships them only in the
 newest release (Art 13(10)).
 
+The end month of that commitment for a release (month and year, Art 13(19)
+and Annex II point 7) is printed in its release notes, five years from the
+release date. It is the date until which Cadasto B.V. keeps shipping fixed
+releases; the release itself is supported only while it is the newest. A
+published release's assets and tag cannot be modified, so the remedy for a
+defect is always a new version: if you are not on the newest release, you are
+not receiving the fix, and the action is to upgrade. To hear of new releases
+and fixes, subscribe to the release feed,
+`https://github.com/FerroHEALTH/FerroBRIDGE/releases.atom`, and poll the
+published advisories,
+`GET https://api.github.com/repos/FerroHEALTH/FerroBRIDGE/security-advisories`.
+
 | Artifact | Supported version | Where fixes ship |
 | --- | --- | --- |
 | The `ferrobridge` binary (release tarballs) | the newest published release | the newest release |
@@ -35,24 +47,50 @@ newest release (Art 13(10)).
 
 ## Reporting a vulnerability
 
-**Do not open a public issue for a security vulnerability.** Report it
-privately through GitHub's private vulnerability reporting:
+**Do not open a public issue for a security vulnerability.**
 
-1. Open the private advisory form:
-   <https://github.com/FerroHEALTH/FerroBRIDGE/security/advisories/new>. You
-   can also reach it from the repository's **Security** tab under **Report a
-   vulnerability**.
-2. Describe the issue, the affected version or commit, and a reproduction if
-   you have one.
+This route covers the products this repository publishes: the `ferrobridge`
+server binary, the `ferrobridge` and `ferrobridge-console` container images,
+and the library crates on crates.io. Report privately, through either route:
 
-This opens a private advisory visible only to you and the maintainer. If you
-cannot use GitHub's form, contact the maintainer through their GitHub profile
-and ask for a private channel before sending any details. The family policy
-lists what a report should carry.
+- [GitHub private vulnerability reporting](https://github.com/FerroHEALTH/FerroBRIDGE/security/advisories/new)
+  ("Report a vulnerability" on the repository's **Security** tab), which
+  needs a GitHub account and opens a private advisory visible only to you and
+  the maintainer; or
+- email to [info@cadasto.com](mailto:info@cadasto.com), the single point of
+  contact of Cadasto B.V., the manufacturer (CRA Art 13(17)), with
+  "FerroBRIDGE vulnerability" in the subject. No account is needed. The
+  address has no published encryption key, so send the details you are
+  comfortable sending by email and say that more is available; we will agree
+  a channel for the rest.
+
+Both routes reach the same people and the same procedure. Describe the issue,
+the affected version or commit, and a reproduction if you have one. If you
+have seen the vulnerability exploited, say so. The family policy lists what a
+report should carry.
 
 **Never include patient data in a report.** A bridge sits in the path of
 clinical data, so a reproduction is easy to build from real content by
 accident. Redact it, or synthesize an equivalent case.
+
+## Security advisories
+
+Every report, from either route, gets a private draft GitHub security
+advisory on this repository on receipt, and the draft is the record until the
+fix ships. Fixed vulnerabilities in FerroBRIDGE are published as those
+advisories, with the fixing release and in the same hour as it. The
+`### Security` entry for the fix in [`CHANGELOG.md`](CHANGELOG.md) carries the
+advisory's `GHSA-` identifier, and the release notes repeat it. The
+advisories are machine-readable through the GitHub REST API
+(`GET /repos/FerroHEALTH/FerroBRIDGE/security-advisories`).
+
+A security fix ships alone, in a patch release with no functional change in
+it, as Annex I Part II(2) asks where technically feasible. When a functional
+change has to ride with it, the release's `### Security` section opens with
+`Shipped with functional changes because:` and the reason, and the release
+notes carry that line. The release lane refuses a cut whose Security section
+breaks either rule (`docs/release.md`). The steps this repository follows are
+[`docs/post-market.md`](docs/post-market.md).
 
 ## Response times
 
