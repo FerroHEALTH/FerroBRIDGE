@@ -9,7 +9,9 @@
 #                                   └─ build-console ───────────────────┘
 #
 # plan refuses a tag whose milestone (titled exactly as the tag) is missing or
-# still holds an open item, and milestone closes it once every leg succeeded.
+# still holds an open item, or whose changelog section breaks the structure or
+# Security rules (scripts/release/plan.sh), and milestone closes the milestone
+# once every leg succeeded.
 #
 # The release is created as a DRAFT, the binaries, their SBOMs and their
 # Sigstore bundles are attached to it, and only once the expected asset set is
@@ -112,101 +114,21 @@ jobs:
           persist-credentials: false
           ref: ${{ github.sha }}
 
-      # A release is cut only when its milestone is empty
-      # (.claude/rules/issue-workflow.md), so this refuses the tag before
-      # anything is created and names every open item.
-      - name: The milestone titled as the tag holds no open item
+      # Every release fact, as ONE list: the milestone titled as the tag, the
+      # product version in every file that declares it, the changelog's
+      # structure and Security rules for this section, the previous release
+      # taken by version from `git ls-remote`, and the changelog section as
+      # the release notes with the support period appended. The list is
+      # scripts/release/plan.sh; scripts/release/preflight.sh runs the same
+      # list before the tag is pushed, so the two cannot drift. It names every
+      # refused check, and writes release-notes.md for github-release. A
+      # missing or empty section fails the release rather than falling back to
+      # notes generated from the commit range.
+      - name: Every release fact holds at the tagged commit
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
-        run: bash scripts/release/milestone.sh check "$TAG"
-
-      - name: The tag matches the declared product version
-        # Every file that declares the product version has to agree with the
-        # tag: the root Cargo.toml, CITATION.cff and the product row of
-        # docs/VERSIONS.md. The manifest is required, because the release
-        # promises binaries built from it.
-        env:
-          TAG: ${{ steps.tag.outputs.tag }}
-          VERSION: ${{ steps.tag.outputs.version }}
-        run: |
-          set -euo pipefail
-          fail=0
-          check() {
-            if [ -z "$2" ]; then
-              echo "::error::$1 declares no product version." >&2
-              fail=1
-            elif [ "$2" != "$VERSION" ]; then
-              echo "::error::tag $TAG declares version $VERSION, but $1 says $2." >&2
-              fail=1
-            else
-              echo "OK: $1 declares $VERSION"
-            fi
-          }
-
-          for required in Cargo.toml CITATION.cff docs/VERSIONS.md CHANGELOG.md compose.yaml; do
-            if [ ! -f "$required" ]; then
-              echo "::error::${required} is missing at ${TAG}, so this release cannot be cut." >&2
-              exit 1
-            fi
-          done
-
-          manifest="$(awk '
-            /^[[:space:]]*\[/ { h = $0; gsub(/[[:space:]]/, "", h); f = (h == "[workspace.package]"); next }
-            f && $0 ~ /^[[:space:]]*version[[:space:]]*=/ {
-              if (match($0, /"[^"]*"/)) { print substr($0, RSTART + 1, RLENGTH - 2); exit }
-            }
-          ' Cargo.toml)"
-          check "the root Cargo.toml [workspace.package] version" "$manifest"
-
-          cff="$(sed -nE 's/^version:[[:space:]]*//p' CITATION.cff | head -n1 | tr -d '"'\''[:space:]')"
-          check "CITATION.cff" "$cff"
-
-          # The first token of the second cell of the markdown row whose first
-          # cell is "Product version", backticks and padding removed. Same
-          # reading scripts/checks/versions.sh does.
-          matrix="$(awk -F'|' '
-            NF >= 3 {
-              k = $2; v = $3
-              gsub(/`/, "", k); gsub(/`/, "", v)
-              gsub(/^[[:space:]]+|[[:space:]]+$/, "", k)
-              gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
-              if (k == "Product version") { split(v, w, /[[:space:]]/); print w[1]; exit }
-            }
-          ' docs/VERSIONS.md)"
-          check "the docs/VERSIONS.md product-version row" "$matrix"
-
-          [ "$fail" -eq 0 ] || exit 1
-
-      - id: notes
-        name: Extract the changelog section as the release notes
-        # The changelog is hand-curated and is the release notes. A missing or
-        # empty section fails the release rather than falling back to notes
-        # generated from the commit range, which would silently replace the
-        # record with a different one.
-        env:
-          VERSION: ${{ steps.tag.outputs.version }}
-        run: |
-          set -euo pipefail
-          if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no '## [$VERSION]' section. Cut the release before tagging: rename [Unreleased] to $VERSION with its date." >&2
-            exit 1
-          fi
-          # Everything under the version heading, stopping at the next version
-          # heading or at the trailing link-reference block, whichever comes
-          # first.
-          awk -v ver="$VERSION" '
-            $0 ~ "^## \\[" ver "\\]" { found = 1; next }
-            found && /^## \[/ { exit }
-            found && /^\[[^]]+\]:/ { exit }
-            found { print }
-          ' CHANGELOG.md > release-notes.md
-          if ! grep -q '[^[:space:]]' release-notes.md; then
-            echo "::error::the [$VERSION] changelog section is empty." >&2
-            exit 1
-          fi
-          echo "release notes ($(wc -l < release-notes.md) lines):"
-          cat release-notes.md
+        run: bash scripts/release/plan.sh checks "$TAG" --notes release-notes.md
 
       - id: workspace
         name: Name the binary targets

@@ -265,6 +265,10 @@ the testkit tool crate. Beside it:
   usage report switched off; `todo-issues.sh`, which fails a `TODO(#N)` or a pending subcommand's issue
   that the tracker reports closed;
   `changelog-released.sh`, every released changelog section against its tag;
+  `changelog-structure.sh` and `changelog-security.sh`, the Keep a Changelog
+  types and the CRA Security rules (a reason line, a `GHSA-` id or VEX path
+  per entry) over `[Unreleased]` and, through `scripts/release/plan.sh`, over
+  the section a release cuts;
   `pin-freshness.sh`, every pin no ecosystem watches against its newest
   upstream release; and `conformance.sh`, the pass-list gate over the six
   corpora under `conformance/` (fifteen: the two mapping libraries, the
@@ -483,6 +487,8 @@ apply always. Read the relevant one before working in that area.
 - `.claude/rules/ci-cd.md`, `ai-code-review.md`, `crates-publishing.md`: the
   workflow-security discipline, the advisory-analyzer policy (SonarQube Cloud,
   CodeQL), and the crates.io bump and publish rules.
+- `.claude/rules/changelog.md`: the changelog structure and the Security
+  rules a release cut is refused on (`docs/release.md`, `docs/post-market.md`).
 - `.claude/rules/issue-workflow.md`, `issue-relationships.md`,
   `project-board.md`: the tracker work style.
 - Skills: `/spec-lookup` (find the authoritative answer in oracle order),

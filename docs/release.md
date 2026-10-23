@@ -36,14 +36,18 @@ flowchart LR
 ```
 
 - **plan** validates the tag shape, refuses a dispatch that is not at the tag
-  it names, refuses the tag when no milestone is titled exactly as it or that
+  it names, and runs `scripts/release/plan.sh checks`, the one list of
+  release facts ([Preflight](#preflight-the-plan-job-before-the-tag)): it
+  refuses the tag when no milestone is titled exactly as it or that
   milestone still holds an open issue or pull request (naming each one),
-  checks the tag against every file that declares the product
-  version, and extracts the `## [X.Y.Z]` section of `CHANGELOG.md` as the
-  release notes. A missing or empty section fails the release, so a cut can
-  never ship with notes generated from the commit range standing in for the
-  changelog. It also emits the target matrix, which the build jobs and the
-  asset check both read, so the two cannot drift apart.
+  checks the tag against every file that declares the product version,
+  checks the changelog's structure and the Security rules of the section
+  being cut, and extracts the `## [X.Y.Z]` section of `CHANGELOG.md` as the
+  release notes with the support period appended. A missing or empty section
+  fails the release, so a cut can never ship with notes generated from the
+  commit range standing in for the changelog. It also emits the target
+  matrix, which the build jobs and the asset check both read, so the two
+  cannot drift apart.
 - **github-release** creates the release as a draft carrying those notes and
   attaches `compose.yaml`. A draft is mutable and invisible to anyone browsing
   releases, which is the window the asset uploads need.
@@ -278,16 +282,68 @@ before a real cut.
 5. **The changelog names the release.** `[Unreleased]` becomes the version and
    the date, with a fresh empty `[Unreleased]` above it and a new link
    reference. What sits under the version heading is what the release notes
-   say, so read it as the release notes before you tag.
-6. **The gates pass on the release commit.** The tier-1 set is
+   say, so read it as the release notes before you tag. The heading carries
+   the date, because the support period in the notes counts from it.
+6. **Every Security entry names its advisory.** Each `### Security` entry
+   carries the `GHSA-` id of the draft advisory on this repository, or the
+   path of a VEX statement under `security/vex/`, and a Security section
+   beside other change subsections opens with
+   `Shipped with functional changes because: <reason>`
+   (`.claude/rules/changelog.md`). The drafted advisories are published in
+   the same hour as the release (`post-market.md`).
+7. **The gates pass on the release commit.** The tier-1 set is
    `zizmor --min-severity=low .github/`, `actionlint`, `shellcheck
    --severity=style` over every tracked shell program, `hadolint` over every
    tracked Dockerfile, `scripts/checks/comment-style.sh --all`,
    `scripts/checks/versions.sh`, and `mdbook build website/book`, beside the
    Rust lanes (`docs/ci-cd.md`).
-7. **A pre-release has rehearsed any change to the lane itself.** Tag
+8. **A pre-release has rehearsed any change to the lane itself.** Tag
    `vX.Y.Z-rc.1`, watch the whole graph run, and read what it produced. A
    pre-release takes the same path and is never marked latest.
+9. **The preflight passes** at the commit you are about to tag
+   (below).
+
+## Preflight: the plan job, before the tag
+
+The `plan` job verifies every release fact at the tagged commit before
+anything is built or published. Its checks are one list,
+`scripts/release/plan.sh`, and `scripts/release/preflight.sh` runs the same
+list on your machine:
+
+```sh
+bash scripts/release/preflight.sh v0.0.11
+bash scripts/release/preflight.sh v0.0.11 --notes /tmp/notes.md   # keep the notes
+```
+
+Run it on the release branch once the release pull request is ready, and
+again on `main` after the merge, at the commit you are about to tag. It exits
+0 when the plan job would pass, names every check that refuses, and prints the
+path of the release notes it composed so you can read them before they are
+published.
+
+The checks, in the order the plan job runs them:
+
+| Check | Script |
+|---|---|
+| The milestone titled as the tag holds no open item | `scripts/release/milestone.sh check` |
+| The tag equals the version in `Cargo.toml`, `CITATION.cff` and `docs/VERSIONS.md` | `plan.sh` |
+| The changelog has only Keep a Changelog types, each once per section | `scripts/checks/changelog-structure.sh` |
+| The section being cut opens its `### Security` with the reason when it mixes security and functional changes, and every Security entry names a GHSA id or a `security/vex/` path | `scripts/checks/changelog-security.sh --section X.Y.Z` |
+| The previous release resolves from the pushed tags | `plan.sh prev-tag` |
+| The changelog section becomes the notes, with the support period | `plan.sh notes` |
+
+The previous release is resolved from `git ls-remote --tags origin 'v*'`, by
+version order. A tag that was pushed but whose release never published still
+counts, and ancestry plays no part (`bash scripts/release/plan.sh prev-tag
+vX.Y.Z` prints it). The support period is the month and year five years
+after the date on the release heading (CRA Art 13(8) and (19)), computed in
+bash so the preflight gives the same month on macOS as the plan job on Linux.
+
+You need `gh` logged in, because the milestone check reads the tracker. A
+missing tool refuses its check; it is never skipped.
+
+To add a release fact, add a function and a line to the list in
+`scripts/release/plan.sh`. The plan job and the preflight both pick it up.
 
 ## The tag
 

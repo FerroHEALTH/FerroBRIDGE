@@ -286,6 +286,14 @@ crates on crates.io.
 
 ### Changed
 
+- A release's notes end with its support period (#1149): the month and year
+  until which Cadasto B.V. keeps publishing security fixes, five years from
+  the release date (CRA Art 13(8) and (19)). The release lane refuses a cut
+  whose `### Security` entries name no `GHSA-` advisory or `security/vex/`
+  statement, or that mixes security and functional changes without saying
+  why (CRA Annex I Part II(2)); `scripts/release/preflight.sh vX.Y.Z` runs
+  the same checks before the tag. `SECURITY.md` adds `info@cadasto.com` as a
+  reporting route and describes the advisory each fix is published with.
 - **Breaking:** the operator console is renamed from `ferrobridge-viewer`
   to `ferrobridge-console` (#1133), as every FerroHEALTH product names its
   operator UI. The crate and its binary are `ferrobridge-console`
@@ -729,21 +737,24 @@ crates on crates.io.
 
 ### Security
 
-- `ctutils` moves from 0.4.2 to 0.4.5 (RUSTSEC-2026-0385): before 0.4.4
-  its constant-time mask generation could compile to a branch on a secret
-  value. It reaches the build through `digest` 0.11.
+Shipped with functional changes because: only the newest release is supported (SECURITY.md), so a separate 0.0.10 patch published beside 0.0.11 would be out of support the moment 0.0.11 lands and give no one a release to stay on; each fix is a dependency or base-image bump with no behaviour change of its own.
 
+- `ctutils` moves from 0.4.2 to 0.4.5 (RUSTSEC-2026-0385,
+  GHSA-qq87-xvj3-pfgj): before 0.4.4 its constant-time mask generation could
+  compile to a branch on a secret value. It reaches the build through
+  `digest` 0.11.
 - The TLS stack the bridge calls the CDR, the terminology server and the
   sending sites through no longer trusts the distrusted emSign
   intermediates: `rustls-webpki` 0.103.16 rejects their public keys
   (RUSTSEC-2026-0382), and `webpki-roots` and `webpki-root-certs` 1.0.10
-  drop the root that allowed them (RUSTSEC-2026-0381, RUSTSEC-2026-0383).
+  drop the root that allowed them (RUSTSEC-2026-0381, RUSTSEC-2026-0383,
+  GHSA-6q27-c9m3-vj9m).
 - The bridge and operator console images no longer trust the compromised
   eMudhra (emSign) intermediates in the system trust store (Debian
-  DSA-6572-1, #1140). The distroless base
+  DSA-6572-1, GHSA-6q27-c9m3-vj9m, #1140). The distroless base
   `gcr.io/distroless/static-debian13:nonroot` moves to index digest
   `d620678`, which ships `ca-certificates` 20250419+deb13u1, in the `FROM`
-  of `docker/Dockerfile` and `docker/viewer/Dockerfile` and in the pin row.
+  of `docker/Dockerfile` and `docker/console/Dockerfile` and in the pin row.
 
 ## [0.0.10] - 2026-10-19
 
