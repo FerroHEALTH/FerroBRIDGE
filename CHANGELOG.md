@@ -739,19 +739,17 @@ crates on crates.io.
 
 Shipped with functional changes because: only the newest release is supported (SECURITY.md), so a separate 0.0.10 patch published beside 0.0.11 would be out of support the moment 0.0.11 lands and give no one a release to stay on; each fix is a dependency or base-image bump with no behaviour change of its own.
 
-- `ctutils` moves from 0.4.2 to 0.4.5 (RUSTSEC-2026-0385,
-  GHSA-qq87-xvj3-pfgj): before 0.4.4 its constant-time mask generation could
-  compile to a branch on a secret value. It reaches the build through
-  `digest` 0.11.
+- `ctutils` moves from 0.4.2 to 0.4.5 (RUSTSEC-2026-0385): before 0.4.4
+  its constant-time mask generation could compile to a branch on a secret
+  value. It reaches the build through `digest` 0.11.
 - The TLS stack the bridge calls the CDR, the terminology server and the
   sending sites through no longer trusts the distrusted emSign
   intermediates: `rustls-webpki` 0.103.16 rejects their public keys
   (RUSTSEC-2026-0382), and `webpki-roots` and `webpki-root-certs` 1.0.10
-  drop the root that allowed them (RUSTSEC-2026-0381, RUSTSEC-2026-0383,
-  GHSA-6q27-c9m3-vj9m).
+  drop the root that allowed them (RUSTSEC-2026-0381, RUSTSEC-2026-0383).
 - The bridge and operator console images no longer trust the compromised
   eMudhra (emSign) intermediates in the system trust store (Debian
-  DSA-6572-1, GHSA-6q27-c9m3-vj9m, #1140). The distroless base
+  DSA-6572-1, #1140). The distroless base
   `gcr.io/distroless/static-debian13:nonroot` moves to index digest
   `d620678`, which ships `ca-certificates` 20250419+deb13u1, in the `FROM`
   of `docker/Dockerfile` and `docker/console/Dockerfile` and in the pin row.
