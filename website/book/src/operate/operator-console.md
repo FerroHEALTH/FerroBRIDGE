@@ -181,7 +181,9 @@ The card a signed-out operator reads.
 
 ![The dashboard](img/console/dashboard.png)
 
-The dashboard with the flow. [Dark theme](img/console/dashboard-dark.png).
+The dashboard with the flow. How it is drawn, in the flow's head, opens
+a short dialog with each state's line and what it means.
+[Dark theme](img/console/dashboard-dark.png).
 
 ### Mapping set
 
@@ -369,7 +371,7 @@ upgrade, change each old name to the new one:
 The cookies change with the name, so every operator signs in again after
 the upgrade.
 
-The 0.0.11 console is also drawn anew on FerroUI 0.3.3, and its addresses
+The 0.0.11 console is also drawn anew on FerroUI 0.3.4, and its addresses
 moved with it. A bookmark to an old address answers the page-not-found
 page; follow its links, or use the new address:
 

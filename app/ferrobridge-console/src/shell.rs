@@ -133,6 +133,7 @@ fn top_bar(
             back: path.clone(),
         },
         choices: Vec::new(),
+        links: Vec::new(),
         shortcuts: None,
         sign_out: Some(String::from(SIGN_OUT)),
     });
