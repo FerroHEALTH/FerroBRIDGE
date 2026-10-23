@@ -112,6 +112,16 @@ server a deployment points the bridge at (report those to that project), and an
 issue that requires an already-compromised host or a misconfiguration outside
 FerroBRIDGE's control.
 
+Each release carries a vulnerability record,
+`ferrobridge-vX.Y.Z-vulnerability-record.json`: every finding of a Trivy scan
+of both images and the server tarballs, at every severity and fixed or not,
+joined with the OpenVEX statement that judges it. The release is refused while
+a finding has none. Findings that do not affect FerroBRIDGE are argued as
+OpenVEX documents under [`security/vex/`](security/vex/), with the
+justification and an impact statement you can check; if you think one of those
+arguments is wrong, that is a valid report. The published images are scanned
+again every week with those documents applied.
+
 ## Verifying a release
 
 Every binary and every image is built in an isolated reusable workflow, which

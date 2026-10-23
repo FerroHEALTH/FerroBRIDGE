@@ -25,14 +25,17 @@ flowchart LR
   draft --> b3["binaries<br/>aarch64 gnu"]
   draft --> b4["binaries<br/>aarch64 musl"]
   draft --> console["console<br/>binaries, site bundle, image"]
-  b2 --> image["image<br/>linux/amd64, linux/arm64"]
+  b2 --> image["image<br/>linux/amd64, linux/arm64<br/>pushed by digest"]
   b4 --> image
-  b1 --> publish["finalize-release<br/>asset set, then publish"]
-  b3 --> publish
-  image --> publish
-  console --> publish
+  b1 --> record["vulnerability-record<br/>every finding judged"]
+  b3 --> record
+  image --> record
+  console --> record
+  record --> publish["finalize-release<br/>asset set, then publish"]
+  record --> tag["scan-and-tag<br/>HIGH/CRITICAL gate, then tags"]
   publish --> crates["crates.io<br/>approval-gated"]
   crates --> milestone["milestone<br/>closed"]
+  tag --> milestone
 ```
 
 - **plan** validates the tag shape, refuses a dispatch that is not at the tag
@@ -56,13 +59,29 @@ flowchart LR
   emulation.
 - **build-image** calls `release-image.yml` once the musl binaries exist, and
   builds `ghcr.io/ferrohealth/ferrobridge` for `linux/amd64` and `linux/arm64`
-  from them.
+  from them. It pushes the image by digest with no tag.
 - **build-console** calls `release-console.yml` once the draft exists. It
   builds the operator console's musl binaries and its site bundle, attaches
   them to the draft, and builds `ghcr.io/ferrohealth/ferrobridge-console` for
-  `linux/amd64` and `linux/arm64` from them.
-- **finalize-release** checks that the draft carries every asset this version
-  promises, then publishes. Publishing last means a half-assembled release is
+  `linux/amd64` and `linux/arm64` from them, pushed by digest with no tag.
+- **vulnerability-record** scans both images on both platforms and the four
+  server tarballs with Trivy at every severity, unfixed findings included,
+  with an empty configuration so the gate's floor and exceptions stay out.
+  `scripts/checks/vex-coverage.sh` joins every finding with the OpenVEX
+  statement under `security/vex/` that judges it and refuses the release
+  while one has none (CRA Annex I Part I(2)(a)). It attaches
+  `ferrobridge-vX.Y.Z-vulnerability-record.json` and the raw reports
+  (`ferrobridge-vX.Y.Z-trivy-reports.tar.gz`) to the draft, and keeps them as
+  a run artifact when it refuses.
+- **scan-and-tag** calls `scan-and-tag.yml` once the record passes. It scans
+  each pushed digest against `trivy.yaml` (HIGH and CRITICAL, fixed findings
+  only, `.trivyignore.yaml`) and only then applies the tags, so a refused
+  image is never referencable by tag. `imagetools create` re-tags the same
+  digest, so the attestations hold, and each tag is verified as a consumer
+  would.
+- **finalize-release** waits for the vulnerability record, checks that the
+  draft carries every asset this version promises, the record included, then
+  publishes. Publishing last means a half-assembled release is
   never visible. A pre-release publishes with `--latest=false`, so it never
   becomes the repository's latest release.
 - **crates** uploads the `crates/*` members to crates.io once the release is
@@ -191,8 +210,10 @@ architecture, and that Dockerfile runs none, being a single distroless stage
 that copies a binary already built for each platform ([multi-platform
 builds](https://docs.docker.com/build/building/multi-platform/)).
 
-The index is tagged with the version, and for a release that is not a
-pre-release also with its major.minor and with `latest`. BuildKit's own
+The index is pushed by digest with no tag. The lane computes the tags (the
+version, and for a release that is not a pre-release also its major.minor and
+`latest`) and hands them to `scan-and-tag`, which applies them once the
+vulnerability record and the image scan pass. BuildKit's own
 provenance and SBOM attestations are off, because the GitHub attestations carry
 both, keyless-signed through Sigstore, while BuildKit's are unsigned
 attestation manifests inside the index. Five attestations are pushed as OCI
@@ -231,11 +252,23 @@ Every name below is prefixed `ferrobridge-console-vX.Y.Z-`:
 takes the tarballs from this run's artifacts, verifies each against
 `release-console.yml`'s own signer identity, stages them for
 `docker/console/Dockerfile`, and from there runs the steps `release-image.yml`
-runs: one buildx build for both platforms with no QEMU, the version and, for
-a release that is not a pre-release, the major.minor and `latest` tags, five
+runs: one buildx build for both platforms with no QEMU, pushed by digest
+with the version and, for a release that is not a pre-release, the
+major.minor and `latest` tags left for `scan-and-tag` to apply, five
 attestations pushed as OCI referrers (provenance for the index, provenance
 plus an SPDX SBOM per platform manifest), and a verification of its own
 output as a consumer would run it.
+
+## Between releases: the weekly image scan
+
+`.github/workflows/image-scan.yml` scans both published images at `latest`
+every Monday, both platforms, with `trivy.yaml` and every OpenVEX document
+under `security/vex/` passed as `--vex`. A finding files or comments on one
+tracking issue and the run stays green; the run goes red only when the scan
+itself fails. `scripts/security/scan-images.sh` replays the same scan
+locally, and `--candidate <image>` scans a local build before you release
+it. The Trivy version of all three lanes is the `trivy` row of
+`docs/VERSIONS.md`.
 
 ## The pre-release rule
 

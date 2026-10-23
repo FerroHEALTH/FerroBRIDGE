@@ -294,6 +294,15 @@ crates on crates.io.
   why (CRA Annex I Part II(2)); `scripts/release/preflight.sh vX.Y.Z` runs
   the same checks before the tag. `SECURITY.md` adds `info@cadasto.com` as a
   reporting route and describes the advisory each fix is published with.
+- The `ferrobridge` and `ferrobridge-console` images of a release are tagged
+  only after a Trivy scan of each pushed digest finds no fixable HIGH or
+  CRITICAL vulnerability (#1149), and a release carries
+  `ferrobridge-vX.Y.Z-vulnerability-record.json`: every finding of a full
+  scan of both images and the server tarballs, joined with the OpenVEX
+  statement under `security/vex/` that judges it. The release is refused
+  while a finding has none. `security/vex/rust-advisories.openvex.json`
+  publishes the argument for each advisory `deny.toml` accepts, and the
+  published images are scanned every week with those documents applied.
 - **Breaking:** the operator console is renamed from `ferrobridge-viewer`
   to `ferrobridge-console` (#1133), as every FerroHEALTH product names its
   operator UI. The crate and its binary are `ferrobridge-console`

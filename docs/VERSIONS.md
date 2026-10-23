@@ -431,10 +431,14 @@ release without a reviewed change (`docs/release.md`).
 | `cargo-cyclonedx` | 0.5.9 | `.github/workflows/release-build.yml` |
 | `cargo-fuzz` | 0.13.2 | `.github/workflows/fuzz.yml` (the fuzz lane, the one nightly-toolchain job; #155) |
 | `syft` | 1.51.1 | `.github/workflows/release-build.yml`, `.github/workflows/release-image.yml`, `.github/workflows/release-console.yml` |
+| `trivy` | 0.73.0 | `.github/workflows/release.yml` (the vulnerability record), `.github/workflows/scan-and-tag.yml`, `.github/workflows/image-scan.yml` |
 
 `scripts/checks/versions.sh` reads every `tool:` line of the two release
 workflows back against these rows, so a bump moves one row and the workflows
-follow it.
+follow it. `trivy` is installed by the digest-pinned
+`aquasecurity/setup-trivy` at the version each workflow's `TRIVY_VERSION`
+names, and `versions.sh` reads each of those back against its row; it is the
+version FerroEHR's release lane runs.
 
 ## Operator console build tools
 

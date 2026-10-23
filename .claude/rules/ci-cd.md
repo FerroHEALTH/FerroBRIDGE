@@ -18,7 +18,7 @@ build.
 
 ## What runs today
 
-Twelve workflows:
+Fourteen workflows:
 
 - `.github/workflows/ci.yml`: the two-tier gate. Tier 1 runs now (zizmor,
   actionlint, shellcheck, hadolint, the comment-style guard, the versions
@@ -71,6 +71,14 @@ Twelve workflows:
   as `release-image.yml` does. All three are reusable workflows because SLSA
   Build Level 3 needs the signing identity out of reach of caller-defined
   steps.
+- `.github/workflows/scan-and-tag.yml`: the reusable image gate the release
+  calls once the vulnerability record passes. It scans each pushed image
+  digest with Trivy against `trivy.yaml` (fixable HIGH and CRITICAL) and only
+  then applies the tags, so a refused image is never referencable by tag.
+- `.github/workflows/image-scan.yml`: the weekly scan of the published images
+  at `latest`, with every OpenVEX document under `security/vex/` applied. A
+  finding files or comments on one tracking issue; the run is red only when
+  the scan itself fails.
 - `.github/workflows/pin-freshness.yml`: the weekly freshness read over every
   pin no Dependabot ecosystem covers, the analyzer versions in `ci.yml` and the
   documentation toolchain. It opens one issue when a pin is behind its newest
