@@ -34,9 +34,9 @@
 #   e2e_packages   those of them that are, space-separated
 #   test_matrix    the test shards as a matrix (JSON, one line)
 #   lint_matrix    the clippy and msrv shards as a matrix (JSON, one line)
-#   viewer         ferrobridge-viewer is affected (its wasm32 lint and its
+#   console        ferrobridge-console is affected (its wasm32 lint and its
 #                  site bundle)
-#   journeys       ferrobridge-viewer or ferrobridge-server is affected (the
+#   journeys       ferrobridge-console or ferrobridge-server is affected (the
 #                  console's browser journeys, which run both)
 #
 # A path reaches a package in three ways. A path under a member's directory
@@ -160,10 +160,10 @@ classify() {
     # The operator console's build surface: its Leptos rule holds the bundle
     # budget, and these scripts install its tools, build its site bundle and
     # measure it; each reaches the console as its own files would.
-    .claude/rules/leptos-ui.md) echo "packages ferrobridge-viewer" ;;
-    scripts/release/viewer-*.sh | scripts/checks/viewer-*.sh) echo "packages ferrobridge-viewer" ;;
+    .claude/rules/leptos-ui.md) echo "packages ferrobridge-console" ;;
+    scripts/release/console-*.sh | scripts/checks/console-*.sh) echo "packages ferrobridge-console" ;;
     # Installs the browser the console's journeys drive.
-    scripts/release/journey-tools.sh) echo "packages ferrobridge-viewer" ;;
+    scripts/release/journey-tools.sh) echo "packages ferrobridge-console" ;;
     # Read by the testkit's screenshot guard: every console screenshot and
     # every book page that shows one.
     website/book/src/*) echo "only ferrobridge-testkit" ;;
@@ -328,9 +328,9 @@ emit() {
   if [ -n "$e2e" ]; then flag=true; else flag=false; fi
   echo "e2e=$flag"
   echo "e2e_packages=$e2e"
-  if has "$packages" ferrobridge-viewer; then flag=true; else flag=false; fi
-  echo "viewer=$flag"
-  if has "$packages" ferrobridge-viewer || has "$packages" ferrobridge-server; then
+  if has "$packages" ferrobridge-console; then flag=true; else flag=false; fi
+  echo "console=$flag"
+  if has "$packages" ferrobridge-console || has "$packages" ferrobridge-server; then
     flag=true
   else
     flag=false
@@ -525,17 +525,17 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   # The screenshot guard reads every page of the book and every console
   # screenshot; the rest of the site reaches no cargo lane.
   check "a book page reaches the screenshot guard" "website/book/src/index.md" false \
-    "+ferrobridge-testkit -ferrobridge-server -ferrobridge-viewer"
+    "+ferrobridge-testkit -ferrobridge-server -ferrobridge-console"
   check "a console screenshot reaches the screenshot guard" \
     "website/book/src/operate/img/console/dashboard.png" false \
-    "+ferrobridge-testkit -ferrobridge-server -ferrobridge-viewer"
+    "+ferrobridge-testkit -ferrobridge-server -ferrobridge-console"
   check "the book theme is inert" "website/book/theme/favicon.svg" false ""
   check "the journeys' browser install reaches the console" "scripts/release/journey-tools.sh" false \
-    "+ferrobridge-viewer +ferrobridge-testkit -ferrobridge-server"
+    "+ferrobridge-console +ferrobridge-testkit -ferrobridge-server"
   # The console's image recipe and release lane are read by tier-1 jobs and
   # the release lane alone, never by a cargo lane.
-  check "the console image recipe is inert" "docker/viewer/Dockerfile" false ""
-  check "the console release lane is inert" ".github/workflows/release-viewer.yml" false ""
+  check "the console image recipe is inert" "docker/console/Dockerfile" false ""
+  check "the console release lane is inert" ".github/workflows/release-console.yml" false ""
   check "the quickstart is inert" "compose.yaml" false ""
   check "the toolchain reaches everything" "rust-toolchain.toml" false ALL
   check "the pin matrix reaches every member testing with the testkit" "docs/VERSIONS.md" false \
@@ -567,10 +567,10 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   # dev-dependant.
   check "the FerroPULSE vendor script reaches the server and its journeys" \
     "scripts/vendor/ferropulse-schemas.sh" false \
-    "+ferrobridge-server +ferrobridge-testkit -fhir-codegen -ferrobridge-viewer"
+    "+ferrobridge-server +ferrobridge-testkit -fhir-codegen -ferrobridge-console"
   check "the agreement vendor script reaches the validator" \
     "scripts/vendor/hl7-validator-agreement.sh" false \
-    "+ferrobridge-validator -fhir-codegen -ferrobridge-viewer"
+    "+ferrobridge-validator -fhir-codegen -ferrobridge-console"
   check "a KDS vendor script reaches the testkit and fhirconnect" \
     "scripts/vendor/kds-diagnose-opt.sh" false \
     "+ferrobridge-testkit +fhirconnect +ferrobridge-server -fhir-codegen -fhir-types -hl7v2-types"
@@ -578,19 +578,19 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "scripts/vendor/lib/kds-opt.sh" false \
     "+ferrobridge-testkit +fhirconnect +ferrobridge-server -fhir-codegen -fhir-types -hl7v2-types"
   check "the console reaches itself and nothing it does not link" \
-    "app/ferrobridge-viewer/src/lib.rs" false \
-    "+ferrobridge-viewer -fhir-types -openehr-mapping-core -ferrobridge-server"
+    "app/ferrobridge-console/src/lib.rs" false \
+    "+ferrobridge-console -fhir-types -openehr-mapping-core -ferrobridge-server"
   check "the console's rule reaches the console" ".claude/rules/leptos-ui.md" false \
-    "+ferrobridge-viewer -ferrobridge-server -fhir-types"
-  check "the console's build scripts reach the console" "scripts/release/viewer-site.sh" false \
-    "+ferrobridge-viewer -ferrobridge-server"
-  check "the console's bundle checks reach the console" "scripts/checks/viewer-bundle.sh" false \
-    "+ferrobridge-viewer -ferrobridge-server"
+    "+ferrobridge-console -ferrobridge-server -fhir-types"
+  check "the console's build scripts reach the console" "scripts/release/console-site.sh" false \
+    "+ferrobridge-console -ferrobridge-server"
+  check "the console's bundle checks reach the console" "scripts/checks/console-bundle.sh" false \
+    "+ferrobridge-console -ferrobridge-server"
   check "fhir-types reaches the console that links it" "crates/fhir-types/src/lib.rs" false \
-    "+ferrobridge-viewer"
+    "+ferrobridge-console"
   check "the operator contract reaches the server and the console" \
     "crates/ferrobridge-operator-api/src/lib.rs" false \
-    "+ferrobridge-operator-api +ferrobridge-server +ferrobridge-viewer -fhir-types"
+    "+ferrobridge-operator-api +ferrobridge-server +ferrobridge-console -fhir-types"
   check "another rule stays inert" ".claude/rules/testing.md" false ""
   check "the sqlx script reaches omop-cdm" "scripts/checks/sqlx-offline.sh" false \
     "+omop-cdm +omocl +ferrobridge-server"

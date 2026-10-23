@@ -50,7 +50,7 @@ not run on a push to `main`, on a pull request, or in a merge group.
 
 ```text
 plan ── github-release (draft) ─┬─ build-binaries ── build-image ─┬─ finalize-release (publish) ── crates
-                                └─ build-viewer ──────────────────┘
+                                └─ build-console ──────────────────┘
 ```
 
 - **plan** validates the tag shape, checks it against every file that declares
@@ -69,11 +69,11 @@ plan ── github-release (draft) ─┬─ build-binaries ── build-image �
 - **build-image** calls the reusable `release-image.yml` once the musl binaries
   exist, verifies them against the build lane's signer identity, and pushes
   `ghcr.io/ferrohealth/ferrobridge` for `linux/amd64` and `linux/arm64`.
-- **build-viewer** calls the reusable `release-viewer.yml` once the draft
+- **build-console** calls the reusable `release-console.yml` once the draft
   exists. It builds the operator console's two musl binaries with
   `cargo auditable` and its site bundle, attaches each with its checksum and
   provenance (the binaries with an SBOM too), verifies them against its own
-  signer identity, and pushes `ghcr.io/ferrohealth/ferrobridge-viewer` for
+  signer identity, and pushes `ghcr.io/ferrohealth/ferrobridge-console` for
   `linux/amd64` and `linux/arm64` with the bridge image's attestations.
 - **finalize-release** checks that the draft carries every asset this version
   promises, the console's included, then publishes. Publishing last means a half-assembled release is

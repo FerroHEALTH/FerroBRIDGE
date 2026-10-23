@@ -290,7 +290,7 @@ impl Provider {
             "iss": self.issuer(),
             "aud": audience,
             "sub": "synthetic-operator",
-            "client_id": "ferrobridge-viewer",
+            "client_id": "ferrobridge-console",
             "iat": now,
             "exp": now.saturating_add(3600),
             "jti": "synthetic-operator-access",

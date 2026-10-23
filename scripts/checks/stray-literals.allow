@@ -4,7 +4,7 @@
 # reader of the operator console sees as its text, each with the reason, and
 # the files it does not cover.
 
-skip app/ferrobridge-viewer/src/locale.rs   # the catalog mechanism: message ids
+skip app/ferrobridge-console/src/locale.rs   # the catalog mechanism: message ids
 
 allow ^(ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Home|End|Enter|Escape|Tab)$   # UI Events KeyboardEvent.key values
 allow ^Ferro(BRIDGE|FED|EHR|TERM|HEALTH)   # product names, the same in every language
@@ -15,9 +15,9 @@ allow ^L(\{number\})?$                      # an editor line's id prefix
 allow ^[a-z]+[A-Z][A-Za-z]*$                # a JSON member name (resourceType, valueString)
 allow ^[A-Z][a-z]+[A-Z][A-Za-z]+$           # a FHIR resource type name (OperationOutcome)
 
-skip app/ferrobridge-viewer/src/cli.rs      # the command line's help, which a terminal shows and no page draws
-skip app/ferrobridge-viewer/src/command.rs  # the process's terminal output and log lines, which no page draws
-skip app/ferrobridge-viewer/src/config/     # configuration refusals at start, on the terminal before any page exists
+skip app/ferrobridge-console/src/cli.rs      # the command line's help, which a terminal shows and no page draws
+skip app/ferrobridge-console/src/command.rs  # the process's terminal output and log lines, which no page draws
+skip app/ferrobridge-console/src/config/     # configuration refusals at start, on the terminal before any page exists
 
 allow ^(Bearer|Basic) \{\}$                  # HTTP authentication schemes (RFC 7617 §2, RFC 6750 §2.1)
 allow ^S256$                                # the PKCE code_challenge_method (RFC 7636 §4.3)

@@ -24,13 +24,13 @@ flowchart LR
   draft --> b2["binaries<br/>x86_64 musl"]
   draft --> b3["binaries<br/>aarch64 gnu"]
   draft --> b4["binaries<br/>aarch64 musl"]
-  draft --> viewer["viewer<br/>binaries, site bundle, image"]
+  draft --> console["console<br/>binaries, site bundle, image"]
   b2 --> image["image<br/>linux/amd64, linux/arm64"]
   b4 --> image
   b1 --> publish["finalize-release<br/>asset set, then publish"]
   b3 --> publish
   image --> publish
-  viewer --> publish
+  console --> publish
   publish --> crates["crates.io<br/>approval-gated"]
   crates --> milestone["milestone<br/>closed"]
 ```
@@ -53,9 +53,9 @@ flowchart LR
 - **build-image** calls `release-image.yml` once the musl binaries exist, and
   builds `ghcr.io/ferrohealth/ferrobridge` for `linux/amd64` and `linux/arm64`
   from them.
-- **build-viewer** calls `release-viewer.yml` once the draft exists. It
+- **build-console** calls `release-console.yml` once the draft exists. It
   builds the operator console's musl binaries and its site bundle, attaches
-  them to the draft, and builds `ghcr.io/ferrohealth/ferrobridge-viewer` for
+  them to the draft, and builds `ghcr.io/ferrohealth/ferrobridge-console` for
   `linux/amd64` and `linux/arm64` from them.
 - **finalize-release** checks that the draft carries every asset this version
   promises, then publishes. Publishing last means a half-assembled release is
@@ -96,14 +96,14 @@ nothing else reaches the builder, and `.gitignore` keeps the staged tree out of
 git. The same two commands reproduce the build on a laptop from a locally
 cross-compiled binary.
 
-`docker/viewer/Dockerfile`, the operator console's recipe, compiles nothing
-either. It copies `dist/viewer/${TARGETOS}_${TARGETARCH}/ferrobridge-viewer`
-and the site bundle at `dist/viewer/site/`, which `release-viewer.yml`
+`docker/console/Dockerfile`, the operator console's recipe, compiles nothing
+either. It copies `dist/console/${TARGETOS}_${TARGETARCH}/ferrobridge-console`
+and the site bundle at `dist/console/site/`, which `release-console.yml`
 stages from its own attested tarballs. The same `.dockerignore` applies.
 
 ## Why the build jobs are reusable workflows
 
-`build-binaries`, `build-image` and `build-viewer` carry a `uses:` line and
+`build-binaries`, `build-image` and `build-console` carry a `uses:` line and
 nothing else. That
 shape is load-bearing.
 
@@ -197,18 +197,18 @@ platform manifest. The lane then verifies its own output the way a consumer
 would, so a broken attestation fails the release instead of the first
 deployment.
 
-## What release-viewer.yml produces
+## What release-console.yml produces
 
 The console ships as an image on distroless static, so its binary is built
 for the two musl targets alone, `x86_64-unknown-linux-musl` and
 `aarch64-unknown-linux-musl`, each on a runner of its own architecture. The
-`plan` job names them once, and both the viewer lane's matrix and the asset
+`plan` job names them once, and both the console lane's matrix and the asset
 check read that list. The site bundle is the same for every architecture and
-is built once, by `scripts/release/viewer-site.sh` with the tools
-`scripts/release/viewer-tools.sh` installs at their pinned digests, so
+is built once, by `scripts/release/console-site.sh` with the tools
+`scripts/release/console-tools.sh` installs at their pinned digests, so
 cargo-leptos downloads nothing in the attested job. No job restores a cache.
 
-Every name below is prefixed `ferrobridge-viewer-vX.Y.Z-`:
+Every name below is prefixed `ferrobridge-console-vX.Y.Z-`:
 
 | Asset | What it is |
 |---|---|
@@ -225,8 +225,8 @@ Every name below is prefixed `ferrobridge-viewer-vX.Y.Z-`:
 
 `finalize-release` checks the whole set beside the bridge's. The image job
 takes the tarballs from this run's artifacts, verifies each against
-`release-viewer.yml`'s own signer identity, stages them for
-`docker/viewer/Dockerfile`, and from there runs the steps `release-image.yml`
+`release-console.yml`'s own signer identity, stages them for
+`docker/console/Dockerfile`, and from there runs the steps `release-image.yml`
 runs: one buildx build for both platforms with no QEMU, the version and, for
 a release that is not a pre-release, the major.minor and `latest` tags, five
 attestations pushed as OCI referrers (provenance for the index, provenance
@@ -253,7 +253,7 @@ before a real cut.
 2. **The version moves in every file the pin matrix names:** the root
    `Cargo.toml` `[workspace.package]` `version`, `CITATION.cff`, the
    product-version row of `docs/VERSIONS.md`, and the
-   `ghcr.io/ferrohealth/ferrobridge` and `ghcr.io/ferrohealth/ferrobridge-viewer`
+   `ghcr.io/ferrohealth/ferrobridge` and `ghcr.io/ferrohealth/ferrobridge-console`
    image tag defaults in `compose.yaml`.
    `scripts/checks/versions.sh` fails on any file left behind, and the `plan`
    job checks the first three against the tag and refuses the release when one
@@ -269,7 +269,7 @@ before a real cut.
 4. **The console screenshots show the release.** After the version moves,
    take the book's operator console screenshots again on the release
    commit's tree: `scripts/release/journey-tools.sh target/journey-tools`,
-   the release site bundle (`scripts/release/viewer-site.sh --release`), then
+   the release site bundle (`scripts/release/console-site.sh --release`), then
    `FERROBRIDGE_SCREENSHOTS=1 cargo nextest run -p ferrobridge-testkit -E
    'test(/screenshots::the_book_shows/)'`. The capture writes the version it
    ran at to `website/book/src/operate/img/console/captured-version.txt`, and
@@ -313,7 +313,7 @@ unsigned tag is refused at push time. `release.yml` takes it from there.
 3. **The GHCR packages are public.** A package pushed for the first time is
    private, which hides the image from everyone and breaks a
    `docker pull`. The owner sets each one public once, in the package
-   settings: `ferrobridge`, and `ferrobridge-viewer` after the first release
+   settings: `ferrobridge`, and `ferrobridge-console` after the first release
    that carries the console.
 4. **Post the board status update** with what shipped and what the next
    milestone targets (`.claude/rules/project-board.md`).

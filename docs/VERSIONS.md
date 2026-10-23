@@ -152,18 +152,18 @@ which a bare PostgreSQL does not have.
 
 ### The shipped image and the quickstart
 
-`docker/Dockerfile` and `docker/viewer/Dockerfile` build on one more image,
+`docker/Dockerfile` and `docker/console/Dockerfile` build on one more image,
 pinned by the digest of its image index, which is what Docker resolves for a
 multi-platform build. `scripts/checks/versions.sh` reads both `FROM` lines
 back against this row, and Dependabot (`docker`, over `/docker` and
-`/docker/viewer`) proposes the bumps.
+`/docker/console`) proposes the bumps.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| Container base image | `gcr.io/distroless/static-debian13:nonroot@sha256:d62067879de890a1def9da0e7766b7d20810a5e5555cef8506b752437d7a3e88` | the `FROM` of `docker/Dockerfile` and of `docker/viewer/Dockerfile`, and each one's `org.opencontainers.image.base.name` label without the digest |
+| Container base image | `gcr.io/distroless/static-debian13:nonroot@sha256:d62067879de890a1def9da0e7766b7d20810a5e5555cef8506b752437d7a3e88` | the `FROM` of `docker/Dockerfile` and of `docker/console/Dockerfile`, and each one's `org.opencontainers.image.base.name` label without the digest |
 
 The quickstart `compose.yaml` pulls `ghcr.io/ferrohealth/ferrobridge` and,
-under its `viewer` profile, `ghcr.io/ferrohealth/ferrobridge-viewer` at the
+under its `console` profile, `ghcr.io/ferrohealth/ferrobridge-console` at the
 release it shipped with, so both tags are the product version below rather
 than pins of their own, and the guard compares them. Its CDM service runs the same
 `postgres:18.6` image the row above pins for the end-to-end lane, so a
@@ -427,10 +427,10 @@ release without a reviewed change (`docs/release.md`).
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `cargo-auditable` | 0.7.5 | `.github/workflows/release-build.yml`, `.github/workflows/release-viewer.yml` |
+| `cargo-auditable` | 0.7.5 | `.github/workflows/release-build.yml`, `.github/workflows/release-console.yml` |
 | `cargo-cyclonedx` | 0.5.9 | `.github/workflows/release-build.yml` |
 | `cargo-fuzz` | 0.13.2 | `.github/workflows/fuzz.yml` (the fuzz lane, the one nightly-toolchain job; #155) |
-| `syft` | 1.51.1 | `.github/workflows/release-build.yml`, `.github/workflows/release-image.yml`, `.github/workflows/release-viewer.yml` |
+| `syft` | 1.51.1 | `.github/workflows/release-build.yml`, `.github/workflows/release-image.yml`, `.github/workflows/release-console.yml` |
 
 `scripts/checks/versions.sh` reads every `tool:` line of the two release
 workflows back against these rows, so a bump moves one row and the workflows
@@ -438,19 +438,19 @@ follow it.
 
 ## Operator console build tools
 
-The `viewer` job of `.github/workflows/ci.yml` builds the operator console's
-site bundle (`app/ferrobridge-viewer`, #599) with three tools. cargo-leptos
+The `console` job of `.github/workflows/ci.yml` builds the operator console's
+site bundle (`app/ferrobridge-console`, #599) with three tools. cargo-leptos
 and the wasm-bindgen CLI are fetched by the digest-pinned
 `taiki-e/install-action`; the wasm-bindgen CLI equals the `wasm-bindgen`
 crate requirement of the root `Cargo.toml`, because the CLI and the crate
 must agree on the bindings they write. Binaryen's `wasm-opt` is installed by
-`scripts/release/viewer-tools.sh`, checked against its SHA-256.
+`scripts/release/console-tools.sh`, checked against its SHA-256.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `cargo-leptos` | 0.3.11 | `.github/workflows/ci.yml` (the `viewer` job), `.github/workflows/release-viewer.yml` |
-| `wasm-bindgen` | 0.2.129 | `.github/workflows/ci.yml` (the `viewer` job), `.github/workflows/release-viewer.yml`, the root `Cargo.toml` `[workspace.dependencies]` |
-| Binaryen | version_133 | `scripts/release/viewer-tools.sh` |
+| `cargo-leptos` | 0.3.11 | `.github/workflows/ci.yml` (the `console` job), `.github/workflows/release-console.yml` |
+| `wasm-bindgen` | 0.2.129 | `.github/workflows/ci.yml` (the `console` job), `.github/workflows/release-console.yml`, the root `Cargo.toml` `[workspace.dependencies]` |
+| Binaryen | version_133 | `scripts/release/console-tools.sh` |
 
 `scripts/checks/versions.sh` reads each of them back against these rows.
 

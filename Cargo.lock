@@ -1418,6 +1418,45 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
+name = "ferrobridge-console"
+version = "0.0.10"
+dependencies = [
+ "aws-lc-rs",
+ "axum",
+ "base64 0.23.1",
+ "clap",
+ "console_error_panic_hook",
+ "cookie",
+ "ferrobridge-operator-api",
+ "ferrobridge-testkit",
+ "ferrohealth-ui",
+ "fhir-types",
+ "fluent-templates",
+ "http",
+ "jsonwebtoken",
+ "leptos",
+ "leptos_axum",
+ "leptos_meta",
+ "leptos_router",
+ "openehr-mapping-core",
+ "reqwest",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "toml",
+ "tower",
+ "tower-http 0.7.1",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "wasm-bindgen",
+ "wiremock",
+]
+
+[[package]]
 name = "ferrobridge-fhirpath"
 version = "0.1.127"
 dependencies = [
@@ -1554,8 +1593,8 @@ dependencies = [
  "anyhow",
  "aws-lc-rs",
  "base64 0.23.1",
+ "ferrobridge-console",
  "ferrobridge-server",
- "ferrobridge-viewer",
  "fhir-types",
  "jiff",
  "jsonwebtoken",
@@ -1594,45 +1633,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
- "wiremock",
-]
-
-[[package]]
-name = "ferrobridge-viewer"
-version = "0.0.10"
-dependencies = [
- "aws-lc-rs",
- "axum",
- "base64 0.23.1",
- "clap",
- "console_error_panic_hook",
- "cookie",
- "ferrobridge-operator-api",
- "ferrobridge-testkit",
- "ferrohealth-ui",
- "fhir-types",
- "fluent-templates",
- "http",
- "jsonwebtoken",
- "leptos",
- "leptos_axum",
- "leptos_meta",
- "leptos_router",
- "openehr-mapping-core",
- "reqwest",
- "secrecy",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "toml",
- "tower",
- "tower-http 0.7.1",
- "tracing",
- "tracing-subscriber",
- "url",
- "wasm-bindgen",
  "wiremock",
 ]
 

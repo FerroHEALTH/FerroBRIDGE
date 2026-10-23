@@ -62,12 +62,12 @@ Twelve workflows:
   stages them for `docker/Dockerfile`, pushes the multi-platform image to GHCR,
   attests the index and both platform manifests as OCI referrers, and verifies
   its own output as a consumer would.
-- `.github/workflows/release-viewer.yml`: the reusable operator console lane
+- `.github/workflows/release-console.yml`: the reusable operator console lane
   (#603). It builds the musl console binary per architecture with
-  `cargo auditable` and the site bundle with the pinned viewer tools, attests
+  `cargo auditable` and the site bundle with the pinned console tools, attests
   both and attaches them to the draft, then verifies them against its own
-  signer identity, stages them for `docker/viewer/Dockerfile`, pushes
-  `ghcr.io/ferrohealth/ferrobridge-viewer`, and attests and verifies the image
+  signer identity, stages them for `docker/console/Dockerfile`, pushes
+  `ghcr.io/ferrohealth/ferrobridge-console`, and attests and verifies the image
   as `release-image.yml` does. All three are reusable workflows because SLSA
   Build Level 3 needs the signing identity out of reach of caller-defined
   steps.

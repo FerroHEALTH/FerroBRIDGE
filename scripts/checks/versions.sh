@@ -36,11 +36,11 @@
 #                          the three release workflows install, against
 #                          docs/VERSIONS.md.
 #                          The operator console's build tools: cargo-leptos
-#                          and the wasm-bindgen CLI of the ci.yml viewer job
-#                          and of release-viewer.yml,
+#                          and the wasm-bindgen CLI of the ci.yml console job
+#                          and of release-console.yml,
 #                          the wasm-bindgen crate requirement, and the
 #                          Binaryen release of
-#                          scripts/release/viewer-tools.sh.
+#                          scripts/release/console-tools.sh.
 #                          The browser journeys: the thirtyfour requirement,
 #                          the chrome-version of the ci.yml journeys job, and
 #                          the release and SHA-256 digests of
@@ -51,7 +51,7 @@
 #   7. container images    the PinnedImage constants of the testkit container
 #                          harness against the docs/VERSIONS.md image rows.
 #   8. image and compose   the FROM of docker/Dockerfile and of
-#                          docker/viewer/Dockerfile against the base-image
+#                          docker/console/Dockerfile against the base-image
 #                          row, the compose.yaml PostgreSQL image against the
 #                          PostgreSQL row, and the compose.yaml bridge and
 #                          console tags against the product version and the
@@ -449,7 +449,7 @@ echo "== release and fuzz tool pins (.github/workflows/{release-*,fuzz}.yml <-> 
 # tool named in both files has to carry the same pin in both.
 release_tool_pins() {
   local tool="$1" wf
-  for wf in .github/workflows/release-build.yml .github/workflows/release-image.yml .github/workflows/release-viewer.yml .github/workflows/fuzz.yml; do
+  for wf in .github/workflows/release-build.yml .github/workflows/release-image.yml .github/workflows/release-console.yml .github/workflows/fuzz.yml; do
     [ -f "$wf" ] || continue
     sed -nE "s|^[[:space:]]*tool:[[:space:]]*${tool}@([^[:space:]]+).*|\1|p" "$wf"
   done | sort -u
@@ -479,8 +479,8 @@ else
   note "no release-build.yml or release-image.yml yet, skipped"
 fi
 
-echo "== operator console build tools (ci.yml, Cargo.toml, scripts/release/viewer-*.sh <-> docs/VERSIONS.md)"
-if [ -f app/ferrobridge-viewer/Cargo.toml ]; then
+echo "== operator console build tools (ci.yml, Cargo.toml, scripts/release/console-*.sh <-> docs/VERSIONS.md)"
+if [ -f app/ferrobridge-console/Cargo.toml ]; then
   # The value of the first `NAME="..."` assignment in FILE.
   shell_pin() {
     sed -nE "s|^$1=\"([^\"]+)\".*|\1|p" "$2" | head -n1
@@ -499,7 +499,7 @@ if [ -f app/ferrobridge-viewer/Cargo.toml ]; then
       note "OK: $row $found ($where)"
     fi
   }
-  for wf in .github/workflows/ci.yml .github/workflows/release-viewer.yml; do
+  for wf in .github/workflows/ci.yml .github/workflows/release-console.yml; do
     if [ ! -f "$wf" ]; then
       note "no $wf yet, skipped"
       continue
@@ -514,8 +514,8 @@ if [ -f app/ferrobridge-viewer/Cargo.toml ]; then
     done
   done
   console_pin wasm-bindgen "$(manifest_req wasm-bindgen)" "the root Cargo.toml"
-  console_pin Binaryen "$(shell_pin binaryen_version scripts/release/viewer-tools.sh)" \
-    scripts/release/viewer-tools.sh
+  console_pin Binaryen "$(shell_pin binaryen_version scripts/release/console-tools.sh)" \
+    scripts/release/console-tools.sh
   # The browser journeys: the WebDriver client, the Chrome for Testing
   # release the journeys job installs, and the local install of that release
   # with each zip's SHA-256.
@@ -538,7 +538,7 @@ if [ -f app/ferrobridge-viewer/Cargo.toml ]; then
       scripts/release/journey-tools.sh
   done
 else
-  note "no app/ferrobridge-viewer yet, skipped"
+  note "no app/ferrobridge-console yet, skipped"
 fi
 
 echo "== docs toolchain (.github/actions/docs-toolchain <-> docs/VERSIONS.md)"
@@ -609,10 +609,10 @@ else
   note "no $harness yet, skipped"
 fi
 
-echo "== container recipes and quickstart (docker/Dockerfile, docker/viewer/Dockerfile, compose.yaml <-> docs/VERSIONS.md)"
+echo "== container recipes and quickstart (docker/Dockerfile, docker/console/Dockerfile, compose.yaml <-> docs/VERSIONS.md)"
 # The bridge image and the console image build on the one base the matrix
 # pins, so a bump moves both FROM lines or this fails.
-for recipe in docker/Dockerfile docker/viewer/Dockerfile; do
+for recipe in docker/Dockerfile docker/console/Dockerfile; do
   if [ ! -f "$recipe" ] || [ ! -f docs/VERSIONS.md ]; then
     note "no $recipe yet, skipped"
     continue
@@ -640,7 +640,7 @@ if [ -f compose.yaml ] && [ -f docs/VERSIONS.md ]; then
   # Every ferrobridge image reference in the quickstart, the console's
   # included, carries the same tag default, so the set is collapsed and a
   # second value is drift by itself.
-  tags="$(sed -nE 's|^[[:space:]]*image:[[:space:]]*ghcr\.io/ferrohealth/ferrobridge(-viewer)?:\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]+)\}[[:space:]]*$|\2|p' compose.yaml | sort -u)"
+  tags="$(sed -nE 's|^[[:space:]]*image:[[:space:]]*ghcr\.io/ferrohealth/ferrobridge(-console)?:\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]+)\}[[:space:]]*$|\2|p' compose.yaml | sort -u)"
   count="$(printf '%s\n' "$tags" | grep -c . || true)"
   matrix_product="$(pin_of "Product version" docs/VERSIONS.md)"
   if [ "$count" -eq 0 ]; then

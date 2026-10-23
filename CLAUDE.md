@@ -118,14 +118,14 @@ the testkit tool crate. Beside it:
   facade's and the operations lane's programs, which every request reads once
   at entry. `src/mappings/compile.rs` is the one FHIRconnect load path the
   lanes, `mapping check` and the reload share (#725).
-- `app/ferrobridge-viewer`: the operator console (#599, `docs/architecture.md`
-  §4.10), its own binary `ferrobridge-viewer`: a Leptos app rendered on the
+- `app/ferrobridge-console`: the operator console (#599, `docs/architecture.md`
+  §4.10), its own binary `ferrobridge-console`: a Leptos app rendered on the
   server and hydrated, halves chosen by target, with `serve`, `config check`
-  and `healthcheck`, the TOML configuration with `FERROBRIDGE_VIEWER__`
+  and `healthcheck`, the TOML configuration with `FERROBRIDGE_CONSOLE__`
   overrides and `_file` secrets, the nonce CSP and the other browser security
   headers, and the typed bridge client (`src/bridge/`). Its server half
   links only `openehr-mapping-core`, `fhir-types` and
-  `ferrobridge-operator-api` of the workspace and its browser half none, held by `tests/it/boundary.rs`; the CI `viewer` lane
+  `ferrobridge-operator-api` of the workspace and its browser half none, held by `tests/it/boundary.rs`; the CI `console` lane
   lints the wasm32 half and builds the site bundle against its budget
   (`.claude/rules/leptos-ui.md`). FerroUI (`ferrohealth-ui`, pinned exactly)
   leads its UI: its components, design and component rules come from the
@@ -244,12 +244,12 @@ the testkit tool crate. Beside it:
   dependency closure is complete.
 - `docker/Dockerfile`: the container recipe (#22), one stage on distroless
   static pinned by index digest, copying the binary the release lane stages
-  under `dist/<os>_<arch>/`; it compiles nothing. `docker/viewer/Dockerfile`
+  under `dist/<os>_<arch>/`; it compiles nothing. `docker/console/Dockerfile`
   is the operator console's recipe (#603) on the same base, copying the
-  console binary and site bundle staged under `dist/viewer/`.
+  console binary and site bundle staged under `dist/console/`.
 - `compose.yaml`: the quickstart that runs the published image with the
   hardening set, file secrets, the `cdm`, `cdm-init` and `vocab-load`
-  profiles over the pinned PostgreSQL, and the `viewer` profile that runs
+  profiles over the pinned PostgreSQL, and the `console` profile that runs
   the operator console beside the bridge.
 - `.claude/`: the working discipline. `rules/` (the path-scoped and standing
   rules), `hooks/`, `skills/`, `agents/`, `memory/`.
@@ -277,14 +277,14 @@ the testkit tool crate. Beside it:
   the same set (`docs/ci-cd.md`).
 - `.github/`: issue and pull-request templates, CODEOWNERS, Dependabot, and
   twelve workflows (CI, Docs, Scorecard, CodeQL, SonarQube Cloud, Release,
-  Release build, Release image, Release viewer, Publish crates, Pin
+  Release build, Release image, Release console, Publish crates, Pin
   freshness, Fuzz). `ci.yml` runs
   its workflow, shell, container and guard tier beside the Rust tier; its
   `conclusion` job is the single required check on `main` (`docs/ci-cd.md`).
   `release.yml` is dormant until a `v*` tag is pushed and cuts a release from
   the changelog section, and its `crates` leg publishes the library crates
   through Trusted Publishing. `release-build.yml`, `release-image.yml` and
-  `release-viewer.yml` are the three reusable workflows it calls, which is
+  `release-console.yml` are the three reusable workflows it calls, which is
   what puts the signing identity out of reach of caller-defined steps (SLSA
   Build Level 3); they produce the attested tarballs, the SBOMs per target,
   and the multi-platform GHCR images of the bridge and of the operator
@@ -476,7 +476,7 @@ apply always. Read the relevant one before working in that area.
 - `.claude/rules/vendored-inputs.md`: every external corpus is fetched by a
   committed `scripts/vendor/*.sh`, vendored verbatim, provenance-stamped.
 - `.claude/rules/leptos-ui.md`: the operator console's Leptos discipline,
-  scoped to `app/ferrobridge-viewer/**`. FerroUI leads the UI: the rule opens
+  scoped to `app/ferrobridge-console/**`. FerroUI leads the UI: the rule opens
   with FerroUI's consumer guide and component rules and keeps only what is
   particular to this console.
 - `.claude/rules/ci-cd.md`, `ai-code-review.md`, `crates-publishing.md`: the

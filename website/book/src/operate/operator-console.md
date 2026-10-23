@@ -3,7 +3,7 @@
 
 # The operator console
 
-The FerroBRIDGE Console is a separate binary, `ferrobridge-viewer`, that
+The FerroBRIDGE Console is a separate binary, `ferrobridge-console`, that
 serves a web console in front of the bridge. Its server calls the bridge
 over the bridge's public HTTP surface with the signed-in operator's own
 access token, so the bridge checks that token as it checks any other
@@ -30,8 +30,8 @@ issuer = "https://idp.example.org/realms/ferrobridge"
 authorization_endpoint = "https://idp.example.org/realms/ferrobridge/protocol/openid-connect/auth"
 token_endpoint = "https://idp.example.org/realms/ferrobridge/protocol/openid-connect/token"
 jwks_uri = "https://idp.example.org/realms/ferrobridge/protocol/openid-connect/certs"
-client_id = "ferrobridge-viewer"
-client_secret_file = "/run/secrets/viewer-client-secret"
+client_id = "ferrobridge-console"
+client_secret_file = "/run/secrets/console-client-secret"
 redirect_uri = "https://console.example.org/auth/callback"
 offline_access = true
 end_session_endpoint = "https://idp.example.org/realms/ferrobridge/protocol/openid-connect/logout"

@@ -116,7 +116,7 @@ async fn every_state(browser: &Browser, stack: &Stack, theme: &str) -> Result<()
     layout(browser, 1440, 900, theme).await?;
     browser.driver().delete_all_cookies().await?;
     browser.goto(&stack.url("/")).await?;
-    let mut cookie = Cookie::new(ferrobridge_viewer::session::THEME_COOKIE, theme);
+    let mut cookie = Cookie::new(ferrobridge_console::session::THEME_COOKIE, theme);
     cookie.set_path("/");
     browser.driver().add_cookie(cookie).await?;
     sign_in(browser, stack).await?;
