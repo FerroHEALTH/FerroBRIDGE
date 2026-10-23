@@ -5,7 +5,7 @@
 
 The contract of the bridge's health and operator documents, shared by
 `ferrobridge-server`, which serializes them, and the server half of
-`ferrobridge-viewer`, which decodes them (`docs/architecture.md` §4.10).
+`ferrobridge-console`, which decodes them (`docs/architecture.md` §4.10).
 
 - **Serde types and nothing else.** No HTTP, no I/O, no logic beyond a
   constructor a type needs. Behaviour stays in the server; a status code a
@@ -17,4 +17,4 @@ The contract of the bridge's health and operator documents, shared by
 - **Diagnostics are `openehr_mapping_core::diagnostic::Diagnostic`.** Never
   a local diagnostic shape (`.claude/rules/codegen.md`).
 - **The console links this crate on its server half alone**, which
-  `app/ferrobridge-viewer/tests/it/boundary.rs` holds.
+  `app/ferrobridge-console/tests/it/boundary.rs` holds.

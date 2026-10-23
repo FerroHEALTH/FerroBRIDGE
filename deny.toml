@@ -88,7 +88,7 @@ exceptions = [
   { allow = ["BUSL-1.1"], crate = "ferrobridge-validator" },
   { allow = ["BUSL-1.1"], crate = "ferrobridge-operator-api" },
   { allow = ["BUSL-1.1"], crate = "ferrobridge-server" },
-  { allow = ["BUSL-1.1"], crate = "ferrobridge-viewer" },
+  { allow = ["BUSL-1.1"], crate = "ferrobridge-console" },
   { allow = ["BUSL-1.1"], crate = "ferrobridge-testkit" },
   { allow = ["BUSL-1.1"], crate = "fhir-codegen" },
   { allow = ["BUSL-1.1"], crate = "omop-cdm-codegen" },

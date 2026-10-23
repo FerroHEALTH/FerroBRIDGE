@@ -120,7 +120,7 @@ fixed.
   The evaluator implements FHIRPath N1 2.0.0 with the FHIR R4 additions. The
   validator holds a resource to the profiles of a package set it reads offline
   and lists every constraint it could not evaluate.
-- **The operator console**, `ghcr.io/ferrohealth/ferrobridge-viewer`: a web
+- **The operator console**, `ghcr.io/ferrohealth/ferrobridge-console`: a web
   console behind OpenID Connect sign-in. It shows the engine state, lists and
   edits the mapping files, and runs the transform playground and the
   validation dry run.
@@ -150,11 +150,11 @@ Three profiles add services:
 - `vocab` runs `vocab load` over an OHDSI Athena export you downloaded
   yourself. That job does not load yet: it exits naming
   [#233](https://github.com/FerroHEALTH/FerroBRIDGE/issues/233);
-- `viewer` runs the operator console beside the bridge.
+- `console` runs the operator console beside the bridge.
 
 ```bash
 docker compose --profile cdm up
-docker compose --profile viewer up
+docker compose --profile console up
 ```
 
 To run the image without compose, pull

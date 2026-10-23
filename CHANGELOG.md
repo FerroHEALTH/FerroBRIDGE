@@ -286,6 +286,27 @@ crates on crates.io.
 
 ### Changed
 
+- **Breaking:** the operator console is renamed from `ferrobridge-viewer`
+  to `ferrobridge-console` (#1133), as every FerroHEALTH product names its
+  operator UI. The crate and its binary are `ferrobridge-console`
+  (`app/ferrobridge-console`), the image is
+  `ghcr.io/ferrohealth/ferrobridge-console`, built by the reusable
+  `release-console.yml` from `docker/console/Dockerfile`, and the
+  `ferrobridge-viewer` image is no longer built. Upgrade note: change the
+  image reference to `ghcr.io/ferrohealth/ferrobridge-console`; rename the
+  environment variables from `FERROBRIDGE_VIEWER__` to
+  `FERROBRIDGE_CONSOLE__` and `FERROBRIDGE_VIEWER_CONFIG` to
+  `FERROBRIDGE_CONSOLE_CONFIG`; in `compose.yaml` the profile and service
+  `viewer` are `console` and the secret file
+  `secrets/viewer_oidc_client_secret` is
+  `secrets/console_oidc_client_secret`. The session, sign-in and theme
+  cookies are renamed from `ferrobridge_viewer_*` to
+  `ferrobridge_console_*`, so every operator signs in again after the
+  upgrade and the theme starts from the system's. The CI job and the build
+  scripts follow (`console`, `scripts/release/console-site.sh`,
+  `console-tools.sh`, `scripts/checks/console-bundle.sh`,
+  `console-paths.sh`).
+
 - The workspace builds with Rust 1.99.1 in place of 1.98.1, and the MSRV
   stays at 1.98: the FerroHEALTH family builds with the latest stable
   toolchain and declares the release before it as its MSRV. Clippy 1.99's

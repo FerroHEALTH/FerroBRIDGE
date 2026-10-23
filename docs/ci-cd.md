@@ -31,7 +31,7 @@ the committed guards, so both are live code from day one and both need a gate.
 | `actionlint` | the official digest-pinned image, with `SHELLCHECK_OPTS='-e SC2016'` |
 | `shellcheck` | `--severity=style` over every tracked `*.sh` and every tracked extensionless file with a shell shebang |
 | `hadolint` | every tracked Dockerfile under `.hadolint.yaml` (`failure-threshold: warning`) |
-| `container-config` | `docker compose --profile viewer config` and the same over every profile, with empty secret files, then `docker buildx build --check` and a one-platform build with no output of `docker/viewer/Dockerfile` over placeholder files at the staged paths |
+| `container-config` | `docker compose --profile console config` and the same over every profile, with empty secret files, then `docker buildx build --check` and a one-platform build with no output of `docker/console/Dockerfile` over placeholder files at the staged paths |
 | `comment-style` | `scripts/checks/comment-style.sh --all` |
 | `versions` | `scripts/checks/versions.sh`, and `scripts/checks/changelog-released.sh`: every released `CHANGELOG.md` section from 0.0.9 on reads as it does at its tag |
 | `profile-packages` | `scripts/vendor/profile-packages.sh` over a cache keyed on `--cache-key` (the profile packages fetched at build time and never committed, each checked at its pinned count and digest), then `--self-test` and `--check`: every `PROVENANCE.md` against its pin, no unpinned tree, and every `dependencies` entry of every fetched `package.json` pinned too |
@@ -43,7 +43,7 @@ the committed guards, so both are live code from day one and both need a gate.
 | `tracker-helpers` | the `--self-test` of `scripts/gh/fields.sh`, `labels.sh` and `migrate-fields.sh`, each driven against a stub `gh` on `PATH`, of `scripts/gh/changelog-merge.sh` on changelog fixtures that reproduce a release cut under a queued entry, and of `scripts/deploy-probe.sh` against a stub `curl` |
 
 `hadolint` runs against the two tracked recipes, `docker/Dockerfile` (#22)
-and `docker/viewer/Dockerfile` (#603), whose digest-pinned `FROM` lines the
+and `docker/console/Dockerfile` (#603), whose digest-pinned `FROM` lines the
 `versions` job checks against the one `docs/VERSIONS.md` row in the same
 tier. `versions` still skips the checks
 whose subject file is absent, reporting each skip with its reason, so it gains
@@ -88,7 +88,7 @@ A changed path reaches packages in one of these ways:
 | `docs/VERSIONS.md` | `ferrobridge-testkit`, and through it every member testing with it (`matrix_pin`) |
 | `docs/architecture.md` | the testkit's own tests |
 | `scripts/checks/sqlx-offline.sh` | `omop-cdm` |
-| `.claude/rules/leptos-ui.md`, `scripts/release/viewer-*.sh`, `scripts/checks/viewer-*.sh`, `scripts/release/journey-tools.sh` | `ferrobridge-viewer` (the rule holds its bundle budget; the scripts build and measure its site bundle and install the browser its journeys drive) |
+| `.claude/rules/leptos-ui.md`, `scripts/release/console-*.sh`, `scripts/checks/console-*.sh`, `scripts/release/journey-tools.sh` | `ferrobridge-console` (the rule holds its bundle budget; the scripts build and measure its site bundle and install the browser its journeys drive) |
 | `website/book/src/**` | the testkit's own tests (its screenshot guard reads every page of the book and every console screenshot) |
 | `.github/workflows/ci.yml`, `.github/actions/setup-rust/**`, `scripts/checks/affected.sh`, `scripts/checks/fast.sh` | everything |
 | the rest of `.github/`, the rest of `.claude/`, the rest of `website/`, `assets/`, `docker/`, `fuzz/`, `scripts/gh/`, the rest of `scripts/release/`, `docs/ci-cd.md`, `docs/release.md`, the root community files, and the guard scripts tier 1 runs | nothing |
@@ -105,8 +105,8 @@ maps it. Each lane then reads one output:
 | `codegen-drift`, `codegen-emit-tests` | `fhir-codegen` is reached (its sources, its vendored packages, `fhir-types` or `hl7v2-types`) |
 | `omop-cdm-codegen-drift` | `omop-cdm-codegen` is reached (its sources or `omop-cdm`) |
 | `sqlx-offline` | `omop-cdm` is reached |
-| `viewer (wasm32 and site bundle)` | `ferrobridge-viewer` is reached: its browser half linted for `wasm32-unknown-unknown`, its release site bundle built, held to the budget of `.claude/rules/leptos-ui.md` §12, and checked for build-host paths |
-| `journeys (browser)` | `ferrobridge-viewer` or `ferrobridge-server` is reached: the console's browser journeys in headless Chrome at the pinned Chrome for Testing release, against a running bridge and console serving the release site bundle |
+| `console (wasm32 and site bundle)` | `ferrobridge-console` is reached: its browser half linted for `wasm32-unknown-unknown`, its release site bundle built, held to the budget of `.claude/rules/leptos-ui.md` §12, and checked for build-host paths |
+| `journeys (browser)` | `ferrobridge-console` or `ferrobridge-server` is reached: the console's browser journeys in headless Chrome at the pinned Chrome for Testing release, against a running bridge and console serving the release site bundle |
 | `conformance` | a package `conformance.sh` runs is reached |
 | `e2e (containers)` | one of `omop-cdm`, `ferrobridge-server`, `ferrobridge-term`, `ferrobridge-testkit` is reached; it runs those of them that are |
 | `rustfmt`, `cargo-deny`, `dependency-review` and every tier-1 job | always (`cargo-deny` because the advisory database moves without a change) |
@@ -487,7 +487,7 @@ actionlint lanes read.
 | `release.yml` | on a `v*` tag: plan, draft, the three calls, publish, crates.io | none of its own |
 | `release-build.yml` | called once per target, on a runner of that architecture | `cargo-auditable`, `cargo-cyclonedx`, `syft` |
 | `release-image.yml` | called once the musl binaries exist | `syft` |
-| `release-viewer.yml` | called once the draft exists: the console binaries, its site bundle and its image | `cargo-auditable`, `syft`, `cargo-leptos`, `wasm-bindgen` |
+| `release-console.yml` | called once the draft exists: the console binaries, its site bundle and its image | `cargo-auditable`, `syft`, `cargo-leptos`, `wasm-bindgen` |
 
 Those versions are rows of `docs/VERSIONS.md`, and
 `scripts/checks/versions.sh` reads every `tool:` line of the three release

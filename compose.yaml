@@ -41,7 +41,7 @@
 # SECRETS. The four files under ./secrets are yours to create before the first
 # `docker compose up`; compose refuses to start a service whose secret source
 # is missing. A file whose lane is off may be empty, because nothing reads it.
-# The `viewer` profile reads a fifth, the console's OIDC client secret. Never
+# The `console` profile reads a fifth, the console's OIDC client secret. Never
 # commit them.
 #
 #   mkdir -p secrets
@@ -49,7 +49,7 @@
 #   printf '%s' "$PASSWORD" > secrets/cdm_password
 #   printf '%s' "$CDR_PASSWORD" > secrets/cdr_password
 #   printf '%s' "$TX_PASSWORD" > secrets/terminology_password
-#   printf '%s' "$CLIENT_SECRET" > secrets/viewer_oidc_client_secret
+#   printf '%s' "$CLIENT_SECRET" > secrets/console_oidc_client_secret
 #
 # PORTS. The published port binds the loopback interface by default. A
 # published port is DNAT'd ahead of the host firewall's own chains, so a port
@@ -68,7 +68,7 @@
 #
 # PROFILES. The `cdm` profile stands up the OMOP CDM database and applies the
 # DDL; the `vocab` profile loads an OHDSI Athena export you downloaded
-# yourself; the `viewer` profile runs the operator console beside the bridge.
+# yourself; the `console` profile runs the operator console beside the bridge.
 # None of them runs on a plain `docker compose up`.
 
 # Without this the project is named after the directory the file sits in, and
@@ -247,10 +247,10 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  # The operator console (ghcr.io/ferrohealth/ferrobridge-viewer), a client of
+  # The operator console (ghcr.io/ferrohealth/ferrobridge-console), a client of
   # the bridge's HTTP surface that operators sign in to with OpenID Connect.
   #
-  #   docker compose --profile viewer up
+  #   docker compose --profile console up
   #   open http://127.0.0.1:3000/
   #
   # Sign-in is off until you name your OpenID Provider and register the
@@ -258,14 +258,14 @@ services:
   # http://127.0.0.1:3000/auth/callback (or the address you publish). Set the
   # provider in your shell or .env, and point the secret at the file below:
   #
-  #   FERROBRIDGE_VIEWER__OIDC__ISSUER=https://idp.example.org/realms/ferrobridge
-  #   FERROBRIDGE_VIEWER__OIDC__AUTHORIZATION_ENDPOINT=https://idp.example.org/realms/ferrobridge/protocol/openid-connect/auth
-  #   FERROBRIDGE_VIEWER__OIDC__TOKEN_ENDPOINT=https://idp.example.org/realms/ferrobridge/protocol/openid-connect/token
-  #   FERROBRIDGE_VIEWER__OIDC__JWKS_URI=https://idp.example.org/realms/ferrobridge/protocol/openid-connect/certs
-  #   FERROBRIDGE_VIEWER__OIDC__CLIENT_ID=ferrobridge-viewer
-  #   FERROBRIDGE_VIEWER__OIDC__CLIENT_SECRET_FILE=/run/secrets/viewer_oidc_client_secret
-  #   FERROBRIDGE_VIEWER__OIDC__REDIRECT_URI=http://127.0.0.1:3000/auth/callback
-  #   FERROBRIDGE_VIEWER__SESSION__SECURE_COOKIE=false
+  #   FERROBRIDGE_CONSOLE__OIDC__ISSUER=https://idp.example.org/realms/ferrobridge
+  #   FERROBRIDGE_CONSOLE__OIDC__AUTHORIZATION_ENDPOINT=https://idp.example.org/realms/ferrobridge/protocol/openid-connect/auth
+  #   FERROBRIDGE_CONSOLE__OIDC__TOKEN_ENDPOINT=https://idp.example.org/realms/ferrobridge/protocol/openid-connect/token
+  #   FERROBRIDGE_CONSOLE__OIDC__JWKS_URI=https://idp.example.org/realms/ferrobridge/protocol/openid-connect/certs
+  #   FERROBRIDGE_CONSOLE__OIDC__CLIENT_ID=ferrobridge-console
+  #   FERROBRIDGE_CONSOLE__OIDC__CLIENT_SECRET_FILE=/run/secrets/console_oidc_client_secret
+  #   FERROBRIDGE_CONSOLE__OIDC__REDIRECT_URI=http://127.0.0.1:3000/auth/callback
+  #   FERROBRIDGE_CONSOLE__SESSION__SECURE_COOKIE=false
   #
   # The last line is for a console served over plain http on loopback, as
   # above, and the console refuses it anywhere else; behind an https proxy,
@@ -275,36 +275,36 @@ services:
   # token: name the issuer in its [auth] section, and turn on [operator] for
   # the mapping files.
   # The image's own HEALTHCHECK runs the binary's `healthcheck` subcommand.
-  viewer:
-    image: ghcr.io/ferrohealth/ferrobridge-viewer:${FERROBRIDGE_VERSION:-0.0.10}
-    profiles: [viewer]
+  console:
+    image: ghcr.io/ferrohealth/ferrobridge-console:${FERROBRIDGE_VERSION:-0.0.10}
+    profiles: [console]
     restart: unless-stopped
     depends_on:
       - ferrobridge
     ports:
-      - "${FERROBRIDGE_BIND_HOST:-127.0.0.1}:${FERROBRIDGE_VIEWER_PORT:-3000}:3000"
+      - "${FERROBRIDGE_BIND_HOST:-127.0.0.1}:${FERROBRIDGE_CONSOLE_PORT:-3000}:3000"
     environment:
       # The image sets the same value; repeated so `docker compose config`
       # shows the address the container binds.
-      FERROBRIDGE_VIEWER__SERVER__LISTEN: 0.0.0.0:3000
+      FERROBRIDGE_CONSOLE__SERVER__LISTEN: 0.0.0.0:3000
       # The bridge, server to server over the compose network.
-      FERROBRIDGE_VIEWER__BRIDGE__BASE_URL: http://ferrobridge:8080/
+      FERROBRIDGE_CONSOLE__BRIDGE__BASE_URL: http://ferrobridge:8080/
       # Passed through only when set in your shell or .env: without an issuer
       # the console offers no sign-in, while an empty one is a boot error.
-      FERROBRIDGE_VIEWER__OIDC__ISSUER:
-      FERROBRIDGE_VIEWER__OIDC__AUTHORIZATION_ENDPOINT:
-      FERROBRIDGE_VIEWER__OIDC__TOKEN_ENDPOINT:
-      FERROBRIDGE_VIEWER__OIDC__JWKS_URI:
-      FERROBRIDGE_VIEWER__OIDC__CLIENT_ID:
-      FERROBRIDGE_VIEWER__OIDC__CLIENT_SECRET_FILE:
-      FERROBRIDGE_VIEWER__OIDC__REDIRECT_URI:
-      FERROBRIDGE_VIEWER__OIDC__SCOPES:
-      FERROBRIDGE_VIEWER__OIDC__OFFLINE_ACCESS:
-      FERROBRIDGE_VIEWER__OIDC__END_SESSION_ENDPOINT:
-      FERROBRIDGE_VIEWER__OIDC__POST_LOGOUT_REDIRECT_URI:
-      FERROBRIDGE_VIEWER__SESSION__SECURE_COOKIE:
+      FERROBRIDGE_CONSOLE__OIDC__ISSUER:
+      FERROBRIDGE_CONSOLE__OIDC__AUTHORIZATION_ENDPOINT:
+      FERROBRIDGE_CONSOLE__OIDC__TOKEN_ENDPOINT:
+      FERROBRIDGE_CONSOLE__OIDC__JWKS_URI:
+      FERROBRIDGE_CONSOLE__OIDC__CLIENT_ID:
+      FERROBRIDGE_CONSOLE__OIDC__CLIENT_SECRET_FILE:
+      FERROBRIDGE_CONSOLE__OIDC__REDIRECT_URI:
+      FERROBRIDGE_CONSOLE__OIDC__SCOPES:
+      FERROBRIDGE_CONSOLE__OIDC__OFFLINE_ACCESS:
+      FERROBRIDGE_CONSOLE__OIDC__END_SESSION_ENDPOINT:
+      FERROBRIDGE_CONSOLE__OIDC__POST_LOGOUT_REDIRECT_URI:
+      FERROBRIDGE_CONSOLE__SESSION__SECURE_COOKIE:
     secrets:
-      - viewer_oidc_client_secret
+      - console_oidc_client_secret
     # The console keeps its sessions in memory and writes no file, so the
     # root filesystem is read-only and no volume is mounted.
     read_only: true
@@ -341,9 +341,9 @@ secrets:
   cdm_password:
     file: ${FERROBRIDGE_CDM_PASSWORD_FILE:-./secrets/cdm_password}
   # The operator console's OIDC client secret at your OpenID Provider, read
-  # once at boot through FERROBRIDGE_VIEWER__OIDC__CLIENT_SECRET_FILE.
-  viewer_oidc_client_secret:
-    file: ${FERROBRIDGE_VIEWER_OIDC_CLIENT_SECRET_FILE:-./secrets/viewer_oidc_client_secret}
+  # once at boot through FERROBRIDGE_CONSOLE__OIDC__CLIENT_SECRET_FILE.
+  console_oidc_client_secret:
+    file: ${FERROBRIDGE_CONSOLE_OIDC_CLIENT_SECRET_FILE:-./secrets/console_oidc_client_secret}
 
 volumes:
   cdm-data:

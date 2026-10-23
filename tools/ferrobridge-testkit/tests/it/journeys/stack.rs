@@ -29,7 +29,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 const SITE_ENV: &str = "FERROBRIDGE_JOURNEYS_SITE";
 
 /// The console's client id at the provider.
-const CLIENT_ID: &str = "ferrobridge-viewer";
+const CLIENT_ID: &str = "ferrobridge-console";
 
 /// The scope of the operator's access token: the operator API, and every
 /// FHIR interaction the playground and the capability read call.
@@ -158,15 +158,15 @@ impl Stack {
             end_session = provider.end_session_endpoint(),
         );
         let settings =
-            ferrobridge_viewer::config::Config::from_sources(Some(&text), &BTreeMap::new())?
+            ferrobridge_console::config::Config::from_sources(Some(&text), &BTreeMap::new())?
                 .resolve()?;
-        let state = ferrobridge_viewer::server::ViewerState::new(settings)?;
+        let state = ferrobridge_console::server::ConsoleState::new(settings)?;
         let cookie = state
             .sessions()
-            .cookie_name(ferrobridge_viewer::session::COOKIE);
-        tokio::spawn(ferrobridge_viewer::server::serve(
+            .cookie_name(ferrobridge_console::session::COOKIE);
+        tokio::spawn(ferrobridge_console::server::serve(
             listener,
-            ferrobridge_viewer::server::router(state),
+            ferrobridge_console::server::router(state),
             std::future::pending(),
         ));
         Ok(Self {
@@ -212,10 +212,10 @@ fn site_root() -> Result<PathBuf, Box<dyn Error>> {
         || Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/site"),
         PathBuf::from,
     );
-    let bundle = site.join("pkg/ferrobridge-viewer.wasm");
+    let bundle = site.join("pkg/ferrobridge-console.wasm");
     if !bundle.is_file() {
         return Err(format!(
-            "{} holds no site bundle: build it with scripts/release/viewer-site.sh --release, or name its directory in {SITE_ENV}",
+            "{} holds no site bundle: build it with scripts/release/console-site.sh --release, or name its directory in {SITE_ENV}",
             site.display()
         )
         .into());

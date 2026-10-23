@@ -1,11 +1,11 @@
 ---
-paths: ["app/ferrobridge-viewer/**"]
+paths: ["app/ferrobridge-console/**"]
 ---
 
 <!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
-# Leptos viewer rules (`app/ferrobridge-viewer`, and any Leptos code)
+# Leptos console rules (`app/ferrobridge-console`, and any Leptos code)
 
 **FerroUI leads the UI.** The console draws with `ferrohealth-ui`, pinned
 exactly in the root `[workspace.dependencies]` (today `=0.2.0`), and the
@@ -109,7 +109,7 @@ made in a slice.
   `[target.'cfg(not(target_arch = "wasm32"))'.dependencies]`, browser-only
   ones under `[target.'cfg(target_arch = "wasm32")'.dependencies]`, and code
   for one half only carries the matching `#[cfg(target_arch …)]`. Keep the
-  lib compiling for `wasm32-unknown-unknown` at all times: the CI `viewer`
+  lib compiling for `wasm32-unknown-unknown` at all times: the CI `console`
   job runs clippy on that target.
 - **Before the first `#[server]` function**, confirm against the Leptos book
   and a wasm32 clippy pass that the `#[server]` macro builds under the target
@@ -129,7 +129,7 @@ made in a slice.
   `[package.metadata.leptos]`; `[profile.release]` stays the server's. Avoid
   `regex` and generics-heavy code on browser paths. A new browser-side
   dependency is justified against the bundle bytes it adds, measured from
-  `scripts/release/viewer-site.sh --release`, and the bundle is held to the
+  `scripts/release/console-site.sh --release`, and the bundle is held to the
   budget of §12.
 - **The bundle name is fixed at compile time.** Leptos names the WebAssembly
   file it loads from `LEPTOS_OUTPUT_NAME`, which the repository's
@@ -315,10 +315,10 @@ here, checked per slice:
   against a `wiremock` stub bridge (`tests/it/bridge.rs`), with synthetic
   bodies.
 - Gates for every console change: `cargo fmt` clean; `cargo clippy -p
-  ferrobridge-viewer --all-targets -- -D warnings` on the host and `cargo
-  clippy -p ferrobridge-viewer --lib --target wasm32-unknown-unknown -- -D
-  warnings`; `cargo nextest run -p ferrobridge-viewer`;
-  `scripts/release/viewer-site.sh --release` completing when the change
+  ferrobridge-console --all-targets -- -D warnings` on the host and `cargo
+  clippy -p ferrobridge-console --lib --target wasm32-unknown-unknown -- -D
+  warnings`; `cargo nextest run -p ferrobridge-console`;
+  `scripts/release/console-site.sh --release` completing when the change
   touches the build surface.
 - **Browser journeys** drive the console in headless Chrome through a
   WebDriver client in Rust, never Playwright, which is JavaScript and falls
@@ -337,8 +337,8 @@ here, checked per slice:
 ## 12. The bundle budget and the `wasm-release` profile
 
 The browser downloads the WebAssembly before the page hydrates, so its size
-is held to a budget in CI. After `scripts/release/viewer-site.sh --release`,
-the `viewer` job runs `scripts/checks/viewer-bundle.sh`, which writes the
+is held to a budget in CI. After `scripts/release/console-site.sh --release`,
+the `console` job runs `scripts/checks/console-bundle.sh`, which writes the
 WebAssembly and its JavaScript glue, raw, `gzip -9` and `brotli -q 11`, to
 the job summary, and fails when the brotli-compressed WebAssembly is over the
 budget below. The script reads the budget from this table, so the number
@@ -430,18 +430,18 @@ changes here and nowhere else.
 - **The bundle names no directory of the build host.** The panic locations
   rustc embeds as data name the source file of every crate, so an
   unremapped CI build ships `/home/runner/...` and the registry and
-  toolchain paths. `scripts/release/viewer-site.sh` remaps the cargo home,
+  toolchain paths. `scripts/release/console-site.sh` remaps the cargo home,
   the toolchain sysroot and the checkout to `/cargo`, `/rustc-sysroot` and
   `/ferrobridge` for the WebAssembly build alone
   (`CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS` with
-  `--remap-path-prefix`; `trim-paths` is unstable), and the `viewer` job's
-  `scripts/checks/viewer-paths.sh` fails when a home, runner, registry or
+  `--remap-path-prefix`; `trim-paths` is unstable), and the `console` job's
+  `scripts/checks/console-paths.sh` fails when a home, runner, registry or
   toolchain path appears in the WebAssembly or its JavaScript glue. A
   `RUSTFLAGS` set in the environment overrides the target variable, and the
   check then fails.
-- **The build tools are pinned and checked.** `scripts/release/viewer-tools.sh`
+- **The build tools are pinned and checked.** `scripts/release/console-tools.sh`
   installs Binaryen's `wasm-opt` at the release `docs/VERSIONS.md` pins,
-  checked against its SHA-256, and `viewer-site.sh` refuses to run
+  checked against its SHA-256, and `console-site.sh` refuses to run
   cargo-leptos until the one on `PATH` matches, so cargo-leptos never
   downloads it unchecked. The CI job installs cargo-leptos and the
   wasm-bindgen CLI at their pinned versions; the CLI equals the
@@ -468,7 +468,7 @@ The catalog rule is FerroUI's (its `.claude/rules/leptos-ui.md` §13): no
 string the console draws lives outside a catalog, and a language joins as a
 catalog file with no code change. What is particular here:
 
-- The console's catalog is `app/ferrobridge-viewer/locales/<tag>/ferrobridge-viewer.ftl`,
+- The console's catalog is `app/ferrobridge-console/locales/<tag>/ferrobridge-console.ftl`,
   embedded by `fluent_templates::static_loader!` in `crate::locale`, where
   each message is one `Msg`. A test holds every catalog directory to the
   full message set, and a throwaway catalog under `tests/locales/` shows the
@@ -479,7 +479,7 @@ catalog file with no code change. What is particular here:
   `SharedValue` and provides it with `ferrohealth_ui::i18n::provide_locale`,
   so the console's words and the library's switch together, and the document
   writes it as `<html lang>`.
-- `scripts/checks/stray-literals.sh app/ferrobridge-viewer/src` runs in CI
+- `scripts/checks/stray-literals.sh app/ferrobridge-console/src` runs in CI
   against `scripts/checks/stray-literals.baseline`, which names no file: a
   console string outside the catalog fails it. A literal no page draws (a
   protocol token, a header value, the name of a document in a log line) is

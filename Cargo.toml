@@ -184,11 +184,11 @@ chumsky = "0.13.0"
 # crates.io on 2026-10-15.
 flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
 tar = { version = "0.4.46", default-features = false }
-# The operator console, app/ferrobridge-viewer (#599; no specification
+# The operator console, app/ferrobridge-console (#599; no specification
 # governs it: our own design): Leptos rendered on the server and hydrated in
 # the browser. The server half and the browser half take their features per
 # target in that crate, so a workspace --all-features build never enables
-# both. The wasm-bindgen CLI of the viewer build must equal the wasm-bindgen
+# both. The wasm-bindgen CLI of the console build must equal the wasm-bindgen
 # crate version, and scripts/checks/versions.sh holds the two to
 # docs/VERSIONS.md. Verified against crates.io on 2026-10-17.
 leptos = "0.8.22"
@@ -204,7 +204,7 @@ console_error_panic_hook = "0.1.7"
 # 2026-10-19.
 ferrohealth-ui = "=0.2.0"
 # The console's string catalogs (#956): Project Fluent messages embedded at
-# build time from app/ferrobridge-viewer/locales/, the crate and version
+# build time from app/ferrobridge-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
 # Verified against crates.io on 2026-10-19.
 fluent-templates = { version = "0.15.1", default-features = false, features = ["macros", "walkdir"] }
@@ -352,7 +352,7 @@ panic = "unwind"
 overflow-checks = true
 debug = "line-tables-only"
 
-# The operator console's WebAssembly bundle (app/ferrobridge-viewer), built
+# The operator console's WebAssembly bundle (app/ferrobridge-console), built
 # by cargo-leptos: optimized for size, since the browser downloads it (the
 # Cargo reference, profiles; no specification governs this: our own design).
 # It keeps the inherited overflow checks and drops the line tables, which

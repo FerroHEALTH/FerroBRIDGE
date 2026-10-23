@@ -421,7 +421,7 @@ async fn visit(
 /// Puts the theme cookie for `theme` in the browser, which must be at the
 /// console.
 async fn choose(browser: &Browser, theme: Theme) -> Result<(), Box<dyn Error>> {
-    let mut cookie = Cookie::new(ferrobridge_viewer::session::THEME_COOKIE, theme.word());
+    let mut cookie = Cookie::new(ferrobridge_console::session::THEME_COOKIE, theme.word());
     cookie.set_path("/");
     browser.driver().add_cookie(cookie).await?;
     scheme(browser, theme).await
@@ -528,7 +528,7 @@ fn routes() -> Result<BTreeSet<String>, Box<dyn Error>> {
     let source = std::fs::read_to_string(
         root()
             .join("app")
-            .join("ferrobridge-viewer")
+            .join("ferrobridge-console")
             .join("src")
             .join("app.rs"),
     )?;

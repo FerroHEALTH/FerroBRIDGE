@@ -4,7 +4,7 @@
 # The book theme favicons and the operator console's are copies of the brand
 # favicon, not files of their own (assets/brand/README.md). mdBook reads a
 # theme override from website/book/theme/favicon.svg and favicon.png, and the
-# console serves app/ferrobridge-viewer/public/favicon.ico from its site root,
+# console serves app/ferrobridge-console/public/favicon.ico from its site root,
 # so the mark exists more than once and nothing but this check keeps the
 # copies in step: change the brand mark, forget a copy, and the book or the
 # console serves the old favicon (#52, #602).
@@ -22,7 +22,7 @@ cd "$(dirname "$0")/../.."
 readonly PAIRS="\
 website/book/theme/favicon.svg	assets/brand/favicon.svg
 website/book/theme/favicon.png	assets/brand/favicon-32.png
-app/ferrobridge-viewer/public/favicon.ico	assets/brand/favicon.ico"
+app/ferrobridge-console/public/favicon.ico	assets/brand/favicon.ico"
 
 fail=0
 while IFS=$'\t' read -r copy source; do

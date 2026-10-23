@@ -8,7 +8,7 @@
 
 use std::error::Error;
 
-use ferrobridge_viewer::app::PRODUCT;
+use ferrobridge_console::app::PRODUCT;
 use thirtyfour::{By, SameSite};
 
 use crate::journeys::browser::{Browser, until, with_browser};

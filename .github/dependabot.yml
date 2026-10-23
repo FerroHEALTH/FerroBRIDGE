@@ -71,7 +71,7 @@ updates:
 
   - package-ecosystem: "docker"
     # The two container recipes, docker/Dockerfile (#22) and
-    # docker/viewer/Dockerfile (#603), on one base that
+    # docker/console/Dockerfile (#603), on one base that
     # scripts/checks/versions.sh holds equal. The image tags in compose.yaml
     # are not this ecosystem's subject: the bridge and console tags are the
     # workspace version, which the release cut moves and versions.sh guards,
@@ -79,7 +79,7 @@ updates:
     # harness.
     directories:
       - "/docker"
-      - "/docker/viewer"
+      - "/docker/console"
     labels:
       - "dependencies"
     schedule:
