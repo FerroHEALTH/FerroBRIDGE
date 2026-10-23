@@ -1208,8 +1208,12 @@ is for an operator who wants to see what the bridge runs and work with its
 mapping files without a shell on the host.
 
 **The console is its own binary and image.** `app/ferrobridge-console` is a
-Leptos application rendered on the server and hydrated in the browser, with a
-backend-for-frontend, shipped as `ghcr.io/ferrohealth/ferrobridge-console`.
+Leptos application in islands mode: the server draws every page whole, the
+browser hydrates only its islands (the menus, the code editor, the JSON
+input), and every action is a plain form post the server answers with the
+page it draws, so no server function exists. It is a backend-for-frontend,
+shipped as `ghcr.io/ferrohealth/ferrobridge-console`, drawn with FerroUI
+0.3.2.
 The server half and the browser half are chosen by compilation target, never
 by Cargo feature, so a workspace `--all-features` build never enables both.
 The operator's OpenID Connect session (authorization code with PKCE) lives on
@@ -1225,8 +1229,8 @@ renders; and on `ferrobridge-operator-api` (#777), the serde types of the
 bridge's health and operator documents, which the bridge serializes and the
 console decodes, so a field renamed on one side fails the other's build. The
 contract crate carries serde types and nothing else: no engine, no I/O. The
-browser half links none of them and receives view data from server
-functions. A dependency-closure test fails on any other workspace member, so
+browser half links none of them and receives its islands' props in the
+page the server draws. A dependency-closure test fails on any other workspace member, so
 the console can never compile or run a mapping itself: every check,
 transform and save goes through the bridge. Linking these crates is what
 `codegen.md` asks of a consumer, which may not shadow a model the workspace
@@ -1237,9 +1241,9 @@ library** (published on crates.io, pinned exactly in the root
 `[workspace.dependencies]`), which every FerroHEALTH console shares. It is
 not a workspace crate, so the dependency-closure test admits it as it admits
 any other registry crate: it carries views, the stylesheet and the brand
-themes, and fetches nothing. The console keeps only its brand theme
-(`style/theme.css`) and its screens; the server serves the library's
-stylesheet and that theme as two stylesheets of its own origin, so the
+themes, and fetches nothing. The console keeps only its screens; the
+server serves the library's stylesheet and the library's FerroBRIDGE brand
+theme as two stylesheets of its own origin, so the
 Content-Security-Policy keeps `style-src 'self'`.
 
 **The operator API is off by default.** It is mounted under `/operator` on

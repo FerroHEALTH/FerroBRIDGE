@@ -4,7 +4,7 @@
 //! The console's interaction states, captured behind the
 //! `FERROBRIDGE_SCREENSHOTS` gate for the visual review: the pointer on a
 //! navigation entry and on a table row, the keyboard focus on a navigation
-//! entry, the theme toggle and a form's button, the operator's menu open,
+//! entry, the user menu's button and a form's button, the user menu open,
 //! the drawer open on a phone, and the top bar with a long operator name on
 //! a phone and at 1440 pixels, each in the light and the dark theme.
 //!
@@ -15,6 +15,7 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use ferrobridge_console::session::PREFERENCE_PREFIX;
 use serde_json::json;
 use thirtyfour::{By, Cookie, WebElement};
 
@@ -111,67 +112,57 @@ async fn shot_of_view(browser: &Browser, state: &str, theme: &str) -> Result<(),
     Ok(())
 }
 
+/// The user menu's button in the top bar.
+const USER_MENU: &str = "//header//button[@aria-controls = 'user-menu-menu']";
+
 /// Captures every state in `theme` on `stack`.
 async fn every_state(browser: &Browser, stack: &Stack, theme: &str) -> Result<(), Box<dyn Error>> {
     layout(browser, 1440, 900, theme).await?;
     browser.driver().delete_all_cookies().await?;
     browser.goto(&stack.url("/")).await?;
-    let mut cookie = Cookie::new(ferrobridge_console::session::THEME_COOKIE, theme);
+    let mut cookie = Cookie::new(format!("{PREFERENCE_PREFIX}theme"), theme);
     cookie.set_path("/");
     browser.driver().add_cookie(cookie).await?;
     sign_in(browser, stack).await?;
-    browser.goto(&stack.url("/files")).await?;
-    browser.element(By::XPath("//table//code")).await?;
+    browser.goto(&stack.url("/mappings/files")).await?;
+    browser.element(By::XPath("//table//tbody//tr")).await?;
     hydrated(browser).await?;
     let sidebar = browser.element(By::Id("sidebar")).await?;
-    let entry = browser.element(By::LinkText("Capability")).await?;
+    let entry = browser
+        .element(By::XPath(
+            "//nav[@aria-label = 'Console']//a[starts-with(normalize-space(.), 'Playground')]",
+        ))
+        .await?;
     hover(browser, &entry).await?;
     shot_of(browser, &sidebar, "hover-nav", theme).await?;
     focus(browser, &entry).await?;
     shot_of(browser, &sidebar, "focus-nav", theme).await?;
     let row = browser.element(By::XPath("//table//tbody//tr")).await?;
     hover(browser, &row).await?;
-    let table = browser.element(By::Css(".fui-table-scroll")).await?;
+    let table = browser.element(By::XPath("//table")).await?;
     shot_of(browser, &table, "hover-row", theme).await?;
     let bar = browser.element(By::Css(".fui-topbar")).await?;
-    let toggle = browser.element(By::Css(".fui-theme-toggle button")).await?;
-    let shown = if toggle.is_displayed().await? {
-        toggle
-    } else {
-        browser.element(By::Id("theme-to-light")).await?
-    };
-    focus(browser, &shown).await?;
-    shot_of(browser, &bar, "focus-theme-toggle", theme).await?;
-    browser
-        .element(By::XPath(
-            "//header//button[@aria-controls = 'operator-menu']",
-        ))
-        .await?
-        .click()
-        .await?;
-    browser.element(By::Id("operator-menu")).await?;
-    shot_of_view(browser, "operator-menu", theme).await?;
+    let menu = browser.element(By::XPath(USER_MENU)).await?;
+    focus(browser, &menu).await?;
+    shot_of(browser, &bar, "focus-user-menu", theme).await?;
+    menu.click().await?;
+    browser.element(By::Css("#user-menu:popover-open")).await?;
+    shot_of_view(browser, "user-menu", theme).await?;
     browser.goto(&stack.url("/playground")).await?;
     hydrated(browser).await?;
-    let run = browser
-        .element(By::XPath("//button[normalize-space(.) = 'Run $tofhir']"))
-        .await?;
+    let run = browser.element(By::Id("pg-run")).await?;
     focus(browser, &run).await?;
-    let form = browser
-        .element(By::XPath(
-            "//section[.//button[normalize-space(.) = 'Run $tofhir']]",
-        ))
-        .await?;
+    let form = browser.element(By::XPath("//main//form")).await?;
     shot_of(browser, &form, "focus-run", theme).await?;
     layout(browser, 390, 900, theme).await?;
-    browser.goto(&stack.url("/files")).await?;
+    browser.goto(&stack.url("/mappings/files")).await?;
     hydrated(browser).await?;
     browser
-        .element(By::XPath("//button[@aria-label = 'Menu']"))
+        .element(By::XPath("//button[@commandfor = 'sidebar']"))
         .await?
         .click()
         .await?;
-    browser.element(By::Css("#sidebar:popover-open")).await?;
+    browser.element(By::Css("#sidebar[open]")).await?;
     shot_of_view(browser, "drawer-open", theme).await?;
     long_name(browser, stack, theme).await
 }
@@ -181,16 +172,12 @@ const LONG_NAME: &str = "annemarie.van-der-berg-hoogstraten@ziekenhuis-noordwest
 
 /// Captures the top bar with [`LONG_NAME`] in place of the operator's name,
 /// at 390 and at 1440 CSS pixels: the test provider issues one name, so the
-/// longest words of the operator's menu button are swapped once it is drawn.
+/// longest words of the user menu's button are swapped once it is drawn.
 async fn long_name(browser: &Browser, stack: &Stack, theme: &str) -> Result<(), Box<dyn Error>> {
     for (width, state) in [(390, "topbar-long-name-narrow"), (1440, "topbar-long-name")] {
         layout(browser, width, 900, theme).await?;
-        browser.goto(&stack.url("/files")).await?;
-        let button = browser
-            .element(By::XPath(
-                "//header//button[@aria-controls = 'operator-menu']",
-            ))
-            .await?;
+        browser.goto(&stack.url("/mappings/files")).await?;
+        let button = browser.element(By::XPath(USER_MENU)).await?;
         browser
             .driver()
             .execute(

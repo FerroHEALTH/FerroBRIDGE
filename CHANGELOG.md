@@ -307,6 +307,53 @@ crates on crates.io.
   `console-tools.sh`, `scripts/checks/console-bundle.sh`,
   `console-paths.sh`).
 
+- **Breaking:** the operator console is drawn anew on FerroUI 0.3.2
+  (`ferrohealth-ui = "=0.3.2"`, #1143, FerroHEALTH/FerroUI#161), page for
+  page from the FerroBRIDGE design. It runs in Leptos islands mode: the
+  server draws every page whole and the browser hydrates only the menus,
+  the code editor and the JSON input, each island loaded lazily from its
+  own chunk (the entry bundle measured 316603 bytes brotli-compressed). The
+  pages are the dashboard with the flow, the Mapping set with its Contexts,
+  OMOCL, Templates, Files and Diagnostics tabs, each mapping file with its
+  Program tab, each template, the editor, the playground with its
+  `$tofhir`, `$toopenehr` and `$validate` tabs, the FHIR facade, HL7 v2,
+  OMOP ETL, Connections, Your preferences and About. Upgrade note: the
+  addresses moved, and an old bookmark answers the page-not-found page:
+  `/files` is `/mappings/files`, `/files/{path}` is
+  `/mappings/files/{path}`, `/edit` is `/mappings/new`, `/edit/{path}` is
+  `/mappings/edit/{path}`, `/validate` is `/playground/validate`, and
+  `/capability` is `/facade/capability` and `/facade/security`.
+- **Breaking:** the console registers no server function. Every action (a
+  preference, a reload, a check, a save, a playground run) is a plain form
+  post to its page's own address, which the server answers with the page it
+  draws, so every action works before any WebAssembly arrives. Upgrade
+  note: the console's `/api/…` server-function routes no longer exist;
+  the console has no API, and a script reads the bridge's operator API.
+- **Breaking:** the theme toggle is gone from the top bar. The theme is set
+  in the user menu and in Your preferences alone. Your preferences has
+  three tabs (Appearance, Language and region, Keyboard), and each choice is
+  kept in a cookie of its own for a year: `ferrobridge_console_theme`,
+  `_density`, `_motion`, `_language`, `_week-start` and `_hints` (under
+  `__Host-` when the cookies are secure), with Reset to defaults clearing
+  them. The sidebar folds to a rail, kept in `ferrobridge_console_sidebar`.
+  Upgrade note: every operator chooses the theme again; nothing to
+  configure.
+- **Breaking:** a sign-out with no `end_session_endpoint` configured lands
+  on the new signed-out page, `/signed-out`, instead of the sign-in. A
+  sign-in the provider refused, could not complete, or a full session pool
+  now draws the sign-in card with what happened and the way on, with the
+  status `401`, `502` or `503`. Upgrade note: nothing to configure; a
+  monitor that followed the sign-out to `/` follows it to `/signed-out`.
+- The editor saves a draft with LF line ends: a text area posts its line
+  breaks as CRLF (HTML Living Standard §4.10.11), and the console reads the
+  draft back with the LF the editor shows, so the bytes saved are the bytes
+  you edited. A `$toopenehr` answer in the playground shows the composition
+  its `composition` parameter carries, with the issues of its `outcome`
+  above it, and the template is a choice of the running set's templates.
+  The Settings tabs and the Configuration page of the design wait for the
+  operator API's configuration document (#1147); the design's navigation
+  glyphs, its state words and a subtitle with markup wait for FerroUI
+  (#1146).
 - The workspace builds with Rust 1.99.1 in place of 1.98.1, and the MSRV
   stays at 1.98: the FerroHEALTH family builds with the latest stable
   toolchain and declares the release before it as its MSRV. Clippy 1.99's
@@ -681,6 +728,10 @@ crates on crates.io.
   manifest `cargo metadata` cannot read.
 
 ### Security
+
+- `ctutils` moves from 0.4.2 to 0.4.5 (RUSTSEC-2026-0385): before 0.4.4
+  its constant-time mask generation could compile to a branch on a secret
+  value. It reaches the build through `digest` 0.11.
 
 - The TLS stack the bridge calls the CDR, the terminology server and the
   sending sites through no longer trusts the distrusted emSign

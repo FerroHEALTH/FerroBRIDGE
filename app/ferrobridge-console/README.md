@@ -4,8 +4,9 @@
 # ferrobridge-console
 
 The FerroBRIDGE Console, the operator console: the `ferrobridge-console`
-binary, a Leptos app rendered on the server and hydrated in the browser, with
-a backend-for-frontend in front of the bridge.
+binary, a Leptos app in islands mode drawn with FerroUI 0.3.2: the server
+draws every page whole and the browser hydrates only its islands, with a
+backend-for-frontend in front of the bridge.
 
 Part of [FerroBRIDGE](https://ferrobridge.eu), a pure-Rust bridge between
 openEHR and two interoperability targets: HL7 FHIR through the FHIRconnect
@@ -14,18 +15,17 @@ specification. This crate is never published to crates.io.
 
 The console is one more client of the bridge's public HTTP surface. Its
 server calls the bridge over HTTP and never compiles or runs a mapping
-itself. Built so far: the health route, the shell (a top bar with the
-bridge's status and version, the navigation, the light, dark and system
-themes, the About page), the engine-state screens (the dashboard, the
-capability screen and the mappings overview), the mapping files shown
-verbatim with their diagnostics, the mapping editor (check, save under
-`If-Match` with a reason, reload), the transform playground and the
-validation dry run, under the browser security
-headers, operator
-sign-in with OpenID Connect, the configuration
-with its environment overrides and `_file` secrets, the typed bridge client
-that calls the bridge with the operator's own access token, and the check
-that holds the crate to the two workspace crates it may link.
+itself. It serves the dashboard with the flow, the Mapping set with its
+tabs and reload, each mapping file and template, the mapping editor (check,
+save under `If-Match` with a reason), the playground (`$tofhir`,
+`$toopenehr`, `$validate`), the FHIR facade, HL7 v2 and OMOP ETL pages,
+the connections, Your preferences and About. Every action is a plain form
+post the server answers with the page it draws; the console registers no
+server function. Under them: the browser security headers, operator sign-in
+with OpenID Connect, the configuration with its environment overrides and
+`_file` secrets, the typed bridge client that calls the bridge with the
+operator's own access token, and the check that holds the crate to the
+three workspace crates it may link.
 
 ## Sign-in
 
@@ -39,7 +39,7 @@ under the `__Host-` prefix when it is `Secure`, and never a token. The
 console refreshes the access token before it expires, one refresh per
 session at a time, and keeps a rotated refresh token. `POST /logout` ends
 the session and, when the provider publishes one, sends the operator to its
-end-session endpoint with the ID Token hint. Every request other than
+end-session endpoint with the ID Token hint, or else to `/signed-out`. Every request other than
 `GET`, `HEAD` and `OPTIONS` is taken only from the console's own pages.
 
 ## The subcommands

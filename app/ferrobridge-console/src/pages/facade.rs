@@ -1,0 +1,437 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
+//! The FHIR facade, a face of the bridge: a detail page (T2) whose title
+//! row carries its state, over binder tabs of panel sections (B10).
+//!
+//! Overview says what the facade serves, Capability lists the resource
+//! types the bridge's `CapabilityStatement` declares (FHIR R4
+//! `capabilitystatement.html`), each opening the program that serves it,
+//! and Security shows the SMART discovery document (SMART App Launch
+//! 2.2.0, conformance). A facade that is off keeps only Overview.
+
+use ferrobridge_operator_api::health::{Info, Readiness, State};
+use ferrobridge_operator_api::operator::EngineState;
+use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::table::view::{
+    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+};
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::code::{Code, code_viewer};
+use ferrohealth_ui::view::status::badge;
+use ferrohealth_ui::view::surface::{Header, definitions, facts_row, panel_sections};
+use ferrohealth_ui::view::tabs::{Tab, TabRow};
+use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
+use fhir_types::r4::capability_statement::{CapabilityStatement, CapabilityStatementRestResource};
+use leptos::prelude::*;
+use leptos_router::hooks::use_params_map;
+
+use crate::app::{FACADE, MAPPINGS, PLAYGROUND, page_title};
+use crate::load::{Capability, Ready};
+use crate::locale::messages::Msg;
+use crate::locale::{tr, tr_with};
+use crate::model::{Loaded, Outcome};
+use crate::pages::parts::{faulted, quiet, refused, section, state};
+
+/// The tabs of a facade that is on, each its key and its words.
+const TABS: [(&str, Msg); 3] = [
+    ("overview", Msg::TabOverview),
+    ("capability", Msg::TabCapability),
+    ("security", Msg::TabSecurity),
+];
+
+/// The page of the tab `key`.
+fn tab_href(key: &str) -> String {
+    if key == "overview" {
+        String::from(FACADE)
+    } else {
+        format!("{FACADE}/{key}")
+    }
+}
+
+/// The FHIR facade, on the tab the route names.
+#[must_use]
+pub fn page() -> impl IntoView {
+    let tab = use_params_map().with_untracked(|params| {
+        params
+            .get("tab")
+            .unwrap_or_else(|| String::from("overview"))
+    });
+    if !TABS.iter().any(|(key, _)| *key == tab) {
+        return crate::pages::errors::not_found().into_any();
+    }
+    view! {
+        {page_title(tr(Msg::FhirFacade))}
+        <Suspense>
+            {move || {
+                let tab = tab.clone();
+                Suspend::new(async move {
+                    let info = crate::load::info().await;
+                    let readiness = crate::load::readiness().await;
+                    let capability = crate::load::capability().await;
+                    let state = crate::load::state().await;
+                    let smart = if tab == "security" {
+                        Some(crate::load::smart().await)
+                    } else {
+                        None
+                    };
+                    drawn(&tab, &info, &readiness, &capability, &state, smart.as_ref())
+                })
+            }}
+        </Suspense>
+    }
+    .into_any()
+}
+
+/// Whether the lane named `name` is on.
+#[must_use]
+pub fn lane_on(info: &Info, name: &str) -> bool {
+    info.lanes
+        .iter()
+        .any(|lane| lane.name == name && lane.enabled)
+}
+
+/// The page over what the bridge answered.
+fn drawn(
+    tab: &str,
+    info: &Loaded<Info>,
+    readiness: &Loaded<Ready>,
+    capability: &Loaded<Capability>,
+    running: &Loaded<EngineState>,
+    smart: Option<&Loaded<serde_json::Value>>,
+) -> AnyView {
+    let info = match info {
+        Ok(Outcome::Shown(info)) => info,
+        Ok(Outcome::Refused(refusal)) => return refused(refusal),
+        Err(fault) => return faulted(fault, &tab_href(tab)),
+    };
+    let on = lane_on(info, "facade");
+    let header = Header {
+        title: tr(Msg::FhirFacade).into(),
+        subtitle: Some(
+            tr(if on {
+                Msg::FacadeOnSubtitle
+            } else {
+                Msg::FacadeOffSubtitle
+            })
+            .into(),
+        ),
+        crumbs: Vec::new(),
+        mono: false,
+        badge: Some(if on {
+            state(Tone::Ok, &tr(Msg::StateOn), None)
+        } else {
+            badge(Tone::Neutral, tr(Msg::StateOff)).into_any()
+        }),
+    };
+    if !on {
+        return detail_page(DetailPage {
+            header,
+            actions: ActionGroup::none(),
+            stepper: None,
+            tabs: None,
+            body: quiet(tr(Msg::FacadeOff), None),
+        });
+    }
+    let statement = match capability {
+        Ok(Outcome::Shown((statement, _raw))) => Some(statement),
+        Ok(Outcome::Refused(_)) | Err(_) => None,
+    };
+    let body = match tab {
+        "capability" => match capability {
+            Ok(Outcome::Shown((statement, _raw))) => capability_panel(statement, running),
+            Ok(Outcome::Refused(refusal)) => refused(refusal),
+            Err(fault) => faulted(fault, &tab_href(tab)),
+        },
+        "security" => security_panel(smart),
+        _ => overview(info, readiness, statement, running),
+    };
+    let tabs = TabRow {
+        label: tr(Msg::FhirFacade),
+        tabs: TABS
+            .iter()
+            .map(|(key, words)| {
+                let drawn = Tab::new(*key, tab_href(key), tr(*words));
+                match (*key, capability) {
+                    ("capability", Ok(Outcome::Shown((statement, _raw)))) => drawn.count(
+                        u64::try_from(resources(statement).len()).unwrap_or(u64::MAX),
+                        tr(*words),
+                    ),
+                    _ => drawn,
+                }
+            })
+            .collect(),
+        current: tab.to_owned(),
+    };
+    detail_page(DetailPage {
+        header,
+        actions: ActionGroup::none(),
+        stepper: None,
+        tabs: Some(tabs),
+        body,
+    })
+}
+
+/// The resources of `statement`'s server `rest` blocks.
+fn resources(statement: &CapabilityStatement) -> Vec<&CapabilityStatementRestResource> {
+    statement
+        .rest
+        .iter()
+        .flat_map(|rest| rest.resource.iter())
+        .collect()
+}
+
+/// The resource type a resource declares.
+fn type_of(resource: &CapabilityStatementRestResource) -> String {
+    resource.r#type.value.clone().unwrap_or_default()
+}
+
+/// The Overview tab: the facade, what it serves, its operations and its
+/// identity store.
+fn overview(
+    info: &Info,
+    readiness: &Loaded<Ready>,
+    statement: Option<&CapabilityStatement>,
+    state: &Loaded<EngineState>,
+) -> AnyView {
+    let base = crate::session::request::signed_in()
+        .map(|(console, _token)| format!("{}fhir", console.settings().bridge.base))
+        .unwrap_or_default();
+    let types = statement.map_or(0, |statement| resources(statement).len());
+    let contexts = match state {
+        Ok(Outcome::Shown(state)) => {
+            view! { <a href=MAPPINGS>{state.contexts.len().to_string()}</a> }.into_any()
+        }
+        Ok(Outcome::Refused(_)) | Err(_) => String::from("–").into_any(),
+    };
+    let version = statement
+        .and_then(|statement| statement.fhir_version.value.clone())
+        .unwrap_or_else(|| String::from("–"));
+    let facts = facts_row(vec![
+        (tr(Msg::FactBase), view! { <code>{base}</code> }.into_any()),
+        (tr(Msg::ColContexts), contexts),
+        (
+            tr(Msg::FactResourceTypes),
+            view! { <a href=format!("{FACADE}/capability")>{types.to_string()}</a> }.into_any(),
+        ),
+        (tr(Msg::FactFhir), version.into_any()),
+    ])
+    .into_any();
+    let searchable = statement.map_or(0, |statement| {
+        resources(statement)
+            .iter()
+            .filter(|resource| !resource.search_param.is_empty())
+            .count()
+    });
+    let validated = statement.map_or(0, |statement| {
+        resources(statement)
+            .iter()
+            .filter(|resource| {
+                resource
+                    .operation
+                    .iter()
+                    .any(|operation| operation.name.value.as_deref() == Some("validate"))
+            })
+            .count()
+    });
+    let serves = definitions(vec![
+        (
+            tr(Msg::ServesValidation),
+            tr_with(Msg::ServesValidationValue, &[("count", validated.into())]).into_any(),
+        ),
+        (
+            tr(Msg::ServesSearch),
+            tr_with(Msg::ServesSearchValue, &[("count", searchable.into())]).into_any(),
+        ),
+    ])
+    .into_any();
+    let operations_on = lane_on(info, "operations");
+    let ops = definitions(vec![
+        (
+            tr(Msg::FactLane),
+            if operations_on {
+                state_on()
+            } else {
+                badge(Tone::Neutral, tr(Msg::StateOff)).into_any()
+            },
+        ),
+        (tr(Msg::FlowOperations), tr(Msg::OperationsValue).into_any()),
+        (
+            tr(Msg::TryThem),
+            view! { <a href=PLAYGROUND>{tr(Msg::InPlayground)}</a> }.into_any(),
+        ),
+    ])
+    .into_any();
+    let identity = identity(readiness);
+    panel_sections(view! {
+        {section(tr(Msg::FhirFacade), None, facts)}
+        {section(tr(Msg::WhatItServes), None, serves)}
+        {section(tr(Msg::FlowOperations), None, ops)}
+        {section(tr(Msg::Identity), None, identity)}
+    })
+}
+
+/// The state "On", as a lane's facts say it.
+fn state_on() -> AnyView {
+    state(Tone::Ok, &tr(Msg::StateOn), None)
+}
+
+/// The identity store's facts from the readiness of `readiness`.
+fn identity(readiness: &Loaded<Ready>) -> AnyView {
+    let value = match readiness {
+        Ok(Outcome::Shown((_, readiness))) => indicator(readiness, "identity-store"),
+        Ok(Outcome::Refused(_)) | Err(_) => String::from("–").into_any(),
+    };
+    definitions(vec![(tr(Msg::IndicatorIdentityStore), value)]).into_any()
+}
+
+/// The state of the indicator `name`, with why when it is down.
+#[must_use]
+pub fn indicator(readiness: &Readiness, name: &str) -> AnyView {
+    match readiness.indicators.get(name) {
+        Some(found) if found.state == State::Up => state(Tone::Ok, &tr(Msg::StateUp), None),
+        Some(found) => state(Tone::Bad, &tr(Msg::StateUnreachable), found.detail.clone()),
+        None => state(Tone::Neutral, &tr(Msg::StateNotChecked), None),
+    }
+}
+
+/// The Capability tab: every resource type the statement declares.
+fn capability_panel(statement: &CapabilityStatement, state: &Loaded<EngineState>) -> AnyView {
+    let programs = match state {
+        Ok(Outcome::Shown(state)) => state.contexts.clone(),
+        Ok(Outcome::Refused(_)) | Err(_) => Vec::new(),
+    };
+    let columns = [
+        Column::text("type", tr(Msg::ColResourceType)).role(Role::Title),
+        Column::text("profiles", tr(Msg::ColProfiles))
+            .numeric()
+            .role(Role::Quiet),
+        Column::text("interactions", tr(Msg::ColInteractions)).role(Role::Wide),
+        Column::text("search", tr(Msg::ColSearchParams)).role(Role::Sub),
+        Column::text("operations", tr(Msg::ColOperations)),
+    ];
+    let [_, profiles, interactions, search, operations] = &columns;
+    let mut found = resources(statement);
+    found.sort_by_key(|resource| type_of(resource));
+    if found.is_empty() {
+        return quiet(tr(Msg::NoResourceTypes), None);
+    }
+    let rows = found
+        .iter()
+        .map(|resource| {
+            let kind = type_of(resource);
+            let href = programs
+                .iter()
+                .find(|program| program.resource_type == kind)
+                .and_then(crate::pages::mappings::program_href);
+            let joined = |words: Vec<String>| {
+                if words.is_empty() {
+                    String::from("–")
+                } else {
+                    words.join(", ")
+                }
+            };
+            let codes = joined(
+                resource
+                    .interaction
+                    .iter()
+                    .filter_map(|interaction| interaction.code.value.clone())
+                    .collect(),
+            );
+            let params = joined(
+                resource
+                    .search_param
+                    .iter()
+                    .filter_map(|param| param.name.value.clone())
+                    .collect(),
+            );
+            let ops = joined(
+                resource
+                    .operation
+                    .iter()
+                    .filter_map(|operation| operation.name.value.clone())
+                    .map(|name| format!("${name}"))
+                    .collect(),
+            );
+            view! {
+                <tr>
+                    {title_cell(href.as_deref(), kind.clone(), None)}
+                    {cell(profiles, resource.supported_profile.len().to_string())}
+                    {cell(interactions, codes)}
+                    {cell(search, params)}
+                    {cell(operations, view! { <code>{ops}</code> })}
+                </tr>
+            }
+        })
+        .collect_view()
+        .into_any();
+    let table = data_table(DataTable {
+        caption: &tr(Msg::FactResourceTypes),
+        columns: &columns,
+        sorting: Sorting::default(),
+        body: Body::Rows(rows),
+    })
+    .into_any();
+    let intro =
+        view! { <p class="fui-small fui-muted fui-section-intro">{tr(Msg::CapabilityIntro)}</p> };
+    view! { {intro} {table} }.into_any()
+}
+
+/// The Security tab: the SMART discovery document the facade answers.
+fn security_panel(smart: Option<&Loaded<serde_json::Value>>) -> AnyView {
+    let body = match smart {
+        Some(Ok(Outcome::Shown(document))) => {
+            let capabilities = document
+                .get("capabilities")
+                .and_then(serde_json::Value::as_array)
+                .map_or_else(
+                    || String::from("–").into_any(),
+                    |list| {
+                        list.iter()
+                            .filter_map(serde_json::Value::as_str)
+                            .map(ferrohealth_ui::view::tag::tag)
+                            .collect_view()
+                            .into_any()
+                    },
+                );
+            let issuer = document
+                .get("issuer")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("–")
+                .to_owned();
+            let facts = definitions(vec![
+                (
+                    tr(Msg::FactIssuer),
+                    view! { <code>{issuer}</code> }.into_any(),
+                ),
+                (tr(Msg::FactCapabilities), capabilities),
+            ])
+            .into_any();
+            let text = serde_json::to_string_pretty(document).unwrap_or_default();
+            let code = code_viewer(
+                None,
+                &Code {
+                    label: tr(Msg::SmartDiscovery),
+                    language: Language::Json,
+                    text,
+                    ids: None,
+                    current: None,
+                    diagnostics: Vec::new(),
+                },
+            );
+            view! {
+                {section(tr(Msg::WhatFacadeDeclares), None, facts)}
+                {section(tr(Msg::SmartDiscovery), None, code)}
+            }
+            .into_any()
+        }
+        Some(Ok(Outcome::Refused(refusal))) if refusal.not_served() => {
+            section(tr(Msg::SmartDiscovery), None, quiet(tr(Msg::NoSmart), None))
+        }
+        Some(Ok(Outcome::Refused(refusal))) => refused(refusal),
+        Some(Err(fault)) => faulted(fault, &tab_href("security")),
+        None => ().into_any(),
+    };
+    panel_sections(body)
+}

@@ -11,8 +11,9 @@
 # loud when Cargo.lock does not satisfy every manifest and leaves the second
 # resolution nothing to change, and --locked is passed to the compile itself.
 #
-# The bundle is target/site: pkg/ferrobridge-console.wasm, its JavaScript glue
-# and the favicon from public/; the server serves the stylesheet itself. The
+# The bundle is target/site: pkg/ferrobridge-console.wasm, its JavaScript glue,
+# the chunks of the lazy islands and the favicon from public/; the server
+# serves the stylesheet itself. The
 # server binary is built apart from it, with cargo, because the bundle is the
 # same for every architecture.
 #
@@ -62,9 +63,12 @@ export CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS="--remap-path-prefix=$cargo
 bash "$root/scripts/release/console-tools.sh" --check
 
 # cargo-leptos reads its configuration from the crate's own manifest
-# directory, so the build runs from there.
+# directory, so the build runs from there. `--split` cuts each lazy island
+# (`#[island(lazy)]`) out of the entry WebAssembly into chunks of its own,
+# which load only on a page that draws it (the Leptos book,
+# `deployment/binary_size`, "Code Splitting").
 cd "$console"
-cargo leptos build --frontend-only --lib-cargo-args=--locked "$@"
+cargo leptos build --frontend-only --split --lib-cargo-args=--locked "$@"
 
 missing=0
 for file in pkg/ferrobridge-console.wasm pkg/ferrobridge-console.js favicon.ico; do

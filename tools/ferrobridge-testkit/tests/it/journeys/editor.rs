@@ -114,56 +114,69 @@ pub(crate) async fn draft(
     path: &str,
     draft: &str,
 ) -> Result<(), Box<dyn Error>> {
-    browser.goto(&stack.url("/edit")).await?;
+    browser.goto(&stack.url("/mappings/new")).await?;
     hydrated(browser).await?;
     browser
-        .element(By::Id("edit-path"))
+        .element(By::Id("editor-path"))
         .await?
         .send_keys(path)
         .await?;
     browser
-        .element(By::Id("edit-draft"))
+        .element(By::Id("draft"))
         .await?
         .send_keys(draft)
         .await?;
     Ok(())
 }
 
-/// Saves the new file open in the editor with `reason`.
+/// Clicks the editor's submit button that posts the decision `decision`.
+pub(crate) async fn press(browser: &Browser, decision: &str) -> Result<(), Box<dyn Error>> {
+    let button = By::XPath(format!(
+        "//button[@name = 'decision' and @value = '{decision}']"
+    ));
+    browser.enabled(button.clone()).await?;
+    browser.element(button).await?.click().await?;
+    Ok(())
+}
+
+/// Saves the new file open in the editor with `reason`, and confirms the
+/// save.
 pub(crate) async fn save(browser: &Browser, reason: &str) -> Result<(), Box<dyn Error>> {
     browser
-        .element(By::Id("edit-reason"))
+        .element(By::Id("editor-reason"))
         .await?
         .send_keys(reason)
         .await?;
+    press(browser, "save").await?;
+    press(browser, "confirm").await
+}
+
+/// Reloads the set from the Mapping set's More menu and its confirmation.
+pub(crate) async fn reload(browser: &Browser, stack: &Stack) -> Result<(), Box<dyn Error>> {
+    browser.goto(&stack.url("/mappings")).await?;
+    hydrated(browser).await?;
     browser
-        .element(By::Id("edit-confirm"))
+        .element(By::XPath("//summary[contains(@aria-controls, 'set-more')]"))
         .await?
         .click()
         .await?;
-    let create = By::XPath("//button[normalize-space(.) = 'Create the file']");
-    browser.enabled(create.clone()).await?;
-    browser.element(create).await?.click().await?;
-    Ok(())
-}
-
-/// Clicks the editor's submit button whose words are `words`.
-async fn press(browser: &Browser, words: &str) -> Result<(), Box<dyn Error>> {
     browser
-        .element(By::XPath(format!(
-            "//form//button[@type = 'submit' and normalize-space(.) = '{words}']"
-        )))
+        .element(By::XPath("//button[@commandfor = 'reload-set']"))
         .await?
         .click()
         .await?;
+    let confirm = By::XPath("//dialog[@id = 'reload-set']//button[@type = 'submit']");
+    browser.enabled(confirm.clone()).await?;
+    browser.element(confirm).await?.click().await?;
     Ok(())
 }
 
-/// The names of the contexts the mapping overview lists, of the provisioned
-/// one and the journey's.
+/// The names of the contexts the Mapping set lists, of the provisioned one
+/// and the journey's.
 async fn contexts(browser: &Browser, stack: &Stack) -> Result<Vec<String>, Box<dyn Error>> {
     browser.goto(&stack.url("/mappings")).await?;
-    browser.text("h2", "Contexts").await?;
+    browser.text("h1", "Mapping set").await?;
+    browser.text("tr", CONTEXT).await?;
     let mut names = Vec::new();
     for name in [CONTEXT.to_owned(), context_name(SECOND)] {
         let found = browser
@@ -193,28 +206,44 @@ async fn a_refused_draft_changes_nothing_and_a_save_is_byte_identical_and_reload
     let path = context_path(SECOND);
     let saved = stack.console_files().join(&path);
     let valid = context(SECOND, TEMPLATE);
+    let invalid = context(SECOND, MISSING_TEMPLATE);
     with_browser(async |browser| {
         sign_in(browser, &stack).await?;
 
-        draft(browser, &stack, &path, &context(SECOND, MISSING_TEMPLATE)).await?;
-        press(browser, "Check").await?;
+        draft(browser, &stack, &path, &invalid).await?;
+        press(browser, "check").await?;
         browser
-            .text("div", "The set does not compile with this draft")
+            .text("main", "The set does not compile with this draft")
             .await?;
+        browser
+            .element(By::XPath(
+                "//button[@name = 'decision' and @value = 'save' and @disabled]",
+            ))
+            .await?;
+        browser
+            .console_clean("a draft that does not compile")
+            .await?;
+
+        draft(browser, &stack, &path, &invalid).await?;
         save(browser, "a context over a template the bridge lacks").await?;
-        browser.text("h2", "Not saved").await?;
+        browser
+            .text(
+                "main",
+                "Not saved: the set does not compile with your draft",
+            )
+            .await?;
         browser.console_clean("a refused draft").await?;
         assert!(!saved.exists(), "a refused draft wrote {}", saved.display());
         assert_eq!(vec![CONTEXT.to_owned()], contexts(browser, &stack).await?);
 
         draft(browser, &stack, &path, &valid).await?;
-        press(browser, "Check").await?;
+        press(browser, "check").await?;
         browser
-            .text("div", "The set compiles with this draft.")
+            .text("main", "The set compiles with this draft")
             .await?;
         save(browser, "a second profile over the diagnosis").await?;
         browser
-            .text("div", "Saved, and the set reloaded with it.")
+            .text("main", "Saved, and the set reloaded with it.")
             .await?;
         browser.console_clean("a save").await?;
         assert_eq!(valid.as_bytes(), std::fs::read(&saved)?.as_slice());
@@ -223,13 +252,11 @@ async fn a_refused_draft_changes_nothing_and_a_save_is_byte_identical_and_reload
             contexts(browser, &stack).await?
         );
 
-        browser.goto(&stack.url("/edit")).await?;
-        hydrated(browser).await?;
-        press(browser, "Reload").await?;
+        reload(browser, &stack).await?;
         browser
             .text(
-                "div",
-                "The files on disk compiled and replaced the running set.",
+                "main",
+                "Reloaded: the set compiled and replaced the running one",
             )
             .await?;
         browser.console_clean("a reload").await

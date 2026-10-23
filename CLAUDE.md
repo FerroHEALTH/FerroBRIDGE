@@ -119,8 +119,9 @@ the testkit tool crate. Beside it:
   at entry. `src/mappings/compile.rs` is the one FHIRconnect load path the
   lanes, `mapping check` and the reload share (#725).
 - `app/ferrobridge-console`: the operator console (#599, `docs/architecture.md`
-  §4.10), its own binary `ferrobridge-console`: a Leptos app rendered on the
-  server and hydrated, halves chosen by target, with `serve`, `config check`
+  §4.10), its own binary `ferrobridge-console`: a Leptos app in islands mode
+  on FerroUI 0.3.2 (the server draws each page, the browser hydrates its
+  islands, every action a plain form post), halves chosen by target, with `serve`, `config check`
   and `healthcheck`, the TOML configuration with `FERROBRIDGE_CONSOLE__`
   overrides and `_file` secrets, the nonce CSP and the other browser security
   headers, and the typed bridge client (`src/bridge/`). Its server half

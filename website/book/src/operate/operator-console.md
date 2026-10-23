@@ -68,123 +68,166 @@ operator out, and replicas behind a load balancer need sticky sessions.
 
 ## The console's pages
 
-A signed-in operator reads a top bar with the bridge's status and version,
-the navigation grouped Overview, Mappings, Tools and Bridge (a drawer on a
-narrow screen), and an operator menu with the sign-out. The status is a
-word as well as a colour: `Bridge UP` with the version, `Bridge refused`
-with the status the bridge answered, or `Bridge DOWN` when the console
-cannot reach it. The About page names the console's version and its maker,
-Cadasto B.V.
+A signed-in operator reads a top bar with the search, the bridge's status
+and the user menu, and a sidebar grouped Overview, Mappings, Bridge and
+Console (a drawer on a narrow screen, a rail when you fold it). The status
+is a word as well as a colour: `Bridge up` with the version beside it,
+`Bridge refused 401` when the bridge refuses the operator's token,
+`Bridge unreachable`, or `Bridge unknown` with the reason for any other
+answer. The Mapping set entry counts the errors of the running load.
+The user menu holds Your preferences, the theme and Sign out.
 
-Three screens show the engine state:
+The console draws every page on its server and sends it whole. The
+browser runs WebAssembly for the interactive parts alone (the menus, the
+code editor, the JSON input), so every page and every action works before
+that code arrives. Each action is a plain form post that the console
+answers with the page it drew; the console registers no server function.
 
-- **Dashboard** (`/`): the bridge's version, build facts and pins
-  (`GET /health/info`), its lanes and whether each listener is up, its
-  readiness indicators (`GET /health/readiness`), and the counts of the
-  contexts, models, templates and OMOCL files its running load compiled,
-  with its errors and warnings (`GET /operator/state`).
-- **Capability** (`/capability`): the `CapabilityStatement` the facade
-  serves, as cards per resource, and the SMART discovery document.
-- **Mappings overview** (`/mappings`): each context with its template,
-  profile, resource type, models, extensions and search declaration, the
-  templates and where each came from, the OMOCL files, and every
-  diagnostic.
+- **Dashboard** (`/`): the running load's contexts, its errors and
+  warnings, the upstreams the bridge reaches, what needs attention, and
+  the flow from the callers through the faces and the mapping set to the
+  upstreams (`GET /health/info`, `GET /health/readiness`,
+  `GET /operator/state`).
+- **Mapping set** (`/mappings`): the load report and five tabs. Contexts
+  lists each context with its resource type, template, models, search
+  declaration, owner and state; OMOCL, Templates, Files and Diagnostics
+  live at `/mappings/omocl`, `/mappings/templates`, `/mappings/files` and
+  `/mappings/diagnostics`. The Files tab filters by path, language and
+  owner, and pages its rows. More holds Reload the set, which asks first,
+  then compiles the files on disk and replaces the running set when they
+  compile.
+- **A mapping file** (`/mappings/files/{path}`): the file as the bridge
+  serves it, byte for byte, with numbered lines, highlighted YAML, its
+  SHA-256 and the diagnostics beside it, each linked to its line. The
+  Program tab (`?tab=program`) shows what the context compiled to.
+- **A template** (`/mappings/templates/{id}`): where the template came
+  from and the contexts that name it.
+- **The editor** (`/mappings/edit/{path}`, or `/mappings/new` for a new
+  file): see below.
+- **Playground** (`/playground`, `/playground/toopenehr`,
+  `/playground/validate`): runs `$tofhir`, `$toopenehr` and `$validate` as
+  the operator, and keeps nothing.
+- **FHIR facade** (`/facade`, `/facade/capability`, `/facade/security`):
+  the facade's state, the resource types its `CapabilityStatement` serves,
+  and the SMART discovery document.
+- **HL7 v2** (`/hl7v2`) and **OMOP ETL** (`/omop`): whether the MLLP
+  listener runs and where, and whether an ETL is configured.
+- **Connections** (`/connections`, `/connections/{name}`): each upstream,
+  the lanes that use it and its state from the bridge's readiness.
+- **Your preferences** (`/preferences`, `/preferences/language`,
+  `/preferences/keyboard`): appearance, language and region, and keyboard
+  hints.
+- **About** (`/about`): the console's and the bridge's versions, the
+  licence and the maker, Cadasto B.V.
 
-The **Files** page (`/files`) lists every mapping file the bridge reads,
-with its owner (provisioned, or saved by the console), whether the console
-may write it, and how many diagnostics it has. Following one shows the file
-as the bridge serves it, byte for byte, with numbered lines, highlighted
-YAML, its SHA-256, and the diagnostics beside it, each linked to its line.
-
-The **editor** (`/edit/{path}`, or `/edit` for a new file) changes the
-console's own mapping files, which live under the bridge's
-`[operator] mapping_dir`:
+The editor changes the console's own mapping files, which live under the
+bridge's `[operator] mapping_dir`:
 
 1. **Check** compiles the whole set with your draft in place of the file
    and lists every diagnostic. Nothing is written.
-2. **Save** needs a one-line reason and a confirmation. The bridge compiles
-   the set with the draft again and writes the file only when it compiles,
-   then reloads, so a refused draft leaves the disk and the running set as
-   they were. The save carries the digest the file was opened at: when
-   someone changed the file in the meantime, the bridge refuses with `412`
-   and your draft stays in the editor.
-3. **Reload** compiles the files on disk and replaces the running set when
-   they compile.
+2. **Save** needs a one-line reason and a confirmation in the bar at the
+   foot of the page. The bridge compiles the set with the draft again and
+   writes the file only when it compiles, then reloads, so a refused draft
+   leaves the disk and the running set as they were. The save carries the
+   digest the file was opened at: when someone changed the file in the
+   meantime, the bridge refuses with `412` and your draft stays in the
+   editor. The draft is saved with LF line ends, whatever line ends the
+   browser posts.
 
-A provisioned file opens for a check only: the console never saves over
-one. The bridge's audit log names who saved which file, the two digests and
-the reason, never the content.
+A provisioned file opens for a check only, or to save under a path of its
+own: the console never saves over one. The bridge's audit log names who
+saved which file, the two digests and the reason, never the content.
 
-Two tools run the bridge's operations as the operator, and keep nothing:
+What you enter in the playground goes to the bridge in the request body
+alone, never in an address or the browser's history, and the console logs
+none of it. A `$toopenehr` answer shows the composition, with the issues
+of the `OperationOutcome` the bridge returned beside it above the first
+line. When the bridge's operations lane is off, the playground says so and
+its run button is disabled.
 
-- **Transform playground** (`/playground`): `$tofhir` turns a canonical or
-  FLAT composition into the `Bundle` the running programs map it to, with
-  an optional template id and `context.patient` reference. `$toopenehr`
-  turns a `Bundle` into a canonical or FLAT composition.
-- **Validation dry run** (`/validate`): `$validate` on a resource type the
-  `CapabilityStatement` declares it on, which commits nothing. The issues
-  appear errors first.
+The mapping counts, the Mapping set, the files and the editor read the
+operator API, so they need `[operator] enabled = true` on the bridge and
+an operator token that carries the operator scope. Without either, those
+sections say the operator API is off, or show the bridge's refusal with
+its status, while the rest of the page still draws.
 
-What you enter goes to the bridge in the request body alone, never in an
-address or the browser's history, and the console logs none of it. The
-operations lane must be on for the playground; when it is off, the
-playground shows the bridge's `503` and the reason the bridge gave.
-
-The mapping counts, the overview and the files read the operator API, so they need
-`[operator] enabled = true` on the bridge and an operator token that
-carries the operator scope. Without either, those sections show the
-bridge's refusal, its status and its diagnostics, while the rest of the
-screen still draws.
-
-The theme switch offers light, dark and system, which follows the
-operating system. The choice is kept in a cookie and the server draws each
-page in it, so nothing is kept in the browser's storage. Both themes meet
-WCAG 2.2 AA contrast.
+Your preferences keeps each choice in a cookie of its own for a year
+(`ferrobridge_console_theme`, `_density`, `_motion`, `_language`,
+`_week-start` and `_hints`, under the `__Host-` prefix when the cookies
+are secure), and the server draws each page in them, so nothing is kept
+in the browser's storage. Reset to defaults clears them all. The theme
+offers light, dark and system, which follows the operating system, and is
+set in the user menu and in Your preferences alone.
 
 ## Every screen
 
-Each screen below is shown in the light theme, with a link to the same
-screen in the dark theme. The browser journeys take them against a running
-bridge with a synthetic mapping set, so what you read is what the console
-draws.
+Each screen below is shown in the light theme at 1440 pixels wide, with a
+link to the same screen in the dark theme. The browser journeys take them
+against a running bridge with a synthetic mapping set, so what you read is
+what the console draws.
 
-### Signing in
+### Signing in and out
 
 ![The sign-in card a visitor reads](img/console/sign-in.png)
 
 The sign-in card a visitor reads. [Dark theme](img/console/sign-in-dark.png).
 
-### Engine state
+![The signed-out card](img/console/signed-out.png)
+
+The card a signed-out operator reads.
+[Dark theme](img/console/signed-out-dark.png).
+
+### Dashboard
 
 ![The dashboard](img/console/dashboard.png)
 
-The dashboard: the bridge, its lanes, its pins, its readiness and its
-mapping counts. [Dark theme](img/console/dashboard-dark.png).
+The dashboard with the flow. [Dark theme](img/console/dashboard-dark.png).
 
-![The mappings overview](img/console/mappings.png)
+### Mapping set
 
-The mappings overview: each context, the templates, the OMOCL files and the
-diagnostics. [Dark theme](img/console/mappings-dark.png).
+![The Mapping set](img/console/mappings.png)
 
-![The capability](img/console/capability.png)
+The Mapping set on its Contexts tab.
+[Dark theme](img/console/mappings-dark.png).
 
-The `CapabilityStatement` and the SMART discovery document.
-[Dark theme](img/console/capability-dark.png).
+![The OMOCL tab](img/console/mappings-omocl.png)
 
-### Mapping files
+The OMOCL tab. [Dark theme](img/console/mappings-omocl-dark.png).
 
-![The file list](img/console/files.png)
+![The Templates tab](img/console/mappings-templates.png)
 
-Every mapping file the bridge reads. [Dark theme](img/console/files-dark.png).
+The Templates tab. [Dark theme](img/console/mappings-templates-dark.png).
+
+![The Files tab](img/console/mappings-files.png)
+
+The Files tab with its filters. [Dark theme](img/console/mappings-files-dark.png).
+
+![The Diagnostics tab](img/console/mappings-diagnostics.png)
+
+The Diagnostics tab. [Dark theme](img/console/mappings-diagnostics-dark.png).
+
+![A reload of the set](img/console/mappings-reloaded.png)
+
+The set after a reload. [Dark theme](img/console/mappings-reloaded-dark.png).
 
 ![A context mapping file](img/console/file-context.png)
 
-A context mapping file, with its lines and its diagnostics.
+A provisioned context mapping file with its diagnostics.
 [Dark theme](img/console/file-context-dark.png).
+
+![The program of a context](img/console/file-program.png)
+
+The program a context compiled to.
+[Dark theme](img/console/file-program-dark.png).
 
 ![A model mapping file](img/console/file-model.png)
 
 A model mapping file. [Dark theme](img/console/file-model-dark.png).
+
+![A template](img/console/template.png)
+
+A template and the contexts that name it.
+[Dark theme](img/console/template-dark.png).
 
 ### The editor
 
@@ -194,46 +237,100 @@ A new console file. [Dark theme](img/console/edit-new-dark.png).
 
 ![A provisioned file in the editor](img/console/edit-provisioned.png)
 
-A provisioned file, which the console checks and never saves over.
+A provisioned file, open to check or to save under a path of its own.
 [Dark theme](img/console/edit-provisioned-dark.png).
+
+![A draft whose check found errors](img/console/edit-checked.png)
+
+A draft the set does not compile with, and its save blocked.
+[Dark theme](img/console/edit-checked-dark.png).
+
+![The confirmation of a save](img/console/edit-confirm.png)
+
+The confirmation a save asks for. [Dark theme](img/console/edit-confirm-dark.png).
 
 ![A draft the bridge refused](img/console/edit-refused.png)
 
-A draft that does not compile: nothing is written and the running set is
-unchanged. [Dark theme](img/console/edit-refused-dark.png).
+A draft the bridge refused to save, with the running set unchanged.
+[Dark theme](img/console/edit-refused-dark.png).
 
 ![A draft the bridge saved](img/console/edit-saved.png)
 
-A saved draft, with the reload's report and the file's new SHA-256.
+A draft the bridge saved and reloaded the set with.
 [Dark theme](img/console/edit-saved-dark.png).
 
-### Tools
+### Playground
 
-![The transform playground](img/console/playground.png)
+![The playground](img/console/playground.png)
 
-The transform playground. [Dark theme](img/console/playground-dark.png).
+The playground on its `$tofhir` tab. [Dark theme](img/console/playground-dark.png).
 
-![A transform the bridge answered](img/console/playground-answered.png)
+![The $toopenehr tab](img/console/playground-toopenehr.png)
 
-A `$toopenehr` the bridge answered with a composition.
+The `$toopenehr` tab. [Dark theme](img/console/playground-toopenehr-dark.png).
+
+![The validate tab](img/console/playground-validate.png)
+
+The `$validate` tab. [Dark theme](img/console/playground-validate-dark.png).
+
+![A conversion the bridge answered](img/console/playground-answered.png)
+
+A `$toopenehr` the bridge answered, with its outcome's issues.
 [Dark theme](img/console/playground-answered-dark.png).
 
-![A transform the bridge refused](img/console/playground-refused.png)
+![A conversion the bridge refused](img/console/playground-refused.png)
 
-A `$tofhir` the bridge refused, with its status and its reason.
+A `$tofhir` the bridge refused, with its status.
 [Dark theme](img/console/playground-refused-dark.png).
 
 ![A bridge whose operations lane is off](img/console/playground-off.png)
 
-A bridge whose operations lane is off answers `503`.
+A bridge whose operations lane is off.
 [Dark theme](img/console/playground-off-dark.png).
 
-![The validation dry run](img/console/validate.png)
+### Bridge
 
-The validation dry run over the types the `CapabilityStatement` declares
-`$validate` on. [Dark theme](img/console/validate-dark.png).
+![The FHIR facade](img/console/facade.png)
 
-### Elsewhere
+The FHIR facade. [Dark theme](img/console/facade-dark.png).
+
+![The facade's capability](img/console/facade-capability.png)
+
+The resource types the facade serves.
+[Dark theme](img/console/facade-capability-dark.png).
+
+![The facade's security](img/console/facade-security.png)
+
+The SMART discovery document. [Dark theme](img/console/facade-security-dark.png).
+
+![HL7 v2](img/console/hl7v2.png)
+
+The HL7 v2 face of a bridge that runs no listener.
+[Dark theme](img/console/hl7v2-dark.png).
+
+![OMOP ETL](img/console/omop.png)
+
+The OMOP ETL of a bridge with no ETL configured.
+[Dark theme](img/console/omop-dark.png).
+
+![Connections](img/console/connections.png)
+
+The upstreams. [Dark theme](img/console/connections-dark.png).
+
+![A connection](img/console/connection-cdr.png)
+
+The openEHR CDR. [Dark theme](img/console/connection-cdr-dark.png).
+
+### Console
+
+![Your preferences](img/console/preferences.png)
+
+Your preferences, Appearance. [Dark theme](img/console/preferences-dark.png).
+
+![Language and region](img/console/preferences-language.png)
+
+Your preferences, Language and region.
+[Dark theme](img/console/preferences-language-dark.png).
 
 ![The About page](img/console/about.png)
 
@@ -241,16 +338,17 @@ The About page. [Dark theme](img/console/about-dark.png).
 
 ![The page for an unknown path](img/console/not-found.png)
 
-The page for a path the console does not serve, answered `404`.
+The page for a path the console does not serve.
 [Dark theme](img/console/not-found-dark.png).
 
 ## Signing out
 
-The console's sign-out is a `POST` to `/logout`. It ends the session and,
-when `end_session_endpoint` is set, sends the browser to the provider with
-the ID Token hint (OpenID Connect RP-Initiated Logout 1.0). The console
-takes a `POST` only from its own pages, by the browser's `Sec-Fetch-Site`
-header, or by `Origin` when the browser sends no fetch metadata.
+Sign out, in the user menu, is a `POST` to `/logout`. It ends the session
+and, when `end_session_endpoint` is set, sends the browser to the provider
+with the ID Token hint (OpenID Connect RP-Initiated Logout 1.0); without
+one it lands on `/signed-out`. The console takes a `POST` only from its
+own pages, by the browser's `Sec-Fetch-Site` header, or by `Origin` when
+the browser sends no fetch metadata.
 
 ## Upgrading from `ferrobridge-viewer`
 
@@ -270,3 +368,22 @@ upgrade, change each old name to the new one:
 
 The cookies change with the name, so every operator signs in again after
 the upgrade.
+
+The 0.0.11 console is also drawn anew on FerroUI 0.3.2, and its addresses
+moved with it. A bookmark to an old address answers the page-not-found
+page; follow its links, or use the new address:
+
+| Up to 0.0.10 | From 0.0.11 |
+|---|---|
+| `/files` | `/mappings/files` |
+| `/files/{path}` | `/mappings/files/{path}` |
+| `/edit` | `/mappings/new` |
+| `/edit/{path}` | `/mappings/edit/{path}` |
+| `/validate` | `/playground/validate` |
+| `/capability` | `/facade/capability` and `/facade/security` |
+
+The theme toggle left the top bar: set the theme in the user menu or in
+Your preferences. Each preference, the theme among them, is kept in a
+cookie of its own for a year, so every operator chooses the theme again
+after the upgrade. A sign-out with no `end_session_endpoint` lands on `/signed-out`
+instead of the sign-in.
