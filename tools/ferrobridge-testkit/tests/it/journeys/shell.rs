@@ -2,31 +2,47 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The shell: every navigation entry leads to its page and marks itself the
-//! current one, the theme switch redraws the page in the chosen theme, and
-//! the sign-out ends the session at the provider and lands on the sign-in.
+//! current one, the user menu's theme redraws the page in the chosen theme
+//! and keeps it, and its sign-out ends the session at the provider and lands on
+//! the sign-in.
 
 use std::error::Error;
 
 use ferrobridge_console::app::PRODUCT;
 use thirtyfour::By;
 
-use crate::journeys::browser::{until, with_browser};
+use crate::journeys::browser::{Browser, until, with_browser};
 use crate::journeys::journeys_enabled;
+use crate::journeys::playground::hydrated;
 use crate::journeys::sign_in::{sign_in, signed_out_shell};
 use crate::journeys::stack::Stack;
 
 /// Every navigation entry: its words, the page it leads to, and the title
 /// that page carries.
 const ENTRIES: [(&str, &str, &str); 8] = [
-    ("Overview", "/mappings", "Mappings"),
-    ("Files", "/files", "Mapping files"),
-    ("New file", "/edit", "New mapping file"),
-    ("Playground", "/playground", "Transform playground"),
-    ("Validation dry run", "/validate", "Validation dry run"),
-    ("Capability", "/capability", "Capability"),
+    ("Mapping set", "/mappings", "Mapping set"),
+    ("Playground", "/playground", "Playground"),
+    ("FHIR facade", "/facade", "FHIR facade"),
+    ("HL7 v2", "/hl7v2", "HL7 v2"),
+    ("OMOP ETL", "/omop", "OMOP ETL"),
+    ("Connections", "/connections", "Connections"),
     ("About", "/about", "About"),
     ("Dashboard", "/", "Dashboard"),
 ];
+
+/// Opens the user menu once its island runs.
+pub(crate) async fn open_user_menu(browser: &Browser) -> Result<(), Box<dyn Error>> {
+    hydrated(browser).await?;
+    browser
+        .element(By::XPath(
+            "//header//button[@aria-controls = 'user-menu-menu']",
+        ))
+        .await?
+        .click()
+        .await?;
+    browser.element(By::Css("#user-menu:popover-open")).await?;
+    Ok(())
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn every_entry_leads_to_its_page_and_marks_itself_current() -> Result<(), Box<dyn Error>> {
@@ -37,7 +53,9 @@ async fn every_entry_leads_to_its_page_and_marks_itself_current() -> Result<(), 
     with_browser(async |browser| {
         sign_in(browser, &stack).await?;
         for (words, path, title) in ENTRIES {
-            let link = format!("//nav[@aria-label = 'Pages']//a[normalize-space(.) = '{words}']");
+            let link = format!(
+                "//nav[@aria-label = 'Console']//a[starts-with(normalize-space(.), '{words}')]"
+            );
             browser
                 .element(By::XPath(link.clone()))
                 .await?
@@ -56,7 +74,7 @@ async fn every_entry_leads_to_its_page_and_marks_itself_current() -> Result<(), 
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn the_theme_toggle_swaps_in_place_keeps_the_choice_and_the_sign_out_ends_the_session()
+async fn the_user_menu_sets_the_theme_and_its_sign_out_ends_the_session()
 -> Result<(), Box<dyn Error>> {
     if !journeys_enabled() {
         return Ok(());
@@ -64,42 +82,39 @@ async fn the_theme_toggle_swaps_in_place_keeps_the_choice_and_the_sign_out_ends_
     let stack = Stack::start().await?;
     with_browser(async |browser| {
         sign_in(browser, &stack).await?;
+        browser.goto(&stack.url("/mappings")).await?;
         browser
-            .driver()
-            .cdp()
-            .send_raw(
-                "Emulation.setEmulatedMedia",
-                serde_json::json!({ "features": [{ "name": "prefers-color-scheme", "value": "light" }] }),
-            )
+            .element(By::Css(r#"html[data-theme="system"]"#))
             .await?;
-        browser.goto(&stack.url("/files")).await?;
-        until("the toggle swaps the theme in place", async || {
-            let to_dark = browser.element(By::Id("theme-to-dark")).await?;
-            if to_dark.is_displayed().await? {
-                to_dark.click().await?;
-            }
-            Ok(!browser
-                .driver()
-                .find_all(By::Css(r#"html[data-theme="dark"]"#))
-                .await?
-                .is_empty())
-        })
-        .await?;
-        browser.at(&stack.url("/files")).await?;
-        browser.element(By::Id("theme-to-light")).await?;
-        browser.goto(&stack.url("/files")).await?;
-        browser.element(By::Css(r#"html[data-theme="dark"]"#)).await?;
-        browser.console_clean("the theme toggle").await?;
+        open_user_menu(browser).await?;
+        browser
+            .element(By::XPath(
+                "//button[@role = 'menuitemradio' and @name = 'theme' and @value = 'dark']",
+            ))
+            .await?
+            .click()
+            .await?;
+        browser
+            .element(By::Css(r#"html[data-theme="dark"]"#))
+            .await?;
+        browser.at(&stack.url("/mappings")).await?;
+        browser.goto(&stack.url("/playground")).await?;
+        browser
+            .element(By::Css(r#"html[data-theme="dark"]"#))
+            .await?;
+        if !browser
+            .driver()
+            .find_all(By::Css(".fui-theme-toggle"))
+            .await?
+            .is_empty()
+        {
+            return Err("the top bar draws a theme toggle".into());
+        }
+        browser
+            .console_clean("the theme from the user menu")
+            .await?;
 
-        browser
-            .element(By::XPath("//header//button[@popovertarget]//span"))
-            .await?;
-        let menu = browser
-            .driver()
-            .find_all(By::XPath("//header//button[@aria-controls = 'operator-menu']"))
-            .await?;
-        let operator = menu.first().ok_or("the operator menu button")?;
-        operator.click().await?;
+        open_user_menu(browser).await?;
         browser
             .element(By::XPath("//form//button[normalize-space(.) = 'Sign out']"))
             .await?
@@ -110,7 +125,7 @@ async fn the_theme_toggle_swaps_in_place_keeps_the_choice_and_the_sign_out_ends_
         })
         .await?;
         browser.at(&stack.url("/")).await?;
-        browser.titled(PRODUCT).await?;
+        browser.titled(&format!("Sign in · {PRODUCT}")).await?;
         signed_out_shell(browser).await?;
         browser.console_clean("the sign-out").await
     })

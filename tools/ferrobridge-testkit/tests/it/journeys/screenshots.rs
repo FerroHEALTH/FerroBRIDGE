@@ -28,12 +28,15 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use ferrobridge_console::session::PREFERENCE_PREFIX;
 use serde::Deserialize;
 use serde_json::json;
 use thirtyfour::{By, Cookie};
 
 use crate::journeys::browser::{Browser, with_browser};
-use crate::journeys::editor::{MISSING_TEMPLATE, TEMPLATE, context, context_path, draft, save};
+use crate::journeys::editor::{
+    MISSING_TEMPLATE, TEMPLATE, context, context_path, draft, press, reload, save,
+};
 use crate::journeys::playground::{bundle, hydrated, to_fhir, to_openehr};
 use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::{Lanes, Stack};
@@ -90,6 +93,27 @@ struct Shot {
     url: &'static str,
     /// The `XPath` of an element the page shows once it has loaded.
     ready: &'static str,
+    /// Whether the page is drawn in the shell, whose islands the capture
+    /// waits for.
+    shell: bool,
+}
+
+impl Shot {
+    /// A page in the shell, loaded at `url` for `route`.
+    const fn page(
+        image: &'static str,
+        route: &'static str,
+        url: &'static str,
+        ready: &'static str,
+    ) -> Self {
+        Self {
+            image,
+            route,
+            url,
+            ready,
+            shell: true,
+        }
+    }
 }
 
 /// The sign-in card a visitor reads.
@@ -97,126 +121,217 @@ const SIGN_IN: Shot = Shot {
     image: "sign-in",
     route: "/",
     url: "/",
-    ready: "//a[normalize-space(.) = 'Sign in']",
+    ready: "//a[normalize-space(.) = 'Sign in with your identity provider']",
+    shell: false,
 };
 
+/// The card a signed-out operator reads.
+const SIGNED_OUT: Shot = Shot {
+    image: "signed-out",
+    route: "/signed-out",
+    url: "/signed-out",
+    ready: "//*[contains(., 'You are signed out of the console.')]",
+    shell: false,
+};
+
+/// The wire path of the provisioned context mapping.
+const CONTEXT_FILE: &str = "/mappings/files/fhirconnect/ferrobridge_journey_diagnose.context.yml";
+
 /// The pages a signed-in operator loads and reads as they are.
-const PAGES: [Shot; 11] = [
-    Shot {
-        image: "dashboard",
-        route: "/",
-        url: "/",
-        ready: "//h2[contains(., 'Readiness')]",
-    },
-    Shot {
-        image: "mappings",
-        route: "/mappings",
-        url: "/mappings",
-        ready: "//h2[contains(., 'Contexts')]",
-    },
-    Shot {
-        image: "files",
-        route: "/files",
-        url: "/files",
-        ready: "//table//code",
-    },
-    Shot {
-        image: "file-context",
-        route: "/files/*path",
-        url: "/files/fhirconnect/ferrobridge_journey_diagnose.context.yml",
-        ready: "//*[@id = 'L1']",
-    },
-    Shot {
-        image: "file-model",
-        route: "/files/*path",
-        url: "/files/fhirconnect/ferrobridge_journey_diagnose.yml",
-        ready: "//*[@id = 'L1']",
-    },
-    Shot {
-        image: "edit-new",
-        route: "/edit",
-        url: "/edit",
-        ready: "//*[@id = 'edit-draft']",
-    },
-    Shot {
-        image: "edit-provisioned",
-        route: "/edit/*path",
-        url: "/edit/fhirconnect/ferrobridge_journey_diagnose.yml",
-        ready: "//p[@role = 'note']",
-    },
-    Shot {
-        image: "playground",
-        route: "/playground",
-        url: "/playground",
-        ready: "//*[@id = 'toopenehr-bundle']",
-    },
-    Shot {
-        image: "validate",
-        route: "/validate",
-        url: "/validate",
-        ready: "//h1[contains(., 'Validation dry run')]",
-    },
-    Shot {
-        image: "capability",
-        route: "/capability",
-        url: "/capability",
-        ready: "//h2[contains(., 'CapabilityStatement')]",
-    },
-    Shot {
-        image: "about",
-        route: "/about",
-        url: "/about",
-        ready: "//h1",
-    },
+const PAGES: [Shot; 25] = [
+    Shot::page("dashboard", "/", "/", "//h1[. = 'Dashboard']"),
+    Shot::page(
+        "mappings",
+        "/mappings",
+        "/mappings",
+        "//h1[. = 'Mapping set']",
+    ),
+    Shot::page(
+        "mappings-omocl",
+        "/mappings/:tab",
+        "/mappings/omocl",
+        "//h1[. = 'Mapping set']",
+    ),
+    Shot::page(
+        "mappings-templates",
+        "/mappings/:tab",
+        "/mappings/templates",
+        "//tr[contains(., 'ferrobridge.diagnose.v1')]",
+    ),
+    Shot::page(
+        "mappings-files",
+        "/mappings/:tab",
+        "/mappings/files",
+        "//table//tbody//tr",
+    ),
+    Shot::page(
+        "mappings-diagnostics",
+        "/mappings/:tab",
+        "/mappings/diagnostics",
+        "//h1[. = 'Mapping set']",
+    ),
+    Shot::page(
+        "file-context",
+        "/mappings/files/*path",
+        CONTEXT_FILE,
+        "//*[@id = 'L1']",
+    ),
+    Shot::page(
+        "file-program",
+        "/mappings/files/*path",
+        "/mappings/files/fhirconnect/ferrobridge_journey_diagnose.context.yml?tab=program",
+        "//h1",
+    ),
+    Shot::page(
+        "file-model",
+        "/mappings/files/*path",
+        "/mappings/files/fhirconnect/ferrobridge_journey_diagnose.yml",
+        "//*[@id = 'L1']",
+    ),
+    Shot::page(
+        "template",
+        "/mappings/templates/:id",
+        "/mappings/templates/ferrobridge.diagnose.v1",
+        "//h1",
+    ),
+    Shot::page(
+        "edit-new",
+        "/mappings/new",
+        "/mappings/new",
+        "//*[@id = 'draft']",
+    ),
+    Shot::page(
+        "edit-provisioned",
+        "/mappings/edit/*path",
+        "/mappings/edit/fhirconnect/ferrobridge_journey_diagnose.yml",
+        "//*[@id = 'draft']",
+    ),
+    Shot::page(
+        "playground",
+        "/playground",
+        "/playground",
+        "//*[@id = 'pg-run']",
+    ),
+    Shot::page(
+        "playground-toopenehr",
+        "/playground/:tab",
+        "/playground/toopenehr",
+        "//*[@id = 'pg-run']",
+    ),
+    Shot::page(
+        "playground-validate",
+        "/playground/:tab",
+        "/playground/validate",
+        "//h1[. = 'Playground']",
+    ),
+    Shot::page("facade", "/facade", "/facade", "//h1[. = 'FHIR facade']"),
+    Shot::page(
+        "facade-capability",
+        "/facade/:tab",
+        "/facade/capability",
+        "//*[contains(., 'From the CapabilityStatement')]",
+    ),
+    Shot::page(
+        "facade-security",
+        "/facade/:tab",
+        "/facade/security",
+        "//h1[. = 'FHIR facade']",
+    ),
+    Shot::page("hl7v2", "/hl7v2", "/hl7v2", "//h1[. = 'HL7 v2']"),
+    Shot::page("omop", "/omop", "/omop", "//h1[. = 'OMOP ETL']"),
+    Shot::page(
+        "connections",
+        "/connections",
+        "/connections",
+        "//h1[. = 'Connections']",
+    ),
+    Shot::page(
+        "connection-cdr",
+        "/connections/:name",
+        "/connections/cdr",
+        "//h1",
+    ),
+    Shot::page(
+        "preferences",
+        "/preferences",
+        "/preferences",
+        "//h1[. = 'Your preferences']",
+    ),
+    Shot::page(
+        "preferences-language",
+        "/preferences/:section",
+        "/preferences/language",
+        "//h1[. = 'Your preferences']",
+    ),
+    Shot::page("about", "/about", "/about", "//h1"),
 ];
 
 /// The page no route answers.
-const NOT_FOUND: Shot = Shot {
-    image: "not-found",
-    route: "*",
-    url: "/no/such/page",
-    ready: "//h1",
-};
+const NOT_FOUND: Shot = Shot::page("not-found", "*", "/no/such/page", "//h1");
 
 /// A `$toopenehr` the bridge answered.
-const PLAYGROUND_ANSWERED: Shot = Shot {
-    image: "playground-answered",
-    route: "/playground",
-    url: "/playground",
-    ready: "//h2[contains(., '$toopenehr answered')]",
-};
+const PLAYGROUND_ANSWERED: Shot = Shot::page(
+    "playground-answered",
+    "/playground/:tab",
+    "/playground/toopenehr",
+    "//*[contains(., 'Synthetic problem one')]",
+);
 
 /// A `$tofhir` the bridge refused.
-const PLAYGROUND_REFUSED: Shot = Shot {
-    image: "playground-refused",
-    route: "/playground",
-    url: "/playground",
-    ready: "//p[contains(., 'the bridge refused the request.')]",
-};
+const PLAYGROUND_REFUSED: Shot = Shot::page(
+    "playground-refused",
+    "/playground",
+    "/playground",
+    "//*[contains(., 'The bridge refused the request')]",
+);
 
 /// A bridge whose operations lane is off.
-const PLAYGROUND_OFF: Shot = Shot {
-    image: "playground-off",
-    route: "/playground",
-    url: "/playground",
-    ready: "//li[contains(., '[operations] enabled is false')]",
-};
+const PLAYGROUND_OFF: Shot = Shot::page(
+    "playground-off",
+    "/playground/:tab",
+    "/playground/toopenehr",
+    "//*[contains(., 'Conversions are off on this bridge.')]",
+);
+
+/// A draft whose check found the set does not compile.
+const EDIT_CHECKED: Shot = Shot::page(
+    "edit-checked",
+    "/mappings/new",
+    "/mappings/new",
+    "//*[contains(., 'The set does not compile with this draft')]",
+);
+
+/// The confirmation a save asks for.
+const EDIT_CONFIRM: Shot = Shot::page(
+    "edit-confirm",
+    "/mappings/new",
+    "/mappings/new",
+    "//button[@name = 'decision' and @value = 'confirm']",
+);
 
 /// A draft the bridge refused to save.
-const EDIT_REFUSED: Shot = Shot {
-    image: "edit-refused",
-    route: "/edit",
-    url: "/edit",
-    ready: "//h2[contains(., 'Not saved')]",
-};
+const EDIT_REFUSED: Shot = Shot::page(
+    "edit-refused",
+    "/mappings/new",
+    "/mappings/new",
+    "//*[contains(., 'Not saved: the set does not compile with your draft')]",
+);
 
 /// A draft the bridge saved and reloaded.
-const EDIT_SAVED: Shot = Shot {
-    image: "edit-saved",
-    route: "/edit",
-    url: "/edit",
-    ready: "//div[contains(., 'Saved, and the set reloaded with it.')]",
-};
+const EDIT_SAVED: Shot = Shot::page(
+    "edit-saved",
+    "/mappings/new",
+    "/mappings/new",
+    "//*[contains(., 'Saved, and the set reloaded with it.')]",
+);
+
+/// A reload of the set from the Mapping set.
+const MAPPINGS_RELOADED: Shot = Shot::page(
+    "mappings-reloaded",
+    "/mappings",
+    "/mappings",
+    "//*[contains(., 'Reloaded: the set compiled and replaced the running one')]",
+);
 
 /// Every shot the capture takes.
 fn shots() -> impl Iterator<Item = &'static Shot> {
@@ -224,9 +339,13 @@ fn shots() -> impl Iterator<Item = &'static Shot> {
         &PLAYGROUND_ANSWERED,
         &PLAYGROUND_REFUSED,
         &PLAYGROUND_OFF,
+        &EDIT_CHECKED,
+        &EDIT_CONFIRM,
         &EDIT_REFUSED,
         &EDIT_SAVED,
+        &MAPPINGS_RELOADED,
         &NOT_FOUND,
+        &SIGNED_OUT,
     ])
 }
 
@@ -388,7 +507,9 @@ async fn capture(
     browser
         .element(By::Css(format!(r#"html[data-theme="{}"]"#, theme.word())))
         .await?;
-    hydrated(browser).await?;
+    if shot.shell {
+        hydrated(browser).await?;
+    }
     let height = content_height(browser).await?;
     window(browser, width, height).await?;
     to_top(browser).await?;
@@ -421,7 +542,7 @@ async fn visit(
 /// Puts the theme cookie for `theme` in the browser, which must be at the
 /// console.
 async fn choose(browser: &Browser, theme: Theme) -> Result<(), Box<dyn Error>> {
-    let mut cookie = Cookie::new(ferrobridge_console::session::THEME_COOKIE, theme.word());
+    let mut cookie = Cookie::new(format!("{PREFERENCE_PREFIX}theme"), theme.word());
     cookie.set_path("/");
     browser.driver().add_cookie(cookie).await?;
     scheme(browser, theme).await
@@ -435,14 +556,14 @@ async fn enter(browser: &Browser, stack: &Stack, theme: Theme) -> Result<(), Box
     browser.goto(&stack.url("/")).await
 }
 
-/// Runs the playground's answers and the editor's two outcomes, and
+/// Runs the playground's answers, the editor's outcomes and a reload, and
 /// captures each in `theme`.
 async fn answers(
     browser: &Browser,
     stack: &Stack,
     (theme, width): (Theme, Width),
 ) -> Result<(), Box<dyn Error>> {
-    browser.goto(&stack.url("/playground")).await?;
+    browser.goto(&stack.url("/playground/toopenehr")).await?;
     hydrated(browser).await?;
     to_openehr(browser, &bundle()?).await?;
     capture(browser, &PLAYGROUND_ANSWERED, theme, width).await?;
@@ -453,12 +574,25 @@ async fn answers(
 
     let slug = "second";
     let path = context_path(slug);
-    draft(browser, stack, &path, &context(slug, MISSING_TEMPLATE)).await?;
-    save(browser, "a context over a template the bridge lacks").await?;
+    let invalid = context(slug, MISSING_TEMPLATE);
+    draft(browser, stack, &path, &invalid).await?;
+    press(browser, "check").await?;
+    capture(browser, &EDIT_CHECKED, theme, width).await?;
+    draft(browser, stack, &path, &invalid).await?;
+    browser
+        .element(By::Id("editor-reason"))
+        .await?
+        .send_keys("a context over a template the bridge lacks")
+        .await?;
+    press(browser, "save").await?;
+    capture(browser, &EDIT_CONFIRM, theme, width).await?;
+    press(browser, "confirm").await?;
     capture(browser, &EDIT_REFUSED, theme, width).await?;
     draft(browser, stack, &path, &context(slug, TEMPLATE)).await?;
     save(browser, "a second profile over the diagnosis").await?;
-    capture(browser, &EDIT_SAVED, theme, width).await
+    capture(browser, &EDIT_SAVED, theme, width).await?;
+    reload(browser, stack).await?;
+    capture(browser, &MAPPINGS_RELOADED, theme, width).await
 }
 
 /// Captures every shot of the full stack in `theme`.
@@ -474,7 +608,8 @@ async fn every_page(
         visit(browser, stack, shot, (theme, width)).await?;
     }
     answers(browser, stack, (theme, width)).await?;
-    visit(browser, stack, &NOT_FOUND, (theme, width)).await
+    visit(browser, stack, &NOT_FOUND, (theme, width)).await?;
+    visit(browser, stack, &SIGNED_OUT, (theme, width)).await
 }
 
 /// Captures the playground of a bridge whose operations lane is off in
@@ -486,10 +621,7 @@ async fn lane_off(
 ) -> Result<(), Box<dyn Error>> {
     enter(browser, stack, theme).await?;
     sign_in(browser, stack).await?;
-    browser.goto(&stack.url("/playground")).await?;
-    hydrated(browser).await?;
-    to_openehr(browser, &bundle()?).await?;
-    capture(browser, &PLAYGROUND_OFF, theme, width).await
+    visit(browser, stack, &PLAYGROUND_OFF, (theme, width)).await
 }
 
 #[tokio::test(flavor = "multi_thread")]

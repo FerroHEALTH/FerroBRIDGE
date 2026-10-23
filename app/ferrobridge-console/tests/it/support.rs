@@ -16,10 +16,10 @@ use http::{Request, Response, StatusCode};
 use tower::ServiceExt as _;
 use url::Url;
 
-use ferrobridge_testkit::oidc::{IdTokenClaims, Provider, TokenAnswer};
 use ferrobridge_console::config::Config;
 use ferrobridge_console::config::settings::Settings;
 use ferrobridge_console::server::{ConsoleState, router};
+use ferrobridge_testkit::oidc::{IdTokenClaims, Provider, TokenAnswer};
 
 /// The settings a console with its site bundle under `site_root` and its
 /// bridge at `bridge` runs on.

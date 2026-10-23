@@ -1,37 +1,50 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The view models the server functions answer, which both halves share.
+//! What a page reads from the bridge, split into the bridge's answer and the
+//! console's own faults.
 //!
-//! An answer is an [`Outcome`]: the view, or the bridge's refusal with its
-//! status. Only the console's own faults (no live session, a bridge it
-//! cannot reach, a body it cannot read) are a [`ViewError`], so a caller
-//! branches on two distinct types. Every integer is fixed-size, since the
-//! browser half is 32-bit. No specification governs the console: our own
-//! design.
+//! An answer is an [`Outcome`]: the document, or the bridge's refusal with
+//! its status. Only the console's own faults (no live session, a bridge it
+//! cannot reach, a body it cannot read) are a [`ViewError`], so a page
+//! branches on two distinct types. No specification governs the console:
+//! our own design.
 
-use leptos::server_fn::codec::JsonEncoding;
-use leptos::server_fn::error::{FromServerFnError, ServerFnErrorErr};
-use serde::{Deserialize, Serialize};
+use fhir_types::codec::{Json as _, Path, Value};
+use fhir_types::r4::operation_outcome::OperationOutcome;
+use http::StatusCode;
 
-use crate::locale::{Msg, tr, tr_with};
+use crate::bridge::BridgeError;
+use crate::locale::messages::Msg;
+use crate::locale::{tr, tr_with};
 
-/// What a server function answers when the console did its part.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// What the bridge answered when the console did its part.
+#[derive(Debug, Clone, PartialEq)]
 pub enum Outcome<T> {
-    /// The view.
+    /// The document.
     Shown(T),
     /// The bridge refused the request.
     Refused(Refusal),
 }
 
+impl<T> Outcome<T> {
+    /// Returns the outcome with its document turned by `turn`, a refusal as
+    /// it is.
+    pub fn map<U>(self, turn: impl FnOnce(T) -> U) -> Outcome<U> {
+        match self {
+            Self::Shown(document) => Outcome::Shown(turn(document)),
+            Self::Refused(refusal) => Outcome::Refused(refusal),
+        }
+    }
+}
+
 /// An expected refusal of the bridge's, with its status.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Refusal {
     /// The bridge refused the request.
     Bridge {
         /// The status the bridge answered with.
-        status: u16,
+        status: StatusCode,
         /// The diagnostics of the `OperationOutcome` it answered with, in
         /// order; empty when its body carried none.
         diagnostics: Vec<String>,
@@ -59,7 +72,7 @@ impl Refusal {
             } => {
                 let mut text = tr_with(
                     Msg::BridgeRefusedStatus,
-                    &[("status", status.to_string().into())],
+                    &[("status", status.as_u16().to_string().into())],
                 );
                 for said in diagnostics {
                     text.push(' ');
@@ -67,71 +80,62 @@ impl Refusal {
                 }
                 text
             }
-            Self::NotAuthenticated => tr(Msg::N401BridgeDidNotAcceptYour),
+            Self::NotAuthenticated => tr(Msg::BridgeRefusedSignIn),
             Self::Invalid { reason } => reason.clone(),
         }
+    }
+
+    /// The status the bridge answered with, when it answered.
+    #[must_use]
+    pub const fn status(&self) -> Option<StatusCode> {
+        match self {
+            Self::Bridge { status, .. } => Some(*status),
+            Self::NotAuthenticated => Some(StatusCode::UNAUTHORIZED),
+            Self::Invalid { .. } => None,
+        }
+    }
+
+    /// Whether the bridge answered `404`, as it does for a surface it does
+    /// not serve, such as the operator API while `[operator]` is off.
+    #[must_use]
+    pub fn not_served(&self) -> bool {
+        self.status() == Some(StatusCode::NOT_FOUND)
     }
 }
 
 /// A fault of the console: its session, its reach to the bridge, or a body
 /// it cannot read.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ViewError {
     /// The request carries no live signed-in session.
     #[error("sign in to see this view")]
     SignedOut,
     /// The bridge answered with a body this console cannot read.
-    #[error("the bridge answered {status} with a body this console cannot read")]
-    Unreadable {
-        /// The status the bridge answered with.
-        status: u16,
-    },
+    #[error("the bridge answered with a body this console cannot read")]
+    Unreadable,
     /// The bridge gave no answer at all.
     #[error("the bridge could not be reached")]
     Unreachable,
-    /// A plain form post, which a page sends before its bundle has loaded,
-    /// asked a tool for an answer no page would show.
-    #[error("the tool runs once its page has loaded; reload the page and run it again")]
-    PlainPost,
     /// The console could not serve the view.
     #[error("the console could not serve this view")]
     Unavailable,
-    /// The view could not be fetched from the console's server.
-    #[error("the view could not be fetched: {source}")]
-    Fetch {
-        /// What the server function transport reported.
-        #[source]
-        source: ServerFnErrorErr,
-    },
 }
 
 impl ViewError {
     /// The words of the fault in the page's locale; its `Display` is the log's.
     #[must_use]
     pub fn text(&self) -> String {
-        match self {
-            Self::SignedOut => tr(Msg::ViewSignedOut),
-            Self::Unreadable { status } => tr_with(
-                Msg::ViewUnreadable,
-                &[("status", status.to_string().into())],
-            ),
-            Self::Unreachable => tr(Msg::ViewUnreachable),
-            Self::PlainPost => tr(Msg::ViewPlainPost),
-            Self::Unavailable => tr(Msg::ViewUnavailable),
-            Self::Fetch { source } => {
-                tr_with(Msg::ViewFetch, &[("cause", source.to_string().into())])
-            }
-        }
+        tr(match self {
+            Self::SignedOut => Msg::ViewSignedOut,
+            Self::Unreadable => Msg::ViewUnreadable,
+            Self::Unreachable => Msg::ViewUnreachable,
+            Self::Unavailable => Msg::ViewUnavailable,
+        })
     }
 }
 
-impl FromServerFnError for ViewError {
-    type Encoder = JsonEncoding;
-
-    fn from_server_fn_error(value: ServerFnErrorErr) -> Self {
-        Self::Fetch { source: value }
-    }
-}
+/// What a page loads: the bridge's answer, or the console's fault.
+pub type Loaded<T> = Result<Outcome<T>, ViewError>;
 
 /// What the server knows of the request's session, which decides the page
 /// drawn.
@@ -146,149 +150,106 @@ pub enum SessionState {
     Unreadable,
 }
 
-impl std::fmt::Display for SessionState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::SignedIn => "in",
-            Self::SignedOut => "out",
-            Self::Unreadable => "unreadable",
-        })
-    }
-}
-
-impl std::str::FromStr for SessionState {
-    type Err = UnknownSessionState;
-
-    fn from_str(said: &str) -> Result<Self, Self::Err> {
-        match said {
-            "in" => Ok(Self::SignedIn),
-            "out" => Ok(Self::SignedOut),
-            "unreadable" => Ok(Self::Unreadable),
-            _ => Err(UnknownSessionState),
-        }
-    }
-}
-
-/// A serialized [`SessionState`] the browser cannot read.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-#[error("the page names a session state the console does not know")]
-pub struct UnknownSessionState;
-
-/// What the bridge says of itself in its `CapabilityStatement`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BridgeView {
-    /// The software's name, `software.name`.
-    pub software: Option<String>,
-    /// The software's version, `software.version`.
-    pub version: Option<String>,
-    /// The FHIR version it serves, `fhirVersion`.
-    pub fhir_version: Option<String>,
-}
-
-/// The server half: a failed bridge call split into the bridge's refusal or
-/// the console's fault.
-#[cfg(not(target_arch = "wasm32"))]
-pub mod server {
-    use crate::locale::{Msg, tr_served};
-    use fhir_types::codec::{Json as _, Path, Value};
-    use fhir_types::r4::operation_outcome::OperationOutcome;
-    use http::StatusCode;
-
-    use crate::bridge::BridgeError;
-    use crate::model::{Refusal, ViewError};
-
-    /// The refusal `error` carries, or the console's fault it is.
-    ///
-    /// A refusal is logged with its status alone, a fault with its cause;
-    /// neither line carries a body or a token.
-    ///
-    /// # Errors
-    /// Returns [`ViewError::Unreachable`] for a bridge that gave no answer,
-    /// [`ViewError::Unreadable`] for an answer this console cannot read, and
-    /// [`ViewError::Unavailable`] for a request the console could not send.
-    pub fn refusal(error: &BridgeError) -> Result<Refusal, ViewError> {
-        match error {
-            BridgeError::Refused { status, body } => {
-                tracing::warn!(%status, "the bridge refused a view");
-                if *status == StatusCode::UNAUTHORIZED {
-                    return Ok(Refusal::NotAuthenticated);
-                }
-                Ok(Refusal::Bridge {
-                    status: status.as_u16(),
-                    diagnostics: diagnostics(body),
-                })
+/// The refusal `error` carries, or the console's fault it is.
+///
+/// A refusal is logged with its status alone, a fault with its cause;
+/// neither line carries a body or a token.
+///
+/// # Errors
+/// Returns [`ViewError::Unreachable`] for a bridge that gave no answer,
+/// [`ViewError::Unreadable`] for an answer this console cannot read, and
+/// [`ViewError::Unavailable`] for a request the console could not send.
+pub fn refusal(error: &BridgeError) -> Result<Refusal, ViewError> {
+    match error {
+        BridgeError::Refused { status, body } => {
+            tracing::warn!(%status, "the bridge refused a view");
+            if *status == StatusCode::UNAUTHORIZED {
+                return Ok(Refusal::NotAuthenticated);
             }
-            BridgeError::Transport { .. } => {
-                tracing::error!(error = %crate::command::chain(error), "the bridge could not be reached");
-                Err(ViewError::Unreachable)
-            }
-            BridgeError::TooLarge { .. }
-            | BridgeError::Payload { .. }
-            | BridgeError::NotAnObject
-            | BridgeError::Document { .. }
-            | BridgeError::Decode { .. } => {
-                tracing::error!(error = %crate::command::chain(error), "the bridge answered a body this console cannot read");
-                Err(ViewError::Unreadable {
-                    status: StatusCode::OK.as_u16(),
-                })
-            }
-            BridgeError::Path => Ok(Refusal::Invalid {
-                reason: tr_served(Msg::MappingFilePathNotPlainNames),
-            }),
-            BridgeError::ResourceType => Ok(Refusal::Invalid {
-                reason: tr_served(Msg::ResourceTypeNotFhirResourceType),
-            }),
-            BridgeError::Reason => Ok(Refusal::Invalid {
-                reason: tr_served(Msg::ReasonMustOneLineMost200),
-            }),
-            BridgeError::Route { .. }
-            | BridgeError::Token
-            | BridgeError::Encode { .. }
-            | BridgeError::Number { .. } => {
-                tracing::error!(error = %crate::command::chain(error), "a request to the bridge could not be sent");
-                Err(ViewError::Unavailable)
-            }
-        }
-    }
-
-    /// The words of each issue of the R4 `OperationOutcome` `body` holds, in
-    /// order: its `details.text` and its `diagnostics`, each when present
-    /// (FHIR R4 `operationoutcome.html`, `OperationOutcome.issue`).
-    fn diagnostics(body: &str) -> Vec<String> {
-        // NOTE: no specification governs this: our own design; a refusal body
-        // that is no OperationOutcome carries no diagnostics, and its status stands.
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(body) else {
-            return Vec::new();
-        };
-        let Value::Object(object) = Value::from_serde_json(value) else {
-            return Vec::new();
-        };
-        OperationOutcome::from_json(&object, &mut Path::root("OperationOutcome"))
-            .map(|outcome| {
-                outcome
-                    .issue
-                    .into_iter()
-                    .flat_map(|issue| {
-                        let details = issue
-                            .details
-                            .and_then(|details| details.text)
-                            .and_then(|text| text.value);
-                        let diagnostics = issue.diagnostics.and_then(|text| text.value);
-                        details.into_iter().chain(diagnostics)
-                    })
-                    .collect()
+            Ok(Refusal::Bridge {
+                status: *status,
+                diagnostics: diagnostics(body),
             })
-            .unwrap_or_default()
+        }
+        BridgeError::Transport { .. } => {
+            tracing::error!(error = %crate::command::chain(error), "the bridge could not be reached");
+            Err(ViewError::Unreachable)
+        }
+        BridgeError::TooLarge { .. }
+        | BridgeError::Payload { .. }
+        | BridgeError::NotAnObject
+        | BridgeError::Document { .. }
+        | BridgeError::Decode { .. } => {
+            tracing::error!(error = %crate::command::chain(error), "the bridge answered a body this console cannot read");
+            Err(ViewError::Unreadable)
+        }
+        BridgeError::Path => Ok(Refusal::Invalid {
+            reason: tr(Msg::InvalidPath),
+        }),
+        BridgeError::ResourceType => Ok(Refusal::Invalid {
+            reason: tr(Msg::InvalidResourceType),
+        }),
+        BridgeError::Reason => Ok(Refusal::Invalid {
+            reason: tr(Msg::InvalidReason),
+        }),
+        BridgeError::Route { .. }
+        | BridgeError::Token
+        | BridgeError::Encode { .. }
+        | BridgeError::Number { .. } => {
+            tracing::error!(error = %crate::command::chain(error), "a request to the bridge could not be sent");
+            Err(ViewError::Unavailable)
+        }
     }
+}
+
+/// The answer `result` holds as a page loads it: the document, the bridge's
+/// refusal, or the console's fault.
+///
+/// # Errors
+/// As [`refusal`].
+pub fn loaded<T>(result: Result<T, BridgeError>) -> Loaded<T> {
+    match result {
+        Ok(document) => Ok(Outcome::Shown(document)),
+        Err(error) => refusal(&error).map(Outcome::Refused),
+    }
+}
+
+/// The words of each issue of the R4 `OperationOutcome` `body` holds, in
+/// order: its `details.text` and its `diagnostics`, each when present
+/// (FHIR R4 `operationoutcome.html`, `OperationOutcome.issue`).
+fn diagnostics(body: &str) -> Vec<String> {
+    // NOTE: no specification governs this: our own design; a refusal body
+    // that is no OperationOutcome carries no diagnostics, and its status stands.
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(body) else {
+        return Vec::new();
+    };
+    let Value::Object(object) = Value::from_serde_json(value) else {
+        return Vec::new();
+    };
+    OperationOutcome::from_json(&object, &mut Path::root("OperationOutcome"))
+        .map(|outcome| {
+            outcome
+                .issue
+                .into_iter()
+                .flat_map(|issue| {
+                    let details = issue
+                        .details
+                        .and_then(|details| details.text)
+                        .and_then(|text| text.value);
+                    let diagnostics = issue.diagnostics.and_then(|text| text.value);
+                    details.into_iter().chain(diagnostics)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
 mod tests {
     use http::StatusCode;
 
+    use super::{Refusal, ViewError, refusal};
     use crate::bridge::BridgeError;
-    use crate::model::server::refusal;
-    use crate::model::{Refusal, ViewError};
 
     #[test]
     fn a_401_asks_for_a_new_sign_in_and_another_refusal_keeps_its_status_and_diagnostics() {
@@ -305,7 +266,7 @@ mod tests {
         };
         assert_eq!(
             Ok(Refusal::Bridge {
-                status: 403,
+                status: StatusCode::FORBIDDEN,
                 diagnostics: vec![String::from("the operator scope is missing")],
             }),
             refusal(&forbidden)
@@ -318,7 +279,7 @@ mod tests {
         };
         assert_eq!(
             Ok(Refusal::Bridge {
-                status: 503,
+                status: StatusCode::SERVICE_UNAVAILABLE,
                 diagnostics: vec![
                     String::from("the operations are not served"),
                     String::from("no mapping set"),
@@ -333,14 +294,14 @@ mod tests {
         };
         assert_eq!(
             Ok(Refusal::Bridge {
-                status: 503,
+                status: StatusCode::SERVICE_UNAVAILABLE,
                 diagnostics: Vec::new(),
             }),
             refusal(&plain)
         );
         assert_eq!(Err(ViewError::Unavailable), refusal(&BridgeError::Token));
         assert_eq!(
-            Err(ViewError::Unreadable { status: 200 }),
+            Err(ViewError::Unreadable),
             refusal(&BridgeError::NotAnObject)
         );
     }
@@ -348,24 +309,27 @@ mod tests {
     #[test]
     fn a_refusal_and_a_fault_draw_their_english_words_from_the_catalog() {
         let refused = Refusal::Bridge {
-            status: 503,
+            status: StatusCode::SERVICE_UNAVAILABLE,
             diagnostics: vec![String::from("synthetic diagnostic")],
         };
         assert_eq!(
-            "503: the bridge refused the request. synthetic diagnostic",
+            "The bridge refused the request (503). synthetic diagnostic",
             refused.text()
         );
         assert_eq!(
-            "401: the bridge did not accept your sign-in. Sign in again.",
+            "The bridge did not accept your sign-in (401). Sign in again.",
             Refusal::NotAuthenticated.text()
         );
         assert_eq!(
-            "the bridge answered 502 with a body this console cannot read",
-            ViewError::Unreadable { status: 502 }.text()
+            "The bridge answered with a body this console cannot read.",
+            ViewError::Unreadable.text()
         );
-        assert_eq!(
-            "the tool runs once its page has loaded; reload the page and run it again",
-            ViewError::PlainPost.text()
+        assert!(
+            Refusal::Bridge {
+                status: StatusCode::NOT_FOUND,
+                diagnostics: Vec::new()
+            }
+            .not_served()
         );
     }
 }

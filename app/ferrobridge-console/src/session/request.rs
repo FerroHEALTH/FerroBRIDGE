@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The session of the request being rendered or answered, read from the
-//! context the server provides to every page and server function.
+//! context the server provides to every page it draws.
 
 use leptos::context::use_context;
 
@@ -14,9 +14,7 @@ use crate::session::COOKIE;
 /// The console's state and the operator's access token, for a request that
 /// carries a live signed-in session.
 ///
-/// Every server function calls this before it reads anything else, since
-/// each is a public endpoint of its own (the Leptos book,
-/// `server/25_server_functions`).
+/// Every read a page makes calls this before it asks the bridge anything.
 ///
 /// # Errors
 /// Returns [`ViewError::SignedOut`] when the request carries no live
@@ -60,4 +58,26 @@ pub fn operator() -> Option<String> {
     // NOTE: no specification governs this: our own design; a store that
     // cannot be read names no operator, and [`state`] reports that fault itself.
     state.sessions().operator(&id).ok().flatten()
+}
+
+/// Whether the console has an OpenID Provider to sign operators in at.
+#[must_use]
+pub fn configured_sign_in() -> bool {
+    use_context::<ConsoleState>().is_some_and(|state| state.settings().oidc.is_some())
+}
+
+/// Whether the request carries a session cookie whose session has ended,
+/// by its idle or absolute timeout or a refused refresh.
+#[must_use]
+pub fn ended() -> bool {
+    let Some(state) = use_context::<ConsoleState>() else {
+        return false;
+    };
+    let Some(parts) = use_context::<http::request::Parts>() else {
+        return false;
+    };
+    state
+        .sessions()
+        .cookie_in(&parts.headers, COOKIE)
+        .is_some_and(|id| matches!(state.sessions().access_token(&id), Ok(None)))
 }

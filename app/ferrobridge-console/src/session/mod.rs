@@ -46,9 +46,10 @@ pub const COOKIE: &str = "ferrobridge_console_session";
 /// the `__Host-` prefix when the cookie is `Secure`.
 pub const SIGN_IN_COOKIE: &str = "ferrobridge_console_sign_in";
 
-/// The name of the cookie that carries the operator's theme choice, under
-/// the `__Host-` prefix when the cookie is `Secure`.
-pub const THEME_COOKIE: &str = "ferrobridge_console_theme";
+/// What the name of every preference cookie starts with, before the
+/// preference's own name and under the `__Host-` prefix when the cookie is
+/// `Secure`, such as `ferrobridge_console_theme`.
+pub const PREFERENCE_PREFIX: &str = "ferrobridge_console_";
 
 /// The cookie name prefix that binds a cookie to the host that set it.
 ///

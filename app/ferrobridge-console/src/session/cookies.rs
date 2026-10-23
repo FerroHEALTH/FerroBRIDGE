@@ -7,7 +7,7 @@
 use cookie::{Cookie, SameSite};
 use http::HeaderMap;
 
-use crate::session::{COOKIE, HOST_PREFIX, SIGN_IN_COOKIE, SessionId, Sessions, THEME_COOKIE};
+use crate::session::{COOKIE, HOST_PREFIX, PREFERENCE_PREFIX, SIGN_IN_COOKIE, SessionId, Sessions};
 
 impl Sessions {
     /// The name `base` takes on this console: [`HOST_PREFIX`] and `base` when
@@ -71,13 +71,21 @@ impl Sessions {
             .build()
     }
 
-    /// The `Set-Cookie` value that keeps the operator's theme choice `theme`
-    /// for 400 days, the longest a browser keeps a cookie (RFC 6265bis
-    /// §5.6.2).
+    /// The `Set-Cookie` value that keeps the operator's preference `name`
+    /// at `value` for one year (FerroUI family rule 9), under
+    /// [`PREFERENCE_PREFIX`].
     #[must_use]
-    pub fn theme_cookie(&self, theme: &str) -> Cookie<'static> {
-        self.cookie(THEME_COOKIE, theme)
-            .max_age(cookie::time::Duration::days(400))
+    pub fn preference_cookie(&self, name: &str, value: &str) -> Cookie<'static> {
+        self.cookie(&format!("{PREFERENCE_PREFIX}{name}"), value)
+            .max_age(cookie::time::Duration::days(365))
+            .build()
+    }
+
+    /// The `Set-Cookie` value that clears the operator's preference `name`.
+    #[must_use]
+    pub fn preference_cookie_removal(&self, name: &str) -> Cookie<'static> {
+        self.cookie(&format!("{PREFERENCE_PREFIX}{name}"), "")
+            .max_age(cookie::time::Duration::ZERO)
             .build()
     }
 
@@ -124,11 +132,17 @@ mod tests {
     }
 
     #[test]
-    fn the_theme_cookie_is_host_bound_http_only_lax_secure_and_kept_400_days() {
+    fn a_preference_cookie_is_host_bound_http_only_lax_secure_and_kept_one_year() {
         let sessions = Sessions::new(settings());
         assert_eq!(
-            "__Host-ferrobridge_console_theme=dark; HttpOnly; SameSite=Lax; Secure; Path=/; Max-Age=34560000",
-            sessions.theme_cookie("dark").to_string()
+            "__Host-ferrobridge_console_theme=dark; HttpOnly; SameSite=Lax; Secure; Path=/; Max-Age=31536000",
+            sessions.preference_cookie("theme", "dark").to_string()
+        );
+        assert!(
+            sessions
+                .preference_cookie_removal("theme")
+                .to_string()
+                .contains("Max-Age=0")
         );
     }
 

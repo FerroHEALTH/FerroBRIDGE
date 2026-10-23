@@ -1,310 +1,275 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The shell around every page: the theme the server draws from its cookie,
-//! the top bar with the bridge's status and version, the grouped
-//! navigation and its drawer, the theme toggle, the operator's menu, the
-//! About page naming the maker, and the page for a path the console does not
-//! serve.
+//! The shell around every page and the operator's preferences: the
+//! document drawn in the preferences its cookies name, the top bar with no
+//! theme toggle, the user menu that alone sets the theme, the navigation
+//! and its honest count, each preference kept in a cookie of its own by a
+//! plain form post, Reset to defaults, the rail, the search over the
+//! running load, the About page and the page for a path the console does
+//! not serve.
 
 use std::error::Error;
 
-use axum::body::Body;
-use ferrobridge_testkit::oidc::{Provider, TokenAnswer};
-use ferrobridge_console::model::{BridgeView, Outcome, Refusal, ViewError};
-use ferrobridge_console::shell::{bridge_status, navigation};
-use ferrohealth_ui::tone::Tone;
-use http::{Request, StatusCode};
-use wiremock::matchers::{method, path};
-use wiremock::{Mock, MockServer, ResponseTemplate};
+use http::StatusCode;
 
-use crate::support::{
-    OPERATOR_NAME, OPERATOR_TOKEN, configuration, console, get, get_with, header, send,
-    set_cookies, sign_in,
-};
+use crate::stub::{BROKEN, CONTEXT, bridge, post, signed_in};
+use crate::support::{OPERATOR_NAME, console, get, get_with, header, send, set_cookies};
 
-/// A stub bridge that answers its `CapabilityStatement` at version 0.0.8.
-async fn bridge() -> MockServer {
-    let server = MockServer::start().await;
-    Mock::given(method("GET"))
-        .and(path("/fhir/metadata"))
-        .respond_with(ResponseTemplate::new(200).set_body_raw(
-            r#"{"resourceType":"CapabilityStatement","status":"active","date":"2026-10-17","kind":"instance","software":{"name":"FerroBRIDGE","version":"0.0.8"},"fhirVersion":"4.0.1","format":["json"]}"#,
-            "application/fhir+json",
-        ))
-        .mount(&server)
-        .await;
-    server
-}
-
-/// The console over `bridge` and a signed-in session's cookie.
-async fn signed_in(bridge: &MockServer) -> Result<(axum::Router, String), Box<dyn Error>> {
-    let provider = Provider::start().await?;
-    let base = format!("{}/", bridge.uri());
-    let (_state, service) = console(&configuration(&provider, &base, "", ""))?;
-    let cookie = sign_in(&service, &provider, TokenAnswer::bearer(OPERATOR_TOKEN)).await?;
-    Ok((service, cookie))
-}
-
-/// The `data-theme` the page's `<html>` carries.
-fn data_theme(page: &str) -> &str {
-    page.split_once("data-theme=\"")
+/// The value of the attribute `name` the page's `<html>` carries.
+fn root_attribute<'a>(page: &'a str, name: &str) -> &'a str {
+    page.split_once(&format!("{name}=\""))
         .and_then(|(_, rest)| rest.split_once('"'))
-        .map(|(theme, _)| theme)
+        .map(|(value, _)| value)
         .unwrap_or_default()
 }
 
 #[tokio::test]
-async fn a_page_without_a_theme_cookie_follows_the_system() -> Result<(), Box<dyn Error>> {
+async fn a_page_without_a_preference_cookie_follows_the_system_and_the_defaults()
+-> Result<(), Box<dyn Error>> {
     let (_state, service) = console("")?;
     let (_response, page) = send(&service, get("/")?).await?;
-    assert_eq!("system", data_theme(&page));
+    assert_eq!("system", root_attribute(&page, "data-theme"));
+    assert_eq!("comfortable", root_attribute(&page, "data-density"));
+    assert_eq!("en", root_attribute(&page, "lang"));
     Ok(())
 }
 
 #[tokio::test]
-async fn the_server_draws_the_theme_its_cookie_names_and_ignores_another_word()
--> Result<(), Box<dyn Error>> {
-    let (_state, service) = console("[session]\nsecure_cookie = false\n")?;
-    for (cookie, theme) in [
-        ("ferrobridge_console_theme=dark", "dark"),
-        ("ferrobridge_console_theme=light", "light"),
-        ("ferrobridge_console_theme=sepia", "system"),
-    ] {
-        let (_response, page) = send(&service, get_with("/", cookie)?).await?;
-        assert_eq!(theme, data_theme(&page), "{cookie}");
-    }
-    Ok(())
-}
-
-#[tokio::test]
-async fn the_signed_in_shell_carries_the_bar_the_navigation_and_the_footer()
+async fn the_document_wears_the_preferences_its_cookies_name_and_ignores_another_word()
 -> Result<(), Box<dyn Error>> {
     let bridge = bridge().await;
     let (service, cookie) = signed_in(&bridge).await?;
-    let (response, page) = send(&service, get_with("/", &cookie)?).await?;
-    assert_eq!(StatusCode::OK, response.status());
-    assert!(page.contains(r##"<a href="#main""##), "a skip link: {page}");
-    assert!(page.contains(r#"<main id="main""#), "{page}");
-    assert!(page.contains("Bridge UP · v0.0.8"), "{page}");
-    assert!(page.contains(OPERATOR_NAME), "{page}");
-    assert!(page.contains(r#"popovertarget="sidebar""#), "{page}");
-    assert!(
-        page.contains(r#"<nav id="sidebar" popover="auto""#),
-        "{page}"
-    );
-    assert!(
-        page.contains(r#"id="theme-to-dark""#),
-        "the toggle's moon: {page}"
-    );
-    assert!(
-        page.contains(r#"id="theme-to-light""#),
-        "the toggle's sun: {page}"
-    );
-    assert!(
-        page.contains("Switch to the dark theme"),
-        "a named toggle: {page}"
-    );
-    assert!(page.contains(r#"action="/api/theme""#), "{page}");
-    assert!(page.contains("Cadasto B.V."), "the footer names the maker");
-    assert!(page.contains(r#"href="/about""#), "{page}");
-    assert!(!page.contains(OPERATOR_TOKEN), "{page}");
+    let chosen =
+        format!("{cookie}; ferrobridge_console_theme=dark; ferrobridge_console_density=compact");
+    let (_response, page) = send(&service, get_with("/", &chosen)?).await?;
+    assert_eq!("dark", root_attribute(&page, "data-theme"));
+    assert_eq!("compact", root_attribute(&page, "data-density"));
+    let wrong = format!("{cookie}; ferrobridge_console_theme=sepia");
+    let (_response, page) = send(&service, get_with("/", &wrong)?).await?;
+    assert_eq!("system", root_attribute(&page, "data-theme"));
     Ok(())
 }
 
 #[tokio::test]
-async fn the_navigation_draws_its_groups_in_order_and_leaves_an_empty_one_out()
+async fn the_shell_carries_the_lockup_the_status_the_user_menu_and_no_theme_toggle()
 -> Result<(), Box<dyn Error>> {
-    let groups = navigation();
-    let titles: Vec<String> = groups.iter().map(|group| group.title.to_string()).collect();
-    assert_eq!(vec!["Overview", "Mappings", "Tools", "Bridge"], titles);
     let bridge = bridge().await;
     let (service, cookie) = signed_in(&bridge).await?;
     let (_response, page) = send(&service, get_with("/", &cookie)?).await?;
-    let mut at = 0;
-    for group in groups {
-        let heading = format!(r#"id="{}""#, group.id);
-        match page.find(&heading) {
-            Some(found) if !group.entries.is_empty() => {
-                assert!(found > at, "{} out of order", group.title);
-                at = found;
-                assert!(
-                    page.contains(&format!(r#"aria-labelledby="{}""#, group.id)),
-                    "the list names its heading"
-                );
-            }
-            None if group.entries.is_empty() => {}
-            found => panic!("{}: {found:?}", group.title),
-        }
+    assert!(page.contains("/pkg/ferrobridge-icon.svg"), "{page}");
+    assert!(page.contains("Bridge up"), "{page}");
+    assert!(page.contains("version 0.0.8"), "{page}");
+    assert!(page.contains(OPERATOR_NAME), "{page}");
+    assert!(page.contains(r#"action="/preference""#), "{page}");
+    assert!(page.contains(r#"action="/logout""#), "{page}");
+    assert!(!page.contains("fui-theme-toggle"), "{page}");
+    for group in ["Overview", "Mappings", "Bridge", "Console"] {
+        assert!(page.contains(group), "{group}");
     }
-    assert!(
-        page.contains(r#"aria-current="page""#),
-        "the dashboard is the page"
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn a_visitor_reads_no_navigation_no_bar_and_the_footer() -> Result<(), Box<dyn Error>> {
-    let (_state, service) = console("")?;
-    let (_response, page) = send(&service, get("/")?).await?;
-    assert!(!page.contains("<nav"), "{page}");
-    assert!(!page.contains("Sign out"), "{page}");
-    assert!(page.contains("Cadasto B.V."), "{page}");
-    Ok(())
-}
-
-#[tokio::test]
-async fn about_names_the_maker_and_shows_the_bridge_only_to_an_operator()
--> Result<(), Box<dyn Error>> {
-    let (_state, service) = console("")?;
-    let (response, page) = send(&service, get("/about")?).await?;
-    assert_eq!(StatusCode::OK, response.status());
-    assert!(page.contains("Made by"), "{page}");
-    assert!(page.contains("Cadasto B.V."), "{page}");
-    assert!(page.contains(env!("CARGO_PKG_VERSION")), "{page}");
-    assert!(!page.contains("<code>http"), "{page}");
-    let bridge = bridge().await;
-    let (service, cookie) = signed_in(&bridge).await?;
-    let (_response, page) = send(&service, get_with("/about", &cookie)?).await?;
-    assert!(
-        page.contains(&format!("<code>{}/</code>", bridge.uri())),
-        "{page}"
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn a_path_the_console_does_not_serve_is_a_404_page_with_the_way_back()
--> Result<(), Box<dyn Error>> {
-    let (_state, service) = console("")?;
-    let (response, page) = send(&service, get("/no/such/page")?).await?;
-    assert_eq!(StatusCode::NOT_FOUND, response.status());
-    assert!(page.contains("404: the console has no page at this address."));
-    assert!(page.contains("Back to the console"));
-    Ok(())
-}
-
-/// A `POST` of the theme server function with `form` and `accept`.
-fn theme_post(form: &str, accept: &str, cookie: &str) -> Result<Request<Body>, Box<dyn Error>> {
-    Ok(Request::post("/api/theme")
-        .header("content-type", "application/x-www-form-urlencoded")
-        .header("accept", accept)
-        .header("sec-fetch-site", "same-origin")
-        .header("cookie", cookie)
-        .body(Body::from(form.to_owned()))?)
-}
-
-#[tokio::test]
-async fn the_theme_switch_keeps_the_choice_in_its_cookie_and_the_next_page_wears_it()
--> Result<(), Box<dyn Error>> {
-    let bridge = bridge().await;
-    let (service, cookie) = signed_in(&bridge).await?;
-    let (response, body) = send(
-        &service,
-        theme_post("theme=dark", "application/json", &cookie)?,
-    )
-    .await?;
-    assert_eq!(StatusCode::OK, response.status(), "{body}");
-    let kept = set_cookies(&response)
-        .into_iter()
-        .find(|set| set.starts_with("ferrobridge_console_theme=dark"))
-        .ok_or("the theme cookie")?;
-    assert!(
-        kept.contains("HttpOnly") && kept.contains("Max-Age=34560000"),
-        "{kept}"
-    );
-    let both = format!("{cookie}; ferrobridge_console_theme=dark");
-    let (_response, page) = send(&service, get_with("/", &both)?).await?;
-    assert_eq!("dark", data_theme(&page));
-    Ok(())
-}
-
-#[tokio::test]
-async fn a_plain_theme_post_returns_to_the_consoles_own_page_alone() -> Result<(), Box<dyn Error>> {
-    let bridge = bridge().await;
-    let (service, cookie) = signed_in(&bridge).await?;
-    let (response, _body) = send(
-        &service,
-        theme_post("theme=light&back=%2Fabout", "text/html", &cookie)?,
-    )
-    .await?;
-    assert_eq!(StatusCode::SEE_OTHER, response.status());
-    assert_eq!("/about", header(&response, "location"));
-    for page in [
-        "/files",
-        "/files/fhirconnect/diagnose.yml",
-        "/edit",
-        "/playground",
+    for entry in [
+        "Dashboard",
+        "Mapping set",
+        "Playground",
+        "FHIR facade",
+        "HL7 v2",
+        "OMOP ETL",
+        "Connections",
+        "About",
     ] {
-        let body = format!("theme=dark&back={}", page.replace('/', "%2F"));
-        let (response, _body) = send(&service, theme_post(&body, "text/html", &cookie)?).await?;
-        assert_eq!(StatusCode::SEE_OTHER, response.status(), "{page}");
-        assert_eq!(page, header(&response, "location"), "{page}");
+        assert!(page.contains(entry), "{entry}");
     }
+    assert!(page.contains("1 error in the running load"), "{page}");
+    assert!(page.contains("FerroBRIDGE Console"), "the footer: {page}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_preference_post_keeps_its_cookie_for_a_year_and_returns_saying_so()
+-> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
     let (response, _body) = send(
         &service,
-        theme_post(
-            "theme=light&back=https%3A%2F%2Fattacker.example.net%2F",
-            "text/html",
+        post(
+            "/preference",
+            "back=%2Fpreferences%2Flanguage&language=en",
             &cookie,
         )?,
     )
     .await?;
-    assert_ne!(
-        "https://attacker.example.net/",
+    assert_eq!(StatusCode::SEE_OTHER, response.status());
+    assert_eq!(
+        "/preferences/language?saved=language",
         header(&response, "location")
     );
-    assert!(!header(&response, "location").contains("attacker"));
+    let kept = set_cookies(&response);
+    assert!(
+        kept.iter()
+            .any(|set| set.starts_with("ferrobridge_console_language=en;")
+                && set.contains("HttpOnly")
+                && set.contains("SameSite=Lax")
+                && set.contains("Max-Age=31536000")),
+        "{kept:?}"
+    );
+    let (response, _body) = send(
+        &service,
+        post("/preference", "back=%2Fmappings&theme=dark", &cookie)?,
+    )
+    .await?;
+    assert_eq!("/mappings", header(&response, "location"));
     Ok(())
 }
 
 #[tokio::test]
-async fn a_word_that_names_no_theme_is_refused_and_sets_no_cookie() -> Result<(), Box<dyn Error>> {
+async fn a_preference_the_console_does_not_offer_is_refused_and_sets_no_cookie()
+-> Result<(), Box<dyn Error>> {
     let bridge = bridge().await;
     let (service, cookie) = signed_in(&bridge).await?;
-    let (response, body) = send(
+    for form in [
+        "back=%2F&theme=sepia",
+        "back=%2F&language=tlh",
+        "back=%2F&reveal=10",
+        "back=%2F",
+        "back=%2F&theme=dark&density=compact",
+    ] {
+        let (response, _body) = send(&service, post("/preference", form, &cookie)?).await?;
+        assert_eq!(StatusCode::BAD_REQUEST, response.status(), "{form}");
+        assert!(set_cookies(&response).is_empty(), "{form}");
+    }
+    let (response, _body) = send(
         &service,
-        theme_post("theme=sepia", "application/json", &cookie)?,
+        post(
+            "/preference",
+            "back=https%3A%2F%2Fattacker.example.net%2F&theme=dark",
+            &cookie,
+        )?,
     )
     .await?;
-    assert_eq!(StatusCode::OK, response.status());
-    assert!(body.contains("Invalid"), "{body}");
+    assert_eq!("/", header(&response, "location"), "never off the console");
+    Ok(())
+}
+
+#[tokio::test]
+async fn reset_to_defaults_clears_every_preference_cookie_and_the_rail_stays()
+-> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (response, _body) = send(
+        &service,
+        post("/preferences/reset", "back=%2Fpreferences", &cookie)?,
+    )
+    .await?;
+    assert_eq!(StatusCode::SEE_OTHER, response.status());
+    let cleared = set_cookies(&response);
+    for name in [
+        "theme",
+        "density",
+        "motion",
+        "language",
+        "week-start",
+        "hints",
+    ] {
+        assert!(
+            cleared.iter().any(
+                |set| set.starts_with(&format!("ferrobridge_console_{name}"))
+                    && set.contains("Max-Age=0")
+            ),
+            "{name}: {cleared:?}"
+        );
+    }
     assert!(
-        !set_cookies(&response)
+        !cleared
             .iter()
-            .any(|set| set.starts_with("ferrobridge_console_theme")),
-        "no cookie for a refused word"
+            .any(|set| set.starts_with("ferrobridge_console_sidebar")),
+        "{cleared:?}"
     );
     Ok(())
 }
 
-// WCAG 2.2 SC 1.4.1: the status is a word as well as a tint.
-#[test]
-fn the_bridge_status_is_a_word_for_every_answer() {
-    let shown = Ok(Outcome::Shown(BridgeView {
-        software: Some(String::from("FerroBRIDGE")),
-        version: Some(String::from("0.0.8")),
-        fhir_version: Some(String::from("4.0.1")),
-    }));
-    assert_eq!(
-        (Tone::Ok, String::from("Bridge UP · v0.0.8")),
-        bridge_status(&shown)
+#[tokio::test]
+async fn the_rail_is_kept_in_its_cookie_and_the_next_page_draws_it_folded()
+-> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (response, _body) = send(
+        &service,
+        post("/sidebar", "sidebar=rail&back=%2Fmappings", &cookie)?,
+    )
+    .await?;
+    assert_eq!("/mappings", header(&response, "location"));
+    assert!(
+        set_cookies(&response)
+            .iter()
+            .any(|set| set.starts_with("ferrobridge_console_sidebar=rail;")),
+        "{:?}",
+        set_cookies(&response)
     );
-    let refused = Ok(Outcome::Refused(Refusal::Bridge {
-        status: 403,
-        diagnostics: Vec::new(),
-    }));
-    assert_eq!(
-        (Tone::Bad, String::from("Bridge refused 403")),
-        bridge_status(&refused)
-    );
-    assert_eq!(
-        (Tone::Bad, String::from("Bridge DOWN")),
-        bridge_status(&Err(ViewError::Unreachable))
-    );
-    assert_eq!(
-        (Tone::Warn, String::from("Bridge UNKNOWN")),
-        bridge_status(&Err(ViewError::Unavailable))
-    );
+    let folded = format!("{cookie}; ferrobridge_console_sidebar=rail");
+    let (_response, page) = send(&service, get_with("/mappings", &folded)?).await?;
+    assert!(page.contains("fui-sidebar-rail"), "{page}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn your_preferences_draws_the_three_tabs_and_says_what_it_kept() -> Result<(), Box<dyn Error>>
+{
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(
+        &service,
+        get_with("/preferences/language?saved=language", &cookie)?,
+    )
+    .await?;
+    for tab in ["Appearance", "Language and region", "Keyboard"] {
+        assert!(page.contains(tab), "{tab}: {page}");
+    }
+    assert!(page.contains("Only for you, in this browser."), "{page}");
+    assert!(page.contains("Saved"), "{page}");
+    let (response, _body) = send(&service, get_with("/preferences/nowhere", &cookie)?).await?;
+    assert_eq!(StatusCode::NOT_FOUND, response.status());
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_search_answers_contexts_files_and_templates_in_the_page() -> Result<(), Box<dyn Error>>
+{
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(&service, get_with("/?q=observation", &cookie)?).await?;
+    assert!(page.contains("matches for “observation”"), "{page}");
+    assert!(page.contains(CONTEXT), "{page}");
+    let (_response, none) = send(&service, get_with("/?q=nothing-here", &cookie)?).await?;
+    assert!(none.contains("Nothing found for “nothing-here”"), "{none}");
+    assert!(!none.contains(BROKEN), "{none}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn about_names_the_maker_the_licence_and_the_bridges_build() -> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(&service, get_with("/about", &cookie)?).await?;
+    assert!(page.contains("Business Source License 1.1"), "{page}");
+    assert!(page.contains("www.cadasto.com/contact"), "{page}");
+    assert!(page.contains("FHIRconnect"), "{page}");
+    assert!(page.contains(&bridge.uri()), "{page}");
+    let (response, info) = send(&service, get_with("/about/health-info.json", &cookie)?).await?;
+    assert_eq!(StatusCode::OK, response.status());
+    assert!(info.contains("\"product\":\"FerroBRIDGE\""), "{info}");
+    let (response, _body) = send(&service, get("/about/health-info.json")?).await?;
+    assert_eq!(StatusCode::UNAUTHORIZED, response.status());
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_path_the_console_does_not_serve_is_a_404_page_with_the_ways_on()
+-> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (response, page) = send(&service, get_with("/no/such/page", &cookie)?).await?;
+    assert_eq!(StatusCode::NOT_FOUND, response.status());
+    assert!(page.contains("Page not found"), "{page}");
+    assert!(page.contains("Back to the dashboard"), "{page}");
+    Ok(())
 }

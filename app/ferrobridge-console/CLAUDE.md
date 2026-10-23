@@ -32,16 +32,23 @@ crate.
   line; `tests/it/sign_in.rs` and `tests/it/refresh.rs` read the captured
   log and the page for each. Sign-in, refresh and sign-out are tested
   against the test OpenID Provider of `ferrobridge_testkit::oidc`.
-- **Every server function checks the session first**
-  (`session::request::signed_in`) and is listed in
-  `tests/it/server_functions.rs`, which fails on one it does not hold.
-- **A view draws with `ferrohealth-ui`**, the FerroHEALTH component
-  library, and keeps only its brand theme, `style/theme.css`: the role layer is the
-  library's, the theme sets the five accent properties, both dark blocks stay
-  identical, and `tests/it/contrast.rs` holds every pair to WCAG 2.2 AA. The
-  theme is the server's, drawn from its cookie as `data-theme`; the browser
-  keeps no storage. The server serves the library's stylesheet and the theme
-  itself (`server::stylesheet`, `server::theme`).
+- **Islands mode, no server function.** The page tree is server-only; the
+  browser half compiles `islands` alone (`MappingEditor`, `JsonInput`, both
+  `#[island(lazy)]`, and the library's islands). Every action is a plain
+  form post (`prefs`, `posts`) that checks the session first and answers
+  with the page `server::render` draws, the outcome in context;
+  `tests/it/forms.rs` lists every post, holds each to a live session from
+  the console's own pages, and asserts no server function is registered.
+- **A view draws with `ferrohealth-ui`** (FerroUI, pinned `=0.3.2`): its
+  templates, components and brand theme (`BRAND.theme()`), never a local
+  copy or override; a gap is a FerroUI issue and a `TODO(#1146)`. Each
+  preference is the server's, drawn from its own cookie
+  (`ferrobridge_console_<name>`, one year) onto `<html>`; the theme is set
+  in the user menu and Your preferences alone, and the browser keeps no
+  storage. The server serves the library's stylesheet, the theme and the
+  marks itself (`server::stylesheet`, `server::theme`). Every string is a
+  `Msg` of `locales/en/ferrobridge-console.ftl`, numbers through the
+  registered `format_number`.
 - **A route has a journey and two screenshots.** The browser journeys and
   the book's screenshots live in the testkit
   (`tools/ferrobridge-testkit/tests/it/journeys/`); a new route joins the

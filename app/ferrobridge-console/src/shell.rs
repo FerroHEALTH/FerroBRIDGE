@@ -2,231 +2,279 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The chrome around every signed-in page, drawn with the `FerroHEALTH`
-//! components of `ferrohealth_ui`.
+//! components of `ferrohealth_ui` as the reviewed FerroBRIDGE design lays
+//! it out.
 //!
-//! It is the top bar with the bridge's status and version, the theme toggle
-//! and the operator's menu; the navigation grouped Overview, Mappings, Tools
-//! and Bridge, a column beside the page from `md` and a drawer below it; and
-//! the one-line footer every page carries. The drawer and the operator's
-//! menu are HTML popovers, which the browser opens and closes with no
-//! script; the library's navigation adds the drawer's focus handling. No
-//! specification governs the console: our own design.
+//! The top bar holds the drawer button, the FerroBRIDGE lockup, the search
+//! over the running load, the bridge's status pill and the user menu, which
+//! alone sets the theme (FerroUI family rule 5). The navigation groups
+//! Overview, Mappings, Bridge and Console, folds to its rail from 48 rem up
+//! and is the drawer below it; the Mapping set carries the honest count of
+//! the running load's errors (R12). The footer names the console, its
+//! version and its maker. No specification governs the console: our own
+//! design.
 
+use std::borrow::Cow;
+
+use ferrobridge_operator_api::operator::EngineState;
+use ferrohealth_ui::i18n::Arg;
 use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::theme::Theme;
-use ferrohealth_ui::tone::Tone;
-use ferrohealth_ui::view::menu::{OperatorMenu, operator_menu};
-use ferrohealth_ui::view::shell::{Footer, drawer_button, mark};
-use ferrohealth_ui::view::status::status;
-use ferrohealth_ui::widget::nav::{Entry, Group};
-use ferrohealth_ui::widget::theme::theme_toggle;
+use ferrohealth_ui::view::shell::{Footer, Shell, TopBar, brand_mark, lockup, topbar};
+use ferrohealth_ui::view::status::{Reach, StatusPill, status_pill};
+use ferrohealth_ui::widget::menu::{ThemeChoice, UserMenu, user_menu};
+use ferrohealth_ui::widget::nav::{Count, Entry, Group, Rail, Sidebar, sidebar};
 use leptos::prelude::*;
-use leptos::server_fn::ServerFn as _;
+use leptos_router::hooks::use_location;
+use openehr_mapping_core::diagnostic::Severity;
 
-use crate::app::{ABOUT, PRODUCT, SIGN_OUT, VERSION};
-use crate::locale::{Msg, tr, tr_with};
-use crate::model::{BridgeView, Outcome, Refusal, ViewError};
-use crate::theme::SetTheme;
+use crate::app::{
+    ABOUT, CONNECTIONS, DASHBOARD, FACADE, HL7V2, MAPPINGS, MARK_DARK, MARK_LIGHT, OMOP,
+    PLAYGROUND, PREFERENCES, PRODUCT, SIGN_OUT, VERSION,
+};
+use crate::locale::messages::Msg;
+use crate::locale::{tr, tr_with};
+use crate::model::{Loaded, Outcome, Refusal, ViewError};
 
 /// The id of the navigation, which the drawer button opens.
-const SIDEBAR_ID: &str = "sidebar";
+pub const SIDEBAR_ID: &str = "sidebar";
 
-/// The id of the operator's menu, which the operator's button opens.
-const MENU_ID: &str = "operator-menu";
+/// The id of the user menu, which the operator's button opens.
+pub const MENU_ID: &str = "user-menu";
+
+/// The id of the top bar's search field.
+pub const SEARCH_ID: &str = "find";
 
 /// What the footer of every page names.
 #[must_use]
 pub fn footer_names() -> Footer {
     Footer {
-        product: PRODUCT.into(),
-        version: VERSION,
-        about: ABOUT,
+        product: Cow::Borrowed(PRODUCT),
+        version: Cow::Borrowed(VERSION),
+        about: Cow::Borrowed(ABOUT),
     }
 }
 
-/// What the top bar of a signed-in page shows.
-#[derive(Debug, Clone, Copy)]
-pub struct Bar {
-    /// The theme in force, which the server wrote on `<html>`.
-    pub theme: Theme,
-    /// The bridge's status, loaded once for the page.
-    pub bridge: Resource<Result<Outcome<BridgeView>, ViewError>>,
+/// The FerroBRIDGE lockup that leads to the dashboard.
+#[must_use]
+pub fn console_lockup() -> AnyView {
+    lockup(
+        DASHBOARD,
+        brand_mark(MARK_LIGHT, MARK_DARK),
+        "FerroBRIDGE",
+        tr(Msg::Console),
+    )
+    .into_any()
 }
 
-/// The navigation, in the order it is drawn.
+/// Returns the signed-in page around `content`: the top bar, the
+/// navigation and the footer, each part reading the bridge as it is drawn.
 #[must_use]
-pub fn navigation() -> [Group; 4] {
-    [
+pub fn shell(content: AnyView) -> AnyView {
+    let path = use_location().pathname.get_untracked();
+    let bar = view! {
+        <Suspense>
+            {move || Suspend::new(async move {
+                let info = crate::load::info().await;
+                let searched = leptos_router::hooks::use_query_map()
+                    .with_untracked(|query| query.get("q"))
+                    .is_some_and(|words| !words.trim().is_empty());
+                let state = if searched { Some(crate::load::state().await) } else { None };
+                top_bar(&info, state.as_ref())
+            })}
+        </Suspense>
+    }
+    .into_any();
+    let nav = view! {
+        <Suspense>
+            {
+                let path = path.clone();
+                move || {
+                    let path = path.clone();
+                    Suspend::new(async move {
+                        let state = crate::load::state().await;
+                        navigation(&path, &state)
+                    })
+                }
+            }
+        </Suspense>
+    }
+    .into_any();
+    ferrohealth_ui::view::shell::shell(Shell {
+        topbar: bar,
+        banner: None,
+        sidebar: nav,
+        content,
+        dock: None,
+        footer: footer_names(),
+    })
+}
+
+/// The top bar, with the bridge's state from `info`.
+fn top_bar(
+    info: &Loaded<ferrobridge_operator_api::health::Info>,
+    state: Option<&Loaded<EngineState>>,
+) -> AnyView {
+    let path = use_location().pathname.get_untracked();
+    let query = leptos_router::hooks::use_query_map()
+        .with_untracked(|query| query.get("q"))
+        .unwrap_or_default();
+    let chosen = crate::prefs::requested().preferences;
+    let operator = crate::session::request::operator().unwrap_or_else(crate::app::unnamed_operator);
+    let menu = user_menu(UserMenu {
+        id: MENU_ID,
+        label: operator.clone(),
+        name: Some(operator.clone()),
+        who: operator,
+        line: tr(Msg::OperatorLine),
+        preferences: String::from(PREFERENCES),
+        theme: ThemeChoice {
+            current: chosen.theme,
+            action: String::from(crate::prefs::PREFERENCE),
+            back: path.clone(),
+        },
+        choices: Vec::new(),
+        shortcuts: None,
+        sign_out: Some(String::from(SIGN_OUT)),
+    });
+    let pill = status_pill(pill(info));
+    let end = view! {
+        {pill}
+        {menu}
+    }
+    .into_any();
+    let running = match state {
+        Some(Ok(Outcome::Shown(state))) => Some(state),
+        _ => None,
+    };
+    let search = crate::pages::search::search_box(&path, &query, running);
+    topbar(TopBar {
+        sidebar: SIDEBAR_ID,
+        lockup: console_lockup(),
+        search: Some(search),
+        end,
+    })
+}
+
+/// The status pill for the bridge's `info`: up with its version, refused,
+/// unreachable, or unknown.
+#[must_use]
+pub fn pill(info: &Loaded<ferrobridge_operator_api::health::Info>) -> StatusPill {
+    match info {
+        Ok(Outcome::Shown(info)) => StatusPill {
+            reach: Reach::Up,
+            words: tr(Msg::BridgeUp),
+            detail: Some(tr_with(
+                Msg::BridgeVersion,
+                &[("version", Arg::from(info.version.as_str()))],
+            )),
+        },
+        Ok(Outcome::Refused(Refusal::NotAuthenticated)) => StatusPill {
+            reach: Reach::Refused,
+            words: tr(Msg::BridgeRefused401),
+            detail: None,
+        },
+        Ok(Outcome::Refused(refusal)) => StatusPill {
+            reach: Reach::Unknown,
+            words: tr(Msg::BridgeUnknown),
+            detail: Some(refusal.text()),
+        },
+        Err(ViewError::Unreachable) => StatusPill {
+            reach: Reach::Unreachable,
+            words: tr(Msg::BridgeUnreachable),
+            detail: None,
+        },
+        Err(fault) => StatusPill {
+            reach: Reach::Unknown,
+            words: tr(Msg::BridgeUnknown),
+            detail: Some(fault.text()),
+        },
+    }
+}
+
+/// The count the Mapping set entry carries for the running load `state`:
+/// its errors, or a dash with the reason no count is known (R12).
+#[must_use]
+pub fn error_count(state: &Loaded<EngineState>) -> Count {
+    match state {
+        Ok(Outcome::Shown(state)) => {
+            let errors = state
+                .diagnostics
+                .iter()
+                .filter(|diagnostic| diagnostic.severity() == Severity::Error)
+                .count();
+            let count = u32::try_from(errors).unwrap_or(u32::MAX);
+            Count::Known {
+                count,
+                words: tr_with(Msg::NavErrors, &[("count", Arg::from(count))]),
+            }
+        }
+        Ok(Outcome::Refused(refusal)) if refusal.not_served() => Count::Unknown {
+            why: tr(Msg::NavUnknownOff),
+        },
+        Ok(Outcome::Refused(_)) | Err(_) => Count::Unknown {
+            why: tr(Msg::NavUnknownDown),
+        },
+    }
+}
+
+/// The navigation, the page at `path` marked, with the running load's count.
+fn navigation(path: &str, state: &Loaded<EngineState>) -> AnyView {
+    let rail = crate::prefs::requested().rail;
+    let entry = |href: &'static str, label: Msg, glyph: Glyph, exact: bool| Entry {
+        href: Cow::Borrowed(href),
+        label: Cow::Owned(tr(label)),
+        glyph,
+        exact,
+        count: None,
+    };
+    let mut set = entry(MAPPINGS, Msg::MappingSet, Glyph::LAYERS, false);
+    set.count = Some(error_count(state));
+    // TODO(#1146): the Bridge group's glyphs follow the design once FerroUI vendors flame, message-square, table-2 and plug (FerroHEALTH/FerroUI#321).
+    let groups = vec![
         Group {
             id: "nav-overview",
-            title: tr(Msg::Overview).into(),
-            entries: vec![Entry {
-                href: "/",
-                label: tr(Msg::Dashboard).into(),
-                glyph: Glyph::LAYOUT_DASHBOARD,
-                exact: true,
-            }],
+            title: Cow::Owned(tr(Msg::Overview)),
+            entries: vec![entry(
+                DASHBOARD,
+                Msg::Dashboard,
+                Glyph::LAYOUT_DASHBOARD,
+                true,
+            )],
         },
         Group {
             id: "nav-mappings",
-            title: tr(Msg::Mappings).into(),
+            title: Cow::Owned(tr(Msg::Mappings)),
             entries: vec![
-                Entry {
-                    href: crate::engine::MAPPINGS,
-                    label: tr(Msg::Overview).into(),
-                    glyph: Glyph::LAYERS,
-                    exact: true,
-                },
-                Entry {
-                    href: crate::engine::FILES,
-                    label: tr(Msg::Files).into(),
-                    glyph: Glyph::FILES,
-                    exact: false,
-                },
-                Entry {
-                    href: crate::editor::EDIT,
-                    label: tr(Msg::NewFile).into(),
-                    glyph: Glyph::FILE_PLUS,
-                    exact: true,
-                },
-            ],
-        },
-        Group {
-            id: "nav-tools",
-            title: tr(Msg::Tools).into(),
-            entries: vec![
-                Entry {
-                    href: crate::tools::PLAYGROUND,
-                    label: tr(Msg::Playground).into(),
-                    glyph: Glyph::FLASK_CONICAL,
-                    exact: true,
-                },
-                Entry {
-                    href: crate::tools::VALIDATE,
-                    label: tr(Msg::ValidationDryRun).into(),
-                    glyph: Glyph::LIST_CHECKS,
-                    exact: true,
-                },
+                set,
+                entry(PLAYGROUND, Msg::Playground, Glyph::FLASK_CONICAL, false),
             ],
         },
         Group {
             id: "nav-bridge",
-            title: tr(Msg::Bridge).into(),
+            title: Cow::Owned(tr(Msg::Bridge)),
             entries: vec![
-                Entry {
-                    href: crate::engine::CAPABILITY,
-                    label: tr(Msg::Capability).into(),
-                    glyph: Glyph::SHIELD_CHECK,
-                    exact: true,
-                },
-                Entry {
-                    href: ABOUT,
-                    label: tr(Msg::About).into(),
-                    glyph: Glyph::INFO,
-                    exact: true,
-                },
+                entry(FACADE, Msg::FhirFacade, Glyph::SHIELD_CHECK, false),
+                entry(HL7V2, Msg::Hl7v2, Glyph::RADIO_TOWER, false),
+                entry(OMOP, Msg::OmopEtl, Glyph::DATABASE, false),
+                entry(CONNECTIONS, Msg::Connections, Glyph::LINK, false),
             ],
         },
-    ]
-}
-/// The mark and the product name, which lead to the dashboard.
-#[must_use]
-pub fn lockup() -> impl IntoView {
-    ferrohealth_ui::view::shell::lockup("/", mark(Glyph::LAYERS), "FerroBRIDGE", tr(Msg::Console))
-}
-
-/// The top bar of a signed-in page: the drawer button, the lockup, and at
-/// the far end the bridge's status, the operator and the theme toggle.
-#[must_use]
-pub fn topbar(operator: String, bar: Bar) -> AnyView {
-    let bridge = bar.bridge;
-    let status = view! {
-        <Suspense fallback=|| {
-            status(Tone::Neutral, Glyph::SERVER, &tr(Msg::Bridge), None)
-        }>{move || Suspend::new(async move { bridge_pill(&bridge.await) })}</Suspense>
-    };
-    let location = leptos_router::hooks::use_location();
-    // NOTE: no specification governs this: our own design; the toggle swaps the
-    // theme in place and the server function keeps it in the session's cookie.
-    let keep = ServerAction::<SetTheme>::new();
-    let chosen = Callback::new(move |theme: Theme| {
-        keep.dispatch(SetTheme {
-            theme: theme.key().to_owned(),
-            back: None,
-        });
-    });
-    let switch = move || theme_toggle(SetTheme::url().to_owned(), location.pathname.get(), chosen);
-    let start = view! {
-        {drawer_button(SIDEBAR_ID)}
-        {lockup()}
-    };
-    let end = view! {
-        <span class="fui-roomy-only">{status}</span>
-        {operator_menu(
-            OperatorMenu {
-                id: MENU_ID,
-                name: operator,
-                subtitle: tr(Msg::SignedConsole).into(),
-                sign_out: Some(String::from(SIGN_OUT)),
-            },
-            (),
-        )}
-        {switch}
-    };
-    ferrohealth_ui::view::shell::topbar(start, end).into_any()
-}
-
-/// Returns the tone and the words of the bridge's status.
-///
-/// They are `UP` with its version once the bridge answered, its status when
-/// it refused, `DOWN` when the console could not reach it, and `UNKNOWN`
-/// for any other fault.
-#[must_use]
-pub fn bridge_status(answer: &Result<Outcome<BridgeView>, ViewError>) -> (Tone, String) {
-    match answer {
-        Ok(Outcome::Shown(view)) => {
-            let words = view.version.as_deref().map_or_else(
-                || tr(Msg::BridgeUp),
-                |version| tr_with(Msg::BridgeUpVersion, &[("version", version.into())]),
-            );
-            (Tone::Ok, words)
-        }
-        Ok(Outcome::Refused(Refusal::Bridge { status, .. })) => (
-            Tone::Bad,
-            tr_with(
-                Msg::BridgeRefusedCode,
-                &[("status", status.to_string().into())],
-            ),
-        ),
-        Ok(Outcome::Refused(Refusal::NotAuthenticated)) => (Tone::Bad, tr(Msg::BridgeRefused401)),
-        Err(ViewError::Unreachable) => (Tone::Bad, tr(Msg::BridgeDown)),
-        Ok(Outcome::Refused(Refusal::Invalid { .. })) | Err(_) => {
-            (Tone::Warn, tr(Msg::BridgeUnknown))
-        }
-    }
-}
-
-/// The bridge's status: an icon and a word, never a colour alone.
-fn bridge_pill(answer: &Result<Outcome<BridgeView>, ViewError>) -> AnyView {
-    let (tone, words) = bridge_status(answer);
-    let glyph = match tone {
-        Tone::Ok => Glyph::CIRCLE_CHECK,
-        Tone::Bad => Glyph::SERVER_CRASH,
-        _ => Glyph::TRIANGLE_ALERT,
-    };
-    status(tone, glyph, &words, None).into_any()
-}
-
-/// The navigation a signed-in operator reads, grouped by what each page is
-/// about.
-#[must_use]
-pub fn sidebar() -> AnyView {
-    ferrohealth_ui::widget::nav::sidebar(SIDEBAR_ID, tr(Msg::Pages), navigation().into())
-}
-
-/// The one line at the foot of every page: the product, its version, its
-/// maker, and the About page.
-#[must_use]
-pub fn footer() -> impl IntoView {
-    ferrohealth_ui::view::shell::footer(footer_names())
+        Group {
+            id: "nav-console",
+            title: Cow::Owned(tr(Msg::ConsoleGroup)),
+            entries: vec![entry(ABOUT, Msg::About, Glyph::INFO, true)],
+        },
+    ];
+    sidebar(Sidebar {
+        id: SIDEBAR_ID,
+        label: tr(Msg::ConsoleNavigation),
+        groups,
+        current: path.to_owned(),
+        rail: Some(Rail {
+            collapsed: rail,
+            action: String::from(crate::prefs::SIDEBAR),
+            back: path.to_owned(),
+        }),
+        nest: None,
+    })
 }

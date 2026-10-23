@@ -70,6 +70,17 @@ js="$pkg/$name.js"
 wasm_br="$(br "$wasm")"
 percent=$((wasm_br * 100 / budget))
 
+# The chunks a split build writes beside the entry: each lazy island's own,
+# loaded only on a page that draws it, reported and never gated.
+chunks_raw=0
+chunks_br=0
+shopt -s nullglob
+for chunk in "$pkg"/split_*.wasm "$pkg"/chunk_*.wasm; do
+  chunks_raw=$((chunks_raw + $(raw "$chunk")))
+  chunks_br=$((chunks_br + $(br "$chunk")))
+done
+shopt -u nullglob
+
 table="$(
   echo "### Operator console bundle"
   echo
@@ -77,6 +88,7 @@ table="$(
   echo "|---|---:|---:|---:|"
   echo "| \`$name.wasm\` | $(raw "$wasm") | $(gz "$wasm") | $wasm_br |"
   echo "| \`$name.js\` | $(raw "$js") | $(gz "$js") | $(br "$js") |"
+  echo "| lazy island chunks | $chunks_raw | | $chunks_br |"
   echo
   echo "Sizes in bytes. Budget: $budget bytes of brotli-compressed WebAssembly; this build is $wasm_br bytes, $percent% of it."
 )"
