@@ -316,6 +316,9 @@ crates on crates.io.
   the flow draws, its line and what it means. The mapping editor and the
   playground's JSON input take keys from the first paint, before the page
   hydrates.
+- The operator console moves to FerroUI 0.3.5 (`ferrohealth-ui = "=0.3.5"`,
+  #1166). The console draws no part 0.3.5 changes, so its pages look and
+  behave as before.
 
 - Both container images name their manufacturer: the
   `org.opencontainers.image.vendor` label and index annotation of

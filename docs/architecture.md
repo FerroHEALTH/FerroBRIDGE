@@ -1213,7 +1213,7 @@ browser hydrates only its islands (the menus, the code editor, the JSON
 input), and every action is a plain form post the server answers with the
 page it draws, so no server function exists. It is a backend-for-frontend,
 shipped as `ghcr.io/ferrohealth/ferrobridge-console`, drawn with FerroUI
-0.3.4.
+0.3.5.
 The server half and the browser half are chosen by compilation target, never
 by Cargo feature, so a workspace `--all-features` build never enables both.
 The operator's OpenID Connect session (authorization code with PKCE) lives on
