@@ -281,11 +281,13 @@ the testkit tool crate. Beside it:
   CI lanes a pull request runs, and `fast.sh` is the default local gate over
   the same set (`docs/ci-cd.md`).
 - `.github/`: issue and pull-request templates, CODEOWNERS, Dependabot, and
-  fourteen workflows (CI, Docs, Scorecard, CodeQL, SonarQube Cloud, Release,
-  Release build, Release image, Release console, Scan and tag images,
+  fifteen workflows (CI, PR guards, Docs, Scorecard, CodeQL, SonarQube Cloud,
+  Release, Release build, Release image, Release console, Scan and tag images,
   Published image scan, Publish crates, Pin freshness, Fuzz). `ci.yml` runs
   its workflow, shell, container and guard tier beside the Rust tier; its
   `conclusion` job is the single required check on `main` (`docs/ci-cd.md`).
+  `pr-guards.yml` re-runs the guard a changed label or description affects
+  in the head commit's CI run.
   `release.yml` is dormant until a `v*` tag is pushed and cuts a release from
   the changelog section, and its `crates` leg publishes the library crates
   through Trusted Publishing. `release-build.yml`, `release-image.yml` and
