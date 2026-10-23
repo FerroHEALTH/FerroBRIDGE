@@ -524,6 +524,16 @@ push to `main` and a merge-group run each verify a commit that must keep its
 own result, while a superseded pull-request run verifies a commit nobody will
 merge.
 
+The pull-request trigger lists `opened`, `synchronize` and `reopened` only, so
+a commit gets one run. An `edited`, `labeled` or `unlabeled` event would start a
+second run on the same commit, the concurrency group would cancel the first,
+and that run's `conclusion` would report a failure on the head commit. The
+guards read the `no-crate-bump` label and the description from the API when
+they run, and `pr-guards.yml` listens for `labeled`, `unlabeled` and `edited`,
+waits for the CI run on the head commit to complete, and re-runs the guard the
+change affects, which re-runs `conclusion` with it
+(<https://docs.github.com/en/rest/actions/workflow-runs#re-run-a-job-from-a-workflow-run>).
+
 ## Owner actions (one-time, not scriptable)
 
 These are repository settings only the owner can change. Issue #19 is the
