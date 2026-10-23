@@ -12,6 +12,8 @@ use http::StatusCode;
 use serde_json::json;
 use wiremock::MockServer;
 
+use ferrohealth_ui::icon::Glyph;
+
 use crate::stub::{CONTEXT, answer, bridge, info, readiness, signed_in};
 use crate::support::{get_with, send};
 
@@ -32,6 +34,41 @@ async fn the_dashboard_draws_its_stats_needs_attention_and_the_flow() -> Result<
     assert!(page.contains("answers 503"), "{page}");
     assert!(page.contains("fui-pipeline"), "the flow: {page}");
     assert!(page.contains("/connections/terminology"), "{page}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_flow_draws_the_designs_glyphs_and_explains_how_it_is_drawn()
+-> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(&service, get_with("/", &cookie)?).await?;
+    for (name, glyph) in [("send", Glyph::SEND), ("book-open", Glyph::BOOK_OPEN)] {
+        let first = glyph
+            .markup()
+            .split("/>")
+            .next()
+            .ok_or("a glyph has a path")?;
+        assert!(page.contains(first), "the flow draws {name}: {page}");
+    }
+    for (name, glyph) in [
+        ("radio-tower", Glyph::RADIO_TOWER),
+        ("book-a", Glyph::BOOK_A),
+    ] {
+        assert!(
+            !page.contains(glyph.markup()),
+            "the stand-in {name} is gone: {page}"
+        );
+    }
+    assert!(page.contains("How it is drawn"), "the rule button: {page}");
+    assert!(
+        page.contains(r#"commandfor="flow-rule""#),
+        "the button opens the rule: {page}"
+    );
+    assert!(page.contains(r#"id="flow-rule""#), "the dialog: {page}");
+    assert!(page.contains("How the flow is drawn"), "{page}");
+    assert!(page.contains("it does not answer"), "{page}");
+    assert!(page.contains("A card opens its page."), "{page}");
     Ok(())
 }
 

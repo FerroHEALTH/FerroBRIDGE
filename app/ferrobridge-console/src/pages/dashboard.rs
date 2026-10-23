@@ -20,7 +20,10 @@ use ferrohealth_ui::table::view::{
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::button::Variant;
-use ferrohealth_ui::view::flow::{Flow, FlowCard, FlowEdge, FlowLane, FlowState, flow};
+use ferrohealth_ui::view::flow::{
+    EdgeRule, Flow, FlowCard, FlowEdge, FlowLane, FlowRule, FlowState, flow, rule_button,
+    rule_dialog,
+};
 use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::status::{badge, pill};
 use ferrohealth_ui::view::surface::{
@@ -437,7 +440,7 @@ fn callers(reading: &Reading) -> FlowLane {
             card(
                 (
                     "senders",
-                    Glyph::RADIO_TOWER,
+                    Glyph::SEND,
                     tr(Msg::FlowSenders),
                     tr(Msg::FlowSendersLine),
                 ),
@@ -529,7 +532,7 @@ fn upstreams(reading: &Reading) -> FlowLane {
             card(
                 (
                     "term",
-                    Glyph::BOOK_A,
+                    Glyph::BOOK_OPEN,
                     tr(Msg::UpstreamTerminology),
                     reading.codes.1.clone(),
                 ),
@@ -597,7 +600,6 @@ fn foot(reading: &Reading) -> String {
 
 /// The flow's panel: the bridge's callers, faces, mapping set and upstreams.
 fn flow_panel(info: &Info, readiness: &Readiness, state: Option<&EngineState>) -> AnyView {
-    // TODO(#1155): the send and book-open glyphs and the How it is drawn dialog, once FerroUI carries them.
     let reading = Reading::of(info, readiness, state);
     let hub = FlowLane {
         title: tr(Msg::FlowMappingSet),
@@ -623,11 +625,39 @@ fn flow_panel(info: &Info, readiness: &Readiness, state: Option<&EngineState>) -
         foot: foot(&reading),
     });
     let action = view! {
+        {rule_button(Cow::Borrowed(FLOW_RULE))}
         <a href=CONNECTIONS class=Variant::Secondary.small()>
             {tr(Msg::Connections)}
             {ferrohealth_ui::icon::icon(Glyph::CHEVRON_RIGHT, "16")}
         </a>
     }
     .into_any();
-    titled_panel(tr(Msg::Flow), action, drawn).into_any()
+    let panel = titled_panel(tr(Msg::Flow), action, drawn);
+    view! {
+        {panel}
+        {flow_rule()}
+    }
+    .into_any()
+}
+
+/// The id of the flow's "How the flow is drawn" dialog.
+const FLOW_RULE: &str = "flow-rule";
+
+/// "How the flow is drawn": each state the flow draws, its line and what it
+/// means on this page.
+fn flow_rule() -> AnyView {
+    let rule = |state, meaning| EdgeRule {
+        state,
+        meaning: tr(meaning),
+    };
+    rule_dialog(FlowRule {
+        id: Cow::Borrowed(FLOW_RULE),
+        rules: vec![
+            rule(FlowState::Up, Msg::FlowRuleUp),
+            rule(FlowState::Unreachable, Msg::FlowRuleUnreachable),
+            rule(FlowState::NotChecked, Msg::FlowRuleNotChecked),
+            rule(FlowState::Off, Msg::FlowRuleOff),
+        ],
+        note: tr(Msg::FlowRuleNote),
+    })
 }

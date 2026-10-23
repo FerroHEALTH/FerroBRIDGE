@@ -308,6 +308,14 @@ crates on crates.io.
   with the number of files it keeps, sent with the find words, so
   `?owner=console&owner=provisioned` names several choices and an address
   with one value keeps working.
+- The operator console moves to FerroUI 0.3.4 (`ferrohealth-ui = "=0.3.4"`,
+  #1155), which carries the two parts the 0.3.3 move still drew stand-ins
+  for. The dashboard's flow draws the design's `send` glyph for the HL7 v2
+  senders and `book-open` for the terminology server, and its head offers
+  How it is drawn, which opens the How the flow is drawn dialog: each state
+  the flow draws, its line and what it means. The mapping editor and the
+  playground's JSON input take keys from the first paint, before the page
+  hydrates.
 
 - Both container images name their manufacturer: the
   `org.opencontainers.image.vendor` label and index annotation of

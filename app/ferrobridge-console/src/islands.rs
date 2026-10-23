@@ -102,16 +102,14 @@ pub fn MappingEditor(
     rows: DiagnosticsWords,
 ) -> impl IntoView {
     let value = RwSignal::new(draft);
-    let ready = RwSignal::new(false);
-    Effect::new(move |_| ready.set(true));
     let caret = RwSignal::new(Position::default());
     let marks = Signal::stored(marks_of(&findings));
     let field = Editor {
-        id: DRAFT,
+        id: DRAFT.into(),
         language: Language::Yaml,
         text: value.into(),
         marks,
-        editable: ready.into(),
+        editable: Signal::stored(true),
     };
     let check = view! {
         <button type="submit" name="decision" value="check" class=Variant::Secondary.small()>
@@ -121,7 +119,7 @@ pub fn MappingEditor(
     .into_any();
     let panel = editor_panel(
         Panel {
-            editor: field,
+            editor: field.clone(),
             label: text.label.clone(),
             lead: text.lead.clone(),
             facts: text.facts.clone(),
@@ -166,15 +164,13 @@ pub fn JsonInput(
     text: String,
 ) -> impl IntoView {
     let value = RwSignal::new(text);
-    let ready = RwSignal::new(false);
-    Effect::new(move |_| ready.set(true));
     let editor = ferrohealth_ui::widget::editor::code_editor(
         Editor {
-            id: INPUT,
+            id: INPUT.into(),
             language: Language::Json,
             text: value.into(),
             marks: Signal::stored(Vec::new()),
-            editable: ready.into(),
+            editable: Signal::stored(true),
         },
         move |typed| value.set(typed),
     );

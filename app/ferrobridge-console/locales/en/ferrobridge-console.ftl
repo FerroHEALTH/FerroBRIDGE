@@ -189,6 +189,11 @@ flow-foot = { $faces ->
         [one] { $total } upstream
        *[other] { $total } upstreams
     } up.
+flow-rule-up = it answers
+flow-rule-unreachable = it does not answer
+flow-rule-not-checked = the upstream is not configured, so no probe reads it
+flow-rule-off = the face is not configured to run
+flow-rule-note = Colour and line both say the state, and only an unreachable edge carries a label. A face shows its lane; an upstream shows the bridge's readiness indicator for it. A card opens its page.
 
 ## The mapping set
 
