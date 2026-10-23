@@ -251,3 +251,22 @@ when `end_session_endpoint` is set, sends the browser to the provider with
 the ID Token hint (OpenID Connect RP-Initiated Logout 1.0). The console
 takes a `POST` only from its own pages, by the browser's `Sec-Fetch-Site`
 header, or by `Origin` when the browser sends no fetch metadata.
+
+## Upgrading from `ferrobridge-viewer`
+
+Up to 0.0.10 the console was named `ferrobridge-viewer`. From 0.0.11 it is
+`ferrobridge-console`, and the old image is no longer built. When you
+upgrade, change each old name to the new one:
+
+| What | Up to 0.0.10 | From 0.0.11 |
+|---|---|---|
+| Image | `ghcr.io/ferrohealth/ferrobridge-viewer` | `ghcr.io/ferrohealth/ferrobridge-console` |
+| Binary | `ferrobridge-viewer` | `ferrobridge-console` |
+| Configuration file variable | `FERROBRIDGE_VIEWER_CONFIG` | `FERROBRIDGE_CONSOLE_CONFIG` |
+| Environment prefix | `FERROBRIDGE_VIEWER__` | `FERROBRIDGE_CONSOLE__` |
+| Compose profile and service | `viewer` | `console` |
+| Compose secret file | `secrets/viewer_oidc_client_secret` | `secrets/console_oidc_client_secret` |
+| Cookies | `ferrobridge_viewer_*` | `ferrobridge_console_*` |
+
+The cookies change with the name, so every operator signs in again after
+the upgrade.
