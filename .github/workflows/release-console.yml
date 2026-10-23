@@ -47,6 +47,11 @@ on:
       digest:
         description: The digest of the pushed image index.
         value: ${{ jobs.image.outputs.digest }}
+      tags:
+        description: >-
+          The newline-separated tag list for that digest, which release.yml's
+          scan-and-tag applies once the scan and the vulnerability record pass.
+        value: ${{ jobs.image.outputs.tags }}
 
 permissions: {}
 
@@ -319,6 +324,7 @@ jobs:
       attestations: write # store them against this repository
     outputs:
       digest: ${{ steps.build.outputs.digest }}
+      tags: ${{ steps.meta.outputs.tags }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -412,11 +418,15 @@ jobs:
           context: .
           file: docker/console/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: true
+          # Pushed by DIGEST only: the tags computed above are applied by
+          # release.yml's scan-and-tag once the image scan and the
+          # vulnerability record pass, so a refused image is never
+          # referencable by tag. The attestations bind the digest, so they
+          # hold for every tag later pointed at it.
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           no-cache: true
           provenance: false
           sbom: false
-          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
 
@@ -507,7 +517,7 @@ jobs:
         run: |
           set -euo pipefail
           signer="${GITHUB_REPOSITORY}/.github/workflows/release-console.yml"
-          gh attestation verify "oci://${IMAGE}:${VERSION}" --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer"
+          # By digest: the version tag exists only after scan-and-tag.
           gh attestation verify "oci://${IMAGE}@${DIGEST}" --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer"
           for manifest in "$AMD64" "$ARM64"; do
             gh attestation verify "oci://${IMAGE}@${manifest}" --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer"
@@ -515,7 +525,7 @@ jobs:
               --predicate-type https://spdx.dev/Document/v2.3
           done
           {
-            echo "image ${IMAGE}:${VERSION}"
+            echo "image ${IMAGE}:${VERSION} (tagged after the scan)"
             echo "index ${DIGEST}"
             echo "amd64 ${AMD64}"
             echo "arm64 ${ARM64}"

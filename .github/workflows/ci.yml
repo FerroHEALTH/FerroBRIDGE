@@ -1001,6 +1001,16 @@ jobs:
       # Reads the same RustSec advisory database as cargo-audit and adds
       # yanked, licences, bans and sources, so there is no separate audit job.
       - run: cargo deny check
+      # The OpenVEX side of the same exceptions (security/vex/README.md): the
+      # generated document is exactly what deny.toml and the prose produce, no
+      # exception outlives its finding, and every statement's dependency path
+      # is the one cargo resolves. yq and jq come with the hosted runner.
+      - run: bash scripts/checks/vex-advisories.sh
+      - run: bash scripts/checks/advisory-exceptions.sh
+      - run: bash scripts/checks/vex-reachability.sh
+      # The release record's join of Trivy findings and VEX statements, over
+      # synthetic input.
+      - run: bash scripts/checks/vex-coverage.sh --self-test
 
   # The reached packages in the clippy lane's shards.
   msrv:

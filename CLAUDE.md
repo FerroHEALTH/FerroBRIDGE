@@ -281,9 +281,9 @@ the testkit tool crate. Beside it:
   CI lanes a pull request runs, and `fast.sh` is the default local gate over
   the same set (`docs/ci-cd.md`).
 - `.github/`: issue and pull-request templates, CODEOWNERS, Dependabot, and
-  twelve workflows (CI, Docs, Scorecard, CodeQL, SonarQube Cloud, Release,
-  Release build, Release image, Release console, Publish crates, Pin
-  freshness, Fuzz). `ci.yml` runs
+  fourteen workflows (CI, Docs, Scorecard, CodeQL, SonarQube Cloud, Release,
+  Release build, Release image, Release console, Scan and tag images,
+  Published image scan, Publish crates, Pin freshness, Fuzz). `ci.yml` runs
   its workflow, shell, container and guard tier beside the Rust tier; its
   `conclusion` job is the single required check on `main` (`docs/ci-cd.md`).
   `release.yml` is dormant until a `v*` tag is pushed and cuts a release from
@@ -293,8 +293,16 @@ the testkit tool crate. Beside it:
   what puts the signing identity out of reach of caller-defined steps (SLSA
   Build Level 3); they produce the attested tarballs, the SBOMs per target,
   and the multi-platform GHCR images of the bridge and of the operator
-  console (`docs/release.md`). `pin-freshness.yml` reads every pin no Dependabot
-  ecosystem covers against its newest upstream release each week.
+  console, pushed by digest. Its `vulnerability-record` job scans both
+  images and the server tarballs at every severity and refuses the release
+  while a finding lacks an OpenVEX judgement under `security/vex/`
+  (`scripts/checks/vex-coverage.sh`); `scan-and-tag.yml` then gates each
+  digest on fixable HIGH and CRITICAL findings before it applies the tags,
+  and `image-scan.yml` scans the published images weekly with the VEX
+  applied. `security/vex/rust-advisories.openvex.json` is generated from
+  `deny.toml` and checked in the `cargo-deny` job. `pin-freshness.yml` reads
+  every pin no Dependabot ecosystem covers against its newest upstream
+  release each week.
 - Root markdown: this file, `README.md`, and the community and governance set.
 
 When the workspace lands, each crate carries its own `CLAUDE.md` with

@@ -181,6 +181,9 @@ classify() {
     scripts/checks/pin-freshness.sh | scripts/checks/versions.sh) echo inert ;;
     scripts/checks/changelog-released.sh | scripts/checks/changelog-structure.sh) echo inert ;;
     scripts/checks/changelog-security.sh | scripts/lib/guard-args.sh) echo inert ;;
+    scripts/checks/vex-advisories.sh | scripts/checks/vex-reachability.sh) echo inert ;;
+    scripts/checks/vex-coverage.sh | scripts/checks/advisory-exceptions.sh) echo inert ;;
+    scripts/security/* | security/* | trivy.yaml | .trivyignore.yaml) echo inert ;;
     scripts/checks/todo-issues.sh | scripts/checks/usage-report-off.sh) echo inert ;;
     scripts/deploy-probe.sh) echo inert ;;
     # The pass lists, the badges and the README badge block are read by the

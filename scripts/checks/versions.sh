@@ -479,6 +479,27 @@ else
   note "no release-build.yml or release-image.yml yet, skipped"
 fi
 
+echo "== trivy (.github/workflows/{release,scan-and-tag,image-scan}.yml <-> docs/VERSIONS.md)"
+trivy_want="$(pin_of trivy docs/VERSIONS.md)"
+trivy_seen=0
+for wf in .github/workflows/release.yml .github/workflows/scan-and-tag.yml .github/workflows/image-scan.yml; do
+  [ -f "$wf" ] || continue
+  found="$(sed -nE 's|^[[:space:]]*TRIVY_VERSION:[[:space:]]*"([^"]+)".*|\1|p' "$wf" | sort -u)"
+  if [ -z "$found" ]; then
+    bad "$wf pins no TRIVY_VERSION"
+  elif [ "$(printf '%s\n' "$found" | wc -l | tr -d '[:space:]')" != "1" ]; then
+    bad "trivy: $wf pins more than one version ($(printf '%s' "$found" | tr '\n' ' '))"
+  elif [ -z "$trivy_want" ]; then
+    bad "docs/VERSIONS.md has no 'trivy' row"
+  elif [ "$found" != "$trivy_want" ]; then
+    bad "trivy: $wf pins $found, docs/VERSIONS.md pins $trivy_want"
+  else
+    trivy_seen=$((trivy_seen + 1))
+    note "OK: trivy $found ($wf)"
+  fi
+done
+[ "$trivy_seen" -gt 0 ] || note "no workflow installs trivy yet, skipped"
+
 echo "== operator console build tools (ci.yml, Cargo.toml, scripts/release/console-*.sh <-> docs/VERSIONS.md)"
 if [ -f app/ferrobridge-console/Cargo.toml ]; then
   # The value of the first `NAME="..."` assignment in FILE.

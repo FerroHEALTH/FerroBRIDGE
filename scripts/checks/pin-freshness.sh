@@ -37,6 +37,7 @@ zizmor	zizmorcore/zizmor
 actionlint	rhysd/actionlint
 shellcheck	koalaman/shellcheck
 hadolint	hadolint/hadolint
+trivy	aquasecurity/trivy
 mdBook	rust-lang/mdBook
 mdbook-toc	badboy/mdbook-toc
 mdbook-mermaid	badboy/mdbook-mermaid
