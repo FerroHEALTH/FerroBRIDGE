@@ -424,7 +424,7 @@ messages! {
     #[doc = "The rejected notice."] SignInRejected = "sign-in-rejected",
     #[doc = "The refused notice."] SignInRefused = "sign-in-refused",
     #[doc = "The full notice."] SignInFull = "sign-in-full",
-    #[doc = "A sign-in route without [oidc]."] SignInNotConfigured = "sign-in-not-configured",
+    #[doc = "A sign-in route without `[oidc]`."] SignInNotConfigured = "sign-in-not-configured",
     #[doc = "A sign-out that failed."] SessionNotEnded = "session-not-ended",
     #[doc = "A sign-out redirect that failed."] SignOutRedirectUnwritten = "sign-out-redirect-unwritten",
     #[doc = "A sign-in redirect that failed."] SignInRedirectUnwritten = "sign-in-redirect-unwritten",

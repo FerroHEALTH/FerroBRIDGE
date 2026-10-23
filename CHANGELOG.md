@@ -729,6 +729,10 @@ crates on crates.io.
 
 ### Security
 
+- `ctutils` moves from 0.4.2 to 0.4.5 (RUSTSEC-2026-0385): before 0.4.4
+  its constant-time mask generation could compile to a branch on a secret
+  value. It reaches the build through `digest` 0.11.
+
 - The TLS stack the bridge calls the CDR, the terminology server and the
   sending sites through no longer trusts the distrusted emSign
   intermediates: `rustls-webpki` 0.103.16 rejects their public keys
