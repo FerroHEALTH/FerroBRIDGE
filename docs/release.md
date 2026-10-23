@@ -46,7 +46,8 @@ flowchart LR
   checks the tag against every file that declares the product version,
   checks the changelog's structure and the Security rules of the section
   being cut, and extracts the `## [X.Y.Z]` section of `CHANGELOG.md` as the
-  release notes with the support period appended. A missing or empty section
+  release notes with the support period and the link to the CRA user
+  information appended. A missing or empty section
   fails the release, so a cut can never ship with notes generated from the
   commit range standing in for the changelog. It also emits the target
   matrix, which the build jobs and the asset check both read, so the two
@@ -363,7 +364,7 @@ The checks, in the order the plan job runs them:
 | The changelog has only Keep a Changelog types, each once per section | `scripts/checks/changelog-structure.sh` |
 | The section being cut opens its `### Security` with the reason when it mixes security and functional changes, and every Security entry names a GHSA id or a `security/vex/` path | `scripts/checks/changelog-security.sh --section X.Y.Z` |
 | The previous release resolves from the pushed tags | `plan.sh prev-tag` |
-| The changelog section becomes the notes, with the support period | `plan.sh notes` |
+| The changelog section becomes the notes, with the support period and the CRA user information link | `plan.sh notes` |
 
 The previous release is resolved from `git ls-remote --tags origin 'v*'`, by
 version order. A tag that was pushed but whose release never published still
@@ -371,6 +372,12 @@ counts, and ancestry plays no part (`bash scripts/release/plan.sh prev-tag
 vX.Y.Z` prints it). The support period is the month and year five years
 after the date on the release heading (CRA Art 13(8) and (19)), computed in
 bash so the preflight gives the same month on macOS as the plan job on Linux.
+The notes end with a link to the book's
+[CRA information for users](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)
+page, the Annex II information CRA Art 13(18) has accompany each release. The
+book is published from `main`, so every release links the same address, and
+`plan.sh notes` refuses when `website/book/src/SUMMARY.md` does not list the
+page.
 
 You need `gh` logged in, because the milestone check reads the tracker. A
 missing tool refuses its check; it is never skipped.

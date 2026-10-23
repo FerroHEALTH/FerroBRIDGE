@@ -40,6 +40,7 @@ published advisories,
 | Artifact | Supported version | Where fixes ship |
 | --- | --- | --- |
 | The `ferrobridge` binary (release tarballs) | the newest published release | the newest release |
+| The `ferrobridge-console` binary (release tarballs) and its site bundle (`ferrobridge-console-vX.Y.Z-site.tar.gz`) | the newest published release | the newest release |
 | The bridge and operator console container images | the newest published release | the newest release |
 | The library crates on crates.io | the newest published release | the newest release |
 
@@ -50,8 +51,9 @@ published advisories,
 **Do not open a public issue for a security vulnerability.**
 
 This route covers the products this repository publishes: the `ferrobridge`
-server binary, the `ferrobridge` and `ferrobridge-console` container images,
-and the library crates on crates.io. Report privately, through either route:
+server binary, the `ferrobridge-console` binary and its site bundle, the
+`ferrobridge` and `ferrobridge-console` container images, and the library
+crates on crates.io. Report privately, through either route:
 
 - [GitHub private vulnerability reporting](https://github.com/FerroHEALTH/FerroBRIDGE/security/advisories/new)
   ("Report a vulnerability" on the repository's **Security** tab), which
