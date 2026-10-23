@@ -12,6 +12,7 @@
 
 use ferrobridge_operator_api::operator::{EngineState, Listed, Owner, Program};
 use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::i18n::Phrase;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
@@ -21,6 +22,7 @@ use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::code::{Code, CodeHead, Digest, code_viewer};
 use ferrohealth_ui::view::diagnostics::{FileFindings, diagnostics};
 use ferrohealth_ui::view::notice::{Announce, notice};
+use ferrohealth_ui::view::state::Mark;
 use ferrohealth_ui::view::surface::{
     Crumb, Header, definitions, facts_row, page_heading, panel_sections, panel_sections_card,
     source_split,
@@ -38,7 +40,7 @@ use crate::locale::{tr, tr_with};
 use crate::model::{Loaded, Outcome};
 use crate::pages::parts::{
     diagnostics_state, edit_href, faulted, file_href, findings, language_name, line_diagnostics,
-    quiet, refused_operator, section, short, tally, wire_path,
+    quiet, refused_operator, section, short, tally, wire_path, with_markup,
 };
 
 /// The id prefix of the code viewer's lines, which a diagnostic links to.
@@ -147,13 +149,14 @@ fn drawn(
         .find(|program| program.file.as_deref() == Some(path));
     let text = String::from_utf8(file.bytes.clone()).ok();
     let badge = if text.is_none() {
-        crate::pages::parts::state(Tone::Bad, &tr(Msg::StateNotUtf8), None)
+        ferrohealth_ui::view::state::state(Mark::Bad, tr(Msg::StateNotUtf8), None)
     } else {
         diagnostics_state(errors, warnings, Msg::StateCompiles)
     };
     let header = Header {
         title: short(path).to_owned().into(),
-        subtitle: Some(subtitle(kind, program, owner, path).into()),
+        subtitle: None,
+        subtitle_view: Some(subtitle(kind, program, owner, path)),
         crumbs: vec![Crumb::new(tr(Msg::MappingSet), FILES)],
         mono: false,
         badge: Some(badge),
@@ -237,28 +240,46 @@ fn context_tabs(path: &str, program_tab: bool, body: AnyView) -> AnyView {
     )
 }
 
-/// The subtitle of a file of `kind`: what it is, and who owns it.
-// TODO(#1146): bold the resource and link the template once the header takes markup.
-fn subtitle(kind: Kind, program: Option<&Program>, owner: Owner, path: &str) -> String {
+/// The subtitle of a file of `kind`: what it is, and who owns it, a
+/// context's resource type in bold and its template a code link.
+fn subtitle(kind: Kind, program: Option<&Program>, owner: Owner, path: &str) -> AnyView {
     let by = tr(match owner {
         Owner::Console => Msg::SavedByConsole,
         Owner::Provisioned => Msg::Provisioned,
     });
-    match (kind, program) {
-        (Kind::Context, Some(program)) => tr_with(
-            Msg::ContextSubtitle,
-            &[
-                ("resource", program.resource_type.clone().into()),
-                ("template", program.template.clone().into()),
-                ("owned", by.clone().into()),
-            ],
-        ),
-        (Kind::Model, _) => tr_with(Msg::ModelSubtitle, &[("owned", by.clone().into())]),
-        _ if path.starts_with("omocl/") => {
-            tr_with(Msg::OmoclSubtitle, &[("owned", by.clone().into())])
+    let text = match (kind, program) {
+        (Kind::Context, Some(program)) => {
+            let text = tr_with(
+                Msg::ContextSubtitle,
+                &[
+                    ("resource", Phrase::open("resource")),
+                    ("template", Phrase::open("template")),
+                    ("owned", by.into()),
+                ],
+            );
+            let resource = program.resource_type.clone();
+            let template = program.template.clone();
+            return with_markup(
+                &text,
+                vec![
+                    ("resource", view! { <strong>{resource}</strong> }.into_any()),
+                    (
+                        "template",
+                        view! {
+                            <a href=format!("{TEMPLATES}/{template}")>
+                                <code>{template.clone()}</code>
+                            </a>
+                        }
+                        .into_any(),
+                    ),
+                ],
+            );
         }
-        _ => tr_with(Msg::FileSubtitle, &[("owned", by.clone().into())]),
-    }
+        (Kind::Model, _) => tr_with(Msg::ModelSubtitle, &[("owned", by.into())]),
+        _ if path.starts_with("omocl/") => tr_with(Msg::OmoclSubtitle, &[("owned", by.into())]),
+        _ => tr_with(Msg::FileSubtitle, &[("owned", by.into())]),
+    };
+    view! { {text} }.into_any()
 }
 
 /// The diagnostics section beside the source: the findings of the file,

@@ -21,6 +21,7 @@ use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::flow::{Flow, FlowCard, FlowEdge, FlowLane, FlowState, flow};
+use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::status::{badge, pill};
 use ferrohealth_ui::view::surface::{
     Header, Stat, page_heading, stack, stat_card_marked, stat_grid, titled_panel,
@@ -32,7 +33,7 @@ use crate::load::Ready;
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::model::{Loaded, Outcome};
-use crate::pages::parts::{faulted, operator_off, state, tally};
+use crate::pages::parts::{faulted, operator_off, tally};
 
 /// The names of the upstreams the readiness report checks, in the order
 /// the flow draws them.
@@ -204,7 +205,7 @@ fn upstreams_card(readiness: &Readiness) -> AnyView {
     };
     stat_card_marked(
         Stat {
-            glyph: Glyph::LINK,
+            glyph: Glyph::PLUG,
             value: tr_with(
                 Msg::StatUpstreamsValue,
                 &[("up", up.into()), ("total", checked.len().into())],
@@ -270,7 +271,7 @@ fn attention(_info: &Info, readiness: &Readiness) -> Option<AnyView> {
                 <tr>
                     {title_cell(Some(&indicator_href(name)), indicator_name(name), None)}
                     {cell(kind, kind_word)}
-                    {cell(word, state(Tone::Bad, &tr(Msg::StateUnreachable), None))}
+                    {cell(word, state(Mark::Bad, tr(Msg::StateUnreachable), None))}
                     {cell(why, detail)}
                 </tr>
             }
@@ -463,7 +464,7 @@ fn faces(reading: &Reading) -> FlowLane {
             card(
                 (
                     "facade",
-                    Glyph::SHIELD_CHECK,
+                    Glyph::FLAME,
                     tr(Msg::FhirFacade),
                     reading.facade.1.clone(),
                 ),
@@ -483,7 +484,12 @@ fn faces(reading: &Reading) -> FlowLane {
                 &OPS_PATH,
             ),
             card(
-                ("hl7", Glyph::ROUTE, tr(Msg::Hl7v2), reading.hl7.1.clone()),
+                (
+                    "hl7",
+                    Glyph::MESSAGE_SQUARE,
+                    tr(Msg::Hl7v2),
+                    reading.hl7.1.clone(),
+                ),
                 reading.hl7.0,
                 String::from(HL7V2),
                 &HL7_PATH,
@@ -491,7 +497,7 @@ fn faces(reading: &Reading) -> FlowLane {
             card(
                 (
                     "etl",
-                    Glyph::DATABASE,
+                    Glyph::TABLE_2,
                     tr(Msg::OmopEtl),
                     reading.etl.1.clone(),
                 ),
@@ -534,7 +540,7 @@ fn upstreams(reading: &Reading) -> FlowLane {
             card(
                 (
                     "cdm",
-                    Glyph::DATABASE,
+                    Glyph::TABLE_2,
                     tr(Msg::UpstreamCdm),
                     reading.rows.1.clone(),
                 ),
@@ -591,6 +597,7 @@ fn foot(reading: &Reading) -> String {
 
 /// The flow's panel: the bridge's callers, faces, mapping set and upstreams.
 fn flow_panel(info: &Info, readiness: &Readiness, state: Option<&EngineState>) -> AnyView {
+    // TODO(#1155): the send and book-open glyphs and the How it is drawn dialog, once FerroUI carries them.
     let reading = Reading::of(info, readiness, state);
     let hub = FlowLane {
         title: tr(Msg::FlowMappingSet),

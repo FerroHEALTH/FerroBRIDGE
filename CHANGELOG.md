@@ -296,6 +296,19 @@ crates on crates.io.
 
 ### Changed
 
+- The operator console moves to FerroUI 0.3.3 (`ferrohealth-ui = "=0.3.3"`,
+  #1154) with the library's `split` feature on, since its site builds with
+  `cargo leptos build --split`. The parts the 0.3.2 rewrite drew stand-ins
+  for are now drawn as designed (#1146): the Bridge group of the navigation
+  and the dashboard's flow and Upstreams card take the design's `flame`,
+  `message-square`, `table-2` and `plug` glyphs; every state a table cell,
+  a fact or a title shows is the F12 state mark; a context file's subtitle
+  bolds its resource type and links its template. The Files tab's Language
+  and Owner filters are the library's filter menu: a checkbox per choice
+  with the number of files it keeps, sent with the find words, so
+  `?owner=console&owner=provisioned` names several choices and an address
+  with one value keeps working.
+
 - Both container images name their manufacturer: the
   `org.opencontainers.image.vendor` label and index annotation of
   `ghcr.io/ferrohealth/ferrobridge` and `ghcr.io/ferrohealth/ferrobridge-console`

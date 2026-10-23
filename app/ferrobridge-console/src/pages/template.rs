@@ -127,6 +127,7 @@ fn drawn(id: &str, state: &Loaded<EngineState>, listing: &Loaded<Vec<Listed>>) -
         header: Header {
             title: id.to_owned().into(),
             subtitle: Some(subtitle.into()),
+            subtitle_view: None,
             crumbs: vec![Crumb::new(
                 tr(Msg::MappingSet),
                 format!("{}/templates", crate::app::MAPPINGS),

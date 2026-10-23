@@ -10,6 +10,7 @@
 use ferrobridge_operator_api::health::Info;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::{Header, definitions, facts_row, panel_sections_card};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
@@ -21,7 +22,7 @@ use crate::locale::messages::Msg;
 use crate::locale::tr;
 use crate::model::{Loaded, Outcome};
 use crate::pages::facade::indicator;
-use crate::pages::parts::{faulted, quiet, refused, section, state};
+use crate::pages::parts::{faulted, quiet, refused, section};
 
 /// The HL7 v2 face.
 #[must_use]
@@ -59,10 +60,11 @@ fn drawn(info: &Loaded<Info>, readiness: &Loaded<Ready>) -> AnyView {
             })
             .into(),
         ),
+        subtitle_view: None,
         crumbs: Vec::new(),
         mono: false,
         badge: Some(if on {
-            state(Tone::Ok, &tr(Msg::StateOn), None)
+            state(Mark::Ok, tr(Msg::StateOn), None)
         } else {
             badge(Tone::Neutral, tr(Msg::StateOff)).into_any()
         }),

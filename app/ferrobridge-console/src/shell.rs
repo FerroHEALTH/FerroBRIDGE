@@ -229,7 +229,6 @@ fn navigation(path: &str, state: &Loaded<EngineState>) -> AnyView {
     };
     let mut set = entry(MAPPINGS, Msg::MappingSet, Glyph::LAYERS, false);
     set.count = Some(error_count(state));
-    // TODO(#1146): the Bridge group's glyphs follow the design once FerroUI vendors flame, message-square, table-2 and plug (FerroHEALTH/FerroUI#321).
     let groups = vec![
         Group {
             id: "nav-overview",
@@ -253,10 +252,10 @@ fn navigation(path: &str, state: &Loaded<EngineState>) -> AnyView {
             id: "nav-bridge",
             title: Cow::Owned(tr(Msg::Bridge)),
             entries: vec![
-                entry(FACADE, Msg::FhirFacade, Glyph::SHIELD_CHECK, false),
-                entry(HL7V2, Msg::Hl7v2, Glyph::RADIO_TOWER, false),
-                entry(OMOP, Msg::OmopEtl, Glyph::DATABASE, false),
-                entry(CONNECTIONS, Msg::Connections, Glyph::LINK, false),
+                entry(FACADE, Msg::FhirFacade, Glyph::FLAME, false),
+                entry(HL7V2, Msg::Hl7v2, Glyph::MESSAGE_SQUARE, false),
+                entry(OMOP, Msg::OmopEtl, Glyph::TABLE_2, false),
+                entry(CONNECTIONS, Msg::Connections, Glyph::PLUG, false),
             ],
         },
         Group {
