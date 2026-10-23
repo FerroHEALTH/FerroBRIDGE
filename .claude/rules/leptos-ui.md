@@ -353,7 +353,9 @@ changes here and nowhere else.
   page loads only when it draws that island.
 - **The budget is 448 KiB.** The move to FerroUI 0.3.4 (#1155, 2026-10-23,
   cargo-leptos 0.3.11, wasm-bindgen 0.2.129, Rust 1.99.1) measured 322256
-  bytes for the entry, 70% of it. The move to FerroUI 0.3.3 with its `split`
+  bytes for the entry, 70% of it, with 294857 more in the lazy chunks
+  (#1162): 221301 in the five `split_*` files of the islands' own code and
+  73556 in the thirteen `chunk_*` files they share. The move to FerroUI 0.3.3 with its `split`
   feature (#1154, 2026-10-23, the same tools) measured 319953 bytes for the
   entry, 69% of it, with 294802 more in the lazy chunks. The move to FerroUI
   0.3.2 in islands mode
