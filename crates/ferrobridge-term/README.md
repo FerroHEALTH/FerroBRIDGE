@@ -30,9 +30,10 @@ Five operations on one configured server:
 `code_system_count` asks `GET [base]/CodeSystem?url=<system>&_summary=count`,
 so a caller can tell an unserved code system from an unknown code.
 
-`validate` takes the three input forms `$validate-code` declares: a code with
-its system, `systemVersion` and `display`, a `Coding`, or a `CodeableConcept`,
-with an optional `valueSetVersion` (R4 and R4B). `validate_all` answers several validations
+`validate` takes the input forms `$validate-code` declares: a code with its
+system, `systemVersion` and `display`, a code with the `context` that implies
+its system (`Coded::InContext`, R4 and R4B), a `Coding`, or a
+`CodeableConcept`, with an optional `valueSetVersion` (R4 and R4B). `validate_all` answers several validations
 by position, one call for one and one `batch` for several.
 
 `batch` sends several of them as one `batch` `Bundle` and answers them by
@@ -67,6 +68,9 @@ and `out` parameters for the five operations. STU3 (3.0.2) differs:
 - `$validate-code` names the code system version `version` where R4 names it
   `systemVersion`, and the client sends it under that name. STU3 has no
   `valueSetVersion`.
+- `$validate-code` requires a system for a code, where R4 and R4B accept a
+  `context` in its place, so an STU3 client refuses `Coded::InContext` with
+  `Error::SystemRequired` before anything is sent.
 - `$expand` has no `valueSetVersion` either.
 - `$translate` has no `url`, so STU3 cannot name the concept map to use.
 - `$lookup` types `property.value` as `code`, so every property value of an
@@ -86,12 +90,21 @@ base path, so the base URL and the wire version are configured together.
 
 ## An absent server
 
-`Client::new` is the only way to get a client, so a deployment that configures
-no terminology server holds `Option<Client>` and the absence is visible at
-every call site. Keep it that way: a `None` is a refusal to translate, not a
+`Client::new` and `Client::with_http` are the only ways to get a client, so a
+deployment that configures no terminology server holds `Option<Client>` and
+the absence is visible at every call site. Keep it that way: a `None` is a refusal to translate, not a
 reason to pass a source code through under a target system.
 
 The `Client::translate` documentation carries the worked example.
+
+## Mutual TLS and private trust roots
+
+`Client::with_http` takes an HTTP client you build, so a server that asks for
+a client certificate, or whose certificate chains to a private root, is
+reached with the `reqwest::Identity` and `reqwest::Certificate` you give that
+client. The configured timeout still bounds each request, and the
+credentials, the retry budget and the typed errors apply as for
+`Client::new`.
 
 ## Status
 

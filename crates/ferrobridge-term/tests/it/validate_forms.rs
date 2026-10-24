@@ -269,3 +269,106 @@ async fn a_failed_batch_is_a_typed_error_carrying_the_upstream_status()
     }
     Ok(())
 }
+
+/// The context a bare code is validated in: a profile and its bound element.
+const CONTEXT: &str =
+    "http://example.org/fhir/StructureDefinition/synthetic-profile#Observation.status";
+
+#[tokio::test]
+async fn a_code_in_context_goes_with_its_context_and_no_system() -> Result<(), Box<dyn StdError>> {
+    for version in RELEASES {
+        let server = MockServer::start().await;
+        mount_operation(
+            &server,
+            version,
+            terminology::validate_code(true, None, None),
+        )
+        .await;
+        let outcome = client(&server, version)?
+            .validate(&validation(Coded::InContext {
+                context: CONTEXT.to_owned(),
+                code: fixtures::TERM_MEMBER_CODE.to_owned(),
+                display: Some(fixtures::TERM_MEMBER_DISPLAY.to_owned()),
+            }))
+            .await?;
+        assert!(outcome.is_valid());
+
+        let body = request_body(&server, 0).await?;
+        assert_eq!(
+            Some(("valueUri".to_owned(), json!(CONTEXT))),
+            parameter(&body, "context")
+        );
+        assert_eq!(
+            Some(("valueCode".to_owned(), json!(fixtures::TERM_MEMBER_CODE))),
+            parameter(&body, "code")
+        );
+        assert_eq!(
+            Some((
+                "valueString".to_owned(),
+                json!(fixtures::TERM_MEMBER_DISPLAY)
+            )),
+            parameter(&body, "display")
+        );
+        assert_eq!(
+            None,
+            parameter(&body, "system"),
+            "R4 $validate-code: a context stands in for the system"
+        );
+        assert_eq!(
+            Some(("valueUri".to_owned(), json!(fixtures::TERM_VALUE_SET_URL))),
+            parameter(&body, "url")
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_code_in_context_goes_in_a_batch() -> Result<(), Box<dyn StdError>> {
+    let server = MockServer::start().await;
+    let entry = json!({
+        "resource": {
+            "resourceType": "Parameters",
+            "parameter": [{"name": "result", "valueBoolean": true}]
+        },
+        "response": {"status": "200 OK"}
+    });
+    mount_base(
+        &server,
+        WireVersion::R4,
+        ResponseTemplate::new(200).set_body_raw(
+            json!({
+                "resourceType": "Bundle",
+                "type": "batch-response",
+                "entry": [entry.clone(), entry]
+            })
+            .to_string(),
+            "application/fhir+json",
+        ),
+    )
+    .await;
+    let answers = client(&server, WireVersion::R4)?
+        .validate_all(&[
+            validation(Coded::InContext {
+                context: CONTEXT.to_owned(),
+                code: fixtures::TERM_MEMBER_CODE.to_owned(),
+                display: None,
+            }),
+            validation(Coded::Coding(member())),
+        ])
+        .await?;
+    assert_eq!(2, answers.len());
+    for answer in answers {
+        assert!(
+            matches!(answer, Ok(ValidateOutcome::Valid { .. })),
+            "{answer:?}"
+        );
+    }
+    let body = request_body(&server, 0).await?;
+    let first = body.pointer("/entry/0/resource").ok_or("no first entry")?;
+    assert_eq!(
+        Some(("valueUri".to_owned(), json!(CONTEXT))),
+        parameter(first, "context")
+    );
+    assert_eq!(None, parameter(first, "system"));
+    Ok(())
+}

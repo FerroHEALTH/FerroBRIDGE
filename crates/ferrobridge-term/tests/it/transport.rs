@@ -260,3 +260,81 @@ async fn a_reachability_probe_that_never_connects_is_a_transport_error()
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn a_caller_built_client_carries_every_request() -> Result<(), Box<dyn StdError>> {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(route()))
+        .respond_with(terminology::lookup(
+            "FerroBridgeSyntheticSource",
+            fixtures::TERM_MEMBER_DISPLAY,
+            None,
+        ))
+        .mount(&server)
+        .await;
+    let mut headers = http::HeaderMap::new();
+    headers.insert(
+        "x-synthetic-transport",
+        http::HeaderValue::from_static("caller"),
+    );
+    let http = reqwest::Client::builder()
+        .default_headers(headers)
+        .build()?;
+    let client = Client::with_http(
+        config(&server, WireVersion::R4)?.with_credentials(Credentials::Basic {
+            user: String::from("bridge"),
+            password: SecretString::from("s3cr3t-password"),
+        }),
+        http,
+    )?;
+    lookup(&client).await?;
+    assert_eq!(
+        vec!["caller".to_owned()],
+        crate::support::request_header(&server, 0, "x-synthetic-transport").await?,
+        "the request went through the caller's client"
+    );
+    assert_eq!(
+        vec!["Basic YnJpZGdlOnMzY3IzdC1wYXNzd29yZA==".to_owned()],
+        crate::support::request_header(&server, 0, "authorization").await?,
+        "the configured credentials still travel"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_caller_built_client_is_bounded_by_the_configured_timeout()
+-> Result<(), Box<dyn StdError>> {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(route()))
+        .respond_with(
+            terminology::lookup("FerroBridgeSyntheticSource", "Alpha finding", None)
+                .set_delay(Duration::from_secs(2)),
+        )
+        .mount(&server)
+        .await;
+    let client = Client::with_http(
+        config(&server, WireVersion::R4)?
+            .with_timeout(Duration::from_millis(50))
+            .with_retry(RetryPolicy {
+                max_attempts: 1,
+                initial_backoff: Duration::from_millis(1),
+                max_backoff: Duration::from_millis(1),
+            }),
+        reqwest::Client::new(),
+    )?;
+    let error = lookup(&client).await.expect_err("the server was too slow");
+    assert_eq!("timeout", error.kind());
+    Ok(())
+}
+
+#[test]
+fn a_caller_built_client_refuses_a_base_that_cannot_carry_a_path() -> Result<(), Box<dyn StdError>>
+{
+    let config = Config::new("mailto:tx@example.org".parse()?, WireVersion::R4);
+    let error = Client::with_http(config, reqwest::Client::new())
+        .expect_err("a mailto URL carries no path");
+    assert_eq!("base-url", error.kind());
+    Ok(())
+}
