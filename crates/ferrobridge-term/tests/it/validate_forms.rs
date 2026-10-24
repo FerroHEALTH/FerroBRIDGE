@@ -15,7 +15,6 @@ use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use http::StatusCode;
 use serde_json::json;
-use std::error::Error as StdError;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -61,7 +60,8 @@ fn validation(coded: Coded) -> Validation {
 }
 
 #[tokio::test]
-async fn a_coding_goes_as_the_coding_parameter_in_both_releases() -> Result<(), Box<dyn StdError>> {
+async fn a_coding_goes_as_the_coding_parameter_in_both_releases()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount_operation(
@@ -94,7 +94,8 @@ async fn a_coding_goes_as_the_coding_parameter_in_both_releases() -> Result<(), 
 }
 
 #[tokio::test]
-async fn a_codeable_concept_goes_with_every_coding_and_its_text() -> Result<(), Box<dyn StdError>> {
+async fn a_codeable_concept_goes_with_every_coding_and_its_text()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount_operation(
@@ -134,7 +135,7 @@ async fn a_codeable_concept_goes_with_every_coding_and_its_text() -> Result<(), 
 
 #[tokio::test]
 async fn a_code_carries_its_system_version_display_and_the_value_set_version()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount_operation(
         &server,
@@ -171,7 +172,7 @@ async fn a_code_carries_its_system_version_display_and_the_value_set_version()
 }
 
 #[tokio::test]
-async fn one_validation_goes_as_one_call() -> Result<(), Box<dyn StdError>> {
+async fn one_validation_goes_as_one_call() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount_operation(
         &server,
@@ -190,8 +191,8 @@ async fn one_validation_goes_as_one_call() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn several_validations_go_as_one_batch_answered_by_position() -> Result<(), Box<dyn StdError>>
-{
+async fn several_validations_go_as_one_batch_answered_by_position()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount_base(
@@ -242,7 +243,7 @@ async fn several_validations_go_as_one_batch_answered_by_position() -> Result<()
 
 #[tokio::test]
 async fn a_failed_batch_is_a_typed_error_carrying_the_upstream_status()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount_base(
@@ -275,7 +276,8 @@ const CONTEXT: &str =
     "http://example.org/fhir/StructureDefinition/synthetic-profile#Observation.status";
 
 #[tokio::test]
-async fn a_code_in_context_goes_with_its_context_and_no_system() -> Result<(), Box<dyn StdError>> {
+async fn a_code_in_context_goes_with_its_context_and_no_system()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount_operation(
@@ -323,7 +325,7 @@ async fn a_code_in_context_goes_with_its_context_and_no_system() -> Result<(), B
 }
 
 #[tokio::test]
-async fn a_code_in_context_goes_in_a_batch() -> Result<(), Box<dyn StdError>> {
+async fn a_code_in_context_goes_in_a_batch() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let entry = json!({
         "resource": {

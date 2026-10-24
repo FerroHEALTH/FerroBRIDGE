@@ -6,7 +6,7 @@
 //! refuses identified parties in clinical content answers through the plain
 //! `422` row with its own words.
 
-use std::error::Error as StdError;
+use std::error::Error;
 
 use http::StatusCode;
 use wiremock::Mock;
@@ -34,7 +34,7 @@ const DETAIL: &str = "/content[0]/provider/identifiers is not allowed";
 
 #[tokio::test]
 async fn a_cdr_refusing_an_identified_party_answers_through_the_422_row_unchanged()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness_over(FIXTURES, settings()).await;
     mount_ehr(&harness.cdr).await;
     Mock::given(matchers::method("POST"))

@@ -4,8 +4,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use fhir_types::codec;
 use fhir_types::codec::Value;
-use fhir_types::codec::{DecodeErrorKind, Json, Path as ElementPath, expect_object};
+use fhir_types::codec::{DecodeErrorKind, Json, expect_object};
 
 use fhir_codegen::package::without_byte_order_mark;
 
@@ -46,7 +47,7 @@ fn round_trip<T: Json>(path: &Path, root: &str) -> Result<(), String> {
     let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
     let original: Value =
         serde_json::from_str(without_byte_order_mark(&text)).map_err(|e| e.to_string())?;
-    let mut element_path = ElementPath::root(root);
+    let mut element_path = codec::Path::root(root);
     let object = expect_object(&original, &element_path).map_err(|e| e.to_string())?;
     let decoded =
         T::from_json(object, &mut element_path).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -96,7 +97,7 @@ pub(crate) fn decode_file<T: Json>(package: &str, file: &Path) -> Result<Option<
     let text = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
     let value: Value = serde_json::from_str(without_byte_order_mark(&text))
         .map_err(|e| format!("{}: not JSON: {e}", file.display()))?;
-    let mut path = ElementPath::root("Resource");
+    let mut path = codec::Path::root("Resource");
     let object = expect_object(&value, &path).map_err(|e| format!("{}: {e}", file.display()))?;
     match T::from_json(object, &mut path) {
         Ok(decoded) => Ok(Some(decoded)),
@@ -229,7 +230,7 @@ const PATIENT: &str = r#"{"resourceType":"Patient","name":[{"family":"Synthetic"
 /// Decodes `text` and asserts the encoding is the document it came from.
 fn round_trip_text<T: Json>(text: &str, root: &str) -> T {
     let original: Value = serde_json::from_str(text).expect("the fixture is JSON");
-    let mut path = ElementPath::root(root);
+    let mut path = codec::Path::root(root);
     let object = expect_object(&original, &path).expect("the fixture is an object");
     let decoded = T::from_json(object, &mut path).expect("the fixture decodes");
     let encoded = Value::Object(decoded.to_json().expect("the value encodes"));
@@ -275,11 +276,9 @@ fn a_clinical_resource_round_trips_in_every_version() {
     round_trip_text::<fhir_types::stu3::patient::Patient>(PATIENT, "Patient");
 }
 
-fn decode_coding(
-    text: &str,
-) -> Result<fhir_types::r4b::coding::Coding, fhir_types::codec::DecodeError> {
+fn decode_coding(text: &str) -> Result<fhir_types::r4b::coding::Coding, codec::DecodeError> {
     let value: Value = serde_json::from_str(text).expect("json");
-    let mut path = ElementPath::root("Coding");
+    let mut path = codec::Path::root("Coding");
     let object = expect_object(&value, &path).expect("object");
     fhir_types::r4b::coding::Coding::from_json(object, &mut path)
 }
@@ -308,7 +307,7 @@ fn primitive_extensions_and_choice_types_round_trip() {
     // (https://hl7.org/fhir/R4B/json.html#primitive).
     let text = r#"{"resourceType":"Parameters","parameter":[{"name":"x","valueString":"hello","_valueString":{"id":"v1","extension":[{"url":"http://example.org/e","valueBoolean":true}]}},{"name":"y","valueDecimal":2.50},{"name":"z","valueCoding":{"system":"http://s","code":"c"}}]}"#;
     let original: Value = serde_json::from_str(text).expect("json");
-    let mut path = ElementPath::root("Parameters");
+    let mut path = codec::Path::root("Parameters");
     let object = expect_object(&original, &path).expect("object");
     let decoded =
         fhir_types::r4b::parameters::Parameters::from_json(object, &mut path).expect("decodes");
@@ -322,7 +321,7 @@ fn primitive_extensions_and_choice_types_round_trip() {
     );
     let duplicate = r#"{"resourceType":"Parameters","parameter":[{"name":"x","valueString":"a","valueCode":"b"}]}"#;
     let value: Value = serde_json::from_str(duplicate).expect("json");
-    let mut path = ElementPath::root("Parameters");
+    let mut path = codec::Path::root("Parameters");
     let err = fhir_types::r4b::parameters::Parameters::from_json(
         expect_object(&value, &path).expect("object"),
         &mut path,

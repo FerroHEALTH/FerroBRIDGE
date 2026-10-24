@@ -6,7 +6,7 @@
 //! No specification governs the operator surface: our own design.
 
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::io::Write as _;
 
 use ferrobridge_operator_api::configuration::{Configuration, SecretState, Source, Value};
@@ -59,7 +59,7 @@ fn environment() -> BTreeMap<String, String> {
 
 /// Resolves the case's configuration and returns the running configuration
 /// the operator API answers, with the password file kept alive.
-fn running() -> Result<(Configuration, tempfile::NamedTempFile), Box<dyn StdError>> {
+fn running() -> Result<(Configuration, tempfile::NamedTempFile), Box<dyn Error>> {
     let mut password = tempfile::NamedTempFile::new()?;
     writeln!(password, "SYNTHETIC-TERMINOLOGY-PASSWORD")?;
     let settings =
@@ -74,7 +74,7 @@ fn running() -> Result<(Configuration, tempfile::NamedTempFile), Box<dyn StdErro
 fn entry<'c>(
     configuration: &'c Configuration,
     key: &str,
-) -> Result<(&'c Value, Source), Box<dyn StdError>> {
+) -> Result<(&'c Value, Source), Box<dyn Error>> {
     let entry = configuration
         .entry(key)
         .ok_or_else(|| format!("no entry for {key}"))?;
@@ -83,7 +83,7 @@ fn entry<'c>(
 
 #[test]
 fn each_key_carries_its_value_and_whether_the_file_the_environment_or_the_default_set_it()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let (configuration, _password) = running()?;
     assert_eq!(
         (
@@ -117,7 +117,7 @@ fn each_key_carries_its_value_and_whether_the_file_the_environment_or_the_defaul
 }
 
 #[test]
-fn a_secret_is_its_state_and_its_file_never_its_value() -> Result<(), Box<dyn StdError>> {
+fn a_secret_is_its_state_and_its_file_never_its_value() -> Result<(), Box<dyn Error>> {
     let (configuration, password) = running()?;
     assert_eq!(
         (&Value::Secret(SecretState::Set), Source::File),
@@ -168,7 +168,7 @@ fn a_secret_is_its_state_and_its_file_never_its_value() -> Result<(), Box<dyn St
 }
 
 #[test]
-fn no_secret_reaches_the_answer_or_the_log() -> Result<(), Box<dyn StdError>> {
+fn no_secret_reaches_the_answer_or_the_log() -> Result<(), Box<dyn Error>> {
     let logs = support::Logs::default();
     let capture = subscriber(Rendering::Json, "trace", false, logs.clone());
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -183,7 +183,7 @@ fn no_secret_reaches_the_answer_or_the_log() -> Result<(), Box<dyn StdError>> {
             let body = bytes(response).await?;
             let answered: Configuration = serde_json::from_slice(&body)?;
             assert_eq!(configuration, answered);
-            Ok::<_, Box<dyn StdError>>(String::from_utf8(body)?)
+            Ok::<_, Box<dyn Error>>(String::from_utf8(body)?)
         })
     })?;
     let logged = logs.text();
@@ -205,8 +205,7 @@ fn no_secret_reaches_the_answer_or_the_log() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn an_operator_api_with_no_running_configuration_answers_404() -> Result<(), Box<dyn StdError>>
-{
+async fn an_operator_api_with_no_running_configuration_answers_404() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let response = case.get("/operator/configuration", Some(OPERATOR)).await?;
     assert_eq!(StatusCode::NOT_FOUND, response.status());
@@ -215,7 +214,7 @@ async fn an_operator_api_with_no_running_configuration_answers_404() -> Result<(
 
 #[test]
 fn an_unset_operator_scope_is_answered_as_the_scope_the_bridge_runs_on()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let text = concat!(
         "[auth]\nenabled = true\nissuer = \"https://as.example.org/realms/ferro\"\n",
         "audience = [\"https://bridge.example.org/fhir\"]\n\n",

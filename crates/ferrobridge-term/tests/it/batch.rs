@@ -13,7 +13,6 @@ use ferrobridge_term::outcome::{
 };
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
-use std::error::Error as StdError;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -89,7 +88,8 @@ fn answers() -> ResponseTemplate {
 }
 
 #[tokio::test]
-async fn the_entries_map_back_by_position_in_both_releases() -> Result<(), Box<dyn StdError>> {
+async fn the_entries_map_back_by_position_in_both_releases()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(&server, version, answers()).await;
@@ -120,7 +120,7 @@ async fn the_entries_map_back_by_position_in_both_releases() -> Result<(), Box<d
 }
 
 #[tokio::test]
-async fn the_bundle_carries_one_post_entry_per_request() -> Result<(), Box<dyn StdError>> {
+async fn the_bundle_carries_one_post_entry_per_request() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(&server, WireVersion::R4, answers()).await;
     client(&server, WireVersion::R4)?.batch(&requests()).await?;
@@ -172,7 +172,7 @@ async fn the_bundle_carries_one_post_entry_per_request() -> Result<(), Box<dyn S
 }
 
 #[tokio::test]
-async fn a_failed_entry_is_that_entrys_typed_error() -> Result<(), Box<dyn StdError>> {
+async fn a_failed_entry_is_that_entrys_typed_error() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -243,7 +243,7 @@ async fn a_failed_entry_is_that_entrys_typed_error() -> Result<(), Box<dyn StdEr
 }
 
 #[tokio::test]
-async fn a_short_answer_is_an_arity_error() -> Result<(), Box<dyn StdError>> {
+async fn a_short_answer_is_an_arity_error() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -273,8 +273,8 @@ async fn a_short_answer_is_an_arity_error() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_bundle_that_is_not_a_batch_response_is_a_decode_error() -> Result<(), Box<dyn StdError>>
-{
+async fn a_bundle_that_is_not_a_batch_response_is_a_decode_error()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -294,7 +294,7 @@ async fn a_bundle_that_is_not_a_batch_response_is_a_decode_error() -> Result<(),
 
 #[tokio::test]
 async fn an_expansion_and_a_subsumption_map_back_by_position_in_both_releases()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(

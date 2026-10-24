@@ -9,7 +9,7 @@ use ferrobridge_server::facade::identity::store::Store;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use wiremock::Mock;
@@ -43,7 +43,7 @@ use super::transaction_of;
 
 #[tokio::test]
 async fn a_contribution_answer_naming_no_versions_for_the_entries_is_a_typed_failure()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     Mock::given(matchers::method("POST"))
@@ -72,13 +72,13 @@ async fn a_contribution_answer_naming_no_versions_for_the_entries_is_a_typed_fai
 
 /// Returns the container the identity map bound the entry `location` names
 /// to.
-fn bound_container(harness: &Harness, location: Option<&str>) -> Result<String, Box<dyn StdError>> {
+fn bound_container(harness: &Harness, location: Option<&str>) -> Result<String, Box<dyn Error>> {
     Ok(bound(harness, location)?.1.versioned_object_uid)
 }
 
 #[tokio::test]
 async fn a_reversed_version_list_still_binds_each_entry_to_its_own_composition()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // ITS-REST 1.1.0 states no order for `CONTRIBUTION.versions`, so each
     // version is matched to its entry by the FEEDER_AUDIT read back.
     let harness = harness().await;
@@ -112,8 +112,7 @@ async fn a_reversed_version_list_still_binds_each_entry_to_its_own_composition()
 }
 
 #[tokio::test]
-async fn a_committed_version_that_matches_no_entry_binds_nothing() -> Result<(), Box<dyn StdError>>
-{
+async fn a_committed_version_that_matches_no_entry_binds_nothing() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_echo(&harness.cdr, ECHOED, Echo::Foreign).await;
@@ -147,7 +146,7 @@ async fn a_committed_version_that_matches_no_entry_binds_nothing() -> Result<(),
 
 /// Returns the consumed-source key of the synthetic Condition.
 fn condition_source()
--> Result<ferrobridge_server::facade::identity::record::SourceVersion, Box<dyn StdError>> {
+-> Result<ferrobridge_server::facade::identity::record::SourceVersion, Box<dyn Error>> {
     Ok(
         ferrobridge_server::facade::identity::record::SourceVersion::new(
             "Condition",
@@ -161,7 +160,7 @@ fn condition_source()
 
 #[tokio::test]
 async fn a_commit_answered_without_its_versions_binds_from_the_contribution_read_back()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // An empty `201` names the contribution in its `ETag`
     // (`ehr-codegen.openapi.yaml`, `201_CONTRIBUTION`), and `contribution_get`
     // answers the CONTRIBUTION whose `versions` the entries bind from.
@@ -194,7 +193,7 @@ async fn a_commit_answered_without_its_versions_binds_from_the_contribution_read
 
 #[tokio::test]
 async fn a_contribution_that_cannot_be_read_back_is_a_typed_failure_and_its_retry_commits_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     Mock::given(matchers::method("GET"))
@@ -256,7 +255,7 @@ fn bound(
         String,
         ferrobridge_server::facade::identity::record::CompositionBinding,
     ),
-    Box<dyn StdError>,
+    Box<dyn Error>,
 > {
     let location = location.ok_or("the entry answers a location")?;
     let id = location
@@ -273,7 +272,7 @@ fn bound(
 
 #[tokio::test]
 async fn a_retry_binds_the_identity_the_cdr_stored_as_a_first_delivery_does()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The stub CDR stores an entry uid the sender never sent, so the stored
     // composition differs from a fresh build in an identity input; both the
     // first delivery and the retry after a failed read-back bind the stored one.
@@ -319,7 +318,7 @@ async fn a_retry_binds_the_identity_the_cdr_stored_as_a_first_delivery_does()
 
 #[tokio::test]
 async fn a_single_create_of_a_committed_unbound_entry_binds_from_the_read_back_and_commits_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     Mock::given(matchers::method("GET"))
@@ -380,7 +379,7 @@ async fn a_single_create_of_a_committed_unbound_entry_binds_from_the_read_back_a
 }
 
 /// Returns how many version containers the echo CDR committed into.
-fn containers_of(committed: &Arc<std::sync::Mutex<Committed>>) -> Result<usize, Box<dyn StdError>> {
+fn containers_of(committed: &Arc<std::sync::Mutex<Committed>>) -> Result<usize, Box<dyn Error>> {
     let held = committed
         .lock()
         .map_err(|_poisoned| "the echo CDR's record is poisoned")?;
@@ -389,7 +388,7 @@ fn containers_of(committed: &Arc<std::sync::Mutex<Committed>>) -> Result<usize, 
 
 #[tokio::test]
 async fn a_transaction_entry_at_a_new_version_id_of_a_known_resource_commits_one_modification()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // A CONTRIBUTION version that follows another names it as its
     // `preceding_version_uid` (`ehr-codegen.openapi.yaml`, `UpdateVersion`),
     // and its audit states a modification (openEHR terminology code 251).
@@ -474,7 +473,7 @@ async fn a_transaction_entry_at_a_new_version_id_of_a_known_resource_commits_one
 
 #[tokio::test]
 async fn a_revising_transaction_entry_whose_binding_failed_binds_on_retry_and_commits_once()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     let committed = mount_echo_tracked(&harness.cdr, ECHOED, Echo::Minimal, Duration::ZERO).await;

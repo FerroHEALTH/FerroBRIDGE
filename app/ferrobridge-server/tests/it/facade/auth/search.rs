@@ -5,7 +5,7 @@
 //! token's search reaches only its patient's EHR
 //! (<https://hl7.org/fhir/smart-app-launch/scopes-and-launch-context.html>).
 
-use std::error::Error as StdError;
+use std::error::Error;
 
 use ferrobridge_server::cdr::ids::EhrId;
 use ferrobridge_server::facade::identity::PersonId;
@@ -34,7 +34,7 @@ async fn search_as(
     scope: &str,
     patient: Option<&str>,
     path: &str,
-) -> Result<(StatusCode, serde_json::Value, Vec<serde_json::Value>), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value, Vec<serde_json::Value>), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = crate::facade::search_harness(Limits::default()).await;
@@ -73,7 +73,7 @@ async fn search_as(
 }
 
 #[tokio::test]
-async fn a_token_without_the_search_permission_is_forbidden() -> Result<(), Box<dyn StdError>> {
+async fn a_token_without_the_search_permission_is_forbidden() -> Result<(), Box<dyn Error>> {
     let (status, _, queries) = search_as("system/Condition.r", None, "/fhir/Condition").await?;
     assert_eq!(StatusCode::FORBIDDEN, status);
     assert!(queries.is_empty(), "a forbidden search reached the CDR");
@@ -81,7 +81,7 @@ async fn a_token_without_the_search_permission_is_forbidden() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn a_system_search_token_reaches_every_ehr() -> Result<(), Box<dyn StdError>> {
+async fn a_system_search_token_reaches_every_ehr() -> Result<(), Box<dyn Error>> {
     let (status, body, queries) = search_as("system/Condition.rs", None, "/fhir/Condition").await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     let query = queries.first().ok_or("the search reached the CDR")?;
@@ -96,7 +96,7 @@ async fn a_system_search_token_reaches_every_ehr() -> Result<(), Box<dyn StdErro
 }
 
 #[tokio::test]
-async fn a_patient_token_searches_its_own_patients_ehr_only() -> Result<(), Box<dyn StdError>> {
+async fn a_patient_token_searches_its_own_patients_ehr_only() -> Result<(), Box<dyn Error>> {
     let (status, body, queries) =
         search_as("patient/Condition.rs", Some("p-1"), "/fhir/Condition").await?;
     assert_eq!(StatusCode::OK, status, "{body}");

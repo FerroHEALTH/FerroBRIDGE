@@ -6,7 +6,7 @@
 
 use axum::body::Body;
 use http::{Request, StatusCode, header};
-use std::error::Error as StdError;
+use std::error::Error;
 
 use super::FHIR_JSON;
 use super::OPENEHR_JSON;
@@ -21,7 +21,7 @@ use super::mapping_tree;
 const TEMPLATE: &str = "ferrobridge.diagnose.v1";
 
 #[tokio::test]
-async fn toopenehr_answers_a_parameters_with_the_composition() -> Result<(), Box<dyn StdError>> {
+async fn toopenehr_answers_a_parameters_with_the_composition() -> Result<(), Box<dyn Error>> {
     let root = mapping_tree()?;
     let (status, media, body) = call(
         app(&root)?,
@@ -45,7 +45,7 @@ async fn toopenehr_answers_a_parameters_with_the_composition() -> Result<(), Box
 }
 
 #[tokio::test]
-async fn tofhir_answers_a_bundle_with_a_provenance() -> Result<(), Box<dyn StdError>> {
+async fn tofhir_answers_a_bundle_with_a_provenance() -> Result<(), Box<dyn Error>> {
     let root = mapping_tree()?;
     let built = composition(app(&root)?).await?;
     let request = serde_json::json!({
@@ -83,7 +83,7 @@ async fn tofhir_answers_a_bundle_with_a_provenance() -> Result<(), Box<dyn StdEr
 }
 
 #[tokio::test]
-async fn the_direct_form_reads_an_openehr_json_body() -> Result<(), Box<dyn StdError>> {
+async fn the_direct_form_reads_an_openehr_json_body() -> Result<(), Box<dyn Error>> {
     // "POST [base]/tofhir, Content-Type: application/openehr+json" is the
     // chapter's direct payload invocation, which it keeps outside the FHIR
     // implementation guide.
@@ -104,7 +104,7 @@ async fn the_direct_form_reads_an_openehr_json_body() -> Result<(), Box<dyn StdE
 }
 
 #[tokio::test]
-async fn the_direct_form_answers_the_composition_itself() -> Result<(), Box<dyn StdError>> {
+async fn the_direct_form_answers_the_composition_itself() -> Result<(), Box<dyn Error>> {
     let root = mapping_tree()?;
     let (status, media, body) = call(
         app(&root)?,
@@ -121,7 +121,7 @@ async fn the_direct_form_answers_the_composition_itself() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
-async fn the_direct_form_answers_the_requested_format() -> Result<(), Box<dyn StdError>> {
+async fn the_direct_form_answers_the_requested_format() -> Result<(), Box<dyn Error>> {
     let root = mapping_tree()?;
     let (status, media, body) = call(
         app(&root)?,
@@ -147,7 +147,7 @@ async fn the_direct_form_answers_the_requested_format() -> Result<(), Box<dyn St
 }
 
 #[tokio::test]
-async fn the_body_takes_precedence_over_the_query() -> Result<(), Box<dyn StdError>> {
+async fn the_body_takes_precedence_over_the_query() -> Result<(), Box<dyn Error>> {
     // "Where the same field is supplied both in the body and as a query
     // parameter, the body takes precedence" (rest-api.adoc, section
     // Query parameters).
@@ -176,7 +176,7 @@ async fn the_body_takes_precedence_over_the_query() -> Result<(), Box<dyn StdErr
 }
 
 #[tokio::test]
-async fn the_query_pins_the_template_when_the_body_does_not() -> Result<(), Box<dyn StdError>> {
+async fn the_query_pins_the_template_when_the_body_does_not() -> Result<(), Box<dyn Error>> {
     let root = mapping_tree()?;
     let built = composition(app(&root)?).await?;
     let flat = call(
@@ -212,7 +212,7 @@ async fn the_query_pins_the_template_when_the_body_does_not() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn the_enveloped_toopenehr_reads_a_parameters_body() -> Result<(), Box<dyn StdError>> {
+async fn the_enveloped_toopenehr_reads_a_parameters_body() -> Result<(), Box<dyn Error>> {
     // ToOpenEhr.fsh declares `bundle` as an `in` parameter while the chapter's
     // prose puts the Bundle in the body directly; both forms are read.
     let root = mapping_tree()?;

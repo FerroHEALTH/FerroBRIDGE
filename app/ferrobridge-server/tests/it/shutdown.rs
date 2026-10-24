@@ -7,7 +7,7 @@ use crate::support;
 use axum::Router;
 use axum::routing::get;
 use ferrobridge_server::{serve_until, with_middleware};
-use std::error::Error as StdError;
+use std::error::Error;
 use std::time::Duration;
 use tokio::net::TcpListener;
 
@@ -29,7 +29,7 @@ fn app() -> Router {
 }
 
 #[tokio::test]
-async fn a_request_in_flight_finishes_after_the_stop_signal() -> Result<(), Box<dyn StdError>> {
+async fn a_request_in_flight_finishes_after_the_stop_signal() -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
@@ -59,7 +59,7 @@ async fn a_request_in_flight_finishes_after_the_stop_signal() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn the_server_returns_once_the_drain_is_done() -> Result<(), Box<dyn StdError>> {
+async fn the_server_returns_once_the_drain_is_done() -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();

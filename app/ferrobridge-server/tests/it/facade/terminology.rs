@@ -7,7 +7,7 @@
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_testkit::stubs::terminology;
 use http::StatusCode;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use wiremock::Mock;
 use wiremock::MockServer;
@@ -33,7 +33,7 @@ const CONCEPT_MAP: &str = "http://example.org/fhir/ConceptMap/ferrobridge-facade
 
 /// Writes the facade fixture tree into a temporary directory, its problem
 /// name translated through [`CONCEPT_MAP`].
-fn translating_fixtures() -> Result<tempfile::TempDir, Box<dyn StdError>> {
+fn translating_fixtures() -> Result<tempfile::TempDir, Box<dyn Error>> {
     let root = tempfile::tempdir()?;
     for name in [
         "ferrobridge_facade.context.yml",
@@ -62,7 +62,7 @@ fn translating_fixtures() -> Result<tempfile::TempDir, Box<dyn StdError>> {
 async fn translating(
     fixtures: &tempfile::TempDir,
     server: &MockServer,
-) -> Result<Harness, Box<dyn StdError>> {
+) -> Result<Harness, Box<dyn Error>> {
     let store = Arc::new(MemoryStore::new());
     let (cdr, facade) = facade_over(
         fixtures.path().to_str().ok_or("a UTF-8 temporary path")?,
@@ -88,7 +88,7 @@ fn first_names(outcome: &serde_json::Value, code: &str, words: &[&str]) -> bool 
 
 #[tokio::test]
 async fn a_terminology_server_failure_refuses_the_write_with_502_and_the_upstream_status()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // An upstream failure is never the caller's fault: the terminology server
     // answering 503 is the facade's UPSTREAM row (R4 http.html, 502 transient).
     let server = MockServer::start().await;
@@ -119,8 +119,7 @@ async fn a_terminology_server_failure_refuses_the_write_with_502_and_the_upstrea
 
 /// Returns a harness whose `$translate` calls reach a terminology server
 /// that answers `503`, with the EHR mounted.
-async fn failing_terminology() -> Result<(Harness, MockServer, tempfile::TempDir), Box<dyn StdError>>
-{
+async fn failing_terminology() -> Result<(Harness, MockServer, tempfile::TempDir), Box<dyn Error>> {
     let server = MockServer::start().await;
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/r4/ConceptMap/$translate"))
@@ -134,7 +133,7 @@ async fn failing_terminology() -> Result<(Harness, MockServer, tempfile::TempDir
 }
 
 #[tokio::test]
-async fn validate_answers_502_when_the_terminology_server_fails() -> Result<(), Box<dyn StdError>> {
+async fn validate_answers_502_when_the_terminology_server_fails() -> Result<(), Box<dyn Error>> {
     // R4 operation-resource-validate.html: the outcome judges the resource,
     // and a failed terminology server says nothing about it.
     let (harness, _server, _fixtures) = failing_terminology().await?;
@@ -154,8 +153,8 @@ async fn validate_answers_502_when_the_terminology_server_fails() -> Result<(), 
 }
 
 #[tokio::test]
-async fn a_transaction_answers_502_when_the_terminology_server_fails()
--> Result<(), Box<dyn StdError>> {
+async fn a_transaction_answers_502_when_the_terminology_server_fails() -> Result<(), Box<dyn Error>>
+{
     let (harness, _server, _fixtures) = failing_terminology().await?;
     let bundle = serde_json::json!({
         "resourceType": "Bundle",
@@ -190,7 +189,7 @@ async fn a_transaction_answers_502_when_the_terminology_server_fails()
 
 #[tokio::test]
 async fn a_refused_translation_refuses_the_write_with_502_and_the_upstream_status()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/r4/ConceptMap/$translate"))
@@ -216,7 +215,7 @@ async fn a_refused_translation_refuses_the_write_with_502_and_the_upstream_statu
 }
 
 #[tokio::test]
-async fn an_untranslated_required_code_stays_the_callers_422() -> Result<(), Box<dyn StdError>> {
+async fn an_untranslated_required_code_stays_the_callers_422() -> Result<(), Box<dyn Error>> {
     // A translation the server answers with no match is an outcome, never an
     // upstream failure, so the refusal stays the mapping's own 422.
     let server = MockServer::start().await;

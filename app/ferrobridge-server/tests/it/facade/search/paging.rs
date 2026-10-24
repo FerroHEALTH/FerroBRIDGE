@@ -6,7 +6,7 @@
 
 use ferrobridge_server::facade::search::Limits;
 use http::StatusCode;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
@@ -34,7 +34,7 @@ fn relative(url: &str) -> &str {
 }
 
 #[tokio::test]
-async fn a_count_above_the_cap_is_answered_with_the_cap() -> Result<(), Box<dyn StdError>> {
+async fn a_count_above_the_cap_is_answered_with_the_cap() -> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.5.3: "Servers SHALL NOT return more resources than
     // requested ... but may return less than the client requested".
     let harness = searching_with(Limits {
@@ -65,7 +65,7 @@ async fn a_count_above_the_cap_is_answered_with_the_cap() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
-async fn a_percent_encoded_count_reads_as_its_decoded_value() -> Result<(), Box<dyn StdError>> {
+async fn a_percent_encoded_count_reads_as_its_decoded_value() -> Result<(), Box<dyn Error>> {
     // Search parameters are application/x-www-form-urlencoded
     // (<https://hl7.org/fhir/R4/http.html#search>), so `%32` is `2`: the
     // request guard and the search read the one decoded value.
@@ -93,7 +93,7 @@ async fn a_percent_encoded_count_reads_as_its_decoded_value() -> Result<(), Box<
 
 #[tokio::test]
 async fn count_zero_answers_the_total_with_no_entries_and_no_next_link()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.5.3: "if _count has the value 0, this shall be
     // treated the same as _summary=count: the server returns a bundle that
     // reports the total number of resources that match in Bundle.total, but
@@ -131,7 +131,7 @@ async fn count_zero_answers_the_total_with_no_entries_and_no_next_link()
 }
 
 #[tokio::test]
-async fn count_zero_for_an_unknown_subject_needs_no_cdr_call() -> Result<(), Box<dyn StdError>> {
+async fn count_zero_for_an_unknown_subject_needs_no_cdr_call() -> Result<(), Box<dyn Error>> {
     let harness = searching().await;
     let (status, body) = get(&harness, "Condition?patient=nobody&_count=0").await?;
     assert_eq!(StatusCode::OK, status, "{body}");
@@ -142,7 +142,7 @@ async fn count_zero_for_an_unknown_subject_needs_no_cdr_call() -> Result<(), Box
 
 #[tokio::test]
 async fn the_next_link_round_trips_across_a_page_boundary_in_a_stable_order()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = searching().await;
     let composition = harness.composition();
     let second = format!("{OTHER_CONTAINER}::ferrobridge.test::1");
@@ -208,7 +208,7 @@ async fn the_next_link_round_trips_across_a_page_boundary_in_a_stable_order()
 }
 
 #[tokio::test]
-async fn total_accurate_counts_the_rows_of_a_paged_search() -> Result<(), Box<dyn StdError>> {
+async fn total_accurate_counts_the_rows_of_a_paged_search() -> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.5.2: _total=accurate asks for the exact number.
     let harness = searching().await;
     let composition = harness.composition();
@@ -250,7 +250,7 @@ async fn total_accurate_counts_the_rows_of_a_paged_search() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn total_estimate_never_reads_a_composition_to_count() -> Result<(), Box<dyn StdError>> {
+async fn total_estimate_never_reads_a_composition_to_count() -> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.5.2: _total=estimate, "a rough estimate of the
     // number of matching resources is sufficient"; a node search answers its
     // row count (#661).
@@ -285,7 +285,7 @@ async fn total_estimate_never_reads_a_composition_to_count() -> Result<(), Box<d
 }
 
 #[tokio::test]
-async fn a_cursor_of_another_search_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn a_cursor_of_another_search_is_refused() -> Result<(), Box<dyn Error>> {
     let harness = searching().await;
     let (status, body) = get(
         &harness,

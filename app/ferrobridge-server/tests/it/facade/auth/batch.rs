@@ -6,7 +6,7 @@
 //! (<https://hl7.org/fhir/R4/http.html#transaction>, §3.1.0.11: each entry is
 //! treated as an individual interaction).
 
-use std::error::Error as StdError;
+use std::error::Error;
 
 use axum::body::Body;
 use http::Request;
@@ -40,7 +40,7 @@ async fn send(
     app: axum::Router,
     bundle: &serde_json::Value,
     token: &str,
-) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     let request = Request::post("/fhir")
         .header(header::CONTENT_TYPE, "application/fhir+json")
         .body(Body::from(bundle.to_string()))?;
@@ -52,7 +52,7 @@ async fn send(
 
 #[tokio::test]
 async fn an_entry_outside_the_token_scope_is_refused_inside_and_the_others_proceed()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -116,8 +116,8 @@ async fn an_entry_outside_the_token_scope_is_refused_inside_and_the_others_proce
 }
 
 #[tokio::test]
-async fn an_entry_outside_the_patient_compartment_is_refused_inside()
--> Result<(), Box<dyn StdError>> {
+async fn an_entry_outside_the_patient_compartment_is_refused_inside() -> Result<(), Box<dyn Error>>
+{
     // SMART App Launch 2.x scopes-and-launch-context: a `patient/` grant
     // reaches the compartment of the patient in the launch context only.
     let key = ec_key("k1", Algorithm::ES256);
@@ -157,7 +157,7 @@ async fn an_entry_outside_the_patient_compartment_is_refused_inside()
 }
 
 #[tokio::test]
-async fn a_batch_without_a_token_is_refused_whole() -> Result<(), Box<dyn StdError>> {
+async fn a_batch_without_a_token_is_refused_whole() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;

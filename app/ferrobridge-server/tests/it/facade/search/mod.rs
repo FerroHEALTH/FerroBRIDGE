@@ -23,7 +23,7 @@ use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::search::Limits;
 use http::Request;
 use http::StatusCode;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::Mock;
 use wiremock::MockServer;
 use wiremock::ResponseTemplate;
@@ -202,7 +202,7 @@ async fn queries(harness: &Harness) -> Vec<serde_json::Value> {
 async fn get(
     harness: &Harness,
     path_and_query: &str,
-) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     call(
         harness.app(),
         Request::get(format!("/fhir/{path_and_query}")).body(Body::empty())?,
