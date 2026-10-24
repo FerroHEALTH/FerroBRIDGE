@@ -11,7 +11,7 @@ use ferrobridge_server::facade::ehr::Policy;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
@@ -46,7 +46,7 @@ const ECHOED_BESIDE_CREATE: &[&str] = &["5f0e2b1a-0000-4000-8000-00000000000d"];
 
 #[tokio::test]
 async fn a_body_media_type_this_server_does_not_read_is_four_hundred_and_fifteen()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let request = Request::post("/fhir/Condition")
         .header(header::CONTENT_TYPE, "application/fhir+xml")
@@ -58,7 +58,7 @@ async fn a_body_media_type_this_server_does_not_read_is_four_hundred_and_fifteen
 }
 
 #[tokio::test]
-async fn a_malformed_count_is_four_hundred_invalid() -> Result<(), Box<dyn StdError>> {
+async fn a_malformed_count_is_four_hundred_invalid() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let (status, body) = call(
         harness.app(),
@@ -75,7 +75,7 @@ async fn a_malformed_count_is_four_hundred_invalid() -> Result<(), Box<dyn StdEr
 }
 
 #[tokio::test]
-async fn an_unknown_property_is_four_hundred_structure() -> Result<(), Box<dyn StdError>> {
+async fn an_unknown_property_is_four_hundred_structure() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let mut resource = condition();
     resource["notAnElement"] = serde_json::json!("x");
@@ -91,7 +91,7 @@ async fn an_unknown_property_is_four_hundred_structure() -> Result<(), Box<dyn S
 
 #[tokio::test]
 async fn a_resource_no_program_claims_is_four_hundred_and_twenty_two()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let mut resource = condition();
     resource["meta"] = serde_json::json!({ "profile": ["http://example.org/other"] });
@@ -110,7 +110,7 @@ async fn a_resource_no_program_claims_is_four_hundred_and_twenty_two()
 
 #[tokio::test]
 async fn a_cdr_validation_refusal_is_four_hundred_and_twenty_two_with_its_errors()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     Mock::given(matchers::method("POST"))
@@ -140,7 +140,7 @@ async fn a_cdr_validation_refusal_is_four_hundred_and_twenty_two_with_its_errors
 
 #[tokio::test]
 async fn a_cdr_five_hundred_is_five_hundred_and_two_carrying_the_upstream_status()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     Mock::given(matchers::method("POST"))
@@ -161,7 +161,7 @@ async fn a_cdr_five_hundred_is_five_hundred_and_two_carrying_the_upstream_status
 
 #[tokio::test]
 async fn a_cdr_four_hundred_and_one_stays_four_hundred_and_one_with_its_challenge()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path("/ehr"))
@@ -188,7 +188,7 @@ async fn a_cdr_four_hundred_and_one_stays_four_hundred_and_one_with_its_challeng
 }
 
 #[tokio::test]
-async fn a_cdr_status_its_rest_does_not_document_is_five_hundred() -> Result<(), Box<dyn StdError>>
+async fn a_cdr_status_its_rest_does_not_document_is_five_hundred() -> Result<(), Box<dyn Error>>
 {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
@@ -207,7 +207,7 @@ async fn a_cdr_status_its_rest_does_not_document_is_five_hundred() -> Result<(),
 }
 
 #[tokio::test]
-async fn the_three_absences_differ_on_the_wire() -> Result<(), Box<dyn StdError>> {
+async fn the_three_absences_differ_on_the_wire() -> Result<(), Box<dyn Error>> {
     // The carry-over case of #115: a disabled surface, a type outside the
     // loaded programs and an id of a loaded type that nothing maps are three
     // answers.
@@ -253,7 +253,7 @@ async fn the_three_absences_differ_on_the_wire() -> Result<(), Box<dyn StdError>
 }
 
 #[tokio::test]
-async fn both_json_media_types_are_read_on_every_write() -> Result<(), Box<dyn StdError>> {
+async fn both_json_media_types_are_read_on_every_write() -> Result<(), Box<dyn Error>> {
     // "The MIME-type for JSON content is `application/fhir+json`" and
     // `application/json` is its alias (<https://hl7.org/fhir/R4/http.html#mime-type>).
     for media in ["application/fhir+json", "application/json"] {
@@ -324,7 +324,7 @@ async fn both_json_media_types_are_read_on_every_write() -> Result<(), Box<dyn S
 
 #[tokio::test]
 async fn any_other_media_type_is_four_hundred_and_fifteen_on_every_write()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     for media in ["application/fhir+xml", "text/plain", "application/xml"] {
         for request in [
@@ -353,7 +353,7 @@ async fn any_other_media_type_is_four_hundred_and_fifteen_on_every_write()
 }
 
 /// Creates the fixture Condition sent as `media` and returns its logical id.
-async fn create_one_as(harness: &Harness, media: &str) -> Result<String, Box<dyn StdError>> {
+async fn create_one_as(harness: &Harness, media: &str) -> Result<String, Box<dyn Error>> {
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, &harness.composition()).await;
     let (status, body) = call(
@@ -371,7 +371,7 @@ async fn create_one_as(harness: &Harness, media: &str) -> Result<String, Box<dyn
 }
 
 #[tokio::test]
-async fn every_answer_carries_the_fhir_media_type() -> Result<(), Box<dyn StdError>> {
+async fn every_answer_carries_the_fhir_media_type() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     for request in [
         Request::get("/fhir/metadata").body(Body::empty())?,
@@ -404,7 +404,7 @@ fn leaky_error_body(message: &str) -> String {
 
 #[tokio::test]
 async fn a_refused_ehr_creation_carries_only_the_documented_error_shape()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness_with(settings_with(Policy::CreateOnFirstWrite)).await;
     mount_no_ehr(&harness.cdr).await;
     Mock::given(matchers::method("POST"))
@@ -432,7 +432,7 @@ async fn a_refused_ehr_creation_carries_only_the_documented_error_shape()
 
 #[tokio::test]
 async fn a_refused_composition_carries_only_the_documented_error_shape()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     Mock::given(matchers::method("POST"))

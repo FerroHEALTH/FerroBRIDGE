@@ -22,7 +22,7 @@ use ferrobridge_testkit::conformance::Corpus;
 use ferrobridge_testkit::conformance::record;
 use ferrobridge_testkit::examples::Package;
 use fhir_types::codec::Json;
-use fhir_types::codec::Path as ElementPath;
+use fhir_types::codec;
 use fhir_types::codec::Value;
 use fhir_types::codec::expect_object;
 use fhir_types::schema::Schemas;
@@ -39,7 +39,7 @@ fn failure<T: Json>(schemas: &Schemas, file: &Path) -> Option<String> {
         Ok(value) => value,
         Err(error) => return Some(format!("not JSON: {error}")),
     };
-    let mut path = ElementPath::root("Resource");
+    let mut path = codec::Path::root("Resource");
     let decoded = match expect_object(&original, &path).and_then(|o| T::from_json(o, &mut path)) {
         Ok(decoded) => decoded,
         Err(error) => return Some(format!("JSON decode: {error}")),

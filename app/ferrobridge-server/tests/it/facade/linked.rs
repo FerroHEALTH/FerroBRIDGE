@@ -6,7 +6,7 @@
 //! into the Condition composition's `LINK.target`
 //! (`types-of-mappings/concept-type/concept-mappings.adoc`, §Linked mappings).
 
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -86,7 +86,7 @@ impl Respond for Committing {
 
 /// Returns a harness over [`FIXTURES`] whose facade fetches references from
 /// `base`, and whose CDR commits as `committing` answers.
-async fn linking(base: &str, committing: Committing) -> Result<Harness, Box<dyn StdError>> {
+async fn linking(base: &str, committing: Committing) -> Result<Harness, Box<dyn Error>> {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(
@@ -175,7 +175,7 @@ fn condition(sender: &MockServer) -> serde_json::Value {
 async fn post(
     harness: &Harness,
     resource: &serde_json::Value,
-) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     call(
         harness.app(),
         Request::post("/fhir/Condition")
@@ -217,7 +217,7 @@ fn link_targets(composition: &serde_json::Value) -> Vec<String> {
 
 #[tokio::test]
 async fn a_linked_resource_is_committed_first_and_its_composition_linked()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // concept-mappings.adoc §Linked mappings: the context the Encounter's
     // profile names "is executed and saved as a separate composition", which
     // "is linked using the openEHR links"; LINK.target is a DV_EHR_URI naming
@@ -253,7 +253,7 @@ async fn a_linked_resource_is_committed_first_and_its_composition_linked()
 
 #[tokio::test]
 async fn a_linked_resource_no_context_maps_commits_one_composition_with_no_link()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // §Linked mappings: only "if a context mapping for this `meta.url` is
     // found" is a composition made; the loss is declared.
     let sender = sender(&["http://example.org/fhir/StructureDefinition/unmapped"]).await;
@@ -278,7 +278,7 @@ async fn a_linked_resource_no_context_maps_commits_one_composition_with_no_link(
 
 #[tokio::test]
 async fn a_linking_commit_the_cdr_refuses_names_the_linked_composition_it_left()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The two commits cannot be one CONTRIBUTION (ITS-REST 1.1.0 gives an
     // UPDATE_VERSION no uid), so a refused second commit reports the first.
     let sender = sender(&[LINKED_PROFILE]).await;
@@ -307,7 +307,7 @@ async fn a_linking_commit_the_cdr_refuses_names_the_linked_composition_it_left()
 
 #[tokio::test]
 async fn a_transaction_entry_that_links_a_resource_is_refused_whole()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 http.html §transaction: all or nothing in one CONTRIBUTION, and the
     // linked composition's id is the CDR's to assign at its commit, so the
     // link cannot be written inside one; the refusal names why.

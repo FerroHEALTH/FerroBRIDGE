@@ -7,7 +7,7 @@
 //! `ehr_create`), when the facade creates EHRs. No specification governs
 //! provisioning an EHR from a FHIR `Patient` create: our own design.
 
-use std::error::Error as StdError;
+use std::error::Error;
 
 use ferrobridge_server::facade::Settings;
 use ferrobridge_server::facade::ehr::Policy;
@@ -36,7 +36,7 @@ const NAMESPACE: &str = "fhir_facade";
 
 /// Returns facade settings with `policy` and a subject link that keys a
 /// patient by its logical id in [`NAMESPACE`].
-fn linked(policy: Policy) -> Result<Settings, Box<dyn StdError>> {
+fn linked(policy: Policy) -> Result<Settings, Box<dyn Error>> {
     Ok(Settings {
         ehr_policy: policy,
         subject: SubjectLink::new(NAMESPACE, IdForm::LogicalId, "PERSON")?,
@@ -84,7 +84,7 @@ async fn ehr_calls(cdr: &MockServer) -> Vec<(String, String, serde_json::Value)>
 }
 
 #[tokio::test]
-async fn a_created_patient_gets_the_ehr_its_party_id_keys() -> Result<(), Box<dyn StdError>> {
+async fn a_created_patient_gets_the_ehr_its_party_id_keys() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)?).await?;
     mount_party_create(&cdr, "person").await;
     mount_no_ehr(&cdr).await;
@@ -123,7 +123,7 @@ async fn a_created_patient_gets_the_ehr_its_party_id_keys() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn an_ehr_the_cdr_holds_for_the_party_is_found_not_created() -> Result<(), Box<dyn StdError>>
+async fn an_ehr_the_cdr_holds_for_the_party_is_found_not_created() -> Result<(), Box<dyn Error>>
 {
     let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)?).await?;
     mount_party_create(&cdr, "person").await;
@@ -152,7 +152,7 @@ async fn an_ehr_the_cdr_holds_for_the_party_is_found_not_created() -> Result<(),
 
 #[tokio::test]
 async fn under_the_existing_policy_a_patient_create_sends_no_ehr_call()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness_with(linked(Policy::Existing)?).await?;
     mount_party_create(&cdr, "person").await;
 
@@ -170,7 +170,7 @@ async fn under_the_existing_policy_a_patient_create_sends_no_ehr_call()
 }
 
 #[tokio::test]
-async fn a_practitioner_create_sends_no_ehr_call() -> Result<(), Box<dyn StdError>> {
+async fn a_practitioner_create_sends_no_ehr_call() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)?).await?;
     mount_party_create(&cdr, "person").await;
     let practitioner = serde_json::json!({
@@ -193,7 +193,7 @@ async fn a_practitioner_create_sends_no_ehr_call() -> Result<(), Box<dyn StdErro
 
 #[tokio::test]
 async fn a_refused_ehr_creation_is_a_refusal_that_names_the_stored_patient()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)?).await?;
     mount_party_create(&cdr, "person").await;
     mount_no_ehr(&cdr).await;

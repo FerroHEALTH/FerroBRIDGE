@@ -5,7 +5,7 @@
 //! bearer tokens: the user's configured scopes decide what it reaches, and a
 //! refused credential is the generic `401`.
 
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 
 use argon2::Argon2;
@@ -33,7 +33,7 @@ use crate::facade::raw;
 const UNKNOWN: &str = "/fhir/Condition/never-written";
 
 /// Returns the Argon2id PHC string of `password` under a fixed salt.
-fn hash(password: &str) -> Result<SecretString, Box<dyn StdError>> {
+fn hash(password: &str) -> Result<SecretString, Box<dyn Error>> {
     Ok(SecretString::from(
         Argon2::default()
             .hash_password_with_salt(password.as_bytes(), b"synthetic-salt-16")
@@ -44,7 +44,7 @@ fn hash(password: &str) -> Result<SecretString, Box<dyn StdError>> {
 
 /// Returns the router of a facade that admits the Basic user `etl` with
 /// `system/Condition.r` beside the issuer's tokens.
-async fn app() -> Result<axum::Router, Box<dyn StdError>> {
+async fn app() -> Result<axum::Router, Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let mut settings = issuer.settings();
@@ -62,7 +62,7 @@ fn basic(
     mut request: http::Request<axum::body::Body>,
     user: &str,
     password: &str,
-) -> Result<http::Request<axum::body::Body>, Box<dyn StdError>> {
+) -> Result<http::Request<axum::body::Body>, Box<dyn Error>> {
     let credential = Credential::new(user, SecretString::from(password))?;
     request
         .headers_mut()
@@ -71,7 +71,7 @@ fn basic(
 }
 
 #[tokio::test]
-async fn a_basic_user_reaches_what_its_scopes_grant() -> Result<(), Box<dyn StdError>> {
+async fn a_basic_user_reaches_what_its_scopes_grant() -> Result<(), Box<dyn Error>> {
     let app = app().await?;
     let read = raw(
         app.clone(),
@@ -89,7 +89,7 @@ async fn a_basic_user_reaches_what_its_scopes_grant() -> Result<(), Box<dyn StdE
 }
 
 #[tokio::test]
-async fn a_wrong_password_or_an_unknown_user_is_the_same_401() -> Result<(), Box<dyn StdError>> {
+async fn a_wrong_password_or_an_unknown_user_is_the_same_401() -> Result<(), Box<dyn Error>> {
     let app = app().await?;
     for (user, password) in [
         ("etl", "another-password"),
@@ -109,7 +109,7 @@ async fn a_wrong_password_or_an_unknown_user_is_the_same_401() -> Result<(), Box
 }
 
 #[tokio::test]
-async fn a_missing_credential_is_challenged_for_both_schemes() -> Result<(), Box<dyn StdError>> {
+async fn a_missing_credential_is_challenged_for_both_schemes() -> Result<(), Box<dyn Error>> {
     let response = raw(app().await?, get(UNKNOWN)).await?;
     assert_eq!(StatusCode::UNAUTHORIZED, response.status());
     // NOTE: RFC 9110 §11.6.1, a 401 may carry one challenge per scheme.

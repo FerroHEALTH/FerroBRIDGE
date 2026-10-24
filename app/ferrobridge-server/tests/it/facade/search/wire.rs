@@ -8,7 +8,7 @@ use axum::body::Body;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
@@ -31,7 +31,7 @@ use super::searching;
 
 #[tokio::test]
 async fn a_search_answers_one_entry_per_composition_in_a_well_formed_searchset()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 bundle.html bdl-7 (unique fullUrl), search.html §3.1.1.5.2 (total
     // counts matches) and §3.1.1.5.4 (entry.search.mode); the carry-over
     // register adds Bundle.id and meta, which the retired connector lacked.
@@ -128,7 +128,7 @@ async fn a_search_answers_one_entry_per_composition_in_a_well_formed_searchset()
 }
 
 #[tokio::test]
-async fn an_unknown_patient_is_an_empty_searchset_and_never_a_404() -> Result<(), Box<dyn StdError>>
+async fn an_unknown_patient_is_an_empty_searchset_and_never_a_404() -> Result<(), Box<dyn Error>>
 {
     // R4 search.html §3.1.1.3: an unknown subject is a logical condition, so
     // the search answers an empty set; the identity map decides, never the CDR.
@@ -147,7 +147,7 @@ async fn an_unknown_patient_is_an_empty_searchset_and_never_a_404() -> Result<()
 
 #[tokio::test]
 async fn an_empty_store_answers_two_hundred_with_the_fhir_media_type()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = searching().await;
     mount_rows(&harness.cdr, &[]).await;
     let response = raw(
@@ -172,7 +172,7 @@ async fn an_empty_store_answers_two_hundred_with_the_fhir_media_type()
 
 #[tokio::test]
 async fn a_post_search_reads_its_form_body_as_a_get_reads_its_query()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.2: a POST _search carries the parameters as an
     // application/x-www-form-urlencoded body.
     let harness = searching().await;
@@ -204,7 +204,7 @@ async fn a_post_search_reads_its_form_body_as_a_get_reads_its_query()
 
 #[tokio::test]
 async fn a_type_without_a_search_declaration_answers_404_not_supported()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = super::super::harness().await;
     let (status, body) = get(&harness, "Condition").await?;
     assert_eq!(StatusCode::NOT_FOUND, status, "{body}");
@@ -214,7 +214,7 @@ async fn a_type_without_a_search_declaration_answers_404_not_supported()
 
 #[tokio::test]
 async fn the_capability_statement_names_exactly_the_declared_parameters()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 capabilitystatement.html: rest.resource.searchParam names the
     // parameters the server supports, and search-type the interaction.
     let harness = searching().await;
@@ -293,7 +293,7 @@ async fn the_capability_statement_names_exactly_the_declared_parameters()
 
 #[tokio::test]
 async fn a_cdr_failure_maps_through_the_status_table_and_never_to_an_empty_bundle()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // docs/architecture.md §4.6: any CDR 5xx is a 502 carrying the upstream
     // status; the query operation's own 400 is the bridge's fault, a 500.
     for (upstream, expected, code) in [
@@ -340,7 +340,7 @@ async fn a_cdr_failure_maps_through_the_status_table_and_never_to_an_empty_bundl
 
 #[tokio::test]
 async fn a_row_the_outbound_mapping_refuses_is_a_500_naming_no_clinical_value()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // NOTE: R4 http.html §3.1.0.4: a search sends no content, so a stored composition the
     // engine refuses is the server's failure, a `500` with `processing` (#831).
     let harness = searching().await;
@@ -361,7 +361,7 @@ async fn a_row_the_outbound_mapping_refuses_is_a_500_naming_no_clinical_value()
 
 #[tokio::test]
 async fn a_row_the_bridge_cannot_read_is_a_502_naming_the_column_alone()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = searching().await;
     mount_rows(
         &harness.cdr,

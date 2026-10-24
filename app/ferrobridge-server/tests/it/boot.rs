@@ -14,7 +14,7 @@ use ferrobridge_server::boot::{Backoff, serve_settings};
 use ferrobridge_server::config::{Config, Settings};
 use http::StatusCode;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -36,7 +36,7 @@ const BACKOFF: Backoff = Backoff {
 
 /// Returns settings with a CDR at `cdr`, one attempt per call, and the
 /// fixture mapping set.
-fn settings(cdr: &MockServer) -> Result<Settings, Box<dyn StdError>> {
+fn settings(cdr: &MockServer) -> Result<Settings, Box<dyn Error>> {
     let text = format!(
         "[cdr]\nbase_url = \"{}/\"\ntimeout_ms = 2000\n\n[cdr.retry]\nmax_attempts = 1\n\n[auth]\nenabled = false\n\n[mappings]\ndirectory = \"{FIXTURES}\"\n",
         cdr.uri()
@@ -58,7 +58,7 @@ async fn get(
     client: &reqwest::Client,
     address: SocketAddr,
     path: &str,
-) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     let response = client.get(format!("http://{address}{path}")).send().await?;
     let status = StatusCode::from_u16(response.status().as_u16())?;
     let text = response.text().await?;
@@ -72,7 +72,7 @@ async fn readiness_until(
     client: &reqwest::Client,
     address: SocketAddr,
     wanted: StatusCode,
-) -> Result<serde_json::Value, Box<dyn StdError>> {
+) -> Result<serde_json::Value, Box<dyn Error>> {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     loop {
         // The handover from the probe routes to the lanes closes the idle
@@ -91,7 +91,7 @@ async fn readiness_until(
 
 #[tokio::test]
 async fn a_cdr_that_answers_late_keeps_the_process_up_until_the_lanes_start()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let cdr = MockServer::start().await;
     template(&cdr, ResponseTemplate::new(503)).await;
     let settings = settings(&cdr)?;
@@ -139,7 +139,7 @@ async fn a_cdr_that_answers_late_keeps_the_process_up_until_the_lanes_start()
         );
         assert_eq!("up", ready["indicators"]["cdr"]["state"], "{ready}");
         stop.send(()).map_err(|()| "the server is gone")?;
-        Ok::<(), Box<dyn StdError>>(())
+        Ok::<(), Box<dyn Error>>(())
     };
 
     let (served, probed) = tokio::join!(serving, probing);
@@ -149,7 +149,7 @@ async fn a_cdr_that_answers_late_keeps_the_process_up_until_the_lanes_start()
 }
 
 #[tokio::test]
-async fn a_template_the_cdr_refuses_still_fails_the_start() -> Result<(), Box<dyn StdError>> {
+async fn a_template_the_cdr_refuses_still_fails_the_start() -> Result<(), Box<dyn Error>> {
     let cdr = MockServer::start().await;
     template(&cdr, ResponseTemplate::new(400)).await;
     let settings = settings(&cdr)?;
@@ -172,7 +172,7 @@ async fn a_template_the_cdr_refuses_still_fails_the_start() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn a_stop_while_the_cdr_is_not_ready_ends_the_wait() -> Result<(), Box<dyn StdError>> {
+async fn a_stop_while_the_cdr_is_not_ready_ends_the_wait() -> Result<(), Box<dyn Error>> {
     let cdr = MockServer::start().await;
     template(&cdr, ResponseTemplate::new(503)).await;
     let settings = settings(&cdr)?;
@@ -192,7 +192,7 @@ async fn a_stop_while_the_cdr_is_not_ready_ends_the_wait() -> Result<(), Box<dyn
         let client = reqwest::Client::new();
         readiness_until(&client, address, StatusCode::SERVICE_UNAVAILABLE).await?;
         stop.send(()).map_err(|()| "the server is gone")?;
-        Ok::<(), Box<dyn StdError>>(())
+        Ok::<(), Box<dyn Error>>(())
     };
     let (served, probed) = tokio::join!(serving, probing);
     probed?;

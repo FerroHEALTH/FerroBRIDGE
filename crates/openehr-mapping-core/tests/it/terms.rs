@@ -10,7 +10,7 @@
 //! template excludes: the OPT 1.4 `C_ARCHETYPE_ROOT` carries the archetype's
 //! `term_definitions` whole, and the template carries no node for it.
 
-use std::error::Error as StdError;
+use std::error::Error;
 
 use ferrobridge_testkit::fixtures::MINIMAL_EVALUATION_OPT;
 use openehr_mapping_core::index::WebTemplateIndex;
@@ -25,11 +25,11 @@ const EVALUATION: &str = "/content[openEHR-EHR-EVALUATION.ferrobridge_note.v1]";
 /// The last term the fixture's `EVALUATION` root defines, as it spells it.
 const LAST_TERM: &str = "<items id=\"description\">The one text element of the synthetic note</items>\n        </term_definitions>";
 
-fn source(xml: &str) -> Result<TemplateSource, Box<dyn StdError>> {
+fn source(xml: &str) -> Result<TemplateSource, Box<dyn Error>> {
     Ok(TemplateSource::opt14(xml)?)
 }
 
-fn with_excluded_term() -> Result<String, Box<dyn StdError>> {
+fn with_excluded_term() -> Result<String, Box<dyn Error>> {
     if !MINIMAL_EVALUATION_OPT.contains(LAST_TERM) {
         return Err("the fixture no longer spells its last EVALUATION term as expected".into());
     }
@@ -43,7 +43,7 @@ fn with_excluded_term() -> Result<String, Box<dyn StdError>> {
 }
 
 #[test]
-fn an_archetype_root_defines_the_codes_of_the_nodes_it_keeps() -> Result<(), Box<dyn StdError>> {
+fn an_archetype_root_defines_the_codes_of_the_nodes_it_keeps() -> Result<(), Box<dyn Error>> {
     let index = WebTemplateIndex::build(&source(MINIMAL_EVALUATION_OPT)?)?;
     let root = index.node(&AqlPath::new(EVALUATION))?;
     assert_eq!(Some(true), index.archetype_defines(root, "at0002"));
@@ -53,7 +53,7 @@ fn an_archetype_root_defines_the_codes_of_the_nodes_it_keeps() -> Result<(), Box
 
 #[test]
 fn an_archetype_root_defines_a_code_the_template_carries_no_node_for()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let index = WebTemplateIndex::build(&source(&with_excluded_term()?)?)?;
     let root = index.node(&AqlPath::new(EVALUATION))?;
     assert_eq!(Some(true), index.archetype_defines(root, "at0003"));
@@ -65,7 +65,7 @@ fn an_archetype_root_defines_a_code_the_template_carries_no_node_for()
 }
 
 #[test]
-fn a_node_that_roots_no_archetype_answers_none() -> Result<(), Box<dyn StdError>> {
+fn a_node_that_roots_no_archetype_answers_none() -> Result<(), Box<dyn Error>> {
     let index = WebTemplateIndex::build(&source(MINIMAL_EVALUATION_OPT)?)?;
     let leaf = index
         .nodes()
@@ -76,7 +76,7 @@ fn a_node_that_roots_no_archetype_answers_none() -> Result<(), Box<dyn StdError>
 }
 
 #[test]
-fn an_index_over_a_built_web_template_has_no_terms_to_read() -> Result<(), Box<dyn StdError>> {
+fn an_index_over_a_built_web_template_has_no_terms_to_read() -> Result<(), Box<dyn Error>> {
     let built = web_template(&source(MINIMAL_EVALUATION_OPT)?)?;
     let index = WebTemplateIndex::over(built, Generation::Adl14)?;
     let root = index.node(&AqlPath::new(EVALUATION))?;

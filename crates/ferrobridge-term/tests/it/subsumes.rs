@@ -11,7 +11,6 @@ use ferrobridge_term::error::Error;
 use ferrobridge_term::outcome::{SubsumesOutcome, Subsumption};
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
-use std::error::Error as StdError;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -38,7 +37,7 @@ fn question() -> Subsumption {
 }
 
 #[tokio::test]
-async fn each_of_the_four_outcomes_is_read_in_every_release() -> Result<(), Box<dyn StdError>> {
+async fn each_of_the_four_outcomes_is_read_in_every_release() -> Result<(), Box<dyn std::error::Error>> {
     let cases = [
         ("equivalent", SubsumesOutcome::Equivalent),
         ("subsumes", SubsumesOutcome::Subsumes),
@@ -57,7 +56,7 @@ async fn each_of_the_four_outcomes_is_read_in_every_release() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn StdError>> {
+async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(&server, version, terminology::subsumes("subsumes")).await;
@@ -85,7 +84,7 @@ async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn a_version_left_unset_is_not_sent() -> Result<(), Box<dyn StdError>> {
+async fn a_version_left_unset_is_not_sent() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -101,7 +100,7 @@ async fn a_version_left_unset_is_not_sent() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn an_outcome_outside_the_value_set_is_a_decode_error() -> Result<(), Box<dyn StdError>> {
+async fn an_outcome_outside_the_value_set_is_a_decode_error() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(&server, WireVersion::R4, terminology::subsumes("related")).await;
 
@@ -115,7 +114,7 @@ async fn an_outcome_outside_the_value_set_is_a_decode_error() -> Result<(), Box<
 
 #[tokio::test]
 async fn an_undeterminable_relationship_is_a_refusal_carrying_its_tx_issue()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(

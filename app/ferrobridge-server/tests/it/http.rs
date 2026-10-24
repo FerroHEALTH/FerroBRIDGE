@@ -13,7 +13,6 @@ use ferrobridge_server::state::AppState;
 use ferrobridge_server::telemetry::{Rendering, subscriber};
 use ferrobridge_server::{request_id, with_middleware};
 use http::{Request, Response, StatusCode, header};
-use std::error::Error as StdError;
 use std::sync::Arc;
 use std::time::Duration;
 use tower::ServiceExt as _;
@@ -22,7 +21,7 @@ use tower::ServiceExt as _;
 async fn call(
     app: Router,
     request: Request<Body>,
-) -> Result<(StatusCode, String), Box<dyn StdError>> {
+) -> Result<(StatusCode, String), Box<dyn std::error::Error>> {
     let response: Response<Body> = app.oneshot(request).await?;
     let status = response.status();
     let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
@@ -30,7 +29,7 @@ async fn call(
 }
 
 /// Sends `request` through `app` and returns the whole response.
-async fn raw(app: Router, request: Request<Body>) -> Result<Response<Body>, Box<dyn StdError>> {
+async fn raw(app: Router, request: Request<Body>) -> Result<Response<Body>, Box<dyn std::error::Error>> {
     Ok(app.oneshot(request).await?)
 }
 
@@ -40,7 +39,7 @@ fn app() -> Router {
 }
 
 #[tokio::test]
-async fn the_info_route_serves_the_build_facts_and_the_pins() -> Result<(), Box<dyn StdError>> {
+async fn the_info_route_serves_the_build_facts_and_the_pins() -> Result<(), Box<dyn std::error::Error>> {
     let (status, body) = call(app(), Request::get("/health/info").body(Body::empty())?).await?;
     assert_eq!(StatusCode::OK, status);
     let document: serde_json::Value = serde_json::from_str(&body)?;
@@ -101,7 +100,7 @@ async fn the_info_route_serves_the_build_facts_and_the_pins() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn the_root_document_names_the_product_and_the_version() -> Result<(), Box<dyn StdError>> {
+async fn the_root_document_names_the_product_and_the_version() -> Result<(), Box<dyn std::error::Error>> {
     let (status, body) = call(app(), Request::get("/").body(Body::empty())?).await?;
     assert_eq!(StatusCode::OK, status);
     let document: serde_json::Value = serde_json::from_str(&body)?;
@@ -115,14 +114,14 @@ async fn the_root_document_names_the_product_and_the_version() -> Result<(), Box
 }
 
 #[tokio::test]
-async fn liveness_is_two_hundred_once_the_router_is_built() -> Result<(), Box<dyn StdError>> {
+async fn liveness_is_two_hundred_once_the_router_is_built() -> Result<(), Box<dyn std::error::Error>> {
     let (status, _) = call(app(), Request::get("/health/liveness").body(Body::empty())?).await?;
     assert_eq!(StatusCode::OK, status);
     Ok(())
 }
 
 #[tokio::test]
-async fn readiness_with_no_indicator_is_two_hundred() -> Result<(), Box<dyn StdError>> {
+async fn readiness_with_no_indicator_is_two_hundred() -> Result<(), Box<dyn std::error::Error>> {
     let (status, body) = call(
         app(),
         Request::get("/health/readiness").body(Body::empty())?,
@@ -136,7 +135,7 @@ async fn readiness_with_no_indicator_is_two_hundred() -> Result<(), Box<dyn StdE
 
 #[tokio::test]
 async fn a_legal_request_id_is_echoed_and_an_illegal_one_is_replaced()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let response = raw(
         app(),
         Request::get("/health/liveness")
@@ -183,7 +182,7 @@ async fn a_legal_request_id_is_echoed_and_an_illegal_one_is_replaced()
 
 #[tokio::test]
 async fn a_panicking_handler_yields_a_five_hundred_with_the_request_id_in_its_body()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let router = with_middleware(
         Router::new().route(
             "/boom",
@@ -235,7 +234,7 @@ async fn a_panicking_handler_yields_a_five_hundred_with_the_request_id_in_its_bo
 
 #[tokio::test]
 async fn a_panicking_fhir_handler_answers_a_500_operation_outcome_naming_the_request_id()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     // NOTE: R4 http.html §3.1.0.4 asks for an OperationOutcome on an error.
     let router = with_middleware(
         Router::new().route(
@@ -279,7 +278,7 @@ async fn a_panicking_fhir_handler_answers_a_500_operation_outcome_naming_the_req
 }
 
 #[tokio::test]
-async fn a_request_past_the_timeout_yields_four_hundred_and_eight() -> Result<(), Box<dyn StdError>>
+async fn a_request_past_the_timeout_yields_four_hundred_and_eight() -> Result<(), Box<dyn std::error::Error>>
 {
     let mut settings = support::settings();
     settings.request_timeout = Duration::from_millis(20);
@@ -301,7 +300,7 @@ async fn a_request_past_the_timeout_yields_four_hundred_and_eight() -> Result<()
 }
 
 #[tokio::test]
-async fn a_body_over_the_ceiling_yields_four_hundred_and_thirteen() -> Result<(), Box<dyn StdError>>
+async fn a_body_over_the_ceiling_yields_four_hundred_and_thirteen() -> Result<(), Box<dyn std::error::Error>>
 {
     let settings = support::settings();
     let oversized = "x".repeat(settings.body_limit + 1);
@@ -318,7 +317,7 @@ async fn a_body_over_the_ceiling_yields_four_hundred_and_thirteen() -> Result<()
 /// answer, asserting it is one.
 async fn edge_outcome(
     response: Response<Body>,
-) -> Result<(String, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(String, serde_json::Value), Box<dyn std::error::Error>> {
     let media = response
         .headers()
         .get(header::CONTENT_TYPE)
@@ -359,7 +358,7 @@ fn edge_app() -> Router {
 
 #[tokio::test]
 async fn a_fhir_request_past_the_timeout_answers_a_504_operation_outcome()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     // NOTE: R4 http.html §3.1.0.4 asks for an OperationOutcome on an error;
     // the 504 over a 408 is our own design (RFC 9110 §15.6.5, §15.5.9).
     let response = raw(edge_app(), Request::get("/fhir/slow").body(Body::empty())?).await?;
@@ -379,7 +378,7 @@ async fn a_fhir_request_past_the_timeout_answers_a_504_operation_outcome()
 
 #[tokio::test]
 async fn a_request_past_the_timeout_off_the_fhir_surface_keeps_its_plain_408()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let response = raw(edge_app(), Request::get("/slow").body(Body::empty())?).await?;
     assert_eq!(StatusCode::REQUEST_TIMEOUT, response.status());
     assert!(
@@ -395,7 +394,7 @@ async fn a_request_past_the_timeout_off_the_fhir_surface_keeps_its_plain_408()
 
 #[tokio::test]
 async fn a_fhir_body_declared_over_the_ceiling_answers_a_413_operation_outcome()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let oversized = "x".repeat(support::settings().body_limit + 1);
     let request = Request::post("/fhir/echo")
         .header(header::CONTENT_LENGTH, oversized.len())
@@ -417,7 +416,7 @@ async fn a_fhir_body_declared_over_the_ceiling_answers_a_413_operation_outcome()
 
 #[tokio::test]
 async fn a_streamed_fhir_body_over_the_ceiling_answers_a_413_operation_outcome()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let oversized = "x".repeat(support::settings().body_limit + 1);
     let chunks = futures_util::stream::iter([Ok::<_, std::io::Error>(oversized)]);
     let request = Request::post("/fhir/echo").body(Body::from_stream(chunks))?;
@@ -432,7 +431,7 @@ async fn a_streamed_fhir_body_over_the_ceiling_answers_a_413_operation_outcome()
 
 #[tokio::test]
 async fn a_body_over_the_ceiling_off_the_fhir_surface_keeps_its_plain_413()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let oversized = "x".repeat(support::settings().body_limit + 1);
     let request = Request::post("/health/liveness")
         .header(header::CONTENT_LENGTH, oversized.len())

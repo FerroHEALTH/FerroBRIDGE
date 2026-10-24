@@ -10,7 +10,7 @@ use ferrobridge_server::facade::programs;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use wiremock::MockServer;
 
@@ -25,7 +25,7 @@ use super::raw;
 
 #[tokio::test]
 async fn a_disabled_facade_mounts_no_route_and_answers_four_hundred_and_four()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let app = ferrobridge_server::router(support::state(), &support::settings());
     let (status, _) = call(app, Request::get("/fhir/metadata").body(Body::empty())?).await?;
     assert_eq!(
@@ -38,7 +38,7 @@ async fn a_disabled_facade_mounts_no_route_and_answers_four_hundred_and_four()
 
 #[tokio::test]
 async fn the_capability_statement_names_exactly_the_loaded_programs()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let response = raw(
         harness.app(),
@@ -104,7 +104,7 @@ async fn the_capability_statement_names_exactly_the_loaded_programs()
 
 #[tokio::test]
 async fn a_conditional_update_the_statement_does_not_declare_is_not_served()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The statement declares `conditionalUpdate: false`, so `PUT
     // [type]?[search parameters]` (R4 http.html#cond-update) reaches no
     // handler and writes nothing.
@@ -143,7 +143,7 @@ fn system_operations(body: &serde_json::Value) -> Vec<(String, String)> {
 
 #[tokio::test]
 async fn a_template_the_cdr_does_not_hold_names_the_context_and_the_status()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // An unmatched route answers 404 on both definition routes of ITS-REST.
     let cdr = MockServer::start().await;
     let set = programs::read_set(std::path::Path::new(FIXTURES))?;
@@ -167,7 +167,7 @@ async fn a_template_the_cdr_does_not_hold_names_the_context_and_the_status()
 }
 
 #[tokio::test]
-async fn a_served_operations_lane_is_declared_at_the_system_level() -> Result<(), Box<dyn StdError>>
+async fn a_served_operations_lane_is_declared_at_the_system_level() -> Result<(), Box<dyn Error>>
 {
     // R4 CapabilityStatement.rest.operation carries the system-level
     // operations; both FSH definitions of the REST API chapter set `system = true`.
@@ -195,7 +195,7 @@ async fn a_served_operations_lane_is_declared_at_the_system_level() -> Result<()
 }
 
 #[tokio::test]
-async fn an_absent_operations_lane_is_not_declared() -> Result<(), Box<dyn StdError>> {
+async fn an_absent_operations_lane_is_not_declared() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let (status, body) = call(
         harness.app(),
@@ -211,7 +211,7 @@ async fn an_absent_operations_lane_is_not_declared() -> Result<(), Box<dyn StdEr
 }
 
 #[tokio::test]
-async fn the_direct_forms_of_the_operations_are_never_declared() -> Result<(), Box<dyn StdError>> {
+async fn the_direct_forms_of_the_operations_are_never_declared() -> Result<(), Box<dyn Error>> {
     // rest-api.adoc, Direct payload invocation: "intentionally not
     // part of the FHIRconnect FHIR Implementation Guide".
     let harness = harness().await;
@@ -237,7 +237,7 @@ async fn the_direct_forms_of_the_operations_are_never_declared() -> Result<(), B
 }
 
 #[tokio::test]
-async fn a_type_with_no_program_is_not_supported_on_the_wire() -> Result<(), Box<dyn StdError>> {
+async fn a_type_with_no_program_is_not_supported_on_the_wire() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let (status, body) = call(
         harness.app(),
@@ -254,7 +254,7 @@ async fn a_type_with_no_program_is_not_supported_on_the_wire() -> Result<(), Box
 }
 
 #[test]
-fn a_compiler_warning_reaches_the_log_once_as_the_facade_loads() -> Result<(), Box<dyn StdError>> {
+fn a_compiler_warning_reaches_the_log_once_as_the_facade_loads() -> Result<(), Box<dyn Error>> {
     // The KDS project context lists an extension of a model no mapping of it
     // reaches, which the compiler accepts with `fc-unreached-extension`.
     let directory = tempfile::tempdir()?;

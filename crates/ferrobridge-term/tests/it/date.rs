@@ -11,7 +11,7 @@ use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::outcome::{Coded, Validation};
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -38,7 +38,7 @@ fn date() -> (String, serde_json::Value) {
 }
 
 #[tokio::test]
-async fn a_lookup_at_a_date_sends_it() -> Result<(), Box<dyn StdError>> {
+async fn a_lookup_at_a_date_sends_it() -> Result<(), Box<dyn Error>> {
     for version in [WireVersion::Stu3, WireVersion::R4, WireVersion::R4B] {
         let server = MockServer::start().await;
         mount(
@@ -71,7 +71,7 @@ async fn a_lookup_at_a_date_sends_it() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_lookup_without_a_date_sends_none() -> Result<(), Box<dyn StdError>> {
+async fn a_lookup_without_a_date_sends_none() -> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -96,7 +96,7 @@ async fn a_lookup_without_a_date_sends_none() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_validation_at_a_date_sends_it() -> Result<(), Box<dyn StdError>> {
+async fn a_validation_at_a_date_sends_it() -> Result<(), Box<dyn Error>> {
     for version in [WireVersion::Stu3, WireVersion::R4, WireVersion::R4B] {
         let server = MockServer::start().await;
         mount(
@@ -130,7 +130,7 @@ async fn a_validation_at_a_date_sends_it() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_validation_without_a_date_sends_none() -> Result<(), Box<dyn StdError>> {
+async fn a_validation_without_a_date_sends_none() -> Result<(), Box<dyn Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(

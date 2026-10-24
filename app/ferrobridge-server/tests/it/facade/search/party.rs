@@ -11,7 +11,7 @@
 //! own design.
 
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -186,7 +186,7 @@ fn party(class: &str, concept: &str, template: &str, uid: &str) -> serde_json::V
 /// searching the party types `search` configures.
 async fn harness(
     search: Option<PartySearch>,
-) -> Result<(MockServer, Arc<Facade>), Box<dyn StdError>> {
+) -> Result<(MockServer, Arc<Facade>), Box<dyn Error>> {
     let cdr = MockServer::start().await;
     for (id, opt) in [
         (
@@ -260,7 +260,7 @@ async fn mount_party(cdr: &MockServer, path: &str, body: &serde_json::Value, uid
 async fn get(
     facade: &Arc<Facade>,
     path: &str,
-) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     call(
         app_over(facade),
         Request::get(format!("/fhir/{path}")).body(Body::empty())?,
@@ -280,7 +280,7 @@ async fn queries(cdr: &MockServer) -> Vec<serde_json::Value> {
 }
 
 #[tokio::test]
-async fn each_party_type_is_searched_by_identifier() -> Result<(), Box<dyn StdError>> {
+async fn each_party_type_is_searched_by_identifier() -> Result<(), Box<dyn Error>> {
     for (resource_type, class, concept, template, path) in PARTIES {
         let (cdr, facade) = harness(Some(searching(&[resource_type]))).await?;
         mount_rows(&cdr, &[UID]).await;
@@ -302,7 +302,7 @@ async fn each_party_type_is_searched_by_identifier() -> Result<(), Box<dyn StdEr
 }
 
 #[tokio::test]
-async fn a_page_with_a_row_left_links_the_next_page() -> Result<(), Box<dyn StdError>> {
+async fn a_page_with_a_row_left_links_the_next_page() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
     mount_rows(&cdr, &[UID, OTHER]).await;
     let (class, concept, template) = ("PERSON", "ferrobridge_person", "ferrobridge.person.v1");
@@ -324,7 +324,7 @@ async fn a_page_with_a_row_left_links_the_next_page() -> Result<(), Box<dyn StdE
 /// RFC 9110 §15.6.2: a CDR without the extension refuses the query, and the
 /// server cannot serve the search.
 #[tokio::test]
-async fn a_cdr_that_does_not_serve_the_extension_is_a_501() -> Result<(), Box<dyn StdError>> {
+async fn a_cdr_that_does_not_serve_the_extension_is_a_501() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
     Mock::given(matchers::method("POST"))
         .and(matchers::path(AQL))
@@ -348,7 +348,7 @@ async fn a_cdr_that_does_not_serve_the_extension_is_a_501() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn a_type_no_query_is_configured_for_offers_no_search() -> Result<(), Box<dyn StdError>> {
+async fn a_type_no_query_is_configured_for_offers_no_search() -> Result<(), Box<dyn Error>> {
     let (_cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
     let (status, body) = get(&facade, "Organization?identifier=SYN-0001").await?;
     assert_eq!(StatusCode::NOT_FOUND, status, "{body}");
@@ -357,7 +357,7 @@ async fn a_type_no_query_is_configured_for_offers_no_search() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn an_unsupported_parameter_or_combination_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn an_unsupported_parameter_or_combination_is_refused() -> Result<(), Box<dyn Error>> {
     let (_cdr, facade) = harness(Some(searching(&["Patient", "Organization"]))).await?;
     for path in [
         "Patient?birthdate=1990-01-01",
@@ -377,7 +377,7 @@ async fn an_unsupported_parameter_or_combination_is_refused() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn a_count_that_is_no_number_is_invalid() -> Result<(), Box<dyn StdError>> {
+async fn a_count_that_is_no_number_is_invalid() -> Result<(), Box<dyn Error>> {
     let (_cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
     let (status, body) = get(&facade, "Patient?identifier=SYN-0001&_count=many").await?;
     assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");
@@ -388,7 +388,7 @@ async fn a_count_that_is_no_number_is_invalid() -> Result<(), Box<dyn StdError>>
 /// R4 search.html §3.1.1.3: `Prefer: handling=lenient` asks the server to
 /// ignore a parameter it does not support.
 #[tokio::test]
-async fn a_lenient_search_ignores_another_parameter_and_reports_it() -> Result<(), Box<dyn StdError>>
+async fn a_lenient_search_ignores_another_parameter_and_reports_it() -> Result<(), Box<dyn Error>>
 {
     let (cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
     mount_rows(&cdr, &[UID]).await;
@@ -414,7 +414,7 @@ async fn a_lenient_search_ignores_another_parameter_and_reports_it() -> Result<(
 
 #[tokio::test]
 async fn the_statement_declares_search_on_the_configured_types_only()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let (_cdr, facade) = harness(Some(searching(&["Patient", "Organization"]))).await?;
     let (status, body) = get(&facade, "metadata").await?;
     assert_eq!(StatusCode::OK, status, "{body}");
@@ -468,7 +468,7 @@ async fn the_statement_declares_search_on_the_configured_types_only()
 }
 
 #[tokio::test]
-async fn a_search_of_a_type_no_party_context_serves_does_not_boot() -> Result<(), Box<dyn StdError>>
+async fn a_search_of_a_type_no_party_context_serves_does_not_boot() -> Result<(), Box<dyn Error>>
 {
     let search = PartySearch::new(BTreeMap::from([(
         String::from("Group"),
@@ -508,7 +508,7 @@ async fn party_reads(cdr: &MockServer) -> usize {
 /// by case"; the dialect's `LIKE` is case-sensitive, so three case variants
 /// are bound.
 #[tokio::test]
-async fn a_name_search_binds_three_case_variants_of_a_prefix() -> Result<(), Box<dyn StdError>> {
+async fn a_name_search_binds_three_case_variants_of_a_prefix() -> Result<(), Box<dyn Error>> {
     for resource_type in ["Patient", "Practitioner"] {
         let (cdr, facade) = harness(Some(searching(&[resource_type]))).await?;
         mount_rows(&cdr, &[UID]).await;
@@ -528,7 +528,7 @@ async fn a_name_search_binds_three_case_variants_of_a_prefix() -> Result<(), Box
 /// R4 search.html §3.1.1.4.10: `[parameter]=[code]` matches "irrespective
 /// of the value of the system property", so two parties are two entries.
 #[tokio::test]
-async fn a_bare_identifier_two_parties_carry_answers_both() -> Result<(), Box<dyn StdError>> {
+async fn a_bare_identifier_two_parties_carry_answers_both() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
     mount_rows(&cdr, &[UID, OTHER]).await;
     mount_party(&cdr, "person", &person(UID), UID).await;
@@ -547,7 +547,7 @@ async fn a_bare_identifier_two_parties_carry_answers_both() -> Result<(), Box<dy
 
 /// R4 search.html §3.1.1.4.10: `[system]|[code]` matches the system too.
 #[tokio::test]
-async fn an_identifier_with_a_system_runs_the_system_query() -> Result<(), Box<dyn StdError>> {
+async fn an_identifier_with_a_system_runs_the_system_query() -> Result<(), Box<dyn Error>> {
     let system_query = "SELECT p/uid/value FROM PERSON p WHERE \
                         p/details[at0001]/items[at0002]/value/id = $identifier AND \
                         p/details[at0001]/items[at0002]/value/issuer = $system";
@@ -582,7 +582,7 @@ async fn an_identifier_with_a_system_runs_the_system_query() -> Result<(), Box<d
 
 /// R4 search.html §3.1.1.4.1: `_id` names the one resource with that id.
 #[tokio::test]
-async fn an_id_reads_the_one_party_it_names_and_runs_no_query() -> Result<(), Box<dyn StdError>> {
+async fn an_id_reads_the_one_party_it_names_and_runs_no_query() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
     mount_party(&cdr, "person", &person(UID), UID).await;
     let (status, body) = get(&facade, &format!("Patient?_id={UID}")).await?;
@@ -595,7 +595,7 @@ async fn an_id_reads_the_one_party_it_names_and_runs_no_query() -> Result<(), Bo
 }
 
 #[tokio::test]
-async fn an_id_naming_no_party_of_the_type_matches_nothing() -> Result<(), Box<dyn StdError>> {
+async fn an_id_naming_no_party_of_the_type_matches_nothing() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness(Some(searching(&["Patient", "Organization"]))).await?;
     mount_party(
         &cdr,
@@ -629,7 +629,7 @@ async fn an_id_naming_no_party_of_the_type_matches_nothing() -> Result<(), Box<d
 /// reports the total number of resources that match in Bundle.total, but
 /// with no entries, and no prev/next/last links."
 #[tokio::test]
-async fn a_count_of_zero_answers_the_total_and_no_entry() -> Result<(), Box<dyn StdError>> {
+async fn a_count_of_zero_answers_the_total_and_no_entry() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
     mount_rows(&cdr, &[UID, OTHER]).await;
     mount_party(&cdr, "person", &person(UID), UID).await;
@@ -659,7 +659,7 @@ async fn a_count_of_zero_answers_the_total_and_no_entry() -> Result<(), Box<dyn 
 /// R4 search.html §3.1.1.5.3: "Servers SHALL NOT return more resources than
 /// requested", and the facade answers no more than its largest page.
 #[tokio::test]
-async fn a_count_above_the_largest_page_is_capped() -> Result<(), Box<dyn StdError>> {
+async fn a_count_above_the_largest_page_is_capped() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
     mount_rows(&cdr, &[]).await;
     let (status, body) = get(&facade, "Patient?identifier=SYN-0001&_count=100000").await?;

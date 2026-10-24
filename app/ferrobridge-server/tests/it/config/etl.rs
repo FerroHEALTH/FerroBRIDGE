@@ -9,7 +9,6 @@ use ferrobridge_server::config::error::Error;
 use ferrobridge_server::etl::aql::AqlError;
 use ferrobridge_server::etl::deletions::DeletionPolicy;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 
 /// An `[etl]` section with every required key and a composition query that
 /// carries the four projections and an order.
@@ -24,7 +23,7 @@ observation_period_type_concept_id = 32880
 const VISITS: &str = "SELECT e/ehr_id/value AS ehr_id, c/name/value AS visit_source, c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/context/start_time/value";
 
 /// Resolves `text`, returning the refusal.
-fn refusal(text: &str) -> Result<Error, Box<dyn StdError>> {
+fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
     match Config::from_sources(Some(text), &BTreeMap::new())?.resolve() {
         Ok(_) => Err("the configuration resolved".into()),
         Err(error) => Ok(error),
@@ -32,7 +31,7 @@ fn refusal(text: &str) -> Result<Error, Box<dyn StdError>> {
 }
 
 #[test]
-fn the_cdm_section_defaults_its_schemas_and_policy() -> Result<(), Box<dyn StdError>> {
+fn the_cdm_section_defaults_its_schemas_and_policy() -> Result<(), Box<dyn std::error::Error>> {
     let text = "[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode=disable\"\n";
     let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
     let cdm = settings.cdm.as_ref().ok_or("the CDM lane is on")?;
@@ -46,7 +45,7 @@ fn the_cdm_section_defaults_its_schemas_and_policy() -> Result<(), Box<dyn StdEr
 }
 
 #[test]
-fn a_schema_that_is_no_identifier_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_schema_that_is_no_identifier_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(
         "[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode=disable\"\nbridge_schema = \"bridge; drop\"\n",
     )?;
@@ -58,7 +57,7 @@ fn a_schema_that_is_no_identifier_refuses_to_boot() -> Result<(), Box<dyn StdErr
 }
 
 #[test]
-fn an_unknown_person_policy_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn an_unknown_person_policy_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(
         "[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode=disable\"\nperson_policy = \"merge\"\n",
     )?;
@@ -67,7 +66,7 @@ fn an_unknown_person_policy_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn an_etl_section_resolves_with_its_query_checked() -> Result<(), Box<dyn StdError>> {
+fn an_etl_section_resolves_with_its_query_checked() -> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert_eq!(32817, etl.type_concept_id);
@@ -79,7 +78,7 @@ fn an_etl_section_resolves_with_its_query_checked() -> Result<(), Box<dyn StdErr
 }
 
 #[test]
-fn a_composition_query_without_its_projections_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_composition_query_without_its_projections_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     for (alias, projection) in [
         ("AS ehr_id", "ehr_id"),
         ("AS version_uid", "version_uid"),
@@ -101,7 +100,7 @@ fn a_composition_query_without_its_projections_refuses_to_boot() -> Result<(), B
 }
 
 #[test]
-fn a_composition_query_without_the_versioned_object_uid_boots() -> Result<(), Box<dyn StdError>> {
+fn a_composition_query_without_the_versioned_object_uid_boots() -> Result<(), Box<dyn std::error::Error>> {
     let text = ETL.replace("vo/uid/value AS versioned_object_uid, ", "");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
@@ -111,7 +110,7 @@ fn a_composition_query_without_the_versioned_object_uid_boots() -> Result<(), Bo
 }
 
 #[test]
-fn a_composition_query_without_an_order_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_composition_query_without_an_order_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&ETL.replace(" ORDER BY v/uid/value", ""))?;
     match &error {
         Error::Aql { source, .. } => {
@@ -125,7 +124,7 @@ fn a_composition_query_without_an_order_refuses_to_boot() -> Result<(), Box<dyn 
 // NOTE: QUERY AQL 1.1.0 §6 leaves a query's version scope open without
 // LATEST_VERSION, and a deletion is a version with Void data (RM Common §6.2.5).
 #[test]
-fn a_composition_query_over_every_version_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_composition_query_over_every_version_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&ETL.replace("VERSION v[LATEST_VERSION]", "VERSION v"))?;
     match &error {
         Error::Aql { key, source } => {
@@ -138,7 +137,7 @@ fn a_composition_query_over_every_version_refuses_to_boot() -> Result<(), Box<dy
 }
 
 #[test]
-fn a_visit_query_over_every_version_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_visit_query_over_every_version_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let query = VISITS.replace("CONTAINS VERSION v[LATEST_VERSION] ", "");
     let error = refusal(&format!(
         "{ETL}\n[etl.visits]\naql = \"{query}\"\nvisit_concept_id = 9201\nvisit_type_concept_id = 32817\n"
@@ -154,7 +153,7 @@ fn a_visit_query_over_every_version_refuses_to_boot() -> Result<(), Box<dyn StdE
 }
 
 #[test]
-fn a_visit_query_naming_since_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_visit_query_naming_since_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let query = VISITS.replace(
         " ORDER BY",
         " WHERE v/commit_audit/time_committed/value > $since ORDER BY",
@@ -174,7 +173,7 @@ fn a_visit_query_naming_since_refuses_to_boot() -> Result<(), Box<dyn StdError>>
 }
 
 #[test]
-fn a_visit_query_naming_no_since_boots() -> Result<(), Box<dyn StdError>> {
+fn a_visit_query_naming_no_since_boots() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!(
         "{ETL}\n[etl.visits]\naql = \"{VISITS}\"\nvisit_concept_id = 9201\nvisit_type_concept_id = 32817\n"
     );
@@ -186,7 +185,7 @@ fn a_visit_query_naming_no_since_boots() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn a_visit_query_that_does_not_parse_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_visit_query_that_does_not_parse_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&format!(
         "{ETL}\n[etl.visits]\naql = \"SELECT FROM\"\nvisit_concept_id = 9201\nvisit_type_concept_id = 32817\n"
     ))?;
@@ -201,7 +200,7 @@ fn a_visit_query_that_does_not_parse_refuses_to_boot() -> Result<(), Box<dyn Std
 }
 
 #[test]
-fn a_visit_query_without_its_four_projections_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_visit_query_without_its_four_projections_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     for (alias, projection) in [
         ("AS ehr_id", "ehr_id"),
         ("AS visit_source", "visit_source"),
@@ -224,7 +223,7 @@ fn a_visit_query_without_its_four_projections_refuses_to_boot() -> Result<(), Bo
 }
 
 #[test]
-fn a_visit_section_without_its_concepts_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_visit_section_without_its_concepts_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&format!("{ETL}\n[etl.visits]\naql = \"{VISITS}\"\n"))?;
     match &error {
         Error::Missing { key } => assert_eq!("etl.visits.visit_concept_id", key),
@@ -234,7 +233,7 @@ fn a_visit_section_without_its_concepts_refuses_to_boot() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn an_etl_section_without_a_type_concept_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn an_etl_section_without_a_type_concept_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&ETL.replace("\ntype_concept_id = 32817", ""))?;
     match &error {
         Error::Missing { key } => assert_eq!("etl.type_concept_id", key),
@@ -244,14 +243,14 @@ fn an_etl_section_without_a_type_concept_refuses_to_boot() -> Result<(), Box<dyn
 }
 
 #[test]
-fn a_page_size_of_zero_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_page_size_of_zero_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&format!("{ETL}page_size = 0\n"))?;
     assert!(matches!(error, Error::PageSize { .. }), "{error:?}");
     Ok(())
 }
 
 #[test]
-fn the_deletion_policy_defaults_to_remove() -> Result<(), Box<dyn StdError>> {
+fn the_deletion_policy_defaults_to_remove() -> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert_eq!(DeletionPolicy::Remove, etl.deletions);
@@ -259,7 +258,7 @@ fn the_deletion_policy_defaults_to_remove() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn the_report_deletion_policy_resolves() -> Result<(), Box<dyn StdError>> {
+fn the_report_deletion_policy_resolves() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!("{ETL}deletions = \"report\"\n");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
@@ -268,7 +267,7 @@ fn the_report_deletion_policy_resolves() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn an_unknown_deletion_policy_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn an_unknown_deletion_policy_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&format!("{ETL}deletions = \"ignore\"\n"))?;
     match &error {
         Error::Deletions { key, value } => {
@@ -287,7 +286,7 @@ fn with_aliases(table: &str) -> String {
 
 #[test]
 fn the_default_aliases_read_the_terminologies_the_laboratory_compositions_name()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert_eq!("LOINC", etl.aliases.vocabulary_of("LOINC"));
@@ -297,7 +296,7 @@ fn the_default_aliases_read_the_terminologies_the_laboratory_compositions_name()
 }
 
 #[test]
-fn a_table_of_aliases_resolves_over_the_defaults() -> Result<(), Box<dyn StdError>> {
+fn a_table_of_aliases_resolves_over_the_defaults() -> Result<(), Box<dyn std::error::Error>> {
     let text = with_aliases(
         "\"http://terminology.hl7.org/CodeSystem/v2-0001\" = \"Gender\"\n\
          \"urn:oid:2.16.840.1.113883.6.1\" = \"LOINC\"\n\
@@ -323,7 +322,7 @@ fn a_table_of_aliases_resolves_over_the_defaults() -> Result<(), Box<dyn StdErro
 }
 
 #[test]
-fn an_alias_with_an_empty_terminology_id_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn an_alias_with_an_empty_terminology_id_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&with_aliases("\"\" = \"Gender\""))?;
     match &error {
         Error::AliasTerminology { key } => assert_eq!("etl.vocabulary_aliases", key),
@@ -333,7 +332,7 @@ fn an_alias_with_an_empty_terminology_id_refuses_to_boot() -> Result<(), Box<dyn
 }
 
 #[test]
-fn an_alias_with_an_empty_vocabulary_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn an_alias_with_an_empty_vocabulary_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&with_aliases("\"urn:oid:2.16.840.1.113883.6.1\" = \"\""))?;
     match &error {
         Error::Missing { key } => {
@@ -349,7 +348,7 @@ fn an_alias_with_an_empty_vocabulary_refuses_to_boot() -> Result<(), Box<dyn Std
 
 #[test]
 fn an_alias_to_a_vocabulary_wider_than_the_cdm_column_refuses_to_boot()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     // OMOP CDM v5.4 `VOCABULARY.vocabulary_id` is `varchar(20)`.
     let error = refusal(&with_aliases("\"LOCAL\" = \"A-VOCABULARY-OF-21-CH\""))?;
     match &error {
@@ -363,7 +362,7 @@ fn an_alias_to_a_vocabulary_wider_than_the_cdm_column_refuses_to_boot()
 }
 
 #[test]
-fn an_alias_that_is_no_string_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn an_alias_that_is_no_string_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = Config::from_sources(Some(&with_aliases("\"LOCAL\" = 7")), &BTreeMap::new())
         .err()
         .ok_or("an alias of 7 resolved")?;

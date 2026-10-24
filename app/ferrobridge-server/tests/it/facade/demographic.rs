@@ -12,7 +12,7 @@
 //! facade's status table. No specification governs a party context: our own
 //! design.
 
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -103,7 +103,7 @@ pub(super) fn patient() -> serde_json::Value {
 
 /// Returns the stub CDR and a facade over the demographic fixture set, with
 /// `[cdr] demographic` on.
-async fn harness() -> Result<(MockServer, Arc<Facade>), Box<dyn StdError>> {
+async fn harness() -> Result<(MockServer, Arc<Facade>), Box<dyn Error>> {
     harness_with(settings()).await
 }
 
@@ -111,7 +111,7 @@ async fn harness() -> Result<(MockServer, Arc<Facade>), Box<dyn StdError>> {
 /// runs with `facade_settings`, with `[cdr] demographic` on.
 pub(super) async fn harness_with(
     facade_settings: ferrobridge_server::facade::Settings,
-) -> Result<(MockServer, Arc<Facade>), Box<dyn StdError>> {
+) -> Result<(MockServer, Arc<Facade>), Box<dyn Error>> {
     let cdr = MockServer::start().await;
     for (id, opt) in [
         (
@@ -148,7 +148,7 @@ pub(super) async fn harness_with(
 }
 
 /// Returns a client for `cdr` with `[cdr] demographic` set as `on`.
-fn demographic_client(cdr: &MockServer, on: bool) -> Result<CdrClient, Box<dyn StdError>> {
+fn demographic_client(cdr: &MockServer, on: bool) -> Result<CdrClient, Box<dyn Error>> {
     let base = format!("{}/", cdr.uri()).parse()?;
     Ok(CdrClient::new(&CdrConfig::new(base).with_demographic(on))?)
 }
@@ -183,7 +183,7 @@ pub(super) fn with_body(
     method: http::Method,
     uri: &str,
     body: &serde_json::Value,
-) -> Result<Request<Body>, Box<dyn StdError>> {
+) -> Result<Request<Body>, Box<dyn Error>> {
     Ok(Request::builder()
         .method(method)
         .uri(uri)
@@ -192,7 +192,7 @@ pub(super) fn with_body(
 }
 
 #[tokio::test]
-async fn the_statement_declares_the_party_types_as_development() -> Result<(), Box<dyn StdError>> {
+async fn the_statement_declares_the_party_types_as_development() -> Result<(), Box<dyn Error>> {
     let (_cdr, facade) = harness().await?;
     let (status, body) = call(
         app_over(&facade),
@@ -245,7 +245,7 @@ async fn the_statement_declares_the_party_types_as_development() -> Result<(), B
 }
 
 #[tokio::test]
-async fn a_patient_creates_a_person() -> Result<(), Box<dyn StdError>> {
+async fn a_patient_creates_a_person() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/demographic/person"))
@@ -280,7 +280,7 @@ async fn a_patient_creates_a_person() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_patient_reads_from_its_person() -> Result<(), Box<dyn StdError>> {
+async fn a_patient_reads_from_its_person() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     mount_person(&cdr, UID, &person(2), 2).await;
     let (status, body) = call(
@@ -297,7 +297,7 @@ async fn a_patient_reads_from_its_person() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn one_person_reads_as_a_practitioner_under_the_same_id() -> Result<(), Box<dyn StdError>> {
+async fn one_person_reads_as_a_practitioner_under_the_same_id() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     mount_person(&cdr, UID, &person(1), 1).await;
     let (status, body) = call(
@@ -312,7 +312,7 @@ async fn one_person_reads_as_a_practitioner_under_the_same_id() -> Result<(), Bo
 }
 
 #[tokio::test]
-async fn a_patient_vreads_one_version() -> Result<(), Box<dyn StdError>> {
+async fn a_patient_vreads_one_version() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     mount_person(&cdr, UID, &person(2), 2).await;
     mount_person(&cdr, &version(1), &person(1), 1).await;
@@ -327,7 +327,7 @@ async fn a_patient_vreads_one_version() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_patient_lists_its_history() -> Result<(), Box<dyn StdError>> {
+async fn a_patient_lists_its_history() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     mount_person(&cdr, &version(1), &person(1), 1).await;
     mount_person(&cdr, &version(2), &person(2), 2).await;
@@ -371,7 +371,7 @@ async fn a_patient_lists_its_history() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_patient_updates_over_the_version_if_match_names() -> Result<(), Box<dyn StdError>> {
+async fn a_patient_updates_over_the_version_if_match_names() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     mount_person(&cdr, UID, &person(1), 1).await;
     Mock::given(matchers::method("PUT"))
@@ -402,7 +402,7 @@ async fn a_patient_updates_over_the_version_if_match_names() -> Result<(), Box<d
 }
 
 #[tokio::test]
-async fn a_patient_deletes_its_latest_version() -> Result<(), Box<dyn StdError>> {
+async fn a_patient_deletes_its_latest_version() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     mount_person(&cdr, UID, &person(1), 1).await;
     Mock::given(matchers::method("DELETE"))
@@ -445,7 +445,7 @@ async fn a_patient_deletes_its_latest_version() -> Result<(), Box<dyn StdError>>
 }
 
 #[tokio::test]
-async fn a_party_of_another_template_is_not_found() -> Result<(), Box<dyn StdError>> {
+async fn a_party_of_another_template_is_not_found() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     let other = party(
         "PERSON",
@@ -465,7 +465,7 @@ async fn a_party_of_another_template_is_not_found() -> Result<(), Box<dyn StdErr
 }
 
 #[tokio::test]
-async fn a_demographic_400_is_a_500() -> Result<(), Box<dyn StdError>> {
+async fn a_demographic_400_is_a_500() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/demographic/person"))
@@ -483,7 +483,7 @@ async fn a_demographic_400_is_a_500() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_demographic_404_is_a_404() -> Result<(), Box<dyn StdError>> {
+async fn a_demographic_404_is_a_404() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(format!("/demographic/person/{UID}")))
@@ -501,7 +501,7 @@ async fn a_demographic_404_is_a_404() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_demographic_409_is_a_409() -> Result<(), Box<dyn StdError>> {
+async fn a_demographic_409_is_a_409() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     mount_person(&cdr, UID, &person(1), 1).await;
     Mock::given(matchers::method("DELETE"))
@@ -523,7 +523,7 @@ async fn a_demographic_409_is_a_409() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_demographic_412_is_a_412() -> Result<(), Box<dyn StdError>> {
+async fn a_demographic_412_is_a_412() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     mount_person(&cdr, UID, &person(2), 2).await;
     Mock::given(matchers::method("PUT"))
@@ -548,7 +548,7 @@ async fn a_demographic_412_is_a_412() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_demographic_422_is_a_422() -> Result<(), Box<dyn StdError>> {
+async fn a_demographic_422_is_a_422() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/demographic/person"))
@@ -575,7 +575,7 @@ fn assert_diagnoses(body: &serde_json::Value) {
 }
 
 #[tokio::test]
-async fn a_party_context_with_the_gate_off_does_not_load() -> Result<(), Box<dyn StdError>> {
+async fn a_party_context_with_the_gate_off_does_not_load() -> Result<(), Box<dyn Error>> {
     let (_cdr, facade) = harness().await?;
     let refused = programs::check_parties(&facade.programs(), false);
     assert!(
@@ -586,7 +586,7 @@ async fn a_party_context_with_the_gate_off_does_not_load() -> Result<(), Box<dyn
 }
 
 #[tokio::test]
-async fn a_type_no_party_context_serves_has_no_delete_or_history() -> Result<(), Box<dyn StdError>>
+async fn a_type_no_party_context_serves_has_no_delete_or_history() -> Result<(), Box<dyn Error>>
 {
     let facade = super::harness().await.facade;
     let deleted = call(
@@ -627,7 +627,7 @@ fn practitioner_role(reference: &str) -> serde_json::Value {
 /// the role, here the `Practitioner` the facade serves under `UID`.
 #[tokio::test]
 async fn a_practitioner_role_creates_a_role_performed_by_its_practitioner()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/demographic/role"))
@@ -671,7 +671,7 @@ async fn a_practitioner_role_creates_a_role_performed_by_its_practitioner()
 
 #[tokio::test]
 async fn a_practitioner_of_another_server_is_a_422_and_reaches_no_cdr()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness().await?;
     let (status, body) = call(
         app_over(&facade),

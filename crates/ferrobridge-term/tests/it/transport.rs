@@ -16,7 +16,6 @@ use ferrobridge_term::outcome::LookupOutcome;
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use secrecy::SecretString;
-use std::error::Error as StdError;
 use std::time::Duration;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -38,7 +37,7 @@ async fn lookup(client: &Client) -> Result<LookupOutcome, Error> {
 }
 
 #[tokio::test]
-async fn a_503_is_retried_and_the_second_attempt_answers() -> Result<(), Box<dyn StdError>> {
+async fn a_503_is_retried_and_the_second_attempt_answers() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(route()))
@@ -74,7 +73,7 @@ async fn a_503_is_retried_and_the_second_attempt_answers() -> Result<(), Box<dyn
 }
 
 #[tokio::test]
-async fn an_exhausted_budget_answers_the_upstream_status() -> Result<(), Box<dyn StdError>> {
+async fn an_exhausted_budget_answers_the_upstream_status() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(route()))
@@ -108,7 +107,7 @@ async fn an_exhausted_budget_answers_the_upstream_status() -> Result<(), Box<dyn
 }
 
 #[tokio::test]
-async fn a_timeout_is_a_typed_error_and_never_an_empty_answer() -> Result<(), Box<dyn StdError>> {
+async fn a_timeout_is_a_typed_error_and_never_an_empty_answer() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(route()))
@@ -135,7 +134,7 @@ async fn a_timeout_is_a_typed_error_and_never_an_empty_answer() -> Result<(), Bo
 }
 
 #[tokio::test]
-async fn a_401_keeps_the_www_authenticate_challenge() -> Result<(), Box<dyn StdError>> {
+async fn a_401_keeps_the_www_authenticate_challenge() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(route()))
@@ -168,7 +167,7 @@ async fn a_401_keeps_the_www_authenticate_challenge() -> Result<(), Box<dyn StdE
 
 #[tokio::test]
 async fn basic_credentials_travel_and_never_reach_a_debug_rendering()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(route()))
@@ -206,7 +205,7 @@ async fn basic_credentials_travel_and_never_reach_a_debug_rendering()
 }
 
 #[tokio::test]
-async fn an_unreachable_server_is_a_transport_error() -> Result<(), Box<dyn StdError>> {
+async fn an_unreachable_server_is_a_transport_error() -> Result<(), Box<dyn std::error::Error>> {
     // A closed loopback port refuses the connection at once, so the failure is
     // the transport's rather than a slow address.
     let closed = ferrobridge_testkit::net::closed_http_url()?;
@@ -230,7 +229,7 @@ async fn an_unreachable_server_is_a_transport_error() -> Result<(), Box<dyn StdE
 }
 
 #[tokio::test]
-async fn a_reachability_probe_reads_the_capability_statement_route() -> Result<(), Box<dyn StdError>>
+async fn a_reachability_probe_reads_the_capability_statement_route() -> Result<(), Box<dyn std::error::Error>>
 {
     for answered in [200_u16, 401, 404, 503] {
         let server = MockServer::start().await;
@@ -249,7 +248,7 @@ async fn a_reachability_probe_reads_the_capability_statement_route() -> Result<(
 
 #[tokio::test]
 async fn a_reachability_probe_that_never_connects_is_a_transport_error()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let closed = ferrobridge_testkit::net::closed_http_url()?;
     let config = Config::new(format!("{closed}/r4").parse()?, WireVersion::R4);
 
@@ -262,7 +261,7 @@ async fn a_reachability_probe_that_never_connects_is_a_transport_error()
 }
 
 #[tokio::test]
-async fn a_caller_built_client_carries_every_request() -> Result<(), Box<dyn StdError>> {
+async fn a_caller_built_client_carries_every_request() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(route()))
@@ -304,7 +303,7 @@ async fn a_caller_built_client_carries_every_request() -> Result<(), Box<dyn Std
 
 #[tokio::test]
 async fn a_caller_built_client_is_bounded_by_the_configured_timeout()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(route()))
@@ -330,7 +329,7 @@ async fn a_caller_built_client_is_bounded_by_the_configured_timeout()
 }
 
 #[test]
-fn a_caller_built_client_refuses_a_base_that_cannot_carry_a_path() -> Result<(), Box<dyn StdError>>
+fn a_caller_built_client_refuses_a_base_that_cannot_carry_a_path() -> Result<(), Box<dyn std::error::Error>>
 {
     let config = Config::new("mailto:tx@example.org".parse()?, WireVersion::R4);
     let error = Client::with_http(config, reqwest::Client::new())

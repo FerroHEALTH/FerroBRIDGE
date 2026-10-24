@@ -7,13 +7,12 @@ use ferrobridge_server::config::Config;
 use ferrobridge_server::config::error::Error;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 use std::time::Duration;
 
 use super::FULL;
 
 #[test]
-fn a_file_states_every_section_and_the_resolver_reads_it() -> Result<(), Box<dyn StdError>> {
+fn a_file_states_every_section_and_the_resolver_reads_it() -> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(Some(FULL), &BTreeMap::new())?.resolve()?;
     assert_eq!("0.0.0.0:9000", settings.server.listen.to_string());
     assert_eq!(Duration::from_millis(1000), settings.server.request_timeout);
@@ -63,7 +62,7 @@ fn a_file_states_every_section_and_the_resolver_reads_it() -> Result<(), Box<dyn
 }
 
 #[test]
-fn the_operations_lane_is_on_by_default_and_names_its_own_device() -> Result<(), Box<dyn StdError>>
+fn the_operations_lane_is_on_by_default_and_names_its_own_device() -> Result<(), Box<dyn std::error::Error>>
 {
     let settings = Config::from_sources(None, &BTreeMap::new())?.resolve()?;
     assert!(settings.operations.enabled);
@@ -79,7 +78,7 @@ fn the_operations_lane_is_on_by_default_and_names_its_own_device() -> Result<(),
 }
 
 #[test]
-fn a_mappings_section_with_no_directory_is_refused() -> Result<(), Box<dyn StdError>> {
+fn a_mappings_section_with_no_directory_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let file = "[mappings]\ntemplates = \"/srv/templates\"\n";
     let error = Config::from_sources(Some(file), &BTreeMap::new())?
         .resolve()
@@ -94,7 +93,7 @@ fn a_mappings_section_with_no_directory_is_refused() -> Result<(), Box<dyn StdEr
 
 #[test]
 fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused_at_resolve()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let file = "[mappings]\ndirectory = \"/srv/mappings\"\n";
     let error = Config::from_sources(Some(file), &BTreeMap::new())?
         .resolve()
@@ -121,7 +120,7 @@ fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused_at_resolve()
 }
 
 #[test]
-fn the_omocl_directory_is_read_from_the_mappings_section() -> Result<(), Box<dyn StdError>> {
+fn the_omocl_directory_is_read_from_the_mappings_section() -> Result<(), Box<dyn std::error::Error>> {
     let text = "[mappings]\nomocl = \"/srv/omocl\"\n";
     let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
     assert_eq!(
@@ -137,7 +136,7 @@ fn the_omocl_directory_is_read_from_the_mappings_section() -> Result<(), Box<dyn
 
 #[test]
 fn the_display_fallback_is_off_unless_the_terminology_lane_turns_it_on()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let lane = "[terminology]\nbase_url = \"http://tx.invalid/fhir\"\n";
     let off = Config::from_sources(Some(lane), &BTreeMap::new())?.resolve()?;
     assert!(
@@ -160,7 +159,7 @@ fn the_display_fallback_is_off_unless_the_terminology_lane_turns_it_on()
 }
 
 #[test]
-fn the_terminology_lane_accepts_each_release_the_client_speaks() -> Result<(), Box<dyn StdError>> {
+fn the_terminology_lane_accepts_each_release_the_client_speaks() -> Result<(), Box<dyn std::error::Error>> {
     for (spelled, expected) in [
         ("stu3", ferrobridge_term::config::WireVersion::Stu3),
         ("STU3", ferrobridge_term::config::WireVersion::Stu3),

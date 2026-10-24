@@ -6,7 +6,6 @@
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 use std::time::Duration;
 
 use super::env;
@@ -20,7 +19,7 @@ fn with_face(face: &str) -> String {
 }
 
 #[test]
-fn the_hl7v2_face_is_off_until_its_section_turns_it_on() -> Result<(), Box<dyn StdError>> {
+fn the_hl7v2_face_is_off_until_its_section_turns_it_on() -> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(None, &BTreeMap::new())?.resolve()?;
     assert!(
         settings.hl7v2.is_none(),
@@ -30,7 +29,7 @@ fn the_hl7v2_face_is_off_until_its_section_turns_it_on() -> Result<(), Box<dyn S
 }
 
 #[test]
-fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn StdError>> {
+fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn std::error::Error>> {
     let text = with_face(concat!(
         "listen = \"0.0.0.0:2576\"\n",
         "default_charset = \"8859/1\"\n",
@@ -93,7 +92,7 @@ fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn the_hl7v2_defaults_skip_and_count_with_both_timeouts() -> Result<(), Box<dyn StdError>> {
+fn the_hl7v2_defaults_skip_and_count_with_both_timeouts() -> Result<(), Box<dyn std::error::Error>> {
     let text = with_face("concept_maps = \"/srv/v2mappings/package\"\n");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let face = settings.hl7v2.ok_or("the face is on")?;
@@ -116,7 +115,7 @@ fn the_hl7v2_defaults_skip_and_count_with_both_timeouts() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn an_hl7v2_key_is_set_through_its_environment_name() -> Result<(), Box<dyn StdError>> {
+fn an_hl7v2_key_is_set_through_its_environment_name() -> Result<(), Box<dyn std::error::Error>> {
     let text = with_face("concept_maps = \"/srv/v2mappings/package\"\n");
     let settings = Config::from_sources(
         Some(&text),
@@ -129,7 +128,7 @@ fn an_hl7v2_key_is_set_through_its_environment_name() -> Result<(), Box<dyn StdE
 }
 
 #[test]
-fn an_hl7v2_face_without_the_facade_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn an_hl7v2_face_without_the_facade_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     match &refusal("[hl7v2]\nenabled = true\nconcept_maps = \"/srv/p\"\n")? {
         Error::Needs { key, needs } => {
             assert_eq!("hl7v2.enabled", key);
@@ -141,7 +140,7 @@ fn an_hl7v2_face_without_the_facade_refuses_to_boot() -> Result<(), Box<dyn StdE
 }
 
 #[test]
-fn an_hl7v2_face_without_its_concept_maps_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn an_hl7v2_face_without_its_concept_maps_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     match &refusal(&with_face(""))? {
         Error::Missing { key } => assert_eq!("hl7v2.concept_maps", key),
         other => return Err(format!("expected a missing key, got {other:?}").into()),
@@ -150,7 +149,7 @@ fn an_hl7v2_face_without_its_concept_maps_refuses_to_boot() -> Result<(), Box<dy
 }
 
 #[test]
-fn every_bad_hl7v2_value_refuses_to_boot_naming_its_key() -> Result<(), Box<dyn StdError>> {
+fn every_bad_hl7v2_value_refuses_to_boot_naming_its_key() -> Result<(), Box<dyn std::error::Error>> {
     let maps = "concept_maps = \"/srv/p\"\n";
     let cases = [
         ("listen = \"nowhere\"\n", "hl7v2.listen"),

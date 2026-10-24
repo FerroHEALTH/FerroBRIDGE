@@ -6,7 +6,7 @@
 //! specification governs where the files live: our own design.
 
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use ferrobridge_server::config::Config;
@@ -31,7 +31,7 @@ struct Trees {
 
 impl Trees {
     /// Creates both trees, empty.
-    fn new() -> Result<Self, Box<dyn StdError>> {
+    fn new() -> Result<Self, Box<dyn Error>> {
         let root = tempfile::tempdir()?;
         std::fs::create_dir_all(root.path().join("omocl"))?;
         std::fs::create_dir_all(root.path().join("console/omocl"))?;
@@ -49,13 +49,13 @@ impl Trees {
     }
 
     /// Copies the corpus cluster `name` to `directory` as `as_name`.
-    fn copy(directory: &Path, name: &str, as_name: &str) -> Result<(), Box<dyn StdError>> {
+    fn copy(directory: &Path, name: &str, as_name: &str) -> Result<(), Box<dyn Error>> {
         std::fs::copy(Path::new(CLUSTERS).join(name), directory.join(as_name))?;
         Ok(())
     }
 
     /// Returns the settings of a configuration naming both trees.
-    fn settings(&self) -> Result<ferrobridge_server::config::Settings, Box<dyn StdError>> {
+    fn settings(&self) -> Result<ferrobridge_server::config::Settings, Box<dyn Error>> {
         let text = format!(
             "{AUTH}\n[mappings]\nomocl = \"{}\"\n\n[operator]\nenabled = true\nmapping_dir = \"{}\"\n",
             self.provisioned().display(),
@@ -77,7 +77,7 @@ fn names(set: &omocl::model::load::MappingSet) -> Vec<String> {
 
 #[test]
 fn the_console_tree_joins_the_provisioned_one_when_the_operator_api_saves()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let trees = Trees::new()?;
     let roots = omocl_roots(&trees.settings()?);
     let owners: Vec<(Language, Owner, &Path)> = roots
@@ -97,7 +97,7 @@ fn the_console_tree_joins_the_provisioned_one_when_the_operator_api_saves()
 }
 
 #[test]
-fn without_the_operator_api_only_the_provisioned_tree_is_read() -> Result<(), Box<dyn StdError>> {
+fn without_the_operator_api_only_the_provisioned_tree_is_read() -> Result<(), Box<dyn Error>> {
     let trees = Trees::new()?;
     let text = format!(
         "[mappings]\nomocl = \"{}\"\n",
@@ -123,7 +123,7 @@ fn without_the_operator_api_only_the_provisioned_tree_is_read() -> Result<(), Bo
 
 #[test]
 fn etl_run_maps_with_the_provisioned_and_the_console_files_together()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let trees = Trees::new()?;
     Trees::copy(
         &trees.provisioned(),
@@ -147,7 +147,7 @@ fn etl_run_maps_with_the_provisioned_and_the_console_files_together()
 }
 
 #[test]
-fn a_provisioned_file_owns_a_path_the_console_tree_also_holds() -> Result<(), Box<dyn StdError>> {
+fn a_provisioned_file_owns_a_path_the_console_tree_also_holds() -> Result<(), Box<dyn Error>> {
     let trees = Trees::new()?;
     Trees::copy(&trees.provisioned(), "Specimen_v1.yml", "Specimen_v1.yml")?;
     std::fs::write(
@@ -160,7 +160,7 @@ fn a_provisioned_file_owns_a_path_the_console_tree_also_holds() -> Result<(), Bo
 }
 
 #[test]
-fn a_console_file_defining_a_provisioned_mapping_is_refused() -> Result<(), Box<dyn StdError>> {
+fn a_console_file_defining_a_provisioned_mapping_is_refused() -> Result<(), Box<dyn Error>> {
     let trees = Trees::new()?;
     Trees::copy(&trees.provisioned(), "Specimen_v1.yml", "Specimen_v1.yml")?;
     Trees::copy(
@@ -177,7 +177,7 @@ fn a_console_file_defining_a_provisioned_mapping_is_refused() -> Result<(), Box<
 }
 
 #[test]
-fn a_console_tree_alone_serves_and_an_empty_one_is_refused() -> Result<(), Box<dyn StdError>> {
+fn a_console_tree_alone_serves_and_an_empty_one_is_refused() -> Result<(), Box<dyn Error>> {
     let trees = Trees::new()?;
     let text = format!(
         "{AUTH}\n[operator]\nenabled = true\nmapping_dir = \"{}\"\n",

@@ -10,7 +10,6 @@ use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::error::Error;
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
-use std::error::Error as StdError;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -26,7 +25,7 @@ async fn mount(server: &MockServer, version: WireVersion, response: ResponseTemp
 }
 
 #[tokio::test]
-async fn a_served_code_system_counts_one_in_every_release() -> Result<(), Box<dyn StdError>> {
+async fn a_served_code_system_counts_one_in_every_release() -> Result<(), Box<dyn std::error::Error>> {
     for version in [WireVersion::Stu3, WireVersion::R4, WireVersion::R4B] {
         let server = MockServer::start().await;
         mount(&server, version, terminology::search_count(1)).await;
@@ -39,7 +38,7 @@ async fn a_served_code_system_counts_one_in_every_release() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn an_unserved_code_system_counts_zero() -> Result<(), Box<dyn StdError>> {
+async fn an_unserved_code_system_counts_zero() -> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(&server, version, terminology::search_count(0)).await;
@@ -52,7 +51,7 @@ async fn an_unserved_code_system_counts_zero() -> Result<(), Box<dyn StdError>> 
 }
 
 #[tokio::test]
-async fn an_answer_that_is_not_a_searchset_is_a_decode_error() -> Result<(), Box<dyn StdError>> {
+async fn an_answer_that_is_not_a_searchset_is_a_decode_error() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let bundle =
         serde_json::json!({"resourceType": "Bundle", "type": "batch-response", "total": 1});
@@ -72,7 +71,7 @@ async fn an_answer_that_is_not_a_searchset_is_a_decode_error() -> Result<(), Box
 }
 
 #[tokio::test]
-async fn a_searchset_with_no_total_is_a_decode_error() -> Result<(), Box<dyn StdError>> {
+async fn a_searchset_with_no_total_is_a_decode_error() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let bundle = serde_json::json!({"resourceType": "Bundle", "type": "searchset"});
     mount(
@@ -91,7 +90,7 @@ async fn a_searchset_with_no_total_is_a_decode_error() -> Result<(), Box<dyn Std
 }
 
 #[tokio::test]
-async fn a_refused_search_is_a_typed_error() -> Result<(), Box<dyn StdError>> {
+async fn a_refused_search_is_a_typed_error() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,

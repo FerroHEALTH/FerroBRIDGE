@@ -16,12 +16,11 @@ use ferrobridge_testkit::containers::{self, Postgres};
 use ferrobridge_testkit::tls::{TlsError, TlsMaterial};
 use omop_cdm::connection::SslMode;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 use std::io::Write;
 use std::process::Output;
 
 /// Resolves `text`, returning the refusal.
-fn refusal(text: &str) -> Result<Error, Box<dyn StdError>> {
+fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
     match Config::from_sources(Some(text), &BTreeMap::new())?.resolve() {
         Ok(_) => Err("the configuration resolved".into()),
         Err(error) => Ok(error),
@@ -29,7 +28,7 @@ fn refusal(text: &str) -> Result<Error, Box<dyn StdError>> {
 }
 
 /// Returns `error` and every cause behind it as one line.
-fn chain(error: &dyn StdError) -> String {
+fn chain(error: &dyn std::error::Error) -> String {
     let mut line = error.to_string();
     let mut cause = error.source();
     while let Some(source) = cause {
@@ -45,7 +44,7 @@ fn chain(error: &dyn StdError) -> String {
     clippy::print_stderr,
     reason = "a case that cannot generate its certificates says it skipped"
 )]
-fn material() -> Result<Option<TlsMaterial>, Box<dyn StdError>> {
+fn material() -> Result<Option<TlsMaterial>, Box<dyn std::error::Error>> {
     match TlsMaterial::generate() {
         Ok(material) => Ok(Some(material)),
         Err(TlsError::MissingOpenssl) => {
@@ -57,7 +56,7 @@ fn material() -> Result<Option<TlsMaterial>, Box<dyn StdError>> {
 }
 
 #[test]
-fn a_fallback_sslmode_is_refused_naming_the_mode() -> Result<(), Box<dyn StdError>> {
+fn a_fallback_sslmode_is_refused_naming_the_mode() -> Result<(), Box<dyn std::error::Error>> {
     for mode in ["prefer", "allow"] {
         let error = refusal(&format!(
             "[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode={mode}\"\n"
@@ -73,14 +72,14 @@ fn a_fallback_sslmode_is_refused_naming_the_mode() -> Result<(), Box<dyn StdErro
 }
 
 #[test]
-fn an_unknown_sslmode_is_refused_naming_the_mode() -> Result<(), Box<dyn StdError>> {
+fn an_unknown_sslmode_is_refused_naming_the_mode() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal("[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode=strict\"\n")?;
     assert!(chain(&error).contains("sslmode=strict"), "{error:?}");
     Ok(())
 }
 
 #[test]
-fn a_fallback_sslmode_exits_seventy_eight() -> Result<(), Box<dyn StdError>> {
+fn a_fallback_sslmode_exits_seventy_eight() -> Result<(), Box<dyn std::error::Error>> {
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(
         file,
@@ -103,7 +102,7 @@ fn a_fallback_sslmode_exits_seventy_eight() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn every_libpq_mode_that_never_falls_back_resolves() -> Result<(), Box<dyn StdError>> {
+fn every_libpq_mode_that_never_falls_back_resolves() -> Result<(), Box<dyn std::error::Error>> {
     for mode in [
         SslMode::Disable,
         SslMode::Require,
@@ -119,7 +118,7 @@ fn every_libpq_mode_that_never_falls_back_resolves() -> Result<(), Box<dyn StdEr
 }
 
 #[test]
-fn a_url_without_sslmode_is_refused_naming_the_four_modes() -> Result<(), Box<dyn StdError>> {
+fn a_url_without_sslmode_is_refused_naming_the_four_modes() -> Result<(), Box<dyn std::error::Error>> {
     for url in [
         "postgres://db.invalid/cdm",
         "postgres://db.invalid/cdm?application_name=bridge",
@@ -139,7 +138,7 @@ fn a_url_without_sslmode_is_refused_naming_the_four_modes() -> Result<(), Box<dy
 }
 
 #[test]
-fn a_url_without_sslmode_exits_seventy_eight() -> Result<(), Box<dyn StdError>> {
+fn a_url_without_sslmode_exits_seventy_eight() -> Result<(), Box<dyn std::error::Error>> {
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "[cdm]\nurl = \"postgres://db.invalid/cdm\"")?;
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_ferrobridge"))
@@ -158,7 +157,7 @@ fn a_url_without_sslmode_exits_seventy_eight() -> Result<(), Box<dyn StdError>> 
 }
 
 #[test]
-fn a_libpq_tls_variable_in_the_environment_is_refused_naming_it() -> Result<(), Box<dyn StdError>> {
+fn a_libpq_tls_variable_in_the_environment_is_refused_naming_it() -> Result<(), Box<dyn std::error::Error>> {
     for name in ["PGSSLROOTCERT", "PGSSLCERT", "PGSSLKEY"] {
         let mut file = tempfile::NamedTempFile::new()?;
         writeln!(
@@ -196,7 +195,7 @@ observation_period_type_concept_id = 32880
 "#;
 
 #[test]
-fn the_etl_lane_reports_the_sslmode_and_no_credential() -> Result<(), Box<dyn StdError>> {
+fn the_etl_lane_reports_the_sslmode_and_no_credential() -> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(Some(ETL_OVER_TLS), &BTreeMap::new())?.resolve()?;
     let lanes = ferrobridge_server::startup::lanes(&settings);
     let etl = lanes
@@ -221,7 +220,7 @@ fn the_etl_lane_reports_the_sslmode_and_no_credential() -> Result<(), Box<dyn St
 }
 
 #[test]
-fn a_ca_inline_and_in_a_file_together_are_refused() -> Result<(), Box<dyn StdError>> {
+fn a_ca_inline_and_in_a_file_together_are_refused() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(
         "[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode=verify-full\"\n\
          tls_ca = \"x\"\ntls_ca_file = \"/nonexistent\"\n",
@@ -234,7 +233,7 @@ fn a_ca_inline_and_in_a_file_together_are_refused() -> Result<(), Box<dyn StdErr
 }
 
 #[test]
-fn a_ca_file_that_holds_no_certificate_is_refused_naming_the_key() -> Result<(), Box<dyn StdError>>
+fn a_ca_file_that_holds_no_certificate_is_refused_naming_the_key() -> Result<(), Box<dyn std::error::Error>>
 {
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "not a certificate")?;
@@ -250,7 +249,7 @@ fn a_ca_file_that_holds_no_certificate_is_refused_naming_the_key() -> Result<(),
 }
 
 #[test]
-fn an_unreadable_ca_file_is_refused_naming_the_key() -> Result<(), Box<dyn StdError>> {
+fn an_unreadable_ca_file_is_refused_naming_the_key() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(
         "[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode=verify-full\"\n\
          tls_ca_file = \"/nonexistent/ca.pem\"\n",
@@ -263,7 +262,7 @@ fn an_unreadable_ca_file_is_refused_naming_the_key() -> Result<(), Box<dyn StdEr
 }
 
 #[test]
-fn a_ca_with_sslmode_disable_is_refused() -> Result<(), Box<dyn StdError>> {
+fn a_ca_with_sslmode_disable_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let error =
         refusal("[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode=disable\"\ntls_ca = \"x\"\n")?;
     assert!(
@@ -274,7 +273,7 @@ fn a_ca_with_sslmode_disable_is_refused() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn a_ca_file_is_read_at_configuration() -> Result<(), Box<dyn StdError>> {
+fn a_ca_file_is_read_at_configuration() -> Result<(), Box<dyn std::error::Error>> {
     let Some(material) = material()? else {
         return Ok(());
     };
@@ -292,7 +291,7 @@ fn a_ca_file_is_read_at_configuration() -> Result<(), Box<dyn StdError>> {
 
 /// Runs `ferrobridge cdm init` with `extra` over a configuration naming
 /// `url` and `lines`.
-fn cdm_init(url: &str, lines: &str, extra: &[&str]) -> Result<Output, Box<dyn StdError>> {
+fn cdm_init(url: &str, lines: &str, extra: &[&str]) -> Result<Output, Box<dyn std::error::Error>> {
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "[cdm]\nurl = {url:?}\n{lines}")?;
     Ok(
@@ -316,7 +315,7 @@ fn text(output: &Output) -> String {
 }
 
 /// Runs `statements` on `postgres` over a connection of its own.
-async fn execute(postgres: &Postgres, statements: &str) -> Result<(), Box<dyn StdError>> {
+async fn execute(postgres: &Postgres, statements: &str) -> Result<(), Box<dyn std::error::Error>> {
     let (client, connection) =
         tokio_postgres::connect(postgres.url(), tokio_postgres::NoTls).await?;
     let driver = tokio::spawn(connection);
@@ -326,7 +325,7 @@ async fn execute(postgres: &Postgres, statements: &str) -> Result<(), Box<dyn St
 }
 
 /// Returns how many foreign keys schema `cdm` holds.
-async fn foreign_keys(postgres: &Postgres) -> Result<i64, Box<dyn StdError>> {
+async fn foreign_keys(postgres: &Postgres) -> Result<i64, Box<dyn std::error::Error>> {
     let (client, connection) =
         tokio_postgres::connect(postgres.url(), tokio_postgres::NoTls).await?;
     let driver = tokio::spawn(connection);
@@ -344,7 +343,7 @@ async fn foreign_keys(postgres: &Postgres) -> Result<i64, Box<dyn StdError>> {
 
 #[tokio::test]
 async fn a_second_cdm_init_exits_zero_and_says_the_schema_is_initialised()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }
@@ -368,7 +367,7 @@ async fn a_second_cdm_init_exits_zero_and_says_the_schema_is_initialised()
 
 #[tokio::test]
 async fn cdm_init_on_a_partial_schema_fails_naming_the_missing_tables()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }
@@ -389,7 +388,7 @@ async fn cdm_init_on_a_partial_schema_fails_naming_the_missing_tables()
 }
 
 #[tokio::test]
-async fn cdm_init_without_the_flag_leaves_the_foreign_keys_out() -> Result<(), Box<dyn StdError>> {
+async fn cdm_init_without_the_flag_leaves_the_foreign_keys_out() -> Result<(), Box<dyn std::error::Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }
@@ -403,7 +402,7 @@ async fn cdm_init_without_the_flag_leaves_the_foreign_keys_out() -> Result<(), B
 /// At OHDSI tag v5.4.3 PostgreSQL refuses line 157 of the constraints file
 /// with SQLSTATE 42830, so the flag fails the run and names the statement.
 #[tokio::test]
-async fn cdm_init_with_constraints_reports_the_refused_statement() -> Result<(), Box<dyn StdError>>
+async fn cdm_init_with_constraints_reports_the_refused_statement() -> Result<(), Box<dyn std::error::Error>>
 {
     if !containers::e2e_enabled() {
         return Ok(());
@@ -426,7 +425,7 @@ async fn cdm_init_with_constraints_reports_the_refused_statement() -> Result<(),
 }
 
 #[tokio::test]
-async fn cdm_init_connects_over_verify_full_with_the_ca_file() -> Result<(), Box<dyn StdError>> {
+async fn cdm_init_connects_over_verify_full_with_the_ca_file() -> Result<(), Box<dyn std::error::Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }

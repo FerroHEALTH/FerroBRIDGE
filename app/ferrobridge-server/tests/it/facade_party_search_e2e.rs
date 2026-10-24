@@ -17,7 +17,7 @@
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -99,7 +99,7 @@ fn name_query_of(class: &str) -> String {
 /// Returns the search of every `(type, class)` pair, with a `name` query on
 /// `Patient` and `Practitioner`, the two R4 types of this search that define
 /// `name` over a person (<https://hl7.org/fhir/R4/patient.html#search>).
-fn searching(types: &[(&str, &str)]) -> Result<PartySearch, Box<dyn StdError>> {
+fn searching(types: &[(&str, &str)]) -> Result<PartySearch, Box<dyn Error>> {
     let mut queries = BTreeMap::new();
     for &(resource_type, class) in types {
         let name = matches!(resource_type, "Patient" | "Practitioner")
@@ -115,7 +115,7 @@ fn searching(types: &[(&str, &str)]) -> Result<PartySearch, Box<dyn StdError>> {
 }
 
 /// Starts the reference CDR and uploads the testkit's party templates.
-async fn started() -> Result<Cdr, Box<dyn StdError>> {
+async fn started() -> Result<Cdr, Box<dyn Error>> {
     let cdr = containers::cdr().await?;
     for opt in [
         fixtures::PERSON_OPT,
@@ -128,7 +128,7 @@ async fn started() -> Result<Cdr, Box<dyn StdError>> {
 }
 
 /// Returns a facade over `cdr` searching as `search` configures.
-async fn facade_over(cdr: &Cdr, search: PartySearch) -> Result<Arc<Facade>, Box<dyn StdError>> {
+async fn facade_over(cdr: &Cdr, search: PartySearch) -> Result<Arc<Facade>, Box<dyn Error>> {
     let client = CdrClient::new(&CdrConfig::new(cdr.base_url().parse()?).with_demographic(true))?;
     let set = programs::read_set(std::path::Path::new(FIXTURES))?;
     let templates = programs::fetch_templates(&set, &client).await?;
@@ -163,7 +163,7 @@ fn person(resource_type: &str, identifier: &str, name: &str) -> serde_json::Valu
 async fn create(
     facade: &Arc<Facade>,
     body: &serde_json::Value,
-) -> Result<String, Box<dyn StdError>> {
+) -> Result<String, Box<dyn Error>> {
     let resource_type = body["resourceType"].as_str().ok_or("a resource type")?;
     let created = call(
         app(facade),
@@ -191,7 +191,7 @@ async fn create(
 async fn get(
     facade: &Arc<Facade>,
     path: &str,
-) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     call(
         app(facade),
         Request::get(format!("/fhir/{path}")).body(Body::empty())?,
@@ -203,7 +203,7 @@ async fn get(
 async fn searchset(
     facade: &Arc<Facade>,
     path: &str,
-) -> Result<serde_json::Value, Box<dyn StdError>> {
+) -> Result<serde_json::Value, Box<dyn Error>> {
     let (status, body) = get(facade, path).await?;
     assert_eq!(StatusCode::OK, status, "{path}: {body}");
     assert_eq!(body["type"], "searchset", "{path}: {body}");
@@ -268,7 +268,7 @@ struct Seeded {
 }
 
 /// Creates the synthetic parties through the facade.
-async fn seed(facade: &Arc<Facade>) -> Result<Seeded, Box<dyn StdError>> {
+async fn seed(facade: &Arc<Facade>) -> Result<Seeded, Box<dyn Error>> {
     let alpha = create(
         facade,
         &person("Patient", PATIENT_IDENTIFIER, "Alpha Synthetic"),
@@ -314,7 +314,7 @@ async fn seed(facade: &Arc<Facade>) -> Result<Seeded, Box<dyn StdError>> {
 
 #[tokio::test]
 async fn the_party_searches_find_the_parties_the_reference_cdr_holds()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }
@@ -421,7 +421,7 @@ async fn the_party_searches_find_the_parties_the_reference_cdr_holds()
 /// configured over one and answers `501 not-supported` naming the extension,
 /// never an empty searchset.
 #[tokio::test]
-async fn a_root_the_reference_cdr_refuses_answers_501() -> Result<(), Box<dyn StdError>> {
+async fn a_root_the_reference_cdr_refuses_answers_501() -> Result<(), Box<dyn Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }

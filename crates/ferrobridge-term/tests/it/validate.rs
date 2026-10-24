@@ -11,7 +11,6 @@ use ferrobridge_term::outcome::ValidateOutcome;
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use http::StatusCode;
-use std::error::Error as StdError;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -47,7 +46,7 @@ async fn validate(
 
 #[tokio::test]
 async fn a_member_is_valid_and_carries_its_display_in_both_releases()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -68,7 +67,7 @@ async fn a_member_is_valid_and_carries_its_display_in_both_releases()
 }
 
 #[tokio::test]
-async fn a_non_member_is_invalid_and_surfaces_its_issues_outcome() -> Result<(), Box<dyn StdError>>
+async fn a_non_member_is_invalid_and_surfaces_its_issues_outcome() -> Result<(), Box<dyn std::error::Error>>
 {
     for version in RELEASES {
         let server = MockServer::start().await;
@@ -105,7 +104,7 @@ async fn a_non_member_is_invalid_and_surfaces_its_issues_outcome() -> Result<(),
 }
 
 #[tokio::test]
-async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn StdError>> {
+async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -144,7 +143,7 @@ async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dy
 
 #[tokio::test]
 async fn an_unknown_value_set_is_a_typed_error_and_never_an_invalid_code()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     // The testkit stubs write one `OperationOutcome` shape for R4 and R4B,
     // so each release is refused from the same body.
     for version in RELEASES {
@@ -181,7 +180,7 @@ async fn an_unknown_value_set_is_a_typed_error_and_never_an_invalid_code()
 
 #[tokio::test]
 async fn a_server_failure_is_a_typed_error_carrying_the_upstream_status_in_both_releases()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(

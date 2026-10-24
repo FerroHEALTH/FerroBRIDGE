@@ -6,10 +6,9 @@
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 
 #[test]
-fn an_unknown_key_refuses_to_boot_and_the_message_names_it() -> Result<(), Box<dyn StdError>> {
+fn an_unknown_key_refuses_to_boot_and_the_message_names_it() -> Result<(), Box<dyn std::error::Error>> {
     let error = Config::from_sources(Some("[server]\nlisten_port = 8080\n"), &BTreeMap::new())
         .expect_err("an unknown key is a boot error");
     let Error::Parse { source } = &error else {
@@ -23,7 +22,7 @@ fn an_unknown_key_refuses_to_boot_and_the_message_names_it() -> Result<(), Box<d
 }
 
 #[test]
-fn an_unknown_section_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn an_unknown_section_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = Config::from_sources(Some("[cache]\nsize = 1\n"), &BTreeMap::new())
         .expect_err("an unknown section is a boot error");
     let Error::Parse { source } = &error else {
@@ -35,7 +34,7 @@ fn an_unknown_section_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 fn a_value_of_the_wrong_type_refuses_to_boot_and_the_message_names_its_key()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let error = Config::from_sources(
         Some("[server]\nrequest_timeout_ms = \"thirty seconds\"\n"),
         &BTreeMap::new(),
@@ -52,7 +51,7 @@ fn a_value_of_the_wrong_type_refuses_to_boot_and_the_message_names_its_key()
 }
 
 #[test]
-fn an_unknown_log_format_refuses_to_boot_and_names_its_key() -> Result<(), Box<dyn StdError>> {
+fn an_unknown_log_format_refuses_to_boot_and_names_its_key() -> Result<(), Box<dyn std::error::Error>> {
     let error = Config::from_sources(Some("[telemetry]\nformat = \"xml\"\n"), &BTreeMap::new())
         .expect_err("xml is not a rendering");
     let Error::Parse { source } = &error else {
@@ -66,7 +65,7 @@ fn an_unknown_log_format_refuses_to_boot_and_names_its_key() -> Result<(), Box<d
 
 #[test]
 fn a_bad_listen_address_a_bad_url_and_a_bad_release_each_name_their_key()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let listen = Config::from_sources(Some("[server]\nlisten = \"nowhere\"\n"), &BTreeMap::new())?
         .resolve()
         .expect_err("nowhere is not a socket address");
@@ -104,7 +103,7 @@ fn a_bad_listen_address_a_bad_url_and_a_bad_release_each_name_their_key()
 }
 
 #[test]
-fn a_section_that_is_present_and_names_no_url_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_section_that_is_present_and_names_no_url_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = Config::from_sources(Some("[cdr]\ntimeout_ms = 1000\n"), &BTreeMap::new())?
         .resolve()
         .expect_err("a CDR lane with no base URL cannot start");

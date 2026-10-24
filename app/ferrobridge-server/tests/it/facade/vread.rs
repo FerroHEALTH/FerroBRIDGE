@@ -7,7 +7,7 @@ use axum::body::Body;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::Mock;
 use wiremock::MockServer;
 use wiremock::ResponseTemplate;
@@ -52,7 +52,7 @@ async fn mount_version(cdr: &MockServer, version: &str, body: &serde_json::Value
 }
 
 #[tokio::test]
-async fn a_vread_of_the_location_a_create_answers_is_that_version() -> Result<(), Box<dyn StdError>>
+async fn a_vread_of_the_location_a_create_answers_is_that_version() -> Result<(), Box<dyn Error>>
 {
     // vread answers `GET [base]/[type]/[id]/_history/[vid]` with an ETag
     // naming the versionId (<https://hl7.org/fhir/R4/http.html#vread>).
@@ -83,7 +83,7 @@ async fn a_vread_of_the_location_a_create_answers_is_that_version() -> Result<()
 
 #[tokio::test]
 async fn after_an_update_each_version_reads_back_with_its_own_content()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -129,7 +129,7 @@ async fn after_an_update_each_version_reads_back_with_its_own_content()
 
 #[tokio::test]
 async fn a_vread_of_a_version_the_cdr_does_not_hold_is_four_hundred_and_four()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -153,7 +153,7 @@ async fn a_vread_of_a_version_the_cdr_does_not_hold_is_four_hundred_and_four()
 
 #[tokio::test]
 async fn a_vread_of_a_version_the_cdr_reports_deleted_is_four_hundred_and_ten()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // "If the version referred to is actually one where the resource was
     // deleted, the server should return a 410"
     // (<https://hl7.org/fhir/R4/http.html#vread>).
@@ -181,7 +181,7 @@ async fn a_vread_of_a_version_the_cdr_reports_deleted_is_four_hundred_and_ten()
 async fn get_modified(
     harness: &super::Harness,
     path: &str,
-) -> Result<(StatusCode, Option<String>, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, Option<String>, serde_json::Value), Box<dyn Error>> {
     let response = super::raw(harness.app(), Request::get(path).body(Body::empty())?).await?;
     let status = response.status();
     let modified = response
@@ -195,7 +195,7 @@ async fn get_modified(
 
 #[tokio::test]
 async fn a_read_and_a_vread_answer_the_commit_time_as_last_modified()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // "Servers SHOULD return an ETag header … and a Last-Modified header"
     // (<https://hl7.org/fhir/R4/http.html#read>, #vread); the commit time is
     // the version's commit audit in the CDR's revision history.
@@ -216,7 +216,7 @@ async fn a_read_and_a_vread_answer_the_commit_time_as_last_modified()
 
 #[tokio::test]
 async fn an_earlier_version_reads_back_after_the_latest_was_deleted()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // vread names a version, and only "a version where the resource was
     // deleted" answers 410 (<https://hl7.org/fhir/R4/http.html#vread>).
     let harness = harness().await;
@@ -248,7 +248,7 @@ async fn an_earlier_version_reads_back_after_the_latest_was_deleted()
 }
 
 #[tokio::test]
-async fn an_earlier_version_is_named_by_its_own_creating_system() -> Result<(), Box<dyn StdError>> {
+async fn an_earlier_version_is_named_by_its_own_creating_system() -> Result<(), Box<dyn Error>> {
     // The history names each version whole, so a version committed by another
     // system than the latest is still the one `[vid]` names.
     let harness = harness().await;
@@ -270,7 +270,7 @@ async fn an_earlier_version_is_named_by_its_own_creating_system() -> Result<(), 
 }
 
 #[tokio::test]
-async fn a_commit_time_with_no_offset_answers_no_last_modified() -> Result<(), Box<dyn StdError>> {
+async fn a_commit_time_with_no_offset_answers_no_last_modified() -> Result<(), Box<dyn Error>> {
     // An HTTP-date names an instant, and a local ISO 8601 date-time names none.
     let harness = harness().await;
     let id = create_one(&harness).await?;
@@ -284,7 +284,7 @@ async fn a_commit_time_with_no_offset_answers_no_last_modified() -> Result<(), B
 }
 
 #[tokio::test]
-async fn a_commit_time_that_is_no_date_time_is_a_bad_gateway() -> Result<(), Box<dyn StdError>> {
+async fn a_commit_time_that_is_no_date_time_is_a_bad_gateway() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_history(&harness.cdr, &[VERSION_ONE], "the day before yesterday").await;
@@ -301,7 +301,7 @@ async fn a_commit_time_that_is_no_date_time_is_a_bad_gateway() -> Result<(), Box
 
 #[tokio::test]
 async fn a_version_the_outbound_mapping_refuses_is_a_500_naming_no_clinical_value()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // NOTE: R4 http.html §3.1.0.4: a vread sends no content, so a stored composition the
     // engine refuses is the server's failure, a `500` with `processing` (#831).
     let harness = harness().await;
@@ -324,7 +324,7 @@ async fn a_version_the_outbound_mapping_refuses_is_a_500_naming_no_clinical_valu
 
 #[tokio::test]
 async fn a_read_of_a_version_the_history_does_not_list_is_a_bad_gateway()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_history(&harness.cdr, &[VERSION_ONE], COMMITTED).await;

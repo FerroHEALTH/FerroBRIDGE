@@ -7,7 +7,7 @@ use axum::body::Body;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 
 use fhirconnect::operations::issues::OPENEHR_PATH_SYSTEM;
 
@@ -25,7 +25,7 @@ use super::harness_over;
 use super::settings;
 
 #[tokio::test]
-async fn validate_answers_two_hundred_and_commits_nothing() -> Result<(), Box<dyn StdError>> {
+async fn validate_answers_two_hundred_and_commits_nothing() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let request = Request::post(VALIDATE)
         .header(header::CONTENT_TYPE, "application/fhir+json")
@@ -52,7 +52,7 @@ async fn validate_answers_two_hundred_and_commits_nothing() -> Result<(), Box<dy
 
 #[tokio::test]
 async fn validate_reports_the_verdict_of_a_resource_that_would_not_commit()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let mut resource = condition();
     resource["subject"] = serde_json::json!({ "display": "no identifier and no reference" });
@@ -74,7 +74,7 @@ async fn validate_reports_the_verdict_of_a_resource_that_would_not_commit()
 
 #[tokio::test]
 async fn validate_mirrors_the_create_paths_operation_level_statuses()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let mut resource = condition();
     resource["meta"] = serde_json::json!({ "profile": ["http://example.org/other"] });
@@ -100,7 +100,7 @@ async fn validate_mirrors_the_create_paths_operation_level_statuses()
 
 /// Returns `error` and every cause behind it as one line, the way the facade
 /// renders a refusal into `issue.diagnostics`.
-fn chain_of(error: &dyn StdError) -> String {
+fn chain_of(error: &dyn Error) -> String {
     let mut line = error.to_string();
     let mut cause = error.source();
     while let Some(source) = cause {
@@ -122,7 +122,7 @@ fn condition_without_code() -> serde_json::Value {
 }
 
 #[tokio::test]
-async fn validate_names_the_template_and_the_ehr_disposition() -> Result<(), Box<dyn StdError>> {
+async fn validate_names_the_template_and_the_ehr_disposition() -> Result<(), Box<dyn Error>> {
     // The carry-over case of #115: `information` issues naming what would be
     // committed and where.
     let harness = harness().await;
@@ -160,7 +160,7 @@ async fn validate_names_the_template_and_the_ehr_disposition() -> Result<(), Box
 }
 
 #[tokio::test]
-async fn validate_names_the_ehr_the_identity_map_already_holds() -> Result<(), Box<dyn StdError>> {
+async fn validate_names_the_ehr_the_identity_map_already_holds() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     create_one(&harness).await?;
     let before = harness.received("POST", "/ehr").await;
@@ -185,7 +185,7 @@ async fn validate_names_the_ehr_the_identity_map_already_holds() -> Result<(), B
 
 #[tokio::test]
 async fn validate_carries_the_validators_message_verbatim_and_writes_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let resource = condition_without_code();
     let loaded = harness
@@ -225,7 +225,7 @@ async fn validate_carries_the_validators_message_verbatim_and_writes_nothing()
 }
 
 #[tokio::test]
-async fn validate_refuses_at_the_operation_level_as_create_does() -> Result<(), Box<dyn StdError>> {
+async fn validate_refuses_at_the_operation_level_as_create_does() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let mut unknown_member = condition();
     unknown_member["notAnElement"] = serde_json::json!("x");
@@ -285,7 +285,7 @@ fn issues_naming<'a>(body: &'a serde_json::Value, text: &str) -> Vec<&'a serde_j
 
 #[tokio::test]
 async fn validate_locates_a_loss_by_its_fhirpath_and_its_openehr_path()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // `engine/rest-api.adoc` §Reporting partial results with `OperationOutcome`:
     // the gap is explicit, and R4 `OperationOutcome.issue.expression` is where
     // the FHIRPath of the element it concerns goes.

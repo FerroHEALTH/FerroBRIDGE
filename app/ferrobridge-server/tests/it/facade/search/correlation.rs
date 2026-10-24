@@ -11,7 +11,7 @@
 //! `FERROBRIDGE_E2E` proves the crossed pair matches nothing.
 
 use http::StatusCode;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
@@ -33,7 +33,7 @@ use super::searching;
 
 #[tokio::test]
 async fn code_and_system_are_compared_on_the_one_node_the_from_binds()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = searching().await;
     mount_rows(&harness.cdr, &[]).await;
     let (status, body) = get(&harness, "Condition?code=http://snomed.info/sct%7C44054006").await?;
@@ -69,7 +69,7 @@ async fn code_and_system_are_compared_on_the_one_node_the_from_binds()
 }
 
 #[tokio::test]
-async fn a_composition_whose_two_nodes_match_is_one_entry() -> Result<(), Box<dyn StdError>> {
+async fn a_composition_whose_two_nodes_match_is_one_entry() -> Result<(), Box<dyn Error>> {
     let harness = searching().await;
     let composition = harness.composition();
     let node = diagnosis(&composition);
@@ -93,7 +93,7 @@ async fn a_composition_whose_two_nodes_match_is_one_entry() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn paging_and_the_total_count_compositions_and_never_nodes() -> Result<(), Box<dyn StdError>>
+async fn paging_and_the_total_count_compositions_and_never_nodes() -> Result<(), Box<dyn Error>>
 {
     // Rows A, A, B: two compositions, the first matching on two nodes. A page
     // of one holds A, and the next page starts at B's row, offset 2.

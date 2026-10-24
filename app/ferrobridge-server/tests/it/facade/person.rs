@@ -14,7 +14,7 @@ use ferrobridge_server::facade::subject::SubjectLink;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use wiremock::Mock;
 use wiremock::MockServer;
@@ -38,7 +38,7 @@ const CONTEXT: &str = "ferrobridge_kds_person.context";
 
 /// Returns a harness whose facade serves the KDS person mapping set over a
 /// CDR that serves the published `KDS_Person` template.
-async fn person_harness() -> Result<(Harness, tempfile::TempDir), Box<dyn StdError>> {
+async fn person_harness() -> Result<(Harness, tempfile::TempDir), Box<dyn Error>> {
     person_harness_with(settings()).await
 }
 
@@ -46,7 +46,7 @@ async fn person_harness() -> Result<(Harness, tempfile::TempDir), Box<dyn StdErr
 /// `facade_settings`.
 async fn person_harness_with(
     facade_settings: Settings,
-) -> Result<(Harness, tempfile::TempDir), Box<dyn StdError>> {
+) -> Result<(Harness, tempfile::TempDir), Box<dyn Error>> {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(format!(
@@ -76,7 +76,7 @@ async fn person_harness_with(
 }
 
 /// Returns the synthetic MII Person `Patient` of the testkit.
-fn patient() -> Result<serde_json::Value, Box<dyn StdError>> {
+fn patient() -> Result<serde_json::Value, Box<dyn Error>> {
     Ok(serde_json::from_str(
         ferrobridge_testkit::fixtures::KDS_PERSON_PATIENT,
     )?)
@@ -87,7 +87,7 @@ fn patient() -> Result<serde_json::Value, Box<dyn StdError>> {
 fn person_composition(
     harness: &Harness,
     resource: &serde_json::Value,
-) -> Result<serde_json::Value, Box<dyn StdError>> {
+) -> Result<serde_json::Value, Box<dyn Error>> {
     let loaded = harness
         .facade
         .programs()
@@ -109,7 +109,7 @@ fn person_composition(
 }
 
 /// Returns a `POST [base]/Patient` carrying `body`.
-fn post_patient(body: &serde_json::Value) -> Result<Request<Body>, Box<dyn StdError>> {
+fn post_patient(body: &serde_json::Value) -> Result<Request<Body>, Box<dyn Error>> {
     Ok(Request::post("/fhir/Patient")
         .header(header::CONTENT_TYPE, "application/fhir+json")
         .body(Body::from(body.to_string()))?)
@@ -117,7 +117,7 @@ fn post_patient(body: &serde_json::Value) -> Result<Request<Body>, Box<dyn StdEr
 
 #[tokio::test]
 async fn a_patient_is_stored_as_the_kds_person_composition_of_its_own_ehr()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let (harness, _directory) = person_harness().await?;
     let resource = patient()?;
     assert_eq!(
@@ -176,7 +176,7 @@ async fn a_patient_is_stored_as_the_kds_person_composition_of_its_own_ehr()
 }
 
 #[tokio::test]
-async fn a_stored_kds_person_composition_reads_back_as_the_patient() -> Result<(), Box<dyn StdError>>
+async fn a_stored_kds_person_composition_reads_back_as_the_patient() -> Result<(), Box<dyn Error>>
 {
     let (harness, _directory) = person_harness().await?;
     let resource = patient()?;
@@ -235,7 +235,7 @@ const PATIENT_UUID: &str = "7c1d2e3f-4a5b-4c6d-8e7f-0a1b2c3d4e5f";
 
 /// The facade settings with the subject link in the settings' namespace
 /// keyed by the id form `form`.
-fn settings_in(form: IdForm) -> Result<Settings, Box<dyn StdError>> {
+fn settings_in(form: IdForm) -> Result<Settings, Box<dyn Error>> {
     let base = settings();
     let subject = SubjectLink::new(base.subject.namespace(), form, "PERSON")?;
     Ok(Settings { subject, ..base })
@@ -246,7 +246,7 @@ fn settings_in(form: IdForm) -> Result<Settings, Box<dyn StdError>> {
 async fn post_under(
     form: IdForm,
     resource: &serde_json::Value,
-) -> Result<(StatusCode, serde_json::Value, Vec<(String, String)>), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value, Vec<(String, String)>), Box<dyn Error>> {
     let (harness, _directory) = person_harness_with(settings_in(form)?).await?;
     mount_ehr(&harness.cdr).await;
     mount_create(
@@ -280,7 +280,7 @@ fn subject_of(query: &[(String, String)]) -> (Option<&str>, Option<&str>) {
 }
 
 #[tokio::test]
-async fn under_logical_id_a_patient_keys_its_ehr_by_its_logical_id() -> Result<(), Box<dyn StdError>>
+async fn under_logical_id_a_patient_keys_its_ehr_by_its_logical_id() -> Result<(), Box<dyn Error>>
 {
     let (status, body, query) = post_under(IdForm::LogicalId, &patient()?).await?;
     assert_eq!(StatusCode::CREATED, status, "{body}");
@@ -296,7 +296,7 @@ async fn under_logical_id_a_patient_keys_its_ehr_by_its_logical_id() -> Result<(
 }
 
 #[tokio::test]
-async fn under_uuid_a_patient_keys_its_ehr_by_its_uuid_logical_id() -> Result<(), Box<dyn StdError>>
+async fn under_uuid_a_patient_keys_its_ehr_by_its_uuid_logical_id() -> Result<(), Box<dyn Error>>
 {
     let mut resource = patient()?;
     resource["id"] = serde_json::json!(PATIENT_UUID);
@@ -312,7 +312,7 @@ async fn under_uuid_a_patient_keys_its_ehr_by_its_uuid_logical_id() -> Result<()
 
 #[tokio::test]
 async fn under_an_owner_link_form_a_patient_without_a_logical_id_is_refused_naming_the_key()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     for form in [IdForm::LogicalId, IdForm::Uuid] {
         let mut resource = patient()?;
         resource
@@ -332,7 +332,7 @@ async fn under_an_owner_link_form_a_patient_without_a_logical_id_is_refused_nami
 
 #[tokio::test]
 async fn under_uuid_a_patient_whose_logical_id_is_no_uuid_is_refused_naming_the_key()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let (status, body, query) = post_under(IdForm::Uuid, &patient()?).await?;
     assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
     assert!(
@@ -345,7 +345,7 @@ async fn under_uuid_a_patient_whose_logical_id_is_no_uuid_is_refused_naming_the_
 
 #[tokio::test]
 async fn under_reference_a_patient_still_keys_its_ehr_by_its_first_identifier()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let (status, body, query) = post_under(IdForm::Reference, &patient()?).await?;
     assert_eq!(StatusCode::CREATED, status, "{body}");
     assert_eq!(

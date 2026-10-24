@@ -8,14 +8,13 @@ use ferrobridge_server::config::Config;
 use ferrobridge_server::config::error::Error;
 use ferrobridge_server::usage_report::config::{Deployment, ENDPOINT};
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 use std::path::Path;
 
 use super::env;
 use super::refusal;
 
 #[test]
-fn the_report_is_on_by_default_with_no_state_directory() -> Result<(), Box<dyn StdError>> {
+fn the_report_is_on_by_default_with_no_state_directory() -> Result<(), Box<dyn std::error::Error>> {
     let report = Config::from_sources(None, &BTreeMap::new())?
         .resolve()?
         .usage_report;
@@ -27,7 +26,7 @@ fn the_report_is_on_by_default_with_no_state_directory() -> Result<(), Box<dyn S
 }
 
 #[test]
-fn every_usage_report_key_is_read_from_the_file() -> Result<(), Box<dyn StdError>> {
+fn every_usage_report_key_is_read_from_the_file() -> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
         "[usage_report]\n",
         "enabled = false\n",
@@ -49,7 +48,7 @@ fn every_usage_report_key_is_read_from_the_file() -> Result<(), Box<dyn StdError
 }
 
 #[test]
-fn the_environment_switches_the_report_off() -> Result<(), Box<dyn StdError>> {
+fn the_environment_switches_the_report_off() -> Result<(), Box<dyn std::error::Error>> {
     let report = Config::from_sources(None, &env("FERROBRIDGE__USAGE_REPORT__ENABLED", "false"))?
         .resolve()?
         .usage_report;
@@ -65,7 +64,7 @@ fn the_environment_switches_the_report_off() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn a_collector_off_https_or_with_credentials_is_refused() -> Result<(), Box<dyn StdError>> {
+fn a_collector_off_https_or_with_credentials_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     for endpoint in [
         "http://report.example/v1/report",
         "https://user:pw@report.example/v1/report",

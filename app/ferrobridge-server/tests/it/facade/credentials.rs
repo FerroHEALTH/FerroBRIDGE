@@ -16,7 +16,7 @@ use ferrohealth_smart::client::ClientCredentials;
 use ferrohealth_smart::client::Endpoint;
 use http::StatusCode;
 use secrecy::SecretString;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use wiremock::Mock;
 use wiremock::MockServer;
@@ -44,7 +44,7 @@ const SECRET: &str = "synthetic-secret-never-on-the-wire";
 async fn app_over(
     cdr: &MockServer,
     authorization: &str,
-) -> Result<axum::Router, Box<dyn StdError>> {
+) -> Result<axum::Router, Box<dyn Error>> {
     Mock::given(matchers::method("GET"))
         .and(matchers::path(
             "/definition/template/adl1.4/ferrobridge.diagnose.v1",
@@ -77,7 +77,7 @@ async fn app_over(
 
 #[tokio::test]
 async fn a_refused_client_credentials_grant_answers_502_naming_the_oauth_error()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // NOTE: RFC 6749 §5.2 makes `invalid_client` the token endpoint's refusal
     // of the client's own credentials, a fault upstream of the facade.
     let cdr = MockServer::start().await;
@@ -115,7 +115,7 @@ async fn a_refused_client_credentials_grant_answers_502_naming_the_oauth_error()
 }
 
 #[tokio::test]
-async fn an_unreachable_token_endpoint_answers_502() -> Result<(), Box<dyn StdError>> {
+async fn an_unreachable_token_endpoint_answers_502() -> Result<(), Box<dyn Error>> {
     let cdr = MockServer::start().await;
     let closed = ferrobridge_testkit::net::closed_http_url()?;
     let app = app_over(&cdr, &closed).await?;
@@ -131,7 +131,7 @@ async fn an_unreachable_token_endpoint_answers_502() -> Result<(), Box<dyn StdEr
 
 #[tokio::test]
 async fn a_cdr_401_whose_token_renewal_is_refused_answers_502_naming_the_oauth_error()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // NOTE: RFC 6749 §5.2, `invalid_grant` is the token endpoint's refusal of
     // the grant, a fault upstream of the facade even after the CDR's `401`.
     let cdr = MockServer::start().await;

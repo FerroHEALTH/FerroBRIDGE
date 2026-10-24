@@ -15,7 +15,6 @@ use ferrobridge_testkit::stubs::terminology;
 use http::StatusCode;
 use secrecy::{ExposeSecret, SecretString};
 use std::collections::VecDeque;
-use std::error::Error as StdError;
 use std::sync::{Arc, Mutex};
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -73,7 +72,7 @@ impl TokenProvider for Scripted {
 }
 
 /// Returns a client for `server` presenting the tokens `provider` hands out.
-fn client(server: &MockServer, provider: Arc<Scripted>) -> Result<Client, Box<dyn StdError>> {
+fn client(server: &MockServer, provider: Arc<Scripted>) -> Result<Client, Box<dyn std::error::Error>> {
     Ok(Client::new(
         config(server, WireVersion::R4)?.with_credentials(Credentials::OAuth(provider)),
     )?)
@@ -118,7 +117,7 @@ async fn mount_refusal(server: &MockServer, authorization: &str) {
 }
 
 #[tokio::test]
-async fn the_provider_token_travels_as_a_bearer_token() -> Result<(), Box<dyn StdError>> {
+async fn the_provider_token_travels_as_a_bearer_token() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount_answer(&server, "Bearer synthetic-token-1").await;
     let provider = Scripted::new([Ok("synthetic-token-1")]);
@@ -135,7 +134,7 @@ async fn the_provider_token_travels_as_a_bearer_token() -> Result<(), Box<dyn St
 
 #[tokio::test]
 async fn a_refused_token_is_handed_back_and_the_request_sent_once_more()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount_refusal(&server, "Bearer synthetic-token-1").await;
     mount_answer(&server, "Bearer synthetic-token-2").await;
@@ -159,7 +158,7 @@ async fn a_refused_token_is_handed_back_and_the_request_sent_once_more()
 }
 
 #[tokio::test]
-async fn a_second_refusal_stands_and_is_not_renewed_again() -> Result<(), Box<dyn StdError>> {
+async fn a_second_refusal_stands_and_is_not_renewed_again() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount_refusal(&server, "Bearer synthetic-token-1").await;
     mount_refusal(&server, "Bearer synthetic-token-2").await;
@@ -188,7 +187,7 @@ async fn a_second_refusal_stands_and_is_not_renewed_again() -> Result<(), Box<dy
 
 #[tokio::test]
 async fn a_renewal_that_obtains_no_token_keeps_the_refusal_and_the_cause()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount_refusal(&server, "Bearer synthetic-token-1").await;
     let provider = Scripted::new([Ok("synthetic-token-1"), Err(())]);
@@ -200,10 +199,10 @@ async fn a_renewal_that_obtains_no_token_keeps_the_refusal_and_the_cause()
     assert!(matches!(error, Error::Renewal { .. }), "{error:?}");
     assert_eq!("token-renewal", error.kind());
     assert_eq!(Some(StatusCode::UNAUTHORIZED), error.upstream_status());
-    let failure = StdError::source(&error).ok_or("the renewal carries its cause")?;
+    let failure = std::error::Error::source(&error).ok_or("the renewal carries its cause")?;
     assert!(failure.is::<TokenFailure>(), "{failure:?}");
     assert!(
-        failure.source().is_some_and(<dyn StdError>::is::<Refused>),
+        failure.source().is_some_and(<dyn std::error::Error>::is::<Refused>),
         "the provider's own error is the root of the chain"
     );
     assert!(!error.is_retryable());
@@ -215,7 +214,7 @@ async fn a_renewal_that_obtains_no_token_keeps_the_refusal_and_the_cause()
 }
 
 #[tokio::test]
-async fn a_provider_that_obtains_no_token_sends_nothing() -> Result<(), Box<dyn StdError>> {
+async fn a_provider_that_obtains_no_token_sends_nothing() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let provider = Scripted::new([Err(())]);
 
@@ -238,7 +237,7 @@ async fn a_provider_that_obtains_no_token_sends_nothing() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
-async fn a_probe_renews_a_refused_token_once() -> Result<(), Box<dyn StdError>> {
+async fn a_probe_renews_a_refused_token_once() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let metadata = format!("/{}/metadata", release_path(WireVersion::R4));
     Mock::given(method("GET"))
