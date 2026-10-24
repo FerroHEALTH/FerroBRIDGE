@@ -120,6 +120,7 @@ fn origin(entries: &[(Option<&Entry>, Shape)]) -> Option<AnyView> {
     } else {
         return None;
     };
+    // TODO(#1176): draw the source through FerroUI's `Setting` once it carries one.
     Some(view! { " " <span class="fui-muted fui-small">{tr(words)}</span> }.into_any())
 }
 
