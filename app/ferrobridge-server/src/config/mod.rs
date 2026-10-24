@@ -13,11 +13,12 @@ mod auth;
 mod credentials;
 pub mod error;
 mod overrides;
+pub mod provenance;
 mod resolve;
 pub mod section;
 
 use secrecy::SecretString;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -26,6 +27,7 @@ use std::time::Duration;
 use crate::telemetry::{FILTER_ENV, FORMAT_ENV, Format};
 
 use error::Error;
+use overrides::CONSOLE_OVERRIDES;
 use overrides::apply_console_overrides;
 use overrides::apply_override;
 use overrides::parse_override;
@@ -49,6 +51,8 @@ use section::Telemetry;
 use section::Terminology;
 use section::facade::Facade;
 
+use provenance::Provenance;
+
 /// The prefix of every environment override.
 ///
 /// The name after it is the dotted key with `__` between segments, upper or
@@ -59,7 +63,10 @@ pub const ENV_PREFIX: &str = "FERROBRIDGE__";
 pub const CONFIG_PATH_ENV: &str = "FERROBRIDGE_CONFIG";
 
 /// The whole configuration tree, as a file and the environment state it.
-#[derive(Debug, Clone, Default, Deserialize)]
+///
+/// It serializes with every secret redacted ([`section::Secret`]), so the
+/// operator API can answer the running configuration.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     /// The HTTP surface.
@@ -89,6 +96,9 @@ pub struct Config {
     pub usage_report: section::UsageReport,
     /// The operator API, off until its section turns it on.
     pub operator: Operator,
+    /// Where each key came from, which the load records and no file states.
+    #[serde(skip)]
+    provenance: Provenance,
 }
 
 impl Config {
@@ -104,10 +114,10 @@ impl Config {
         let named = path
             .map(Path::to_path_buf)
             .or_else(|| std::env::var_os(CONFIG_PATH_ENV).map(PathBuf::from));
-        let text = match named {
+        let text = match named.as_ref() {
             None => None,
             Some(path) => {
-                let text = std::fs::read_to_string(&path).map_err(|source| Error::Read {
+                let text = std::fs::read_to_string(path).map_err(|source| Error::Read {
                     path: path.clone(),
                     source,
                 })?;
@@ -119,7 +129,17 @@ impl Config {
                 name.starts_with(ENV_PREFIX) || name == FORMAT_ENV || name == FILTER_ENV
             })
             .collect();
-        Self::from_sources(text.as_deref(), &environment)
+        let mut config = Self::from_sources(text.as_deref(), &environment)?;
+        if let Some(path) = named {
+            config.provenance.read_from(path);
+        }
+        Ok(config)
+    }
+
+    /// Returns where each key came from.
+    #[must_use]
+    pub const fn provenance(&self) -> &Provenance {
+        &self.provenance
     }
 
     /// Reads `text` as TOML and applies `environment` over it.
@@ -146,6 +166,14 @@ impl Config {
                 overrides.push(item);
             }
         }
+        let mut environment_keys: BTreeSet<String> =
+            overrides.iter().map(overrides::Override::key).collect();
+        for (variable, key) in CONSOLE_OVERRIDES {
+            if environment.contains_key(variable) {
+                environment_keys.insert(format!("telemetry.{key}"));
+            }
+        }
+        let provenance = Provenance::new(text.is_some().then_some(&file), environment_keys);
         // Each pass places one more override typed, so the loop ends after at
         // most one pass per override.
         let mut typed = BTreeSet::new();
@@ -158,8 +186,13 @@ impl Config {
             // The merged tree is written back and re-read so every refusal
             // carries the key and its position, which a `Table` cannot report.
             let merged = toml::to_string(&table).map_err(|source| Error::Assemble { source })?;
-            let source = match toml::from_str(&merged) {
-                Ok(config) => return Ok(config),
+            let source = match toml::from_str::<Self>(&merged) {
+                Ok(config) => {
+                    return Ok(Self {
+                        provenance,
+                        ..config
+                    });
+                }
                 Err(source) => source,
             };
             let retyped = source
@@ -290,6 +323,14 @@ impl Config {
             },
             usage_report: crate::usage_report::config::resolve(&self.usage_report)?,
             operator: resolve::resolve_operator(&self.operator, &self.auth)?,
+            configuration: if serves && self.operator.enabled {
+                Some(
+                    crate::operator::configuration::document(self, jiff::Timestamp::now())
+                        .map_err(|source| Error::Render { source })?,
+                )
+            } else {
+                None
+            },
         })
     }
 }
@@ -381,6 +422,9 @@ pub struct Settings {
     pub usage_report: crate::usage_report::config::UsageReportSettings,
     /// The operator API, when it is mounted.
     pub operator: Option<crate::operator::OperatorSettings>,
+    /// The running configuration the operator API answers, when it is
+    /// mounted.
+    pub configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
 }
 
 /// The OMOP CDM database, resolved.

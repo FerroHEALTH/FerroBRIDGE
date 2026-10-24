@@ -31,6 +31,13 @@ pub(super) struct Override {
     typed: Option<toml::Value>,
 }
 
+impl Override {
+    /// Returns the dotted key the override sets.
+    pub(super) fn key(&self) -> String {
+        self.path.join(".")
+    }
+}
+
 /// Returns the override `name` makes, or `None` for a variable outside the
 /// prefix.
 ///
@@ -122,6 +129,11 @@ fn value_span(document: &toml::de::DeTable<'_>, path: &[String]) -> Option<Range
     Some(value.span())
 }
 
+/// The variables outside the prefix that set a `[telemetry]` key, each with
+/// that key.
+pub(super) const CONSOLE_OVERRIDES: [(&str, &str); 2] =
+    [(FORMAT_ENV, "format"), (FILTER_ENV, "filter")];
+
 /// Applies [`FORMAT_ENV`] and [`FILTER_ENV`] onto `[telemetry]`.
 ///
 /// They run after every `FERROBRIDGE__` override, so they win over the file
@@ -133,7 +145,7 @@ pub(super) fn apply_console_overrides(
     table: &mut toml::Table,
     environment: &BTreeMap<String, String>,
 ) -> Result<(), Error> {
-    for (variable, key) in [(FORMAT_ENV, "format"), (FILTER_ENV, "filter")] {
+    for (variable, key) in CONSOLE_OVERRIDES {
         let Some(raw) = environment.get(variable) else {
             continue;
         };

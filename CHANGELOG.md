@@ -25,6 +25,13 @@ crates on crates.io.
 
 ### Added
 
+- `GET /operator/configuration` answers the configuration the bridge started
+  on, behind `[operator]` and the operator scope like the other operator
+  routes: every key with its value and its source (the file, the
+  environment or the default), and each secret by reference alone (set,
+  read from a file, or unset), never its value. The document is
+  `ferrobridge_operator_api::configuration::Configuration`, which the
+  operator console decodes (#1147).
 - `hl7v2-types` (Apache-2.0) and `ferrobridge-hl7v2` (BUSL-1.1) join the
   crate line at 0.1.127, leaving their 0.0.0 name reservations, so the next
   publish ships the HL7 v2 tables and the HL7 v2 face (MLLP framing, MSH-18

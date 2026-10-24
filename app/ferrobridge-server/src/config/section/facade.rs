@@ -3,7 +3,7 @@
 
 //! The `[facade]` section and the tables under it.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -12,7 +12,7 @@ use std::path::PathBuf;
 /// The lane is off until `enabled` is set, and a disabled facade mounts no
 /// route, so a request answers `404` rather than `403`
 /// (no specification governs this: our own design).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Facade {
     /// Whether the facade routes are mounted.
@@ -90,7 +90,7 @@ impl Default for Facade {
 /// query has a default: the tenant's archetypes and the extension both move,
 /// so the deployment writes each (no specification governs this: our own
 /// design).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct FacadePartySearch {
     /// Whether the party types under `types` are searched.
@@ -100,7 +100,7 @@ pub struct FacadePartySearch {
 }
 
 /// The queries one party type is searched with.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct FacadePartySearchType {
     /// The AQL an `identifier` value with no system runs, binding
@@ -123,7 +123,7 @@ pub struct FacadePartySearchType {
 /// A relative reference is read from this server; an absolute one is fetched
 /// only from a base listed here, so by default nothing is fetched (no
 /// specification governs the policy: our own design).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct FacadeReferences {
     /// The FHIR service bases an absolute reference may be fetched from.
@@ -150,7 +150,7 @@ impl Default for FacadeReferences {
 ///
 /// Off, no chained parameter is supported. The default `query` is the resolve
 /// observed on Cadasto's platform (no specification governs it: our own design).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct FacadeIdentifierSearch {
     /// Whether `patient.identifier` and `subject.identifier` are supported.

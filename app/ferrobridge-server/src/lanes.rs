@@ -318,6 +318,10 @@ async fn build_operator(
         };
         operator::Operator::new(roots, operator::snapshot::Snapshot::new(report, searches))
     };
+    let built = match settings.configuration.clone() {
+        Some(configuration) => built.with_configuration(configuration),
+        None => built,
+    };
     tracing::info!(
         lane = "operator",
         roots = built.roots().len(),
