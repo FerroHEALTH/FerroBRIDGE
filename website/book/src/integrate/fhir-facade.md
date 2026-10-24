@@ -383,6 +383,12 @@ is still in flight is refused with `409` and commits nothing; retry it after
 the first one answers. The redelivery rule is on the
 [failure and identity](../operate/failure-and-identity.md) page.
 
+An entry whose mapping links a resource as a composition of its own (a
+FHIRconnect linked mapping) is refused with `422` and `not-supported`: the
+linked composition's id exists only once the CDR commits it, so it cannot
+share the transaction's one contribution. Send that resource on its own, or as
+an entry of a `batch`, whose entries commit one at a time.
+
 A `batch` Bundle runs each entry as the single interaction its `request`
 names, and answers `200` with a `batch-response` Bundle, one entry per request
 entry in the same order (R4 http.html §3.1.0.11). The entries run in the order

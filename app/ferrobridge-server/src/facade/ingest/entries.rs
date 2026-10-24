@@ -35,6 +35,7 @@ use super::Skipped;
 use super::UnmappedEntries;
 use super::binding::Engined;
 use super::linked::InBundle;
+use super::linked::bundle_link;
 
 /// Returns the subject a Bundle-local reference of `inbound` names: the
 /// person the entry it references is, as [`patient_person`] keys a Patient
@@ -341,14 +342,17 @@ impl Ingest<'_> {
 ///
 /// A run refused because a referenced resource could not be fetched, or
 /// because the terminology server failed, failed upstream and takes the
-/// [`crate::facade::status::UPSTREAM`] row's issue type; any other refusal is
-/// the mapping's own `processing` (no specification governs the choice: our
-/// own design).
+/// [`crate::facade::status::UPSTREAM`] row's issue type; a `link` naming a
+/// resource, which a Bundle cannot commit ([`InBundle`]), is `not-supported`;
+/// any other refusal is the mapping's own `processing` (no specification
+/// governs the choice: our own design).
 fn entry_refusal(error: &EngineError, full_url: &str) -> Issue {
     let code = if crate::facade::references::unfetched(error).is_some()
         || crate::terminology::failed_upstream(error)
     {
         crate::facade::status::UPSTREAM.issue()
+    } else if bundle_link(error) {
+        IssueType::NotSupported
     } else {
         IssueType::Processing
     };

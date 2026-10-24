@@ -316,9 +316,16 @@ pub(super) fn with_committed(refused: Refused, committed: &[CommittedLink]) -> R
 ///
 /// A transaction commits its entries in one `CONTRIBUTION` and answers all
 /// or nothing (<https://hl7.org/fhir/R4/http.html#transaction>), and the id
-/// of a linked composition is known only once the CDR has committed it, so
-/// a `link` naming a resource cannot be written inside one. No
-/// specification governs the refusal: our own design.
+/// of a linked composition is known only once the CDR has committed it:
+/// ITS-REST 1.1.0 gives an `UPDATE_VERSION` no `uid` and names no
+/// client-assigned composition id (`ehr-codegen.openapi.yaml`,
+/// `contribution_create`, `composition_create`). Committing the linked
+/// composition first and deleting it when the transaction fails would leave a
+/// deleted version in the CDR's history and show the composition to a reader
+/// meanwhile, which is not all or nothing, so a `link` naming a resource is
+/// refused inside a Bundle and followed by a single write or a `batch` entry,
+/// which commit one at a time. No specification governs the refusal: our own
+/// design.
 #[derive(Debug, Clone, Copy, Default)]
 pub(super) struct InBundle;
 
@@ -334,7 +341,20 @@ impl LinkedCompositions for InBundle {
 /// Why a Bundle entry's `link` to a resource is refused.
 #[derive(Debug, thiserror::Error)]
 #[error(
-    "a Bundle commits its entries in one CONTRIBUTION, and a linked composition's id is known \
-     only once the CDR commits it; send the linking resource on its own"
+    "a transaction commits its entries in one CONTRIBUTION, all or nothing, and a linked \
+     composition's id is known only once the CDR commits it; send the linking resource on its \
+     own or as an entry of a batch, which commits each entry by itself"
 )]
 pub(super) struct BundleLink;
+
+/// Returns whether the cause chain of `error` holds a [`BundleLink`].
+pub(super) fn bundle_link(error: &(dyn core::error::Error + 'static)) -> bool {
+    let mut cause = Some(error);
+    while let Some(current) = cause {
+        if current.is::<BundleLink>() {
+            return true;
+        }
+        cause = current.source();
+    }
+    false
+}

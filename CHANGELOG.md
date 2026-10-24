@@ -70,6 +70,11 @@ crates on crates.io.
 
 ### Changed
 
+- A transaction entry whose mapping links a resource as a composition of its
+  own is refused with `422` and `not-supported`, naming why and the ways that
+  commit it: the resource on its own, or as an entry of a `batch`, whose
+  entries commit one at a time and follow the link as a single create does
+  (#1120).
 - `ferrobridge-term` 0.1.130 carries the `date` input of `CodeSystem/$lookup`
   and `ValueSet/$validate-code`: `Client::lookup_at` sends it, and
   `Request::Lookup` and `Validation` gain a `date` field. This breaks a

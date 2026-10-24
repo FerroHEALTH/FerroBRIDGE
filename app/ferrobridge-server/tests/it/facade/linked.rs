@@ -358,6 +358,16 @@ async fn a_transaction_entry_that_links_a_resource_is_refused_whole()
         body.to_string().contains("one CONTRIBUTION"),
         "the refusal says why: {body}"
     );
+    let issues = body["issue"].as_array().ok_or("an OperationOutcome")?;
+    assert!(
+        issues.iter().any(|issue| {
+            issue["code"] == "not-supported"
+                && issue["diagnostics"]
+                    .as_str()
+                    .is_some_and(|text| text.contains("as an entry of a batch"))
+        }),
+        "the refusal names the way that commits: {body}"
+    );
     assert!(
         committed(&harness).await.is_empty(),
         "nothing was committed"
@@ -394,6 +404,53 @@ async fn a_linked_resource_no_context_maps_is_a_loss_the_writer_is_shown()
             .iter()
             .any(|issue| issue["severity"] == "warning" && issue["code"] == "incomplete"),
         "the unmapped link is named as a warning: {body}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_batch_entry_that_links_a_resource_commits_both_compositions()
+-> Result<(), Box<dyn StdError>> {
+    // R4 http.html §batch: "each entry is treated as if an individual
+    // interaction or operation", so the entry runs the single create, which
+    // commits the linked composition first and links it.
+    let sender = sender(&[LINKED_PROFILE]).await;
+    let harness = linking(
+        &format!("{}/fhir", sender.uri()),
+        Committing {
+            taken: Mutex::new(0),
+            fail_at: None,
+        },
+    )
+    .await?;
+    let bundle = serde_json::json!({
+        "resourceType": "Bundle",
+        "type": "batch",
+        "entry": [{
+            "resource": condition(&sender),
+            "request": { "method": "POST", "url": "Condition" }
+        }]
+    });
+    let (status, body) = call(
+        harness.app(),
+        Request::post("/fhir")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(bundle.to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(
+        Some("201 Created"),
+        body["entry"][0]["response"]["status"].as_str(),
+        "{body}"
+    );
+    let sent = committed(&harness).await;
+    let [_, ref linking] = *sent.as_slice() else {
+        return Err(format!("two compositions: {sent:?}").into());
+    };
+    assert_eq!(
+        link_targets(linking),
+        [format!("ehr:/{EHR_ID}/compositions/{}", CONTAINERS[0])]
     );
     Ok(())
 }
