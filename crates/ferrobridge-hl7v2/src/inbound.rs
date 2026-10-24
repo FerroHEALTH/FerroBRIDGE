@@ -81,6 +81,34 @@ pub enum Received {
 /// `default` is the character set the connection agreed on for a message
 /// whose MSH-18 is empty, and `select` picks the message structure from the
 /// lexed message ([`parse::structure::structure_for`] selects it from the definitions).
+///
+/// # Examples
+///
+/// A synthetic admission is parsed and acknowledged with `AA` once the
+/// caller has committed it:
+///
+/// ```
+/// use ferrobridge_hl7v2::ack::{Code, Stamp};
+/// use ferrobridge_hl7v2::decode::Charset;
+/// use ferrobridge_hl7v2::inbound::{self, Received};
+/// use ferrobridge_hl7v2::parse::structure::structure_for;
+///
+/// let message = "MSH|^~\\&|ADMIT|NORTHHOSP|EHR|SOUTHCLINIC|20260925090000+0200||ADT^A01^ADT_A01|MSG00002|P|2.5.1\r\
+///                EVN||20260925085900+0200\r\
+///                PID|1||PAT-0002^^^NORTHHOSP^MR||Doe^Anna^^^^^L||19920304|F\r\
+///                PV1|1|I|WARD1^101^A\r";
+/// let stamp = Stamp { control_id: "ACK00002", timestamp: "20260925090001+0200" };
+/// let Received::Parsed(inbound) =
+///     inbound::receive(message.as_bytes(), Charset::Ascii, structure_for, stamp)
+/// else {
+///     panic!("the admission parses");
+/// };
+/// assert_eq!(inbound.parsed().structure_name(), "ADT_A01");
+///
+/// let reply = String::from_utf8(inbound.answer(Code::Accept, &[], stamp)?)?;
+/// assert!(reply.contains("\rMSA|AA|MSG00002"));
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 #[must_use]
 pub fn receive(
     message: &[u8],

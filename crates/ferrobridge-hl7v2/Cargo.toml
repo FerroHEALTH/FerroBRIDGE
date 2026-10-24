@@ -3,8 +3,8 @@
 [package]
 name = "ferrobridge-hl7v2"
 description = "The FerroBRIDGE HL7 v2 face: MLLP framing, MSH-18 decoding, positional parsing over the generated v2 tables, the acknowledgment, and the v2-to-FHIR ConceptMap interpreter"
-# 0.0.0 reserves the name on crates.io; the crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.0.0"
+# The crate line is the fhir-types line (docs/VERSIONS.md).
+version = "0.1.127"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
