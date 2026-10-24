@@ -4,7 +4,7 @@
 # ferrobridge-console
 
 The FerroBRIDGE Console, the operator console: the `ferrobridge-console`
-binary, a Leptos app in islands mode drawn with FerroUI 0.3.5: the server
+binary, a Leptos app in islands mode drawn with FerroUI 0.3.6: the server
 draws every page whole and the browser hydrates only its islands, with a
 backend-for-frontend in front of the bridge.
 

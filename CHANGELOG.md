@@ -319,6 +319,9 @@ crates on crates.io.
 - The operator console moves to FerroUI 0.3.5 (`ferrohealth-ui = "=0.3.5"`,
   #1166). The console draws no part 0.3.5 changes, so its pages look and
   behave as before.
+- The operator console moves to FerroUI 0.3.6 (`ferrohealth-ui = "=0.3.6"`,
+  #1168). The console draws no activity chart, the one part whose interface
+  0.3.6 changes, so its pages look and behave as before.
 
 - Both container images name their manufacturer: the
   `org.opencontainers.image.vendor` label and index annotation of
