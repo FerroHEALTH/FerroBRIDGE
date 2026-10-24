@@ -235,9 +235,14 @@ pub struct Validation {
     pub coded: Coded,
 }
 
-/// The coded value `ValueSet/$validate-code` tests, in the three input forms
-/// the operation declares
+/// The coded value `ValueSet/$validate-code` tests, in the input forms the
+/// operation declares
 /// (<https://hl7.org/fhir/R4/valueset-operation-validate-code.html>).
+///
+/// R4 and R4B read "If a code is provided, a system or a context must be
+/// provided" (`OperationDefinition-ValueSet-validate-code`, `code`), so a
+/// bare code carries one of the two by construction: [`Coded::Code`] its
+/// system, [`Coded::InContext`] its context.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum Coded {
@@ -252,6 +257,25 @@ pub enum Coded {
         /// `systemVersion`, the version of the system, if one was provided in
         /// the source data. STU3 names this parameter `version`.
         version: Option<String>,
+        /// `display`, the display associated with the code, if provided.
+        display: Option<String>,
+    },
+    /// The `code`, `context` and `display` parameters: a code whose system
+    /// the context implies, such as an element bound to a value set.
+    ///
+    /// `context` is "the context of the value set, so that the server can
+    /// resolve this to a value set to validate against", recommended as
+    /// `[Structure Definition URL]#[name or path into structure definition]`.
+    /// STU3 declares `context` but reads "If a code is provided, a system
+    /// must be provided" (`hl7.fhir.r3.core` 3.0.2), so an STU3 client
+    /// refuses this form with
+    /// [`Error::SystemRequired`](crate::error::Error::SystemRequired) and
+    /// sends nothing.
+    InContext {
+        /// `context`.
+        context: String,
+        /// `code`.
+        code: String,
         /// `display`, the display associated with the code, if provided.
         display: Option<String>,
     },
