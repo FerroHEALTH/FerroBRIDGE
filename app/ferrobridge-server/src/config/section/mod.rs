@@ -5,7 +5,7 @@
 //! and holding its defaults in its own `Default` impl.
 
 use secrecy::{ExposeSecret, SecretString};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -19,11 +19,24 @@ pub mod facade;
 /// parse, so its `Debug` rendering is redacted and its memory is zeroed when
 /// it is dropped.
 ///
-/// It compares by value so a parsed tree can be compared with another. No
-/// specification governs this: our own design.
+/// It compares by value so a parsed tree can be compared with another, and
+/// serializes as [`Secret::REDACTED`], never its value, so the running
+/// configuration can be rendered. No specification governs this: our own
+/// design.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(transparent)]
 pub struct Secret(SecretString);
+
+impl Secret {
+    /// What a set secret serializes as.
+    pub const REDACTED: &str = "[redacted]";
+}
+
+impl Serialize for Secret {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(Self::REDACTED)
+    }
+}
 
 impl Secret {
     /// Returns the secret.
@@ -55,7 +68,7 @@ impl Eq for Secret {}
 /// `[cdr]`, and a `directory` with neither is refused at boot. Everything is
 /// read once at boot, so a mapping that does not compile is a refusal to start
 /// rather than a failure on the request that first touches it.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Mappings {
     /// The directory the FHIRconnect files are read from, recursively.
@@ -77,7 +90,7 @@ pub struct Mappings {
 /// ingest service, the identity map and the programs it writes through are
 /// the facade's. No specification governs this configuration: our own
 /// design.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Hl7v2 {
     /// Whether the MLLP listener runs.
@@ -138,7 +151,7 @@ impl Default for Hl7v2 {
 
 /// One sending facility the HL7 v2 face accepts: a namespace id alone, or a
 /// universal id with its type.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Hl7v2Sender {
     /// HD.1 of MSH-4.
@@ -150,7 +163,7 @@ pub struct Hl7v2Sender {
 }
 
 /// The profile one resource type of a mapped message claims.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Hl7v2Profile {
     /// The R4 resource type, such as `Observation`.
@@ -165,7 +178,7 @@ pub struct Hl7v2Profile {
 /// Off until `enabled` is set, and refused at boot while `[auth]` is off, so
 /// the API is never served to an unauthenticated caller. No specification
 /// governs the operator surface: our own design.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Operator {
     /// Whether the operator routes are mounted under `/operator`.
@@ -180,7 +193,7 @@ pub struct Operator {
 /// The two operations are pure transformations that reach no CDR on a
 /// request, so they are served whenever `[mappings] directory` is set and its
 /// templates load, from `[mappings] templates` or, at boot, from the `[cdr]`.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Operations {
     /// Whether the two operations are served.
@@ -213,7 +226,7 @@ impl Default for Operations {
 }
 
 /// The HTTP surface.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Server {
     /// The socket address to bind.
@@ -238,7 +251,7 @@ impl Default for Server {
 }
 
 /// The console.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Telemetry {
     /// The rendering: `auto`, `json` or `pretty`.
@@ -263,7 +276,7 @@ impl Default for Telemetry {
 }
 
 /// The openEHR CDR lane.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Cdr {
     /// The openEHR REST API root, the path `/ehr` and `/query` live under.
@@ -292,7 +305,7 @@ impl Default for Cdr {
 }
 
 /// The FHIR terminology lane.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Terminology {
     /// The FHIR service base URL.
@@ -324,7 +337,7 @@ impl Default for Terminology {
 }
 
 /// The OMOP CDM database lane.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Cdm {
     /// The PostgreSQL connection URL.
@@ -363,7 +376,7 @@ impl Default for Cdm {
 ///
 /// The queries are parsed and checked when the configuration loads, so a
 /// query the runner cannot read refuses the start of any job.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Etl {
     /// The AQL that selects each composition whole, aliased `ehr_id`,
@@ -403,7 +416,7 @@ impl Default for Etl {
 }
 
 /// The visit derivation of the OMOP ETL job.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct EtlVisits {
     /// The AQL aliased `ehr_id`, `visit_source`, `visit_start` and
@@ -416,7 +429,7 @@ pub struct EtlVisits {
 }
 
 /// How often, and how far apart, a call is retried.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Retry {
     /// How many times a call is sent at most, the first try included.
@@ -443,7 +456,7 @@ impl Default for Retry {
 /// a stable instance id each restart would count as a new installation. A CI
 /// environment keeps it off whatever `enabled` says. No specification
 /// governs this configuration: our own design.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct UsageReport {
     /// Whether the server sends the report.

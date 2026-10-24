@@ -23,6 +23,16 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Added
+
+- `GET /operator/configuration` answers the configuration the bridge started
+  on, behind `[operator]` and the operator scope like the other operator
+  routes: every key with its value and its source (the file, the
+  environment or the default), and each secret by reference alone (set,
+  read from a file, or unset), never its value. The document is
+  `ferrobridge_operator_api::configuration::Configuration`, which the
+  operator console decodes (#1147).
+
 ## [0.0.11] - 2026-10-24
 
 The operator console release. The console is rebuilt page for page on

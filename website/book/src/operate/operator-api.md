@@ -69,6 +69,33 @@ What the running load compiled, as one JSON document:
 - `counts` and `diagnostics`: what `ferrobridge mapping check` reports for
   the same configuration, read once at start-up.
 
+## `GET /operator/configuration`
+
+The configuration the bridge started on, as one JSON document. The bridge
+reads `ferrobridge.toml` and the environment once, at start, so the answer
+holds what it runs on until the next start:
+
+- `file`: the configuration file it read, as `--config` or
+  `FERROBRIDGE_CONFIG` named it, or `null` when it read none;
+- `read_at`: when it read the configuration, RFC 3339 UTC;
+- `entries`: every key the configuration holds a value for, in key order,
+  each with its dotted `key` (`cdr.credentials.oauth.client_id`), its
+  `value` and its `source`: `file`, `environment` (a `FERROBRIDGE__`
+  variable, `FERROBRIDGE_LOG_FORMAT` or `RUST_LOG`, which win over the
+  file) or `default`.
+
+A `value` carries its `kind` (`string`, `integer`, `float`, `boolean`,
+`list`, `table` or `secret`) beside it. A secret is never answered by value.
+A secret and its `_file` sibling are one entry, keyed by the secret
+(`cdm.url`, `cdr.credentials.password`,
+`cdr.credentials.oauth.client_secret`, the same two of `[terminology]`, and
+`password_hash` of each `[[auth.basic.users]]` user), whose value is its
+`state`: `set` (set as a value, in the file or the environment), `file` with
+the `path` it is read from, or `unset`. The file of a private key
+(`private_key_file`, `client_key_file`) is answered as a secret read from
+that file. A key the configuration leaves unset and that has no default is
+absent from `entries`.
+
 ## `GET /operator/mappings`
 
 Every mapping file under the configured directories, as a JSON array. A file
