@@ -38,8 +38,12 @@ ferrobridge-testkit.workspace = true
 http.workspace = true
 secrecy.workspace = true
 serde_json.workspace = true
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time", "net", "io-util"] }
 wiremock.workspace = true
+# The mutual-TLS stub a caller-built client is tested against (#1180).
+rcgen.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
 
 [lints]
 workspace = true
