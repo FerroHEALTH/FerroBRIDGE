@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-**FerroHEALTH** is the family (mother) name; FerroBRIDGE is one product in it, beside FerroEHR, FerroTERM, FerroCHART, FerroFED and the planned FerroPIX, FerroSYS, FerroTASK. Cadasto B.V. is the manufacturer of every product. The family site is <https://ferrohealth.eu> (repo FerroHEALTH/FerroHEALTH); each product documents itself on its own domain.
+**FerroHEALTH** is the family (mother) name; FerroBRIDGE is one product in it, beside FerroEHR, FerroTERM, FerroFORMS (formerly FerroCHART), FerroFED and the planned FerroPIX, FerroSYS, FerroTASK. Cadasto B.V. is the manufacturer of every product. The family site is <https://ferrohealth.eu> (repo FerroHEALTH/FerroHEALTH); each product documents itself on its own domain.
 
 **Why:** owner 2026-10-08: "not everything is only for FerroEHR… it's about the bundled products". Tracked as FerroHEALTH/FerroHEALTH#37 (a family mdBook) and FerroHEALTH/FerroEHR#3701.
 

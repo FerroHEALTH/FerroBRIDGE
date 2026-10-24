@@ -14,6 +14,15 @@ macro_rules! r4_contracts {
             None
         }
 
+        /// Returns whether `request` carries a code this release requires a
+        /// system for and names none.
+        ///
+        /// R4 and R4B take a system or a context, which [`Coded`] carries by
+        /// construction.
+        const fn system_required(_request: &Request) -> bool {
+            false
+        }
+
         /// Returns the `Parameters` that carries `request`.
         fn parameters(request: &Request) -> Result<Parameters, RequestError> {
             Ok(match request {
@@ -64,6 +73,15 @@ macro_rules! r4_contracts {
                     request.system = Some(system.as_str().into());
                     request.code = Some(code.as_str().into());
                     request.system_version = version.as_deref().map(Into::into);
+                    request.display = display.as_deref().map(Into::into);
+                }
+                Coded::InContext {
+                    context,
+                    code,
+                    display,
+                } => {
+                    request.context = Some(context.as_str().into());
+                    request.code = Some(code.as_str().into());
                     request.display = display.as_deref().map(Into::into);
                 }
                 Coded::Coding(concept) => request.coding = Some(coding(concept)),
@@ -147,8 +165,23 @@ macro_rules! stu3_contracts {
             }
         }
 
+        /// Returns whether `request` carries a code with no system.
+        ///
+        /// STU3 `$validate-code` reads "If a code is provided, a system must
+        /// be provided" (`OperationDefinition-ValueSet-validate-code`, `code`,
+        /// 3.0.2), with no context alternative.
+        const fn system_required(request: &Request) -> bool {
+            matches!(
+                request,
+                Request::ValidateCode(Validation {
+                    coded: Coded::InContext { .. },
+                    ..
+                })
+            )
+        }
+
         /// Returns the `Parameters` that carries `request`, which
-        /// `unsupported` has passed.
+        /// `unsupported` and `system_required` have passed.
         fn parameters(request: &Request) -> Result<Parameters, RequestError> {
             Ok(match request {
                 Request::Lookup {
@@ -198,6 +231,15 @@ macro_rules! stu3_contracts {
                     // NOTE: STU3 `version` is "the version of the system", R4's `systemVersion`
                     // (`OperationDefinition-ValueSet-validate-code`, 3.0.2 and 4.0.1).
                     request.version = version.as_deref().map(Into::into);
+                    request.display = display.as_deref().map(Into::into);
+                }
+                Coded::InContext {
+                    context,
+                    code,
+                    display,
+                } => {
+                    request.context = Some(context.as_str().into());
+                    request.code = Some(code.as_str().into());
                     request.display = display.as_deref().map(Into::into);
                 }
                 Coded::Coding(concept) => request.coding = Some(coding(concept)),

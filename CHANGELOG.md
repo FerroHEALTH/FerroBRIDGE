@@ -30,7 +30,7 @@ crates on crates.io.
   `OrdinalOption` carries the ordinal `value` and the code and terminology
   of its symbol, and a node with no ordinal constraint answers `None`.
   `openehr-mapping-core` moves to 0.1.127, `fhirconnect` to 0.1.183 and
-  `ferrobridge-hl7v2` to 0.1.131 with it (#1090).
+  `ferrobridge-hl7v2` to 0.1.132 with it (#1090).
 - `GET /operator/configuration` answers the configuration the bridge started
   on, behind `[operator]` and the operator scope like the other operator
   routes: every key with its value and its source (the file, the
@@ -68,6 +68,21 @@ crates on crates.io.
   `Client::code_system_count` asks
   `GET [base]/CodeSystem?url=<system>&_summary=count`. `ferrobridge-validator`
   moves to 0.1.130 and `ferrobridge-hl7v2` to 0.1.128 with it (#1177).
+- `ferrobridge-term` 0.1.131 reaches a terminology server through an HTTP
+  client the caller builds: `Client::with_http(config, reqwest::Client)`
+  sends every request through it, so a deployment can present a client
+  certificate for mutual TLS, trust a private root beside the platform's or
+  use a proxy. The configured timeout still bounds each request, and the
+  credentials, the retry budget and the typed errors apply as for
+  `Client::new` (#1180).
+- `ferrobridge-term` 0.1.131 validates a code whose system its context
+  implies: `Coded::InContext` sends `ValueSet/$validate-code` with
+  `context`, `code` and `display` and no `system`, which R4 and R4B accept
+  ("If a code is provided, a system or a context must be provided"), alone
+  or in a `batch`. STU3 requires a system for a code, so an STU3 client
+  refuses the form with the new `Error::SystemRequired` and sends nothing,
+  and `Client::check` answers the same (#1181). `ferrobridge-validator`
+  moves to 0.1.131 and `ferrobridge-hl7v2` to 0.1.129 with it.
 
 ### Changed
 
@@ -75,6 +90,13 @@ crates on crates.io.
   and `ValueSet/$validate-code`: `Client::lookup_at` sends it, and
   `Request::Lookup` and `Validation` gain a `date` field. This breaks a
   struct literal of either: add `date: None` where no date is meant (#1177).
+
+### Fixed
+
+- `$toopenehr` and `$tofhir` answer `502` with the issue type `transient`
+  when the terminology server fails during the run, with the upstream status
+  in the diagnostics, as the facade's writes do. A translation the server
+  answers with no match stays a `422` (#1119).
 
 ## [0.0.11] - 2026-10-24
 

@@ -243,6 +243,24 @@ pub enum Error {
         /// The release the client is configured for.
         wire_version: WireVersion,
     },
+    /// The request carries a code with no system, which the configured
+    /// release requires, so nothing was sent.
+    ///
+    /// STU3 `ValueSet/$validate-code` reads "If a code is provided, a system
+    /// must be provided" (`OperationDefinition-ValueSet-validate-code`,
+    /// 3.0.2), so a [`Coded::InContext`](crate::outcome::Coded::InContext)
+    /// code cannot be asked of an STU3 server; R4 and R4B accept a context
+    /// in place of the system.
+    #[error(
+        "the {operation} request carries a code with no system, which FHIR {} requires; nothing was sent",
+        .wire_version.as_str()
+    )]
+    SystemRequired {
+        /// The operation, as `Resource/$code`.
+        operation: &'static str,
+        /// The release the client is configured for.
+        wire_version: WireVersion,
+    },
     /// A numeric input does not fit the FHIR `integer` the operation declares
     /// (<https://hl7.org/fhir/R4/datatypes.html#integer>), so nothing was
     /// sent.
@@ -356,6 +374,7 @@ impl Error {
             Self::ClientBuild { .. } => "client-build",
             Self::RequestBody { .. } => "request-body",
             Self::UnsupportedParameter { .. } => "unsupported-parameter",
+            Self::SystemRequired { .. } => "system-required",
             Self::ParameterRange { .. } => "parameter-range",
             Self::Transport { .. } => "transport",
             Self::Timeout { .. } => "timeout",
