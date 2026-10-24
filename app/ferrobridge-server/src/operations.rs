@@ -28,6 +28,7 @@ use fhir_types::r4::operation_outcome::OperationOutcome;
 use fhir_types::r4::parameters::Parameters;
 use fhir_types::r4::parameters::ParametersParameter;
 use fhir_types::r4::parameters::ParametersParameterValue;
+use fhir_types::r4::primitives::Code;
 use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::library::Library;
@@ -411,13 +412,36 @@ fn with_query(request: ToFhirRequest, query: &OperationQuery) -> ToFhirRequest {
 /// well-formed request is `422`
 /// (<https://hl7.org/fhir/R4/http.html#4.4.1.2>).
 ///
+/// A run refused because the terminology server failed
+/// ([`crate::terminology::failed_upstream`]) failed upstream, so it answers
+/// `502` with the issue type `transient` and the diagnostics carry the upstream
+/// status the failure names, as the facade's writes do; a translation answered
+/// with no match stays a mapping the bridge cannot perform, `422`.
+///
 /// A run the engine refused is counted in `usage` as a mapping failure; a
 /// request refused before a program ran is not.
 fn refused(usage: &Window, error: &OperationError) -> Response {
     if matches!(error, OperationError::Mapping { .. }) {
         usage.record_mapping_failure();
     }
+    if crate::terminology::failed_upstream(error) {
+        return outcome(StatusCode::BAD_GATEWAY, &upstream_outcome(error));
+    }
     outcome(status_of(error), &error.outcome())
+}
+
+/// Returns the outcome of a run the terminology server failed.
+///
+/// The issue keeps the refusal's rendered cause chain and takes the type
+/// `transient`, "a temporary failure" the caller may retry
+/// (<https://hl7.org/fhir/R4/valueset-issue-type.html>). No specification
+/// governs the status: our own design.
+fn upstream_outcome(error: &OperationError) -> OperationOutcome {
+    let mut reported = error.outcome();
+    for issue in &mut reported.issue {
+        issue.code = Code::from("transient");
+    }
+    reported
 }
 
 /// Returns the status one refusal answers with.
