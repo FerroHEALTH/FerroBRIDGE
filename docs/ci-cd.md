@@ -88,7 +88,7 @@ A changed path reaches packages in one of these ways:
 | `docs/VERSIONS.md` | `ferrobridge-testkit`, and through it every member testing with it (`matrix_pin`) |
 | `docs/architecture.md` | the testkit's own tests |
 | `scripts/checks/sqlx-offline.sh` | `omop-cdm` |
-| `.claude/rules/leptos-ui.md`, `scripts/release/console-*.sh`, `scripts/checks/console-*.sh`, `scripts/release/journey-tools.sh` | `ferrobridge-console` (the rule holds its bundle budget; the scripts build and measure its site bundle and install the browser its journeys drive) |
+| `.claude/rules/leptos-ui.md`, `scripts/release/console-*.sh`, `scripts/checks/console-*.sh`, `scripts/release/journey-tools.sh`, `scripts/checks/stray-literals.*` | `ferrobridge-console` (the rule holds its bundle budget; the scripts build and measure its site bundle, install the browser its journeys drive and check its sources for stray literals) |
 | `website/book/src/**` | the testkit's own tests (its screenshot guard reads every page of the book and every console screenshot) |
 | `.github/workflows/ci.yml`, `.github/actions/setup-rust/**`, `scripts/checks/affected.sh`, `scripts/checks/fast.sh` | everything |
 | the rest of `.github/`, the rest of `.claude/`, the rest of `website/`, `assets/`, `docker/`, `fuzz/`, `scripts/gh/`, the rest of `scripts/release/`, `docs/ci-cd.md`, `docs/release.md`, the root community files, and the guard scripts tier 1 runs | nothing |
