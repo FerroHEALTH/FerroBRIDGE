@@ -25,6 +25,11 @@ crates on crates.io.
 
 ### Added
 
+- The facade shows a write's declared losses to the client that wrote it: a
+  committed transaction entry carries them in `response.outcome`, and a
+  single create or update asked for `Prefer: return=OperationOutcome` lists
+  them after the committed version, one issue per loss with the FHIRPath in
+  `expression` and the openEHR path in `details` (#1115).
 - `GET /operator/configuration` answers the configuration the bridge started
   on, behind `[operator]` and the operator scope like the other operator
   routes: every key with its value and its source (the file, the
@@ -80,6 +85,11 @@ crates on crates.io.
 
 ### Changed
 
+- A transaction entry whose mapping links a resource as a composition of its
+  own is refused with `422` and `not-supported`, naming why and the ways that
+  commit it: the resource on its own, or as an entry of a `batch`, whose
+  entries commit one at a time and follow the link as a single create does
+  (#1120).
 - `ferrobridge-term` 0.1.130 carries the `date` input of `CodeSystem/$lookup`
   and `ValueSet/$validate-code`: `Client::lookup_at` sends it, and
   `Request::Lookup` and `Validation` gain a `date` field. This breaks a
