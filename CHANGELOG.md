@@ -70,6 +70,13 @@ crates on crates.io.
   `Request::Lookup` and `Validation` gain a `date` field. This breaks a
   struct literal of either: add `date: None` where no date is meant (#1177).
 
+### Fixed
+
+- `$toopenehr` and `$tofhir` answer `502` with the issue type `transient`
+  when the terminology server fails during the run, with the upstream status
+  in the diagnostics, as the facade's writes do. A translation the server
+  answers with no match stays a `422` (#1119).
+
 ## [0.0.11] - 2026-10-24
 
 The operator console release. The console is rebuilt page for page on
