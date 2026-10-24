@@ -16,8 +16,8 @@
 //! with `coding.display` in so many words.
 
 use fhir_types::r4::coding::Coding;
+use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::Code;
-use fhir_types::r4::primitives::String as FhirString;
 use fhir_types::r4::primitives::Uri;
 use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
@@ -60,9 +60,9 @@ impl Lens<CodePhrase, Coding> for CodePhraseLens {
             // NOTE: CODE_PHRASE.adoc, `version` against `terminology_id/version_id`,
             // "populate with emtpy string if not provided": that is the
             // TERMINOLOGY_ID with no parenthesised suffix.
-            version: (!version.is_empty()).then(|| FhirString::from(version)),
+            version: (!version.is_empty()).then(|| primitives::String::from(version)),
             code: Some(Code::from(source.code_string.clone())),
-            display: source.preferred_term.clone().map(FhirString::from),
+            display: source.preferred_term.clone().map(primitives::String::from),
             ..Coding::default()
         })
     }
@@ -166,8 +166,8 @@ pub(crate) mod tests {
     use crate::engine::lens::Lens;
     use crate::engine::lens::LensError;
     use fhir_types::r4::coding::Coding;
+    use fhir_types::r4::primitives;
     use fhir_types::r4::primitives::Code;
-    use fhir_types::r4::primitives::String as FhirString;
     use fhir_types::r4::primitives::Uri;
     use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
@@ -204,9 +204,9 @@ pub(crate) mod tests {
         ) -> Coding {
             Coding {
                 system: Some(Uri::from(system)),
-                version: version.map(FhirString::from),
+                version: version.map(primitives::String::from),
                 code: Some(Code::from(code)),
-                display: display.map(FhirString::from),
+                display: display.map(primitives::String::from),
                 ..Coding::default()
             }
         }

@@ -180,7 +180,7 @@ async fn build(
         })
         .await
         .map(fhirconnect::engine::outcome::Outcome::into_value)
-        .map_err(|error| Refusal::from(crate::facade::ingest::engine_refusal(&error)))
+        .map_err(|error| Refusal::from(crate::facade::ingest::refusal::engine_refusal(&error)))
 }
 
 /// Returns the commit headers one party write carries.

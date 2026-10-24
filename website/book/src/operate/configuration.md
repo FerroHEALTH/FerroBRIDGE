@@ -276,7 +276,7 @@ with no display keeps its code as the value.
 | `base_url` | none, required | The FHIR service base URL |
 | `wire_version` | `r4` | `stu3`, `r4` or `r4b`, the release the server answers in |
 | `timeout_ms` | `30000` | How long one call may take, connection included |
-| `display_fallback` | `false` | For a code the server does not know: `true` writes the code as the value of the `DV_CODED_TEXT`, `false` refuses the resource. A failed call refuses either way |
+| `display_fallback` | `false` | For a code the server does not know: `true` writes the code as the value of the `DV_CODED_TEXT` or `DV_TEXT`, `false` refuses the resource. A failed call refuses either way |
 
 As an environment variable, `display_fallback` reads
 `FERROBRIDGE__TERMINOLOGY__DISPLAY_FALLBACK`.

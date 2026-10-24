@@ -30,6 +30,7 @@ use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
+use fhirconnect::operations::issues;
 use fhirconnect::resolve::program::binding::TemplateId;
 use http::HeaderMap;
 use http::StatusCode;
@@ -57,6 +58,7 @@ use crate::facade::ingest::Refused;
 use crate::facade::ingest::Revision;
 use crate::facade::ingest::Written;
 use crate::facade::media;
+use crate::facade::outcome;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
@@ -268,6 +270,13 @@ async fn resend(
 }
 
 /// Answers one committed write, honouring `Prefer`.
+///
+/// `return=OperationOutcome` asks for "an `OperationOutcome` resource containing
+/// hints and warnings" (<https://hl7.org/fhir/R4/http.html#return>), so its
+/// outcome names the committed version and then each loss the mapping
+/// declared, one issue per loss as the FHIRconnect operations render them. The
+/// other preferences carry no outcome, which R4 returns only "if explicitly
+/// requested".
 async fn answer(
     facade: &Facade,
     program: &Loaded,
@@ -293,16 +302,17 @@ async fn answer(
     ];
     match media::Prefer::of(headers) {
         media::Prefer::Minimal => Ok(reply::minimal(status, &response_headers)),
-        media::Prefer::Outcome => Ok(reply::issues(
-            status,
-            &[
-                Issue::information(IssueType::Informational).diagnosing(format!(
+        media::Prefer::Outcome => {
+            let mut reported = outcome::outcome(&[Issue::information(IssueType::Informational)
+                .diagnosing(format!(
                     "the resource is committed as version {}",
                     written.version.value()
-                )),
-            ],
-            &response_headers,
-        )),
+                ))]);
+            reported
+                .issue
+                .extend(written.losses.iter().map(issues::of_warning));
+            Ok(reply::built(status, &reported, &response_headers))
+        }
         media::Prefer::Representation => {
             let subject = render::subject_of(facade, &written.ehr_id)?;
             let rendered = render::render(
@@ -388,7 +398,7 @@ pub(crate) fn refuse(answer: &status::Answer) -> Refusal {
 
 /// Returns the refusal an identity-store failure renders as.
 pub(crate) fn store_refusal(error: &crate::facade::identity::store::StoreError) -> Refusal {
-    Refusal::from(ingest::store_refusal(error))
+    Refusal::from(ingest::refusal::store_refusal(error))
 }
 
 /// Returns the refusal a malformed stored identifier renders as.

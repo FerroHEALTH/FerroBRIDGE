@@ -31,10 +31,10 @@ use fhir_types::codec::Value;
 use fhirconnect::engine::demographics::Demographics;
 use fhirconnect::engine::demographics::NoDemographics;
 use fhirconnect::engine::origin::SourceItem;
+use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::NoReferences;
 use fhirconnect::engine::seam::ReferenceSource;
 use fhirconnect::engine::subject::SubjectIdentifier;
-use fhirconnect::engine::traverse::error::EngineError;
 use fhirconnect::resolve::program::binding::TemplateId;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
@@ -54,10 +54,8 @@ use crate::facade::identity::claims::Claims;
 use crate::facade::identity::record::CommittedSource;
 use crate::facade::identity::record::ConsumedSource;
 use crate::facade::identity::store::Store;
-use crate::facade::identity::store::StoreError;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
-use crate::facade::outcome::chain;
 use crate::facade::programs::Loaded;
 use crate::facade::programs::Programs;
 use crate::facade::request::Inbound;
@@ -193,6 +191,18 @@ pub struct Written {
     pub composition: CanonicalComposition,
     /// Whether this write committed the composition or found it committed.
     pub delivery: Delivery,
+    /// The losses the mapping this write committed declared, in the order it
+    /// took them; empty when the write committed nothing.
+    pub losses: Vec<Warning>,
+}
+
+impl Written {
+    /// Returns this write with `losses` as the losses its mapping declared.
+    #[must_use]
+    pub fn with_losses(mut self, losses: Vec<Warning>) -> Self {
+        self.losses = losses;
+        self
+    }
 }
 
 /// The composition version one update follows, and the entry of it the
@@ -301,6 +311,9 @@ pub struct Committed {
     /// the entry's `id` produced. Nothing when this delivery committed
     /// nothing for it.
     pub change: Option<commit::Change>,
+    /// The losses the entry's mapping declared, in the order it took them;
+    /// empty when this delivery committed nothing for the entry.
+    pub losses: Vec<Warning>,
 }
 
 /// How the committed entries of a Bundle reached the CDR.
@@ -449,6 +462,8 @@ struct Mapped {
     consumed: Vec<String>,
     /// The identifiers the entry offers as the subject of the EHR.
     offered: Vec<SubjectIdentifier>,
+    /// The losses the entry's mapping declared.
+    losses: Vec<Warning>,
 }
 
 /// Which versions of a committed contribution the entries being bound
@@ -550,6 +565,7 @@ impl Standing {
             version: self.version,
             composition,
             delivery: Delivery::Replayed,
+            losses: Vec::new(),
         }
     }
 }
@@ -662,54 +678,6 @@ pub enum RepresentationError {
         #[source]
         source: serde_json::Error,
     },
-}
-
-/// Returns the refusal one engine error renders as.
-///
-/// An element the program cannot map refuses the unit (no specification
-/// governs this: our own design), so the answer is a `422` whose diagnostics
-/// name the mapping and the element the engine refused at.
-///
-/// A run refused because a referenced resource could not be fetched
-/// ([`crate::facade::references::Unfetched`]) failed upstream, so it answers
-/// the [`crate::facade::status::UPSTREAM`] row, a `502` with `transient`, and
-/// so does a run refused because the terminology server failed
-/// ([`crate::terminology::failed_upstream`]); the diagnostics carry the
-/// upstream status the failure names.
-#[must_use]
-pub fn engine_refusal(error: &EngineError) -> Refused {
-    let row = status::UPSTREAM;
-    if crate::facade::references::unfetched(error).is_some() {
-        return Refused::new(
-            row.status(),
-            Issue::error(row.issue())
-                .diagnosing(chain(error))
-                .detailing("a resource the mapping reads could not be fetched"),
-        );
-    }
-    if crate::terminology::failed_upstream(error) {
-        return Refused::new(
-            row.status(),
-            Issue::error(row.issue())
-                .diagnosing(chain(error))
-                .detailing("the terminology server failed while the mapping ran"),
-        );
-    }
-    Refused::new(
-        StatusCode::UNPROCESSABLE_ENTITY,
-        Issue::error(IssueType::Processing)
-            .diagnosing(chain(error))
-            .detailing("the mapping refused this resource"),
-    )
-}
-
-/// Returns the refusal an identity-store failure renders as.
-#[must_use]
-pub fn store_refusal(error: &StoreError) -> Refused {
-    Refused::new(
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Issue::error(IssueType::Exception).diagnosing(chain(&error)),
-    )
 }
 
 #[cfg(test)]

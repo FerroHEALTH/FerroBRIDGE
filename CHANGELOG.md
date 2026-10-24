@@ -25,6 +25,11 @@ crates on crates.io.
 
 ### Added
 
+- The facade shows a write's declared losses to the client that wrote it: a
+  committed transaction entry carries them in `response.outcome`, and a
+  single create or update asked for `Prefer: return=OperationOutcome` lists
+  them after the committed version, one issue per loss with the FHIRPath in
+  `expression` and the openEHR path in `details` (#1115).
 - `GET /operator/configuration` answers the configuration the bridge started
   on, behind `[operator]` and the operator scope like the other operator
   routes: every key with its value and its source (the file, the
@@ -80,20 +85,47 @@ crates on crates.io.
 
 ### Changed
 
+- A transaction entry whose mapping links a resource as a composition of its
+  own is refused with `422` and `not-supported`, naming why and the ways that
+  commit it: the resource on its own, or as an entry of a `batch`, whose
+  entries commit one at a time and follow the link as a single create does
+  (#1120).
 - `ferrobridge-term` 0.1.130 carries the `date` input of `CodeSystem/$lookup`
   and `ValueSet/$validate-code`: `Client::lookup_at` sends it, and
   `Request::Lookup` and `Validation` gain a `date` field. This breaks a
   struct literal of either: add `date: None` where no date is meant (#1177).
+- `SECURITY.md` states the fix-time targets every product of the Ferro family
+  commits to, counted from the confirmed assessment: a fixed release within
+  7 days for a Critical vulnerability, 30 days for High, 90 days for Medium
+  and with the next release for Low, beside the acknowledgement within about
+  5 business days and the initial assessment within about 10, both best
+  effort as before.
 
 ### Fixed
 
-- `fhir_types::xml::to_xml` refuses a narrative `div` that is no well-formed
-  XHTML `div` in the XHTML namespace with an `EncodeError` naming its element
-  path, such as `Basic.text.div`, instead of writing a malformed document.
-  `fhir-types` moves to 0.1.128, and `fhirconnect` to 0.1.184,
+- The `fhir-types` XML codec holds a narrative `div` to well-formed XHTML
+  both ways: `xml::to_xml` refuses a `div` that is no well-formed XHTML
+  `div` in the XHTML namespace with an `EncodeError` naming its element path,
+  such as `Basic.text.div`, and `xml::from_xml` refuses a start tag whose
+  attributes are not well-formed XML (no whitespace between two attributes,
+  a name that is no XML name, a `<` in a value), in the narrative and in
+  every other element, where it accepted them and wrote them back repaired.
+  `fhir-types` moves to 0.1.128, `fhirconnect` to 0.1.187,
   `ferrobridge-term` and `ferrobridge-validator` to 0.1.132,
-  `ferrobridge-fhirpath` to 0.1.128 and `ferrobridge-hl7v2` to 0.1.133 with it
-  (#1178).
+  `ferrobridge-fhirpath` to 0.1.128 and `ferrobridge-hl7v2` to 0.1.136 with
+  it (#1178).
+- A coding with no `display` written into a `DV_TEXT`, whose value would
+  otherwise fall back to the coding's code, is looked up through
+  `CodeSystem/$lookup` as one written into a `DV_CODED_TEXT` is: the display
+  becomes the value, an unknown code refuses unless
+  `[terminology] display_fallback` is set, a failed call refuses, and with no
+  server the code stands. `fhirconnect` moves to 0.1.185 and
+  `ferrobridge-hl7v2` to 0.1.134 with it (#1188).
+- An untyped `dateTime` mapped onto an `ELEMENT` whose value admits
+  `DV_TEXT` and `DV_DATE_TIME` converts into `DV_DATE_TIME` whatever the
+  template order: a class that pairs with the FHIR type directly outranks
+  the text fallback. `fhirconnect` moves to 0.1.181 and `ferrobridge-hl7v2`
+  to 0.1.130 with it (#1114).
 - `$toopenehr` and `$tofhir` answer `502` with the issue type `transient`
   when the terminology server fails during the run, with the upstream status
   in the diagnostics, as the facade's writes do. A translation the server

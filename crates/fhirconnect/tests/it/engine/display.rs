@@ -14,7 +14,7 @@ use fhir_types::r4::operations::code_system_lookup::CodeSystemLookupRequest;
 use fhir_types::r4::operations::code_system_lookup::CodeSystemLookupResponse;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateRequest;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateResponse;
-use fhir_types::r4::primitives::String as FhirString;
+use fhir_types::r4::primitives;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::outcome::Loss;
@@ -108,8 +108,8 @@ impl Terminology for Stub {
         }
         match self.answer {
             Answer::Found(display) => Ok(Some(CodeSystemLookupResponse {
-                name: FhirString::from("ferrobridge problems"),
-                display: FhirString::from(display),
+                name: primitives::String::from("ferrobridge problems"),
+                display: primitives::String::from(display),
                 ..CodeSystemLookupResponse::default()
             })),
             Answer::Unknown => Ok(None),
