@@ -87,6 +87,13 @@ crates on crates.io.
 
 ### Fixed
 
+- `fhir_types::xml::to_xml` refuses a narrative `div` that is no well-formed
+  XHTML `div` in the XHTML namespace with an `EncodeError` naming its element
+  path, such as `Basic.text.div`, instead of writing a malformed document.
+  `fhir-types` moves to 0.1.128, and `fhirconnect` to 0.1.184,
+  `ferrobridge-term` and `ferrobridge-validator` to 0.1.132,
+  `ferrobridge-fhirpath` to 0.1.128 and `ferrobridge-hl7v2` to 0.1.133 with it
+  (#1178).
 - `$toopenehr` and `$tofhir` answer `502` with the issue type `transient`
   when the terminology server fails during the run, with the upstream status
   in the diagnostics, as the facade's writes do. A translation the server
