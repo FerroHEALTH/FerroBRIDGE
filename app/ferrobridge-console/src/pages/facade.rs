@@ -10,6 +10,7 @@
 //! and Security shows the SMART discovery document (SMART App Launch
 //! 2.2.0, conformance). A facade that is off keeps only Overview.
 
+use ferrobridge_operator_api::configuration::Configuration;
 use ferrobridge_operator_api::health::{Info, Readiness, State};
 use ferrobridge_operator_api::operator::EngineState;
 use ferrohealth_ui::highlight::Language;
@@ -34,13 +35,18 @@ use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::model::{Loaded, Outcome};
 use crate::pages::parts::{faulted, quiet, refused, section};
+use crate::pages::settings::rows;
 
 /// The tabs of a facade that is on, each its key and its words.
-const TABS: [(&str, Msg); 3] = [
+const TABS: [(&str, Msg); 4] = [
     ("overview", Msg::TabOverview),
     ("capability", Msg::TabCapability),
     ("security", Msg::TabSecurity),
+    ("settings", Msg::TabSettings),
 ];
+
+/// The tabs of a facade that is off.
+const OFF_TABS: [&str; 2] = ["overview", "settings"];
 
 /// The page of the tab `key`.
 fn tab_href(key: &str) -> String {
@@ -77,7 +83,20 @@ pub fn page() -> impl IntoView {
                     } else {
                         None
                     };
-                    drawn(&tab, &info, &readiness, &capability, &state, smart.as_ref())
+                    let configuration = if tab == "settings" {
+                        Some(crate::load::configuration().await)
+                    } else {
+                        None
+                    };
+                    let reads = Reads {
+                        info: &info,
+                        readiness: &readiness,
+                        capability: &capability,
+                        running: &state,
+                        smart: smart.as_ref(),
+                        configuration: configuration.as_ref(),
+                    };
+                    drawn(&tab, &reads)
                 })
             }}
         </Suspense>
@@ -93,15 +112,42 @@ pub fn lane_on(info: &Info, name: &str) -> bool {
         .any(|lane| lane.name == name && lane.enabled)
 }
 
+/// What the page read from the bridge.
+struct Reads<'a> {
+    /// The lanes and pins.
+    info: &'a Loaded<Info>,
+    /// The readiness of every indicator.
+    readiness: &'a Loaded<Ready>,
+    /// The `CapabilityStatement`.
+    capability: &'a Loaded<Capability>,
+    /// The running load.
+    running: &'a Loaded<EngineState>,
+    /// The SMART discovery document, on the Security tab.
+    smart: Option<&'a Loaded<serde_json::Value>>,
+    /// The running configuration, on the Settings tab.
+    configuration: Option<&'a Loaded<Configuration>>,
+}
+
+/// Returns the Settings tab over `configuration`.
+fn settings_panel(configuration: Option<&Loaded<Configuration>>) -> AnyView {
+    match configuration {
+        Some(configuration) => {
+            crate::pages::settings::tab(configuration, &rows::FACADE, &tab_href("settings"))
+        }
+        None => ().into_any(),
+    }
+}
+
 /// The page over what the bridge answered.
-fn drawn(
-    tab: &str,
-    info: &Loaded<Info>,
-    readiness: &Loaded<Ready>,
-    capability: &Loaded<Capability>,
-    running: &Loaded<EngineState>,
-    smart: Option<&Loaded<serde_json::Value>>,
-) -> AnyView {
+fn drawn(tab: &str, reads: &Reads<'_>) -> AnyView {
+    let Reads {
+        info,
+        readiness,
+        capability,
+        running,
+        smart,
+        configuration,
+    } = *reads;
     let info = match info {
         Ok(Outcome::Shown(info)) => info,
         Ok(Outcome::Refused(refusal)) => return refused(refusal),
@@ -128,12 +174,29 @@ fn drawn(
         }),
     };
     if !on {
+        let body = if tab == "settings" {
+            settings_panel(configuration)
+        } else {
+            quiet(
+                tr(Msg::FacadeOff),
+                Some((tr(Msg::SeeItsSettings), tab_href("settings"))),
+            )
+        };
+        let tabs = TabRow {
+            label: tr(Msg::FhirFacade),
+            tabs: TABS
+                .iter()
+                .filter(|(key, _)| OFF_TABS.contains(key))
+                .map(|(key, words)| Tab::new(*key, tab_href(key), tr(*words)))
+                .collect(),
+            current: tab.to_owned(),
+        };
         return detail_page(DetailPage {
             header,
             actions: ActionGroup::none(),
             stepper: None,
-            tabs: None,
-            body: quiet(tr(Msg::FacadeOff), None),
+            tabs: Some(tabs),
+            body,
         });
     }
     let statement = match capability {
@@ -147,6 +210,7 @@ fn drawn(
             Err(fault) => faulted(fault, &tab_href(tab)),
         },
         "security" => security_panel(smart),
+        "settings" => settings_panel(configuration),
         _ => overview(info, readiness, statement, running),
     };
     let tabs = TabRow {

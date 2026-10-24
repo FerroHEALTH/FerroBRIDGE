@@ -14,7 +14,7 @@ use crate::stub::{CONTEXT, bridge, signed_in};
 use crate::support::{OPERATOR_NAME, OPERATOR_TOKEN, console, get, get_with, send};
 
 /// Every route of the console, each with words its page draws.
-const PAGES: [(&str, &str); 22] = [
+const PAGES: [(&str, &str); 29] = [
     ("/", ">Dashboard</h1>"),
     ("/mappings", ">Mapping set</h1>"),
     ("/mappings/omocl", "measurement.yml"),
@@ -40,10 +40,17 @@ const PAGES: [(&str, &str); 22] = [
     ("/facade", ">FHIR facade</h1>"),
     ("/facade/capability", "From the CapabilityStatement"),
     ("/facade/security", "permission-v2"),
+    ("/facade/settings", "facade.base_url"),
     ("/hl7v2", "0.0.0.0:2575"),
+    ("/hl7v2/settings", "hl7v2.listen"),
     ("/omop", "ferrobridge etl run"),
+    ("/omop/settings", "etl.page_size"),
     ("/connections", ">Connections</h1>"),
     ("/connections/terminology", "answers 503"),
+    ("/connections/cdr/settings", "cdr.base_url"),
+    ("/configuration", ">Configuration</h1>"),
+    ("/configuration/mappings", "mappings.directory"),
+    ("/configuration/core", "server.listen"),
     ("/preferences", ">Your preferences</h1>"),
     ("/about", "0123456789ab"),
 ];

@@ -137,6 +137,80 @@ pub(crate) fn statement() -> serde_json::Value {
     })
 }
 
+/// One entry of the synthetic running configuration.
+fn entry(key: &str, value: &serde_json::Value, source: &str) -> serde_json::Value {
+    json!({"key": key, "value": value, "source": source})
+}
+
+/// The synthetic `GET /operator/configuration` document: each lane's keys,
+/// each secret by reference alone.
+pub(crate) fn running_configuration() -> serde_json::Value {
+    let text = |text: &str| json!({"kind": "string", "value": text});
+    let number = |number: i64| json!({"kind": "integer", "value": number});
+    let switch = |on: bool| json!({"kind": "boolean", "value": on});
+    json!({
+        "file": "/etc/ferrobridge/ferrobridge.toml",
+        "read_at": "2026-10-24T06:00:00Z",
+        "entries": [
+            entry("auth.audience", &json!({"kind": "list", "value": [text("https://bridge.example.org/fhir")]}), "file"),
+            entry("auth.issuer", &text("https://idp.example.org/realms/bridge"), "file"),
+            entry("auth.product_scope", &text("__ferrobridge.operator"), "default"),
+            entry("cdm.bridge_schema", &text("ferrobridge"), "default"),
+            entry("cdm.person_policy", &text("create_on_first_sight"), "default"),
+            entry("cdm.schema", &text("cdm"), "default"),
+            entry("cdm.url", &json!({"kind": "secret", "value": {"state": "file", "path": "/run/secrets/cdm-url"}}), "file"),
+            entry("cdr.base_url", &text("https://cdr.example.org/openehr/v1"), "file"),
+            entry("cdr.credentials.oauth.client_id", &text("ferrobridge"), "file"),
+            entry("cdr.credentials.oauth.client_secret", &json!({"kind": "secret", "value": {"state": "file", "path": "/run/secrets/cdr.secret"}}), "file"),
+            entry("cdr.credentials.oauth.token_endpoint", &text("https://idp.example.org/realms/bridge/protocol/openid-connect/token"), "file"),
+            entry("cdr.credentials.password", &json!({"kind": "secret", "value": {"state": "unset"}}), "default"),
+            entry("cdr.demographic", &switch(false), "default"),
+            entry("cdr.retry.initial_backoff_ms", &number(200), "default"),
+            entry("cdr.retry.max_attempts", &number(3), "default"),
+            entry("cdr.retry.max_backoff_ms", &number(5000), "default"),
+            entry("cdr.timeout_ms", &number(30_000), "default"),
+            entry("etl.aql", &text("SELECT e/ehr_id/value AS ehr_id FROM EHR e"), "file"),
+            entry("etl.deletions", &text("remove"), "default"),
+            entry("etl.page_size", &number(100), "default"),
+            entry("etl.vocabulary_aliases", &json!({"kind": "table", "value": {}}), "default"),
+            entry("facade.base_url", &text("https://bridge.example.org/fhir"), "file"),
+            entry("facade.composition_language", &text("en"), "file"),
+            entry("facade.composition_territory", &text("NL"), "file"),
+            entry("facade.ehr_policy", &text("existing"), "default"),
+            entry("facade.enabled", &switch(true), "file"),
+            entry("facade.identifier_search.enabled", &switch(false), "default"),
+            entry("facade.identity_store", &text("identity.redb"), "default"),
+            entry("facade.references.fetch_bases", &json!({"kind": "list", "value": []}), "default"),
+            entry("facade.references.max_depth", &number(2), "default"),
+            entry("facade.search_count", &number(20), "default"),
+            entry("facade.search_count_max", &number(100), "default"),
+            entry("hl7v2.default_charset", &text("ASCII"), "default"),
+            entry("hl7v2.enabled", &switch(true), "file"),
+            entry("hl7v2.frame_limit_bytes", &number(1_048_576), "default"),
+            entry("hl7v2.frame_timeout_ms", &number(30_000), "default"),
+            entry("hl7v2.idle_timeout_ms", &number(300_000), "default"),
+            entry("hl7v2.listen", &text("0.0.0.0:2575"), "environment"),
+            entry("hl7v2.senders", &json!({"kind": "list", "value": []}), "default"),
+            entry("hl7v2.unmapped_entries", &text("skip_and_count"), "default"),
+            entry("mappings.directory", &text("/etc/ferrobridge/mappings"), "file"),
+            entry("operations.enabled", &switch(true), "default"),
+            entry("operator.enabled", &switch(true), "file"),
+            entry("server.body_limit_bytes", &number(1_048_576), "default"),
+            entry("server.listen", &text("0.0.0.0:8080"), "file"),
+            entry("server.request_timeout_ms", &number(30_000), "default"),
+            entry("telemetry.filter", &text("info"), "default"),
+            entry("telemetry.format", &text("json"), "environment"),
+            entry("telemetry.logged_query_parameters", &json!({"kind": "list", "value": []}), "default"),
+            entry("terminology.base_url", &text("https://term.example.org/fhir"), "file"),
+            entry("terminology.credentials.password", &json!({"kind": "secret", "value": {"state": "set"}}), "environment"),
+            entry("terminology.credentials.user", &text("bridge"), "file"),
+            entry("terminology.display_fallback", &switch(false), "default"),
+            entry("terminology.wire_version", &text("r4"), "default"),
+            entry("usage_report.enabled", &switch(true), "default")
+        ]
+    })
+}
+
 /// The synthetic SMART discovery document.
 pub(crate) fn smart() -> serde_json::Value {
     json!({
@@ -171,6 +245,13 @@ pub(crate) async fn bridge() -> MockServer {
     answer(&server, "/health/readiness", 503, &readiness()).await;
     answer(&server, "/operator/state", 200, &state()).await;
     answer(&server, "/operator/mappings", 200, &listing()).await;
+    answer(
+        &server,
+        "/operator/configuration",
+        200,
+        &running_configuration(),
+    )
+    .await;
     answer(&server, "/fhir/metadata", 200, &statement()).await;
     answer(
         &server,

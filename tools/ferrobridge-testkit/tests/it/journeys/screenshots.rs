@@ -138,7 +138,7 @@ const SIGNED_OUT: Shot = Shot {
 const CONTEXT_FILE: &str = "/mappings/files/fhirconnect/ferrobridge_journey_diagnose.context.yml";
 
 /// The pages a signed-in operator loads and reads as they are.
-const PAGES: [Shot; 25] = [
+const PAGES: [Shot; 32] = [
     Shot::page("dashboard", "/", "/", "//h1[. = 'Dashboard']"),
     Shot::page(
         "mappings",
@@ -237,8 +237,26 @@ const PAGES: [Shot; 25] = [
         "/facade/security",
         "//h1[. = 'FHIR facade']",
     ),
+    Shot::page(
+        "facade-settings",
+        "/facade/:tab",
+        "/facade/settings",
+        "//*[contains(., 'facade.base_url')]",
+    ),
     Shot::page("hl7v2", "/hl7v2", "/hl7v2", "//h1[. = 'HL7 v2']"),
+    Shot::page(
+        "hl7v2-settings",
+        "/hl7v2/:tab",
+        "/hl7v2/settings",
+        "//h1[. = 'HL7 v2']",
+    ),
     Shot::page("omop", "/omop", "/omop", "//h1[. = 'OMOP ETL']"),
+    Shot::page(
+        "omop-settings",
+        "/omop/:tab",
+        "/omop/settings",
+        "//h1[. = 'OMOP ETL']",
+    ),
     Shot::page(
         "connections",
         "/connections",
@@ -250,6 +268,30 @@ const PAGES: [Shot; 25] = [
         "/connections/:name",
         "/connections/cdr",
         "//h1",
+    ),
+    Shot::page(
+        "connection-cdr-settings",
+        "/connections/:name/:tab",
+        "/connections/cdr/settings",
+        "//*[contains(., 'cdr.base_url')]",
+    ),
+    Shot::page(
+        "configuration",
+        "/configuration",
+        "/configuration",
+        "//h1[. = 'Configuration']",
+    ),
+    Shot::page(
+        "configuration-mappings",
+        "/configuration/:tab",
+        "/configuration/mappings",
+        "//*[contains(., 'mappings.directory')]",
+    ),
+    Shot::page(
+        "configuration-core",
+        "/configuration/:tab",
+        "/configuration/core",
+        "//*[contains(., 'server.listen')]",
     ),
     Shot::page(
         "preferences",

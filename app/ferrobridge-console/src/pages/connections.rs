@@ -6,10 +6,12 @@
 //! for each.
 //!
 //! Each upstream's state is the bridge's readiness indicator for it, and the
-//! faces that use it are the lanes `GET /health/info` names. Its address and
-//! credentials are the bridge's configuration, which no endpoint answers yet
-//! (#1147).
+//! faces that use it are the lanes `GET /health/info` names. Its host and
+//! its credentials, by reference alone, are the bridge's running
+//! configuration (`GET /operator/configuration`), which the detail page's
+//! Settings tab shows whole.
 
+use ferrobridge_operator_api::configuration::{Configuration, SecretState, Value};
 use ferrobridge_operator_api::health::{Info, Readiness, State};
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
@@ -18,9 +20,8 @@ use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::state::{Mark, state};
-use ferrohealth_ui::view::surface::{
-    Crumb, Header, definitions, page_heading, panel_sections_card,
-};
+use ferrohealth_ui::view::surface::{Crumb, Header, definitions, page_heading, panel_sections};
+use ferrohealth_ui::view::tabs::{Tab, TabRow};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
 use ferrohealth_ui::view::template::list::{ListCard, list_card};
 use leptos::prelude::*;
@@ -34,6 +35,7 @@ use crate::model::{Loaded, Outcome};
 use crate::pages::dashboard::{UPSTREAMS, indicator_name};
 use crate::pages::facade::indicator;
 use crate::pages::parts::{faulted, quiet, refused, section};
+use crate::pages::settings::rows::{self, Credentials};
 
 /// The lanes that use the upstream `name`, as `GET /health/info` names
 /// them, each its words.
@@ -69,6 +71,46 @@ fn upstream_state(readiness: &Readiness, name: &str) -> AnyView {
     }
 }
 
+/// The host of the upstream `name`, from its base URL; the CDM database's
+/// URL is a secret, so its host is never read.
+fn host(configuration: &Configuration, name: &str) -> Option<String> {
+    let entry = configuration.entry(&format!("{name}.base_url"))?;
+    let Value::String(base) = &entry.value else {
+        return None;
+    };
+    // NOTE: no specification governs this: our own design; a base URL that
+    // does not parse shows no host, and the Settings tab shows it whole.
+    let url = url::Url::parse(base).ok()?;
+    url.host_str().map(str::to_owned)
+}
+
+/// How the upstream `name` signs in, in words, its secrets by reference;
+/// a dash for an upstream the configuration has no section for.
+fn credentials_words(configuration: &Configuration, name: &str) -> String {
+    let section = format!("{name}.");
+    if !configuration
+        .entries
+        .iter()
+        .any(|entry| entry.key.starts_with(&section))
+    {
+        return String::from("–");
+    }
+    if name == "cdm" {
+        return tr(
+            match configuration.entry("cdm.url").map(|entry| &entry.value) {
+                Some(Value::Secret(SecretState::File { .. })) => Msg::CredentialsUrlFile,
+                Some(Value::Secret(SecretState::Set)) => Msg::CredentialsUrl,
+                _ => Msg::CredentialsNone,
+            },
+        );
+    }
+    tr(match rows::credentials(configuration, name) {
+        Credentials::Oauth => Msg::CredentialsOauth,
+        Credentials::Basic => Msg::CredentialsBasic,
+        Credentials::None => Msg::CredentialsNone,
+    })
+}
+
 /// The page that lists the upstreams.
 #[must_use]
 pub fn page() -> impl IntoView {
@@ -78,14 +120,19 @@ pub fn page() -> impl IntoView {
             {move || Suspend::new(async move {
                 let info = crate::load::info().await;
                 let readiness = crate::load::readiness().await;
-                list(&info, &readiness)
+                let configuration = crate::load::configuration().await;
+                list(&info, &readiness, &configuration)
             })}
         </Suspense>
     }
 }
 
-/// The list over the lanes and the readiness.
-fn list(info: &Loaded<Info>, readiness: &Loaded<Ready>) -> AnyView {
+/// The list over the lanes, the readiness and the running configuration.
+fn list(
+    info: &Loaded<Info>,
+    readiness: &Loaded<Ready>,
+    configuration: &Loaded<Configuration>,
+) -> AnyView {
     let header = page_heading(
         Header {
             title: tr(Msg::Connections).into(),
@@ -104,12 +151,18 @@ fn list(info: &Loaded<Info>, readiness: &Loaded<Ready>) -> AnyView {
             return view! { {header} {refused(refusal)} }.into_any();
         }
     };
+    let configuration = match configuration {
+        Ok(Outcome::Shown(configuration)) => Some(configuration),
+        Ok(Outcome::Refused(_)) | Err(_) => None,
+    };
     let columns = [
         Column::text("connection", tr(Msg::ColConnection)).role(Role::Title),
+        Column::text("host", tr(Msg::ColHost)).role(Role::Sub),
+        Column::text("credentials", tr(Msg::ColCredentials)),
         Column::text("used", tr(Msg::ColUsedBy)).role(Role::Sub),
         Column::text("state", tr(Msg::ColState)).titled(tr(Msg::StateFromReadiness)),
     ];
-    let [_, used, word] = &columns;
+    let [_, host_column, credentials_column, used, word] = &columns;
     let rows = UPSTREAMS
         .iter()
         .map(|name| {
@@ -119,9 +172,21 @@ fn list(info: &Loaded<Info>, readiness: &Loaded<Ready>) -> AnyView {
             } else {
                 by.join(", ")
             };
+            let address = configuration
+                .and_then(|configuration| host(configuration, name))
+                .map_or_else(
+                    || String::from("–").into_any(),
+                    |host| view! { <code>{host}</code> }.into_any(),
+                );
+            let signs_in = configuration.map_or_else(
+                || String::from("–"),
+                |configuration| credentials_words(configuration, name),
+            );
             view! {
                 <tr>
                     {title_cell(Some(&format!("{CONNECTIONS}/{name}")), indicator_name(name), None)}
+                    {cell(host_column, address)}
+                    {cell(credentials_column, signs_in)}
                     {cell(used, by)}
                     {cell(word, upstream_state(readiness, name))}
                 </tr>
@@ -152,13 +217,33 @@ fn list(info: &Loaded<Info>, readiness: &Loaded<Ready>) -> AnyView {
     .into_any()
 }
 
-/// The page of the upstream the route names.
+/// The tabs of a connection, each its key and its words.
+const TABS: [(&str, Msg); 2] = [
+    ("overview", Msg::TabOverview),
+    ("settings", Msg::TabSettings),
+];
+
+/// The page of the tab `key` of the upstream `name`.
+fn tab_href(name: &str, key: &str) -> String {
+    if key == "overview" {
+        format!("{CONNECTIONS}/{name}")
+    } else {
+        format!("{CONNECTIONS}/{name}/{key}")
+    }
+}
+
+/// The page of the upstream the route names, on the tab it names.
 #[must_use]
 pub fn connection_page() -> impl IntoView {
-    let name = use_params_map()
-        .with_untracked(|params| params.get("name"))
-        .unwrap_or_default();
-    if !UPSTREAMS.contains(&name.as_str()) {
+    let (name, tab) = use_params_map().with_untracked(|params| {
+        (
+            params.get("name").unwrap_or_default(),
+            params
+                .get("tab")
+                .unwrap_or_else(|| String::from("overview")),
+        )
+    });
+    if !UPSTREAMS.contains(&name.as_str()) || !TABS.iter().any(|(key, _)| *key == tab) {
         return crate::pages::errors::not_found().into_any();
     }
     view! {
@@ -166,10 +251,16 @@ pub fn connection_page() -> impl IntoView {
         <Suspense>
             {move || {
                 let name = name.clone();
+                let tab = tab.clone();
                 Suspend::new(async move {
                     let info = crate::load::info().await;
                     let readiness = crate::load::readiness().await;
-                    detail(&name, &info, &readiness)
+                    let configuration = if tab == "settings" {
+                        Some(crate::load::configuration().await)
+                    } else {
+                        None
+                    };
+                    detail(&name, &tab, &info, &readiness, configuration.as_ref())
                 })
             }}
         </Suspense>
@@ -186,12 +277,18 @@ fn subtitle(name: &str) -> String {
     })
 }
 
-/// The detail page of the upstream `name`.
-fn detail(name: &str, info: &Loaded<Info>, readiness: &Loaded<Ready>) -> AnyView {
+/// The detail page of the upstream `name`, on the tab `tab`.
+fn detail(
+    name: &str,
+    tab: &str,
+    info: &Loaded<Info>,
+    readiness: &Loaded<Ready>,
+    configuration: Option<&Loaded<Configuration>>,
+) -> AnyView {
     let (info, readiness) = match (info, readiness) {
         (Ok(Outcome::Shown(info)), Ok(Outcome::Shown((_, readiness)))) => (info, readiness),
         (Err(fault), _) | (_, Err(fault)) => {
-            return faulted(fault, &format!("{CONNECTIONS}/{name}"));
+            return faulted(fault, &tab_href(name, tab));
         }
         (Ok(Outcome::Refused(refusal)), _) | (_, Ok(Outcome::Refused(refusal))) => {
             return refused(refusal);
@@ -230,17 +327,28 @@ fn detail(name: &str, info: &Loaded<Info>, readiness: &Loaded<Ready>) -> AnyView
     };
     let states =
         definitions(vec![(tr(Msg::Readiness), upstream_state(readiness, name))]).into_any();
-    let body = if found.is_none() {
-        quiet(tr(Msg::UpstreamNotConfigured), None)
-    } else {
-        panel_sections_card(
-            indicator_name(name),
-            view! {
-                {warning.map(|warning| ferrohealth_ui::view::surface::panel_section(None, warning))}
-                {section(tr(Msg::State), None, states)}
-                {section(tr(Msg::ColUsedBy), None, used)}
-            },
-        )
+    let body = match configuration.filter(|_| tab == "settings") {
+        Some(configuration) => {
+            let rows = match configuration {
+                Ok(Outcome::Shown(shown)) => rows::connection(shown, name),
+                Ok(Outcome::Refused(_)) | Err(_) => Vec::new(),
+            };
+            crate::pages::settings::tab(configuration, &rows, &tab_href(name, tab))
+        }
+        None if found.is_none() => quiet(tr(Msg::UpstreamNotConfigured), None),
+        None => panel_sections(view! {
+            {warning.map(|warning| ferrohealth_ui::view::surface::panel_section(None, warning))}
+            {section(tr(Msg::State), None, states)}
+            {section(tr(Msg::ColUsedBy), None, used)}
+        }),
+    };
+    let tabs = TabRow {
+        label: indicator_name(name),
+        tabs: TABS
+            .iter()
+            .map(|(key, words)| Tab::new(*key, tab_href(name, key), tr(*words)))
+            .collect(),
+        current: tab.to_owned(),
     };
     detail_page(DetailPage {
         header: Header {
@@ -253,7 +361,7 @@ fn detail(name: &str, info: &Loaded<Info>, readiness: &Loaded<Ready>) -> AnyView
         },
         actions: ActionGroup::none(),
         stepper: None,
-        tabs: None,
+        tabs: Some(tabs),
         body,
     })
 }

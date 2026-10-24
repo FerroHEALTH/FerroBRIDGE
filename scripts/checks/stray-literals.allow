@@ -27,7 +27,7 @@ allow ^text/css; charset=utf-8$             # a media type (RFC 9110 §8.3)
 allow ^DENY$                                # the X-Frame-Options value (RFC 7034 §2.1)
 allow ^no-(cache|store)$                    # Cache-Control directives (RFC 9111 §5.2.2)
 allow ^default-src 'self'; \\$              # the Content-Security-Policy directive list (CSP Level 3)
-allow ^(load report|health info|readiness report|engine state|SMART discovery document|mapping listing)$   # the bridge document a log line names
+allow ^(load report|health info|readiness report|engine state|SMART discovery document|mapping listing|running configuration)$   # the bridge document a log line names
 allow ^(FHIRconnect|OMOCL|JSON|FHIR R4)$     # a specification's or a format's name, the same in every language
 allow ^canonical$                           # the $toopenehr format code (FHIRconnect REST API chapter)
 allow ^\$tofhir, \$toopenehr$               # the FHIRconnect operations, by their names

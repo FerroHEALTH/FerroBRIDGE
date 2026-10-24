@@ -54,6 +54,13 @@ pub fn document(
     let provenance = config.provenance();
     let mut entries = Vec::new();
     walk("", &tree, provenance, &mut entries);
+    for entry in &mut entries {
+        if entry.key == "auth.product_scope" && entry.value == Value::String(String::new()) {
+            // NOTE: no specification governs this: our own design; an empty
+            // product scope runs as the bridge's own, so the document answers it.
+            entry.value = Value::String(String::from(crate::smart::OPERATOR_SCOPE));
+        }
+    }
     entries.sort_by(|left, right| left.key.cmp(&right.key));
     Ok(Configuration {
         file: provenance.file().map(|path| path.display().to_string()),
