@@ -7,6 +7,7 @@
 use fhir_types::codec::Value;
 use fhirconnect::engine::library::Library;
 use fhirconnect::engine::linked::LinkedCompositions;
+use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::subject::SubjectIdentifier;
 use fhirconnect::engine::traverse::error::EngineError;
@@ -43,8 +44,8 @@ use super::Provenance;
 use super::Refused;
 use super::RepresentationError;
 use super::Written;
-use super::engine_refusal;
-use super::store_refusal;
+use super::refusal::engine_refusal;
+use super::refusal::store_refusal;
 
 /// Returns the consumed-source key of one resource: its `resourceType`, `id`
 /// and `meta.versionId`, or nothing when it has no `id`.
@@ -159,29 +160,35 @@ fn linking<'s>(seams: Seams<'s>, linked: Option<&'s dyn LinkedCompositions>) -> 
     }
 }
 
-/// What one engine run answers: the composition, the instant every
-/// defaulted time was taken from, the literal references a `slotContext`
-/// consumed, and the identifiers offered as the subject of the EHR.
-pub(super) type Engined = (
-    CanonicalComposition,
-    String,
-    Vec<String>,
-    Vec<SubjectIdentifier>,
-);
+/// What one engine run answers.
+#[derive(Debug)]
+pub(super) struct Engined {
+    /// The composition the run built.
+    pub(super) composition: CanonicalComposition,
+    /// The instant every defaulted time was taken from.
+    pub(super) instant: String,
+    /// The literal references whose resources a `slotContext` consumed.
+    pub(super) consumed: Vec<String>,
+    /// The identifiers the run offered as the subject of the EHR
+    /// (`fhirconnect::engine::subject`).
+    pub(super) subject: Vec<SubjectIdentifier>,
+    /// The losses the run declared, in the order it took them
+    /// (`fhirconnect::engine::outcome::Outcome::warnings`).
+    pub(super) losses: Vec<Warning>,
+}
 
 impl Ingest<'_> {
-    /// Runs the engine over one inbound resource, and returns the composition
-    /// with the identifiers it offers as the subject of the EHR
-    /// (`fhirconnect::engine::subject`).
+    /// Runs the engine over one inbound resource, and returns what it built,
+    /// the identifiers it offers as the subject of the EHR and the losses it
+    /// declared among them.
     pub(super) async fn build_offering(
         &self,
         program: &Loaded,
         inbound: &Inbound,
         provenance: &Provenance,
-    ) -> Result<(CanonicalComposition, Vec<SubjectIdentifier>), Refused> {
+    ) -> Result<Engined, Refused> {
         self.run_consuming(program, inbound, provenance)
             .await
-            .map(|(composition, _instant, _consumed, subject)| (composition, subject))
             .map_err(|error| engine_refusal(&error))
     }
 
@@ -198,7 +205,7 @@ impl Ingest<'_> {
     ) -> Result<(CanonicalComposition, String), EngineError> {
         self.run_consuming(program, inbound, provenance)
             .await
-            .map(|(composition, instant, _consumed, _subject)| (composition, instant))
+            .map(|engined| (engined.composition, engined.instant))
     }
 
     /// Runs the engine as [`Ingest::run`] does, and also returns the literal
@@ -254,7 +261,14 @@ impl Ingest<'_> {
         })?;
         let consumed = built.consumed().to_vec();
         let subject = built.subject().to_vec();
-        Ok((built.into_value(), now, consumed, subject))
+        let losses = built.warnings().to_vec();
+        Ok(Engined {
+            composition: built.into_value(),
+            instant: now,
+            consumed,
+            subject,
+            losses,
+        })
     }
 
     /// Returns the commit headers one composition write carries.
@@ -355,6 +369,7 @@ impl Ingest<'_> {
             version: version.clone(),
             composition,
             delivery: Delivery::Committed,
+            losses: Vec::new(),
         })
     }
 

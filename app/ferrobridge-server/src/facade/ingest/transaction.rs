@@ -198,6 +198,11 @@ pub(super) fn outcomes(partition: Partition, placed: Vec<Placed>) -> Vec<EntryOu
         .iter()
         .zip(placed)
         .map(|(entry, place)| {
+            let losses = if place.change.is_some() {
+                entry.losses.clone()
+            } else {
+                Vec::new()
+            };
             Some(Committed {
                 full_url: entry.full_url.clone(),
                 resource_type: String::from(entry.inbound.resource_type()),
@@ -205,6 +210,7 @@ pub(super) fn outcomes(partition: Partition, placed: Vec<Placed>) -> Vec<EntryOu
                 id: place.id,
                 version: place.version,
                 change: place.change,
+                losses,
             })
         })
         .collect();

@@ -29,8 +29,13 @@ crates on crates.io.
   `C_DV_ORDINAL` constrains at a `DV_ORDINAL` node, in template order: each
   `OrdinalOption` carries the ordinal `value` and the code and terminology
   of its symbol, and a node with no ordinal constraint answers `None`.
-  `openehr-mapping-core` moves to 0.1.127, `fhirconnect` to 0.1.183 and
-  `ferrobridge-hl7v2` to 0.1.132 with it (#1090).
+  `openehr-mapping-core` moves to 0.1.127, `fhirconnect` to 0.1.186 and
+  `ferrobridge-hl7v2` to 0.1.135 with it (#1090).
+- The facade shows a write's declared losses to the client that wrote it: a
+  committed transaction entry carries them in `response.outcome`, and a
+  single create or update asked for `Prefer: return=OperationOutcome` lists
+  them after the committed version, one issue per loss with the FHIRPath in
+  `expression` and the openEHR path in `details` (#1115).
 - `GET /operator/configuration` answers the configuration the bridge started
   on, behind `[operator]` and the operator scope like the other operator
   routes: every key with its value and its source (the file, the
@@ -86,6 +91,11 @@ crates on crates.io.
 
 ### Changed
 
+- A transaction entry whose mapping links a resource as a composition of its
+  own is refused with `422` and `not-supported`, naming why and the ways that
+  commit it: the resource on its own, or as an entry of a `batch`, whose
+  entries commit one at a time and follow the link as a single create does
+  (#1120).
 - `ferrobridge-term` 0.1.130 carries the `date` input of `CodeSystem/$lookup`
   and `ValueSet/$validate-code`: `Client::lookup_at` sends it, and
   `Request::Lookup` and `Validation` gain a `date` field. This breaks a
@@ -93,6 +103,13 @@ crates on crates.io.
 
 ### Fixed
 
+- A coding with no `display` written into a `DV_TEXT`, whose value would
+  otherwise fall back to the coding's code, is looked up through
+  `CodeSystem/$lookup` as one written into a `DV_CODED_TEXT` is: the display
+  becomes the value, an unknown code refuses unless
+  `[terminology] display_fallback` is set, a failed call refuses, and with no
+  server the code stands. `fhirconnect` moves to 0.1.185 and
+  `ferrobridge-hl7v2` to 0.1.134 with it (#1188).
 - An untyped `dateTime` mapped onto an `ELEMENT` whose value admits
   `DV_TEXT` and `DV_DATE_TIME` converts into `DV_DATE_TIME` whatever the
   template order: a class that pairs with the FHIR type directly outranks
