@@ -45,8 +45,8 @@ use serde_json::Value;
 
 pub mod null_flavour;
 
-use crate::resolve::derive;
 use crate::engine::rm::null_flavour::NULL_FLAVOUR;
+use crate::resolve::derive;
 
 /// The suffix a whole canonical value travels under in a FLAT key.
 ///

@@ -10,7 +10,10 @@ use url::Url;
 use crate::error::Error;
 
 /// Returns the response to `request`, sent once, for `url`.
-pub(super) async fn dispatch(url: &Url, request: reqwest::RequestBuilder) -> Result<reqwest::Response, Error> {
+pub(super) async fn dispatch(
+    url: &Url,
+    request: reqwest::RequestBuilder,
+) -> Result<reqwest::Response, Error> {
     request.send().await.map_err(|source| {
         if source.is_timeout() {
             Error::Timeout {
@@ -34,4 +37,3 @@ pub(super) fn challenge(headers: &HeaderMap) -> Option<String> {
         .and_then(|value| value.to_str().ok())
         .map(str::to_owned)
 }
-

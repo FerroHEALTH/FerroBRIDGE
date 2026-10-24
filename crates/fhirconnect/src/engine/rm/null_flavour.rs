@@ -51,4 +51,3 @@ pub fn null_flavour_of(element: &Value, node: &str) -> Result<Option<NullFlavour
         .transpose()?;
     Ok(Some(NullFlavour { flavour, reason }))
 }
-
