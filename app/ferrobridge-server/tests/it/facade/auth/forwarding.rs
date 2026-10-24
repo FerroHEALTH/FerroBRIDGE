@@ -8,7 +8,7 @@
 //! the token
 //! (<https://hl7.org/fhir/smart-app-launch/scopes-and-launch-context.html>).
 
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -60,7 +60,7 @@ const BRIDGE_AUTHORIZATION: &str = "Basic YnJpZGdlOnN5bnRoZXRpYy1icmlkZ2UtY3JlZG
 
 /// Returns a harness whose facade reaches its CDR with [`BRIDGE_CREDENTIAL`]
 /// and answers search as the fixture declarations state.
-async fn credentialed() -> Result<Harness, Box<dyn StdError>> {
+async fn credentialed() -> Result<Harness, Box<dyn Error>> {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(
@@ -152,7 +152,7 @@ async fn mount_empty_query(cdr: &MockServer) {
 
 #[tokio::test]
 async fn create_read_and_search_reach_the_cdr_with_the_bridge_credential_alone()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = credentialed().await?;
@@ -208,7 +208,7 @@ async fn create_read_and_search_reach_the_cdr_with_the_bridge_credential_alone()
 
 #[tokio::test]
 async fn each_batch_entry_reaches_the_cdr_with_the_bridge_credential_alone()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = credentialed().await?;

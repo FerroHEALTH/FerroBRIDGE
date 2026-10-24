@@ -5,7 +5,7 @@
 
 use axum::body::Body;
 use http::{Request, StatusCode, header};
-use std::error::Error as StdError;
+use std::error::Error;
 
 use super::FHIR_JSON;
 use super::OPENEHR_JSON;
@@ -17,7 +17,7 @@ use super::mapping_tree;
 
 #[tokio::test]
 async fn a_flat_composition_without_a_template_is_four_hundred_required()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // "`templateId` ... is also required when submitting a flat Composition to
     // `$tofhir`" (rest-api.adoc, section Query parameters).
     let root = mapping_tree()?;
@@ -44,7 +44,7 @@ async fn a_flat_composition_without_a_template_is_four_hundred_required()
 }
 
 #[tokio::test]
-async fn another_media_type_is_four_hundred_fifteen() -> Result<(), Box<dyn StdError>> {
+async fn another_media_type_is_four_hundred_fifteen() -> Result<(), Box<dyn Error>> {
     let root = mapping_tree()?;
     for route in [
         "/fhir/$tofhir",
@@ -73,7 +73,7 @@ async fn another_media_type_is_four_hundred_fifteen() -> Result<(), Box<dyn StdE
 
 #[tokio::test]
 async fn an_openehr_body_on_the_enveloped_route_is_four_hundred_fifteen()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // "The `Content-Type` and `Accept` headers on the operation endpoints ...
     // refer to the FHIR envelope, not to the openEHR payload it carries"
     // (rest-api.adoc, section Media types).
@@ -90,8 +90,8 @@ async fn an_openehr_body_on_the_enveloped_route_is_four_hundred_fifteen()
 }
 
 #[tokio::test]
-async fn a_body_that_is_not_a_parameters_answers_an_operation_outcome()
--> Result<(), Box<dyn StdError>> {
+async fn a_body_that_is_not_a_parameters_answers_an_operation_outcome() -> Result<(), Box<dyn Error>>
+{
     let root = mapping_tree()?;
     let (status, media, body) = call(
         app(&root)?,
@@ -110,7 +110,7 @@ async fn a_body_that_is_not_a_parameters_answers_an_operation_outcome()
 
 #[tokio::test]
 async fn a_mapping_that_cannot_run_answers_an_outcome_and_nothing_else()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // Strictness is the default: a failed mapping answers an OperationOutcome
     // and no Bundle.
     let root = mapping_tree()?;
@@ -140,7 +140,7 @@ async fn a_mapping_that_cannot_run_answers_an_outcome_and_nothing_else()
 }
 
 #[tokio::test]
-async fn a_bundle_with_two_subjects_is_refused_naming_them() -> Result<(), Box<dyn StdError>> {
+async fn a_bundle_with_two_subjects_is_refused_naming_them() -> Result<(), Box<dyn Error>> {
     let root = mapping_tree()?;
     let mut first: serde_json::Value =
         serde_json::from_str(ferrobridge_testkit::fixtures::R4_CONDITION)?;

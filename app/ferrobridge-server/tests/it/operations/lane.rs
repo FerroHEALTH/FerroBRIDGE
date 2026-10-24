@@ -12,7 +12,7 @@ use ferrobridge_server::mappings;
 use ferrobridge_server::state::AppState;
 use http::{Request, StatusCode, header};
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 
 use crate::support;
@@ -28,7 +28,7 @@ fn bare() -> Router {
 }
 
 #[tokio::test]
-async fn the_operations_answer_unavailable_with_no_mapping_set() -> Result<(), Box<dyn StdError>> {
+async fn the_operations_answer_unavailable_with_no_mapping_set() -> Result<(), Box<dyn Error>> {
     let (status, media, body) = call(
         bare(),
         Request::post("/fhir/$toopenehr")
@@ -50,7 +50,7 @@ async fn the_operations_answer_unavailable_with_no_mapping_set() -> Result<(), B
 
 /// Returns the reason the application `text` configures answers a
 /// `$toopenehr` with, which must be a `503`.
-async fn reason_of(text: &str) -> Result<String, Box<dyn StdError>> {
+async fn reason_of(text: &str) -> Result<String, Box<dyn Error>> {
     let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
     let state = AppState::build(&settings).await?;
     let app = ferrobridge_server::router(Arc::new(state), &server_settings());
@@ -70,7 +70,7 @@ async fn reason_of(text: &str) -> Result<String, Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_configuration_with_no_mapping_set_names_that_reason() -> Result<(), Box<dyn StdError>> {
+async fn a_configuration_with_no_mapping_set_names_that_reason() -> Result<(), Box<dyn Error>> {
     assert_eq!(
         "the FHIRconnect operations are not served: no mapping set is configured",
         reason_of("").await?
@@ -80,7 +80,7 @@ async fn a_configuration_with_no_mapping_set_names_that_reason() -> Result<(), B
 
 #[tokio::test]
 async fn a_lane_switched_off_names_the_switch_and_not_a_missing_mapping_set()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let root = super::mapping_tree()?;
     let text = format!(
         "[mappings]\ndirectory = {}\ntemplates = {}\n\n[operations]\nenabled = false\n",
@@ -100,7 +100,7 @@ fn toml_path(path: &std::path::Path) -> String {
 }
 
 #[test]
-fn a_compiler_warning_reaches_the_log_once_as_the_lane_loads() -> Result<(), Box<dyn StdError>> {
+fn a_compiler_warning_reaches_the_log_once_as_the_lane_loads() -> Result<(), Box<dyn Error>> {
     // The KDS project context lists an extension of a model no mapping of it
     // reaches, which the compiler accepts with `fc-unreached-extension`.
     let root = tempfile::tempdir()?;

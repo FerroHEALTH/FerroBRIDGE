@@ -7,7 +7,7 @@
 //! design.
 
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 
 use axum::Router;
@@ -43,7 +43,7 @@ struct Unprovisioned {
 
 impl Unprovisioned {
     /// Builds the operator API over an empty console directory.
-    async fn new() -> Result<Self, Box<dyn StdError>> {
+    async fn new() -> Result<Self, Box<dyn Error>> {
         let tree = tempfile::tempdir()?;
         let cdr = MockServer::start().await;
         Mock::given(matchers::method("GET"))
@@ -82,10 +82,7 @@ impl Unprovisioned {
     }
 
     /// Sends `request` under an operator token.
-    async fn send(
-        &self,
-        request: Request<Body>,
-    ) -> Result<http::Response<Body>, Box<dyn StdError>> {
+    async fn send(&self, request: Request<Body>) -> Result<http::Response<Body>, Box<dyn Error>> {
         let token = mint(&self.key, &self.issuer.claims(OPERATOR));
         Ok(self.app.clone().oneshot(bearing(request, &token)).await?)
     }
@@ -97,7 +94,7 @@ impl Unprovisioned {
         relative: &str,
         precondition: (header::HeaderName, String),
         body: &str,
-    ) -> Result<http::Response<Body>, Box<dyn StdError>> {
+    ) -> Result<http::Response<Body>, Box<dyn Error>> {
         self.send(
             Request::put(format!("/operator/mappings/fhirconnect/{relative}"))
                 .header(precondition.0, precondition.1)
@@ -110,7 +107,7 @@ impl Unprovisioned {
 
 #[tokio::test]
 async fn console_files_are_compiled_and_a_broken_draft_is_refused_without_a_provisioned_tree()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let case = Unprovisioned::new().await?;
     let created = (header::IF_NONE_MATCH, String::from("*"));
     for (relative, body) in [

@@ -10,7 +10,7 @@ use ferrobridge_server::state::AppState;
 use ferrobridge_server::terminology::Translator;
 use ferrobridge_term::client::Client;
 use ferrobridge_term::config::{Config, RetryPolicy, WireVersion};
-use std::error::Error as StdError;
+use std::error::Error;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -78,7 +78,7 @@ pub(crate) fn state() -> Arc<AppState> {
 }
 
 /// Returns a translator over the R4 terminology server `server` mocks.
-pub(crate) fn translator(server: &MockServer) -> Result<Translator, Box<dyn StdError>> {
+pub(crate) fn translator(server: &MockServer) -> Result<Translator, Box<dyn Error>> {
     let config = Config::new(format!("{}/r4", server.uri()).parse()?, WireVersion::R4)
         .with_timeout(Duration::from_secs(5))
         .with_retry(RetryPolicy {

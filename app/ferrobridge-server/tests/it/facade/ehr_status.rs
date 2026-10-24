@@ -6,7 +6,7 @@
 //! `If-Match` on the version read (`ehr-codegen.openapi.yaml`), and every
 //! refusal before anything is committed.
 
-use std::error::Error as StdError;
+use std::error::Error;
 
 use ferrobridge_server::facade::Settings;
 use http::StatusCode;
@@ -111,7 +111,7 @@ async fn mount_update(cdr: &MockServer, response: ResponseTemplate) {
 
 #[tokio::test]
 async fn an_anonymous_ehr_status_takes_the_subject_before_the_composition()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness_over(FIXTURES, configured()).await;
     mount_ehr(&harness.cdr).await;
     mount_status(&harness.cdr, &status_body(None)).await;
@@ -164,7 +164,7 @@ async fn an_anonymous_ehr_status_takes_the_subject_before_the_composition()
 }
 
 #[tokio::test]
-async fn an_ehr_status_that_names_the_subject_takes_no_write() -> Result<(), Box<dyn StdError>> {
+async fn an_ehr_status_that_names_the_subject_takes_no_write() -> Result<(), Box<dyn Error>> {
     let harness = harness_over(FIXTURES, configured()).await;
     mount_ehr(&harness.cdr).await;
     mount_status(&harness.cdr, &status_body(Some(reference(VALUE)))).await;
@@ -177,7 +177,7 @@ async fn an_ehr_status_that_names_the_subject_takes_no_write() -> Result<(), Box
 
 #[tokio::test]
 async fn an_ehr_status_that_names_another_subject_is_refused_with_nothing_committed()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness_over(FIXTURES, configured()).await;
     mount_ehr(&harness.cdr).await;
     mount_status(
@@ -199,7 +199,7 @@ async fn an_ehr_status_that_names_another_subject_is_refused_with_nothing_commit
 
 #[tokio::test]
 async fn a_version_conflict_answers_four_hundred_and_twelve_with_the_latest_version()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness_over(FIXTURES, configured()).await;
     mount_ehr(&harness.cdr).await;
     mount_status(&harness.cdr, &status_body(None)).await;
@@ -231,7 +231,7 @@ async fn a_version_conflict_answers_four_hundred_and_twelve_with_the_latest_vers
 
 #[tokio::test]
 async fn a_refused_update_keeps_the_upstream_status_in_the_diagnostics()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness_over(FIXTURES, configured()).await;
     mount_ehr(&harness.cdr).await;
     mount_status(&harness.cdr, &status_body(None)).await;
@@ -253,7 +253,7 @@ async fn a_refused_update_keeps_the_upstream_status_in_the_diagnostics()
 }
 
 #[tokio::test]
-async fn an_unknown_ehr_status_is_refused_as_not_found() -> Result<(), Box<dyn StdError>> {
+async fn an_unknown_ehr_status_is_refused_as_not_found() -> Result<(), Box<dyn Error>> {
     let harness = harness_over(FIXTURES, configured()).await;
     mount_ehr(&harness.cdr).await;
     Mock::given(matchers::method("GET"))
@@ -269,8 +269,7 @@ async fn an_unknown_ehr_status_is_refused_as_not_found() -> Result<(), Box<dyn S
 }
 
 #[tokio::test]
-async fn an_offered_subject_with_no_system_configured_is_refused() -> Result<(), Box<dyn StdError>>
-{
+async fn an_offered_subject_with_no_system_configured_is_refused() -> Result<(), Box<dyn Error>> {
     let harness = harness_over(FIXTURES, settings()).await;
     mount_ehr(&harness.cdr).await;
     let (status, body) = call(harness.app(), post_condition(&condition())).await?;
@@ -285,7 +284,7 @@ async fn an_offered_subject_with_no_system_configured_is_refused() -> Result<(),
 }
 
 #[tokio::test]
-async fn an_identifier_of_another_system_writes_nothing() -> Result<(), Box<dyn StdError>> {
+async fn an_identifier_of_another_system_writes_nothing() -> Result<(), Box<dyn Error>> {
     let harness = harness_over(
         FIXTURES,
         Settings {
@@ -303,8 +302,7 @@ async fn an_identifier_of_another_system_writes_nothing() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
-async fn a_transaction_writes_the_subject_before_its_contribution() -> Result<(), Box<dyn StdError>>
-{
+async fn a_transaction_writes_the_subject_before_its_contribution() -> Result<(), Box<dyn Error>> {
     let harness = harness_over(FIXTURES, configured()).await;
     mount_ehr(&harness.cdr).await;
     mount_status(

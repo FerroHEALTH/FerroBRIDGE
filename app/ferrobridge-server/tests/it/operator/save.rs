@@ -6,7 +6,7 @@
 //! template. No specification governs the operator surface: our own design.
 
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -123,7 +123,7 @@ struct Case {
 impl Case {
     /// Builds a facade and an operations lane over the provisioned fixtures,
     /// with the operator API saving into an empty console directory.
-    async fn new() -> Result<Self, Box<dyn StdError>> {
+    async fn new() -> Result<Self, Box<dyn Error>> {
         let tree = tempfile::tempdir()?;
         let provisioned = tree.path().join("mappings");
         std::fs::create_dir_all(&provisioned)?;
@@ -211,10 +211,7 @@ impl Case {
     }
 
     /// Sends `request` under an operator token.
-    async fn send(
-        &self,
-        request: Request<Body>,
-    ) -> Result<http::Response<Body>, Box<dyn StdError>> {
+    async fn send(&self, request: Request<Body>) -> Result<http::Response<Body>, Box<dyn Error>> {
         let token = mint(&self.key, &self.issuer.claims(OPERATOR));
         Ok(self.app.clone().oneshot(bearing(request, &token)).await?)
     }
@@ -224,7 +221,7 @@ impl Case {
         &self,
         relative: &str,
         body: &str,
-    ) -> Result<http::Response<Body>, Box<dyn StdError>> {
+    ) -> Result<http::Response<Body>, Box<dyn Error>> {
         self.create_at(&format!("fhirconnect/{relative}"), body)
             .await
     }
@@ -234,7 +231,7 @@ impl Case {
         &self,
         wire: &str,
         body: &str,
-    ) -> Result<http::Response<Body>, Box<dyn StdError>> {
+    ) -> Result<http::Response<Body>, Box<dyn Error>> {
         self.send(
             Request::put(format!("/operator/mappings/{wire}"))
                 .header(header::IF_NONE_MATCH, "*")
@@ -245,7 +242,7 @@ impl Case {
     }
 
     /// Returns the operator state document.
-    async fn state(&self) -> Result<serde_json::Value, Box<dyn StdError>> {
+    async fn state(&self) -> Result<serde_json::Value, Box<dyn Error>> {
         let response = self
             .send(Request::get("/operator/state").body(Body::empty())?)
             .await?;
@@ -254,7 +251,7 @@ impl Case {
     }
 
     /// Returns the resource types the `CapabilityStatement` names.
-    async fn declared_types(&self) -> Result<Vec<String>, Box<dyn StdError>> {
+    async fn declared_types(&self) -> Result<Vec<String>, Box<dyn Error>> {
         let response = self
             .app
             .clone()
@@ -310,7 +307,7 @@ fn server_settings() -> ferrobridge_server::config::ServerSettings {
 
 #[tokio::test]
 async fn a_saved_file_is_byte_identical_and_the_capability_statement_follows()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     assert!(
         !case
@@ -349,7 +346,7 @@ async fn a_saved_file_is_byte_identical_and_the_capability_statement_follows()
 
 #[tokio::test]
 async fn the_listing_and_the_file_route_serve_a_saved_file_as_the_consoles()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     assert_eq!(
         StatusCode::OK,
@@ -383,7 +380,7 @@ async fn the_listing_and_the_file_route_serve_a_saved_file_as_the_consoles()
 
 #[tokio::test]
 async fn a_failing_draft_is_refused_and_leaves_disk_and_programs_unchanged()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     assert_eq!(
         StatusCode::OK,
@@ -431,7 +428,7 @@ async fn a_failing_draft_is_refused_and_leaves_disk_and_programs_unchanged()
 }
 
 #[tokio::test]
-async fn a_stale_if_match_answers_412_and_the_current_one_saves() -> Result<(), Box<dyn StdError>> {
+async fn a_stale_if_match_answers_412_and_the_current_one_saves() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     assert_eq!(
         StatusCode::OK,
@@ -470,7 +467,7 @@ async fn a_stale_if_match_answers_412_and_the_current_one_saves() -> Result<(), 
 }
 
 #[tokio::test]
-async fn a_save_without_a_precondition_or_a_reason_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn a_save_without_a_precondition_or_a_reason_is_refused() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let unconditional = case
         .send(
@@ -493,7 +490,7 @@ async fn a_save_without_a_precondition_or_a_reason_is_refused() -> Result<(), Bo
 }
 
 #[tokio::test]
-async fn a_save_over_a_provisioned_path_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn a_save_over_a_provisioned_path_is_refused() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let response = case
         .send(
@@ -523,8 +520,7 @@ async fn a_save_over_a_provisioned_path_is_refused() -> Result<(), Box<dyn StdEr
 }
 
 #[tokio::test]
-async fn a_draft_check_answers_its_diagnostics_and_writes_nothing() -> Result<(), Box<dyn StdError>>
-{
+async fn a_draft_check_answers_its_diagnostics_and_writes_nothing() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let check = |body: &str| {
         Request::post("/operator/mappings/check?path=fhirconnect/ferrobridge_facade.yml")
@@ -556,8 +552,7 @@ async fn a_draft_check_answers_its_diagnostics_and_writes_nothing() -> Result<()
 }
 
 #[tokio::test]
-async fn a_reload_picks_up_a_file_placed_in_the_console_directory() -> Result<(), Box<dyn StdError>>
-{
+async fn a_reload_picks_up_a_file_placed_in_the_console_directory() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     std::fs::create_dir_all(case.console(""))?;
     std::fs::write(case.console("ferrobridge_console.yml"), MODEL)?;
@@ -576,7 +571,7 @@ async fn a_reload_picks_up_a_file_placed_in_the_console_directory() -> Result<()
 
 #[test]
 fn the_save_audit_line_names_the_caller_file_digests_and_reason_and_no_content()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let logs = crate::support::Logs::default();
     let capture = ferrobridge_server::telemetry::subscriber(
         ferrobridge_server::telemetry::Rendering::Json,
@@ -592,7 +587,7 @@ fn the_save_audit_line_names_the_caller_file_digests_and_reason_and_no_content()
             let case = Case::new().await?;
             let response = case.create("ferrobridge_console.yml", MODEL).await?;
             assert_eq!(StatusCode::OK, response.status());
-            Ok::<(), Box<dyn StdError>>(())
+            Ok::<(), Box<dyn Error>>(())
         })
     })?;
     let text = logs.text();
@@ -624,8 +619,8 @@ fn the_save_audit_line_names_the_caller_file_digests_and_reason_and_no_content()
 }
 
 #[tokio::test]
-async fn an_omocl_file_saves_under_the_console_tree_and_joins_the_set()
--> Result<(), Box<dyn StdError>> {
+async fn an_omocl_file_saves_under_the_console_tree_and_joins_the_set() -> Result<(), Box<dyn Error>>
+{
     let case = Case::new().await?;
     let specimen = std::fs::read_to_string(OMOCL_FILE)?;
     let response = case.create_at("omocl/Specimen_v1.yml", &specimen).await?;
@@ -662,7 +657,7 @@ async fn an_omocl_file_saves_under_the_console_tree_and_joins_the_set()
 
 #[tokio::test]
 async fn an_omocl_draft_that_does_not_load_is_refused_and_writes_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let response = case
         .create_at("omocl/broken.yml", "grammar: [unclosed\n")
@@ -683,7 +678,7 @@ async fn an_omocl_draft_that_does_not_load_is_refused_and_writes_nothing()
 }
 
 #[tokio::test]
-async fn an_omocl_clash_with_a_provisioned_file_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn an_omocl_clash_with_a_provisioned_file_is_refused() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let analyte = std::fs::read_to_string(PROVISIONED_OMOCL)?;
     let response = case

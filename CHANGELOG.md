@@ -25,6 +25,12 @@ crates on crates.io.
 
 ### Added
 
+- `WebTemplateIndex::ordinal_options` returns the options an OPT 1.4
+  `C_DV_ORDINAL` constrains at a `DV_ORDINAL` node, in template order: each
+  `OrdinalOption` carries the ordinal `value` and the code and terminology
+  of its symbol, and a node with no ordinal constraint answers `None`.
+  `openehr-mapping-core` moves to 0.1.127, `fhirconnect` to 0.1.186 and
+  `ferrobridge-hl7v2` to 0.1.135 with it (#1090).
 - The facade shows a write's declared losses to the client that wrote it: a
   committed transaction entry carries them in `response.outcome`, and a
   single create or update asked for `Prefer: return=OperationOutcome` lists
@@ -110,9 +116,9 @@ crates on crates.io.
   attributes are not well-formed XML (no whitespace between two attributes,
   a name that is no XML name, a `<` in a value), in the narrative and in
   every other element, where it accepted them and wrote them back repaired.
-  `fhir-types` moves to 0.1.128, `fhirconnect` to 0.1.187,
-  `ferrobridge-term` and `ferrobridge-validator` to 0.1.132,
-  `ferrobridge-fhirpath` to 0.1.128 and `ferrobridge-hl7v2` to 0.1.136 with
+  `fhir-types` moves to 0.1.128, `fhirconnect` to 0.1.189,
+  `ferrobridge-term` and `ferrobridge-validator` to 0.1.134,
+  `ferrobridge-fhirpath` to 0.1.128 and `ferrobridge-hl7v2` to 0.1.140 with
   it (#1178).
 - A coding with no `display` written into a `DV_TEXT`, whose value would
   otherwise fall back to the coding's code, is looked up through

@@ -1539,7 +1539,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.136"
+version = "0.1.140"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1631,7 +1631,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.1.132"
+version = "0.1.134"
 dependencies = [
  "async-trait",
  "backon",
@@ -1683,7 +1683,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.1.132"
+version = "0.1.134"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
@@ -1780,7 +1780,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.187"
+version = "0.1.189"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
@@ -3672,7 +3672,7 @@ dependencies = [
 
 [[package]]
 name = "openehr-mapping-core"
-version = "0.1.126"
+version = "0.1.127"
 dependencies = [
  "ferrobridge-testkit",
  "insta",

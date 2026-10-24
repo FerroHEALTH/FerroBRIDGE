@@ -9,7 +9,7 @@ use ferrobridge_server::facade::identity::store::Store;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::time::Duration;
 use wiremock::Mock;
 use wiremock::MockServer;
@@ -39,7 +39,7 @@ use super::writes;
 
 #[tokio::test]
 async fn a_transaction_with_one_failing_entry_commits_nothing_and_names_it()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     let mut broken = condition();
@@ -74,8 +74,7 @@ async fn a_transaction_with_one_failing_entry_commits_nothing_and_names_it()
 }
 
 #[tokio::test]
-async fn a_transaction_that_maps_in_full_commits_one_contribution() -> Result<(), Box<dyn StdError>>
-{
+async fn a_transaction_that_maps_in_full_commits_one_contribution() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_echo(&harness.cdr, ECHOED, Echo::Sent).await;
@@ -104,7 +103,7 @@ async fn a_transaction_that_maps_in_full_commits_one_contribution() -> Result<()
 
 #[tokio::test]
 async fn a_transaction_entry_claiming_two_profiles_is_mapped_by_the_one_a_context_names()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // FHIRconnect engine/bundles.adoc splits a Bundle by the context profile
     // URLs; R4 resource.html#Meta makes `meta.profile` a list, so an entry
     // that claims an unmapped profile beside a mapped one is selected by
@@ -143,7 +142,7 @@ async fn mount_contribution(cdr: &MockServer) {
 
 #[tokio::test]
 async fn each_transaction_entry_answers_the_location_and_etag_a_create_answers()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // A transaction answers a `transaction-response` Bundle whose entries each
     // carry the status, `location` and `ETag`
     // (<https://hl7.org/fhir/R4/http.html#transaction-response>).
@@ -180,7 +179,7 @@ async fn each_transaction_entry_answers_the_location_and_etag_a_create_answers()
 
 #[tokio::test]
 async fn a_transaction_sent_twice_commits_once_and_answers_the_same_ids()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_contribution(&harness.cdr).await;
@@ -228,8 +227,7 @@ fn issue_locations(body: &serde_json::Value) -> Vec<&str> {
 }
 
 #[tokio::test]
-async fn two_overlapping_deliveries_of_one_transaction_commit_once() -> Result<(), Box<dyn StdError>>
-{
+async fn two_overlapping_deliveries_of_one_transaction_commit_once() -> Result<(), Box<dyn Error>> {
     // No specification governs the redelivery rule: our own design. The CDR
     // holds the first commit's answer, so the second delivery starts while the
     // first holds its claim, and is refused with nothing committed.
@@ -287,7 +285,7 @@ async fn two_overlapping_deliveries_of_one_transaction_commit_once() -> Result<(
 }
 
 #[tokio::test]
-async fn two_overlapping_creates_of_one_resource_commit_once() -> Result<(), Box<dyn StdError>> {
+async fn two_overlapping_creates_of_one_resource_commit_once() -> Result<(), Box<dyn Error>> {
     // No specification governs the redelivery rule: our own design. The CDR
     // holds the first create's answer while the second create of the same
     // `id` and `meta.versionId` arrives.
@@ -330,7 +328,7 @@ async fn two_overlapping_creates_of_one_resource_commit_once() -> Result<(), Box
 
 #[tokio::test]
 async fn a_partly_consumed_transaction_is_refused_naming_the_consumed_entries()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_contribution(&harness.cdr).await;
@@ -370,7 +368,7 @@ async fn a_partly_consumed_transaction_is_refused_naming_the_consumed_entries()
 }
 
 #[tokio::test]
-async fn a_transaction_carrying_one_resource_twice_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn a_transaction_carrying_one_resource_twice_is_refused() -> Result<(), Box<dyn Error>> {
     // "A resource can only appear in a transaction once (by identity)"
     // (<https://hl7.org/fhir/R4/http.html#transaction>).
     let harness = harness().await;
@@ -401,7 +399,7 @@ async fn a_transaction_carrying_one_resource_twice_is_refused() -> Result<(), Bo
 
 #[tokio::test]
 async fn a_transaction_carrying_one_id_at_two_versions_is_refused_naming_both()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // "A resource can only appear in a transaction once (by identity)", and
     // an overlap of identities fails the transaction
     // (<https://hl7.org/fhir/R4/http.html#transaction>).

@@ -7,7 +7,7 @@
 //! A token without the permission answers `403 insufficient_scope` (RFC 6750
 //! §3.1) whose body and challenge name no scope.
 
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -92,7 +92,7 @@ impl Case {
         &self,
         request: Request<Body>,
         scope: &str,
-    ) -> Result<(StatusCode, Option<String>, String), Box<dyn StdError>> {
+    ) -> Result<(StatusCode, Option<String>, String), Box<dyn Error>> {
         let response = raw(
             secured(&self.harness, &self.authority),
             bearing(request, &self.token(scope)),
@@ -140,7 +140,7 @@ fn validate_condition() -> Request<Body> {
 }
 
 #[tokio::test]
-async fn create_needs_c_on_the_type() -> Result<(), Box<dyn StdError>> {
+async fn create_needs_c_on_the_type() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     for scope in ["system/Condition.rus", "system/Observation.c", "openid"] {
         assert_forbidden(&case.send(post_condition(&condition()), scope).await?);
@@ -153,7 +153,7 @@ async fn create_needs_c_on_the_type() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn read_and_vread_need_r_on_the_type() -> Result<(), Box<dyn StdError>> {
+async fn read_and_vread_need_r_on_the_type() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     for path in [
         "/fhir/Condition/never-written",
@@ -167,7 +167,7 @@ async fn read_and_vread_need_r_on_the_type() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn update_needs_u_on_the_type() -> Result<(), Box<dyn StdError>> {
+async fn update_needs_u_on_the_type() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     assert_forbidden(
         &case
@@ -182,7 +182,7 @@ async fn update_needs_u_on_the_type() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn validate_needs_c_or_u_on_the_type() -> Result<(), Box<dyn StdError>> {
+async fn validate_needs_c_or_u_on_the_type() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     assert_forbidden(
         &case
@@ -197,8 +197,8 @@ async fn validate_needs_c_or_u_on_the_type() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn validate_admits_a_token_that_carries_only_the_operator_scope()
--> Result<(), Box<dyn StdError>> {
+async fn validate_admits_a_token_that_carries_only_the_operator_scope() -> Result<(), Box<dyn Error>>
+{
     // No specification governs the operator scope: our own design, a dry run
     // commits nothing, so the console's token needs no clinical write scope.
     let case = Case::new().await;
@@ -223,7 +223,7 @@ async fn validate_admits_a_token_that_carries_only_the_operator_scope()
 }
 
 #[tokio::test]
-async fn a_renamed_operator_scope_is_the_one_validate_admits() -> Result<(), Box<dyn StdError>> {
+async fn a_renamed_operator_scope_is_the_one_validate_admits() -> Result<(), Box<dyn Error>> {
     let case =
         Case::with(|settings| settings.operator_scope = String::from("__bridge.operator")).await;
     let (status, _, body) = case.send(validate_condition(), "__bridge.operator").await?;
@@ -238,7 +238,7 @@ async fn a_renamed_operator_scope_is_the_one_validate_admits() -> Result<(), Box
 
 #[tokio::test]
 async fn a_fhirconnect_operation_admits_a_token_with_only_the_operator_scope()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     let state = AppState::with_health(Registry::default())
         .serving_operations(OperationsLane::new(
@@ -263,8 +263,8 @@ async fn a_fhirconnect_operation_admits_a_token_with_only_the_operator_scope()
 }
 
 #[tokio::test]
-async fn the_wildcard_user_and_v1_scopes_grant_as_their_letters_say()
--> Result<(), Box<dyn StdError>> {
+async fn the_wildcard_user_and_v1_scopes_grant_as_their_letters_say() -> Result<(), Box<dyn Error>>
+{
     let case = Case::new().await;
     let read = get("/fhir/Condition/never-written");
     let (status, _, _) = case.send(read, "system/*.cruds").await?;
@@ -287,7 +287,7 @@ async fn the_wildcard_user_and_v1_scopes_grant_as_their_letters_say()
 
 #[tokio::test]
 async fn a_scopeless_token_gets_system_rights_only_when_its_subject_is_listed()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let unlisted = Case::new().await;
     assert_forbidden(&unlisted.send(post_condition(&condition()), "").await?);
     let listed = Case::with(|settings| {
@@ -302,7 +302,7 @@ async fn a_scopeless_token_gets_system_rights_only_when_its_subject_is_listed()
 }
 
 #[tokio::test]
-async fn a_fhirconnect_operation_needs_a_token() -> Result<(), Box<dyn StdError>> {
+async fn a_fhirconnect_operation_needs_a_token() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     let state = AppState::with_health(Registry::default())
         .with_facade(Arc::clone(&case.harness.facade))
@@ -322,7 +322,7 @@ async fn a_fhirconnect_operation_needs_a_token() -> Result<(), Box<dyn StdError>
 
 /// Returns a case whose CDR also answers the read and the update a revision
 /// sends, with the fixture Condition created at `meta.versionId` 1.
-async fn created_at_one() -> Result<Case, Box<dyn StdError>> {
+async fn created_at_one() -> Result<Case, Box<dyn Error>> {
     let case = Case::new().await;
     mount_read(&case.harness.cdr, VERSION_ONE, &case.harness.composition()).await;
     mount_version_two(&case.harness).await;
@@ -334,7 +334,7 @@ async fn created_at_one() -> Result<Case, Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_create_that_revises_a_known_resource_needs_u_too() -> Result<(), Box<dyn StdError>> {
+async fn a_create_that_revises_a_known_resource_needs_u_too() -> Result<(), Box<dyn Error>> {
     let case = created_at_one().await?;
     assert_forbidden(
         &case
@@ -355,7 +355,7 @@ async fn a_create_that_revises_a_known_resource_needs_u_too() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn a_create_that_replays_needs_only_c() -> Result<(), Box<dyn StdError>> {
+async fn a_create_that_replays_needs_only_c() -> Result<(), Box<dyn Error>> {
     let case = created_at_one().await?;
     let (status, _, body) = case
         .send(post_condition(&condition_at("1")), "system/Condition.c")

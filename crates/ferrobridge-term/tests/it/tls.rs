@@ -19,7 +19,7 @@ use rustls::RootCertStore;
 use rustls::crypto::aws_lc_rs;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::server::WebPkiClientVerifier;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -28,7 +28,7 @@ use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio_rustls::TlsAcceptor;
 
-type BoxError = Box<dyn StdError + Send + Sync>;
+type BoxError = Box<dyn Error + Send + Sync>;
 
 /// The synthetic material of one run: the private root, the server's chain
 /// and key, and the client identity as one PEM.

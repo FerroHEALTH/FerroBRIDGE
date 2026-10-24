@@ -20,6 +20,7 @@ mod alternative;
 mod amend;
 mod embedded;
 pub mod matching;
+pub mod ordinals;
 pub mod paths;
 mod terms;
 
@@ -33,6 +34,7 @@ use openehr_sdt::flat::webtemplate::model::WebTemplateNode;
 use crate::index::matching::matches_ancestor;
 use crate::index::matching::matches_node;
 use crate::index::matching::parse_aql_path;
+use crate::index::ordinals::OrdinalOption;
 use crate::index::paths::AqlPath;
 use crate::index::paths::FlatId;
 use crate::path::MappingPath;
@@ -203,6 +205,9 @@ pub struct WebTemplateIndex {
     /// The node codes the archetype behind each archetype root defines, keyed
     /// by the root's `aqlPath`.
     archetype_terms: BTreeMap<AqlPath, BTreeSet<String>>,
+    /// The options each `C_DV_ORDINAL` node constrains, keyed by the node's
+    /// `aqlPath`.
+    ordinals: BTreeMap<AqlPath, Vec<OrdinalOption>>,
 }
 
 impl WebTemplateIndex {
@@ -227,6 +232,7 @@ impl WebTemplateIndex {
         if let TemplateSource::Opt14(ref template) = *source {
             index.embedded = embedded::embedded_templates(template);
             index.archetype_terms = terms::archetype_terms(template);
+            index.ordinals = ordinals::ordinal_options(template);
         }
         Ok(index)
     }
@@ -304,6 +310,7 @@ impl WebTemplateIndex {
             by_flat_id,
             embedded: BTreeMap::new(),
             archetype_terms: BTreeMap::new(),
+            ordinals: BTreeMap::new(),
         })
     }
 
@@ -364,6 +371,25 @@ impl WebTemplateIndex {
         self.archetype_terms
             .get(root.aql_path())
             .map(|codes| codes.contains(code))
+    }
+
+    /// Returns the ordinal options the template constrains at `node`, in
+    /// template order.
+    ///
+    /// An OPT 1.4 `C_DV_ORDINAL` lists each `DV_ORDINAL` the node admits, a
+    /// `value` and a coded `symbol`, and FHIRconnect
+    /// `types-of-mappings/data-type/DV_ORDINAL.adoc` §`CodeableConcept` keeps
+    /// the `value` "maintained by the archetype itself". This answers `None`
+    /// when `node` is no `DV_ORDINAL` node, when the template constrains no
+    /// list there, when the template is an OPT2, and when the index was built
+    /// by [`WebTemplateIndex::over`], which has no operational template to
+    /// read.
+    #[must_use]
+    pub fn ordinal_options(&self, node: &ResolvedNode) -> Option<&[OrdinalOption]> {
+        if node.rm_type() != "DV_ORDINAL" {
+            return None;
+        }
+        self.ordinals.get(node.aql_path()).map(Vec::as_slice)
     }
 
     /// Returns the root node of the template.

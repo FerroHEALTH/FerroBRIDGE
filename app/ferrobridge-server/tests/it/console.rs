@@ -7,7 +7,7 @@
 use ferrobridge_server::config::Config;
 use ferrobridge_server::{banner, build_info, startup};
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
+use std::error::Error;
 
 /// A deployment whose CDR URL carries user information, with the operations
 /// taking their templates from the CDR and the terminology lane on.
@@ -27,7 +27,7 @@ enabled = false
 "#;
 
 #[test]
-fn every_lane_is_reported_with_the_hosts_it_reaches() -> Result<(), Box<dyn StdError>> {
+fn every_lane_is_reported_with_the_hosts_it_reaches() -> Result<(), Box<dyn Error>> {
     let settings = Config::from_sources(Some(FILE), &BTreeMap::new())?.resolve()?;
     let lanes = startup::lanes(&settings);
     let names: Vec<&str> = lanes.iter().map(|lane| lane.name).collect();
@@ -66,7 +66,7 @@ fn every_lane_is_reported_with_the_hosts_it_reaches() -> Result<(), Box<dyn StdE
 }
 
 #[test]
-fn the_banner_names_the_hosts_and_never_the_user_information() -> Result<(), Box<dyn StdError>> {
+fn the_banner_names_the_hosts_and_never_the_user_information() -> Result<(), Box<dyn Error>> {
     let settings = Config::from_sources(Some(FILE), &BTreeMap::new())?.resolve()?;
     let text = banner::render(
         "0.0.0",

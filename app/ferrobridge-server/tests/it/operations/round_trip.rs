@@ -5,7 +5,7 @@
 
 use axum::body::Body;
 use http::{Request, StatusCode, header};
-use std::error::Error as StdError;
+use std::error::Error;
 
 use super::FHIR_JSON;
 use super::PROFILE;
@@ -16,14 +16,14 @@ use super::composition_text;
 use super::mapping_tree;
 
 /// Returns the one `Condition` a `$tofhir` Bundle carries.
-fn mapped_condition(answer: &serde_json::Value) -> Result<&serde_json::Value, Box<dyn StdError>> {
+fn mapped_condition(answer: &serde_json::Value) -> Result<&serde_json::Value, Box<dyn Error>> {
     answer["entry"]
         .as_array()
         .ok_or("the Bundle carries entries")?
         .iter()
         .map(|entry| &entry["resource"])
         .find(|resource| resource["resourceType"].as_str() == Some("Condition"))
-        .ok_or_else(|| Box::<dyn StdError>::from("the Bundle carries the mapped Condition"))
+        .ok_or_else(|| Box::<dyn Error>::from("the Bundle carries the mapped Condition"))
 }
 
 /// Runs `$toopenehr` then `$tofhir` over `condition` and returns what the
@@ -35,7 +35,7 @@ async fn both_legs(
     root: &tempfile::TempDir,
     condition: &serde_json::Value,
     patient: Option<serde_json::Value>,
-) -> Result<serde_json::Value, Box<dyn StdError>> {
+) -> Result<serde_json::Value, Box<dyn Error>> {
     let carried = serde_json::json!({
         "resourceType": "Bundle",
         "type": "collection",
@@ -91,7 +91,7 @@ async fn both_legs(
 
 #[tokio::test]
 async fn the_two_operations_round_trip_a_condition_modulo_what_the_program_maps()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The synthetic program maps the diagnosis name both ways and writes the
     // subject going to FHIR only, so every other element of the input is the
     // declared loss of this round trip, the subject comes back as the literal
@@ -143,7 +143,7 @@ async fn the_two_operations_round_trip_a_condition_modulo_what_the_program_maps(
 /// and the id is the one `$tofhir` derives from the composition's version.
 #[tokio::test]
 async fn the_two_operations_round_trip_the_kds_condition_as_the_engine_does()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let root = tempfile::tempdir()?;
     crate::kds::write_mappings(&root.path().join("mappings"))?;
     std::fs::create_dir_all(root.path().join("templates"))?;

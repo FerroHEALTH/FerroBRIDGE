@@ -9,7 +9,7 @@ use ferrobridge_server::cdr::ids::EhrId;
 use ferrobridge_server::facade::identity::PersonId;
 use ferrobridge_server::facade::identity::store::Store;
 use http::StatusCode;
-use std::error::Error as StdError;
+use std::error::Error;
 
 use super::super::EHR_ID;
 use super::super::VERSION_ONE;
@@ -43,7 +43,7 @@ async fn keyed_by_identifier() -> super::super::Harness {
 }
 
 #[tokio::test]
-async fn an_identifier_names_the_subject_keyed_by_it() -> Result<(), Box<dyn StdError>> {
+async fn an_identifier_names_the_subject_keyed_by_it() -> Result<(), Box<dyn Error>> {
     let harness = keyed_by_identifier().await;
     let composition = harness.composition();
     mount_rows(&harness.cdr, &[row(VERSION_ONE, &composition)]).await;
@@ -62,7 +62,7 @@ async fn an_identifier_names_the_subject_keyed_by_it() -> Result<(), Box<dyn Std
 }
 
 #[tokio::test]
-async fn an_identifier_no_subject_is_keyed_by_matches_nothing() -> Result<(), Box<dyn StdError>> {
+async fn an_identifier_no_subject_is_keyed_by_matches_nothing() -> Result<(), Box<dyn Error>> {
     let harness = keyed_by_identifier().await;
     for query in [
         "Condition?patient:identifier=http://example.org/mrn%7CMRN-9999",
@@ -78,7 +78,7 @@ async fn an_identifier_no_subject_is_keyed_by_matches_nothing() -> Result<(), Bo
 
 #[tokio::test]
 async fn a_subject_rendered_as_a_literal_reference_carries_no_identifier()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The suite's subject `Patient/p-1` is keyed in the link's own namespace,
     // so its resources name it by `reference` alone and no identifier matches.
     let harness = searching().await;
@@ -94,7 +94,7 @@ async fn a_subject_rendered_as_a_literal_reference_carries_no_identifier()
 }
 
 #[tokio::test]
-async fn an_identifier_without_a_system_or_a_value_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn an_identifier_without_a_system_or_a_value_is_refused() -> Result<(), Box<dyn Error>> {
     let harness = keyed_by_identifier().await;
     for query in [
         "Condition?patient:identifier=MRN-0001",

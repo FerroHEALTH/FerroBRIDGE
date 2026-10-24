@@ -11,7 +11,7 @@ use http::Request;
 use http::Response;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
@@ -43,8 +43,8 @@ use super::stub::mount_version_two;
 use super::writes;
 
 #[tokio::test]
-async fn a_create_answers_two_hundred_and_one_with_location_and_etag()
--> Result<(), Box<dyn StdError>> {
+async fn a_create_answers_two_hundred_and_one_with_location_and_etag() -> Result<(), Box<dyn Error>>
+{
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -82,7 +82,7 @@ async fn a_create_answers_two_hundred_and_one_with_location_and_etag()
 }
 
 #[tokio::test]
-async fn a_create_records_the_identity_it_assigned() -> Result<(), Box<dyn StdError>> {
+async fn a_create_records_the_identity_it_assigned() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     let internal = ferrobridge_server::facade::identity::FhirResourceId::new(&id)?;
@@ -97,8 +97,7 @@ async fn a_create_records_the_identity_it_assigned() -> Result<(), Box<dyn StdEr
 }
 
 #[tokio::test]
-async fn a_create_records_the_source_resource_in_the_feeder_audit() -> Result<(), Box<dyn StdError>>
-{
+async fn a_create_records_the_source_resource_in_the_feeder_audit() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     create_one(&harness).await?;
     let sent = harness
@@ -122,7 +121,7 @@ async fn a_create_records_the_source_resource_in_the_feeder_audit() -> Result<()
 }
 
 #[tokio::test]
-async fn a_derived_id_follows_the_r4_grammar() -> Result<(), Box<dyn StdError>> {
+async fn a_derived_id_follows_the_r4_grammar() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     assert!(
@@ -134,7 +133,7 @@ async fn a_derived_id_follows_the_r4_grammar() -> Result<(), Box<dyn StdError>> 
 
 #[tokio::test]
 async fn an_update_of_an_id_the_map_does_not_know_is_four_hundred_and_four()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let request = Request::put("/fhir/Condition/abcdef")
         .header(header::CONTENT_TYPE, "application/fhir+json")
@@ -151,7 +150,7 @@ async fn an_update_of_an_id_the_map_does_not_know_is_four_hundred_and_four()
 
 #[tokio::test]
 async fn an_update_whose_body_names_no_id_is_four_hundred_and_commits_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // "If no id element is provided ... the server SHALL respond with an HTTP
     // 400 error code" (<https://hl7.org/fhir/R4/http.html#update>).
     let harness = harness().await;
@@ -180,7 +179,7 @@ async fn an_update_whose_body_names_no_id_is_four_hundred_and_commits_nothing()
 
 #[tokio::test]
 async fn an_update_whose_body_names_another_id_is_four_hundred_and_commits_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // "If ... the id disagrees with the id in the URL, the server SHALL
     // respond with an HTTP 400 error code"
     // (<https://hl7.org/fhir/R4/http.html#update>).
@@ -201,7 +200,7 @@ async fn an_update_whose_body_names_another_id_is_four_hundred_and_commits_nothi
 }
 
 #[tokio::test]
-async fn an_update_without_if_match_checks_the_current_etag() -> Result<(), Box<dyn StdError>> {
+async fn an_update_without_if_match_checks_the_current_etag() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -230,7 +229,7 @@ async fn an_update_without_if_match_checks_the_current_etag() -> Result<(), Box<
 
 #[tokio::test]
 async fn a_cdr_precondition_failure_is_four_hundred_and_twelve_with_the_current_etag()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -258,7 +257,7 @@ async fn a_cdr_precondition_failure_is_four_hundred_and_twelve_with_the_current_
 }
 
 /// Returns a `PUT [base]/Condition/{id}` carrying `If-Match: {if_match}`.
-fn put_if_match(id: &str, if_match: &str) -> Result<Request<Body>, Box<dyn StdError>> {
+fn put_if_match(id: &str, if_match: &str) -> Result<Request<Body>, Box<dyn Error>> {
     Ok(Request::put(format!("/fhir/Condition/{id}"))
         .header(header::CONTENT_TYPE, "application/fhir+json")
         .header(header::IF_MATCH, if_match)
@@ -275,7 +274,7 @@ fn header_text<'a>(response: &'a Response<Body>, name: &header::HeaderName) -> O
 
 #[tokio::test]
 async fn an_update_carrying_the_etag_a_read_answered_commits_the_next_version()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The ETag is the versionId as a weak entity tag, and a version-aware
     // update sends it back in If-Match
     // (<https://hl7.org/fhir/R4/http.html#concurrency>).
@@ -318,7 +317,7 @@ async fn an_update_carrying_the_etag_a_read_answered_commits_the_next_version()
 
 #[tokio::test]
 async fn an_update_carrying_a_quoted_or_bare_version_id_is_completed_the_same_way()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -333,7 +332,7 @@ async fn an_update_carrying_a_quoted_or_bare_version_id_is_completed_the_same_wa
 
 #[tokio::test]
 async fn an_update_carrying_a_stale_etag_is_four_hundred_and_twelve_and_commits_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // A version-aware update whose If-Match does not name the current version
     // is 412 (<https://hl7.org/fhir/R4/http.html#concurrency>).
     let harness = harness().await;
@@ -352,8 +351,7 @@ async fn an_update_carrying_a_stale_etag_is_four_hundred_and_twelve_and_commits_
 }
 
 #[tokio::test]
-async fn an_update_carrying_the_cdr_version_id_passes_it_through() -> Result<(), Box<dyn StdError>>
-{
+async fn an_update_carrying_the_cdr_version_id_passes_it_through() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_version_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -398,7 +396,7 @@ async fn an_update_carrying_the_cdr_version_id_passes_it_through() -> Result<(),
 
 #[tokio::test]
 async fn an_update_carrying_a_cdr_version_id_the_cdr_does_not_hold_is_four_hundred_and_twelve()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The update follows the version If-Match names, and one the CDR does not
     // hold cannot be followed (<https://hl7.org/fhir/R4/http.html#concurrency>).
     let harness = harness().await;
@@ -425,7 +423,7 @@ async fn an_update_carrying_a_cdr_version_id_the_cdr_does_not_hold_is_four_hundr
 
 #[tokio::test]
 async fn an_update_carrying_a_version_of_another_composition_is_four_hundred_and_twelve()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_version_two(&harness).await;
@@ -443,7 +441,7 @@ async fn an_update_carrying_a_version_of_another_composition_is_four_hundred_and
 
 #[tokio::test]
 async fn an_update_carrying_a_malformed_if_match_is_four_hundred_and_commits_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -462,7 +460,7 @@ async fn an_update_carrying_a_malformed_if_match_is_four_hundred_and_commits_not
 }
 
 #[tokio::test]
-async fn invalid_mapped_content_stores_nothing() -> Result<(), Box<dyn StdError>> {
+async fn invalid_mapped_content_stores_nothing() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     Mock::given(matchers::method("POST"))
@@ -501,7 +499,7 @@ async fn invalid_mapped_content_stores_nothing() -> Result<(), Box<dyn StdError>
 }
 
 #[tokio::test]
-async fn the_feeder_audit_carries_the_source_version() -> Result<(), Box<dyn StdError>> {
+async fn the_feeder_audit_carries_the_source_version() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -524,7 +522,7 @@ async fn the_feeder_audit_carries_the_source_version() -> Result<(), Box<dyn Std
 }
 
 #[tokio::test]
-async fn a_source_resource_with_no_id_is_audited_as_unknown() -> Result<(), Box<dyn StdError>> {
+async fn a_source_resource_with_no_id_is_audited_as_unknown() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -550,7 +548,7 @@ async fn a_source_resource_with_no_id_is_audited_as_unknown() -> Result<(), Box<
 
 #[tokio::test]
 async fn an_ehr_created_on_first_sight_names_the_subject_in_the_namespace()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The subject shape is a PARTY_SELF over a PARTY_REF whose GENERIC_ID
     // scheme is the namespace, which is what `ehr_get_by_subject` matches on
     // (`ehr-codegen.openapi.yaml`).
@@ -595,8 +593,8 @@ async fn an_ehr_created_on_first_sight_names_the_subject_in_the_namespace()
 }
 
 #[tokio::test]
-async fn an_unknown_subject_creates_no_ehr_under_the_default_policy()
--> Result<(), Box<dyn StdError>> {
+async fn an_unknown_subject_creates_no_ehr_under_the_default_policy() -> Result<(), Box<dyn Error>>
+{
     let harness = harness().await;
     mount_no_ehr(&harness.cdr).await;
     let (status, body) = call(harness.app(), post_condition(&condition())).await?;
