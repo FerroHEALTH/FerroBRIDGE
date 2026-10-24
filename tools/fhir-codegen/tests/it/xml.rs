@@ -453,18 +453,49 @@ fn the_narrative_div_is_held_to_the_xhtml_namespace() {
     }
 }
 
+/// A narrative the `FerroPIX` fuzzer reached: no whitespace between two
+/// attributes, and a name that starts with `%`, both outside
+/// `STag ::= '<' Name (S Attribute)* S? '>'` (XML 1.0 §3.1 \[40\]).
+const PIX_DIV: &str = r#"<div xmlns="http://www.w3.org/1999/xhtml"><table><tr><td style="width:1px"%title="synthetic">x</td></tr></table></div>"#;
+
+/// A narrative or an element whose attributes are not well-formed XML is
+/// refused as malformed on reading, never repaired by inserting whitespace.
+#[test]
+fn a_start_tag_with_malformed_attributes_is_refused_on_reading() {
+    for schemas in namespace_versions() {
+        for (xml, path) in [
+            (with_narrative(PIX_DIV), "Resource.text.div"),
+            (
+                with_narrative(r#"<div xmlns="http://www.w3.org/1999/xhtml"><p class="a"id="b">x</p></div>"#),
+                "Resource.text.div",
+            ),
+            (
+                r#"<Basic xmlns="http://hl7.org/fhir"><code><text value="synthetic"id="x"/></code></Basic>"#.to_owned(),
+                "Resource.code.text",
+            ),
+        ] {
+            let refused = from_xml(schemas, &xml).expect_err(&xml);
+            assert!(
+                matches!(refused.kind, DecodeErrorKind::MalformedXml { .. }),
+                "{xml}: {:?}",
+                refused.kind
+            );
+            assert_eq!(refused.path, path, "{xml}");
+        }
+    }
+}
+
 /// The JSON object of a synthetic Basic resource with the narrative `div`
 /// given.
 fn basic_with_div(div: &str) -> fhir_types::codec::Object {
-    let value = Value::from_serde_json(serde_json::json!({
+    Value::from_serde_json(serde_json::json!({
         "resourceType": "Basic",
         "text": {"status": "generated", "div": div},
         "code": {"text": "synthetic"},
-    }));
-    match value {
-        Value::Object(object) => object,
-        _ => panic!("the synthetic Basic is an object"),
-    }
+    }))
+    .as_object()
+    .cloned()
+    .expect("the synthetic Basic is an object")
 }
 
 /// The JSON `div` is "a single escaped string of XHTML" whose root "needs to
@@ -484,6 +515,7 @@ fn a_narrative_div_that_is_no_xhtml_div_is_refused_on_writing_xml() {
             r#"<div xmlns="http://www.w3.org/1999/xhtml">synthetic</div><div xmlns="http://www.w3.org/1999/xhtml">two</div>"#,
             r#"<div xmlns="http://www.w3.org/1999/xhtml"><p xmlns="http://example.org/other">synthetic</p></div>"#,
             r#"<div xmlns="http://www.w3.org/1999/xhtml"><x:b>synthetic</x:b></div>"#,
+            PIX_DIV,
         ] {
             let refused = to_xml(schemas, &basic_with_div(div)).expect_err(div);
             let text = refused.to_string();

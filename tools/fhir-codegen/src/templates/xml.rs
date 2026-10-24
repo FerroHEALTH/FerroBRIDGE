@@ -600,6 +600,7 @@ fn read_complex(
     path: &mut Path,
 ) -> Result<Object, DecodeError> {
     let mut object = Object::new();
+    well_formed_attributes(start, path)?;
     for attr in start.attributes() {
         let Some((key, value)) = attribute(reader, attr, path)? else {
             continue;
@@ -863,6 +864,7 @@ fn read_primitive(
 ) -> Result<(Option<Value>, Option<Value>), DecodeError> {
     let mut value = None;
     let mut element = Object::new();
+    well_formed_attributes(start, path)?;
     for attr in start.attributes() {
         let Some((key, text)) = attribute(reader, attr, path)? else {
             continue;
@@ -1147,6 +1149,7 @@ fn write_xhtml_tag(
     raw: &mut String,
     path: &mut Path,
 ) -> Result<(), DecodeError> {
+    well_formed_attributes(element, path)?;
     let mut attributes = Vec::new();
     for attr in element.attributes() {
         let attr = attr.map_err(|e| {
@@ -1202,6 +1205,93 @@ fn write_xhtml_tag(
     raw.push_str(&tag);
     raw.push_str(if empty { "/>" } else { ">" });
     Ok(())
+}
+
+/// Refuses a start tag whose attributes are not well-formed XML.
+///
+/// "STag ::= '<' Name (S Attribute)* S? '>'", "Attribute ::= Name Eq
+/// AttValue" and "AttValue ::= '\"' (\[^<&\"\] | Reference)* '\"' | \"'\" (\[^<&'\]
+/// | Reference)* \"'\"" (XML 1.0 §3.1 \[40\] \[41\] and §2.3 \[10\],
+/// <https://www.w3.org/TR/xml/#NT-STag>): each attribute follows whitespace,
+/// its name starts with a `NameStartChar` and goes on with `NameChar`s (§2.3
+/// \[4\] \[4a\]), and its value holds no `<`. The parser's attribute iterator
+/// accepts `a="1"b="2"` and a name such as `%title`, so the raw text of the
+/// tag is read here, for the resource's elements and the narrative's alike.
+fn well_formed_attributes(start: &BytesStart<'_>, path: &Path) -> Result<(), DecodeError> {
+    let malformed = |reason: &str| {
+        path.error(DecodeErrorKind::MalformedXml {
+            reason: format!(
+                "the start tag {}: {reason}",
+                local_name(start.name().as_ref())
+            ),
+        })
+    };
+    let raw = start.attributes_raw();
+    let mut chars = raw.chars().peekable();
+    loop {
+        let mut spaced = false;
+        while chars.next_if(|c| is_xml_space(*c)).is_some() {
+            spaced = true;
+        }
+        match chars.peek() {
+            None | Some('/') => return Ok(()),
+            Some(_) if !spaced => {
+                return Err(malformed("an attribute does not follow whitespace"));
+            }
+            Some(_) => {}
+        }
+        let mut name = String::new();
+        while let Some(c) = chars.next_if(|c| *c != '=' && !is_xml_space(*c)) {
+            name.push(c);
+        }
+        let mut name_chars = name.chars();
+        let named =
+            name_chars.next().is_some_and(is_name_start_char) && name_chars.all(is_name_char);
+        if !named {
+            return Err(malformed(&format!("`{name}` is no XML name")));
+        }
+        while chars.next_if(|c| is_xml_space(*c)).is_some() {}
+        if chars.next() != Some('=') {
+            return Err(malformed(&format!("the attribute `{name}` has no `=`")));
+        }
+        while chars.next_if(|c| is_xml_space(*c)).is_some() {}
+        let Some(quote @ ('"' | '\'')) = chars.next() else {
+            return Err(malformed(&format!("the value of `{name}` is not quoted")));
+        };
+        loop {
+            match chars.next() {
+                Some(c) if c == quote => break,
+                Some('<') => {
+                    return Err(malformed(&format!("the value of `{name}` holds a `<`")));
+                }
+                Some(_) => {}
+                None => return Err(malformed(&format!("the value of `{name}` is not closed"))),
+            }
+        }
+    }
+}
+
+/// Whether `c` is XML whitespace, "S ::= (#x20 | #x9 | #xD | #xA)+" (XML 1.0
+/// §2.3 \[3\]).
+fn is_xml_space(c: char) -> bool {
+    matches!(c, ' ' | '\t' | '\r' | '\n')
+}
+
+/// Whether `c` may start an XML name (XML 1.0 §2.3 \[4\] `NameStartChar`).
+fn is_name_start_char(c: char) -> bool {
+    matches!(c,
+        ':' | 'A'..='Z' | '_' | 'a'..='z'
+        | '\u{C0}'..='\u{D6}' | '\u{D8}'..='\u{F6}' | '\u{F8}'..='\u{2FF}'
+        | '\u{370}'..='\u{37D}' | '\u{37F}'..='\u{1FFF}' | '\u{200C}'..='\u{200D}'
+        | '\u{2070}'..='\u{218F}' | '\u{2C00}'..='\u{2FEF}' | '\u{3001}'..='\u{D7FF}'
+        | '\u{F900}'..='\u{FDCF}' | '\u{FDF0}'..='\u{FFFD}' | '\u{10000}'..='\u{EFFFF}')
+}
+
+/// Whether `c` may go on an XML name (XML 1.0 §2.3 \[4a\] `NameChar`).
+fn is_name_char(c: char) -> bool {
+    is_name_start_char(c)
+        || matches!(c,
+            '-' | '.' | '0'..='9' | '\u{B7}' | '\u{300}'..='\u{36F}' | '\u{203F}'..='\u{2040}')
 }
 
 /// The refusal of an element or attribute name, in the resource or in its
