@@ -32,16 +32,19 @@ Where to read it:
 
 The library crates are published on crates.io under plain names so other Rust
 projects can depend on them: `fhir-types`, `hl7v2-types`,
-`openehr-mapping-core`, `fhirconnect`, `omocl`, `omop-cdm`, `ferrobridge-term`
-and `ferrobridge-hl7v2`. Each carries the
+`openehr-mapping-core`, `fhirconnect`, `omocl`, `omop-cdm`,
+`ferrobridge-operator-api`, `ferrobridge-term`, `ferrobridge-hl7v2`,
+`ferrobridge-fhirpath` and `ferrobridge-validator`. Each carries the
 `version` in its own
 `crates/*/Cargo.toml`, and that number never adopts the product version or a
 specification version.
 
-The set is deliberately not lockstep. `fhir-types`, `openehr-mapping-core` and
-`fhirconnect` carry a real 0.1.x line: `fhir-types` continues the sequence it
-had on crates.io before it moved here from the sibling terminology server, and
-the other two joined it on their first publish. Every other member still sits
+The set is deliberately not lockstep. Eight members carry a real 0.1.x line:
+`fhir-types` continues the sequence it had on crates.io before it moved here
+from the sibling terminology server, and `hl7v2-types`,
+`openehr-mapping-core`, `fhirconnect`, `ferrobridge-term`,
+`ferrobridge-hl7v2`, `ferrobridge-fhirpath` and `ferrobridge-validator`
+joined it on their first publish. Every other member still sits
 at the 0.0.0 placeholder that holds its name on the registry until its
 first real release. A 0.0.0 on crates.io is a name reservation and nothing
 else: it compiles, it carries the licence and the metadata, and it is not the
@@ -73,6 +76,7 @@ on the [crate versions](../contribute/crate-versions.md) page.
 
 ## Licences
 
-Every published member is BUSL-1.1 except `fhir-types`, which is Apache-2.0:
-it is generated from the HL7 FHIR packages and exists to be usable by any Rust
-project. The [licensing](../evaluate/licensing.md) page carries the terms.
+Every published member is BUSL-1.1 except the two generated crates, which are
+Apache-2.0: `fhir-types`, generated from the HL7 FHIR packages, and
+`hl7v2-types`, generated from the HL7 v2 definitions, so both are usable by
+any Rust project. The [licensing](../evaluate/licensing.md) page carries the terms.

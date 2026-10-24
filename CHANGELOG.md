@@ -32,6 +32,13 @@ crates on crates.io.
   read from a file, or unset), never its value. The document is
   `ferrobridge_operator_api::configuration::Configuration`, which the
   operator console decodes (#1147).
+- `hl7v2-types` (Apache-2.0) and `ferrobridge-hl7v2` (BUSL-1.1) join the
+  crate line at 0.1.127, leaving their 0.0.0 name reservations, so the next
+  publish ships the HL7 v2 tables and the HL7 v2 face (MLLP framing, MSH-18
+  decoding, the positional parser, the acknowledgment and the v2-to-FHIR
+  map) on crates.io for other projects to depend on. Each README carries a
+  worked example, and the entry points of `ferrobridge-hl7v2` carry tested
+  `# Examples`. Pin each exactly, as for every crate of the line (#1131).
 
 ## [0.0.11] - 2026-10-24
 

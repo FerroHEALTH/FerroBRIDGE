@@ -313,7 +313,8 @@ change that breaks a public API is a patch too, so a consumer pins a crate of
 the line exactly (owner decision 2026-10-17, #510).
 `openehr-mapping-core` and `fhirconnect` joined the line at 0.1.108 with their
 first publish (#397), and `ferrobridge-term`, `ferrobridge-fhirpath` and
-`ferrobridge-validator` joined it at 0.1.126 (#432). Every other library crate holds its name with a 0.0.0
+`ferrobridge-validator` joined it at 0.1.126 (#432), and `hl7v2-types` and
+`ferrobridge-hl7v2` at 0.1.127 (#1131). Every other library crate holds its name with a 0.0.0
 placeholder (#107), outside the line until its first publish, when it joins
 at the line's current value.
 

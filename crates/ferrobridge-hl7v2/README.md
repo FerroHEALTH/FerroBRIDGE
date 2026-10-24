@@ -45,10 +45,37 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
   or add one it lacks; `Corpus::with_shipped_supplements` loads them over the
   guide, and the run counts each one it uses as `supplemented`.
 
-## Status
+## Example
 
-The crate version is a placeholder while the crate line settles; the tracker
-carries the build order.
+Receive one message from an MLLP frame and build its acknowledgment:
+
+```rust
+use ferrobridge_hl7v2::ack::{Code, Stamp};
+use ferrobridge_hl7v2::decode::{Charset, DecodeError};
+use ferrobridge_hl7v2::inbound::{self, Received};
+use ferrobridge_hl7v2::parse::structure::structure_for;
+
+/// The bytes to send back for one MLLP frame, or `None` when no header can be
+/// read to address an answer to.
+fn answer(frame: &[u8], stamp: Stamp<'_>) -> Result<Option<Vec<u8>>, DecodeError> {
+    match inbound::receive(frame, Charset::Ascii, structure_for, stamp) {
+        // Map and commit `inbound.parsed()` here; answer AE on a refusal.
+        Received::Parsed(inbound) => inbound.answer(Code::Accept, &[], stamp).map(Some),
+        // The message owed AR or AE before it could be mapped.
+        Received::Answered { reply, .. } => Ok(Some(reply)),
+        Received::Unanswerable => Ok(None),
+    }
+}
+```
+
+The `# Examples` sections of `inbound::receive`, `decode::decode`,
+`ack::render` and `mllp::Codec` carry the tested forms.
+
+## Versions
+
+The crate is on the FerroBRIDGE crate line: every change moves it one patch,
+a breaking change included, so pin it exactly, with `hl7v2-types` at the
+version this crate names.
 
 ## Licence
 
