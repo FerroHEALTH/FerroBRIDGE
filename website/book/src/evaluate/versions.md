@@ -26,8 +26,8 @@ feature-gated in the model crate and claimed once a mapping corpus proves it.
 ## Terminology operations
 
 The FHIR terminology client speaks `CodeSystem/$lookup`,
-`ConceptMap/$translate`, and `ValueSet/$validate-code`, and tolerates a server
-answering R4 or R4B. The terminology server is configured, never assumed. OMOP
+`ConceptMap/$translate`, `ValueSet/$validate-code`, `ValueSet/$expand` and
+`CodeSystem/$subsumes`, and tolerates a server answering R4 or R4B. The terminology server is configured, never assumed. OMOP
 concept resolution does not go through it at all; it is SQL over the loaded
 OHDSI vocabulary.
 

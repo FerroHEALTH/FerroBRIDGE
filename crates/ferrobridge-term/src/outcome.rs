@@ -116,11 +116,19 @@ pub enum Request {
         code: String,
         /// The code system version, when the source data named one.
         version: Option<String>,
+        /// `date`, the date the information is wanted for, as a FHIR
+        /// `dateTime`, when the caller asks for the code system as it stood
+        /// then.
+        date: Option<String>,
     },
     /// `ConceptMap/$translate`.
     Translate(Translation),
     /// `ValueSet/$validate-code`.
     ValidateCode(Validation),
+    /// `ValueSet/$expand`.
+    Expand(Expansion),
+    /// `CodeSystem/$subsumes`.
+    Subsumes(Subsumption),
 }
 
 impl Request {
@@ -131,6 +139,8 @@ impl Request {
             Self::Lookup { .. } => crate::LOOKUP,
             Self::Translate(_) => crate::TRANSLATE,
             Self::ValidateCode(_) => crate::VALIDATE_CODE,
+            Self::Expand(_) => crate::EXPAND,
+            Self::Subsumes(_) => crate::SUBSUMES,
         }
     }
 }
@@ -217,6 +227,10 @@ pub struct Validation {
     /// STU3 `$validate-code` has no such parameter, so an STU3 client
     /// refuses a validation that names one.
     pub value_set_version: Option<String>,
+    /// `date`, the date the validation is wanted for, as a FHIR `dateTime`,
+    /// when the caller asks for the value set and code system as they stood
+    /// then.
+    pub date: Option<String>,
     /// The coded value, in one of the three forms the operation accepts.
     pub coded: Coded,
 }
@@ -264,11 +278,230 @@ pub enum BatchOutcome {
     Translate(TranslateOutcome),
     /// The answer to a [`Request::ValidateCode`].
     ValidateCode(ValidateOutcome),
+    /// The answer to a [`Request::Expand`].
+    Expand(ExpandOutcome),
+    /// The answer to a [`Request::Subsumes`].
+    Subsumes(SubsumesOutcome),
+}
+
+/// One `ValueSet/$expand` question: the codes the value set holds.
+///
+/// R4 declares every input used here `0..1`
+/// (<https://hl7.org/fhir/R4/valueset-operation-expand.html>), so each is
+/// sent only when it is set.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Expansion {
+    /// `url`, the canonical URL of the value set, without a version.
+    pub value_set_url: String,
+    /// `valueSetVersion`, the version of the value set, when one is named.
+    ///
+    /// STU3 `$expand` has no such parameter, so an STU3 client refuses an
+    /// expansion that names one.
+    pub value_set_version: Option<String>,
+    /// `date`, the date the expansion is wanted for, as a FHIR `dateTime`.
+    pub date: Option<String>,
+    /// `filter`, the text filter the server applies to the codes it returns.
+    pub filter: Option<String>,
+    /// `offset`, the number of codes to skip in a paged flat expansion.
+    pub offset: Option<u32>,
+    /// `count`, the number of codes a page holds; `0` asks for the size of
+    /// the expansion alone.
+    pub count: Option<u32>,
+    /// `includeDesignations`, whether the codes carry their designations.
+    pub include_designations: Option<bool>,
+}
+
+impl Expansion {
+    /// Returns the expansion of the value set `value_set_url`, with no other
+    /// input set yet.
+    #[must_use]
+    pub fn new(value_set_url: impl Into<String>) -> Self {
+        Self {
+            value_set_url: value_set_url.into(),
+            value_set_version: None,
+            date: None,
+            filter: None,
+            offset: None,
+            count: None,
+            include_designations: None,
+        }
+    }
+
+    /// Names the version of the value set, sent as `valueSetVersion`.
+    #[must_use]
+    pub fn with_version(mut self, version: impl Into<String>) -> Self {
+        self.value_set_version = Some(version.into());
+        self
+    }
+
+    /// Names the date the expansion is wanted for, sent as `date`.
+    #[must_use]
+    pub fn with_date(mut self, date: impl Into<String>) -> Self {
+        self.date = Some(date.into());
+        self
+    }
+
+    /// Sets the text filter, sent as `filter`.
+    #[must_use]
+    pub fn with_filter(mut self, filter: impl Into<String>) -> Self {
+        self.filter = Some(filter.into());
+        self
+    }
+
+    /// Asks for one page, sent as `offset` and `count`.
+    #[must_use]
+    pub const fn with_page(mut self, offset: u32, count: u32) -> Self {
+        self.offset = Some(offset);
+        self.count = Some(count);
+        self
+    }
+
+    /// Sets `includeDesignations`.
+    #[must_use]
+    pub const fn with_designations(mut self, include: bool) -> Self {
+        self.include_designations = Some(include);
+        self
+    }
+}
+
+/// What `ValueSet/$expand` answered.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ExpandOutcome {
+    /// The server expanded the value set.
+    Expanded(Expanded),
+    /// The server does not know the value set.
+    NotFound {
+        /// The upstream status and body, with any `tx-issue-type` coding.
+        outcome: Box<UpstreamError>,
+    },
+}
+
+/// The expanded value set `ValueSet/$expand` returned.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Expanded {
+    /// `ValueSet.url`, when the answer states it.
+    pub url: Option<String>,
+    /// `ValueSet.version`, when the answer states it.
+    pub version: Option<String>,
+    /// `expansion.total`, the number of codes in the whole expansion, when
+    /// the server states it.
+    pub total: Option<i32>,
+    /// `expansion.offset`, where this page starts, when the server states it.
+    pub offset: Option<i32>,
+    /// `expansion.contains`, with its nesting kept.
+    pub contains: Vec<ExpansionContains>,
+}
+
+/// One entry of `ValueSet.expansion.contains`, the same in every release
+/// (<https://hl7.org/fhir/R4/valueset-definitions.html#ValueSet.expansion.contains>).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpansionContains {
+    /// `system`.
+    pub system: Option<String>,
+    /// `version`.
+    pub version: Option<String>,
+    /// `code`, absent on an entry that only groups its children.
+    pub code: Option<String>,
+    /// `display`.
+    pub display: Option<String>,
+    /// `abstract`: when `true`, the entry is not selectable.
+    pub r#abstract: Option<bool>,
+    /// `inactive`: when `true`, the concept is inactive in its code system.
+    pub inactive: Option<bool>,
+    /// `designation`, when the server returned any.
+    pub designations: Vec<Designation>,
+    /// `contains`, the entries nested under this one.
+    pub contains: Vec<ExpansionContains>,
+}
+
+/// One `CodeSystem/$subsumes` question: how `code_a` relates to `code_b` in
+/// `system`.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Subsumption {
+    /// `system`, the code system the subsumption is tested in.
+    pub system: String,
+    /// `codeA`.
+    pub code_a: String,
+    /// `codeB`.
+    pub code_b: String,
+    /// `version`, the version of the code system, when one is named.
+    pub version: Option<String>,
+}
+
+impl Subsumption {
+    /// Returns the question of how `code_a` relates to `code_b` in `system`.
+    #[must_use]
+    pub fn new(
+        system: impl Into<String>,
+        code_a: impl Into<String>,
+        code_b: impl Into<String>,
+    ) -> Self {
+        Self {
+            system: system.into(),
+            code_a: code_a.into(),
+            code_b: code_b.into(),
+            version: None,
+        }
+    }
+
+    /// Names the version of the code system, sent as `version`.
+    #[must_use]
+    pub fn with_version(mut self, version: impl Into<String>) -> Self {
+        self.version = Some(version.into());
+        self
+    }
+}
+
+/// What `CodeSystem/$subsumes` answered: the `outcome` code.
+///
+/// The parameter is bound `required` to the `ConceptSubsumptionOutcome`
+/// value set (`OperationDefinition-CodeSystem-subsumes`, R4 and R4B), and
+/// STU3 names the same four codes, so a code outside them is a defective
+/// answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SubsumesOutcome {
+    /// `equivalent`: A and B are equivalent.
+    Equivalent,
+    /// `subsumes`: A subsumes B.
+    Subsumes,
+    /// `subsumed-by`: A is subsumed by B.
+    SubsumedBy,
+    /// `not-subsumed`: neither subsumes the other.
+    NotSubsumed,
+}
+
+impl SubsumesOutcome {
+    /// Returns the outcome `code` names, `None` for a code outside the
+    /// value set.
+    #[must_use]
+    pub fn from_code(code: &str) -> Option<Self> {
+        match code {
+            "equivalent" => Some(Self::Equivalent),
+            "subsumes" => Some(Self::Subsumes),
+            "subsumed-by" => Some(Self::SubsumedBy),
+            "not-subsumed" => Some(Self::NotSubsumed),
+            _ => None,
+        }
+    }
+
+    /// Returns the code as the value set spells it.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Equivalent => "equivalent",
+            Self::Subsumes => "subsumes",
+            Self::SubsumedBy => "subsumed-by",
+            Self::NotSubsumed => "not-subsumed",
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Request, TranslateOutcome, ValidateOutcome};
+    use super::{
+        Expansion, Request, SubsumesOutcome, Subsumption, TranslateOutcome, ValidateOutcome,
+    };
     use crate::concept::{Concept, Equivalence, Match};
 
     fn found(equivalence: &str, code: &str) -> Match {
@@ -332,7 +565,25 @@ mod tests {
             system: "http://example.org/cs".to_owned(),
             code: "a".to_owned(),
             version: None,
+            date: None,
         };
         assert_eq!("CodeSystem/$lookup", lookup.operation());
+        assert_eq!(
+            "ValueSet/$expand",
+            Request::Expand(Expansion::new("http://example.org/vs")).operation()
+        );
+        assert_eq!(
+            "CodeSystem/$subsumes",
+            Request::Subsumes(Subsumption::new("http://example.org/cs", "a", "b")).operation()
+        );
+    }
+
+    #[test]
+    fn every_subsumption_outcome_reads_back_its_code() {
+        for code in ["equivalent", "subsumes", "subsumed-by", "not-subsumed"] {
+            let outcome = SubsumesOutcome::from_code(code).expect("a code of the value set");
+            assert_eq!(code, outcome.as_str());
+        }
+        assert_eq!(None, SubsumesOutcome::from_code("related"));
     }
 }

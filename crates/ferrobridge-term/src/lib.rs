@@ -1,12 +1,16 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The FerroBRIDGE FHIR terminology client for `$lookup`, `$translate` and
-//! `$validate-code`.
+//! The FerroBRIDGE FHIR terminology client for `$lookup`, `$translate`,
+//! `$validate-code`, `$expand` and `$subsumes`.
 //!
-//! Three operations on one configured server: [`client::Client::lookup`] resolves a
-//! code's display, [`client::Client::translate`] maps a code into another system, and
-//! [`client::Client::validate_code`] tests membership of a value set.
+//! Five operations on one configured server: [`client::Client::lookup`] resolves a
+//! code's display, [`client::Client::translate`] maps a code into another system,
+//! [`client::Client::validate_code`] tests membership of a value set,
+//! [`client::Client::expand`] lists the codes of a value set, and
+//! [`client::Client::subsumes`] tests how two codes relate in their code system.
+//! [`client::Client::code_system_count`] asks whether the server serves a code
+//! system at all.
 //! [`client::Client::batch`] sends several of them as one `batch` `Bundle` and answers
 //! them by position.
 //!
@@ -52,3 +56,15 @@ pub const VALIDATE_CODE: &str = "ValueSet/$validate-code";
 /// The batch interaction, a `POST` of a `Bundle` to the service base
 /// (<https://hl7.org/fhir/R4/http.html#transaction>).
 pub const BATCH: &str = "batch";
+
+/// `ValueSet/$expand`
+/// (<https://hl7.org/fhir/R4/valueset-operation-expand.html>).
+pub const EXPAND: &str = "ValueSet/$expand";
+
+/// `CodeSystem/$subsumes`
+/// (<https://hl7.org/fhir/R4/codesystem-operation-subsumes.html>).
+pub const SUBSUMES: &str = "CodeSystem/$subsumes";
+
+/// The `CodeSystem` search by canonical URL that asks only for the count of
+/// matches (<https://hl7.org/fhir/R4/search.html#summary>).
+pub const CODE_SYSTEM_SEARCH: &str = "CodeSystem?_summary=count";

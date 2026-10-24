@@ -13,7 +13,10 @@
 use crate::client::Answer;
 use crate::config::WireVersion;
 use crate::error::{Error, UpstreamError};
-use crate::outcome::{BatchOutcome, LookupOutcome, Request, TranslateOutcome, ValidateOutcome};
+use crate::outcome::{
+    BatchOutcome, ExpandOutcome, LookupOutcome, Request, SubsumesOutcome, TranslateOutcome,
+    ValidateOutcome,
+};
 use http::StatusCode;
 
 /// The `tx-issue-type` codes that say the server does not know the concept.
@@ -68,6 +71,51 @@ pub(crate) fn validate_code(
     Err(refusal(crate::VALIDATE_CODE, answer, upstream))
 }
 
+/// Returns the `ValueSet/$expand` outcome `answer` carries.
+///
+/// A value set the server does not know is [`ExpandOutcome::NotFound`]; an
+/// expansion the server could not make, `too-costly` among them, is a
+/// refusal, never an empty expansion.
+pub(crate) fn expand(version: WireVersion, answer: &Answer) -> Result<ExpandOutcome, Error> {
+    if answer.status.is_success() {
+        return crate::wire::expanded(version, &answer.body)
+            .map_err(|source| body(crate::EXPAND, answer, source));
+    }
+    let upstream = UpstreamError::new(version, answer.status, answer.body.clone());
+    if is_unknown_value_set(&upstream) {
+        return Ok(ExpandOutcome::NotFound {
+            outcome: Box::new(upstream),
+        });
+    }
+    Err(refusal(crate::EXPAND, answer, upstream))
+}
+
+/// Returns the `CodeSystem/$subsumes` outcome `answer` carries.
+///
+/// "If the server is unable to determine the relationship between the
+/// codes/Codings, then it returns an error response with an
+/// `OperationOutcome`" (`OperationDefinition-CodeSystem-subsumes`, R4), so
+/// every refusal is an error.
+pub(crate) fn subsumes(version: WireVersion, answer: &Answer) -> Result<SubsumesOutcome, Error> {
+    if answer.status.is_success() {
+        return crate::wire::subsumes(version, &answer.body)
+            .map_err(|source| body(crate::SUBSUMES, answer, source));
+    }
+    let upstream = UpstreamError::new(version, answer.status, answer.body.clone());
+    Err(refusal(crate::SUBSUMES, answer, upstream))
+}
+
+/// Returns the `Bundle.total` of the `CodeSystem` count search `answer`
+/// carries.
+pub(crate) fn search_total(version: WireVersion, answer: &Answer) -> Result<u32, Error> {
+    if answer.status == StatusCode::OK {
+        return crate::wire::search_total(version, &answer.body)
+            .map_err(|source| body(crate::CODE_SYSTEM_SEARCH, answer, source));
+    }
+    let upstream = UpstreamError::new(version, answer.status, answer.body.clone());
+    Err(refusal(crate::CODE_SYSTEM_SEARCH, answer, upstream))
+}
+
 /// Returns the outcome one batch entry carries, in the shape of its request.
 pub(crate) fn batch_entry(
     version: WireVersion,
@@ -78,6 +126,8 @@ pub(crate) fn batch_entry(
         Request::Lookup { .. } => lookup(version, answer).map(BatchOutcome::Lookup),
         Request::Translate(_) => translate(version, answer).map(BatchOutcome::Translate),
         Request::ValidateCode(_) => validate_code(version, answer).map(BatchOutcome::ValidateCode),
+        Request::Expand(_) => expand(version, answer).map(BatchOutcome::Expand),
+        Request::Subsumes(_) => subsumes(version, answer).map(BatchOutcome::Subsumes),
     }
 }
 
@@ -90,6 +140,17 @@ fn is_not_found(upstream: &UpstreamError) -> bool {
         return true;
     }
     upstream.status() == StatusCode::NOT_FOUND && upstream.outcome().is_none()
+}
+
+/// Returns whether `upstream` says the value set is not known.
+///
+/// No specification governs this mapping: our own design, as for
+/// [`is_not_found`], read from the `tx-issue-type` code `not-found` alone,
+/// since `invalid-code` names a code and not a value set, and from a bare
+/// `404`.
+fn is_unknown_value_set(upstream: &UpstreamError) -> bool {
+    upstream.has_tx_issue("not-found")
+        || (upstream.status() == StatusCode::NOT_FOUND && upstream.outcome().is_none())
 }
 
 /// Returns the error for a refusal the operation cannot read as an outcome.

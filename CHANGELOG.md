@@ -48,6 +48,27 @@ crates on crates.io.
   map) on crates.io for other projects to depend on. Each README carries a
   worked example, and the entry points of `ferrobridge-hl7v2` carry tested
   `# Examples`. Pin each exactly, as for every crate of the line (#1131).
+- `ferrobridge-term` 0.1.130 sends `ValueSet/$expand` and
+  `CodeSystem/$subsumes`, on STU3, R4 and R4B and in a `batch`.
+  `Client::expand` takes an `Expansion` (`url`, `valueSetVersion`, `date`,
+  `filter`, `offset` and `count`, `includeDesignations`) and answers the
+  expanded value set with the nesting of `expansion.contains` kept, each
+  entry with its system, version, code, display, `abstract`, `inactive` and
+  designations; a value set the server does not know is
+  `ExpandOutcome::NotFound` carrying the `OperationOutcome` and its
+  `tx-issue-type`, and an expansion the server could not make is a refusal,
+  never an empty expansion. `Client::subsumes` answers `SubsumesOutcome`:
+  `Equivalent`, `Subsumes`, `SubsumedBy` or `NotSubsumed`.
+  `Client::code_system_count` asks
+  `GET [base]/CodeSystem?url=<system>&_summary=count`. `ferrobridge-validator`
+  moves to 0.1.130 and `ferrobridge-hl7v2` to 0.1.128 with it (#1177).
+
+### Changed
+
+- `ferrobridge-term` 0.1.130 carries the `date` input of `CodeSystem/$lookup`
+  and `ValueSet/$validate-code`: `Client::lookup_at` sends it, and
+  `Request::Lookup` and `Validation` gain a `date` field. This breaks a
+  struct literal of either: add `date: None` where no date is meant (#1177).
 
 ## [0.0.11] - 2026-10-24
 

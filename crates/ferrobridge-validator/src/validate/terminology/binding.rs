@@ -275,6 +275,7 @@ impl<R: Release> Walk<'_, '_, '_, R> {
         Ok(Some(Validation {
             value_set_url: canonical.url().to_owned(),
             value_set_version: canonical.version().map(str::to_owned),
+            date: None,
             coded,
         }))
     }

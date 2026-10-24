@@ -180,6 +180,20 @@ pub enum BodyError {
     /// absent rather than negative.
     #[error("a batch response entry carries no resource")]
     EntryResource,
+    /// A parameter bound `required` to a value set carries a code outside it.
+    #[error("the answer carries `{code}` for `{parameter}`, a code outside its required value set")]
+    UnknownCode {
+        /// The parameter, dotted for a part.
+        parameter: &'static str,
+        /// The code the server sent.
+        code: String,
+    },
+    /// The answer to a search is not a `searchset` `Bundle`.
+    #[error("a search answered a `{found}` Bundle, not a `searchset`")]
+    SearchType {
+        /// The `Bundle.type` the answer declared.
+        found: String,
+    },
 }
 
 /// A call into the terminology server that did not reach an answer.
@@ -228,6 +242,21 @@ pub enum Error {
         parameter: &'static str,
         /// The release the client is configured for.
         wire_version: WireVersion,
+    },
+    /// A numeric input does not fit the FHIR `integer` the operation declares
+    /// (<https://hl7.org/fhir/R4/datatypes.html#integer>), so nothing was
+    /// sent.
+    #[error(
+        "the {operation} request carries a `{parameter}` larger than a FHIR integer holds; nothing was sent"
+    )]
+    ParameterRange {
+        /// The operation, as `Resource/$code`.
+        operation: &'static str,
+        /// The parameter, as the R4 `OperationDefinition` names it.
+        parameter: &'static str,
+        /// What the conversion reported.
+        #[source]
+        source: std::num::TryFromIntError,
     },
     /// The request never reached the server.
     #[error("the request to {url} could not be sent")]
@@ -327,6 +356,7 @@ impl Error {
             Self::ClientBuild { .. } => "client-build",
             Self::RequestBody { .. } => "request-body",
             Self::UnsupportedParameter { .. } => "unsupported-parameter",
+            Self::ParameterRange { .. } => "parameter-range",
             Self::Transport { .. } => "transport",
             Self::Timeout { .. } => "timeout",
             Self::ServerFailure { .. } => "server-failure",
@@ -356,15 +386,18 @@ impl Error {
     /// Returns whether a retry of the same request could succeed.
     ///
     /// Only a failure that did not reach the server, or one the server
-    /// reported as its own (`5xx`), is transient. The three operations declare
+    /// reported as its own (`5xx`), is transient. The five operations declare
     /// `affectsState: false`
     /// (`OperationDefinition-CodeSystem-lookup`,
-    /// `OperationDefinition-ConceptMap-translate` and
-    /// `OperationDefinition-ValueSet-validate-code`, R4B), so a repeat is the
+    /// `OperationDefinition-ConceptMap-translate`,
+    /// `OperationDefinition-ValueSet-validate-code`,
+    /// `OperationDefinition-ValueSet-expand` and
+    /// `OperationDefinition-CodeSystem-subsumes`, R4B), so a repeat is the
     /// same read and the `POST` form is retried like the `GET` form
     /// (<https://hl7.org/fhir/R4/operations.html>). The STU3 definitions of
     /// the same operations declare no such flag; retrying them on the same
     /// ground is our own design.
+    /// The `CodeSystem` search is a `GET`, a safe method (RFC 9110 §9.2.1).
     #[must_use]
     pub fn is_retryable(&self) -> bool {
         matches!(

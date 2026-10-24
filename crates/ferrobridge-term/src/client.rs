@@ -7,8 +7,8 @@
 use crate::config::{Config, Credentials, TokenFailure};
 use crate::error::{Error, UpstreamError};
 use crate::outcome::{
-    BatchOutcome, Coded, LookupOutcome, Request, TranslateOutcome, Translation, ValidateOutcome,
-    Validation,
+    BatchOutcome, Coded, ExpandOutcome, Expansion, LookupOutcome, Request, SubsumesOutcome,
+    Subsumption, TranslateOutcome, Translation, ValidateOutcome, Validation,
 };
 use backon::{ExponentialBuilder, Retryable};
 use http::header::{ACCEPT, CONTENT_TYPE, WWW_AUTHENTICATE};
@@ -30,8 +30,8 @@ struct Call {
     operation: &'static str,
     /// The absolute URL.
     url: Url,
-    /// The FHIR JSON request body.
-    body: String,
+    /// The FHIR JSON request body of a `POST`; a `GET` carries none.
+    body: Option<String>,
 }
 
 /// What the server answered, read whole.
@@ -199,13 +199,107 @@ impl Client {
         code: &str,
         version: Option<&str>,
     ) -> Result<LookupOutcome, Error> {
-        let request = Request::Lookup {
+        self.send_lookup(Request::Lookup {
             system: system.to_owned(),
             code: code.to_owned(),
             version: version.map(str::to_owned),
-        };
+            date: None,
+        })
+        .await
+    }
+
+    /// Resolves the display of `code` in `system` as the code system stood
+    /// on `date`, a FHIR `dateTime` sent as the `date` input
+    /// (<https://hl7.org/fhir/R4/codesystem-operation-lookup.html>).
+    ///
+    /// # Errors
+    /// As [`Client::lookup`].
+    pub async fn lookup_at(
+        &self,
+        system: &str,
+        code: &str,
+        version: Option<&str>,
+        date: &str,
+    ) -> Result<LookupOutcome, Error> {
+        self.send_lookup(Request::Lookup {
+            system: system.to_owned(),
+            code: code.to_owned(),
+            version: version.map(str::to_owned),
+            date: Some(date.to_owned()),
+        })
+        .await
+    }
+
+    /// Returns the outcome of the `$lookup` `request`.
+    async fn send_lookup(&self, request: Request) -> Result<LookupOutcome, Error> {
         let answer = self.operation(&request).await?;
         crate::decode::lookup(self.config.wire_version, &answer)
+    }
+
+    /// Expands the value set `expansion` names, with the page, filter, date
+    /// and designations it asks for
+    /// (<https://hl7.org/fhir/R4/valueset-operation-expand.html>).
+    ///
+    /// The answer keeps the nesting of `expansion.contains`. A value set the
+    /// server does not know is [`ExpandOutcome::NotFound`] carrying its
+    /// `OperationOutcome`, never an empty expansion.
+    ///
+    /// # Errors
+    /// Returns [`Error::Refused`] when the server refused the expansion for
+    /// another reason, `too-costly` among them, and [`Error`] otherwise when
+    /// the call did not reach an answer or the answer could not be decoded.
+    /// Returns [`Error::UnsupportedParameter`] when the expansion names a
+    /// value set version on an STU3 client, and [`Error::ParameterRange`]
+    /// when `offset` or `count` exceeds a FHIR `integer`; nothing is sent.
+    pub async fn expand(&self, expansion: &Expansion) -> Result<ExpandOutcome, Error> {
+        let request = Request::Expand(expansion.clone());
+        let answer = self.operation(&request).await?;
+        crate::decode::expand(self.config.wire_version, &answer)
+    }
+
+    /// Tests how the two codes `subsumption` names relate in their code
+    /// system (<https://hl7.org/fhir/R4/codesystem-operation-subsumes.html>).
+    ///
+    /// # Errors
+    /// Returns [`Error::Refused`] when the server could not determine the
+    /// relationship, for example because it does not know a code, carrying
+    /// the `OperationOutcome` and its `tx-issue-type` coding, and [`Error`]
+    /// otherwise when the call did not reach an answer or the answer could
+    /// not be decoded. An `outcome` outside the four codes is
+    /// [`Error::Body`].
+    pub async fn subsumes(&self, subsumption: &Subsumption) -> Result<SubsumesOutcome, Error> {
+        let request = Request::Subsumes(subsumption.clone());
+        let answer = self.operation(&request).await?;
+        crate::decode::subsumes(self.config.wire_version, &answer)
+    }
+
+    /// Returns how many `CodeSystem` resources the server holds under the
+    /// canonical URL `system`, asked as
+    /// `GET [base]/CodeSystem?url=<system>&_summary=count`
+    /// (<https://hl7.org/fhir/R4/search.html#summary>).
+    ///
+    /// A count of `0` says the server does not serve the code system, which
+    /// tells an unknown code from an unserved system after a bare `404` from
+    /// [`Client::lookup`].
+    ///
+    /// # Errors
+    /// Returns [`Error::Refused`] when the server refused the search, and
+    /// [`Error::Body`] when the answer is not a `searchset` `Bundle` stating
+    /// its `total`; [`Error`] otherwise when the call did not reach an
+    /// answer.
+    pub async fn code_system_count(&self, system: &str) -> Result<u32, Error> {
+        let mut url = self.url("CodeSystem")?;
+        url.query_pairs_mut()
+            .append_pair("url", system)
+            .append_pair("_summary", "count");
+        let answer = self
+            .execute(Call {
+                operation: crate::CODE_SYSTEM_SEARCH,
+                url,
+                body: None,
+            })
+            .await?;
+        crate::decode::search_total(self.config.wire_version, &answer)
     }
 
     /// Translates the code `translation` names, through the concept map,
@@ -276,6 +370,7 @@ impl Client {
         self.validate(&Validation {
             value_set_url: value_set_url.to_owned(),
             value_set_version: None,
+            date: None,
             coded: Coded::Code {
                 system: system.to_owned(),
                 code: code.to_owned(),
@@ -376,7 +471,7 @@ impl Client {
             .execute(Call {
                 operation: crate::BATCH,
                 url: self.config.base_url.clone(),
-                body,
+                body: Some(body),
             })
             .await?;
         if answer.status != StatusCode::OK {
@@ -418,7 +513,7 @@ impl Client {
         self.execute(Call {
             operation,
             url,
-            body,
+            body: Some(body),
         })
         .await
     }
@@ -467,12 +562,17 @@ impl Client {
     /// Sends `call` once and reads the whole answer.
     async fn attempt(&self, call: &Call) -> Result<Answer, Error> {
         let (response, renewal) = self
-            .send(&call.url, || {
-                self.http
+            .send(&call.url, || match &call.body {
+                Some(body) => self
+                    .http
                     .request(Method::POST, call.url.clone())
                     .header(ACCEPT, FHIR_JSON)
                     .header(CONTENT_TYPE, FHIR_JSON)
-                    .body(call.body.clone())
+                    .body(body.clone()),
+                None => self
+                    .http
+                    .request(Method::GET, call.url.clone())
+                    .header(ACCEPT, FHIR_JSON),
             })
             .await?;
 

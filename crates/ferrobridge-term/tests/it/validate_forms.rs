@@ -55,6 +55,7 @@ fn validation(coded: Coded) -> Validation {
     Validation {
         value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
         value_set_version: None,
+        date: None,
         coded,
     }
 }
