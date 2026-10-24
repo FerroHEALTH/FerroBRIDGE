@@ -34,10 +34,15 @@ const XML_SCHEMA_INSTANCE_NAMESPACE: &str = "http://www.w3.org/2001/XMLSchema-in
 /// # Errors
 ///
 /// Returns [`EncodeError`] when the object names no resource type the schema
-/// knows, or a value has no XML form.
+/// knows, or a value has no XML form, a narrative `div` that is no well-formed
+/// XHTML `div` in the XHTML namespace among them, named by its element path.
 pub fn to_xml(schemas: &Schemas, object: &Object) -> Result<String, EncodeError> {
     let mut writer = Writer::new(Vec::new());
-    write_resource(schemas, &mut writer, object, true)?;
+    let root = match object.get("resourceType") {
+        Some(Value::String(name)) => name.as_str(),
+        _ => "Resource",
+    };
+    write_resource(schemas, &mut writer, object, true, &mut Path::root(root))?;
     String::from_utf8(writer.into_inner()).map_err(|_| EncodeError::Xml {
         reason: String::from("the writer produced invalid UTF-8"),
     })
@@ -54,6 +59,7 @@ fn write_resource(
     writer: &mut Writer<Vec<u8>>,
     object: &Object,
     root: bool,
+    path: &mut Path,
 ) -> Result<(), EncodeError> {
     let name = match object.get("resourceType") {
         Some(Value::String(name)) => name.as_str(),
@@ -73,7 +79,15 @@ fn write_resource(
     if root {
         start.push_attribute(("xmlns", FHIR_NAMESPACE));
     }
-    write_complex(schemas, writer, schema, object, start, &["resourceType"])
+    write_complex(
+        schemas,
+        writer,
+        schema,
+        object,
+        start,
+        &["resourceType"],
+        path,
+    )
 }
 
 /// Whether `object` carries `field`, so an element with no child is written
@@ -105,6 +119,7 @@ fn write_complex(
     object: &Object,
     mut start: BytesStart<'_>,
     skip: &[&str],
+    path: &mut Path,
 ) -> Result<(), EncodeError> {
     for field in schema.fields {
         if field.kind == Kind::Attribute
@@ -127,7 +142,7 @@ fn write_complex(
         if skip.contains(&field.name) {
             continue;
         }
-        write_field(schemas, writer, field, field.name, field.kind, object)?;
+        write_field(schemas, writer, field, field.name, field.kind, object, path)?;
     }
     writer
         .write_event(Event::End(BytesEnd::new(name)))
@@ -145,6 +160,7 @@ fn write_primitive_field(
     field: &FieldSchema,
     name: &str,
     object: &Object,
+    path: &mut Path,
 ) -> Result<(), EncodeError> {
     let values = object.get(name);
     let elements = object.get(&format!("_{name}"));
@@ -152,13 +168,16 @@ fn write_primitive_field(
         return Ok(());
     }
     if !field.many {
-        return write_primitive(
-            schemas,
-            writer,
-            name,
-            values.filter(|v| !v.is_null()),
-            elements.and_then(Value::as_object),
-        );
+        return path.with(name, |path| {
+            write_primitive(
+                schemas,
+                writer,
+                name,
+                values.filter(|v| !v.is_null()),
+                elements.and_then(Value::as_object),
+                path,
+            )
+        });
     }
     let values = values.and_then(Value::as_array);
     let elements = elements.and_then(Value::as_array);
@@ -170,7 +189,9 @@ fn write_primitive_field(
         let element = elements
             .and_then(|e| e.get(index))
             .and_then(Value::as_object);
-        write_primitive(schemas, writer, name, value, element)?;
+        path.with_index(name, index, |path| {
+            write_primitive(schemas, writer, name, value, element, path)
+        })?;
     }
     Ok(())
 }
@@ -184,19 +205,46 @@ fn write_complex_field(
     name: &str,
     type_name: &str,
     object: &Object,
+    path: &mut Path,
 ) -> Result<(), EncodeError> {
     let schema = schemas
         .type_named(type_name)
         .ok_or_else(|| EncodeError::Xml {
             reason: format!("no schema for the type `{type_name}`"),
         })?;
-    for item in items(object.get(name), field.many) {
+    for (index, item) in items(object.get(name), field.many).into_iter().enumerate() {
         let item = item.as_object().ok_or_else(|| EncodeError::Xml {
             reason: format!("`{name}` is not an object"),
         })?;
-        write_complex(schemas, writer, schema, item, BytesStart::new(name), &[])?;
+        at(path, name, field.many, index, |path| {
+            write_complex(
+                schemas,
+                writer,
+                schema,
+                item,
+                BytesStart::new(name),
+                &[],
+                path,
+            )
+        })?;
     }
     Ok(())
+}
+
+/// Runs `write` with `path` stepped into the item `index` of the field
+/// `name`, the index named only for a repeating field.
+fn at<T>(
+    path: &mut Path,
+    name: &str,
+    many: bool,
+    index: usize,
+    write: impl FnOnce(&mut Path) -> Result<T, EncodeError>,
+) -> Result<T, EncodeError> {
+    if many {
+        path.with_index(name, index, write)
+    } else {
+        path.with(name, write)
+    }
 }
 
 fn write_field(
@@ -206,29 +254,32 @@ fn write_field(
     name: &str,
     kind: Kind,
     object: &Object,
+    path: &mut Path,
 ) -> Result<(), EncodeError> {
     match kind {
         Kind::Attribute => Ok(()),
         Kind::Choice(variants) => {
             for (suffix, kind) in variants {
                 let key = format!("{name}{suffix}");
-                write_field(schemas, writer, field, &key, *kind, object)?;
+                write_field(schemas, writer, field, &key, *kind, object, path)?;
             }
             Ok(())
         }
-        Kind::Primitive(_) => write_primitive_field(schemas, writer, field, name, object),
+        Kind::Primitive(_) => write_primitive_field(schemas, writer, field, name, object, path),
         Kind::Complex(type_name) => {
-            write_complex_field(schemas, writer, field, name, type_name, object)
+            write_complex_field(schemas, writer, field, name, type_name, object, path)
         }
         Kind::Resource => {
-            for item in items(object.get(name), field.many) {
+            for (index, item) in items(object.get(name), field.many).into_iter().enumerate() {
                 let item = item.as_object().ok_or_else(|| EncodeError::Xml {
                     reason: format!("`{name}` is not an object"),
                 })?;
                 writer
                     .write_event(Event::Start(BytesStart::new(name)))
                     .map_err(xml_error)?;
-                write_resource(schemas, writer, item, false)?;
+                at(path, name, field.many, index, |path| {
+                    write_resource(schemas, writer, item, false, path)
+                })?;
                 writer
                     .write_event(Event::End(BytesEnd::new(name)))
                     .map_err(xml_error)?;
@@ -245,14 +296,53 @@ fn write_field(
             }
             match object.get(name) {
                 None => Ok(()),
-                Some(Value::String(raw)) => writer
-                    .write_event(Event::Text(BytesText::from_escaped(raw.as_str())))
-                    .map_err(xml_error),
+                Some(Value::String(raw)) => {
+                    path.with(name, |path| xhtml_div(raw, path))?;
+                    writer
+                        .write_event(Event::Text(BytesText::from_escaped(raw.as_str())))
+                        .map_err(xml_error)
+                }
                 Some(_) => Err(EncodeError::Xml {
                     reason: format!("`{name}` is not a string"),
                 }),
             }
         }
+    }
+}
+
+/// Refuses a narrative `div` string the XML form cannot carry, located at
+/// `path`.
+///
+/// The JSON form is "a single escaped string of XHTML" whose root "needs to be
+/// a `<div>` in the xhtml namespace" (R4 json.html §2.6.2.1 and §2.6.2.4), and
+/// the XML form writes that `div` as an element of the document, so a string
+/// that is no well-formed `div` in the XHTML namespace would make the document
+/// malformed. The string is read by the rules [`read_xhtml`] holds an XML
+/// narrative to, with nothing but whitespace around the one `div`.
+fn xhtml_div(raw: &str, path: &mut Path) -> Result<(), EncodeError> {
+    let refused = |path: &Path, reason: &dyn std::fmt::Display| EncodeError::Xml {
+        reason: format!(
+            "{}: the narrative is no well-formed XHTML div in the XHTML namespace: {reason}",
+            path.location()
+        ),
+    };
+    let mut reader = NsReader::from_str(raw);
+    reader.config_mut().trim_text(true);
+    let mut seen = false;
+    loop {
+        let event = reader.read_event().map_err(|e| refused(path, &e))?;
+        let (start, empty) = match event {
+            Event::Eof if seen => return Ok(()),
+            Event::Eof => return Err(refused(path, &"it holds no element")),
+            Event::Start(start) if !seen => (start, false),
+            Event::Empty(start) if !seen => (start, true),
+            _ => return Err(refused(path, &"it holds content beside one root element")),
+        };
+        if local_name(start.name().as_ref()) != "div" {
+            return Err(refused(path, &"its root element is no div"));
+        }
+        read_xhtml(&mut reader, &start, empty, path).map_err(|e| refused(path, &e.kind))?;
+        seen = true;
     }
 }
 
@@ -272,6 +362,7 @@ fn write_primitive(
     name: &str,
     value: Option<&Value>,
     element: Option<&Object>,
+    path: &mut Path,
 ) -> Result<(), EncodeError> {
     let mut start = BytesStart::new(name);
     if let Some(Value::String(id)) = element.and_then(|e| e.get("id")) {
@@ -301,18 +392,21 @@ fn write_primitive(
                     reason: String::from("no schema for the type `Extension`"),
                 })?;
             writer.write_event(Event::Start(start)).map_err(xml_error)?;
-            for extension in extensions {
+            for (index, extension) in extensions.iter().enumerate() {
                 let extension = extension.as_object().ok_or_else(|| EncodeError::Xml {
                     reason: format!("`_{name}.extension` is not an object"),
                 })?;
-                write_complex(
-                    schemas,
-                    writer,
-                    schema,
-                    extension,
-                    BytesStart::new("extension"),
-                    &[],
-                )?;
+                path.with_index("extension", index, |path| {
+                    write_complex(
+                        schemas,
+                        writer,
+                        schema,
+                        extension,
+                        BytesStart::new("extension"),
+                        &[],
+                        path,
+                    )
+                })?;
             }
             writer
                 .write_event(Event::End(BytesEnd::new(name)))

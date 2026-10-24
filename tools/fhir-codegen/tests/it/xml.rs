@@ -453,6 +453,62 @@ fn the_narrative_div_is_held_to_the_xhtml_namespace() {
     }
 }
 
+/// The JSON object of a synthetic Basic resource with the narrative `div`
+/// given.
+fn basic_with_div(div: &str) -> fhir_types::codec::Object {
+    let value = Value::from_serde_json(serde_json::json!({
+        "resourceType": "Basic",
+        "text": {"status": "generated", "div": div},
+        "code": {"text": "synthetic"},
+    }));
+    match value {
+        Value::Object(object) => object,
+        _ => panic!("the synthetic Basic is an object"),
+    }
+}
+
+/// The JSON `div` is "a single escaped string of XHTML" whose root "needs to
+/// be a `<div>` in the xhtml namespace" (R4 json.html §2.6.2.1 and §2.6.2.4),
+/// and the XML form writes it as an element of the document, so a string that
+/// is no such `div` is refused naming its element path, never written into a
+/// malformed document.
+#[test]
+fn a_narrative_div_that_is_no_xhtml_div_is_refused_on_writing_xml() {
+    for schemas in namespace_versions() {
+        for div in [
+            "synthetic text with no element",
+            "<p xmlns=\"http://www.w3.org/1999/xhtml\">synthetic</p>",
+            "<div>synthetic</div>",
+            r#"<div xmlns="http://example.org/other">synthetic</div>"#,
+            r#"<div xmlns="http://www.w3.org/1999/xhtml"><p>synthetic</div>"#,
+            r#"<div xmlns="http://www.w3.org/1999/xhtml">synthetic</div><div xmlns="http://www.w3.org/1999/xhtml">two</div>"#,
+            r#"<div xmlns="http://www.w3.org/1999/xhtml"><p xmlns="http://example.org/other">synthetic</p></div>"#,
+            r#"<div xmlns="http://www.w3.org/1999/xhtml"><x:b>synthetic</x:b></div>"#,
+        ] {
+            let refused = to_xml(schemas, &basic_with_div(div)).expect_err(div);
+            let text = refused.to_string();
+            assert!(text.contains("Basic.text.div"), "{div}: {text}");
+        }
+        let div = r#"<div xmlns="http://www.w3.org/1999/xhtml"><p>synthetic <b>text</b></p></div>"#;
+        let xml = to_xml(schemas, &basic_with_div(div)).expect(div);
+        assert_eq!(narrative_of(schemas, &xml), div);
+    }
+}
+
+/// A narrative inside a contained resource is refused naming the path through
+/// the containing resource.
+#[test]
+fn a_nested_narrative_that_is_no_xhtml_div_names_its_path() {
+    let mut outer = basic_with_div(r#"<div xmlns="http://www.w3.org/1999/xhtml">outer</div>"#);
+    outer.insert(
+        String::from("contained"),
+        Value::Array(vec![Value::Object(basic_with_div("<p>inner</p>"))]),
+    );
+    let refused = to_xml(&fhir_types::r4::schema::SCHEMAS, &outer).expect_err("refused");
+    let text = refused.to_string();
+    assert!(text.contains("Basic.contained[0].text.div"), "{text}");
+}
+
 /// A prefix inside the narrative with no namespace declaration in scope makes
 /// the document not namespace-well-formed (Namespaces in XML 1.0 §5, Prefix
 /// Declared), so the reader refuses it as malformed XML naming the prefix, on
