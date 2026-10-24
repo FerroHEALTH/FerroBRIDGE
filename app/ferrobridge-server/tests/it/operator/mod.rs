@@ -24,6 +24,7 @@ use tower::ServiceExt as _;
 
 use crate::facade::auth::{Issuer, SigningKey, authority, bearing, challenge, ec_key, mint};
 
+mod configuration;
 mod save;
 
 /// The clean mapping set the facade suite runs.
@@ -53,6 +54,14 @@ struct Case {
 impl Case {
     /// Builds the tree, the issuer and the router.
     async fn new() -> Result<Self, Box<dyn StdError>> {
+        Self::answering(None).await
+    }
+
+    /// Builds the tree, the issuer and the router, the operator API
+    /// answering `configuration` as the running configuration when given.
+    async fn answering(
+        configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
+    ) -> Result<Self, Box<dyn StdError>> {
         let tree = tempfile::tempdir()?;
         let mappings = tree.path().join("mappings");
         let templates = tree.path().join("templates");
@@ -89,6 +98,10 @@ impl Case {
             roots,
             Snapshot::new(report, std::collections::BTreeMap::new()),
         );
+        let operator = match configuration {
+            Some(configuration) => operator.with_configuration(configuration),
+            None => operator,
+        };
         let state = AppState::with_health(Registry::default())
             .with_auth(authority)
             .with_operator(Arc::new(operator));
@@ -140,9 +153,10 @@ fn digest(bytes: &[u8]) -> String {
         })
 }
 
-/// The three operator routes, as a client calls them.
-const ROUTES: [&str; 3] = [
+/// The read-only operator routes, as a client calls them.
+const ROUTES: [&str; 4] = [
     "/operator/state",
+    "/operator/configuration",
     "/operator/mappings",
     "/operator/mappings/fhirconnect/ferrobridge_facade.yml",
 ];

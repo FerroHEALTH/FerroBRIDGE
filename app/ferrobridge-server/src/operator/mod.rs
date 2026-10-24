@@ -8,13 +8,16 @@
 //! which the configuration refuses without `[auth]`, and every route passes
 //! the layer of [`guard::layer`]. `GET /operator/state` answers what the running load
 //! compiled, `GET /operator/mappings` every mapping file with its digest and
-//! owner, and `GET /operator/mappings/{path}` one file's verbatim bytes with
-//! its digest as the `ETag`. With `[operator] mapping_dir`, `POST
+//! owner, `GET /operator/mappings/{path}` one file's verbatim bytes with its
+//! digest as the `ETag`, and `GET /operator/configuration` the configuration
+//! the bridge started on, every secret by reference alone
+//! ([`configuration`]). With `[operator] mapping_dir`, `POST
 //! /operator/mappings/check` checks a draft over the running set, `PUT
 //! /operator/mappings/{path}` saves one and reloads, and `POST
 //! /operator/reload` reloads the files on disk ([`save`], [`reload`]). No
 //! specification governs the operator surface: our own design.
 
+pub mod configuration;
 pub mod files;
 pub mod guard;
 pub mod reload;
@@ -62,6 +65,8 @@ pub struct Operator {
     /// Held for the whole of a check, a save or a reload, so they never
     /// interleave.
     saving: tokio::sync::Mutex<()>,
+    /// The configuration the bridge started on, when it is answered.
+    configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
 }
 
 impl Operator {
@@ -75,7 +80,19 @@ impl Operator {
             reloader: None,
             mapping_dir: None,
             saving: tokio::sync::Mutex::new(()),
+            configuration: None,
         }
+    }
+
+    /// Returns this surface answering `configuration` as the running
+    /// configuration.
+    #[must_use]
+    pub fn with_configuration(
+        mut self,
+        configuration: ferrobridge_operator_api::configuration::Configuration,
+    ) -> Self {
+        self.configuration = Some(configuration);
+        self
     }
 
     /// Returns this surface saving into `mapping_dir` and reloading through
@@ -163,6 +180,7 @@ impl Operator {
 pub fn routes(operator: Arc<Operator>, smart: &crate::smart::Smart) -> Router {
     Router::new()
         .route("/operator/state", get(state))
+        .route("/operator/configuration", get(running_configuration))
         .route("/operator/mappings", get(mappings))
         .route("/operator/mappings/check", post(save::check))
         .route("/operator/mappings/{*path}", get(mapping).put(save::save))
@@ -174,6 +192,19 @@ pub fn routes(operator: Arc<Operator>, smart: &crate::smart::Smart) -> Router {
 /// `GET /operator/state`: the running load.
 async fn state(State(operator): State<Arc<Operator>>) -> Response {
     axum::Json(operator.snapshot().document(&operator.roots)).into_response()
+}
+
+/// `GET /operator/configuration`: the configuration the bridge started on.
+async fn running_configuration(State(operator): State<Arc<Operator>>) -> Response {
+    match operator.configuration.as_ref() {
+        Some(configuration) => axum::Json(configuration).into_response(),
+        None => guard::refusal(
+            StatusCode::NOT_FOUND,
+            None,
+            "not-found",
+            "this operator API answers no running configuration",
+        ),
+    }
 }
 
 /// `GET /operator/mappings`: every mapping file with its digest and owner.

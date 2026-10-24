@@ -20,6 +20,10 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
   counts and diagnostics.
 - `operator::Listed`: one entry of the `GET /operator/mappings` listing.
 - `operator::LoadReport`: the answer of a draft check, a save and a reload.
+- `configuration::Configuration`: `GET /operator/configuration`, every key
+  of the configuration the bridge started on with its value and its source
+  (the file, the environment or the default), each secret by reference
+  alone: set, read from a file, or unset.
 
 Every document refuses an unknown field, and every diagnostic is
 `openehr_mapping_core::diagnostic::Diagnostic` in its serde form. The crate
