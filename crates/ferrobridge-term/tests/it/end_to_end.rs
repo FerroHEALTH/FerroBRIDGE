@@ -205,11 +205,13 @@ async fn answer_a_batch_by_position(
             system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
+            date: None,
         },
         Request::Lookup {
             system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
             code: fixtures::TERM_UNKNOWN_CODE.to_owned(),
             version: None,
+            date: None,
         },
     ];
     let outcomes = client.batch(&requests).await?;

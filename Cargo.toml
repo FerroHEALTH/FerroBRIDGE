@@ -79,14 +79,14 @@ omop-cdm = { path = "crates/omop-cdm", version = "0.0.0", default-features = fal
 ferrobridge-testkit = { path = "tools/ferrobridge-testkit" }
 # Published from this workspace and consumed by the published
 # ferrobridge-hl7v2, so the requirement carries both a path and a version.
-ferrobridge-term = { path = "crates/ferrobridge-term", version = "0.1.129" }
+ferrobridge-term = { path = "crates/ferrobridge-term", version = "0.1.130" }
 # Published from this workspace and consumed by the published
 # ferrobridge-validator, so the requirement carries both a path and a version.
 ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "0.1.127" }
 # The HL7 v2 face's crate (MLLP, MSH-18 decoding, parsing, the ACK and the
 # v2-to-FHIR ConceptMap interpreter): published from this workspace, so the
 # requirement carries both a path and a version.
-ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "0.1.127" }
+ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "0.1.128" }
 # The FHIRconnect language crate: the facade, the operations surface and the
 # published ferrobridge-hl7v2 consume it, so the requirement carries both a
 # path and a version.

@@ -46,6 +46,7 @@ impl Lookup {
             system: self.system.clone(),
             code: self.code.clone(),
             version: self.version.clone(),
+            date: None,
         }
     }
 }

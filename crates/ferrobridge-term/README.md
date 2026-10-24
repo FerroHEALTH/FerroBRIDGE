@@ -3,8 +3,8 @@
 
 # ferrobridge-term
 
-The FerroBRIDGE FHIR terminology client for `$lookup`, `$translate` and
-`$validate-code`.
+The FerroBRIDGE FHIR terminology client for `$lookup`, `$translate`,
+`$validate-code`, `$expand` and `$subsumes`.
 
 Part of [FerroBRIDGE](https://ferrobridge.eu), a pure-Rust bridge between
 openEHR and two interoperability targets: HL7 FHIR through the FHIRconnect
@@ -12,11 +12,23 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
 
 ## What it does
 
-Three operations on one configured server:
+Five operations on one configured server:
 
-- `CodeSystem/$lookup` resolves a code's display.
+- `CodeSystem/$lookup` resolves a code's display; `lookup_at` asks for it as
+  the code system stood on a `date`.
 - `ConceptMap/$translate` maps a code into another code system.
-- `ValueSet/$validate-code` tests membership of a value set.
+- `ValueSet/$validate-code` tests membership of a value set, at an optional
+  `date`.
+- `ValueSet/$expand` lists the codes of a value set, with `valueSetVersion`,
+  `date`, `filter`, paging (`offset` and `count`) and `includeDesignations`.
+  The answer keeps the nesting of `expansion.contains`, and each entry
+  carries its `system`, `version`, `code`, `display`, `abstract`, `inactive`
+  and designations.
+- `CodeSystem/$subsumes` tests how two codes relate, answered as
+  `SubsumesOutcome`: `Equivalent`, `Subsumes`, `SubsumedBy` or `NotSubsumed`.
+
+`code_system_count` asks `GET [base]/CodeSystem?url=<system>&_summary=count`,
+so a caller can tell an unserved code system from an unknown code.
 
 `validate` takes the three input forms `$validate-code` declares: a code with
 its system, `systemVersion` and `display`, a `Coding`, or a `CodeableConcept`,
@@ -29,7 +41,9 @@ leaves the others alone.
 
 A negative answer an operation states in its own `out` parameters is an
 outcome: `LookupOutcome::NotFound`, `TranslateOutcome::NoMatch`,
-`ValidateOutcome::Invalid`. Everything else is a typed error carrying the
+`ValidateOutcome::Invalid`, and `ExpandOutcome::NotFound` for a value set the
+server does not know. An expansion the server could not make, `too-costly`
+among them, is a refusal and never an empty expansion. Everything else is a typed error carrying the
 upstream status, the body, and any `tx-issue-type` coding the
 `OperationOutcome` holds. A missing display is `NotFound`, never an empty
 string, so the caller decides between a refusal and a configured fallback.
@@ -48,11 +62,12 @@ no FHIR of its own.
 
 `WireVersion` selects STU3, R4 or R4B, and the release decides which generated
 model writes the request and reads the answer. R4 and R4B declare the same `in`
-and `out` parameters for the three operations. STU3 (3.0.2) differs:
+and `out` parameters for the five operations. STU3 (3.0.2) differs:
 
 - `$validate-code` names the code system version `version` where R4 names it
   `systemVersion`, and the client sends it under that name. STU3 has no
   `valueSetVersion`.
+- `$expand` has no `valueSetVersion` either.
 - `$translate` has no `url`, so STU3 cannot name the concept map to use.
 - `$lookup` types `property.value` as `code`, so every property value of an
   STU3 answer is a `valueCode`.
@@ -61,7 +76,7 @@ and `out` parameters for the three operations. STU3 (3.0.2) differs:
   `accepted()` reads both releases the same way.
 
 A request that names a parameter STU3 has no equivalent for (a concept map URL
-on `translate`, a `value_set_version` on `validate`) is refused with
+on `translate`, a `value_set_version` on `validate` or `expand`) is refused with
 `Error::UnsupportedParameter` before anything is sent. In a batch the whole
 batch is refused. The request is never sent with the parameter dropped,
 because that would ask the server a different question.

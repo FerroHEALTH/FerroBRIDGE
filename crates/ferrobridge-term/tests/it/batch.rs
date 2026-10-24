@@ -8,7 +8,8 @@ use crate::support::{RELEASES, client, release_path, request_body};
 use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::error::Error;
 use ferrobridge_term::outcome::{
-    BatchOutcome, Coded, LookupOutcome, Request, ValidateOutcome, Validation,
+    BatchOutcome, Coded, ExpandOutcome, Expansion, LookupOutcome, Request, SubsumesOutcome,
+    Subsumption, ValidateOutcome, Validation,
 };
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
@@ -32,15 +33,18 @@ fn requests() -> Vec<Request> {
             system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
+            date: None,
         },
         Request::Lookup {
             system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
             code: fixtures::TERM_UNKNOWN_CODE.to_owned(),
             version: None,
+            date: None,
         },
         Request::ValidateCode(Validation {
             value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
             value_set_version: None,
+            date: None,
             coded: Coded::Code {
                 system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
                 code: fixtures::TERM_MEMBER_CODE.to_owned(),
@@ -200,6 +204,7 @@ async fn a_failed_entry_is_that_entrys_typed_error() -> Result<(), Box<dyn StdEr
         Request::ValidateCode(Validation {
             value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
             value_set_version: None,
+            date: None,
             coded: Coded::Code {
                 system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
                 code: fixtures::TERM_MEMBER_CODE.to_owned(),
@@ -211,6 +216,7 @@ async fn a_failed_entry_is_that_entrys_typed_error() -> Result<(), Box<dyn StdEr
             system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
+            date: None,
         },
     ];
     let outcomes = client(&server, WireVersion::R4)?.batch(&sent).await?;
@@ -283,5 +289,74 @@ async fn a_bundle_that_is_not_a_batch_response_is_a_decode_error() -> Result<(),
         .await
         .expect_err("a searchset is not the answer to a batch");
     assert_eq!("body", error.kind());
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_expansion_and_a_subsumption_map_back_by_position_in_both_releases()
+-> Result<(), Box<dyn StdError>> {
+    for version in RELEASES {
+        let server = MockServer::start().await;
+        mount(
+            &server,
+            version,
+            terminology::batch_response(&[
+                (
+                    "200 OK",
+                    terminology::expansion_body(
+                        fixtures::TERM_VALUE_SET_URL,
+                        Some(1),
+                        None,
+                        vec![terminology::expansion_contains(
+                            fixtures::TERM_SOURCE_SYSTEM,
+                            fixtures::TERM_MEMBER_CODE,
+                            fixtures::TERM_MEMBER_DISPLAY,
+                            Vec::new(),
+                        )],
+                    ),
+                ),
+                (
+                    "200 OK",
+                    terminology::parameters_resource(&terminology::subsumes_body("subsumed-by")),
+                ),
+            ]),
+        )
+        .await;
+        let requests = [
+            Request::Expand(Expansion::new(fixtures::TERM_VALUE_SET_URL)),
+            Request::Subsumes(Subsumption::new(
+                fixtures::TERM_SOURCE_SYSTEM,
+                fixtures::TERM_MEMBER_CODE,
+                fixtures::TERM_NON_MEMBER_CODE,
+            )),
+        ];
+
+        let outcomes = client(&server, version)?.batch(&requests).await?;
+        let mut held = outcomes.into_iter();
+        let first = held.next().ok_or("no first entry")??;
+        let BatchOutcome::Expand(ExpandOutcome::Expanded(expanded)) = first else {
+            return Err(format!("the first entry is not an expansion: {first:?}").into());
+        };
+        assert_eq!(Some(1), expanded.total);
+        let second = held.next().ok_or("no second entry")??;
+        assert!(
+            matches!(second, BatchOutcome::Subsumes(SubsumesOutcome::SubsumedBy)),
+            "{second:?}"
+        );
+
+        let body = request_body(&server, 0).await?;
+        let urls: Vec<_> = body
+            .get("entry")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("no entries")?
+            .iter()
+            .filter_map(|entry| {
+                entry
+                    .pointer("/request/url")
+                    .and_then(serde_json::Value::as_str)
+            })
+            .collect();
+        assert_eq!(vec!["ValueSet/$expand", "CodeSystem/$subsumes"], urls);
+    }
     Ok(())
 }

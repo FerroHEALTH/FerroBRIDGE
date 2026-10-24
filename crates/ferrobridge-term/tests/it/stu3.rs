@@ -67,6 +67,7 @@ fn validation(coded: Coded) -> Validation {
     Validation {
         value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
         value_set_version: None,
+        date: None,
         coded,
     }
 }
@@ -523,6 +524,7 @@ async fn an_stu3_batch_answers_each_entry_by_position() -> Result<(), Box<dyn St
             system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
+            date: None,
         },
         Request::Translate(
             Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
@@ -576,6 +578,7 @@ async fn an_stu3_batch_with_an_unsupported_parameter_sends_nothing() -> Result<(
             system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
+            date: None,
         },
         Request::Translate(
             Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)

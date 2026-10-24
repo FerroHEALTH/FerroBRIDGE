@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The values the three operations answer with, in one shape for every wire
-//! version.
+//! The values the operations answer with, in one shape for every wire
+//! version; [`Designation`] is shared with the `ValueSet/$expand` entries.
 //!
 //! R4 and R4B declare the same `out` parameters for `CodeSystem/$lookup`,
 //! `ConceptMap/$translate` and `ValueSet/$validate-code`. STU3 declares a

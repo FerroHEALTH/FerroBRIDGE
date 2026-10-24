@@ -377,6 +377,110 @@ pub mod terminology {
         ))
     }
 
+    /// Returns one `ValueSet.expansion.contains` entry with the entries
+    /// nested under it.
+    ///
+    /// `abstract`, `inactive` and `designation` are set on the returned value
+    /// by a test that needs them
+    /// (<https://hl7.org/fhir/R4/valueset-definitions.html#ValueSet.expansion.contains>).
+    #[must_use]
+    pub fn expansion_contains(
+        system: &str,
+        code: &str,
+        display: &str,
+        nested: Vec<serde_json::Value>,
+    ) -> serde_json::Value {
+        let mut entry = serde_json::Map::new();
+        entry.insert("system".to_owned(), serde_json::Value::from(system));
+        entry.insert("code".to_owned(), serde_json::Value::from(code));
+        entry.insert("display".to_owned(), serde_json::Value::from(display));
+        if !nested.is_empty() {
+            entry.insert("contains".to_owned(), serde_json::Value::Array(nested));
+        }
+        serde_json::Value::Object(entry)
+    }
+
+    /// Returns the expanded `ValueSet` a `ValueSet/$expand` answers with.
+    ///
+    /// The operation's one `out` parameter is the resource named `return`,
+    /// so the answer is the `ValueSet` itself
+    /// (<https://hl7.org/fhir/R4/operations.html#response>). The expansion
+    /// carries `timestamp`, mandatory in every release, and `identifier`,
+    /// mandatory in STU3
+    /// (<https://hl7.org/fhir/STU3/valueset-definitions.html#ValueSet.expansion.identifier>).
+    #[must_use]
+    pub fn expansion_body(
+        url: &str,
+        total: Option<u32>,
+        offset: Option<u32>,
+        contains: Vec<serde_json::Value>,
+    ) -> serde_json::Value {
+        let mut expansion = serde_json::Map::new();
+        expansion.insert(
+            "identifier".to_owned(),
+            serde_json::Value::from("urn:uuid:7d1c0a52-6f2b-4c3e-9a51-0e5b3f6c2d10"),
+        );
+        expansion.insert(
+            "timestamp".to_owned(),
+            serde_json::Value::from("2026-01-01T00:00:00Z"),
+        );
+        if let Some(total) = total {
+            expansion.insert("total".to_owned(), serde_json::Value::from(total));
+        }
+        if let Some(offset) = offset {
+            expansion.insert("offset".to_owned(), serde_json::Value::from(offset));
+        }
+        if !contains.is_empty() {
+            expansion.insert("contains".to_owned(), serde_json::Value::Array(contains));
+        }
+        serde_json::json!({
+            "resourceType": "ValueSet",
+            "url": url,
+            "status": "active",
+            "expansion": expansion,
+        })
+    }
+
+    /// Returns a `200` carrying the expanded `ValueSet` of
+    /// [`expansion_body`].
+    #[must_use]
+    pub fn expansion(
+        url: &str,
+        total: Option<u32>,
+        offset: Option<u32>,
+        contains: Vec<serde_json::Value>,
+    ) -> ResponseTemplate {
+        fhir_resource(&expansion_body(url, total, offset, contains))
+    }
+
+    /// Returns the out parameters of `CodeSystem/$subsumes`.
+    ///
+    /// `outcome` is the one mandatory out parameter, a code of the
+    /// `ConceptSubsumptionOutcome` value set
+    /// (`OperationDefinition-CodeSystem-subsumes`, R4).
+    #[must_use]
+    pub fn subsumes_body(outcome: &str) -> Vec<serde_json::Value> {
+        vec![serde_json::json!({"name": "outcome", "valueCode": outcome})]
+    }
+
+    /// Returns the `Parameters` of `CodeSystem/$subsumes`.
+    #[must_use]
+    pub fn subsumes(outcome: &str) -> ResponseTemplate {
+        fhir_parameters(&subsumes_body(outcome))
+    }
+
+    /// Returns the `searchset` `Bundle` a search with `_summary=count`
+    /// answers with: the `total` and no entries
+    /// (<https://hl7.org/fhir/R4/search.html#summary>).
+    #[must_use]
+    pub fn search_count(total: u32) -> ResponseTemplate {
+        fhir_resource(&serde_json::json!({
+            "resourceType": "Bundle",
+            "type": "searchset",
+            "total": total,
+        }))
+    }
+
     /// Returns the `OperationOutcome` body of a refused operation.
     ///
     /// A failed operation answers "an `OperationOutcome` resource with error
@@ -462,8 +566,13 @@ pub mod terminology {
 
     /// Returns a `200` carrying `parameters` as a FHIR `Parameters`.
     fn fhir_parameters(parameters: &[serde_json::Value]) -> ResponseTemplate {
+        fhir_resource(&parameters_resource(parameters))
+    }
+
+    /// Returns a `200` carrying `resource` as FHIR JSON.
+    fn fhir_resource(resource: &serde_json::Value) -> ResponseTemplate {
         ResponseTemplate::new(200)
             .insert_header("Content-Type", FHIR_JSON)
-            .set_body_string(parameters_resource(parameters).to_string())
+            .set_body_string(resource.to_string())
     }
 }
