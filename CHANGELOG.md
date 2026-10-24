@@ -97,6 +97,13 @@ crates on crates.io.
 
 ### Fixed
 
+- A coding with no `display` written into a `DV_TEXT`, whose value would
+  otherwise fall back to the coding's code, is looked up through
+  `CodeSystem/$lookup` as one written into a `DV_CODED_TEXT` is: the display
+  becomes the value, an unknown code refuses unless
+  `[terminology] display_fallback` is set, a failed call refuses, and with no
+  server the code stands. `fhirconnect` moves to 0.1.185 and
+  `ferrobridge-hl7v2` to 0.1.134 with it (#1188).
 - An untyped `dateTime` mapped onto an `ELEMENT` whose value admits
   `DV_TEXT` and `DV_DATE_TIME` converts into `DV_DATE_TIME` whatever the
   template order: a class that pairs with the FHIR type directly outranks
