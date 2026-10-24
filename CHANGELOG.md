@@ -25,6 +25,11 @@ crates on crates.io.
 
 ### Added
 
+- The facade shows a write's declared losses to the client that wrote it: a
+  committed transaction entry carries them in `response.outcome`, and a
+  single create or update asked for `Prefer: return=OperationOutcome` lists
+  them after the committed version, one issue per loss with the FHIRPath in
+  `expression` and the openEHR path in `details` (#1115).
 - `GET /operator/configuration` answers the configuration the bridge started
   on, behind `[operator]` and the operator scope like the other operator
   routes: every key with its value and its source (the file, the

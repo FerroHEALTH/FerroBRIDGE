@@ -202,6 +202,7 @@ impl Ingest<'_> {
             instant,
             consumed: Vec::new(),
             offered: Vec::new(),
+            losses: Vec::new(),
         }];
         let found = self
             .committed_versions(
@@ -238,6 +239,7 @@ impl Ingest<'_> {
             version,
             composition,
             delivery: Delivery::Reconciled,
+            losses: Vec::new(),
         }))
     }
 

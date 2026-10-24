@@ -364,3 +364,36 @@ async fn a_transaction_entry_that_links_a_resource_is_refused_whole()
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn a_linked_resource_no_context_maps_is_a_loss_the_writer_is_shown()
+-> Result<(), Box<dyn StdError>> {
+    // R4 http.html §Managing Return Content: `return=OperationOutcome` asks for
+    // "hints and warnings", and the unmapped link is the run's declared loss.
+    let sender = sender(&["http://example.org/fhir/StructureDefinition/unmapped"]).await;
+    let harness = linking(
+        &format!("{}/fhir", sender.uri()),
+        Committing {
+            taken: Mutex::new(0),
+            fail_at: None,
+        },
+    )
+    .await?;
+    let (status, body) = call(
+        harness.app(),
+        Request::post("/fhir/Condition")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .header("Prefer", "return=OperationOutcome")
+            .body(Body::from(condition(&sender).to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::CREATED, status, "{body}");
+    let issues = body["issue"].as_array().ok_or("an OperationOutcome")?;
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue["severity"] == "warning" && issue["code"] == "incomplete"),
+        "the unmapped link is named as a warning: {body}"
+    );
+    Ok(())
+}

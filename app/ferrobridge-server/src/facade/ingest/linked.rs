@@ -23,6 +23,7 @@ use std::sync::PoisonError;
 use fhir_types::codec::Value;
 use fhirconnect::engine::linked::Linked;
 use fhirconnect::engine::linked::LinkedCompositions;
+use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::ReferenceError;
 use fhirconnect::engine::subject::SubjectIdentifier;
 use http::StatusCode;
@@ -42,6 +43,7 @@ use super::Ingest;
 use super::Provenance;
 use super::Recognised;
 use super::Refused;
+use super::binding::Engined;
 use super::engine_refusal;
 use super::store_refusal;
 
@@ -122,6 +124,8 @@ pub(super) struct Built {
     /// The identifiers the run offered as the subject of the EHR
     /// (`fhirconnect::engine::subject`).
     pub(super) subject: Vec<SubjectIdentifier>,
+    /// The losses the final run declared, in the order it took them.
+    pub(super) losses: Vec<Warning>,
 }
 
 impl Ingest<'_> {
@@ -151,7 +155,12 @@ impl Ingest<'_> {
         // NOTE: ITS-REST 1.1.0 `UpdateVersion` carries no `uid`, so a linked composition's
         // id exists only after its commit, and the linking run waits for it (our own design).
         let probe = Linker::probing();
-        let (probed, _, _, offered) = self
+        let Engined {
+            composition: probed,
+            subject: offered,
+            losses: probed_losses,
+            ..
+        } = self
             .run_linking(program, inbound, provenance, Some(&probe))
             .await
             .map_err(|error| engine_refusal(&error))?;
@@ -161,6 +170,7 @@ impl Ingest<'_> {
                 composition: probed,
                 committed: Vec::new(),
                 subject: offered,
+                losses: probed_losses,
             });
         }
         let mut answers = BTreeMap::new();
@@ -179,7 +189,12 @@ impl Ingest<'_> {
             answers.insert(reference, linked);
         }
         let last = Linker::answering(answers);
-        let (composition, _, _, subject) = self
+        let Engined {
+            composition,
+            subject,
+            losses,
+            ..
+        } = self
             .run_linking(program, inbound, provenance, Some(&last))
             .await
             .map_err(|error| with_committed(engine_refusal(&error), &committed))?;
@@ -198,6 +213,7 @@ impl Ingest<'_> {
             composition,
             committed,
             subject,
+            losses,
         })
     }
 
