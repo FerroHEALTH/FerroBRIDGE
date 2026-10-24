@@ -91,6 +91,9 @@ crates on crates.io.
 
 ### Changed
 
+- `fhirconnect` 0.1.188 moves `engine::rm::NULL_FLAVOUR`, `NULL_REASON` and
+  `null_flavour_of` to `engine::rm::null_flavour`, which breaks an import of
+  them: name them through `engine::rm::null_flavour::` (#1194).
 - A transaction entry whose mapping links a resource as a composition of its
   own is refused with `422` and `not-supported`, naming why and the ways that
   commit it: the resource on its own, or as an entry of a `batch`, whose

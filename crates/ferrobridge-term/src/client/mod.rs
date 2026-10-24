@@ -11,11 +11,16 @@ use crate::outcome::{
     Subsumption, TranslateOutcome, Translation, ValidateOutcome, Validation,
 };
 use backon::{ExponentialBuilder, Retryable};
-use http::header::{ACCEPT, CONTENT_TYPE, WWW_AUTHENTICATE};
-use http::{HeaderMap, Method, StatusCode};
+use http::header::{ACCEPT, CONTENT_TYPE};
+use http::{Method, StatusCode};
 use secrecy::ExposeSecret;
 use std::sync::Arc;
 use url::Url;
+
+use crate::client::transport::challenge;
+use crate::client::transport::dispatch;
+
+mod transport;
 
 /// The FHIR JSON media type (<https://hl7.org/fhir/R4/http.html#mime-type>).
 pub const FHIR_JSON: &str = "application/fhir+json";
@@ -689,32 +694,6 @@ impl Client {
             upstream: Box::new(self.upstream(answer)),
         }
     }
-}
-
-/// Returns the response to `request`, sent once, for `url`.
-async fn dispatch(url: &Url, request: reqwest::RequestBuilder) -> Result<reqwest::Response, Error> {
-    request.send().await.map_err(|source| {
-        if source.is_timeout() {
-            Error::Timeout {
-                url: url.clone(),
-                source,
-            }
-        } else {
-            Error::Transport {
-                url: url.clone(),
-                source,
-            }
-        }
-    })
-}
-
-/// Returns the `WWW-Authenticate` challenge, when the answer carries usable
-/// text.
-fn challenge(headers: &HeaderMap) -> Option<String> {
-    headers
-        .get(WWW_AUTHENTICATE)
-        .and_then(|value| value.to_str().ok())
-        .map(str::to_owned)
 }
 
 #[cfg(test)]
