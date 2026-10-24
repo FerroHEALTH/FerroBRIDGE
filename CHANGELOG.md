@@ -70,6 +70,13 @@ crates on crates.io.
   `Request::Lookup` and `Validation` gain a `date` field. This breaks a
   struct literal of either: add `date: None` where no date is meant (#1177).
 
+### Fixed
+
+- An untyped `dateTime` mapped onto an `ELEMENT` whose value admits
+  `DV_TEXT` and `DV_DATE_TIME` converts into `DV_DATE_TIME` whatever the
+  template order: a class that pairs with the FHIR type directly outranks
+  the text fallback. `fhirconnect` moves to 0.1.181 (#1114).
+
 ## [0.0.11] - 2026-10-24
 
 The operator console release. The console is rebuilt page for page on
