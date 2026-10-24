@@ -19,9 +19,8 @@ use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::diagnostics::diagnostics_by_file;
 use ferrohealth_ui::view::dialog::{Confirmation, confirm_dialog};
-use ferrohealth_ui::view::load_report::{
-    Arrival, Count, LoadReport, Outcome as Verdict, load_report,
-};
+use ferrohealth_ui::view::load_report;
+use ferrohealth_ui::view::load_report::{Arrival, Count, LoadReport};
 use ferrohealth_ui::view::surface::{Header, page_heading};
 use ferrohealth_ui::view::tabs::{Tab, TabRow};
 use ferrohealth_ui::view::template::list::{ListCard, list_card};
@@ -166,13 +165,13 @@ fn counts(errors: usize, warnings: usize) -> Vec<Count> {
 fn running_report(state: &EngineState) -> AnyView {
     let (errors, warnings) = tally(&state.diagnostics);
     let (outcome, title) = if errors > 0 {
-        (Verdict::Bad, Msg::RunningNotCompiles)
+        (load_report::Outcome::Bad, Msg::RunningNotCompiles)
     } else if warnings > 0 {
-        (Verdict::Warn, Msg::RunningCompilesWarnings)
+        (load_report::Outcome::Warn, Msg::RunningCompilesWarnings)
     } else {
-        (Verdict::Ok, Msg::RunningCompiles)
+        (load_report::Outcome::Ok, Msg::RunningCompiles)
     };
-    load_report(LoadReport {
+    load_report::load_report(LoadReport {
         outcome,
         arrival: Arrival::WithPage,
         title: tr(title).into_any(),
@@ -188,11 +187,11 @@ fn reload_report(reloaded: &Reloaded) -> (AnyView, Option<AnyView>) {
         Ok(Outcome::Shown(report)) => {
             let (errors, warnings) = tally(&report.diagnostics);
             let (outcome, title) = if report.clean {
-                (Verdict::Ok, Msg::Reloaded)
+                (load_report::Outcome::Ok, Msg::Reloaded)
             } else {
-                (Verdict::Bad, Msg::ReloadRefused)
+                (load_report::Outcome::Bad, Msg::ReloadRefused)
             };
-            let shown = load_report(LoadReport {
+            let shown = load_report::load_report(LoadReport {
                 outcome,
                 arrival: Arrival::AfterAction,
                 title: tr(title).into_any(),
