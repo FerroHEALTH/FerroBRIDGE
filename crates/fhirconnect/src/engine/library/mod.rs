@@ -32,7 +32,7 @@ use fhir_types::codec::expect_object;
 use fhir_types::r4::extension::Extension;
 use fhir_types::r4::primitives::Code;
 use fhir_types::r4::primitives::Decimal;
-use fhir_types::r4::primitives::String as FhirString;
+use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::Uri;
 use fhir_types::r4::quantity::Quantity;
 use fhir_types::r4::range::Range;
@@ -377,7 +377,7 @@ fn ucum_amount<'quantity>(
 fn ucum_quantity(value: &str, units: &str) -> Quantity {
     Quantity {
         value: Some(Decimal::from(value)),
-        unit: Some(FhirString::from(units)),
+        unit: Some(primitives::String::from(units)),
         system: Some(Uri::from(UCUM)),
         code: Some(Code::from(units)),
         ..Quantity::default()

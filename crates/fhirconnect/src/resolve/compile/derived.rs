@@ -26,7 +26,7 @@ use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
 use crate::tree::element::Location;
 use crate::tree::element::Move;
-use crate::tree::element::resolve as resolve_element;
+use crate::tree::element;
 use crate::tree::path::FhirPath;
 
 use crate::resolve::compile::Compiler;
@@ -484,7 +484,7 @@ impl<'a> Compiler<'a> {
         let written = format!("{}.{step}", target.expression());
         let (code, reason) = match FhirPath::from_str(&written) {
             Ok(expression) => {
-                match resolve_element(self.table, target.resolved().resource(), &expression) {
+                match element::resolve(self.table, target.resolved().resource(), &expression) {
                     Ok(resolved) => {
                         return Some(
                             FhirTarget::new(expression, resolved).at_level(target.level()),

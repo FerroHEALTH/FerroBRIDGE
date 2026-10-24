@@ -27,7 +27,7 @@
 use fhir_types::r4::primitives::Code;
 use fhir_types::r4::primitives::Decimal;
 use fhir_types::r4::primitives::Integer;
-use fhir_types::r4::primitives::String as FhirString;
+use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::Uri;
 use fhir_types::r4::quantity::Quantity;
 use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
@@ -100,7 +100,7 @@ impl Lens<DvQuantity, Quantity> for QuantityLens {
         Ok(Quantity {
             value: Some(Decimal::from(value.as_str())),
             comparator,
-            unit: Some(FhirString::from(unit)),
+            unit: Some(primitives::String::from(unit)),
             system: Some(Uri::from(source.units_system.as_deref().unwrap_or(UCUM))),
             code: Some(Code::from(source.units.as_str())),
             ..Quantity::default()
@@ -282,7 +282,7 @@ mod tests {
     use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives::Decimal;
     use fhir_types::r4::primitives::Integer;
-    use fhir_types::r4::primitives::String as FhirString;
+    use fhir_types::r4::primitives;
     use fhir_types::r4::quantity::Quantity;
     use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
     use proptest::option;
@@ -465,7 +465,7 @@ mod tests {
     fn a_unit_with_no_code_is_the_units_by_a_one_way_row() {
         let view = Quantity {
             value: Some(Decimal::from("7")),
-            unit: Some(FhirString::from("mg")),
+            unit: Some(primitives::String::from("mg")),
             ..Quantity::default()
         };
         let back = QuantityLens.put(&view, None).expect("the unit stands in");

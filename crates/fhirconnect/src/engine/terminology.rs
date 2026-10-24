@@ -26,7 +26,7 @@ use fhir_types::r4::operations::code_system_lookup::CodeSystemLookupResponse;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateRequest;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateResponse;
 use fhir_types::r4::primitives::Code;
-use fhir_types::r4::primitives::String as FhirString;
+use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::Uri;
 
 /// The terminology server a run translates codes through.
@@ -137,7 +137,7 @@ pub fn request(url: &str, coding: &Coding) -> Result<ConceptMapTranslateRequest,
         url: Some(Uri::from(url)),
         system: Some(Uri::from(system)),
         code: Some(Code::from(code)),
-        version: text(coding.version.as_ref().map(|version| &version.value)).map(FhirString::from),
+        version: text(coding.version.as_ref().map(|version| &version.value)).map(primitives::String::from),
         ..ConceptMapTranslateRequest::default()
     })
 }
@@ -150,7 +150,7 @@ pub fn lookup_request(system: &str, code: &str, version: Option<&str>) -> CodeSy
     CodeSystemLookupRequest {
         system: Some(Uri::from(system)),
         code: Some(Code::from(code)),
-        version: version.map(FhirString::from),
+        version: version.map(primitives::String::from),
         ..CodeSystemLookupRequest::default()
     }
 }
@@ -254,14 +254,14 @@ mod tests {
     use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateResponseMatch;
     use fhir_types::r4::primitives::Boolean;
     use fhir_types::r4::primitives::Code;
-    use fhir_types::r4::primitives::String as FhirString;
+    use fhir_types::r4::primitives;
     use fhir_types::r4::primitives::Uri;
 
     fn coding(system: &str, code: &str, display: Option<&str>) -> Coding {
         Coding {
             system: Some(Uri::from(system)),
             code: Some(Code::from(code)),
-            display: display.map(FhirString::from),
+            display: display.map(primitives::String::from),
             ..Coding::default()
         }
     }
@@ -300,7 +300,7 @@ mod tests {
     #[test]
     fn the_request_carries_the_source_system_code_and_version() {
         let mut source = coding("http://example.org/source", "S-1", Some("Source"));
-        source.version = Some(FhirString::from("2026"));
+        source.version = Some(primitives::String::from("2026"));
         let sent =
             request("http://example.org/ConceptMap/a", &source).expect("the coding is coded");
         assert_eq!(
@@ -393,7 +393,7 @@ mod tests {
         let bare = coding("http://example.org/target", "T-1", None);
         assert_eq!(
             translated(&source, &bare).display,
-            Some(FhirString::from("Source text")),
+            Some(primitives::String::from("Source text")),
             "the source text stands in only when the concept names no display"
         );
     }

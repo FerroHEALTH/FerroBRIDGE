@@ -21,7 +21,7 @@
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::primitives::Code;
-use fhir_types::r4::primitives::String as FhirString;
+use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::Uri;
 use fhir_types::r4::reference::Reference;
 
@@ -180,7 +180,7 @@ fn identifier(text: &str, cell: &'static str) -> Result<Identifier, LensError> {
     let (system, value) = split(text, cell)?;
     Ok(Identifier {
         system: system.map(Uri::from),
-        value: Some(FhirString::from(value)),
+        value: Some(primitives::String::from(value)),
         ..Identifier::default()
     })
 }
@@ -204,7 +204,7 @@ mod tests {
     use fhir_types::r4::coding::Coding;
     use fhir_types::r4::identifier::Identifier;
     use fhir_types::r4::primitives::Code;
-    use fhir_types::r4::primitives::String as FhirString;
+    use fhir_types::r4::primitives;
     use fhir_types::r4::primitives::Uri;
     use fhir_types::r4::reference::Reference;
     use proptest::prop_compose;
@@ -273,7 +273,7 @@ mod tests {
         assert!(Lens::<String, Coding>::put(&StringLens, &coding, None).is_err());
         let identifier = Identifier {
             system: Some(Uri::from("urn:x::y")),
-            value: Some(FhirString::from("1")),
+            value: Some(primitives::String::from("1")),
             ..Identifier::default()
         };
         assert!(Lens::<String, Identifier>::put(&StringLens, &identifier, None).is_err());
@@ -283,7 +283,7 @@ mod tests {
     fn a_reference_with_no_identifier_writes_its_reference_one_way() {
         // String.adoc §Reference contained.
         let view = Reference {
-            reference: Some(FhirString::from("Patient/synthetic-1")),
+            reference: Some(primitives::String::from("Patient/synthetic-1")),
             ..Reference::default()
         };
         assert_eq!(

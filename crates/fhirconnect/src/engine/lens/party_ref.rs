@@ -14,7 +14,7 @@
 //! the demographics endpoint first and names the resource type the element
 //! admits.
 
-use fhir_types::r4::primitives::String as FhirString;
+use fhir_types::r4::primitives;
 use fhir_types::r4::reference::Reference;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
@@ -105,7 +105,7 @@ impl Lens<PartyRef, Reference> for PartyRefLens<'_> {
             ));
         }
         Ok(Reference {
-            reference: Some(FhirString::from(format!("{}/{}", self.target, id.value()))),
+            reference: Some(primitives::String::from(format!("{}/{}", self.target, id.value()))),
             ..Reference::default()
         })
     }
@@ -189,7 +189,7 @@ mod tests {
 
     fn practitioner(id: &str) -> Reference {
         Reference {
-            reference: Some(FhirString::from(format!("Practitioner/{id}"))),
+            reference: Some(primitives::String::from(format!("Practitioner/{id}"))),
             ..Reference::default()
         }
     }
@@ -212,7 +212,7 @@ mod tests {
     fn a_reference_of_another_type_is_refused() {
         let refused = PartyRefLens::new("Practitioner").put(
             &Reference {
-                reference: Some(FhirString::from("Patient/p-1")),
+                reference: Some(primitives::String::from("Patient/p-1")),
                 ..Reference::default()
             },
             None,
@@ -226,7 +226,7 @@ mod tests {
     #[test]
     fn a_display_beside_the_reference_is_refused_rather_than_dropped() {
         let mut view = practitioner("p-1");
-        view.display = Some(FhirString::from("Dr Synthetic"));
+        view.display = Some(primitives::String::from("Dr Synthetic"));
         let refused = PartyRefLens::new("Practitioner").put(&view, None);
         assert!(
             matches!(refused, Err(LensError::Shape { .. })),
