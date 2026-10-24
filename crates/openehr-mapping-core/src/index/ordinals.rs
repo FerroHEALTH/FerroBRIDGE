@@ -10,7 +10,7 @@
 //! class). The Web Template keeps the codes and the ordinals of that list but
 //! not the terminology of each symbol, so the index reads the list from the
 //! operational template and keys it by the `aqlPath` the Web Template builder
-//! gives the node, the key [`super::embedded`] uses.
+//! gives the node, the key the embedded-template map uses.
 
 use std::collections::BTreeMap;
 
