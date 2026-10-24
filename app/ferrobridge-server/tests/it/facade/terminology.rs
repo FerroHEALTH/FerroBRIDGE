@@ -119,8 +119,7 @@ async fn a_terminology_server_failure_refuses_the_write_with_502_and_the_upstrea
 
 /// Returns a harness whose `$translate` calls reach a terminology server
 /// that answers `503`, with the EHR mounted.
-async fn failing_terminology() -> Result<(Harness, MockServer, tempfile::TempDir), Box<dyn Error>>
-{
+async fn failing_terminology() -> Result<(Harness, MockServer, tempfile::TempDir), Box<dyn Error>> {
     let server = MockServer::start().await;
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/r4/ConceptMap/$translate"))
@@ -154,8 +153,8 @@ async fn validate_answers_502_when_the_terminology_server_fails() -> Result<(), 
 }
 
 #[tokio::test]
-async fn a_transaction_answers_502_when_the_terminology_server_fails()
--> Result<(), Box<dyn Error>> {
+async fn a_transaction_answers_502_when_the_terminology_server_fails() -> Result<(), Box<dyn Error>>
+{
     let (harness, _server, _fixtures) = failing_terminology().await?;
     let bundle = serde_json::json!({
         "resourceType": "Bundle",

@@ -116,8 +116,8 @@ async fn an_entry_outside_the_token_scope_is_refused_inside_and_the_others_proce
 }
 
 #[tokio::test]
-async fn an_entry_outside_the_patient_compartment_is_refused_inside()
--> Result<(), Box<dyn Error>> {
+async fn an_entry_outside_the_patient_compartment_is_refused_inside() -> Result<(), Box<dyn Error>>
+{
     // SMART App Launch 2.x scopes-and-launch-context: a `patient/` grant
     // reaches the compartment of the patient in the launch context only.
     let key = ec_key("k1", Algorithm::ES256);

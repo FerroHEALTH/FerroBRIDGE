@@ -52,8 +52,8 @@ fn an_archetype_root_defines_the_codes_of_the_nodes_it_keeps() -> Result<(), Box
 }
 
 #[test]
-fn an_archetype_root_defines_a_code_the_template_carries_no_node_for()
--> Result<(), Box<dyn Error>> {
+fn an_archetype_root_defines_a_code_the_template_carries_no_node_for() -> Result<(), Box<dyn Error>>
+{
     let index = WebTemplateIndex::build(&source(&with_excluded_term()?)?)?;
     let root = index.node(&AqlPath::new(EVALUATION))?;
     assert_eq!(Some(true), index.archetype_defines(root, "at0003"));

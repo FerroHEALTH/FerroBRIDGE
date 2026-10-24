@@ -118,7 +118,8 @@ fn every_libpq_mode_that_never_falls_back_resolves() -> Result<(), Box<dyn std::
 }
 
 #[test]
-fn a_url_without_sslmode_is_refused_naming_the_four_modes() -> Result<(), Box<dyn std::error::Error>> {
+fn a_url_without_sslmode_is_refused_naming_the_four_modes() -> Result<(), Box<dyn std::error::Error>>
+{
     for url in [
         "postgres://db.invalid/cdm",
         "postgres://db.invalid/cdm?application_name=bridge",
@@ -157,7 +158,8 @@ fn a_url_without_sslmode_exits_seventy_eight() -> Result<(), Box<dyn std::error:
 }
 
 #[test]
-fn a_libpq_tls_variable_in_the_environment_is_refused_naming_it() -> Result<(), Box<dyn std::error::Error>> {
+fn a_libpq_tls_variable_in_the_environment_is_refused_naming_it()
+-> Result<(), Box<dyn std::error::Error>> {
     for name in ["PGSSLROOTCERT", "PGSSLCERT", "PGSSLKEY"] {
         let mut file = tempfile::NamedTempFile::new()?;
         writeln!(
@@ -233,8 +235,8 @@ fn a_ca_inline_and_in_a_file_together_are_refused() -> Result<(), Box<dyn std::e
 }
 
 #[test]
-fn a_ca_file_that_holds_no_certificate_is_refused_naming_the_key() -> Result<(), Box<dyn std::error::Error>>
-{
+fn a_ca_file_that_holds_no_certificate_is_refused_naming_the_key()
+-> Result<(), Box<dyn std::error::Error>> {
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "not a certificate")?;
     let error = refusal(&format!(
@@ -388,7 +390,8 @@ async fn cdm_init_on_a_partial_schema_fails_naming_the_missing_tables()
 }
 
 #[tokio::test]
-async fn cdm_init_without_the_flag_leaves_the_foreign_keys_out() -> Result<(), Box<dyn std::error::Error>> {
+async fn cdm_init_without_the_flag_leaves_the_foreign_keys_out()
+-> Result<(), Box<dyn std::error::Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }
@@ -402,8 +405,8 @@ async fn cdm_init_without_the_flag_leaves_the_foreign_keys_out() -> Result<(), B
 /// At OHDSI tag v5.4.3 PostgreSQL refuses line 157 of the constraints file
 /// with SQLSTATE 42830, so the flag fails the run and names the statement.
 #[tokio::test]
-async fn cdm_init_with_constraints_reports_the_refused_statement() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn cdm_init_with_constraints_reports_the_refused_statement()
+-> Result<(), Box<dyn std::error::Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }
@@ -425,7 +428,8 @@ async fn cdm_init_with_constraints_reports_the_refused_statement() -> Result<(),
 }
 
 #[tokio::test]
-async fn cdm_init_connects_over_verify_full_with_the_ca_file() -> Result<(), Box<dyn std::error::Error>> {
+async fn cdm_init_connects_over_verify_full_with_the_ca_file()
+-> Result<(), Box<dyn std::error::Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }

@@ -41,10 +41,7 @@ const SECRET: &str = "synthetic-secret-never-on-the-wire";
 
 /// Returns the application whose facade reaches `cdr` with a credential
 /// fetched from the token endpoint under the base URI `authorization`.
-async fn app_over(
-    cdr: &MockServer,
-    authorization: &str,
-) -> Result<axum::Router, Box<dyn Error>> {
+async fn app_over(cdr: &MockServer, authorization: &str) -> Result<axum::Router, Box<dyn Error>> {
     Mock::given(matchers::method("GET"))
         .and(matchers::path(
             "/definition/template/adl1.4/ferrobridge.diagnose.v1",

@@ -88,7 +88,8 @@ fn answers() -> ResponseTemplate {
 }
 
 #[tokio::test]
-async fn the_entries_map_back_by_position_in_both_releases() -> Result<(), Box<dyn std::error::Error>> {
+async fn the_entries_map_back_by_position_in_both_releases()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(&server, version, answers()).await;
@@ -272,8 +273,8 @@ async fn a_short_answer_is_an_arity_error() -> Result<(), Box<dyn std::error::Er
 }
 
 #[tokio::test]
-async fn a_bundle_that_is_not_a_batch_response_is_a_decode_error() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_bundle_that_is_not_a_batch_response_is_a_decode_error()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,

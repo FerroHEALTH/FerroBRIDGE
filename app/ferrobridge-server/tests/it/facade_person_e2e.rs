@@ -28,8 +28,7 @@ use crate::facade_e2e::call;
 use crate::facade_e2e::upload_published;
 
 #[tokio::test]
-async fn the_facade_round_trips_the_kds_patient_through_a_real_cdr() -> Result<(), Box<dyn Error>>
-{
+async fn the_facade_round_trips_the_kds_patient_through_a_real_cdr() -> Result<(), Box<dyn Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }

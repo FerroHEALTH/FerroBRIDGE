@@ -154,8 +154,8 @@ async fn contributions(cdr: &MockServer) -> usize {
 }
 
 #[tokio::test]
-async fn skip_and_count_commits_the_mapped_entry_and_types_every_skip()
--> Result<(), Box<dyn Error>> {
+async fn skip_and_count_commits_the_mapped_entry_and_types_every_skip() -> Result<(), Box<dyn Error>>
+{
     let (cdr, facade) = facade().await?;
     let provenance = message();
     let ingested = facade
@@ -216,8 +216,7 @@ async fn skip_and_count_commits_the_mapped_entry_and_types_every_skip()
 }
 
 #[tokio::test]
-async fn a_message_origin_names_the_control_id_in_the_feeder_audit() -> Result<(), Box<dyn Error>>
-{
+async fn a_message_origin_names_the_control_id_in_the_feeder_audit() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = facade().await?;
     let provenance = message();
     facade
@@ -568,8 +567,8 @@ async fn the_entries_of_one_message_bind_on_retry_from_the_contribution_read_bac
 }
 
 #[tokio::test]
-async fn an_entry_the_program_refuses_is_counted_as_a_mapping_failure()
--> Result<(), Box<dyn Error>> {
+async fn an_entry_the_program_refuses_is_counted_as_a_mapping_failure() -> Result<(), Box<dyn Error>>
+{
     let (cdr, facade) = facade().await?;
     let usage = Arc::new(Window::default());
     let facade = facade.with_usage(Arc::clone(&usage));

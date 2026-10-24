@@ -37,8 +37,8 @@ async fn a_disabled_facade_mounts_no_route_and_answers_four_hundred_and_four()
 }
 
 #[tokio::test]
-async fn the_capability_statement_names_exactly_the_loaded_programs()
--> Result<(), Box<dyn Error>> {
+async fn the_capability_statement_names_exactly_the_loaded_programs() -> Result<(), Box<dyn Error>>
+{
     let harness = harness().await;
     let response = raw(
         harness.app(),
@@ -167,8 +167,7 @@ async fn a_template_the_cdr_does_not_hold_names_the_context_and_the_status()
 }
 
 #[tokio::test]
-async fn a_served_operations_lane_is_declared_at_the_system_level() -> Result<(), Box<dyn Error>>
-{
+async fn a_served_operations_lane_is_declared_at_the_system_level() -> Result<(), Box<dyn Error>> {
     // R4 CapabilityStatement.rest.operation carries the system-level
     // operations; both FSH definitions of the REST API chapter set `system = true`.
     let harness = harness().await;

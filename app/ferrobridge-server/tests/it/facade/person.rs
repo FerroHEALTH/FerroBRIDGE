@@ -176,8 +176,7 @@ async fn a_patient_is_stored_as_the_kds_person_composition_of_its_own_ehr()
 }
 
 #[tokio::test]
-async fn a_stored_kds_person_composition_reads_back_as_the_patient() -> Result<(), Box<dyn Error>>
-{
+async fn a_stored_kds_person_composition_reads_back_as_the_patient() -> Result<(), Box<dyn Error>> {
     let (harness, _directory) = person_harness().await?;
     let resource = patient()?;
     mount_ehr(&harness.cdr).await;
@@ -280,8 +279,7 @@ fn subject_of(query: &[(String, String)]) -> (Option<&str>, Option<&str>) {
 }
 
 #[tokio::test]
-async fn under_logical_id_a_patient_keys_its_ehr_by_its_logical_id() -> Result<(), Box<dyn Error>>
-{
+async fn under_logical_id_a_patient_keys_its_ehr_by_its_logical_id() -> Result<(), Box<dyn Error>> {
     let (status, body, query) = post_under(IdForm::LogicalId, &patient()?).await?;
     assert_eq!(StatusCode::CREATED, status, "{body}");
     assert_eq!(
@@ -296,8 +294,7 @@ async fn under_logical_id_a_patient_keys_its_ehr_by_its_logical_id() -> Result<(
 }
 
 #[tokio::test]
-async fn under_uuid_a_patient_keys_its_ehr_by_its_uuid_logical_id() -> Result<(), Box<dyn Error>>
-{
+async fn under_uuid_a_patient_keys_its_ehr_by_its_uuid_logical_id() -> Result<(), Box<dyn Error>> {
     let mut resource = patient()?;
     resource["id"] = serde_json::json!(PATIENT_UUID);
     let (status, body, query) = post_under(IdForm::Uuid, &resource).await?;

@@ -116,8 +116,8 @@ async fn split_queries(harness: &Harness) -> (Vec<serde_json::Value>, Vec<serde_
 }
 
 #[tokio::test]
-async fn patient_identifier_resolves_the_party_and_searches_its_ehr()
--> Result<(), Box<dyn Error>> {
+async fn patient_identifier_resolves_the_party_and_searches_its_ehr() -> Result<(), Box<dyn Error>>
+{
     let harness = identifying(Some(by_value()), true).await;
     mount_parties(&harness, &[PARTY]).await;
     let composition = harness.composition();
@@ -215,8 +215,8 @@ async fn an_identifier_two_parties_carry_matches_the_resources_of_both()
 }
 
 #[tokio::test]
-async fn a_party_with_no_ehr_among_several_leaves_the_others_matching()
--> Result<(), Box<dyn Error>> {
+async fn a_party_with_no_ehr_among_several_leaves_the_others_matching() -> Result<(), Box<dyn Error>>
+{
     let harness = identifying(Some(by_value()), true).await;
     mount_parties(
         &harness,
@@ -344,8 +344,8 @@ async fn sort_and_count_apply_to_the_clinical_query() -> Result<(), Box<dyn Erro
 }
 
 #[tokio::test]
-async fn count_zero_for_an_unknown_identifier_makes_no_clinical_call()
--> Result<(), Box<dyn Error>> {
+async fn count_zero_for_an_unknown_identifier_makes_no_clinical_call() -> Result<(), Box<dyn Error>>
+{
     let harness = identifying(Some(by_value()), true).await;
     mount_parties(&harness, &[]).await;
     mount_count(&harness.cdr, &[]).await;
@@ -404,8 +404,7 @@ async fn a_party_with_no_ehr_matches_nothing() -> Result<(), Box<dyn Error>> {
 /// one answer the party search gives too: `501 not-supported` (RFC 9110
 /// §15.6.2), never a `500`.
 #[tokio::test]
-async fn a_refused_identifier_query_is_a_501_naming_the_extension() -> Result<(), Box<dyn Error>>
-{
+async fn a_refused_identifier_query_is_a_501_naming_the_extension() -> Result<(), Box<dyn Error>> {
     let harness = identifying(Some(by_value()), true).await;
     Mock::given(matchers::method("POST"))
         .and(matchers::path(AQL))
@@ -452,8 +451,7 @@ async fn a_system_binds_the_system_query() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
-async fn a_value_the_configured_queries_cannot_express_is_refused() -> Result<(), Box<dyn Error>>
-{
+async fn a_value_the_configured_queries_cannot_express_is_refused() -> Result<(), Box<dyn Error>> {
     for query in [
         "Condition?patient.identifier=http://example.org/mrn%7CMRN-0001",
         "Condition?patient.identifier=%7CMRN-0001",
@@ -488,8 +486,7 @@ async fn the_chain_is_unknown_when_the_resolve_is_off() -> Result<(), Box<dyn Er
 }
 
 #[tokio::test]
-async fn another_chain_is_unknown_and_lenient_handling_ignores_it() -> Result<(), Box<dyn Error>>
-{
+async fn another_chain_is_unknown_and_lenient_handling_ignores_it() -> Result<(), Box<dyn Error>> {
     let harness = identifying(Some(by_value()), true).await;
     let (status, body) = get(&harness, "Condition?patient.name=Muster").await?;
     assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");

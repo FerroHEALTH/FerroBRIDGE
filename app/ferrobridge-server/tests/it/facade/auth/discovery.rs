@@ -129,8 +129,8 @@ async fn the_smart_configuration_names_the_issuer_only_with_openid_connect_sign_
 }
 
 #[tokio::test]
-async fn the_smart_configuration_lists_the_scopes_the_bridge_honours()
--> Result<(), Box<dyn Error>> {
+async fn the_smart_configuration_lists_the_scopes_the_bridge_honours() -> Result<(), Box<dyn Error>>
+{
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -217,8 +217,8 @@ async fn an_open_facade_states_no_security() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
-async fn the_openid_connect_location_answers_when_rfc_8414_has_none()
--> Result<(), Box<dyn Error>> {
+async fn the_openid_connect_location_answers_when_rfc_8414_has_none() -> Result<(), Box<dyn Error>>
+{
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::bare().await;
     issuer

@@ -52,8 +52,8 @@ fn member() -> serde_json::Value {
 }
 
 #[tokio::test]
-async fn a_nested_expansion_keeps_its_hierarchy_in_both_releases() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_nested_expansion_keeps_its_hierarchy_in_both_releases()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         let mut child = member();
@@ -243,7 +243,8 @@ async fn a_count_of_zero_answers_the_size_alone() -> Result<(), Box<dyn std::err
 }
 
 #[tokio::test]
-async fn the_filter_is_sent_and_the_filtered_codes_come_back() -> Result<(), Box<dyn std::error::Error>> {
+async fn the_filter_is_sent_and_the_filtered_codes_come_back()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -276,7 +277,8 @@ async fn the_filter_is_sent_and_the_filtered_codes_come_back() -> Result<(), Box
 }
 
 #[tokio::test]
-async fn included_designations_are_read_from_each_entry() -> Result<(), Box<dyn std::error::Error>> {
+async fn included_designations_are_read_from_each_entry() -> Result<(), Box<dyn std::error::Error>>
+{
     for version in RELEASES {
         let server = MockServer::start().await;
         let mut entry = member();
@@ -368,7 +370,8 @@ async fn a_bare_404_is_a_not_found_outcome() -> Result<(), Box<dyn std::error::E
 }
 
 #[tokio::test]
-async fn an_expansion_error_is_a_refusal_carrying_the_outcome() -> Result<(), Box<dyn std::error::Error>> {
+async fn an_expansion_error_is_a_refusal_carrying_the_outcome()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -458,7 +461,8 @@ async fn a_parameters_answer_is_a_decode_error() -> Result<(), Box<dyn std::erro
 }
 
 #[tokio::test]
-async fn a_value_set_with_no_expansion_is_a_decode_error() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_value_set_with_no_expansion_is_a_decode_error() -> Result<(), Box<dyn std::error::Error>>
+{
     let server = MockServer::start().await;
     let bare = serde_json::json!({
         "resourceType": "ValueSet",

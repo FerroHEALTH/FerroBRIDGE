@@ -74,8 +74,8 @@ async fn a_token_with_an_empty_system_asks_for_no_system() -> Result<(), Box<dyn
 }
 
 #[tokio::test]
-async fn comma_values_are_alternatives_and_repeats_are_all_required()
--> Result<(), Box<dyn Error>> {
+async fn comma_values_are_alternatives_and_repeats_are_all_required() -> Result<(), Box<dyn Error>>
+{
     // R4 search.html §3.1.1.4.17: a comma is OR, a repeated parameter AND.
     // Each occurrence binds a node of its own, so `code=a&code=b` may match
     // two entries, and the alternatives of one occurrence share its node.
@@ -142,8 +142,7 @@ async fn a_string_starts_contains_or_matches_exactly() -> Result<(), Box<dyn Err
 }
 
 #[tokio::test]
-async fn sort_orders_by_the_declared_paths_before_the_total_order() -> Result<(), Box<dyn Error>>
-{
+async fn sort_orders_by_the_declared_paths_before_the_total_order() -> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.5.1: `-` orders a key downward.
     let query = query_of("_sort=-context-start").await?;
     let text = query["q"].as_str().unwrap_or_default();
@@ -157,8 +156,7 @@ async fn sort_orders_by_the_declared_paths_before_the_total_order() -> Result<()
 }
 
 #[tokio::test]
-async fn sort_on_a_parameter_read_under_a_repeated_node_is_refused() -> Result<(), Box<dyn Error>>
-{
+async fn sort_on_a_parameter_read_under_a_repeated_node_is_refused() -> Result<(), Box<dyn Error>> {
     // A parameter read under a bound node has one value per node, so it
     // gives a composition no single place in an order.
     let harness = searching().await;
@@ -254,8 +252,8 @@ async fn an_unsupported_modifier_is_refused_even_under_lenient_handling()
 }
 
 #[tokio::test]
-async fn a_malformed_value_is_invalid_and_the_ap_prefix_unsupported()
--> Result<(), Box<dyn Error>> {
+async fn a_malformed_value_is_invalid_and_the_ap_prefix_unsupported() -> Result<(), Box<dyn Error>>
+{
     let harness = searching().await;
     for (query, code) in [
         ("onset-date=yesterday", "invalid"),
@@ -277,8 +275,8 @@ async fn a_malformed_value_is_invalid_and_the_ap_prefix_unsupported()
 }
 
 #[tokio::test]
-async fn an_empty_parameter_is_ignored_and_left_out_of_the_self_link()
--> Result<(), Box<dyn Error>> {
+async fn an_empty_parameter_is_ignored_and_left_out_of_the_self_link() -> Result<(), Box<dyn Error>>
+{
     // R4 search.html §3.1.1.3: "Empty parameters are not an error".
     let harness = searching().await;
     mount_rows(&harness.cdr, &[]).await;
@@ -292,8 +290,7 @@ async fn an_empty_parameter_is_ignored_and_left_out_of_the_self_link()
 }
 
 #[tokio::test]
-async fn id_resolves_through_the_identity_map_to_the_composition() -> Result<(), Box<dyn Error>>
-{
+async fn id_resolves_through_the_identity_map_to_the_composition() -> Result<(), Box<dyn Error>> {
     let harness = searching().await;
     let id = create_one(&harness).await?;
     mount_rows(&harness.cdr, &[row(VERSION_ONE, &harness.composition())]).await;

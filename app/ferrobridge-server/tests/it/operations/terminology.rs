@@ -311,8 +311,7 @@ async fn with_no_terminology_server_a_conceptmap_refuses_naming_the_missing_serv
 }
 
 #[tokio::test]
-async fn a_run_the_engine_refuses_is_counted_as_a_mapping_failure() -> Result<(), Box<dyn Error>>
-{
+async fn a_run_the_engine_refuses_is_counted_as_a_mapping_failure() -> Result<(), Box<dyn Error>> {
     let root = mapping_tree_with(MODEL_FILE)?;
     let state = state_with(&root, Translator::default())?;
     let app = ferrobridge_server::router(std::sync::Arc::clone(&state), &server_settings());

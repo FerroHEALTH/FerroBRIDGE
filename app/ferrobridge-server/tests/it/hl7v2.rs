@@ -391,8 +391,8 @@ fn assert_counted(counts: &Counts, (aa, ae, ar): (u64, u64, u64), mapping_failur
 }
 
 #[tokio::test]
-async fn a_mapped_message_commits_one_contribution_and_is_answered_aa()
--> Result<(), Box<dyn Error>> {
+async fn a_mapped_message_commits_one_contribution_and_is_answered_aa() -> Result<(), Box<dyn Error>>
+{
     let running = Running::start(true, Duration::ZERO).await?;
     let ack = running.send(&oru_r01(CONTROL_ID)).await?;
     assert!(
@@ -423,8 +423,7 @@ async fn a_mapped_message_commits_one_contribution_and_is_answered_aa()
 }
 
 #[tokio::test]
-async fn a_message_sent_again_is_answered_aa_and_commits_nothing() -> Result<(), Box<dyn Error>>
-{
+async fn a_message_sent_again_is_answered_aa_and_commits_nothing() -> Result<(), Box<dyn Error>> {
     let running = Running::start(true, Duration::ZERO).await?;
     let first = running.send(&oru_r01(CONTROL_ID)).await?;
     assert_eq!(
@@ -447,8 +446,8 @@ async fn a_message_sent_again_is_answered_aa_and_commits_nothing() -> Result<(),
 }
 
 #[tokio::test]
-async fn a_message_no_program_maps_is_answered_ae_naming_each_entry()
--> Result<(), Box<dyn Error>> {
+async fn a_message_no_program_maps_is_answered_ae_naming_each_entry() -> Result<(), Box<dyn Error>>
+{
     let running = Running::start(false, Duration::ZERO).await?;
     let ack = running.send(&oru_r01(CONTROL_ID)).await?;
     assert_eq!(
@@ -629,8 +628,8 @@ async fn a_message_in_flight_when_the_stop_arrives_is_committed_and_answered()
 }
 
 #[tokio::test]
-async fn an_oru_r01_over_mllp_commits_a_composition_into_a_real_cdr()
--> Result<(), Box<dyn Error>> {
+async fn an_oru_r01_over_mllp_commits_a_composition_into_a_real_cdr() -> Result<(), Box<dyn Error>>
+{
     if !ferrobridge_testkit::containers::e2e_enabled() {
         return Ok(());
     }

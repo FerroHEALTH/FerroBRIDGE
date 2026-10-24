@@ -37,7 +37,8 @@ async fn lookup(client: &Client) -> Result<LookupOutcome, Error> {
 }
 
 #[tokio::test]
-async fn a_503_is_retried_and_the_second_attempt_answers() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_503_is_retried_and_the_second_attempt_answers() -> Result<(), Box<dyn std::error::Error>>
+{
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(route()))
@@ -73,7 +74,8 @@ async fn a_503_is_retried_and_the_second_attempt_answers() -> Result<(), Box<dyn
 }
 
 #[tokio::test]
-async fn an_exhausted_budget_answers_the_upstream_status() -> Result<(), Box<dyn std::error::Error>> {
+async fn an_exhausted_budget_answers_the_upstream_status() -> Result<(), Box<dyn std::error::Error>>
+{
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(route()))
@@ -107,7 +109,8 @@ async fn an_exhausted_budget_answers_the_upstream_status() -> Result<(), Box<dyn
 }
 
 #[tokio::test]
-async fn a_timeout_is_a_typed_error_and_never_an_empty_answer() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_timeout_is_a_typed_error_and_never_an_empty_answer()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(route()))
@@ -229,8 +232,8 @@ async fn an_unreachable_server_is_a_transport_error() -> Result<(), Box<dyn std:
 }
 
 #[tokio::test]
-async fn a_reachability_probe_reads_the_capability_statement_route() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_reachability_probe_reads_the_capability_statement_route()
+-> Result<(), Box<dyn std::error::Error>> {
     for answered in [200_u16, 401, 404, 503] {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
@@ -329,8 +332,8 @@ async fn a_caller_built_client_is_bounded_by_the_configured_timeout()
 }
 
 #[test]
-fn a_caller_built_client_refuses_a_base_that_cannot_carry_a_path() -> Result<(), Box<dyn std::error::Error>>
-{
+fn a_caller_built_client_refuses_a_base_that_cannot_carry_a_path()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new("mailto:tx@example.org".parse()?, WireVersion::R4);
     let error = Client::with_http(config, reqwest::Client::new())
         .expect_err("a mailto URL carries no path");

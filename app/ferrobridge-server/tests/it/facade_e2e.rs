@@ -409,8 +409,8 @@ async fn the_kds_template_admits_the_synthetic_composition_on_a_real_cdr()
 }
 
 #[tokio::test]
-async fn the_facade_round_trips_the_kds_condition_through_a_real_cdr()
--> Result<(), Box<dyn Error>> {
+async fn the_facade_round_trips_the_kds_condition_through_a_real_cdr() -> Result<(), Box<dyn Error>>
+{
     if !containers::e2e_enabled() {
         return Ok(());
     }

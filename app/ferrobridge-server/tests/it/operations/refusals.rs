@@ -90,8 +90,8 @@ async fn an_openehr_body_on_the_enveloped_route_is_four_hundred_fifteen()
 }
 
 #[tokio::test]
-async fn a_body_that_is_not_a_parameters_answers_an_operation_outcome()
--> Result<(), Box<dyn Error>> {
+async fn a_body_that_is_not_a_parameters_answers_an_operation_outcome() -> Result<(), Box<dyn Error>>
+{
     let root = mapping_tree()?;
     let (status, media, body) = call(
         app(&root)?,

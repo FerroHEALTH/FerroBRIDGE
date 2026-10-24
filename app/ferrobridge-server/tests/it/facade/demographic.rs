@@ -586,8 +586,7 @@ async fn a_party_context_with_the_gate_off_does_not_load() -> Result<(), Box<dyn
 }
 
 #[tokio::test]
-async fn a_type_no_party_context_serves_has_no_delete_or_history() -> Result<(), Box<dyn Error>>
-{
+async fn a_type_no_party_context_serves_has_no_delete_or_history() -> Result<(), Box<dyn Error>> {
     let facade = super::harness().await.facade;
     let deleted = call(
         app_over(&facade),
@@ -670,8 +669,8 @@ async fn a_practitioner_role_creates_a_role_performed_by_its_practitioner()
 }
 
 #[tokio::test]
-async fn a_practitioner_of_another_server_is_a_422_and_reaches_no_cdr()
--> Result<(), Box<dyn Error>> {
+async fn a_practitioner_of_another_server_is_a_422_and_reaches_no_cdr() -> Result<(), Box<dyn Error>>
+{
     let (cdr, facade) = harness().await?;
     let (status, body) = call(
         app_over(&facade),

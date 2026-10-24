@@ -197,8 +197,8 @@ async fn validate_needs_c_or_u_on_the_type() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
-async fn validate_admits_a_token_that_carries_only_the_operator_scope()
--> Result<(), Box<dyn Error>> {
+async fn validate_admits_a_token_that_carries_only_the_operator_scope() -> Result<(), Box<dyn Error>>
+{
     // No specification governs the operator scope: our own design, a dry run
     // commits nothing, so the console's token needs no clinical write scope.
     let case = Case::new().await;
@@ -263,8 +263,8 @@ async fn a_fhirconnect_operation_admits_a_token_with_only_the_operator_scope()
 }
 
 #[tokio::test]
-async fn the_wildcard_user_and_v1_scopes_grant_as_their_letters_say()
--> Result<(), Box<dyn Error>> {
+async fn the_wildcard_user_and_v1_scopes_grant_as_their_letters_say() -> Result<(), Box<dyn Error>>
+{
     let case = Case::new().await;
     let read = get("/fhir/Condition/never-written");
     let (status, _, _) = case.send(read, "system/*.cruds").await?;

@@ -74,8 +74,7 @@ async fn a_transaction_with_one_failing_entry_commits_nothing_and_names_it()
 }
 
 #[tokio::test]
-async fn a_transaction_that_maps_in_full_commits_one_contribution() -> Result<(), Box<dyn Error>>
-{
+async fn a_transaction_that_maps_in_full_commits_one_contribution() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_echo(&harness.cdr, ECHOED, Echo::Sent).await;
@@ -228,8 +227,7 @@ fn issue_locations(body: &serde_json::Value) -> Vec<&str> {
 }
 
 #[tokio::test]
-async fn two_overlapping_deliveries_of_one_transaction_commit_once() -> Result<(), Box<dyn Error>>
-{
+async fn two_overlapping_deliveries_of_one_transaction_commit_once() -> Result<(), Box<dyn Error>> {
     // No specification governs the redelivery rule: our own design. The CDR
     // holds the first commit's answer, so the second delivery starts while the
     // first holds its claim, and is refused with nothing committed.

@@ -92,7 +92,8 @@ fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn std::error::
 }
 
 #[test]
-fn the_hl7v2_defaults_skip_and_count_with_both_timeouts() -> Result<(), Box<dyn std::error::Error>> {
+fn the_hl7v2_defaults_skip_and_count_with_both_timeouts() -> Result<(), Box<dyn std::error::Error>>
+{
     let text = with_face("concept_maps = \"/srv/v2mappings/package\"\n");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let face = settings.hl7v2.ok_or("the face is on")?;
@@ -140,7 +141,8 @@ fn an_hl7v2_face_without_the_facade_refuses_to_boot() -> Result<(), Box<dyn std:
 }
 
 #[test]
-fn an_hl7v2_face_without_its_concept_maps_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+fn an_hl7v2_face_without_its_concept_maps_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
     match &refusal(&with_face(""))? {
         Error::Missing { key } => assert_eq!("hl7v2.concept_maps", key),
         other => return Err(format!("expected a missing key, got {other:?}").into()),
@@ -149,7 +151,8 @@ fn an_hl7v2_face_without_its_concept_maps_refuses_to_boot() -> Result<(), Box<dy
 }
 
 #[test]
-fn every_bad_hl7v2_value_refuses_to_boot_naming_its_key() -> Result<(), Box<dyn std::error::Error>> {
+fn every_bad_hl7v2_value_refuses_to_boot_naming_its_key() -> Result<(), Box<dyn std::error::Error>>
+{
     let maps = "concept_maps = \"/srv/p\"\n";
     let cases = [
         ("listen = \"nowhere\"\n", "hl7v2.listen"),

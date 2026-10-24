@@ -184,9 +184,7 @@ fn party(class: &str, concept: &str, template: &str, uid: &str) -> serde_json::V
 
 /// Returns the stub CDR and a facade over the demographic fixture set,
 /// searching the party types `search` configures.
-async fn harness(
-    search: Option<PartySearch>,
-) -> Result<(MockServer, Arc<Facade>), Box<dyn Error>> {
+async fn harness(search: Option<PartySearch>) -> Result<(MockServer, Arc<Facade>), Box<dyn Error>> {
     let cdr = MockServer::start().await;
     for (id, opt) in [
         (
@@ -388,8 +386,7 @@ async fn a_count_that_is_no_number_is_invalid() -> Result<(), Box<dyn Error>> {
 /// R4 search.html §3.1.1.3: `Prefer: handling=lenient` asks the server to
 /// ignore a parameter it does not support.
 #[tokio::test]
-async fn a_lenient_search_ignores_another_parameter_and_reports_it() -> Result<(), Box<dyn Error>>
-{
+async fn a_lenient_search_ignores_another_parameter_and_reports_it() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness(Some(searching(&["Patient"]))).await?;
     mount_rows(&cdr, &[UID]).await;
     let (class, concept, template) = ("PERSON", "ferrobridge_person", "ferrobridge.person.v1");
@@ -413,8 +410,8 @@ async fn a_lenient_search_ignores_another_parameter_and_reports_it() -> Result<(
 }
 
 #[tokio::test]
-async fn the_statement_declares_search_on_the_configured_types_only()
--> Result<(), Box<dyn Error>> {
+async fn the_statement_declares_search_on_the_configured_types_only() -> Result<(), Box<dyn Error>>
+{
     let (_cdr, facade) = harness(Some(searching(&["Patient", "Organization"]))).await?;
     let (status, body) = get(&facade, "metadata").await?;
     assert_eq!(StatusCode::OK, status, "{body}");
@@ -468,8 +465,7 @@ async fn the_statement_declares_search_on_the_configured_types_only()
 }
 
 #[tokio::test]
-async fn a_search_of_a_type_no_party_context_serves_does_not_boot() -> Result<(), Box<dyn Error>>
-{
+async fn a_search_of_a_type_no_party_context_serves_does_not_boot() -> Result<(), Box<dyn Error>> {
     let search = PartySearch::new(BTreeMap::from([(
         String::from("Group"),
         PartyQueries::new(Some(IdentifierSearch::new(&query_of("GROUP"), None)?), None),

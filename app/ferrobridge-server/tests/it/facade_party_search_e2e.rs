@@ -160,10 +160,7 @@ fn person(resource_type: &str, identifier: &str, name: &str) -> serde_json::Valu
 }
 
 /// Creates `body` through the facade and returns the id it was given.
-async fn create(
-    facade: &Arc<Facade>,
-    body: &serde_json::Value,
-) -> Result<String, Box<dyn Error>> {
+async fn create(facade: &Arc<Facade>, body: &serde_json::Value) -> Result<String, Box<dyn Error>> {
     let resource_type = body["resourceType"].as_str().ok_or("a resource type")?;
     let created = call(
         app(facade),
@@ -200,10 +197,7 @@ async fn get(
 }
 
 /// Runs a search that has to succeed and returns its searchset.
-async fn searchset(
-    facade: &Arc<Facade>,
-    path: &str,
-) -> Result<serde_json::Value, Box<dyn Error>> {
+async fn searchset(facade: &Arc<Facade>, path: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     let (status, body) = get(facade, path).await?;
     assert_eq!(StatusCode::OK, status, "{path}: {body}");
     assert_eq!(body["type"], "searchset", "{path}: {body}");
@@ -313,8 +307,8 @@ async fn seed(facade: &Arc<Facade>) -> Result<Seeded, Box<dyn Error>> {
 }
 
 #[tokio::test]
-async fn the_party_searches_find_the_parties_the_reference_cdr_holds()
--> Result<(), Box<dyn Error>> {
+async fn the_party_searches_find_the_parties_the_reference_cdr_holds() -> Result<(), Box<dyn Error>>
+{
     if !containers::e2e_enabled() {
         return Ok(());
     }

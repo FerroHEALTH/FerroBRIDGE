@@ -13,6 +13,7 @@ use ferrobridge_server::mappings;
 use ferrobridge_server::state::AppState;
 use http::StatusCode;
 use std::collections::BTreeMap;
+use std::error::Error as _;
 use wiremock::Mock;
 use wiremock::MockServer;
 use wiremock::ResponseTemplate;
@@ -28,7 +29,9 @@ const ADL14_ROUTE: &str = "/definition/template/adl1.4/ferrobridge.diagnose.v1";
 const ADL2_ROUTE: &str = "/definition/template/adl2/ferrobridge.diagnose.v1";
 
 /// Returns the settings `text` describes.
-fn settings(text: &str) -> Result<ferrobridge_server::config::Settings, Box<dyn std::error::Error>> {
+fn settings(
+    text: &str,
+) -> Result<ferrobridge_server::config::Settings, Box<dyn std::error::Error>> {
     Ok(Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?)
 }
 
@@ -229,7 +232,8 @@ async fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused()
 }
 
 #[tokio::test]
-async fn a_disabled_operations_lane_needs_no_template_source() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_disabled_operations_lane_needs_no_template_source()
+-> Result<(), Box<dyn std::error::Error>> {
     let text = format!("[mappings]\ndirectory = \"{FIXTURES}\"\n\n[operations]\nenabled = false\n");
     let state = AppState::build(&settings(&text)?).await?;
     assert!(state.operations().is_none());

@@ -151,8 +151,8 @@ async fn both_entries_matching_answer_two_resources() -> Result<(), Box<dyn Erro
 }
 
 #[tokio::test]
-async fn a_page_boundary_inside_a_composition_answers_each_entry_once()
--> Result<(), Box<dyn Error>> {
+async fn a_page_boundary_inside_a_composition_answers_each_entry_once() -> Result<(), Box<dyn Error>>
+{
     // One composition, two matching entries, pages of one: the next page
     // starts at the composition's first row and skips the entry page one
     // answered.
@@ -260,8 +260,7 @@ async fn a_search_binding_no_node_answers_every_entry_of_each_composition()
 }
 
 #[tokio::test]
-async fn paging_a_search_binding_no_node_answers_each_entry_once() -> Result<(), Box<dyn Error>>
-{
+async fn paging_a_search_binding_no_node_answers_each_entry_once() -> Result<(), Box<dyn Error>> {
     // One composition, two entries, pages of one: page two starts at the
     // composition's row and skips the entry page one answered.
     let harness = searching().await;
@@ -507,8 +506,8 @@ async fn a_comma_path_a_build_up_to_0_0_5_recorded_reads_as_the_first_entry_at_i
 }
 
 #[tokio::test]
-async fn a_comma_path_whose_two_readings_name_two_entries_is_reported()
--> Result<(), Box<dyn Error>> {
+async fn a_comma_path_whose_two_readings_name_two_entries_is_reported() -> Result<(), Box<dyn Error>>
+{
     // `/content[<archetype>, 2]` is the first diagnosis as builds up to 0.0.5
     // wrote it and the second as 0.0.6 wrote it; the read reports the binding.
     let harness = searching().await;
@@ -528,8 +527,8 @@ async fn a_comma_path_whose_two_readings_name_two_entries_is_reported()
 }
 
 #[tokio::test]
-async fn a_search_meeting_a_comma_key_with_two_readings_is_reported()
--> Result<(), Box<dyn Error>> {
+async fn a_search_meeting_a_comma_key_with_two_readings_is_reported() -> Result<(), Box<dyn Error>>
+{
     // The second diagnosis's 0.0.6 key is the first diagnosis's key as builds
     // up to 0.0.5 wrote it, so binding it would move an id between entries.
     let harness = searching().await;

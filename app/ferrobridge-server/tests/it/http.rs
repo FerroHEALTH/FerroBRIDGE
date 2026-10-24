@@ -29,7 +29,10 @@ async fn call(
 }
 
 /// Sends `request` through `app` and returns the whole response.
-async fn raw(app: Router, request: Request<Body>) -> Result<Response<Body>, Box<dyn std::error::Error>> {
+async fn raw(
+    app: Router,
+    request: Request<Body>,
+) -> Result<Response<Body>, Box<dyn std::error::Error>> {
     Ok(app.oneshot(request).await?)
 }
 
@@ -39,7 +42,8 @@ fn app() -> Router {
 }
 
 #[tokio::test]
-async fn the_info_route_serves_the_build_facts_and_the_pins() -> Result<(), Box<dyn std::error::Error>> {
+async fn the_info_route_serves_the_build_facts_and_the_pins()
+-> Result<(), Box<dyn std::error::Error>> {
     let (status, body) = call(app(), Request::get("/health/info").body(Body::empty())?).await?;
     assert_eq!(StatusCode::OK, status);
     let document: serde_json::Value = serde_json::from_str(&body)?;
@@ -100,7 +104,8 @@ async fn the_info_route_serves_the_build_facts_and_the_pins() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn the_root_document_names_the_product_and_the_version() -> Result<(), Box<dyn std::error::Error>> {
+async fn the_root_document_names_the_product_and_the_version()
+-> Result<(), Box<dyn std::error::Error>> {
     let (status, body) = call(app(), Request::get("/").body(Body::empty())?).await?;
     assert_eq!(StatusCode::OK, status);
     let document: serde_json::Value = serde_json::from_str(&body)?;
@@ -114,7 +119,8 @@ async fn the_root_document_names_the_product_and_the_version() -> Result<(), Box
 }
 
 #[tokio::test]
-async fn liveness_is_two_hundred_once_the_router_is_built() -> Result<(), Box<dyn std::error::Error>> {
+async fn liveness_is_two_hundred_once_the_router_is_built() -> Result<(), Box<dyn std::error::Error>>
+{
     let (status, _) = call(app(), Request::get("/health/liveness").body(Body::empty())?).await?;
     assert_eq!(StatusCode::OK, status);
     Ok(())
@@ -278,8 +284,8 @@ async fn a_panicking_fhir_handler_answers_a_500_operation_outcome_naming_the_req
 }
 
 #[tokio::test]
-async fn a_request_past_the_timeout_yields_four_hundred_and_eight() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_request_past_the_timeout_yields_four_hundred_and_eight()
+-> Result<(), Box<dyn std::error::Error>> {
     let mut settings = support::settings();
     settings.request_timeout = Duration::from_millis(20);
     let router = with_middleware(
@@ -300,8 +306,8 @@ async fn a_request_past_the_timeout_yields_four_hundred_and_eight() -> Result<()
 }
 
 #[tokio::test]
-async fn a_body_over_the_ceiling_yields_four_hundred_and_thirteen() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_body_over_the_ceiling_yields_four_hundred_and_thirteen()
+-> Result<(), Box<dyn std::error::Error>> {
     let settings = support::settings();
     let oversized = "x".repeat(settings.body_limit + 1);
     let request = Request::post("/health/liveness")

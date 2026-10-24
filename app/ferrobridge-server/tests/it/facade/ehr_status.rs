@@ -269,8 +269,7 @@ async fn an_unknown_ehr_status_is_refused_as_not_found() -> Result<(), Box<dyn E
 }
 
 #[tokio::test]
-async fn an_offered_subject_with_no_system_configured_is_refused() -> Result<(), Box<dyn Error>>
-{
+async fn an_offered_subject_with_no_system_configured_is_refused() -> Result<(), Box<dyn Error>> {
     let harness = harness_over(FIXTURES, settings()).await;
     mount_ehr(&harness.cdr).await;
     let (status, body) = call(harness.app(), post_condition(&condition())).await?;
@@ -303,8 +302,7 @@ async fn an_identifier_of_another_system_writes_nothing() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
-async fn a_transaction_writes_the_subject_before_its_contribution() -> Result<(), Box<dyn Error>>
-{
+async fn a_transaction_writes_the_subject_before_its_contribution() -> Result<(), Box<dyn Error>> {
     let harness = harness_over(FIXTURES, configured()).await;
     mount_ehr(&harness.cdr).await;
     mount_status(

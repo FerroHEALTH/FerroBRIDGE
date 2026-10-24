@@ -52,8 +52,7 @@ async fn mount_version(cdr: &MockServer, version: &str, body: &serde_json::Value
 }
 
 #[tokio::test]
-async fn a_vread_of_the_location_a_create_answers_is_that_version() -> Result<(), Box<dyn Error>>
-{
+async fn a_vread_of_the_location_a_create_answers_is_that_version() -> Result<(), Box<dyn Error>> {
     // vread answers `GET [base]/[type]/[id]/_history/[vid]` with an ETag
     // naming the versionId (<https://hl7.org/fhir/R4/http.html#vread>).
     let harness = harness().await;
@@ -82,8 +81,8 @@ async fn a_vread_of_the_location_a_create_answers_is_that_version() -> Result<()
 }
 
 #[tokio::test]
-async fn after_an_update_each_version_reads_back_with_its_own_content()
--> Result<(), Box<dyn Error>> {
+async fn after_an_update_each_version_reads_back_with_its_own_content() -> Result<(), Box<dyn Error>>
+{
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -194,8 +193,8 @@ async fn get_modified(
 }
 
 #[tokio::test]
-async fn a_read_and_a_vread_answer_the_commit_time_as_last_modified()
--> Result<(), Box<dyn Error>> {
+async fn a_read_and_a_vread_answer_the_commit_time_as_last_modified() -> Result<(), Box<dyn Error>>
+{
     // "Servers SHOULD return an ETag header … and a Last-Modified header"
     // (<https://hl7.org/fhir/R4/http.html#read>, #vread); the commit time is
     // the version's commit audit in the CDR's revision history.
@@ -215,8 +214,8 @@ async fn a_read_and_a_vread_answer_the_commit_time_as_last_modified()
 }
 
 #[tokio::test]
-async fn an_earlier_version_reads_back_after_the_latest_was_deleted()
--> Result<(), Box<dyn Error>> {
+async fn an_earlier_version_reads_back_after_the_latest_was_deleted() -> Result<(), Box<dyn Error>>
+{
     // vread names a version, and only "a version where the resource was
     // deleted" answers 410 (<https://hl7.org/fhir/R4/http.html#vread>).
     let harness = harness().await;

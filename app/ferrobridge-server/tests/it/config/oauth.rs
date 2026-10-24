@@ -322,7 +322,8 @@ fn a_grant_with_no_endpoint_refuses_to_boot() -> Result<(), Box<dyn std::error::
 }
 
 #[test]
-fn a_grant_with_an_issuer_and_a_token_endpoint_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+fn a_grant_with_an_issuer_and_a_token_endpoint_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&text(
         "",
         "issuer = \"https://as.example.org\"\ntoken_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\n",
@@ -341,8 +342,8 @@ fn a_grant_with_an_issuer_and_a_token_endpoint_refuses_to_boot() -> Result<(), B
 }
 
 #[test]
-fn an_issuer_that_is_not_https_or_carries_a_query_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
-{
+fn an_issuer_that_is_not_https_or_carries_a_query_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
     // NOTE: RFC 8414 §2, an issuer is an https URL with no query or fragment.
     for issuer in [
         "http://as.example.org",
@@ -439,7 +440,8 @@ fn terminology_text(credentials: &str, oauth: &str) -> String {
 }
 
 #[test]
-fn the_terminology_lane_obtains_its_token_with_the_grant() -> Result<(), Box<dyn std::error::Error>> {
+fn the_terminology_lane_obtains_its_token_with_the_grant() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "synthetic-tx-secret")?;
     let text = terminology_text(
@@ -476,7 +478,8 @@ fn the_terminology_lane_obtains_its_token_with_the_grant() -> Result<(), Box<dyn
 }
 
 #[test]
-fn the_terminology_grant_is_reachable_through_the_environment() -> Result<(), Box<dyn std::error::Error>> {
+fn the_terminology_grant_is_reachable_through_the_environment()
+-> Result<(), Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([
         (
             String::from("FERROBRIDGE__TERMINOLOGY__BASE_URL"),
@@ -524,7 +527,8 @@ fn a_terminology_grant_beside_a_user_refuses_to_boot() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn a_terminology_grant_refusal_names_the_terminology_key() -> Result<(), Box<dyn std::error::Error>> {
+fn a_terminology_grant_refusal_names_the_terminology_key() -> Result<(), Box<dyn std::error::Error>>
+{
     let error = refusal(&terminology_text(
         "",
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\n",

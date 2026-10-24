@@ -43,8 +43,8 @@ use super::stub::mount_version_two;
 use super::writes;
 
 #[tokio::test]
-async fn a_create_answers_two_hundred_and_one_with_location_and_etag()
--> Result<(), Box<dyn Error>> {
+async fn a_create_answers_two_hundred_and_one_with_location_and_etag() -> Result<(), Box<dyn Error>>
+{
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -97,8 +97,7 @@ async fn a_create_records_the_identity_it_assigned() -> Result<(), Box<dyn Error
 }
 
 #[tokio::test]
-async fn a_create_records_the_source_resource_in_the_feeder_audit() -> Result<(), Box<dyn Error>>
-{
+async fn a_create_records_the_source_resource_in_the_feeder_audit() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     create_one(&harness).await?;
     let sent = harness
@@ -352,8 +351,7 @@ async fn an_update_carrying_a_stale_etag_is_four_hundred_and_twelve_and_commits_
 }
 
 #[tokio::test]
-async fn an_update_carrying_the_cdr_version_id_passes_it_through() -> Result<(), Box<dyn Error>>
-{
+async fn an_update_carrying_the_cdr_version_id_passes_it_through() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_version_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -595,8 +593,8 @@ async fn an_ehr_created_on_first_sight_names_the_subject_in_the_namespace()
 }
 
 #[tokio::test]
-async fn an_unknown_subject_creates_no_ehr_under_the_default_policy()
--> Result<(), Box<dyn Error>> {
+async fn an_unknown_subject_creates_no_ehr_under_the_default_policy() -> Result<(), Box<dyn Error>>
+{
     let harness = harness().await;
     mount_no_ehr(&harness.cdr).await;
     let (status, body) = call(harness.app(), post_condition(&condition())).await?;

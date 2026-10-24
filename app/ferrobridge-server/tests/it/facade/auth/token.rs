@@ -172,8 +172,8 @@ async fn every_invalid_token_gets_the_same_body_naming_no_claim() -> Result<(), 
 }
 
 #[tokio::test]
-async fn a_token_signed_by_another_key_under_a_known_kid_is_refused()
--> Result<(), Box<dyn Error>> {
+async fn a_token_signed_by_another_key_under_a_known_kid_is_refused() -> Result<(), Box<dyn Error>>
+{
     let key = ec_key("k1", Algorithm::ES256);
     let forger = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;

@@ -112,8 +112,7 @@ async fn a_reversed_version_list_still_binds_each_entry_to_its_own_composition()
 }
 
 #[tokio::test]
-async fn a_committed_version_that_matches_no_entry_binds_nothing() -> Result<(), Box<dyn Error>>
-{
+async fn a_committed_version_that_matches_no_entry_binds_nothing() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_echo(&harness.cdr, ECHOED, Echo::Foreign).await;

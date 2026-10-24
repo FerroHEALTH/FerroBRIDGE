@@ -51,8 +51,8 @@ async fn the_same_composition_read_twice_yields_the_same_id() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn a_read_names_the_subject_the_identity_map_binds_to_the_ehr()
--> Result<(), Box<dyn Error>> {
+async fn a_read_names_the_subject_the_identity_map_binds_to_the_ehr() -> Result<(), Box<dyn Error>>
+{
     // R4 condition.html: Condition.subject is 1..1, and the fixture mapping
     // has no outbound row for it, so the facade writes it from the binding.
     let harness = harness().await;

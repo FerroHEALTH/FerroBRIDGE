@@ -128,8 +128,7 @@ async fn a_search_answers_one_entry_per_composition_in_a_well_formed_searchset()
 }
 
 #[tokio::test]
-async fn an_unknown_patient_is_an_empty_searchset_and_never_a_404() -> Result<(), Box<dyn Error>>
-{
+async fn an_unknown_patient_is_an_empty_searchset_and_never_a_404() -> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.3: an unknown subject is a logical condition, so
     // the search answers an empty set; the identity map decides, never the CDR.
     let harness = searching().await;
@@ -146,8 +145,8 @@ async fn an_unknown_patient_is_an_empty_searchset_and_never_a_404() -> Result<()
 }
 
 #[tokio::test]
-async fn an_empty_store_answers_two_hundred_with_the_fhir_media_type()
--> Result<(), Box<dyn Error>> {
+async fn an_empty_store_answers_two_hundred_with_the_fhir_media_type() -> Result<(), Box<dyn Error>>
+{
     let harness = searching().await;
     mount_rows(&harness.cdr, &[]).await;
     let response = raw(
@@ -171,8 +170,8 @@ async fn an_empty_store_answers_two_hundred_with_the_fhir_media_type()
 }
 
 #[tokio::test]
-async fn a_post_search_reads_its_form_body_as_a_get_reads_its_query()
--> Result<(), Box<dyn Error>> {
+async fn a_post_search_reads_its_form_body_as_a_get_reads_its_query() -> Result<(), Box<dyn Error>>
+{
     // R4 search.html §3.1.1.2: a POST _search carries the parameters as an
     // application/x-www-form-urlencoded body.
     let harness = searching().await;

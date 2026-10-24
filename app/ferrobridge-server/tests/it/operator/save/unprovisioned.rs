@@ -82,10 +82,7 @@ impl Unprovisioned {
     }
 
     /// Sends `request` under an operator token.
-    async fn send(
-        &self,
-        request: Request<Body>,
-    ) -> Result<http::Response<Body>, Box<dyn Error>> {
+    async fn send(&self, request: Request<Body>) -> Result<http::Response<Body>, Box<dyn Error>> {
         let token = mint(&self.key, &self.issuer.claims(OPERATOR));
         Ok(self.app.clone().oneshot(bearing(request, &token)).await?)
     }

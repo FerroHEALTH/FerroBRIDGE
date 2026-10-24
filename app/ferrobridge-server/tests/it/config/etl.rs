@@ -78,7 +78,8 @@ fn an_etl_section_resolves_with_its_query_checked() -> Result<(), Box<dyn std::e
 }
 
 #[test]
-fn a_composition_query_without_its_projections_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+fn a_composition_query_without_its_projections_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
     for (alias, projection) in [
         ("AS ehr_id", "ehr_id"),
         ("AS version_uid", "version_uid"),
@@ -100,7 +101,8 @@ fn a_composition_query_without_its_projections_refuses_to_boot() -> Result<(), B
 }
 
 #[test]
-fn a_composition_query_without_the_versioned_object_uid_boots() -> Result<(), Box<dyn std::error::Error>> {
+fn a_composition_query_without_the_versioned_object_uid_boots()
+-> Result<(), Box<dyn std::error::Error>> {
     let text = ETL.replace("vo/uid/value AS versioned_object_uid, ", "");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
@@ -110,7 +112,8 @@ fn a_composition_query_without_the_versioned_object_uid_boots() -> Result<(), Bo
 }
 
 #[test]
-fn a_composition_query_without_an_order_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+fn a_composition_query_without_an_order_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
     let error = refusal(&ETL.replace(" ORDER BY v/uid/value", ""))?;
     match &error {
         Error::Aql { source, .. } => {
@@ -124,7 +127,8 @@ fn a_composition_query_without_an_order_refuses_to_boot() -> Result<(), Box<dyn 
 // NOTE: QUERY AQL 1.1.0 §6 leaves a query's version scope open without
 // LATEST_VERSION, and a deletion is a version with Void data (RM Common §6.2.5).
 #[test]
-fn a_composition_query_over_every_version_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+fn a_composition_query_over_every_version_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
     let error = refusal(&ETL.replace("VERSION v[LATEST_VERSION]", "VERSION v"))?;
     match &error {
         Error::Aql { key, source } => {
@@ -200,7 +204,8 @@ fn a_visit_query_that_does_not_parse_refuses_to_boot() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn a_visit_query_without_its_four_projections_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+fn a_visit_query_without_its_four_projections_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
     for (alias, projection) in [
         ("AS ehr_id", "ehr_id"),
         ("AS visit_source", "visit_source"),
@@ -223,7 +228,8 @@ fn a_visit_query_without_its_four_projections_refuses_to_boot() -> Result<(), Bo
 }
 
 #[test]
-fn a_visit_section_without_its_concepts_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+fn a_visit_section_without_its_concepts_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
     let error = refusal(&format!("{ETL}\n[etl.visits]\naql = \"{VISITS}\"\n"))?;
     match &error {
         Error::Missing { key } => assert_eq!("etl.visits.visit_concept_id", key),
@@ -233,7 +239,8 @@ fn a_visit_section_without_its_concepts_refuses_to_boot() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn an_etl_section_without_a_type_concept_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+fn an_etl_section_without_a_type_concept_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
     let error = refusal(&ETL.replace("\ntype_concept_id = 32817", ""))?;
     match &error {
         Error::Missing { key } => assert_eq!("etl.type_concept_id", key),
@@ -322,7 +329,8 @@ fn a_table_of_aliases_resolves_over_the_defaults() -> Result<(), Box<dyn std::er
 }
 
 #[test]
-fn an_alias_with_an_empty_terminology_id_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+fn an_alias_with_an_empty_terminology_id_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
     let error = refusal(&with_aliases("\"\" = \"Gender\""))?;
     match &error {
         Error::AliasTerminology { key } => assert_eq!("etl.vocabulary_aliases", key),

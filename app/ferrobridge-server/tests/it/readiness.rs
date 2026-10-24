@@ -234,8 +234,7 @@ async fn a_reachable_cdm_database_makes_readiness_two_hundred() -> Result<(), Bo
 }
 
 #[tokio::test]
-async fn without_a_cdm_section_readiness_carries_no_cdm_indicator() -> Result<(), Box<dyn Error>>
-{
+async fn without_a_cdm_section_readiness_carries_no_cdm_indicator() -> Result<(), Box<dyn Error>> {
     let settings = Config::from_sources(None, &BTreeMap::new())?.resolve()?;
     let state = AppState::build(&settings).await?;
     assert!(

@@ -188,7 +188,8 @@ async fn a_terminology_401_renews_the_token_once() -> Result<(), Box<dyn std::er
 }
 
 #[tokio::test]
-async fn a_renewed_token_refused_again_is_not_renewed_twice() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_renewed_token_refused_again_is_not_renewed_twice()
+-> Result<(), Box<dyn std::error::Error>> {
     let authorization = MockServer::start().await;
     let terminology_server = MockServer::start().await;
     mount_token_once(&authorization, issued("synthetic-token-1")).await;

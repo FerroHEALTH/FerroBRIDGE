@@ -12,7 +12,8 @@ use std::time::Duration;
 use super::FULL;
 
 #[test]
-fn a_file_states_every_section_and_the_resolver_reads_it() -> Result<(), Box<dyn std::error::Error>> {
+fn a_file_states_every_section_and_the_resolver_reads_it() -> Result<(), Box<dyn std::error::Error>>
+{
     let settings = Config::from_sources(Some(FULL), &BTreeMap::new())?.resolve()?;
     assert_eq!("0.0.0.0:9000", settings.server.listen.to_string());
     assert_eq!(Duration::from_millis(1000), settings.server.request_timeout);
@@ -62,8 +63,8 @@ fn a_file_states_every_section_and_the_resolver_reads_it() -> Result<(), Box<dyn
 }
 
 #[test]
-fn the_operations_lane_is_on_by_default_and_names_its_own_device() -> Result<(), Box<dyn std::error::Error>>
-{
+fn the_operations_lane_is_on_by_default_and_names_its_own_device()
+-> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(None, &BTreeMap::new())?.resolve()?;
     assert!(settings.operations.enabled);
     assert!(
@@ -120,7 +121,8 @@ fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused_at_resolve()
 }
 
 #[test]
-fn the_omocl_directory_is_read_from_the_mappings_section() -> Result<(), Box<dyn std::error::Error>> {
+fn the_omocl_directory_is_read_from_the_mappings_section() -> Result<(), Box<dyn std::error::Error>>
+{
     let text = "[mappings]\nomocl = \"/srv/omocl\"\n";
     let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
     assert_eq!(
@@ -159,7 +161,8 @@ fn the_display_fallback_is_off_unless_the_terminology_lane_turns_it_on()
 }
 
 #[test]
-fn the_terminology_lane_accepts_each_release_the_client_speaks() -> Result<(), Box<dyn std::error::Error>> {
+fn the_terminology_lane_accepts_each_release_the_client_speaks()
+-> Result<(), Box<dyn std::error::Error>> {
     for (spelled, expected) in [
         ("stu3", ferrobridge_term::config::WireVersion::Stu3),
         ("STU3", ferrobridge_term::config::WireVersion::Stu3),

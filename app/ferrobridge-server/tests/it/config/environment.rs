@@ -37,7 +37,8 @@ fn an_environment_override_reaches_a_nested_section_and_keeps_its_type()
 }
 
 #[test]
-fn an_environment_override_turns_a_lane_on_with_no_file_at_all() -> Result<(), Box<dyn std::error::Error>> {
+fn an_environment_override_turns_a_lane_on_with_no_file_at_all()
+-> Result<(), Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([
         (
             String::from("FERROBRIDGE__CDR__BASE_URL"),
@@ -67,8 +68,8 @@ fn an_environment_override_turns_a_lane_on_with_no_file_at_all() -> Result<(), B
 }
 
 #[test]
-fn the_console_variables_win_over_the_file_and_the_tree_overrides() -> Result<(), Box<dyn std::error::Error>>
-{
+fn the_console_variables_win_over_the_file_and_the_tree_overrides()
+-> Result<(), Box<dyn std::error::Error>> {
     let file = "[telemetry]\nformat = \"json\"\nfilter = \"warn\"\n";
     let tree = BTreeMap::from([
         (
@@ -161,13 +162,15 @@ fn an_all_digit_value_reaches_a_string_key_as_a_string() -> Result<(), Box<dyn s
 }
 
 #[test]
-fn a_boolean_looking_value_reaches_a_string_key_as_a_string() -> Result<(), Box<dyn std::error::Error>> {
+fn a_boolean_looking_value_reaches_a_string_key_as_a_string()
+-> Result<(), Box<dyn std::error::Error>> {
     assert_eq!("true", cdr_user("true")?);
     Ok(())
 }
 
 #[test]
-fn a_float_looking_value_reaches_a_string_key_as_a_string() -> Result<(), Box<dyn std::error::Error>> {
+fn a_float_looking_value_reaches_a_string_key_as_a_string() -> Result<(), Box<dyn std::error::Error>>
+{
     assert_eq!("1.5", cdr_user("1.5")?);
     Ok(())
 }
@@ -243,8 +246,8 @@ fn a_numeric_key_given_a_number_out_of_its_range_is_refused() {
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
 }
 #[test]
-fn the_demographic_api_is_off_unless_the_cdr_section_turns_it_on() -> Result<(), Box<dyn std::error::Error>>
-{
+fn the_demographic_api_is_off_unless_the_cdr_section_turns_it_on()
+-> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(Some(FULL), &BTreeMap::new())?.resolve()?;
     assert!(
         !settings

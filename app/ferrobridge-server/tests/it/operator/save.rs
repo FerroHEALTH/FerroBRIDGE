@@ -211,10 +211,7 @@ impl Case {
     }
 
     /// Sends `request` under an operator token.
-    async fn send(
-        &self,
-        request: Request<Body>,
-    ) -> Result<http::Response<Body>, Box<dyn Error>> {
+    async fn send(&self, request: Request<Body>) -> Result<http::Response<Body>, Box<dyn Error>> {
         let token = mint(&self.key, &self.issuer.claims(OPERATOR));
         Ok(self.app.clone().oneshot(bearing(request, &token)).await?)
     }
@@ -523,8 +520,7 @@ async fn a_save_over_a_provisioned_path_is_refused() -> Result<(), Box<dyn Error
 }
 
 #[tokio::test]
-async fn a_draft_check_answers_its_diagnostics_and_writes_nothing() -> Result<(), Box<dyn Error>>
-{
+async fn a_draft_check_answers_its_diagnostics_and_writes_nothing() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let check = |body: &str| {
         Request::post("/operator/mappings/check?path=fhirconnect/ferrobridge_facade.yml")
@@ -556,8 +552,7 @@ async fn a_draft_check_answers_its_diagnostics_and_writes_nothing() -> Result<()
 }
 
 #[tokio::test]
-async fn a_reload_picks_up_a_file_placed_in_the_console_directory() -> Result<(), Box<dyn Error>>
-{
+async fn a_reload_picks_up_a_file_placed_in_the_console_directory() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     std::fs::create_dir_all(case.console(""))?;
     std::fs::write(case.console("ferrobridge_console.yml"), MODEL)?;
@@ -624,8 +619,8 @@ fn the_save_audit_line_names_the_caller_file_digests_and_reason_and_no_content()
 }
 
 #[tokio::test]
-async fn an_omocl_file_saves_under_the_console_tree_and_joins_the_set()
--> Result<(), Box<dyn Error>> {
+async fn an_omocl_file_saves_under_the_console_tree_and_joins_the_set() -> Result<(), Box<dyn Error>>
+{
     let case = Case::new().await?;
     let specimen = std::fs::read_to_string(OMOCL_FILE)?;
     let response = case.create_at("omocl/Specimen_v1.yml", &specimen).await?;

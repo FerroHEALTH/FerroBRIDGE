@@ -192,8 +192,8 @@ async fn every_route_answers_403_without_the_operator_scope() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn the_state_names_each_compiled_context_and_where_it_came_from()
--> Result<(), Box<dyn Error>> {
+async fn the_state_names_each_compiled_context_and_where_it_came_from() -> Result<(), Box<dyn Error>>
+{
     let case = Case::new().await?;
     let response = case.get("/operator/state", Some(OPERATOR)).await?;
     assert_eq!(StatusCode::OK, response.status());

@@ -28,7 +28,8 @@ async fn mount(server: &MockServer, version: WireVersion, response: ResponseTemp
 }
 
 #[tokio::test]
-async fn a_found_code_answers_its_display_in_both_releases() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_found_code_answers_its_display_in_both_releases()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -87,7 +88,8 @@ async fn a_found_code_answers_its_display_in_both_releases() -> Result<(), Box<d
 }
 
 #[tokio::test]
-async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>> {
+async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>>
+{
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -176,7 +178,8 @@ async fn an_unknown_code_is_a_not_found_outcome_carrying_its_tx_issue()
 }
 
 #[tokio::test]
-async fn a_bare_404_with_no_outcome_is_a_not_found_outcome() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_bare_404_with_no_outcome_is_a_not_found_outcome()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -200,7 +203,8 @@ async fn a_bare_404_with_no_outcome_is_a_not_found_outcome() -> Result<(), Box<d
 }
 
 #[tokio::test]
-async fn another_refusal_is_a_typed_error_that_keeps_the_body() -> Result<(), Box<dyn std::error::Error>> {
+async fn another_refusal_is_a_typed_error_that_keeps_the_body()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -238,7 +242,8 @@ async fn another_refusal_is_a_typed_error_that_keeps_the_body() -> Result<(), Bo
 }
 
 #[tokio::test]
-async fn an_answer_that_is_not_parameters_is_a_decode_error() -> Result<(), Box<dyn std::error::Error>> {
+async fn an_answer_that_is_not_parameters_is_a_decode_error()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,

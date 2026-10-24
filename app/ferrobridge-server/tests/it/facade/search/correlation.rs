@@ -32,8 +32,8 @@ use super::result_set;
 use super::searching;
 
 #[tokio::test]
-async fn code_and_system_are_compared_on_the_one_node_the_from_binds()
--> Result<(), Box<dyn Error>> {
+async fn code_and_system_are_compared_on_the_one_node_the_from_binds() -> Result<(), Box<dyn Error>>
+{
     let harness = searching().await;
     mount_rows(&harness.cdr, &[]).await;
     let (status, body) = get(&harness, "Condition?code=http://snomed.info/sct%7C44054006").await?;
@@ -93,8 +93,7 @@ async fn a_composition_whose_two_nodes_match_is_one_entry() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn paging_and_the_total_count_compositions_and_never_nodes() -> Result<(), Box<dyn Error>>
-{
+async fn paging_and_the_total_count_compositions_and_never_nodes() -> Result<(), Box<dyn Error>> {
     // Rows A, A, B: two compositions, the first matching on two nodes. A page
     // of one holds A, and the next page starts at B's row, offset 2.
     let harness = searching().await;

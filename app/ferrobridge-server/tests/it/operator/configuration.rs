@@ -205,8 +205,7 @@ fn no_secret_reaches_the_answer_or_the_log() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
-async fn an_operator_api_with_no_running_configuration_answers_404() -> Result<(), Box<dyn Error>>
-{
+async fn an_operator_api_with_no_running_configuration_answers_404() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let response = case.get("/operator/configuration", Some(OPERATOR)).await?;
     assert_eq!(StatusCode::NOT_FOUND, response.status());

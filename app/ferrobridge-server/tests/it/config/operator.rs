@@ -79,7 +79,8 @@ fn the_operator_api_without_an_issuer_refuses_to_boot() -> Result<(), Box<dyn st
 }
 
 #[test]
-fn the_operator_scope_is_read_from_the_file_and_the_environment() -> Result<(), Box<dyn std::error::Error>> {
+fn the_operator_scope_is_read_from_the_file_and_the_environment()
+-> Result<(), Box<dyn std::error::Error>> {
     let text = format!("{AUTH}\n[operator]\nenabled = true\n");
     let default = Config::from_sources(Some(&text), &BTreeMap::new())?
         .resolve()?
@@ -115,7 +116,8 @@ fn an_unknown_operator_key_refuses_to_boot() {
 }
 
 #[test]
-fn the_mapping_dir_is_read_from_the_file_and_the_environment() -> Result<(), Box<dyn std::error::Error>> {
+fn the_mapping_dir_is_read_from_the_file_and_the_environment()
+-> Result<(), Box<dyn std::error::Error>> {
     let text = format!(
         "{AUTH}\n[operator]\nenabled = true\nmapping_dir = \"/var/lib/ferrobridge/mappings\"\n"
     );

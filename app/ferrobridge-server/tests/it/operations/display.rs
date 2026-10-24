@@ -167,8 +167,7 @@ async fn a_lookup_the_server_refuses_refuses_the_run_with_the_upstream_status()
 }
 
 #[tokio::test]
-async fn with_no_terminology_server_the_code_stands_as_the_value() -> Result<(), Box<dyn Error>>
-{
+async fn with_no_terminology_server_the_code_stands_as_the_value() -> Result<(), Box<dyn Error>> {
     let (status, body) = mapped(Translator::default()).await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     let answer: serde_json::Value = serde_json::from_str(&body)?;

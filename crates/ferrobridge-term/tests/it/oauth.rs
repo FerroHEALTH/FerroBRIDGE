@@ -72,7 +72,10 @@ impl TokenProvider for Scripted {
 }
 
 /// Returns a client for `server` presenting the tokens `provider` hands out.
-fn client(server: &MockServer, provider: Arc<Scripted>) -> Result<Client, Box<dyn std::error::Error>> {
+fn client(
+    server: &MockServer,
+    provider: Arc<Scripted>,
+) -> Result<Client, Box<dyn std::error::Error>> {
     Ok(Client::new(
         config(server, WireVersion::R4)?.with_credentials(Credentials::OAuth(provider)),
     )?)
@@ -158,7 +161,8 @@ async fn a_refused_token_is_handed_back_and_the_request_sent_once_more()
 }
 
 #[tokio::test]
-async fn a_second_refusal_stands_and_is_not_renewed_again() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_second_refusal_stands_and_is_not_renewed_again() -> Result<(), Box<dyn std::error::Error>>
+{
     let server = MockServer::start().await;
     mount_refusal(&server, "Bearer synthetic-token-1").await;
     mount_refusal(&server, "Bearer synthetic-token-2").await;
@@ -202,7 +206,9 @@ async fn a_renewal_that_obtains_no_token_keeps_the_refusal_and_the_cause()
     let failure = std::error::Error::source(&error).ok_or("the renewal carries its cause")?;
     assert!(failure.is::<TokenFailure>(), "{failure:?}");
     assert!(
-        failure.source().is_some_and(<dyn std::error::Error>::is::<Refused>),
+        failure
+            .source()
+            .is_some_and(<dyn std::error::Error>::is::<Refused>),
         "the provider's own error is the root of the chain"
     );
     assert!(!error.is_retryable());
@@ -214,7 +220,8 @@ async fn a_renewal_that_obtains_no_token_keeps_the_refusal_and_the_cause()
 }
 
 #[tokio::test]
-async fn a_provider_that_obtains_no_token_sends_nothing() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_provider_that_obtains_no_token_sends_nothing() -> Result<(), Box<dyn std::error::Error>>
+{
     let server = MockServer::start().await;
     let provider = Scripted::new([Err(())]);
 

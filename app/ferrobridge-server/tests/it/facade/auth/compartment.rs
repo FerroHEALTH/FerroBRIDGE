@@ -154,8 +154,7 @@ async fn a_patient_token_creates_for_its_own_patient_only() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn a_patient_scope_without_a_patient_claim_reaches_nothing() -> Result<(), Box<dyn Error>>
-{
+async fn a_patient_scope_without_a_patient_claim_reaches_nothing() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     let token = case.token("patient/Condition.c", None);
     let (status, body) = case

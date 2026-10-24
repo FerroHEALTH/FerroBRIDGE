@@ -25,7 +25,8 @@ async fn mount(server: &MockServer, version: WireVersion, response: ResponseTemp
 }
 
 #[tokio::test]
-async fn a_served_code_system_counts_one_in_every_release() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_served_code_system_counts_one_in_every_release() -> Result<(), Box<dyn std::error::Error>>
+{
     for version in [WireVersion::Stu3, WireVersion::R4, WireVersion::R4B] {
         let server = MockServer::start().await;
         mount(&server, version, terminology::search_count(1)).await;
@@ -51,7 +52,8 @@ async fn an_unserved_code_system_counts_zero() -> Result<(), Box<dyn std::error:
 }
 
 #[tokio::test]
-async fn an_answer_that_is_not_a_searchset_is_a_decode_error() -> Result<(), Box<dyn std::error::Error>> {
+async fn an_answer_that_is_not_a_searchset_is_a_decode_error()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let bundle =
         serde_json::json!({"resourceType": "Bundle", "type": "batch-response", "total": 1});

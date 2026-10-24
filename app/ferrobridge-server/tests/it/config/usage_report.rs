@@ -64,7 +64,8 @@ fn the_environment_switches_the_report_off() -> Result<(), Box<dyn std::error::E
 }
 
 #[test]
-fn a_collector_off_https_or_with_credentials_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+fn a_collector_off_https_or_with_credentials_is_refused() -> Result<(), Box<dyn std::error::Error>>
+{
     for endpoint in [
         "http://report.example/v1/report",
         "https://user:pw@report.example/v1/report",

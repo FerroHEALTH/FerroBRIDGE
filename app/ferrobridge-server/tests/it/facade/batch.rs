@@ -350,8 +350,7 @@ async fn an_entry_of_an_interaction_the_server_does_not_declare_answers_its_rout
 }
 
 #[tokio::test]
-async fn an_absolute_url_under_this_base_reads_as_the_relative_one() -> Result<(), Box<dyn Error>>
-{
+async fn an_absolute_url_under_this_base_reads_as_the_relative_one() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     let id = created(&harness).await?;
@@ -441,8 +440,8 @@ async fn an_empty_batch_answers_an_empty_batch_response() -> Result<(), Box<dyn 
     Ok(())
 }
 #[test]
-fn a_batch_with_one_failing_entry_answers_200_and_counts_the_failure()
--> Result<(), Box<dyn Error>> {
+fn a_batch_with_one_failing_entry_answers_200_and_counts_the_failure() -> Result<(), Box<dyn Error>>
+{
     // R4 http.html §3.1.0.11.1: a batch answers 200 whatever its entries'
     // outcomes, each entry carrying its own status and outcome. R4 gives a
     // batch-response no element for a count (bundle.html, bdl-1 keeps `total`

@@ -62,7 +62,8 @@ fn issuer_rule(error: &Error) -> Option<&ResourceError> {
 }
 
 #[test]
-fn auth_is_on_by_default_and_a_guarded_surface_needs_an_issuer() -> Result<(), Box<dyn std::error::Error>> {
+fn auth_is_on_by_default_and_a_guarded_surface_needs_an_issuer()
+-> Result<(), Box<dyn std::error::Error>> {
     // NOTE: no specification governs this: our own design, a surface the
     // section guards never runs open unless `enabled = false` says so.
     let error = refusal("")?;
@@ -169,7 +170,8 @@ fn every_key_reads() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn several_issuers_read_each_over_the_sections_defaults() -> Result<(), Box<dyn std::error::Error>> {
+fn several_issuers_read_each_over_the_sections_defaults() -> Result<(), Box<dyn std::error::Error>>
+{
     let auth = settings(concat!(
         "[auth]\naudience = [\"https://bridge.example.org/fhir\"]\nclock_skew_seconds = 30\n\n",
         "[[auth.issuer]]\nissuer = \"https://one.example.org\"\n\n",
@@ -364,8 +366,8 @@ fn an_operator_scope_or_capability_that_is_no_scope_token_is_refused()
 }
 
 #[test]
-fn an_operator_scope_outside_the_smart_extension_forms_is_refused() -> Result<(), Box<dyn std::error::Error>>
-{
+fn an_operator_scope_outside_the_smart_extension_forms_is_refused()
+-> Result<(), Box<dyn std::error::Error>> {
     // NOTE: SMART App Launch 2.2.0 scopes-and-launch-context.html,
     // Extensibility: an extension scope is a full URI or starts with `__`.
     for scope in ["ferrobridge.operator", "bridge:operator"] {

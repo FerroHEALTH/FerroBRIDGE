@@ -90,8 +90,8 @@ async fn an_unknown_property_is_four_hundred_structure() -> Result<(), Box<dyn E
 }
 
 #[tokio::test]
-async fn a_resource_no_program_claims_is_four_hundred_and_twenty_two()
--> Result<(), Box<dyn Error>> {
+async fn a_resource_no_program_claims_is_four_hundred_and_twenty_two() -> Result<(), Box<dyn Error>>
+{
     let harness = harness().await;
     let mut resource = condition();
     resource["meta"] = serde_json::json!({ "profile": ["http://example.org/other"] });
@@ -188,8 +188,7 @@ async fn a_cdr_four_hundred_and_one_stays_four_hundred_and_one_with_its_challeng
 }
 
 #[tokio::test]
-async fn a_cdr_status_its_rest_does_not_document_is_five_hundred() -> Result<(), Box<dyn Error>>
-{
+async fn a_cdr_status_its_rest_does_not_document_is_five_hundred() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     Mock::given(matchers::method("POST"))

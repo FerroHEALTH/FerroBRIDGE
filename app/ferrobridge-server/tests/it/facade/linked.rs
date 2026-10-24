@@ -306,8 +306,8 @@ async fn a_linking_commit_the_cdr_refuses_names_the_linked_composition_it_left()
 }
 
 #[tokio::test]
-async fn a_transaction_entry_that_links_a_resource_is_refused_whole()
--> Result<(), Box<dyn Error>> {
+async fn a_transaction_entry_that_links_a_resource_is_refused_whole() -> Result<(), Box<dyn Error>>
+{
     // R4 http.html §transaction: all or nothing in one CONTRIBUTION, and the
     // linked composition's id is the CDR's to assign at its commit, so the
     // link cannot be written inside one; the refusal names why.
@@ -377,7 +377,7 @@ async fn a_transaction_entry_that_links_a_resource_is_refused_whole()
 
 #[tokio::test]
 async fn a_linked_resource_no_context_maps_is_a_loss_the_writer_is_shown()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 http.html §Managing Return Content: `return=OperationOutcome` asks for
     // "hints and warnings", and the unmapped link is the run's declared loss.
     let sender = sender(&["http://example.org/fhir/StructureDefinition/unmapped"]).await;
@@ -410,7 +410,7 @@ async fn a_linked_resource_no_context_maps_is_a_loss_the_writer_is_shown()
 
 #[tokio::test]
 async fn a_batch_entry_that_links_a_resource_commits_both_compositions()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 http.html §batch: "each entry is treated as if an individual
     // interaction or operation", so the entry runs the single create, which
     // commits the linked composition first and links it.

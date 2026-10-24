@@ -82,8 +82,8 @@ fn member() -> Concept {
 }
 
 #[tokio::test]
-async fn a_lookup_sends_stu3_parameters_and_reads_a_code_property() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_lookup_sends_stu3_parameters_and_reads_a_code_property()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -297,8 +297,8 @@ async fn an_stu3_translation_with_no_match_is_no_match() -> Result<(), Box<dyn s
 }
 
 #[tokio::test]
-async fn a_concept_map_url_is_refused_in_stu3_and_nothing_is_sent() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_concept_map_url_is_refused_in_stu3_and_nothing_is_sent()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let error = client(&server, STU3)?
         .translate(
@@ -327,7 +327,8 @@ async fn a_concept_map_url_is_refused_in_stu3_and_nothing_is_sent() -> Result<()
 }
 
 #[tokio::test]
-async fn a_code_sends_its_system_version_as_the_stu3_version() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_code_sends_its_system_version_as_the_stu3_version()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -401,7 +402,8 @@ async fn a_coding_and_a_codeable_concept_go_as_their_stu3_parameters()
 }
 
 #[tokio::test]
-async fn a_false_stu3_validation_is_invalid_with_its_message() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_false_stu3_validation_is_invalid_with_its_message()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -569,8 +571,8 @@ async fn an_stu3_batch_answers_each_entry_by_position() -> Result<(), Box<dyn st
 }
 
 #[tokio::test]
-async fn an_stu3_batch_with_an_unsupported_parameter_sends_nothing() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn an_stu3_batch_with_an_unsupported_parameter_sends_nothing()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let requests = vec![
         Request::Lookup {
@@ -638,8 +640,8 @@ async fn the_same_requests_are_sent_unchanged_in_r4() -> Result<(), Box<dyn std:
     Ok(())
 }
 #[tokio::test]
-async fn check_names_the_parameter_stu3_lacks_and_passes_the_rest() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn check_names_the_parameter_stu3_lacks_and_passes_the_rest()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let stu3 = client(&server, STU3)?;
     let mut versioned = validation(Coded::Coding(member()));

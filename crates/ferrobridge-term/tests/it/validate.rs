@@ -67,8 +67,8 @@ async fn a_member_is_valid_and_carries_its_display_in_both_releases()
 }
 
 #[tokio::test]
-async fn a_non_member_is_invalid_and_surfaces_its_issues_outcome() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_non_member_is_invalid_and_surfaces_its_issues_outcome()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -104,7 +104,8 @@ async fn a_non_member_is_invalid_and_surfaces_its_issues_outcome() -> Result<(),
 }
 
 #[tokio::test]
-async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>> {
+async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>>
+{
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(

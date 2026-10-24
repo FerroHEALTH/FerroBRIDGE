@@ -73,8 +73,8 @@ async fn validate_reports_the_verdict_of_a_resource_that_would_not_commit()
 }
 
 #[tokio::test]
-async fn validate_mirrors_the_create_paths_operation_level_statuses()
--> Result<(), Box<dyn Error>> {
+async fn validate_mirrors_the_create_paths_operation_level_statuses() -> Result<(), Box<dyn Error>>
+{
     let harness = harness().await;
     let mut resource = condition();
     resource["meta"] = serde_json::json!({ "profile": ["http://example.org/other"] });
@@ -284,8 +284,8 @@ fn issues_naming<'a>(body: &'a serde_json::Value, text: &str) -> Vec<&'a serde_j
 }
 
 #[tokio::test]
-async fn validate_locates_a_loss_by_its_fhirpath_and_its_openehr_path()
--> Result<(), Box<dyn Error>> {
+async fn validate_locates_a_loss_by_its_fhirpath_and_its_openehr_path() -> Result<(), Box<dyn Error>>
+{
     // `engine/rest-api.adoc` §Reporting partial results with `OperationOutcome`:
     // the gap is explicit, and R4 `OperationOutcome.issue.expression` is where
     // the FHIRPath of the element it concerns goes.

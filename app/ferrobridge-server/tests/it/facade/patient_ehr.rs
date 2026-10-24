@@ -123,8 +123,7 @@ async fn a_created_patient_gets_the_ehr_its_party_id_keys() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn an_ehr_the_cdr_holds_for_the_party_is_found_not_created() -> Result<(), Box<dyn Error>>
-{
+async fn an_ehr_the_cdr_holds_for_the_party_is_found_not_created() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)?).await?;
     mount_party_create(&cdr, "person").await;
     Mock::given(matchers::method("GET"))
@@ -151,8 +150,8 @@ async fn an_ehr_the_cdr_holds_for_the_party_is_found_not_created() -> Result<(),
 }
 
 #[tokio::test]
-async fn under_the_existing_policy_a_patient_create_sends_no_ehr_call()
--> Result<(), Box<dyn Error>> {
+async fn under_the_existing_policy_a_patient_create_sends_no_ehr_call() -> Result<(), Box<dyn Error>>
+{
     let (cdr, facade) = harness_with(linked(Policy::Existing)?).await?;
     mount_party_create(&cdr, "person").await;
 

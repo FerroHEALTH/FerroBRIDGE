@@ -45,7 +45,8 @@ async fn translate(
 }
 
 #[tokio::test]
-async fn an_equivalent_match_is_a_translation_in_both_releases() -> Result<(), Box<dyn std::error::Error>> {
+async fn an_equivalent_match_is_a_translation_in_both_releases()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -80,8 +81,8 @@ async fn an_equivalent_match_is_a_translation_in_both_releases() -> Result<(), B
 }
 
 #[tokio::test]
-async fn a_wider_or_inexact_match_is_returned_and_never_accepted() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_wider_or_inexact_match_is_returned_and_never_accepted()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -149,7 +150,8 @@ async fn a_false_result_is_a_no_match_outcome() -> Result<(), Box<dyn std::error
 }
 
 #[tokio::test]
-async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>> {
+async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>>
+{
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -254,7 +256,8 @@ async fn sent(
 }
 
 #[tokio::test]
-async fn a_map_url_alone_sends_no_target_system_and_no_reverse() -> Result<(), Box<dyn std::error::Error>> {
+async fn a_map_url_alone_sends_no_target_system_and_no_reverse()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let translation =
             Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
@@ -316,8 +319,8 @@ async fn reverse_is_sent_as_a_boolean_only_when_given() -> Result<(), Box<dyn st
 }
 
 #[tokio::test]
-async fn a_batch_translation_carries_the_same_optional_parameters() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_batch_translation_carries_the_same_optional_parameters()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let no_match = terminology::parameters_resource(&[serde_json::json!({
         "name": "result",

@@ -122,8 +122,8 @@ fn without_the_operator_api_only_the_provisioned_tree_is_read() -> Result<(), Bo
 }
 
 #[test]
-fn etl_run_maps_with_the_provisioned_and_the_console_files_together()
--> Result<(), Box<dyn Error>> {
+fn etl_run_maps_with_the_provisioned_and_the_console_files_together() -> Result<(), Box<dyn Error>>
+{
     let trees = Trees::new()?;
     Trees::copy(
         &trees.provisioned(),

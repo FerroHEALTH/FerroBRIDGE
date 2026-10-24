@@ -465,8 +465,8 @@ fn fetched() -> bool {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn conformance_the_fhir_r4_examples_hold_their_facade_pass_list()
--> Result<(), Box<dyn Error>> {
+async fn conformance_the_fhir_r4_examples_hold_their_facade_pass_list() -> Result<(), Box<dyn Error>>
+{
     if !fetched() {
         return Ok(());
     }

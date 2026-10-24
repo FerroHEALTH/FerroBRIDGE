@@ -144,8 +144,7 @@ async fn a_resource_a_sub_context_consumed_is_not_processed_again_as_a_root()
 }
 
 #[tokio::test]
-async fn a_resource_nothing_consumes_is_still_processed_as_a_root() -> Result<(), Box<dyn Error>>
-{
+async fn a_resource_nothing_consumes_is_still_processed_as_a_root() -> Result<(), Box<dyn Error>> {
     // bundles.adoc: "Resources nothing consumes are still processed as roots", so the
     // Observation no program maps refuses the transaction.
     let harness = harness().await;

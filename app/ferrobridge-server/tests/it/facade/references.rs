@@ -314,8 +314,7 @@ async fn created_observation(
 }
 
 #[tokio::test]
-async fn an_absolute_reference_off_the_allow_list_is_never_fetched() -> Result<(), Box<dyn Error>>
-{
+async fn an_absolute_reference_off_the_allow_list_is_never_fetched() -> Result<(), Box<dyn Error>> {
     // engine/references.adoc: "If not possible, the engine proceeds with the
     // mapping"; no specification governs the allow-list: our own design.
     let sender = MockServer::start().await;
@@ -332,8 +331,7 @@ async fn an_absolute_reference_off_the_allow_list_is_never_fetched() -> Result<(
 }
 
 #[tokio::test]
-async fn an_absolute_reference_on_the_allow_list_is_fetched_once() -> Result<(), Box<dyn Error>>
-{
+async fn an_absolute_reference_on_the_allow_list_is_fetched_once() -> Result<(), Box<dyn Error>> {
     // engine/references.adoc: "the engine should attempt to GET it from the
     // sending site", and "keep track of which ones are already resolved".
     let sender = MockServer::start().await;
@@ -413,8 +411,8 @@ async fn create_and_validate(
 }
 
 #[tokio::test]
-async fn a_failed_fetch_refuses_the_request_with_the_upstream_status()
--> Result<(), Box<dyn Error>> {
+async fn a_failed_fetch_refuses_the_request_with_the_upstream_status() -> Result<(), Box<dyn Error>>
+{
     // engine/Fail.adoc: "either all data should be mapped, or the mapping
     // should fail"; a sending site that fails is an upstream failure, never an
     // absence, and answers the facade's UPSTREAM row (R4 http.html, 502).

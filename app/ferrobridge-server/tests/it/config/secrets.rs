@@ -49,7 +49,8 @@ fn a_cdm_url_file_sibling_is_read_at_boot() -> Result<(), Box<dyn std::error::Er
 }
 
 #[test]
-fn a_cdm_tls_ca_file_is_read_through_its_environment_name() -> Result<(), Box<dyn std::error::Error>> {
+fn a_cdm_tls_ca_file_is_read_through_its_environment_name() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "not a certificate")?;
     let environment = BTreeMap::from([(
@@ -69,7 +70,8 @@ fn a_cdm_tls_ca_file_is_read_through_its_environment_name() -> Result<(), Box<dy
 }
 
 #[test]
-fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
     let text = concat!(
         "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
         "[cdr.credentials]\nuser = \"bridge\"\npassword = \"inline\"\npassword_file = \"/run/secrets/password\"\n",
@@ -213,8 +215,8 @@ fn no_inline_secret_reaches_the_debug_rendering_of_the_tree_or_the_settings()
 }
 
 #[test]
-fn no_inline_client_secret_reaches_the_debug_rendering_of_the_tree() -> Result<(), Box<dyn std::error::Error>>
-{
+fn no_inline_client_secret_reaches_the_debug_rendering_of_the_tree()
+-> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
         "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
         "[cdr.credentials.oauth]\ntoken_endpoint = \"https://idp.invalid/token\"\n",

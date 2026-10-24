@@ -37,7 +37,8 @@ fn question() -> Subsumption {
 }
 
 #[tokio::test]
-async fn each_of_the_four_outcomes_is_read_in_every_release() -> Result<(), Box<dyn std::error::Error>> {
+async fn each_of_the_four_outcomes_is_read_in_every_release()
+-> Result<(), Box<dyn std::error::Error>> {
     let cases = [
         ("equivalent", SubsumesOutcome::Equivalent),
         ("subsumes", SubsumesOutcome::Subsumes),
@@ -56,7 +57,8 @@ async fn each_of_the_four_outcomes_is_read_in_every_release() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>> {
+async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>>
+{
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(&server, version, terminology::subsumes("subsumes")).await;
@@ -100,7 +102,8 @@ async fn a_version_left_unset_is_not_sent() -> Result<(), Box<dyn std::error::Er
 }
 
 #[tokio::test]
-async fn an_outcome_outside_the_value_set_is_a_decode_error() -> Result<(), Box<dyn std::error::Error>> {
+async fn an_outcome_outside_the_value_set_is_a_decode_error()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(&server, WireVersion::R4, terminology::subsumes("related")).await;
 

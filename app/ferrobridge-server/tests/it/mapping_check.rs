@@ -120,8 +120,8 @@ async fn library_check(tree: &Tree) -> Result<check::Report, Box<dyn std::error:
 }
 
 #[tokio::test]
-async fn a_clean_set_reports_no_diagnostic_and_counts_what_it_read() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_clean_set_reports_no_diagnostic_and_counts_what_it_read()
+-> Result<(), Box<dyn std::error::Error>> {
     let tree = Tree::clean()?;
     let report = library_check(&tree).await?;
     assert!(report.is_clean(), "{report}");
@@ -136,8 +136,8 @@ async fn a_clean_set_reports_no_diagnostic_and_counts_what_it_read() -> Result<(
 }
 
 #[tokio::test]
-async fn a_path_no_template_node_carries_is_a_compile_diagnostic() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_path_no_template_node_carries_is_a_compile_diagnostic()
+-> Result<(), Box<dyn std::error::Error>> {
     let tree = Tree::clean()?;
     std::fs::write(
         tree.path("mappings/ferrobridge_facade.yml"),
@@ -214,8 +214,8 @@ async fn a_context_whose_template_no_directory_provides_is_reported()
 }
 
 #[tokio::test]
-async fn a_template_that_does_not_build_is_a_template_diagnostic() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn a_template_that_does_not_build_is_a_template_diagnostic()
+-> Result<(), Box<dyn std::error::Error>> {
     let tree = Tree::clean()?;
     std::fs::write(tree.path("templates/broken.opt"), "<template>")?;
     let report = library_check(&tree).await?;
@@ -254,7 +254,9 @@ async fn cdr_answering(status: u16) -> MockServer {
 }
 
 /// Returns a CDR client over `cdr`, retrying nothing.
-fn client(cdr: &MockServer) -> Result<ferrobridge_server::cdr::CdrClient, Box<dyn std::error::Error>> {
+fn client(
+    cdr: &MockServer,
+) -> Result<ferrobridge_server::cdr::CdrClient, Box<dyn std::error::Error>> {
     let text = format!(
         "[cdr]\nbase_url = \"{}/\"\ntimeout_ms = 2000\n\n[cdr.retry]\nmax_attempts = 1\n",
         cdr.uri()
@@ -330,7 +332,8 @@ async fn a_cdr_that_fails_the_fetch_is_an_error_carrying_the_upstream_failure()
 }
 
 #[test]
-fn the_binary_exits_zero_on_a_clean_set_and_prints_the_summary() -> Result<(), Box<dyn std::error::Error>> {
+fn the_binary_exits_zero_on_a_clean_set_and_prints_the_summary()
+-> Result<(), Box<dyn std::error::Error>> {
     let tree = Tree::clean()?;
     let output = tree.run(&[])?;
     let stdout = String::from_utf8(output.stdout)?;
@@ -371,7 +374,8 @@ fn the_binary_exits_one_and_prints_every_diagnostic_on_a_broken_set()
 }
 
 #[test]
-fn the_json_report_is_one_document_with_every_diagnostic() -> Result<(), Box<dyn std::error::Error>> {
+fn the_json_report_is_one_document_with_every_diagnostic() -> Result<(), Box<dyn std::error::Error>>
+{
     let tree = Tree::clean()?;
     std::fs::write(
         tree.path("mappings/ferrobridge_facade.yml"),
