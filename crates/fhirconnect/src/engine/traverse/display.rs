@@ -19,9 +19,9 @@ use fhir_types::r4::coding::Coding;
 
 use crate::engine::cell::Produced;
 use crate::engine::fhir::FhirValue;
+use crate::engine::lens::Fallback;
 use crate::engine::lens::coded_text::CODEABLE_CONCEPT_CELL;
 use crate::engine::lens::coded_text::CODING_CELL;
-use crate::engine::lens::Fallback;
 use crate::engine::lens::text;
 use crate::engine::rm::RmValue;
 use crate::engine::terminology;
