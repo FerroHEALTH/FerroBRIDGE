@@ -25,6 +25,7 @@ mod search;
 mod stu3;
 mod subsumes;
 mod support;
+mod tls;
 mod translate;
 mod transport;
 mod validate;

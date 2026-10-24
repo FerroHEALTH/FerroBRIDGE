@@ -59,10 +59,10 @@ pub struct Client {
 impl Client {
     /// Returns a client for the server `config` describes.
     ///
-    /// This constructor is the only way to obtain a client, so a deployment
-    /// that configures no terminology server holds no [`Client`] at all and
-    /// the absence is a compile-time `Option<Client>` rather than a runtime
-    /// fallback.
+    /// This constructor and [`Client::with_http`] are the only ways to
+    /// obtain a client, so a deployment that configures no terminology
+    /// server holds no [`Client`] at all and the absence is a compile-time
+    /// `Option<Client>` rather than a runtime fallback.
     ///
     /// # Errors
     /// Returns [`Error::BaseUrl`] when the base URL cannot carry a path, and
@@ -77,6 +77,50 @@ impl Client {
             .timeout(config.timeout)
             .build()
             .map_err(|source| Error::ClientBuild { source })?;
+        Ok(Self {
+            http,
+            config: Arc::new(config),
+        })
+    }
+
+    /// Returns a client for the server `config` describes that sends every
+    /// request through `http`, an HTTP client the caller built.
+    ///
+    /// The caller's client carries what the deployment's transport needs and
+    /// [`Config`] does not hold: a client certificate for mutual TLS, trust
+    /// roots beside the platform's, a proxy. FHIR leaves transport security
+    /// to the deployment (<https://hl7.org/fhir/R4/security.html>). The
+    /// configured timeout still bounds every request, and the configured
+    /// credentials, retry budget and errors apply as they do for
+    /// [`Client::new`]. No specification governs this constructor: our own
+    /// design.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use ferrobridge_term::client::Client;
+    /// use ferrobridge_term::config::{Config, WireVersion};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let pem = b"";
+    /// let http = reqwest::Client::builder()
+    ///     .identity(reqwest::Identity::from_pem(pem)?)
+    ///     .build()?;
+    /// let config = Config::new("https://tx.example.org/r4".parse()?, WireVersion::R4);
+    /// let client = Client::with_http(config, http)?;
+    /// # let _ = client;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    /// Returns [`Error::BaseUrl`] when the base URL cannot carry a path.
+    pub fn with_http(config: Config, http: reqwest::Client) -> Result<Self, Error> {
+        if config.base_url.cannot_be_a_base() {
+            return Err(Error::BaseUrl {
+                base: config.base_url.clone(),
+            });
+        }
         Ok(Self {
             http,
             config: Arc::new(config),
@@ -98,17 +142,25 @@ impl Client {
     /// # Errors
     /// Returns [`Error::UnsupportedParameter`] when `request` names a
     /// parameter the configured release does not declare: a concept map
-    /// `url` or a value set version on an STU3 client.
+    /// `url` or a value set version on an STU3 client. Returns
+    /// [`Error::SystemRequired`] when it validates a code with no system on
+    /// an STU3 client.
     pub fn check(&self, request: &Request) -> Result<(), Error> {
         let version = self.config.wire_version;
-        match crate::wire::unsupported(version, request) {
-            Some(parameter) => Err(Error::UnsupportedParameter {
+        if let Some(parameter) = crate::wire::unsupported(version, request) {
+            return Err(Error::UnsupportedParameter {
                 operation: request.operation(),
                 parameter,
                 wire_version: version,
-            }),
-            None => Ok(()),
+            });
         }
+        if crate::wire::requires_system(version, request) {
+            return Err(Error::SystemRequired {
+                operation: request.operation(),
+                wire_version: version,
+            });
+        }
+        Ok(())
     }
 
     /// Returns the status the server answers `GET [base]/metadata` with.
@@ -130,6 +182,7 @@ impl Client {
             .send(&url, || {
                 self.http
                     .request(Method::GET, url.clone())
+                    .timeout(self.config.timeout)
                     .header(ACCEPT, FHIR_JSON)
             })
             .await?;
@@ -566,12 +619,14 @@ impl Client {
                 Some(body) => self
                     .http
                     .request(Method::POST, call.url.clone())
+                    .timeout(self.config.timeout)
                     .header(ACCEPT, FHIR_JSON)
                     .header(CONTENT_TYPE, FHIR_JSON)
                     .body(body.clone()),
                 None => self
                     .http
                     .request(Method::GET, call.url.clone())
+                    .timeout(self.config.timeout)
                     .header(ACCEPT, FHIR_JSON),
             })
             .await?;

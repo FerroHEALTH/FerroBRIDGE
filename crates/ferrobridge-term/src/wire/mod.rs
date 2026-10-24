@@ -18,7 +18,9 @@
 //! system version `version` and has no `valueSetVersion`, `$expand` has no
 //! `valueSetVersion`, `$translate` has no `url`, and `$lookup` types
 //! `property.value` as `code`. `$subsumes` is the same in all three. A parameter the request
-//! carries and STU3 does not declare is refused before anything is sent.
+//! carries and STU3 does not declare is refused before anything is sent, and
+//! so is a `$validate-code` code with a context and no system, since STU3
+//! requires a system for a code where R4 and R4B accept a context.
 
 use crate::config::WireVersion;
 use crate::error::{BodyError, Error, Outcome};
@@ -65,6 +67,13 @@ pub(crate) enum RequestError {
         /// The parameter, as the R4 `OperationDefinition` names it.
         parameter: &'static str,
     },
+    /// The request carries a code with no system, which the release
+    /// requires.
+    #[error("the {operation} request carries a code with no system, which the release requires")]
+    SystemRequired {
+        /// The operation, as `Resource/$code`.
+        operation: &'static str,
+    },
     /// A numeric input is larger than the FHIR `integer` it is sent as.
     #[error("the {operation} request carries a `{parameter}` larger than a FHIR integer holds")]
     Range {
@@ -90,6 +99,10 @@ impl RequestError {
             } => Error::UnsupportedParameter {
                 operation,
                 parameter,
+                wire_version: version,
+            },
+            Self::SystemRequired { operation } => Error::SystemRequired {
+                operation,
                 wire_version: version,
             },
             Self::Range {
@@ -179,6 +192,15 @@ pub(crate) const fn unsupported(version: WireVersion, request: &Request) -> Opti
         WireVersion::Stu3 => stu3::unsupported_parameter(request),
         WireVersion::R4 => r4::unsupported_parameter(request),
         WireVersion::R4B => r4b::unsupported_parameter(request),
+    }
+}
+
+/// Returns whether `request` names no system where `version` requires one.
+pub(crate) const fn requires_system(version: WireVersion, request: &Request) -> bool {
+    match version {
+        WireVersion::Stu3 => stu3::requires_system(request),
+        WireVersion::R4 => r4::requires_system(request),
+        WireVersion::R4B => r4b::requires_system(request),
     }
 }
 

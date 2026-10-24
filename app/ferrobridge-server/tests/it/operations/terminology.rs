@@ -232,9 +232,61 @@ async fn a_refused_translation_refuses_the_run_with_the_upstream_status()
             .body(Body::from(bundle()?))?,
     )
     .await?;
-    assert_ne!(StatusCode::OK, status, "{body}");
+    assert_eq!(StatusCode::BAD_GATEWAY, status, "{body}");
+    assert!(body.contains(r#""code":"transient""#), "{body}");
     assert!(body.contains(CONCEPT_MAP), "{body}");
     assert!(body.contains("404"), "the upstream status travels: {body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_failing_terminology_server_answers_502_naming_the_upstream_status()
+-> Result<(), Box<dyn StdError>> {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/r4/ConceptMap/$translate"))
+        .respond_with(terminology::outcome(
+            503,
+            "transient",
+            None,
+            "the synthetic terminology server is down",
+        ))
+        .mount(&server)
+        .await;
+    let root = mapping_tree_with(MODEL_FILE)?;
+    let (status, _, body) = call(
+        app_with(&root, translator(&server)?)?,
+        Request::post("/fhir/$toopenehr")
+            .header(header::CONTENT_TYPE, FHIR_JSON)
+            .body(Body::from(bundle()?))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::BAD_GATEWAY, status, "{body}");
+    assert!(body.contains(r#""code":"transient""#), "{body}");
+    assert!(body.contains("503"), "the upstream status travels: {body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_translation_answered_with_no_match_stays_a_422() -> Result<(), Box<dyn StdError>> {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/r4/ConceptMap/$translate"))
+        .respond_with(terminology::translate_no_match(
+            "no translation for that code",
+        ))
+        .mount(&server)
+        .await;
+    let root = mapping_tree_with(MODEL_FILE)?;
+    let (status, _, body) = call(
+        app_with(&root, translator(&server)?)?,
+        Request::post("/fhir/$toopenehr")
+            .header(header::CONTENT_TYPE, FHIR_JSON)
+            .body(Body::from(bundle()?))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+    assert!(body.contains(r#""code":"processing""#), "{body}");
     Ok(())
 }
 

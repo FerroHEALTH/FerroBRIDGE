@@ -44,13 +44,18 @@ macro_rules! per_release {
             /// Returns the `Parameters` that carries `request`, or the
             /// parameter this release cannot carry.
             fn encode(request: &Request) -> Result<Parameters, RequestError> {
-                match unsupported(request) {
-                    Some(parameter) => Err(RequestError::Unsupported {
+                if let Some(parameter) = unsupported(request) {
+                    return Err(RequestError::Unsupported {
                         operation: request.operation(),
                         parameter,
-                    }),
-                    None => parameters(request),
+                    });
                 }
+                if system_required(request) {
+                    return Err(RequestError::SystemRequired {
+                        operation: request.operation(),
+                    });
+                }
+                parameters(request)
             }
 
             /// Returns `concept` as a `Coding` of this release.
@@ -77,6 +82,12 @@ macro_rules! per_release {
             /// Returns the parameter of `request` this release cannot carry.
             pub(crate) const fn unsupported_parameter(request: &Request) -> Option<&'static str> {
                 unsupported(request)
+            }
+
+            /// Returns whether `request` names no system where this release
+            /// requires one.
+            pub(crate) const fn requires_system(request: &Request) -> bool {
+                system_required(request)
             }
 
             /// Returns the FHIR JSON body that carries `request`.
