@@ -162,6 +162,9 @@ classify() {
     # measure it; each reaches the console as its own files would.
     .claude/rules/leptos-ui.md) echo "packages ferrobridge-console" ;;
     scripts/release/console-*.sh | scripts/checks/console-*.sh) echo "packages ferrobridge-console" ;;
+    # The stray-literal guard and its allow and baseline files read only the
+    # console's sources; the CI `stray-literals` job runs it on every change.
+    scripts/checks/stray-literals.*) echo "packages ferrobridge-console" ;;
     # Installs the browser the console's journeys drive.
     scripts/release/journey-tools.sh) echo "packages ferrobridge-console" ;;
     # Read by the testkit's screenshot guard: every console screenshot and
@@ -590,6 +593,11 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+ferrobridge-console -ferrobridge-server"
   check "the console's bundle checks reach the console" "scripts/checks/console-bundle.sh" false \
     "+ferrobridge-console -ferrobridge-server"
+  check "the stray-literal guard reaches the console alone" "scripts/checks/stray-literals.sh" false \
+    "+ferrobridge-console -ferrobridge-server -fhir-codegen -fhir-types"
+  check "the stray-literal baseline reaches the console alone" \
+    "scripts/checks/stray-literals.baseline" false \
+    "+ferrobridge-console -ferrobridge-server -fhir-codegen"
   check "fhir-types reaches the console that links it" "crates/fhir-types/src/lib.rs" false \
     "+ferrobridge-console"
   check "the operator contract reaches the server and the console" \
