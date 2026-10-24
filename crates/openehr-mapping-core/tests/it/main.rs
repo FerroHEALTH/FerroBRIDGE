@@ -14,6 +14,7 @@ mod diagnostic;
 mod embedded;
 mod header;
 mod malformed;
+mod ordinals;
 mod party;
 mod party_build;
 mod paths;
