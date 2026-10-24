@@ -28,13 +28,28 @@ pub(super) fn embedded_templates(template: &OperationalTemplate) -> BTreeMap<Aql
     if let Some(id) = root.template_id.as_ref() {
         found.insert(AqlPath::new(String::new()), id.value.clone());
     }
-    walk(&root.attributes, "", &mut found);
+    visit_objects(&root.attributes, "", &mut |parent, attribute, child| {
+        if let CObject::CArchetypeRoot(root) = child
+            && let Some(id) = root.template_id.as_ref()
+            && let Some(path) = object_path(parent, attribute, child)
+        {
+            found.insert(AqlPath::new(path), id.value.clone());
+        }
+    });
     found
 }
 
-/// Records the embedded template ids under `attributes`, whose owner sits at
-/// `parent`.
-fn walk(attributes: &[CAttribute], parent: &str, found: &mut BTreeMap<AqlPath, String>) {
+/// Calls `visit` with the parent path, the attribute name and the object of
+/// every child under `attributes`, whose owner sits at `parent`, descending
+/// through every archetype root and complex object.
+///
+/// The `name` attribute is passed over: it constrains a node's name, which
+/// the path carries as a predicate ([`fixed_name`]), and holds no node.
+pub(super) fn visit_objects(
+    attributes: &[CAttribute],
+    parent: &str,
+    visit: &mut dyn FnMut(&str, &str, &CObject),
+) {
     for attribute in attributes {
         let (name, children) = match attribute {
             CAttribute::CMultipleAttribute(multiple) => {
@@ -48,23 +63,36 @@ fn walk(attributes: &[CAttribute], parent: &str, found: &mut BTreeMap<AqlPath, S
             continue;
         }
         for child in children {
-            let (node_id, attributes, template_id) = match child {
-                CObject::CArchetypeRoot(root) => (
-                    root.archetype_id.value.as_str(),
-                    &root.attributes,
-                    root.template_id.as_ref().map(|id| id.value.as_str()),
-                ),
-                CObject::CComplexObject(object) => {
-                    (object.node_id.as_str(), &object.attributes, None)
-                }
-                _ => continue,
-            };
-            let path = step(parent, name, node_id, fixed_name(attributes));
-            if let Some(id) = template_id {
-                found.insert(AqlPath::new(path.clone()), id.to_owned());
+            visit(parent, name, child);
+            if let Some(path) = object_path(parent, name, child) {
+                let attributes = match child {
+                    CObject::CArchetypeRoot(root) => &root.attributes,
+                    CObject::CComplexObject(object) => &object.attributes,
+                    _ => continue,
+                };
+                visit_objects(attributes, &path, visit);
             }
-            walk(attributes, &path, found);
         }
+    }
+}
+
+/// Returns the `aqlPath` of `child` under the attribute `attribute` of the
+/// node at `parent`, when it is an archetype root or a complex object.
+pub(super) fn object_path(parent: &str, attribute: &str, child: &CObject) -> Option<String> {
+    match child {
+        CObject::CArchetypeRoot(root) => Some(step(
+            parent,
+            attribute,
+            root.archetype_id.value.as_str(),
+            fixed_name(&root.attributes),
+        )),
+        CObject::CComplexObject(object) => Some(step(
+            parent,
+            attribute,
+            object.node_id.as_str(),
+            fixed_name(&object.attributes),
+        )),
+        _ => None,
     }
 }
 
