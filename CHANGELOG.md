@@ -87,6 +87,13 @@ crates on crates.io.
 
 ### Fixed
 
+- A coding with no `display` written into a `DV_TEXT`, whose value would
+  otherwise fall back to the coding's code, is looked up through
+  `CodeSystem/$lookup` as one written into a `DV_CODED_TEXT` is: the display
+  becomes the value, an unknown code refuses unless
+  `[terminology] display_fallback` is set, a failed call refuses, and with no
+  server the code stands. `fhirconnect` moves to 0.1.185 and
+  `ferrobridge-hl7v2` to 0.1.134 with it (#1188).
 - `$toopenehr` and `$tofhir` answer `502` with the issue type `transient`
   when the terminology server fails during the run, with the upstream status
   in the diagnostics, as the facade's writes do. A translation the server

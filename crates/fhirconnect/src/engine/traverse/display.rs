@@ -21,7 +21,8 @@ use crate::engine::cell::Produced;
 use crate::engine::fhir::FhirValue;
 use crate::engine::lens::coded_text::CODEABLE_CONCEPT_CELL;
 use crate::engine::lens::coded_text::CODING_CELL;
-use crate::engine::lens::text::CODEABLE_CONCEPT_CELL as TEXT_CODEABLE_CONCEPT_CELL;
+use crate::engine::lens::Fallback;
+use crate::engine::lens::text;
 use crate::engine::rm::RmValue;
 use crate::engine::terminology;
 use crate::engine::terminology::TerminologyError;
@@ -59,7 +60,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 let version = String::from(coded.defining_code.terminology_id.version_id());
                 let code = coded.defining_code.code_string.clone();
                 let from_code = coding_of(view, &system, &code).is_some_and(undisplayed)
-                    && filled_from_code(produced, &[CODING_CELL, CODEABLE_CONCEPT_CELL]);
+                    && filled_from_code(&produced.fallbacks, &[CODING_CELL, CODEABLE_CONCEPT_CELL]);
                 // NOTE: no specification governs this: our own design, a server addresses
                 // no archetype-local code, so its code stands as the page's alternative.
                 if !from_code || coded.value != code || LOCAL.contains(&system.as_str()) {
@@ -74,7 +75,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             }
             // NOTE: text.rs `rubric_of` reads DV_TEXT.adoc by DV_CODED_TEXT.adoc, whose
             // code fallback comes with the advice to resolve the display through a server.
-            RmValue::Text(ref mut text) => {
+            RmValue::Text(ref mut rubric) => {
                 let Some(coding) = first_coding(view) else {
                     return Ok(());
                 };
@@ -84,9 +85,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 ) else {
                     return Ok(());
                 };
-                let from_code = undisplayed(&coding)
-                    && filled_from_code(produced, &[TEXT_CODEABLE_CONCEPT_CELL]);
-                if !from_code || text.value != code {
+                let from_code = undisplayed(coding)
+                    && filled_from_code(&produced.fallbacks, &[text::CODEABLE_CONCEPT_CELL]);
+                if !from_code || rubric.value != code {
                     return Ok(());
                 }
                 let version = coding
@@ -97,7 +98,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 let display =
                     self.looked_up(mapping, String::from(system), String::from(code), version)?;
                 if let Some(ref display) = display {
-                    text.value.clone_from(display);
+                    rubric.value.clone_from(display);
                 }
                 display
             }
@@ -160,7 +161,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
 }
 
 /// Whether `coding` carries no display.
-fn undisplayed(coding: &&Coding) -> bool {
+fn undisplayed(coding: &Coding) -> bool {
     coding
         .display
         .as_ref()
@@ -169,9 +170,8 @@ fn undisplayed(coding: &&Coding) -> bool {
 }
 
 /// Whether one of `cells` filled the value from a code.
-fn filled_from_code(produced: &Produced<RmValue>, cells: &[&str]) -> bool {
-    produced
-        .fallbacks
+fn filled_from_code(fallbacks: &[Fallback], cells: &[&str]) -> bool {
+    fallbacks
         .iter()
         .any(|taken| taken.field() == VALUE && cells.contains(&taken.cell()))
 }

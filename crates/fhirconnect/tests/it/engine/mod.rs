@@ -15,6 +15,7 @@ mod composer;
 mod conditions;
 mod demographics;
 mod display;
+mod display_text;
 mod element_links;
 mod end_time;
 mod frames;

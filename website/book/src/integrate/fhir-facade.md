@@ -596,11 +596,17 @@ reported as a loss, and an untranslated required one refuses the resource.
 With no `[terminology]` section, a `conceptmap` mapping refuses with "no
 terminology server is configured to translate through".
 
-Display resolution through `$lookup` arrives with the registry of mapping
-functions in
-[issue #95](https://github.com/FerroHEALTH/FerroBRIDGE/issues/95). Until then
-a mapping that needs a display resolved refuses the unit rather than writing a
-coding without one.
+A coding with no `display` that goes into a `DV_CODED_TEXT`, or into a
+`DV_TEXT` whose value would otherwise fall back to the coding's code (the
+concept carries no `text` either), is looked up through `CodeSystem/$lookup`
+on every run into openEHR (a write, `$validate`, `$toopenehr` and the HL7 v2
+face): the display the server names becomes the value. A code the server does
+not know refuses the resource unless
+`[terminology] display_fallback` is `true`, which writes the code instead; a
+failed call refuses either way. With no `[terminology]` section the code
+stands as the value, and the run reports the fallback as a loss. An
+`DV_CODED_TEXT` code of an archetype-local terminology (`local` or `openehr`)
+is never looked up.
 
 ## Search
 
