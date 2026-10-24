@@ -231,8 +231,8 @@ impl<'a> Compiler<'a> {
     /// children after the parent "has been executed", so the parent converts
     /// its own value first. A class that pairs with the FHIR type itself
     /// outranks one reached through the text fallback of [`derive::element`]:
-    /// `types-of-mappings/data-type/DV_DATE_TIME.adoc` §DateTime pairs
-    /// `dateTime` with `DV_DATE_TIME`, while `DV_TEXT.adoc` §String pairs only
+    /// `types-of-mappings/data-type/DV_DATE_TIME.adoc` §`DateTime` pairs
+    /// `dateTime` with `DV_DATE_TIME`, while `DV_TEXT.adoc` §`String` pairs only
     /// `string`. Among the rest the alternative is the one whose class pairs
     /// with the FHIR type earliest in [`derive::PAIRS`], the first in template
     /// order on a tie (no specification governs the tie-break: our own design).
