@@ -28,8 +28,8 @@ use leptos_router::hooks::use_location;
 use openehr_mapping_core::diagnostic::Severity;
 
 use crate::app::{
-    ABOUT, CONNECTIONS, DASHBOARD, FACADE, HL7V2, MAPPINGS, MARK_DARK, MARK_LIGHT, OMOP,
-    PLAYGROUND, PREFERENCES, PRODUCT, SIGN_OUT, VERSION,
+    ABOUT, CONFIGURATION, CONNECTIONS, DASHBOARD, FACADE, HL7V2, MAPPINGS, MARK_DARK, MARK_LIGHT,
+    OMOP, PLAYGROUND, PREFERENCES, PRODUCT, SIGN_OUT, VERSION,
 };
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
@@ -262,7 +262,10 @@ fn navigation(path: &str, state: &Loaded<EngineState>) -> AnyView {
         Group {
             id: "nav-console",
             title: Cow::Owned(tr(Msg::ConsoleGroup)),
-            entries: vec![entry(ABOUT, Msg::About, Glyph::INFO, true)],
+            entries: vec![
+                entry(CONFIGURATION, Msg::Configuration, Glyph::FILE_TEXT, false),
+                entry(ABOUT, Msg::About, Glyph::INFO, true),
+            ],
         },
     ];
     sidebar(Sidebar {

@@ -13,6 +13,7 @@
 //! the console's pages: our own design.
 
 pub mod about;
+pub mod configuration;
 pub mod connections;
 pub mod dashboard;
 pub mod editor;
@@ -26,5 +27,6 @@ pub mod parts;
 pub mod playground;
 pub mod preferences;
 pub mod search;
+pub mod settings;
 pub mod sign_in;
 pub mod template;

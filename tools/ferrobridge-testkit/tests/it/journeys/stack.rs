@@ -18,7 +18,6 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use ferrobridge_server::boot::{Backoff, serve_settings};
-use ferrobridge_server::operator::OperatorSettings;
 use ferrobridge_testkit::oidc::Provider;
 use tokio::net::TcpListener;
 use wiremock::matchers::{method, path};
@@ -284,10 +283,11 @@ async fn bridge(
     let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
     listener.set_nonblocking(true)?;
     let bridge = format!("http://{}", listener.local_addr()?);
-    let [mappings, templates, identity] = [
+    let [mappings, templates, identity, console] = [
         tree.join("mappings"),
         tree.join("templates"),
         tree.join("identity.redb"),
+        tree.join("console"),
     ]
     .map(|file| toml::Value::String(file.display().to_string()));
     let operations = matches!(lanes, Lanes::All);
@@ -297,16 +297,13 @@ async fn bridge(
          [operations]\nenabled = {operations}\ncomposition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\nidentity_store = {identity}\n\
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
-         [auth]\nissuer = \"{issuer}\"\naudience = [\"{bridge}/fhir\"]\n",
+         [auth]\nissuer = \"{issuer}\"\naudience = [\"{bridge}/fhir\"]\n\n\
+         [operator]\nenabled = true\nmapping_dir = {console}\n",
         cdr = cdr.uri(),
         issuer = provider.issuer(),
     );
-    let mut settings =
-        ferrobridge_server::config::Config::from_sources(Some(&text), &BTreeMap::new())?
-            .resolve()?;
-    settings.operator = Some(OperatorSettings {
-        mapping_dir: Some(tree.join("console")),
-    });
+    let settings = ferrobridge_server::config::Config::from_sources(Some(&text), &BTreeMap::new())?
+        .resolve()?;
     // NOTE: no specification governs this: our own design; the binary drives
     // `serve_settings` on its main thread, so the bridge runs on a runtime of
     // its own thread, as the binary does.

@@ -32,6 +32,15 @@ crates on crates.io.
   read from a file, or unset), never its value. The document is
   `ferrobridge_operator_api::configuration::Configuration`, which the
   operator console decodes (#1147).
+- The operator console draws the running configuration: a Configuration
+  page with the Logging, Mappings and Server and access tabs, a Settings tab
+  on the FHIR facade, HL7 v2, the OMOP ETL and each connection, and the
+  host and credentials of each upstream in the Connections table. Every
+  value is read-only, with its TOML key and whether it came from the
+  environment or is the default, and every secret is shown by reference
+  alone; How configuration works opens from the line that names the file.
+  An empty `[auth] product_scope` is answered as the scope the bridge runs
+  on, `__ferrobridge.operator` (#1147).
 
 ## [0.0.11] - 2026-10-24
 

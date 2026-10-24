@@ -86,6 +86,9 @@ pub const OMOP: &str = "/omop";
 /// The connections.
 pub const CONNECTIONS: &str = "/connections";
 
+/// The bridge's running configuration.
+pub const CONFIGURATION: &str = "/configuration";
+
 /// Your preferences.
 pub const PREFERENCES: &str = "/preferences";
 
@@ -259,7 +262,17 @@ fn routes(session: SessionState) -> AnyView {
                 ssr=SsrMode::Async
             />
             <Route
+                path=path!("/hl7v2/:tab")
+                view=guarded(session, crate::pages::hl7v2::page)
+                ssr=SsrMode::Async
+            />
+            <Route
                 path=path!("/omop")
+                view=guarded(session, crate::pages::omop::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/omop/:tab")
                 view=guarded(session, crate::pages::omop::page)
                 ssr=SsrMode::Async
             />
@@ -271,6 +284,21 @@ fn routes(session: SessionState) -> AnyView {
             <Route
                 path=path!("/connections/:name")
                 view=guarded(session, crate::pages::connections::connection_page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/connections/:name/:tab")
+                view=guarded(session, crate::pages::connections::connection_page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/configuration")
+                view=guarded(session, crate::pages::configuration::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/configuration/:tab")
+                view=guarded(session, crate::pages::configuration::page)
                 ssr=SsrMode::Async
             />
             <Route

@@ -13,6 +13,7 @@
 
 use std::sync::Arc;
 
+use ferrobridge_operator_api::configuration::Configuration;
 use ferrobridge_operator_api::health::{Info, Readiness};
 use ferrobridge_operator_api::operator::{EngineState, Listed};
 use fhir_types::r4::capability_statement::CapabilityStatement;
@@ -42,6 +43,8 @@ pub struct Reads {
     listing: Arc<OnceCell<Loaded<Vec<Listed>>>>,
     /// The `CapabilityStatement`.
     capability: Arc<OnceCell<Loaded<Capability>>>,
+    /// The running configuration.
+    configuration: Arc<OnceCell<Loaded<Configuration>>>,
 }
 
 impl Reads {
@@ -124,6 +127,20 @@ pub async fn capability() -> Loaded<Capability> {
     cell.get_or_init(|| async {
         let (state, token) = crate::session::request::signed_in()?;
         loaded(state.bridge().capability(&token).await)
+    })
+    .await
+    .clone()
+}
+
+/// The configuration the bridge started on, `GET /operator/configuration`.
+///
+/// # Errors
+/// As [`info`].
+pub async fn configuration() -> Loaded<Configuration> {
+    let cell = reads().configuration;
+    cell.get_or_init(|| async {
+        let (state, token) = crate::session::request::signed_in()?;
+        loaded(state.bridge().configuration(&token).await)
     })
     .await
     .clone()

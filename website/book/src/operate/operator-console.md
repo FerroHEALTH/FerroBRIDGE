@@ -107,13 +107,20 @@ answers with the page it drew; the console registers no server function.
 - **Playground** (`/playground`, `/playground/toopenehr`,
   `/playground/validate`): runs `$tofhir`, `$toopenehr` and `$validate` as
   the operator, and keeps nothing.
-- **FHIR facade** (`/facade`, `/facade/capability`, `/facade/security`):
-  the facade's state, the resource types its `CapabilityStatement` serves,
-  and the SMART discovery document.
-- **HL7 v2** (`/hl7v2`) and **OMOP ETL** (`/omop`): whether the MLLP
-  listener runs and where, and whether an ETL is configured.
-- **Connections** (`/connections`, `/connections/{name}`): each upstream,
-  the lanes that use it and its state from the bridge's readiness.
+- **FHIR facade** (`/facade`, `/facade/capability`, `/facade/security`,
+  `/facade/settings`): the facade's state, the resource types its
+  `CapabilityStatement` serves, the SMART discovery document, and its
+  settings.
+- **HL7 v2** (`/hl7v2`, `/hl7v2/settings`) and **OMOP ETL** (`/omop`,
+  `/omop/settings`): whether the MLLP listener runs and where, whether an
+  ETL is configured, and each face's settings.
+- **Connections** (`/connections`, `/connections/{name}`,
+  `/connections/{name}/settings`): each upstream with its host, how it
+  signs in, the lanes that use it and its state from the bridge's
+  readiness, and its settings with its credentials by reference.
+- **Configuration** (`/configuration`, `/configuration/mappings`,
+  `/configuration/core`): the settings no face or connection owns:
+  logging, the mapping directories, and the server and who may call it.
 - **Your preferences** (`/preferences`, `/preferences/language`,
   `/preferences/keyboard`): appearance, language and region, and keyboard
   hints.
@@ -150,6 +157,15 @@ operator API, so they need `[operator] enabled = true` on the bridge and
 an operator token that carries the operator scope. Without either, those
 sections say the operator API is off, or show the bridge's refusal with
 its status, while the rest of the page still draws.
+
+Every Settings tab and the Configuration page read
+`GET /operator/configuration`, the configuration the bridge started on,
+so they are read-only: each row shows its value, its TOML key on hover,
+and whether the value came from the environment or is the default. A
+secret shows only whether it is set and the file it is read from, never
+its value. How configuration works, at the end of the line that names the
+file, says where each setting is shown and that a change is made in the
+file and takes effect at the next start.
 
 Your preferences keeps each choice in a cookie of its own for a year
 (`ferrobridge_console_theme`, `_density`, `_motion`, `_language`,
@@ -305,15 +321,27 @@ The resource types the facade serves.
 
 The SMART discovery document. [Dark theme](img/console/facade-security-dark.png).
 
+![The facade's settings](img/console/facade-settings.png)
+
+The facade's settings. [Dark theme](img/console/facade-settings-dark.png).
+
 ![HL7 v2](img/console/hl7v2.png)
 
 The HL7 v2 face of a bridge that runs no listener.
 [Dark theme](img/console/hl7v2-dark.png).
 
+![The HL7 v2 settings](img/console/hl7v2-settings.png)
+
+The HL7 v2 face's settings. [Dark theme](img/console/hl7v2-settings-dark.png).
+
 ![OMOP ETL](img/console/omop.png)
 
 The OMOP ETL of a bridge with no ETL configured.
 [Dark theme](img/console/omop-dark.png).
+
+![The OMOP ETL settings](img/console/omop-settings.png)
+
+The OMOP ETL's settings. [Dark theme](img/console/omop-settings-dark.png).
 
 ![Connections](img/console/connections.png)
 
@@ -323,7 +351,25 @@ The upstreams. [Dark theme](img/console/connections-dark.png).
 
 The openEHR CDR. [Dark theme](img/console/connection-cdr-dark.png).
 
+![A connection's settings](img/console/connection-cdr-settings.png)
+
+The openEHR CDR's settings, its credentials by reference.
+[Dark theme](img/console/connection-cdr-settings-dark.png).
+
 ### Console
+
+![Configuration](img/console/configuration.png)
+
+Configuration, Logging. [Dark theme](img/console/configuration-dark.png).
+
+![The Mappings tab of Configuration](img/console/configuration-mappings.png)
+
+Configuration, Mappings. [Dark theme](img/console/configuration-mappings-dark.png).
+
+![The Server and access tab of Configuration](img/console/configuration-core.png)
+
+Configuration, Server and access.
+[Dark theme](img/console/configuration-core-dark.png).
 
 ![Your preferences](img/console/preferences.png)
 

@@ -104,6 +104,13 @@ fn each_key_carries_its_value_and_whether_the_file_the_environment_or_the_defaul
         (&Value::Boolean(true), Source::File),
         entry(&configuration, "operator.enabled")?
     );
+    assert_eq!(
+        (
+            &Value::String(String::from("__ferrobridge.operator")),
+            Source::File
+        ),
+        entry(&configuration, "auth.product_scope")?
+    );
     assert_eq!(None, configuration.file, "the sources named no file path");
     configuration.read_at.parse::<jiff::Timestamp>()?;
     Ok(())
@@ -203,5 +210,27 @@ async fn an_operator_api_with_no_running_configuration_answers_404() -> Result<(
     let case = Case::new().await?;
     let response = case.get("/operator/configuration", Some(OPERATOR)).await?;
     assert_eq!(StatusCode::NOT_FOUND, response.status());
+    Ok(())
+}
+
+#[test]
+fn an_unset_operator_scope_is_answered_as_the_scope_the_bridge_runs_on()
+-> Result<(), Box<dyn StdError>> {
+    let text = concat!(
+        "[auth]\nenabled = true\nissuer = \"https://as.example.org/realms/ferro\"\n",
+        "audience = [\"https://bridge.example.org/fhir\"]\n\n",
+        "[operator]\nenabled = true\n",
+    );
+    let configuration = Config::from_sources(Some(text), &BTreeMap::new())?
+        .resolve()?
+        .configuration
+        .ok_or("an operator API answers its configuration")?;
+    assert_eq!(
+        (
+            &Value::String(String::from("__ferrobridge.operator")),
+            Source::Default
+        ),
+        entry(&configuration, "auth.product_scope")?
+    );
     Ok(())
 }
