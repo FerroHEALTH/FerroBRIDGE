@@ -17,7 +17,7 @@
 
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
-use fhir_types::r4::primitives::String as FhirString;
+use fhir_types::r4::primitives;
 use openehr_base::containers::NonEmptyVec;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
@@ -97,14 +97,14 @@ impl Lens<DvCodedText, CodeableConcept> for CodedTextLens {
             .defining_code
             .preferred_term
             .clone()
-            .map(FhirString::from);
+            .map(primitives::String::from);
         let mut codings = vec![defining];
         for mapping in equivalents(source.mappings.iter().flatten()) {
             codings.push(coding_of(mapping, CODEABLE_CONCEPT_CELL)?);
         }
         Ok(CodeableConcept {
             coding: codings,
-            text: Some(FhirString::from(source.value.clone())),
+            text: Some(primitives::String::from(source.value.clone())),
             ..CodeableConcept::default()
         })
     }
@@ -167,7 +167,7 @@ impl Lens<DvCodedText, Coding> for CodedTextLens {
         let mut coding = CodePhraseLens.get(&source.defining_code)?;
         // NOTE: DV_CODED_TEXT.adoc §Coding pairs `display` with `value`, so in
         // this cell the rubric travels and `preferred_term` has no counterpart.
-        coding.display = Some(FhirString::from(source.value.clone()));
+        coding.display = Some(primitives::String::from(source.value.clone()));
         Ok(coding)
     }
 
@@ -235,8 +235,8 @@ mod tests {
     use crate::engine::lens::code_phrase::tests::coding;
     use fhir_types::r4::codeable_concept::CodeableConcept;
     use fhir_types::r4::coding::Coding;
+    use fhir_types::r4::primitives;
     use fhir_types::r4::primitives::Code;
-    use fhir_types::r4::primitives::String as FhirString;
     use fhir_types::r4::primitives::Uri;
     use openehr_base::containers::NonEmptyVec;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
@@ -285,9 +285,9 @@ mod tests {
         ) -> Coding {
             Coding {
                 system: Some(Uri::from(system)),
-                version: version.map(FhirString::from),
+                version: version.map(primitives::String::from),
                 code: Some(Code::from(code)),
-                display: Some(FhirString::from(display)),
+                display: Some(primitives::String::from(display)),
                 ..Coding::default()
             }
         }
@@ -301,7 +301,7 @@ mod tests {
         ) -> CodeableConcept {
             CodeableConcept {
                 coding: codings,
-                text: Some(FhirString::from(text)),
+                text: Some(primitives::String::from(text)),
                 ..CodeableConcept::default()
             }
         }
@@ -357,7 +357,7 @@ mod tests {
                 code_of("http://loinc.org", "LP74849-8"),
                 code_of("http://snomed.info/sct", "386661006"),
             ],
-            text: Some(FhirString::from("Fever")),
+            text: Some(primitives::String::from("Fever")),
             ..CodeableConcept::default()
         };
         let lens = CodedTextLens::bound("http://snomed.info/sct");
@@ -384,7 +384,7 @@ mod tests {
                 code_of("http://loinc.org", "LP74849-8"),
                 code_of("http://snomed.info/sct", "386661006"),
             ],
-            text: Some(FhirString::from("Fever")),
+            text: Some(primitives::String::from("Fever")),
             ..CodeableConcept::default()
         };
         let lens = CodedTextLens::bound("http://example.org/other");
@@ -399,7 +399,7 @@ mod tests {
     fn an_absent_text_falls_back_to_the_display_and_is_recorded() {
         let view = CodeableConcept {
             coding: vec![Coding {
-                display: Some(FhirString::from("Fever")),
+                display: Some(primitives::String::from("Fever")),
                 ..code_of("http://loinc.org", "LP74849-8")
             }],
             ..CodeableConcept::default()
@@ -435,7 +435,7 @@ mod tests {
     #[test]
     fn a_concept_with_no_coding_is_refused() {
         let view = CodeableConcept {
-            text: Some(FhirString::from("Fever")),
+            text: Some(primitives::String::from("Fever")),
             ..CodeableConcept::default()
         };
         let error = <CodedTextLens as Lens<DvCodedText, CodeableConcept>>::put(

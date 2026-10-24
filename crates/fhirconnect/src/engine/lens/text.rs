@@ -12,7 +12,7 @@
 
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
-use fhir_types::r4::primitives::String as FhirString;
+use fhir_types::r4::primitives;
 use openehr_base::containers::NonEmptyVec;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
 
@@ -42,18 +42,18 @@ pub const CODEABLE_CONCEPT_CELL: &str = "DV_TEXT against CodeableConcept";
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TextLens;
 
-impl Lens<DvTextData, FhirString> for TextLens {
+impl Lens<DvTextData, primitives::String> for TextLens {
     fn cell(&self) -> &'static str {
         STRING_CELL
     }
 
-    fn get(&self, source: &DvTextData) -> Result<FhirString, LensError> {
-        Ok(FhirString::from(source.value.clone()))
+    fn get(&self, source: &DvTextData) -> Result<primitives::String, LensError> {
+        Ok(primitives::String::from(source.value.clone()))
     }
 
     fn put(
         &self,
-        view: &FhirString,
+        view: &primitives::String,
         existing: Option<&DvTextData>,
     ) -> Result<DvTextData, LensError> {
         let value = text_of(Some(&view.value)).ok_or(LensError::Missing {
@@ -67,7 +67,7 @@ impl Lens<DvTextData, FhirString> for TextLens {
         })
     }
 
-    fn fallbacks(&self, _view: &FhirString) -> Vec<Fallback> {
+    fn fallbacks(&self, _view: &primitives::String) -> Vec<Fallback> {
         Vec::new()
     }
 
@@ -90,7 +90,7 @@ impl Lens<DvTextData, CodeableConcept> for TextLens {
         }
         Ok(CodeableConcept {
             coding: codings,
-            text: Some(FhirString::from(source.value.clone())),
+            text: Some(primitives::String::from(source.value.clone())),
             ..CodeableConcept::default()
         })
     }
@@ -174,7 +174,7 @@ impl Lens<DvTextData, Coding> for TextLens {
             Some(mapping) => coding_of(mapping, CODING_CELL)?,
             None => Coding::default(),
         };
-        coding.display = Some(FhirString::from(source.value.clone()));
+        coding.display = Some(primitives::String::from(source.value.clone()));
         Ok(coding)
     }
 
@@ -246,8 +246,8 @@ mod tests {
     use crate::engine::lens::code_phrase::tests::coding;
     use fhir_types::r4::codeable_concept::CodeableConcept;
     use fhir_types::r4::coding::Coding;
+    use fhir_types::r4::primitives;
     use fhir_types::r4::primitives::Code;
-    use fhir_types::r4::primitives::String as FhirString;
     use fhir_types::r4::primitives::Uri;
     use openehr_base::containers::NonEmptyVec;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
@@ -288,7 +288,7 @@ mod tests {
         ) -> CodeableConcept {
             CodeableConcept {
                 coding: codings,
-                text: Some(FhirString::from(text)),
+                text: Some(primitives::String::from(text)),
                 ..CodeableConcept::default()
             }
         }
@@ -297,16 +297,16 @@ mod tests {
     proptest! {
         #[test]
         fn string_get_put(source in text_with(0..1)) {
-            let view: FhirString = TextLens.get(&source).expect("the value travels");
+            let view: primitives::String = TextLens.get(&source).expect("the value travels");
             let back = TextLens.put(&view, Some(&source)).expect("the string carries a value");
             assert_eq!(back, source, "GetPut failed for {source:?}");
         }
 
         #[test]
         fn string_put_get(text in "[A-Za-z ]{1,12}") {
-            let view = FhirString::from(text);
+            let view = primitives::String::from(text);
             let source: DvTextData = TextLens.put(&view, None).expect("the string carries a value");
-            let back: FhirString = TextLens.get(&source).expect("the value travels");
+            let back: primitives::String = TextLens.get(&source).expect("the value travels");
             assert_eq!(back, view, "PutGet failed for {view:?}");
         }
 
@@ -401,7 +401,7 @@ mod tests {
     #[test]
     fn a_display_only_coding_leaves_the_mappings_empty() {
         let view = Coding {
-            display: Some(FhirString::from("Fever")),
+            display: Some(primitives::String::from("Fever")),
             ..Coding::default()
         };
         let source: DvTextData = TextLens
@@ -541,13 +541,13 @@ mod tests {
                 Coding {
                     system: Some(Uri::from("http://snomed.info/sct")),
                     code: code.map(Code::from),
-                    display: display.map(FhirString::from),
+                    display: display.map(primitives::String::from),
                     ..Coding::default()
                 },
                 Coding {
                     system: Some(Uri::from("http://snomed.info/sct")),
                     code: Some(Code::from("386661006")),
-                    display: Some(FhirString::from("Second")),
+                    display: Some(primitives::String::from("Second")),
                     ..Coding::default()
                 },
             ],
@@ -558,7 +558,7 @@ mod tests {
     #[test]
     fn the_text_wins_over_the_first_display() {
         let view = CodeableConcept {
-            text: Some(FhirString::from("Fever")),
+            text: Some(primitives::String::from("Fever")),
             ..untexted(Some("Pyrexia"), Some("386661006"))
         };
         let source: DvTextData = TextLens.put(&view, None).expect("the text names the value");

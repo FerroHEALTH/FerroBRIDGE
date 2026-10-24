@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that writes a Condition's code, a
+# CodeableConcept, into the DV_TEXT of items[at0002], so the engine resolves
+# the display of a rubric that fell back to a code against the synthetic
+# ferrobridge.diagnose.v1 template.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_display_text
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "problemName"
+    with:
+      fhir: "$resource.code"
+      openehr: "$archetype/data[at0001]/items[at0002]"

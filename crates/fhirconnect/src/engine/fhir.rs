@@ -22,12 +22,12 @@ use fhir_types::r4::count::Count;
 use fhir_types::r4::duration::Duration;
 use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::period::Period;
+use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::Boolean;
 use fhir_types::r4::primitives::Date;
 use fhir_types::r4::primitives::DateTime;
 use fhir_types::r4::primitives::Decimal;
 use fhir_types::r4::primitives::Integer;
-use fhir_types::r4::primitives::String as FhirString;
 use fhir_types::r4::primitives::Time;
 use fhir_types::r4::primitives::Url;
 use fhir_types::r4::quantity::Quantity;
@@ -191,7 +191,7 @@ impl FhirKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FhirValue {
     /// A `string`.
-    String(FhirString),
+    String(primitives::String),
     /// A `date`.
     Date(Date),
     /// A `dateTime`.
@@ -301,7 +301,7 @@ impl FhirValue {
             source,
         };
         match kind {
-            FhirKind::String => FhirString::from_json_parts(Some(value), None, &mut path)
+            FhirKind::String => primitives::String::from_json_parts(Some(value), None, &mut path)
                 .map(Self::String)
                 .map_err(refuse),
             FhirKind::Date => Date::from_json_parts(Some(value), None, &mut path)
