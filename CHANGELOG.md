@@ -75,7 +75,12 @@ crates on crates.io.
 - An untyped `dateTime` mapped onto an `ELEMENT` whose value admits
   `DV_TEXT` and `DV_DATE_TIME` converts into `DV_DATE_TIME` whatever the
   template order: a class that pairs with the FHIR type directly outranks
-  the text fallback. `fhirconnect` moves to 0.1.181 (#1114).
+  the text fallback. `fhirconnect` moves to 0.1.181 and `ferrobridge-hl7v2`
+  to 0.1.129 with it (#1114).
+- `$toopenehr` and `$tofhir` answer `502` with the issue type `transient`
+  when the terminology server fails during the run, with the upstream status
+  in the diagnostics, as the facade's writes do. A translation the server
+  answers with no match stays a `422` (#1119).
 
 ## [0.0.11] - 2026-10-24
 
