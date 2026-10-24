@@ -398,7 +398,7 @@ pub(crate) fn refuse(answer: &status::Answer) -> Refusal {
 
 /// Returns the refusal an identity-store failure renders as.
 pub(crate) fn store_refusal(error: &crate::facade::identity::store::StoreError) -> Refusal {
-    Refusal::from(ingest::store_refusal(error))
+    Refusal::from(ingest::refusal::store_refusal(error))
 }
 
 /// Returns the refusal a malformed stored identifier renders as.

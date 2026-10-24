@@ -35,7 +35,6 @@ use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::NoReferences;
 use fhirconnect::engine::seam::ReferenceSource;
 use fhirconnect::engine::subject::SubjectIdentifier;
-use fhirconnect::engine::traverse::error::EngineError;
 use fhirconnect::resolve::program::binding::TemplateId;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
@@ -55,10 +54,8 @@ use crate::facade::identity::claims::Claims;
 use crate::facade::identity::record::CommittedSource;
 use crate::facade::identity::record::ConsumedSource;
 use crate::facade::identity::store::Store;
-use crate::facade::identity::store::StoreError;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
-use crate::facade::outcome::chain;
 use crate::facade::programs::Loaded;
 use crate::facade::programs::Programs;
 use crate::facade::request::Inbound;
@@ -681,54 +678,6 @@ pub enum RepresentationError {
         #[source]
         source: serde_json::Error,
     },
-}
-
-/// Returns the refusal one engine error renders as.
-///
-/// An element the program cannot map refuses the unit (no specification
-/// governs this: our own design), so the answer is a `422` whose diagnostics
-/// name the mapping and the element the engine refused at.
-///
-/// A run refused because a referenced resource could not be fetched
-/// ([`crate::facade::references::Unfetched`]) failed upstream, so it answers
-/// the [`crate::facade::status::UPSTREAM`] row, a `502` with `transient`, and
-/// so does a run refused because the terminology server failed
-/// ([`crate::terminology::failed_upstream`]); the diagnostics carry the
-/// upstream status the failure names.
-#[must_use]
-pub fn engine_refusal(error: &EngineError) -> Refused {
-    let row = status::UPSTREAM;
-    if crate::facade::references::unfetched(error).is_some() {
-        return Refused::new(
-            row.status(),
-            Issue::error(row.issue())
-                .diagnosing(chain(error))
-                .detailing("a resource the mapping reads could not be fetched"),
-        );
-    }
-    if crate::terminology::failed_upstream(error) {
-        return Refused::new(
-            row.status(),
-            Issue::error(row.issue())
-                .diagnosing(chain(error))
-                .detailing("the terminology server failed while the mapping ran"),
-        );
-    }
-    Refused::new(
-        StatusCode::UNPROCESSABLE_ENTITY,
-        Issue::error(IssueType::Processing)
-            .diagnosing(chain(error))
-            .detailing("the mapping refused this resource"),
-    )
-}
-
-/// Returns the refusal an identity-store failure renders as.
-#[must_use]
-pub fn store_refusal(error: &StoreError) -> Refused {
-    Refused::new(
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Issue::error(IssueType::Exception).diagnosing(chain(&error)),
-    )
 }
 
 #[cfg(test)]

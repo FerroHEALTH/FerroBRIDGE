@@ -44,13 +44,13 @@ use super::Written;
 use super::binding::representation;
 use super::binding::resource_source;
 use super::binding::strict_read;
-use super::engine_refusal;
 use super::pairing::pair;
 use super::refusal::cdr_refusal;
+use super::refusal::engine_refusal;
+use super::refusal::store_refusal;
 use super::refusal::stored_identifier;
 use super::refusal::unbound;
 use super::refusal::upstream_refusal;
-use super::store_refusal;
 use super::transaction::outcomes;
 
 /// Returns the EHR and the contribution a commit record names.
