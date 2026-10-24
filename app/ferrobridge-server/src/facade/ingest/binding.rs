@@ -44,8 +44,8 @@ use super::Provenance;
 use super::Refused;
 use super::RepresentationError;
 use super::Written;
-use super::engine_refusal;
-use super::store_refusal;
+use super::refusal::engine_refusal;
+use super::refusal::store_refusal;
 
 /// Returns the consumed-source key of one resource: its `resourceType`, `id`
 /// and `meta.versionId`, or nothing when it has no `id`.

@@ -134,7 +134,7 @@ pub(crate) async fn validate(
             if crate::facade::references::unfetched(&error).is_some()
                 || crate::terminology::failed_upstream(&error) =>
         {
-            return Err(crate::facade::ingest::engine_refusal(&error).into());
+            return Err(crate::facade::ingest::refusal::engine_refusal(&error).into());
         }
         Err(error) => return Ok(invalid(&crate::facade::outcome::chain(&error))),
     };

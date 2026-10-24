@@ -37,7 +37,6 @@ use super::binding::representation;
 use super::binding::resource_source;
 use super::binding::strict_read;
 use super::claim::unclaimed;
-use super::engine_refusal;
 use super::linked::Built;
 use super::linked::Linker;
 use super::linked::with_committed;
@@ -45,8 +44,9 @@ use super::pairing::same_content;
 use super::reconcile::one_composition;
 use super::refusal::cdr_refusal;
 use super::refusal::ehr_refusal;
+use super::refusal::engine_refusal;
+use super::refusal::store_refusal;
 use super::refusal::upstream_refusal;
-use super::store_refusal;
 
 impl Ingest<'_> {
     /// Returns what the identity map knows of the source a single create of
