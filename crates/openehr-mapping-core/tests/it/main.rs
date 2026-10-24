@@ -17,6 +17,7 @@ mod malformed;
 mod party;
 mod party_build;
 mod paths;
+mod ordinals;
 mod pins;
 mod registry;
 mod terms;

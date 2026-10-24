@@ -25,6 +25,12 @@ crates on crates.io.
 
 ### Added
 
+- `WebTemplateIndex::ordinal_options` returns the options an OPT 1.4
+  `C_DV_ORDINAL` constrains at a `DV_ORDINAL` node, in template order: each
+  `OrdinalOption` carries the ordinal `value` and the code and terminology
+  of its symbol, and a node with no ordinal constraint answers `None`.
+  `openehr-mapping-core` moves to 0.1.127, `fhirconnect` to 0.1.183 and
+  `ferrobridge-hl7v2` to 0.1.131 with it (#1090).
 - `GET /operator/configuration` answers the configuration the bridge started
   on, behind `[operator]` and the operator scope like the other operator
   routes: every key with its value and its source (the file, the
