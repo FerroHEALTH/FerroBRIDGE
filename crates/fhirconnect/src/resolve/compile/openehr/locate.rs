@@ -6,7 +6,7 @@
 
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::template::PathError;
-use openehr_rm::v1_2::model as rm_model;
+use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::paths::RmPath;
 
 use crate::resolve::compile::Compiler;
@@ -187,7 +187,7 @@ pub(super) fn rm_tail(rm_type: &str, tail: &RmPath) -> Result<Option<String>, St
         let mut declared: Option<&'static str> = None;
         let mut next: Vec<&'static str> = Vec::new();
         for candidate in &candidates {
-            let Some(found) = rm_model::attribute(candidate, attribute) else {
+            let Some(found) = model::attribute(candidate, attribute) else {
                 continue;
             };
             let held = if position == 0 {
@@ -220,7 +220,7 @@ pub(super) fn rm_tail(rm_type: &str, tail: &RmPath) -> Result<Option<String>, St
 
 /// Returns the one concrete form of an abstract class, or the class itself.
 fn concrete_leaf(declared: &'static str) -> String {
-    let Some(class) = rm_model::class(declared) else {
+    let Some(class) = model::class(declared) else {
         return String::from(declared);
     };
     if !class.is_abstract {
@@ -230,7 +230,7 @@ fn concrete_leaf(declared: &'static str) -> String {
         .descendants
         .iter()
         .copied()
-        .filter(|name| rm_model::class(name).is_some_and(|found| !found.is_abstract))
+        .filter(|name| model::class(name).is_some_and(|found| !found.is_abstract))
         .collect();
     match *concrete.as_slice() {
         [only] => String::from(only),
@@ -243,7 +243,7 @@ fn concrete_leaf(declared: &'static str) -> String {
 /// An empty result means the reference model carries no class of that name,
 /// which is what stops [`rm_tail`] rather than refusing.
 pub(super) fn concrete_forms(rm_type: &str) -> Vec<&'static str> {
-    let Some(class) = rm_model::class(rm_type) else {
+    let Some(class) = model::class(rm_type) else {
         return Vec::new();
     };
     let mut forms: Vec<&'static str> = vec![class.name];

@@ -15,7 +15,7 @@ use crate::model::ast::keyword::Direction;
 use crate::resolve::error::ResolveCode;
 use crate::resolve::extensions::Node;
 use crate::resolve::extensions::diagnostic;
-use crate::resolve::program::condition::Condition as CompiledCondition;
+use crate::resolve::program::condition;
 use crate::resolve::program::condition::ConditionParts;
 use crate::resolve::program::manual::Manual;
 use crate::resolve::program::mapping::Derived;
@@ -267,7 +267,7 @@ impl<'a> Compiler<'a> {
         fhir: Option<&FhirTarget>,
         openehr: Option<&OpenehrTarget>,
         path: &ModelPath,
-    ) -> (Option<CompiledCondition>, Option<CompiledCondition>) {
+    ) -> (Option<condition::Condition>, Option<condition::Condition>) {
         let file = node.origin;
         let method = node.mapping;
         let fhir_condition = method.fhir_condition.as_ref().and_then(|condition| {
@@ -307,7 +307,7 @@ impl<'a> Compiler<'a> {
         direction: Direction,
         path: &ModelPath,
         guard: &str,
-    ) -> Option<CompiledCondition> {
+    ) -> Option<condition::Condition> {
         let owner = file.header().name().value();
         let on_fhir = direction == Direction::FhirToOpenehr;
         let root = if on_fhir {
@@ -353,7 +353,7 @@ impl<'a> Compiler<'a> {
             })
             .collect();
         let attachment = attachment_of(&root, guard);
-        Some(CompiledCondition::new(ConditionParts {
+        Some(condition::Condition::new(ConditionParts {
             direction,
             target: root,
             attributes,

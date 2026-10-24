@@ -8,7 +8,7 @@ use core::str::FromStr;
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::path::MappingPath;
 use openehr_mapping_core::position::Located;
-use openehr_rm::v1_2::model as rm_model;
+use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::paths::PathSegment;
 use openehr_rm::v1_2::paths::RmPath;
 
@@ -115,11 +115,11 @@ impl<'a> Compiler<'a> {
         };
         let container = concrete_forms(&parent)
             .into_iter()
-            .find_map(|form| rm_model::attribute(form, &segment.attribute))
+            .find_map(|form| model::attribute(form, &segment.attribute))
             .map(|attribute| attribute.container);
         match container {
             None => true,
-            Some(rm_model::Container::None) => {
+            Some(model::Container::None) => {
                 let written = path.segments.get(..end).unwrap_or_default();
                 self.interior
                     .iter()

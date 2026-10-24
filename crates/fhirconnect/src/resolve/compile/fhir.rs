@@ -17,7 +17,7 @@ use crate::model::ast::keyword::Direction;
 use crate::resolve::error::ResolveCode;
 use crate::resolve::extensions::diagnostic;
 use crate::resolve::program::target::FhirTarget;
-use crate::tree::element::resolve as resolve_element;
+use crate::tree::element;
 use crate::tree::path::FhirPath;
 use crate::tree::path::Writability;
 
@@ -130,7 +130,7 @@ impl<'a> Compiler<'a> {
             return None;
         }
         let level = scope.enclosing.len().saturating_sub(bound_in);
-        match resolve_element(self.table, resource.as_str(), &anchored) {
+        match element::resolve(self.table, resource.as_str(), &anchored) {
             Ok(resolved) => Some(FhirTarget::new(anchored, resolved).at_level(level)),
             Err(error) => {
                 self.diagnostics.push(diagnostic(
