@@ -12,7 +12,8 @@
 //! `arbitrary_precision`, which changes how every number in the build graph
 //! deserializes, so the second half of this file pins what a dependent sees.
 
-use fhir_types::codec::{Json, Path as ElementPath, Value, expect_object};
+use fhir_types::codec;
+use fhir_types::codec::{Json, Value, expect_object};
 use serde::{Deserialize, Serialize};
 
 /// A decimal with a trailing zero, one past `f64` precision, and an exponent.
@@ -30,7 +31,7 @@ fn parameters(decimal: &str) -> String {
 fn round_trip<T: Json + Serialize>(decimal: &str, version: &str) {
     let text = parameters(decimal);
     let carried: Value = serde_json::from_str(&text).expect("the document parses");
-    let mut path = ElementPath::root("Parameters");
+    let mut path = codec::Path::root("Parameters");
     let object = expect_object(&carried, &path).expect("an object");
     let typed = T::from_json(object, &mut path).expect("the document decodes");
     let document =
@@ -58,7 +59,7 @@ fn a_decimal_keeps_its_lexical_form_in_every_served_version() {
 fn a_decimal_reaches_the_typed_value_as_the_text_the_document_carried() {
     for decimal in DECIMALS {
         let carried: Value = serde_json::from_str(&parameters(decimal)).expect("parses");
-        let mut path = ElementPath::root("Parameters");
+        let mut path = codec::Path::root("Parameters");
         let object = expect_object(&carried, &path).expect("an object");
         let typed = fhir_types::r4b::parameters::Parameters::from_json(object, &mut path)
             .expect("the document decodes");

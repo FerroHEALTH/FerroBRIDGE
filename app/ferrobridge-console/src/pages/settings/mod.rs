@@ -23,7 +23,8 @@ use ferrobridge_operator_api::configuration::{Configuration, Entry, SecretState,
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::dialog::{Explanation, info_dialog};
 use ferrohealth_ui::view::layout::bullet_list;
-use ferrohealth_ui::view::secret::{SecretState as Shown, secret_state};
+use ferrohealth_ui::view::secret;
+use ferrohealth_ui::view::secret::secret_state;
 use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::template::settings::{
     How, Setting, file_line, setting_row, settings_panel,
@@ -164,11 +165,11 @@ fn value(held: &Value, shape: Shape) -> AnyView {
 }
 
 /// Returns the state of a secret as the library draws it.
-fn shown(state: &SecretState) -> Shown {
+fn shown(state: &SecretState) -> secret::SecretState {
     match state {
-        SecretState::Set => Shown::Redacted,
-        SecretState::File { path } => Shown::Set(path.clone()),
-        SecretState::Unset => Shown::Unset,
+        SecretState::Set => secret::SecretState::Redacted,
+        SecretState::File { path } => secret::SecretState::Set(path.clone()),
+        SecretState::Unset => secret::SecretState::Unset,
     }
 }
 

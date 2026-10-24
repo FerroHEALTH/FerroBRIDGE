@@ -43,7 +43,8 @@ use fhir_types::r4::operations::code_system_lookup::{
 use fhir_types::r4::operations::concept_map_translate::{
     ConceptMapTranslateRequest, ConceptMapTranslateResponse,
 };
-use fhir_types::r4::primitives::{Boolean, String as FhirString};
+use fhir_types::r4::primitives;
+use fhir_types::r4::primitives::Boolean;
 use fhirconnect::engine::terminology::{NoTerminology, Terminology, TerminologyError};
 
 use crate::terminology::fetch::{Answer, Displayed, Lookup, fetch};
@@ -540,8 +541,8 @@ fn unresolved() -> ConceptMapTranslateResponse {
 /// discarded.
 fn undisplayed() -> CodeSystemLookupResponse {
     CodeSystemLookupResponse {
-        name: FhirString::from("unresolved"),
-        display: FhirString::from("unresolved"),
+        name: primitives::String::from("unresolved"),
+        display: primitives::String::from("unresolved"),
         ..CodeSystemLookupResponse::default()
     }
 }
