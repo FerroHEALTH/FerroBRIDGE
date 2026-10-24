@@ -672,3 +672,55 @@ async fn check_names_the_parameter_stu3_lacks_and_passes_the_rest() -> Result<()
     assert_eq!(0, received(&server).await?);
     Ok(())
 }
+
+#[tokio::test]
+async fn a_code_in_context_is_refused_because_stu3_requires_a_system()
+-> Result<(), Box<dyn StdError>> {
+    let server = MockServer::start().await;
+    mount(
+        &server,
+        "ValueSet/$validate-code",
+        terminology::validate_code(true, None, None),
+    )
+    .await;
+    let stu3 = client(&server, STU3)?;
+    let in_context = validation(Coded::InContext {
+        context: String::from(
+            "http://example.org/fhir/StructureDefinition/synthetic-profile#Observation.status",
+        ),
+        code: fixtures::TERM_MEMBER_CODE.to_owned(),
+        display: None,
+    });
+    let error = stu3
+        .validate(&in_context)
+        .await
+        .expect_err("STU3 $validate-code: if a code is provided, a system must be provided");
+    assert!(
+        matches!(
+            &error,
+            Error::SystemRequired {
+                operation: "ValueSet/$validate-code",
+                wire_version: WireVersion::Stu3,
+            }
+        ),
+        "{error:?}"
+    );
+    assert_eq!("system-required", error.kind());
+    let checked = stu3
+        .check(&Request::ValidateCode(in_context.clone()))
+        .expect_err("check answers what validate refuses");
+    assert!(
+        matches!(checked, Error::SystemRequired { .. }),
+        "{checked:?}"
+    );
+    let batched = stu3
+        .validate_all(&[in_context, validation(Coded::Coding(member()))])
+        .await
+        .expect_err("a batch holding the code is refused whole");
+    assert!(
+        matches!(batched, Error::SystemRequired { .. }),
+        "{batched:?}"
+    );
+    assert_eq!(0, received(&server).await?, "nothing was sent");
+    Ok(())
+}
