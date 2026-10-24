@@ -25,8 +25,8 @@ use fhir_types::r4::operations::code_system_lookup::CodeSystemLookupRequest;
 use fhir_types::r4::operations::code_system_lookup::CodeSystemLookupResponse;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateRequest;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateResponse;
-use fhir_types::r4::primitives::Code;
 use fhir_types::r4::primitives;
+use fhir_types::r4::primitives::Code;
 use fhir_types::r4::primitives::Uri;
 
 /// The terminology server a run translates codes through.
@@ -137,7 +137,8 @@ pub fn request(url: &str, coding: &Coding) -> Result<ConceptMapTranslateRequest,
         url: Some(Uri::from(url)),
         system: Some(Uri::from(system)),
         code: Some(Code::from(code)),
-        version: text(coding.version.as_ref().map(|version| &version.value)).map(primitives::String::from),
+        version: text(coding.version.as_ref().map(|version| &version.value))
+            .map(primitives::String::from),
         ..ConceptMapTranslateRequest::default()
     })
 }
@@ -252,9 +253,9 @@ mod tests {
     use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateRequest;
     use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateResponse;
     use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateResponseMatch;
+    use fhir_types::r4::primitives;
     use fhir_types::r4::primitives::Boolean;
     use fhir_types::r4::primitives::Code;
-    use fhir_types::r4::primitives;
     use fhir_types::r4::primitives::Uri;
 
     fn coding(system: &str, code: &str, display: Option<&str>) -> Coding {

@@ -24,9 +24,9 @@ use crate::resolve::program::mapping::EventTime;
 use crate::resolve::program::mapping::Pairing;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
+use crate::tree::element;
 use crate::tree::element::Location;
 use crate::tree::element::Move;
-use crate::tree::element;
 use crate::tree::path::FhirPath;
 
 use crate::resolve::compile::Compiler;

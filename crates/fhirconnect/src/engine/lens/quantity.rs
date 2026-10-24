@@ -24,10 +24,10 @@
 //! - `magnitude_status` admits `~`, which no `comparator` states, so a value
 //!   with it is refused rather than written as a point value.
 
+use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::Code;
 use fhir_types::r4::primitives::Decimal;
 use fhir_types::r4::primitives::Integer;
-use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::Uri;
 use fhir_types::r4::quantity::Quantity;
 use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
@@ -279,10 +279,10 @@ mod tests {
     use super::UCUM;
     use crate::engine::lens::Lens;
     use crate::engine::lens::LensError;
+    use fhir_types::r4::primitives;
     use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives::Decimal;
     use fhir_types::r4::primitives::Integer;
-    use fhir_types::r4::primitives;
     use fhir_types::r4::quantity::Quantity;
     use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
     use proptest::option;

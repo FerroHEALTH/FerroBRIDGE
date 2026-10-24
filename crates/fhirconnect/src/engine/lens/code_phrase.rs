@@ -16,8 +16,8 @@
 //! with `coding.display` in so many words.
 
 use fhir_types::r4::coding::Coding;
-use fhir_types::r4::primitives::Code;
 use fhir_types::r4::primitives;
+use fhir_types::r4::primitives::Code;
 use fhir_types::r4::primitives::Uri;
 use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
@@ -166,8 +166,8 @@ pub(crate) mod tests {
     use crate::engine::lens::Lens;
     use crate::engine::lens::LensError;
     use fhir_types::r4::coding::Coding;
-    use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives;
+    use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives::Uri;
     use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;

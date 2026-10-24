@@ -188,7 +188,7 @@ fn concept_of(
     Ok(fhir_types::r4::codeable_concept::CodeableConcept {
         coding: vec![fhir_types::r4::coding::Coding {
             system: Some(Uri::from(system)),
-            code: Some(fhir_types::r4::primitives::Code::from(code)),
+            code: Some(primitives::Code::from(code)),
             ..fhir_types::r4::coding::Coding::default()
         }],
         ..fhir_types::r4::codeable_concept::CodeableConcept::default()

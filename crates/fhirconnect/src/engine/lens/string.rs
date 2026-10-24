@@ -20,8 +20,8 @@
 
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::identifier::Identifier;
-use fhir_types::r4::primitives::Code;
 use fhir_types::r4::primitives;
+use fhir_types::r4::primitives::Code;
 use fhir_types::r4::primitives::Uri;
 use fhir_types::r4::reference::Reference;
 
@@ -203,8 +203,8 @@ mod tests {
     use crate::engine::lens::Lens;
     use fhir_types::r4::coding::Coding;
     use fhir_types::r4::identifier::Identifier;
-    use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives;
+    use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives::Uri;
     use fhir_types::r4::reference::Reference;
     use proptest::prop_compose;

@@ -105,7 +105,11 @@ impl Lens<PartyRef, Reference> for PartyRefLens<'_> {
             ));
         }
         Ok(Reference {
-            reference: Some(primitives::String::from(format!("{}/{}", self.target, id.value()))),
+            reference: Some(primitives::String::from(format!(
+                "{}/{}",
+                self.target,
+                id.value()
+            ))),
             ..Reference::default()
         })
     }

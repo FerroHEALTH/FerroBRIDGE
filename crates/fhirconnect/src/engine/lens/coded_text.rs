@@ -235,8 +235,8 @@ mod tests {
     use crate::engine::lens::code_phrase::tests::coding;
     use fhir_types::r4::codeable_concept::CodeableConcept;
     use fhir_types::r4::coding::Coding;
-    use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives;
+    use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives::Uri;
     use openehr_base::containers::NonEmptyVec;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
