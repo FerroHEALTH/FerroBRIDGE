@@ -23,6 +23,19 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.11] - 2026-10-24
+
+The operator console release. The console is rebuilt page for page on
+FerroUI 0.3.6 and renamed from `ferrobridge-viewer` to `ferrobridge-console`,
+so its image, environment variables, compose profile, cookies and page
+addresses change: the Changed section below lists each, with what an
+operator changes. Release images are scanned before they are tagged, every
+release carries a vulnerability record in which each finding is judged, and
+the notes state the support period and link the CRA information for users.
+FHIRconnect registers the last `mappingCode` functions of the published
+library and gains display resolution, `NULL_FLAVOUR`, the `EVENT` choice and
+the quantity, temporal, URI, string and interval data-type pairs.
+
 ### Added
 
 - The book has a [CRA information for users](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)
@@ -358,7 +371,11 @@ crates on crates.io.
   `FERROBRIDGE_CONSOLE_CONFIG`; in `compose.yaml` the profile and service
   `viewer` are `console` and the secret file
   `secrets/viewer_oidc_client_secret` is
-  `secrets/console_oidc_client_secret`. The session, sign-in and theme
+  `secrets/console_oidc_client_secret`, mounted at
+  `/run/secrets/console_oidc_client_secret`; the compose variables
+  `FERROBRIDGE_VIEWER_PORT` and `FERROBRIDGE_VIEWER_OIDC_CLIENT_SECRET_FILE`
+  are `FERROBRIDGE_CONSOLE_PORT` and
+  `FERROBRIDGE_CONSOLE_OIDC_CLIENT_SECRET_FILE`. The session, sign-in and theme
   cookies are renamed from `ferrobridge_viewer_*` to
   `ferrobridge_console_*`, so every operator signs in again after the
   upgrade and the theme starts from the system's. The CI job and the build
@@ -4573,7 +4590,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.10...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.11...HEAD
+[0.0.11]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.10...v0.0.11
 [0.0.10]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.9...v0.0.10
 [0.0.9]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.7...v0.0.8
