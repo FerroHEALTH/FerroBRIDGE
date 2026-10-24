@@ -39,7 +39,7 @@ crate.
   with the page `server::render` draws, the outcome in context;
   `tests/it/forms.rs` lists every post, holds each to a live session from
   the console's own pages, and asserts no server function is registered.
-- **A view draws with `ferrohealth-ui`** (FerroUI, pinned `=0.3.5`): its
+- **A view draws with `ferrohealth-ui`** (FerroUI, pinned `=0.3.6`): its
   templates, components and brand theme (`BRAND.theme()`), never a local
   copy or override; a gap is a FerroUI issue and a `TODO(#N)` naming its tracking issue here. Each
   preference is the server's, drawn from its own cookie

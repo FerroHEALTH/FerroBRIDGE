@@ -8,21 +8,21 @@ paths: ["app/ferrobridge-console/**"]
 # Leptos console rules (`app/ferrobridge-console`, and any Leptos code)
 
 **FerroUI leads the UI.** The console draws with `ferrohealth-ui`, pinned
-exactly in the root `[workspace.dependencies]` (today `=0.3.5`, with
+exactly in the root `[workspace.dependencies]` (today `=0.3.6`, with
 its `split` feature on in the console crate), and the
 FerroUI repository (FerroHEALTH/FerroUI) is the source for its components,
 design, tokens, icons, accessibility bar, interaction contract, words and
 quality control. Read these first, at the git tag that matches the pin
-(today `v0.3.5`):
+(today `v0.3.6`):
 
-- [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.5/docs/consoles.md):
+- [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.6/docs/consoles.md):
   the consumer guide, how a console uses the library.
-- [`.claude/rules/leptos-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.5/.claude/rules/leptos-ui.md):
+- [`.claude/rules/leptos-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.6/.claude/rules/leptos-ui.md):
   the component rules of every FerroHEALTH console. The section numbers this
-  file cites (FerroUI §N) are those of the `v0.3.5` copy.
-- [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.5/crates/ferrohealth-ui/CLAUDE.md):
+  file cites (FerroUI §N) are those of the `v0.3.6` copy.
+- [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.6/crates/ferrohealth-ui/CLAUDE.md):
   the crate's own discipline.
-- [`design/consoles/ferrobridge/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.3.5/design/consoles/ferrobridge):
+- [`design/consoles/ferrobridge/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.3.6/design/consoles/ferrobridge):
   this console's pages, at 1440 and 390 pixels in both themes, which the
   screenshots are checked against.
 
@@ -32,7 +32,7 @@ four-layer interaction contract, the templates and components of
 `design/` is the only design source; a design folder anywhere else is stale
 and is never synced from. The console moved to 0.3.3 with #1154, which
 drew the parts the rollout had found missing (#1146), and to 0.3.4 with
-#1155, which drew the flow's last two (its glyphs and How it is drawn), and to 0.3.5 with #1166, which it
+#1155, which drew the flow's last two (its glyphs and How it is drawn), and to 0.3.5 with #1166 and 0.3.6 with #1168, which it
 follows with no change of its own. A component this console needs and the library
 lacks, or a component that behaves wrongly, is an issue filed in
 FerroHEALTH/FerroUI and linked from the work here: never a local copy, a
@@ -352,7 +352,10 @@ changes here and nowhere else.
   compressed size is the download. The raw and gzip sizes are reported beside
   it, ungated, and so are the lazy island chunks `--split` writes, which a
   page loads only when it draws that island.
-- **The budget is 448 KiB.** The move to FerroUI 0.3.5 (#1166, 2026-10-24,
+- **The budget is 448 KiB.** The move to FerroUI 0.3.6 (#1168, 2026-10-24,
+  the same tools) measured 323191 bytes for the entry, 70% of it, with
+  294668 more in the lazy chunks: 221197 in the five `split_*` files and
+  73471 in the thirteen `chunk_*` files. The move to FerroUI 0.3.5 (#1166, 2026-10-24,
   the same tools) measured 323039 bytes for the entry, 70% of it, with
   294581 more in the lazy chunks: 221118 in the five `split_*` files and
   73463 in the thirteen `chunk_*` files. The move to FerroUI 0.3.4 (#1155, 2026-10-23,
