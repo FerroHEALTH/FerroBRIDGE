@@ -108,6 +108,25 @@ pub enum FrameError {
 }
 
 /// The MLLP frame codec over the `tokio-util` codec traits.
+///
+/// # Examples
+///
+/// ```
+/// use bytes::BytesMut;
+/// use ferrobridge_hl7v2::mllp::{CARRIAGE_RETURN, Codec, END_BLOCK, FrameError, START_BLOCK};
+/// use tokio_util::codec::{Decoder, Encoder};
+///
+/// let mut codec = Codec::default();
+/// let mut wire = BytesMut::new();
+/// codec.encode(b"MSH|^~\\&|A|B|C|D|20260925||ADT^A01|M1|P|2.5.1\r".as_slice(), &mut wire)?;
+/// assert_eq!(wire.first(), Some(&START_BLOCK));
+/// assert!(wire.ends_with(&[END_BLOCK, CARRIAGE_RETURN]));
+///
+/// let message = codec.decode(&mut wire)?.expect("one whole frame");
+/// assert!(message.starts_with(b"MSH|"));
+/// assert!(wire.is_empty());
+/// # Ok::<(), FrameError>(())
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct Codec {
     limit: usize,

@@ -17,9 +17,9 @@
 # and idempotent; the registry is read back before success is reported.
 #
 # Each crate is published and verified at the version in its OWN manifest.
-# `fhir-types`, `openehr-mapping-core` and `fhirconnect` are on the crate line
-# (docs/VERSIONS.md) and every other member still holds its name at the 0.0.0
-# placeholder, so the set is deliberately not lockstep today.
+# The members on the crate line (docs/VERSIONS.md) each move one patch per
+# change, and every other member still holds its name at the 0.0.0 placeholder,
+# so the set is deliberately not lockstep.
 #
 # Usage:
 #   publish-crates.sh publish          # upload each crate in dependency order
