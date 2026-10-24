@@ -31,6 +31,7 @@ use fhir_types::codec::Value;
 use fhirconnect::engine::demographics::Demographics;
 use fhirconnect::engine::demographics::NoDemographics;
 use fhirconnect::engine::origin::SourceItem;
+use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::NoReferences;
 use fhirconnect::engine::seam::ReferenceSource;
 use fhirconnect::engine::subject::SubjectIdentifier;
@@ -193,6 +194,18 @@ pub struct Written {
     pub composition: CanonicalComposition,
     /// Whether this write committed the composition or found it committed.
     pub delivery: Delivery,
+    /// The losses the mapping this write committed declared, in the order it
+    /// took them; empty when the write committed nothing.
+    pub losses: Vec<Warning>,
+}
+
+impl Written {
+    /// Returns this write with `losses` as the losses its mapping declared.
+    #[must_use]
+    pub fn with_losses(mut self, losses: Vec<Warning>) -> Self {
+        self.losses = losses;
+        self
+    }
 }
 
 /// The composition version one update follows, and the entry of it the
@@ -301,6 +314,9 @@ pub struct Committed {
     /// the entry's `id` produced. Nothing when this delivery committed
     /// nothing for it.
     pub change: Option<commit::Change>,
+    /// The losses the entry's mapping declared, in the order it took them;
+    /// empty when this delivery committed nothing for the entry.
+    pub losses: Vec<Warning>,
 }
 
 /// How the committed entries of a Bundle reached the CDR.
@@ -449,6 +465,8 @@ struct Mapped {
     consumed: Vec<String>,
     /// The identifiers the entry offers as the subject of the EHR.
     offered: Vec<SubjectIdentifier>,
+    /// The losses the entry's mapping declared.
+    losses: Vec<Warning>,
 }
 
 /// Which versions of a committed contribution the entries being bound
@@ -550,6 +568,7 @@ impl Standing {
             version: self.version,
             composition,
             delivery: Delivery::Replayed,
+            losses: Vec::new(),
         }
     }
 }

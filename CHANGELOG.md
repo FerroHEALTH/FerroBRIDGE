@@ -25,6 +25,11 @@ crates on crates.io.
 
 ### Added
 
+- The facade shows a write's declared losses to the client that wrote it: a
+  committed transaction entry carries them in `response.outcome`, and a
+  single create or update asked for `Prefer: return=OperationOutcome` lists
+  them after the committed version, one issue per loss with the FHIRPath in
+  `expression` and the openEHR path in `details` (#1115).
 - `GET /operator/configuration` answers the configuration the bridge started
   on, behind `[operator]` and the operator scope like the other operator
   routes: every key with its value and its source (the file, the
@@ -80,6 +85,11 @@ crates on crates.io.
 
 ### Changed
 
+- A transaction entry whose mapping links a resource as a composition of its
+  own is refused with `422` and `not-supported`, naming why and the ways that
+  commit it: the resource on its own, or as an entry of a `batch`, whose
+  entries commit one at a time and follow the link as a single create does
+  (#1120).
 - `ferrobridge-term` 0.1.130 carries the `date` input of `CodeSystem/$lookup`
   and `ValueSet/$validate-code`: `Client::lookup_at` sends it, and
   `Request::Lookup` and `Validation` gain a `date` field. This breaks a
@@ -94,6 +104,11 @@ crates on crates.io.
   `[terminology] display_fallback` is set, a failed call refuses, and with no
   server the code stands. `fhirconnect` moves to 0.1.185 and
   `ferrobridge-hl7v2` to 0.1.134 with it (#1188).
+- An untyped `dateTime` mapped onto an `ELEMENT` whose value admits
+  `DV_TEXT` and `DV_DATE_TIME` converts into `DV_DATE_TIME` whatever the
+  template order: a class that pairs with the FHIR type directly outranks
+  the text fallback. `fhirconnect` moves to 0.1.181 and `ferrobridge-hl7v2`
+  to 0.1.130 with it (#1114).
 - `$toopenehr` and `$tofhir` answer `502` with the issue type `transient`
   when the terminology server fails during the run, with the upstream status
   in the diagnostics, as the facade's writes do. A translation the server

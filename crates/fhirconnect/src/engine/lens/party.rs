@@ -17,7 +17,7 @@
 //! ([`crate::engine::demographics`]).
 
 use fhir_types::r4::identifier::Identifier;
-use fhir_types::r4::primitives::String as FhirString;
+use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::Uri;
 use fhir_types::r4::reference::Reference;
 use openehr_base::containers::NonEmptyVec;
@@ -81,7 +81,7 @@ impl Lens<PartyIdentifiedData, Reference> for PartyLens {
                 .map(|identifier| IdentifierLens.get(identifier))
                 .transpose()?
                 .map(Box::new),
-            display: source.name.clone().map(FhirString::from),
+            display: source.name.clone().map(primitives::String::from),
             ..Reference::default()
         })
     }
@@ -131,7 +131,7 @@ impl Lens<DvIdentifier, Identifier> for IdentifierLens {
         }
         Ok(Identifier {
             system: source.issuer.clone().map(Uri::from),
-            value: Some(FhirString::from(source.id.clone())),
+            value: Some(primitives::String::from(source.id.clone())),
             r#type: source
                 .r#type
                 .as_deref()
@@ -188,7 +188,7 @@ fn concept_of(
     Ok(fhir_types::r4::codeable_concept::CodeableConcept {
         coding: vec![fhir_types::r4::coding::Coding {
             system: Some(Uri::from(system)),
-            code: Some(fhir_types::r4::primitives::Code::from(code)),
+            code: Some(primitives::Code::from(code)),
             ..fhir_types::r4::coding::Coding::default()
         }],
         ..fhir_types::r4::codeable_concept::CodeableConcept::default()
@@ -216,13 +216,13 @@ fn reference_of(assigner: &str) -> Reference {
         Some((system, value)) => Reference {
             identifier: Some(Box::new(Identifier {
                 system: Some(Uri::from(system)),
-                value: Some(FhirString::from(value)),
+                value: Some(primitives::String::from(value)),
                 ..Identifier::default()
             })),
             ..Reference::default()
         },
         None => Reference {
-            reference: Some(FhirString::from(assigner)),
+            reference: Some(primitives::String::from(assigner)),
             ..Reference::default()
         },
     }
@@ -252,7 +252,7 @@ mod tests {
     use super::PartyLens;
     use crate::engine::lens::Lens;
     use fhir_types::r4::identifier::Identifier;
-    use fhir_types::r4::primitives::String as FhirString;
+    use fhir_types::r4::primitives;
     use fhir_types::r4::primitives::Uri;
     use fhir_types::r4::reference::Reference;
     use openehr_base::containers::NonEmptyVec;
@@ -347,7 +347,7 @@ mod tests {
     #[test]
     fn a_reference_string_is_left_for_the_facade_to_resolve() {
         let view = Reference {
-            reference: Some(FhirString::from("Organization/ward-b")),
+            reference: Some(primitives::String::from("Organization/ward-b")),
             ..Reference::default()
         };
         assert_eq!(

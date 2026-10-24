@@ -23,6 +23,7 @@ use std::sync::PoisonError;
 use fhir_types::codec::Value;
 use fhirconnect::engine::linked::Linked;
 use fhirconnect::engine::linked::LinkedCompositions;
+use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::ReferenceError;
 use fhirconnect::engine::subject::SubjectIdentifier;
 use http::StatusCode;
@@ -42,6 +43,7 @@ use super::Ingest;
 use super::Provenance;
 use super::Recognised;
 use super::Refused;
+use super::binding::Engined;
 use super::engine_refusal;
 use super::store_refusal;
 
@@ -122,6 +124,8 @@ pub(super) struct Built {
     /// The identifiers the run offered as the subject of the EHR
     /// (`fhirconnect::engine::subject`).
     pub(super) subject: Vec<SubjectIdentifier>,
+    /// The losses the final run declared, in the order it took them.
+    pub(super) losses: Vec<Warning>,
 }
 
 impl Ingest<'_> {
@@ -151,7 +155,12 @@ impl Ingest<'_> {
         // NOTE: ITS-REST 1.1.0 `UpdateVersion` carries no `uid`, so a linked composition's
         // id exists only after its commit, and the linking run waits for it (our own design).
         let probe = Linker::probing();
-        let (probed, _, _, offered) = self
+        let Engined {
+            composition: probed,
+            subject: offered,
+            losses: probed_losses,
+            ..
+        } = self
             .run_linking(program, inbound, provenance, Some(&probe))
             .await
             .map_err(|error| engine_refusal(&error))?;
@@ -161,6 +170,7 @@ impl Ingest<'_> {
                 composition: probed,
                 committed: Vec::new(),
                 subject: offered,
+                losses: probed_losses,
             });
         }
         let mut answers = BTreeMap::new();
@@ -179,7 +189,12 @@ impl Ingest<'_> {
             answers.insert(reference, linked);
         }
         let last = Linker::answering(answers);
-        let (composition, _, _, subject) = self
+        let Engined {
+            composition,
+            subject,
+            losses,
+            ..
+        } = self
             .run_linking(program, inbound, provenance, Some(&last))
             .await
             .map_err(|error| with_committed(engine_refusal(&error), &committed))?;
@@ -198,6 +213,7 @@ impl Ingest<'_> {
             composition,
             committed,
             subject,
+            losses,
         })
     }
 
@@ -300,9 +316,16 @@ pub(super) fn with_committed(refused: Refused, committed: &[CommittedLink]) -> R
 ///
 /// A transaction commits its entries in one `CONTRIBUTION` and answers all
 /// or nothing (<https://hl7.org/fhir/R4/http.html#transaction>), and the id
-/// of a linked composition is known only once the CDR has committed it, so
-/// a `link` naming a resource cannot be written inside one. No
-/// specification governs the refusal: our own design.
+/// of a linked composition is known only once the CDR has committed it:
+/// ITS-REST 1.1.0 gives an `UPDATE_VERSION` no `uid` and names no
+/// client-assigned composition id (`ehr-codegen.openapi.yaml`,
+/// `contribution_create`, `composition_create`). Committing the linked
+/// composition first and deleting it when the transaction fails would leave a
+/// deleted version in the CDR's history and show the composition to a reader
+/// meanwhile, which is not all or nothing, so a `link` naming a resource is
+/// refused inside a Bundle and followed by a single write or a `batch` entry,
+/// which commit one at a time. No specification governs the refusal: our own
+/// design.
 #[derive(Debug, Clone, Copy, Default)]
 pub(super) struct InBundle;
 
@@ -318,7 +341,20 @@ impl LinkedCompositions for InBundle {
 /// Why a Bundle entry's `link` to a resource is refused.
 #[derive(Debug, thiserror::Error)]
 #[error(
-    "a Bundle commits its entries in one CONTRIBUTION, and a linked composition's id is known \
-     only once the CDR commits it; send the linking resource on its own"
+    "a transaction commits its entries in one CONTRIBUTION, all or nothing, and a linked \
+     composition's id is known only once the CDR commits it; send the linking resource on its \
+     own or as an entry of a batch, which commits each entry by itself"
 )]
 pub(super) struct BundleLink;
+
+/// Returns whether the cause chain of `error` holds a [`BundleLink`].
+pub(super) fn bundle_link(error: &(dyn core::error::Error + 'static)) -> bool {
+    let mut cause = Some(error);
+    while let Some(current) = cause {
+        if current.is::<BundleLink>() {
+            return true;
+        }
+        cause = current.source();
+    }
+    false
+}

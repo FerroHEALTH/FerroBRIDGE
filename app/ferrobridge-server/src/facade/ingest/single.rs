@@ -31,6 +31,7 @@ use super::Refused;
 use super::Revision;
 use super::Standing;
 use super::Written;
+use super::binding::Engined;
 use super::binding::canonical_of;
 use super::binding::representation;
 use super::binding::resource_source;
@@ -105,10 +106,11 @@ impl Ingest<'_> {
             .map_err(|error| store_refusal(&error))?;
         let known = if let Some(known) = exact {
             if source.version_id().is_some() {
-                let (built, _, _, _) = self
+                let built = self
                     .run_linking(program, inbound, provenance, Some(&Linker::probing()))
                     .await
-                    .map_err(|error| engine_refusal(&error))?;
+                    .map_err(|error| engine_refusal(&error))?
+                    .composition;
                 let standing = self.standing(&known).await?;
                 let written = match self.standing_entry(program, inbound, &standing, &built)? {
                     Some((whole, entry)) => standing.replayed(entry.isolate(&whole)),
@@ -140,7 +142,11 @@ impl Ingest<'_> {
         };
         // NOTE: no specification governs this: our own design, recognition commits
         // nothing, so a link reads as the probe URI and a LINKED resource is revised.
-        let (built, instant, _, _) = self
+        let Engined {
+            composition: built,
+            instant,
+            ..
+        } = self
             .run_linking(program, inbound, provenance, Some(&Linker::probing()))
             .await
             .map_err(|error| engine_refusal(&error))?;
@@ -287,17 +293,18 @@ impl Ingest<'_> {
         let built = match linking {
             Linking::Commit => self.build_linked(program, inbound, provenance).await?,
             Linking::Refuse => {
-                let (composition, subject) =
-                    self.build_offering(program, inbound, provenance).await?;
+                let engined = self.build_offering(program, inbound, provenance).await?;
                 Built {
-                    composition,
+                    composition: engined.composition,
                     committed: Vec::new(),
-                    subject,
+                    subject: engined.subject,
+                    losses: engined.losses,
                 }
             }
         };
         self.create(program, inbound, &ehr_id, built.composition, &built.subject)
             .await
+            .map(|written| written.with_losses(built.losses))
             .map_err(|refused| with_committed(refused, &built.committed))
     }
 
@@ -394,6 +401,7 @@ impl Ingest<'_> {
         let linked = self.build_linked(program, inbound, provenance).await?;
         self.revise(inbound, program, revision, &linked)
             .await
+            .map(|written| written.with_losses(linked.losses))
             .map_err(|refused| with_committed(refused, &linked.committed))
     }
 

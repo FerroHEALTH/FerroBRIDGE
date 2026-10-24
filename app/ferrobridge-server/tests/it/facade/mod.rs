@@ -18,6 +18,7 @@ mod demographic;
 mod ehr_status;
 mod examples;
 mod linked;
+mod losses;
 mod party;
 mod patient_ehr;
 mod person;

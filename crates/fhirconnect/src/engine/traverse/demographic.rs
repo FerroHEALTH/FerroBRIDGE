@@ -12,7 +12,7 @@
 //! identifier. A `PARTY_REF` tail (`ROLE.performer`) resolves the same way and
 //! must name a party the endpoint minted.
 
-use fhir_types::r4::primitives::String as FhirString;
+use fhir_types::r4::primitives;
 use openehr_base::containers::NonEmptyVec;
 use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
 use openehr_mapping_core::index::ResolvedNode;
@@ -112,7 +112,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     mapping: String::from(mapping.name()),
                     reference: String::from(literal),
                 })?;
-            relative.reference = Some(FhirString::from(found));
+            relative.reference = Some(primitives::String::from(found));
         }
         lens.put(&relative, None)
             .map(RmValue::PartyRef)

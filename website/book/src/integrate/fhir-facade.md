@@ -195,7 +195,11 @@ A body is parsed through the strict codec of the generated `fhir-types` crate,
 so an unknown property is a `400` with `structure` rather than a value that is
 silently dropped. `Prefer: return=minimal`, `return=representation` and
 `return=OperationOutcome` are honoured on a write, and the default is the
-resource itself.
+resource itself. With `return=OperationOutcome` the outcome names the committed
+version and then each loss the mapping declared: a field the engine filled is
+an `information` issue, an element it could not carry an `incomplete`
+`warning`, each with the FHIRPath of the element in `expression` and the
+openEHR path in `details`.
 
 Everything the facade authors is an `OperationOutcome` with an `issue.code`
 from the R4 value set. An openEHR error body never reaches the wire as its own
@@ -367,7 +371,9 @@ nothing is committed.
 A committed transaction answers `200` with a `transaction-response` Bundle,
 one entry per request entry in the same order. Each entry's `response` carries
 `201 Created`, the `location` `[base]/[type]/[id]/_history/[vid]` and the
-`etag` `W/"[vid]"`, the values a single create answers. Send the same Bundle
+`etag` `W/"[vid]"`, the values a single create answers, and an
+`outcome` naming each loss the entry's mapping declared, as a single write
+answers it under `return=OperationOutcome`. Send the same Bundle
 again and nothing is committed: each entry answers `200 OK` with the location
 of the resource the first delivery created. A Bundle only some of whose
 entries an earlier delivery consumed is refused with `409`, naming those
@@ -376,6 +382,12 @@ A delivery that arrives while another delivery of the same Bundle or resource
 is still in flight is refused with `409` and commits nothing; retry it after
 the first one answers. The redelivery rule is on the
 [failure and identity](../operate/failure-and-identity.md) page.
+
+An entry whose mapping links a resource as a composition of its own (a
+FHIRconnect linked mapping) is refused with `422` and `not-supported`: the
+linked composition's id exists only once the CDR commits it, so it cannot
+share the transaction's one contribution. Send that resource on its own, or as
+an entry of a `batch`, whose entries commit one at a time.
 
 A `batch` Bundle runs each entry as the single interaction its `request`
 names, and answers `200` with a `batch-response` Bundle, one entry per request
