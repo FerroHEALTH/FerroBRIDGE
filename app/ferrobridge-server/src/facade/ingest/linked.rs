@@ -44,8 +44,8 @@ use super::Provenance;
 use super::Recognised;
 use super::Refused;
 use super::binding::Engined;
-use super::engine_refusal;
-use super::store_refusal;
+use super::refusal::engine_refusal;
+use super::refusal::store_refusal;
 
 /// The URI a probe run writes for every linked composition; the run is
 /// discarded, so it never reaches the CDR.
