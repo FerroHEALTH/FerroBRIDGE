@@ -9,7 +9,7 @@
 //! the coding.code can be used if a term server is not an option"
 //! (FHIRconnect `types-of-mappings/data-type/DV_CODED_TEXT.adoc`).
 
-use std::error::Error as StdError;
+use std::error::Error;
 
 use axum::body::Body;
 use ferrobridge_server::terminology::Translator;
@@ -77,7 +77,7 @@ fn bundle() -> String {
 }
 
 /// Maps the Bundle through `$toopenehr` over `translator`.
-async fn mapped(translator: Translator) -> Result<(StatusCode, String), Box<dyn StdError>> {
+async fn mapped(translator: Translator) -> Result<(StatusCode, String), Box<dyn Error>> {
     let root = mapping_tree_with(MODEL_FILE)?;
     let (status, _, body) = call(
         app_with(&root, translator)?,
@@ -99,7 +99,7 @@ async fn mount_lookup(server: &MockServer, answer: wiremock::ResponseTemplate) {
 }
 
 #[tokio::test]
-async fn a_display_the_server_knows_becomes_the_coded_value() -> Result<(), Box<dyn StdError>> {
+async fn a_display_the_server_knows_becomes_the_coded_value() -> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     mount_lookup(
         &server,
@@ -121,7 +121,7 @@ async fn a_display_the_server_knows_becomes_the_coded_value() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn a_code_the_server_does_not_know_refuses_by_default() -> Result<(), Box<dyn StdError>> {
+async fn a_code_the_server_does_not_know_refuses_by_default() -> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     mount_lookup(
         &server,
@@ -136,7 +136,7 @@ async fn a_code_the_server_does_not_know_refuses_by_default() -> Result<(), Box<
 
 #[tokio::test]
 async fn a_code_the_server_does_not_know_keeps_its_code_when_the_fallback_is_configured()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     mount_lookup(
         &server,
@@ -153,7 +153,7 @@ async fn a_code_the_server_does_not_know_keeps_its_code_when_the_fallback_is_con
 
 #[tokio::test]
 async fn a_lookup_the_server_refuses_refuses_the_run_with_the_upstream_status()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     mount_lookup(
         &server,
@@ -167,8 +167,7 @@ async fn a_lookup_the_server_refuses_refuses_the_run_with_the_upstream_status()
 }
 
 #[tokio::test]
-async fn with_no_terminology_server_the_code_stands_as_the_value() -> Result<(), Box<dyn StdError>>
-{
+async fn with_no_terminology_server_the_code_stands_as_the_value() -> Result<(), Box<dyn Error>> {
     let (status, body) = mapped(Translator::default()).await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     let answer: serde_json::Value = serde_json::from_str(&body)?;

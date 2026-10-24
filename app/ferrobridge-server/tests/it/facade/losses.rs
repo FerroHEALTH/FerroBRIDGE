@@ -13,7 +13,7 @@
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 
 use axum::body::Body;
 
@@ -56,7 +56,7 @@ fn defaulted(outcome: &serde_json::Value) -> Vec<&serde_json::Value> {
 
 #[tokio::test]
 async fn a_transaction_entry_answers_its_declared_losses_in_its_outcome()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_echo(&harness.cdr, ECHOED, Echo::Sent).await;
@@ -81,7 +81,7 @@ async fn a_transaction_entry_answers_its_declared_losses_in_its_outcome()
 
 #[tokio::test]
 async fn a_transaction_sent_again_answers_no_losses_for_what_it_did_not_commit()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_echo(&harness.cdr, ECHOED, Echo::Sent).await;
@@ -102,7 +102,7 @@ async fn a_transaction_sent_again_answers_no_losses_for_what_it_did_not_commit()
 
 #[tokio::test]
 async fn a_single_create_asking_for_an_outcome_answers_its_declared_losses()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, super::VERSION_ONE, &harness.composition()).await;
@@ -131,8 +131,8 @@ async fn a_single_create_asking_for_an_outcome_answers_its_declared_losses()
 }
 
 #[tokio::test]
-async fn a_single_create_asking_for_the_resource_answers_no_outcome()
--> Result<(), Box<dyn StdError>> {
+async fn a_single_create_asking_for_the_resource_answers_no_outcome() -> Result<(), Box<dyn Error>>
+{
     // R4 http.html §Managing Return Content: the OperationOutcome "should only
     // be returned if explicitly requested".
     let harness = harness().await;

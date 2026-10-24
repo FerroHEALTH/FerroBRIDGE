@@ -7,7 +7,7 @@
 //! and a transaction is authorised entry by entry and fails whole
 //! (<https://hl7.org/fhir/R4/http.html#transaction>).
 
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -81,7 +81,7 @@ impl Case {
         &self,
         request: Request<Body>,
         token: &str,
-    ) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+    ) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
         let response = raw(
             secured(&self.harness, &self.authority),
             bearing(request, token),
@@ -99,7 +99,7 @@ impl Case {
 
     /// Creates the Condition of `patient` under a system token and returns
     /// its id.
-    async fn create_for(&self, patient: &str) -> Result<String, Box<dyn StdError>> {
+    async fn create_for(&self, patient: &str) -> Result<String, Box<dyn Error>> {
         let resource = condition_of(patient);
         mount_create(
             &self.harness.cdr,
@@ -127,7 +127,7 @@ fn transaction(resources: &[(&str, serde_json::Value)]) -> Request<Body> {
 }
 
 #[tokio::test]
-async fn a_patient_token_creates_for_its_own_patient_only() -> Result<(), Box<dyn StdError>> {
+async fn a_patient_token_creates_for_its_own_patient_only() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     let own = condition_of("p-1");
     mount_create(
@@ -154,8 +154,7 @@ async fn a_patient_token_creates_for_its_own_patient_only() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn a_patient_scope_without_a_patient_claim_reaches_nothing() -> Result<(), Box<dyn StdError>>
-{
+async fn a_patient_scope_without_a_patient_claim_reaches_nothing() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     let token = case.token("patient/Condition.c", None);
     let (status, body) = case
@@ -166,7 +165,7 @@ async fn a_patient_scope_without_a_patient_claim_reaches_nothing() -> Result<(),
 }
 
 #[tokio::test]
-async fn a_patient_token_reads_its_own_patient_only() -> Result<(), Box<dyn StdError>> {
+async fn a_patient_token_reads_its_own_patient_only() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     let id = case.create_for("p-1").await?;
     mount_read(
@@ -198,7 +197,7 @@ async fn a_patient_token_reads_its_own_patient_only() -> Result<(), Box<dyn StdE
 
 #[tokio::test]
 async fn a_transaction_with_one_entry_outside_the_compartment_fails_whole()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     let token = case.token("patient/Condition.c", Some("p-1"));
     let request = transaction(&[
@@ -217,7 +216,7 @@ async fn a_transaction_with_one_entry_outside_the_compartment_fails_whole()
 
 #[tokio::test]
 async fn a_transaction_entry_of_a_type_the_token_does_not_cover_fails_whole()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     let token = case.token("system/Observation.c", None);
     let request = transaction(&[("urn:uuid:entry-1", condition())]);
@@ -228,7 +227,7 @@ async fn a_transaction_entry_of_a_type_the_token_does_not_cover_fails_whole()
 }
 
 #[tokio::test]
-async fn a_covered_transaction_passes_to_the_mapping() -> Result<(), Box<dyn StdError>> {
+async fn a_covered_transaction_passes_to_the_mapping() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await;
     let token = case.token("system/Condition.c", None);
     let mut unmapped = condition();

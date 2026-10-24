@@ -11,7 +11,7 @@ use ferrobridge_server::state::AppState;
 use ferrobridge_testkit::net::closed_http_url;
 use http::{Request, StatusCode};
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use tower::ServiceExt as _;
 use wiremock::matchers::{method, path};
@@ -21,7 +21,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 const PROBE_PATH: &str = "/v1/definition/template/adl1.4";
 
 /// Returns the router of a deployment whose CDR is `base`.
-async fn router(base: &str) -> Result<Router, Box<dyn StdError>> {
+async fn router(base: &str) -> Result<Router, Box<dyn Error>> {
     let text = format!("[cdr]\nbase_url = \"{base}/v1\"\ntimeout_ms = 2000\n");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let state = Arc::new(AppState::build(&settings).await?);
@@ -29,7 +29,7 @@ async fn router(base: &str) -> Result<Router, Box<dyn StdError>> {
 }
 
 /// Sends `GET /health/readiness` through `app`.
-async fn readiness(app: Router) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+async fn readiness(app: Router) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     let response = app
         .oneshot(Request::get("/health/readiness").body(Body::empty())?)
         .await?;
@@ -39,7 +39,7 @@ async fn readiness(app: Router) -> Result<(StatusCode, serde_json::Value), Box<d
 }
 
 #[tokio::test]
-async fn a_cdr_that_answers_makes_readiness_two_hundred() -> Result<(), Box<dyn StdError>> {
+async fn a_cdr_that_answers_makes_readiness_two_hundred() -> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path(PROBE_PATH))
@@ -56,7 +56,7 @@ async fn a_cdr_that_answers_makes_readiness_two_hundred() -> Result<(), Box<dyn 
 
 #[tokio::test]
 async fn a_cdr_that_answers_five_hundred_and_three_makes_readiness_five_hundred_and_three()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path(PROBE_PATH))
@@ -82,7 +82,7 @@ async fn a_cdr_that_answers_five_hundred_and_three_makes_readiness_five_hundred_
 
 #[tokio::test]
 async fn a_cdr_that_refuses_the_credentials_makes_readiness_five_hundred_and_three()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     for refused in [StatusCode::UNAUTHORIZED, StatusCode::FORBIDDEN] {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
@@ -110,7 +110,7 @@ async fn a_cdr_that_refuses_the_credentials_makes_readiness_five_hundred_and_thr
 
 #[tokio::test]
 async fn a_cdr_token_that_cannot_be_obtained_makes_readiness_five_hundred_and_three()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/oauth/token"))
@@ -159,7 +159,7 @@ async fn a_cdr_token_that_cannot_be_obtained_makes_readiness_five_hundred_and_th
 
 #[tokio::test]
 async fn a_cdr_that_never_answers_makes_readiness_five_hundred_and_three()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let closed = closed_http_url()?;
     let (status, document) = readiness(router(&closed).await?).await?;
     assert_eq!(StatusCode::SERVICE_UNAVAILABLE, status);
@@ -175,7 +175,7 @@ async fn a_cdr_that_never_answers_makes_readiness_five_hundred_and_three()
 }
 
 #[tokio::test]
-async fn liveness_stays_two_hundred_while_an_upstream_is_down() -> Result<(), Box<dyn StdError>> {
+async fn liveness_stays_two_hundred_while_an_upstream_is_down() -> Result<(), Box<dyn Error>> {
     let closed = closed_http_url()?;
     let app = router(&closed).await?;
     let response = app
@@ -191,7 +191,7 @@ async fn liveness_stays_two_hundred_while_an_upstream_is_down() -> Result<(), Bo
 
 /// Returns the router of a deployment whose only upstream is the CDM
 /// database `url`.
-async fn cdm_router(url: &str) -> Result<Router, Box<dyn StdError>> {
+async fn cdm_router(url: &str) -> Result<Router, Box<dyn Error>> {
     let text = format!("[cdm]\nurl = {url:?}\n");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let state = Arc::new(AppState::build(&settings).await?);
@@ -200,7 +200,7 @@ async fn cdm_router(url: &str) -> Result<Router, Box<dyn StdError>> {
 
 #[tokio::test]
 async fn an_unreachable_cdm_database_makes_readiness_five_hundred_and_three()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // A port taken and released at once has no listener behind it.
     let port = std::net::TcpListener::bind("127.0.0.1:0")?
         .local_addr()?
@@ -221,7 +221,7 @@ async fn an_unreachable_cdm_database_makes_readiness_five_hundred_and_three()
 }
 
 #[tokio::test]
-async fn a_reachable_cdm_database_makes_readiness_two_hundred() -> Result<(), Box<dyn StdError>> {
+async fn a_reachable_cdm_database_makes_readiness_two_hundred() -> Result<(), Box<dyn Error>> {
     if !ferrobridge_testkit::containers::e2e_enabled() {
         return Ok(());
     }
@@ -234,8 +234,7 @@ async fn a_reachable_cdm_database_makes_readiness_two_hundred() -> Result<(), Bo
 }
 
 #[tokio::test]
-async fn without_a_cdm_section_readiness_carries_no_cdm_indicator() -> Result<(), Box<dyn StdError>>
-{
+async fn without_a_cdm_section_readiness_carries_no_cdm_indicator() -> Result<(), Box<dyn Error>> {
     let settings = Config::from_sources(None, &BTreeMap::new())?.resolve()?;
     let state = AppState::build(&settings).await?;
     assert!(

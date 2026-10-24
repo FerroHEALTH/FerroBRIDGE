@@ -10,7 +10,7 @@ use ferrobridge_server::facade::identity::PersonId;
 use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::search::Limits;
 use http::StatusCode;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::Mock;
 use wiremock::MockServer;
 use wiremock::ResponseTemplate;
@@ -93,7 +93,7 @@ pub(super) async fn mount_create_once(cdr: &MockServer, version: &str, body: &se
 /// Creates the fixture Condition at [`VERSION_ONE`] through a create stub that
 /// answers once, and returns its logical id, so a later stub answers the
 /// batch's own creates.
-async fn created(harness: &Harness) -> Result<String, Box<dyn StdError>> {
+async fn created(harness: &Harness) -> Result<String, Box<dyn Error>> {
     mount_ehr(&harness.cdr).await;
     mount_create_once(&harness.cdr, VERSION_ONE, &harness.composition()).await;
     let (status, body) = call(harness.app(), post_condition(&condition())).await?;
@@ -103,7 +103,7 @@ async fn created(harness: &Harness) -> Result<String, Box<dyn StdError>> {
 
 /// Returns a harness that answers search, with the subject `Patient/p-1`
 /// bound to [`EHR_ID`].
-async fn searching() -> Result<Harness, Box<dyn StdError>> {
+async fn searching() -> Result<Harness, Box<dyn Error>> {
     let harness = super::search_harness(Limits::default()).await;
     harness.store.record_ehr(
         &PersonId::new("http://example.org/fhir", "Patient/p-1")?,
@@ -130,7 +130,7 @@ async fn mount_search(cdr: &MockServer, version: &str, composition: &serde_json:
 }
 
 #[tokio::test]
-async fn a_mixed_batch_answers_every_entry_in_request_order() -> Result<(), Box<dyn StdError>> {
+async fn a_mixed_batch_answers_every_entry_in_request_order() -> Result<(), Box<dyn Error>> {
     // R4 http.html §3.1.0.11.3: one response entry per request entry, in the
     // same order, each with its status, location and ETag.
     let harness = searching().await?;
@@ -196,7 +196,7 @@ async fn a_mixed_batch_answers_every_entry_in_request_order() -> Result<(), Box<
 
 #[tokio::test]
 async fn a_cdr_refusal_of_one_entry_is_that_entry_status_and_the_others_proceed()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 http.html §3.1.0.11.1: the batch answers 200 whatever the entries'
     // outcomes, and an entry other than 2xx failed on its own.
     let harness = harness().await;
@@ -246,7 +246,7 @@ async fn a_cdr_refusal_of_one_entry_is_that_entry_status_and_the_others_proceed(
 
 #[tokio::test]
 async fn an_entry_referencing_another_entry_is_refused_and_the_other_proceeds()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 http.html §3.1.0.11.1: a reference to another entry being created in
     // the batch is non-conformant.
     let harness = harness().await;
@@ -281,7 +281,7 @@ async fn an_entry_referencing_another_entry_is_refused_and_the_other_proceeds()
 }
 
 #[tokio::test]
-async fn an_entry_without_a_request_refuses_the_whole_batch() -> Result<(), Box<dyn StdError>> {
+async fn an_entry_without_a_request_refuses_the_whole_batch() -> Result<(), Box<dyn Error>> {
     // R4 http.html §3.1.0.11: each entry SHALL carry request details, and a
     // POST or PUT a resource.
     let harness = harness().await;
@@ -317,7 +317,7 @@ async fn an_entry_without_a_request_refuses_the_whole_batch() -> Result<(), Box<
 
 #[tokio::test]
 async fn an_entry_of_an_interaction_the_server_does_not_declare_answers_its_route_status()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The CapabilityStatement declares no delete, and no route answers
     // history, so each entry answers what its route would.
     let harness = harness().await;
@@ -350,8 +350,7 @@ async fn an_entry_of_an_interaction_the_server_does_not_declare_answers_its_rout
 }
 
 #[tokio::test]
-async fn an_absolute_url_under_this_base_reads_as_the_relative_one() -> Result<(), Box<dyn StdError>>
-{
+async fn an_absolute_url_under_this_base_reads_as_the_relative_one() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     let id = created(&harness).await?;
@@ -375,7 +374,7 @@ async fn an_absolute_url_under_this_base_reads_as_the_relative_one() -> Result<(
 }
 
 #[tokio::test]
-async fn an_entry_if_match_reaches_its_update_as_the_header() -> Result<(), Box<dyn StdError>> {
+async fn an_entry_if_match_reaches_its_update_as_the_header() -> Result<(), Box<dyn Error>> {
     // Bundle.entry.request.ifMatch is the If-Match of the entry's update
     // (R4 bundle-definitions.html#Bundle.entry.request.ifMatch).
     let harness = harness().await;
@@ -402,7 +401,7 @@ async fn an_entry_if_match_reaches_its_update_as_the_header() -> Result<(), Box<
 
 #[tokio::test]
 async fn prefer_minimal_answers_each_written_entry_without_its_resource()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 http.html §3.1.0.11.3: a resource is included in an entry as the
     // Prefer header specifies.
     let harness = harness().await;
@@ -426,7 +425,7 @@ async fn prefer_minimal_answers_each_written_entry_without_its_resource()
 }
 
 #[tokio::test]
-async fn an_empty_batch_answers_an_empty_batch_response() -> Result<(), Box<dyn StdError>> {
+async fn an_empty_batch_answers_an_empty_batch_response() -> Result<(), Box<dyn Error>> {
     // FHIR JSON forbids an empty array (<https://hl7.org/fhir/R4/json.html>),
     // so a batch Bundle with no entry omits the element.
     let harness = harness().await;
@@ -441,8 +440,8 @@ async fn an_empty_batch_answers_an_empty_batch_response() -> Result<(), Box<dyn 
     Ok(())
 }
 #[test]
-fn a_batch_with_one_failing_entry_answers_200_and_counts_the_failure()
--> Result<(), Box<dyn StdError>> {
+fn a_batch_with_one_failing_entry_answers_200_and_counts_the_failure() -> Result<(), Box<dyn Error>>
+{
     // R4 http.html §3.1.0.11.1: a batch answers 200 whatever its entries'
     // outcomes, each entry carrying its own status and outcome. R4 gives a
     // batch-response no element for a count (bundle.html, bdl-1 keeps `total`

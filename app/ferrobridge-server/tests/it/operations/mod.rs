@@ -24,7 +24,7 @@ use ferrobridge_server::state::AppState;
 use ferrobridge_server::state::OperationsLane;
 use ferrobridge_server::terminology::Translator;
 use http::{Request, Response, StatusCode, header};
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use tower::ServiceExt as _;
 
@@ -91,13 +91,13 @@ mappings:
 "#;
 
 /// Writes the synthetic mapping set into a temporary tree.
-fn mapping_tree() -> Result<tempfile::TempDir, Box<dyn StdError>> {
+fn mapping_tree() -> Result<tempfile::TempDir, Box<dyn Error>> {
     mapping_tree_with(MODEL_FILE)
 }
 
 /// Writes the synthetic context with `model` as its model mapping into a
 /// temporary tree.
-fn mapping_tree_with(model: &str) -> Result<tempfile::TempDir, Box<dyn StdError>> {
+fn mapping_tree_with(model: &str) -> Result<tempfile::TempDir, Box<dyn Error>> {
     let root = tempfile::tempdir()?;
     let mappings = root.path().join("mappings");
     let templates = root.path().join("templates");
@@ -116,13 +116,13 @@ fn mapping_tree_with(model: &str) -> Result<tempfile::TempDir, Box<dyn StdError>
 }
 
 /// Returns the application with the synthetic mapping set loaded.
-fn app(root: &tempfile::TempDir) -> Result<Router, Box<dyn StdError>> {
+fn app(root: &tempfile::TempDir) -> Result<Router, Box<dyn Error>> {
     app_with(root, Translator::default())
 }
 
 /// Returns the application with the mapping set under `root` loaded,
 /// translating every `conceptmap` code through `translator`.
-fn app_with(root: &tempfile::TempDir, translator: Translator) -> Result<Router, Box<dyn StdError>> {
+fn app_with(root: &tempfile::TempDir, translator: Translator) -> Result<Router, Box<dyn Error>> {
     let state = state_with(root, translator)?;
     Ok(ferrobridge_server::router(state, &server_settings()))
 }
@@ -132,7 +132,7 @@ fn app_with(root: &tempfile::TempDir, translator: Translator) -> Result<Router, 
 fn state_with(
     root: &tempfile::TempDir,
     translator: Translator,
-) -> Result<Arc<AppState>, Box<dyn StdError>> {
+) -> Result<Arc<AppState>, Box<dyn Error>> {
     let settings = MappingSettings {
         directory: root.path().join("mappings"),
         templates: root.path().join("templates"),
@@ -166,7 +166,7 @@ fn server_settings() -> ferrobridge_server::config::ServerSettings {
 async fn call(
     app: Router,
     request: Request<Body>,
-) -> Result<(StatusCode, String, String), Box<dyn StdError>> {
+) -> Result<(StatusCode, String, String), Box<dyn Error>> {
     let response: Response<Body> = app.oneshot(request).await?;
     let status = response.status();
     let media = response
@@ -181,7 +181,7 @@ async fn call(
 
 /// Returns the synthetic `Condition` of the testkit inside a `collection`
 /// Bundle claiming the synthetic profile.
-fn bundle() -> Result<String, Box<dyn StdError>> {
+fn bundle() -> Result<String, Box<dyn Error>> {
     let mut condition: serde_json::Value =
         serde_json::from_str(ferrobridge_testkit::fixtures::R4_CONDITION)?;
     if let Some(object) = condition.as_object_mut() {
@@ -199,17 +199,17 @@ fn bundle() -> Result<String, Box<dyn StdError>> {
 }
 
 /// Returns the composition string the first answered parameter carries.
-fn composition_text(answer: &serde_json::Value) -> Result<&str, Box<dyn StdError>> {
+fn composition_text(answer: &serde_json::Value) -> Result<&str, Box<dyn Error>> {
     answer
         .get("parameter")
         .and_then(|parameter| parameter.get(0))
         .and_then(|first| first.get("valueString"))
         .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| Box::<dyn StdError>::from("the answer carries the composition"))
+        .ok_or_else(|| Box::<dyn Error>::from("the answer carries the composition"))
 }
 
 /// Maps the synthetic Bundle into a composition through `$toopenehr`.
-async fn composition(app: Router) -> Result<serde_json::Value, Box<dyn StdError>> {
+async fn composition(app: Router) -> Result<serde_json::Value, Box<dyn Error>> {
     let (status, _, body) = call(
         app,
         Request::post("/fhir/$toopenehr")

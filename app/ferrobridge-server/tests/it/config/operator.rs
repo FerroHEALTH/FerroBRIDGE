@@ -4,7 +4,6 @@
 //! The `[operator]` section: off by default, and refused without `[auth]`.
 
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::error::Error;
@@ -14,14 +13,14 @@ use ferrobridge_server::operator::OperatorSettings;
 const AUTH: &str = "[auth]\nenabled = true\nissuer = \"https://as.example.org/realms/ferro\"\naudience = [\"https://bridge.example.org/fhir\"]\n";
 
 #[test]
-fn the_operator_api_is_off_by_default() -> Result<(), Box<dyn StdError>> {
+fn the_operator_api_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(Some(""), &BTreeMap::new())?.resolve()?;
     assert_eq!(None, settings.operator);
     Ok(())
 }
 
 #[test]
-fn the_operator_api_turns_on_beside_auth() -> Result<(), Box<dyn StdError>> {
+fn the_operator_api_turns_on_beside_auth() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!("{AUTH}\n[operator]\nenabled = true\n");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     assert_eq!(
@@ -33,7 +32,7 @@ fn the_operator_api_turns_on_beside_auth() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn the_environment_turns_the_operator_api_on() -> Result<(), Box<dyn StdError>> {
+fn the_environment_turns_the_operator_api_on() -> Result<(), Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([(
         String::from("FERROBRIDGE__OPERATOR__ENABLED"),
         String::from("true"),
@@ -44,7 +43,7 @@ fn the_environment_turns_the_operator_api_on() -> Result<(), Box<dyn StdError>> 
 }
 
 #[test]
-fn the_operator_api_without_auth_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn the_operator_api_without_auth_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = Config::from_sources(
         Some("[auth]\nenabled = false\n\n[operator]\nenabled = true\n"),
         &BTreeMap::new(),
@@ -59,7 +58,7 @@ fn the_operator_api_without_auth_refuses_to_boot() -> Result<(), Box<dyn StdErro
 }
 
 #[test]
-fn the_operator_api_without_an_issuer_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn the_operator_api_without_an_issuer_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     // NOTE: no specification governs this: our own design, `[auth]` is on by
     // default, so the operator API refuses to start until it names an issuer.
     let error = Config::from_sources(Some("[operator]\nenabled = true\n"), &BTreeMap::new())?
@@ -80,7 +79,8 @@ fn the_operator_api_without_an_issuer_refuses_to_boot() -> Result<(), Box<dyn St
 }
 
 #[test]
-fn the_operator_scope_is_read_from_the_file_and_the_environment() -> Result<(), Box<dyn StdError>> {
+fn the_operator_scope_is_read_from_the_file_and_the_environment()
+-> Result<(), Box<dyn std::error::Error>> {
     let text = format!("{AUTH}\n[operator]\nenabled = true\n");
     let default = Config::from_sources(Some(&text), &BTreeMap::new())?
         .resolve()?
@@ -116,7 +116,8 @@ fn an_unknown_operator_key_refuses_to_boot() {
 }
 
 #[test]
-fn the_mapping_dir_is_read_from_the_file_and_the_environment() -> Result<(), Box<dyn StdError>> {
+fn the_mapping_dir_is_read_from_the_file_and_the_environment()
+-> Result<(), Box<dyn std::error::Error>> {
     let text = format!(
         "{AUTH}\n[operator]\nenabled = true\nmapping_dir = \"/var/lib/ferrobridge/mappings\"\n"
     );

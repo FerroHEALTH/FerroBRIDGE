@@ -26,9 +26,8 @@ use ferrohealth_ui::view::dock::{
     Decision, DecisionBar, DecisionState, DockField, DockForm, DockLine, decision_bar,
 };
 use ferrohealth_ui::view::form::{ERROR, Field, error_id};
-use ferrohealth_ui::view::load_report::{
-    Arrival, Count, LoadReport as Report, Outcome as Verdict, load_report,
-};
+use ferrohealth_ui::view::load_report;
+use ferrohealth_ui::view::load_report::{Arrival, Count};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::surface::{Crumb, Header, Mode, card, editor_heading};
 use ferrohealth_ui::widget::editor::{EditorWords, Opened};
@@ -258,8 +257,8 @@ fn saved(answered: &Answered, path: &str) -> Shown {
             .as_deref()
             .map(short_digest)
             .unwrap_or_default();
-        let report = load_report(Report {
-            outcome: Verdict::Ok,
+        let report = load_report::load_report(load_report::LoadReport {
+            outcome: load_report::Outcome::Ok,
             arrival: Arrival::AfterAction,
             title: tr_with(Msg::SavedReport, &[("digest", digest.clone().into())]).into_any(),
             counts: set_counts(&answered.report),
@@ -280,8 +279,8 @@ fn saved(answered: &Answered, path: &str) -> Shown {
             ..Shown::default()
         }
     } else {
-        let report = load_report(Report {
-            outcome: Verdict::Bad,
+        let report = load_report::load_report(load_report::LoadReport {
+            outcome: load_report::Outcome::Bad,
             arrival: Arrival::AfterAction,
             title: tr(Msg::SaveRefusedCompile).into_any(),
             counts: set_counts(&answered.report),

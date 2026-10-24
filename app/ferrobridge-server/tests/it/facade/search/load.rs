@@ -15,7 +15,7 @@ use ferrobridge_server::facade::search;
 use ferrobridge_server::facade::search::Limits;
 use ferrobridge_server::facade::search::declaration::DeclarationError;
 use http::StatusCode;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -39,7 +39,7 @@ use super::row;
 const CONTEXT: &str = "ferrobridge_facade.context";
 
 /// Writes `files` into a fresh directory and returns it.
-fn directory_of(files: &[(&str, &str)]) -> Result<tempfile::TempDir, Box<dyn StdError>> {
+fn directory_of(files: &[(&str, &str)]) -> Result<tempfile::TempDir, Box<dyn Error>> {
     let directory = tempfile::tempdir()?;
     for (name, text) in files {
         std::fs::write(directory.path().join(name), text)?;
@@ -189,7 +189,7 @@ async fn two_declarations_over_one_template_refuse_the_start() {
 }
 
 #[tokio::test]
-async fn a_required_subject_refuses_a_search_that_names_none() -> Result<(), Box<dyn StdError>> {
+async fn a_required_subject_refuses_a_search_that_names_none() -> Result<(), Box<dyn Error>> {
     // The carry-over register (docs/architecture.md §12): a missing mandatory
     // scope is a 400.
     let base = harness().await;
@@ -221,7 +221,7 @@ async fn a_required_subject_refuses_a_search_that_names_none() -> Result<(), Box
 
 #[tokio::test]
 async fn two_programs_over_one_template_answer_one_entry_per_composition()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The carry-over register (docs/architecture.md §12) and R4 bundle.html
     // bdl-7: two programs over one template never double an entry.
     let base = harness().await;

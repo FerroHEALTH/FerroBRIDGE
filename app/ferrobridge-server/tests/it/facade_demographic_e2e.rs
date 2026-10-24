@@ -12,7 +12,7 @@
 //! becomes the `ROLE`'s mandatory `performer` (RM Demographic IM, the `ROLE`
 //! class). No specification governs a party context: our own design.
 
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -43,7 +43,7 @@ pub(crate) fn with_body(
     uri: &str,
     body: &serde_json::Value,
     if_match: Option<&str>,
-) -> Result<Request<Body>, Box<dyn StdError>> {
+) -> Result<Request<Body>, Box<dyn Error>> {
     let mut request = Request::builder()
         .method(method)
         .uri(uri)
@@ -92,7 +92,7 @@ async fn lifecycle(
     facade: &Arc<Facade>,
     resource_type: &str,
     make: &dyn Fn(&str) -> serde_json::Value,
-) -> Result<(), Box<dyn StdError>> {
+) -> Result<(), Box<dyn Error>> {
     let first_body = make("Synthetic First");
     let base = format!("/fhir/{resource_type}");
     let created = call(
@@ -191,7 +191,7 @@ async fn lifecycle(
 
 #[tokio::test]
 async fn the_party_resources_live_in_the_reference_cdrs_demographic_store()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }

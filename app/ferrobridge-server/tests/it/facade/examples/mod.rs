@@ -20,7 +20,7 @@
 mod e2e;
 
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
@@ -181,7 +181,7 @@ impl Compiled {
 }
 
 /// Compiles `context` against a stub CDR that serves its template.
-async fn compile(context: Context) -> Result<Compiled, Box<dyn StdError>> {
+async fn compile(context: Context) -> Result<Compiled, Box<dyn Error>> {
     let cdr = MockServer::start().await;
     for (id, opt) in [
         (
@@ -465,8 +465,8 @@ fn fetched() -> bool {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn conformance_the_fhir_r4_examples_hold_their_facade_pass_list()
--> Result<(), Box<dyn StdError>> {
+async fn conformance_the_fhir_r4_examples_hold_their_facade_pass_list() -> Result<(), Box<dyn Error>>
+{
     if !fetched() {
         return Ok(());
     }

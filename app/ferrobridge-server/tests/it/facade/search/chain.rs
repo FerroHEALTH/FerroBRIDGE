@@ -15,7 +15,7 @@ use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::search::Limits;
 use ferrobridge_server::facade::search::identifier::IdentifierSearch;
 use http::StatusCode;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
@@ -116,8 +116,8 @@ async fn split_queries(harness: &Harness) -> (Vec<serde_json::Value>, Vec<serde_
 }
 
 #[tokio::test]
-async fn patient_identifier_resolves_the_party_and_searches_its_ehr()
--> Result<(), Box<dyn StdError>> {
+async fn patient_identifier_resolves_the_party_and_searches_its_ehr() -> Result<(), Box<dyn Error>>
+{
     let harness = identifying(Some(by_value()), true).await;
     mount_parties(&harness, &[PARTY]).await;
     let composition = harness.composition();
@@ -151,7 +151,7 @@ async fn patient_identifier_resolves_the_party_and_searches_its_ehr()
 
 #[tokio::test]
 async fn subject_identifier_and_its_patient_type_modifier_resolve_alike()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     for query in [
         "Condition?subject.identifier=MRN-0001",
         "Condition?subject:Patient.identifier=MRN-0001",
@@ -169,7 +169,7 @@ async fn subject_identifier_and_its_patient_type_modifier_resolve_alike()
 
 #[tokio::test]
 async fn an_unknown_identifier_answers_an_empty_searchset_with_no_clinical_query()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.3: an unknown subject is a logical condition that
     // answers an empty search set, never a guess.
     let harness = identifying(Some(by_value()), true).await;
@@ -187,7 +187,7 @@ async fn an_unknown_identifier_answers_an_empty_searchset_with_no_clinical_query
 
 #[tokio::test]
 async fn an_identifier_two_parties_carry_matches_the_resources_of_both()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.4.10: a bare value matches "irrespective of the
     // value of the system property", and §3.1.1.4.15 answers every match.
     let harness = identifying(Some(by_value()), true).await;
@@ -215,8 +215,8 @@ async fn an_identifier_two_parties_carry_matches_the_resources_of_both()
 }
 
 #[tokio::test]
-async fn a_party_with_no_ehr_among_several_leaves_the_others_matching()
--> Result<(), Box<dyn StdError>> {
+async fn a_party_with_no_ehr_among_several_leaves_the_others_matching() -> Result<(), Box<dyn Error>>
+{
     let harness = identifying(Some(by_value()), true).await;
     mount_parties(
         &harness,
@@ -244,7 +244,7 @@ async fn a_party_with_no_ehr_among_several_leaves_the_others_matching()
 }
 
 #[tokio::test]
-async fn two_versions_of_one_party_are_one_patient() -> Result<(), Box<dyn StdError>> {
+async fn two_versions_of_one_party_are_one_patient() -> Result<(), Box<dyn Error>> {
     let harness = identifying(Some(by_value()), true).await;
     mount_parties(
         &harness,
@@ -261,7 +261,7 @@ async fn two_versions_of_one_party_are_one_patient() -> Result<(), Box<dyn StdEr
 }
 
 #[tokio::test]
-async fn count_zero_answers_the_total_alone() -> Result<(), Box<dyn StdError>> {
+async fn count_zero_answers_the_total_alone() -> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.5.3: `_count=0` is treated as `_summary=count`.
     let harness = identifying(Some(by_value()), true).await;
     mount_parties(&harness, &[PARTY]).await;
@@ -283,7 +283,7 @@ async fn count_zero_answers_the_total_alone() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn summary_count_answers_the_total_alone() -> Result<(), Box<dyn StdError>> {
+async fn summary_count_answers_the_total_alone() -> Result<(), Box<dyn Error>> {
     // R4 search.html, `_summary`: `count` returns the count of matches alone.
     let harness = identifying(Some(by_value()), true).await;
     mount_parties(&harness, &[PARTY]).await;
@@ -310,7 +310,7 @@ async fn summary_count_answers_the_total_alone() -> Result<(), Box<dyn StdError>
 }
 
 #[tokio::test]
-async fn sort_and_count_apply_to_the_clinical_query() -> Result<(), Box<dyn StdError>> {
+async fn sort_and_count_apply_to_the_clinical_query() -> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.5.1 (`_sort`) and §3.1.1.5.3 (`_count`): the chain
     // only narrows the EHR, so both reach the clinical query as on any search.
     let harness = identifying(Some(by_value()), true).await;
@@ -344,8 +344,8 @@ async fn sort_and_count_apply_to_the_clinical_query() -> Result<(), Box<dyn StdE
 }
 
 #[tokio::test]
-async fn count_zero_for_an_unknown_identifier_makes_no_clinical_call()
--> Result<(), Box<dyn StdError>> {
+async fn count_zero_for_an_unknown_identifier_makes_no_clinical_call() -> Result<(), Box<dyn Error>>
+{
     let harness = identifying(Some(by_value()), true).await;
     mount_parties(&harness, &[]).await;
     mount_count(&harness.cdr, &[]).await;
@@ -359,7 +359,7 @@ async fn count_zero_for_an_unknown_identifier_makes_no_clinical_call()
 
 #[tokio::test]
 async fn a_party_the_map_does_not_know_is_looked_up_on_the_cdr_by_subject()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // ITS-REST 1.1.0 EHR, `ehr_get_by_subject`: the patient-to-EHR link.
     let harness = identifying(Some(by_value()), false).await;
     mount_parties(&harness, &[PARTY]).await;
@@ -383,7 +383,7 @@ async fn a_party_the_map_does_not_know_is_looked_up_on_the_cdr_by_subject()
 }
 
 #[tokio::test]
-async fn a_party_with_no_ehr_matches_nothing() -> Result<(), Box<dyn StdError>> {
+async fn a_party_with_no_ehr_matches_nothing() -> Result<(), Box<dyn Error>> {
     let harness = identifying(Some(by_value()), false).await;
     mount_parties(&harness, &[PARTY]).await;
     Mock::given(matchers::method("GET"))
@@ -404,8 +404,7 @@ async fn a_party_with_no_ehr_matches_nothing() -> Result<(), Box<dyn StdError>> 
 /// one answer the party search gives too: `501 not-supported` (RFC 9110
 /// §15.6.2), never a `500`.
 #[tokio::test]
-async fn a_refused_identifier_query_is_a_501_naming_the_extension() -> Result<(), Box<dyn StdError>>
-{
+async fn a_refused_identifier_query_is_a_501_naming_the_extension() -> Result<(), Box<dyn Error>> {
     let harness = identifying(Some(by_value()), true).await;
     Mock::given(matchers::method("POST"))
         .and(matchers::path(AQL))
@@ -430,7 +429,7 @@ async fn a_refused_identifier_query_is_a_501_naming_the_extension() -> Result<()
 }
 
 #[tokio::test]
-async fn a_system_binds_the_system_query() -> Result<(), Box<dyn StdError>> {
+async fn a_system_binds_the_system_query() -> Result<(), Box<dyn Error>> {
     let search = IdentifierSearch::new(QUERY, Some(SYSTEM_QUERY)).expect("a legal identifier pair");
     let harness = identifying(Some(search), true).await;
     mount_parties(&harness, &[PARTY]).await;
@@ -452,8 +451,7 @@ async fn a_system_binds_the_system_query() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_value_the_configured_queries_cannot_express_is_refused() -> Result<(), Box<dyn StdError>>
-{
+async fn a_value_the_configured_queries_cannot_express_is_refused() -> Result<(), Box<dyn Error>> {
     for query in [
         "Condition?patient.identifier=http://example.org/mrn%7CMRN-0001",
         "Condition?patient.identifier=%7CMRN-0001",
@@ -473,7 +471,7 @@ async fn a_value_the_configured_queries_cannot_express_is_refused() -> Result<()
 }
 
 #[tokio::test]
-async fn the_chain_is_unknown_when_the_resolve_is_off() -> Result<(), Box<dyn StdError>> {
+async fn the_chain_is_unknown_when_the_resolve_is_off() -> Result<(), Box<dyn Error>> {
     let harness = identifying(None, true).await;
     let (status, body) = get(&harness, "Condition?patient.identifier=MRN-0001").await?;
     assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");
@@ -488,8 +486,7 @@ async fn the_chain_is_unknown_when_the_resolve_is_off() -> Result<(), Box<dyn St
 }
 
 #[tokio::test]
-async fn another_chain_is_unknown_and_lenient_handling_ignores_it() -> Result<(), Box<dyn StdError>>
-{
+async fn another_chain_is_unknown_and_lenient_handling_ignores_it() -> Result<(), Box<dyn Error>> {
     let harness = identifying(Some(by_value()), true).await;
     let (status, body) = get(&harness, "Condition?patient.name=Muster").await?;
     assert_eq!(StatusCode::BAD_REQUEST, status, "{body}");
@@ -507,7 +504,7 @@ async fn another_chain_is_unknown_and_lenient_handling_ignores_it() -> Result<()
 }
 
 #[tokio::test]
-async fn a_modifier_on_the_chain_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn a_modifier_on_the_chain_is_refused() -> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.4.4: a server SHALL reject an unsupported modifier.
     let harness = identifying(Some(by_value()), true).await;
     for query in [
@@ -527,7 +524,7 @@ async fn a_modifier_on_the_chain_is_refused() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_chain_through_another_target_type_matches_nothing() -> Result<(), Box<dyn StdError>> {
+async fn a_chain_through_another_target_type_matches_nothing() -> Result<(), Box<dyn Error>> {
     let harness = identifying(Some(by_value()), true).await;
     let (status, body) = get(&harness, "Condition?subject:Group.identifier=G-1").await?;
     assert_eq!(StatusCode::OK, status, "{body}");
@@ -538,7 +535,7 @@ async fn a_chain_through_another_target_type_matches_nothing() -> Result<(), Box
 
 #[tokio::test]
 async fn the_capability_statement_declares_the_chain_exactly_when_it_is_on()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     for (search, declared) in [(Some(by_value()), true), (None, false)] {
         let harness = identifying(search, true).await;
         let (status, body) = get(&harness, "metadata").await?;

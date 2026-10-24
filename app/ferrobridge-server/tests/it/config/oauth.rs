@@ -12,7 +12,6 @@ use ferrohealth_smart::client::{ClientAuth, ClientCredentials, Endpoint};
 use ferrohealth_smart::config::ConfigError;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 use std::io::Write;
 use std::time::Duration;
 
@@ -45,7 +44,7 @@ fn exposed(grant: &ClientCredentials) -> Option<&str> {
 }
 
 /// Returns the refusal `text` boots into.
-fn refusal(text: &str) -> Result<Error, Box<dyn StdError>> {
+fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
     match Config::from_sources(Some(text), &BTreeMap::new()) {
         Err(error) => Ok(error),
         Ok(config) => Ok(config
@@ -56,7 +55,7 @@ fn refusal(text: &str) -> Result<Error, Box<dyn StdError>> {
 }
 
 /// Returns the grant `text` resolves to.
-fn grant(text: &str) -> Result<ClientCredentials, Box<dyn StdError>> {
+fn grant(text: &str) -> Result<ClientCredentials, Box<dyn std::error::Error>> {
     let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
     match settings.cdr.ok_or("the CDR lane is on")?.credentials {
         Some(CdrCredentials::OAuth(oauth)) => Ok(*oauth),
@@ -65,7 +64,7 @@ fn grant(text: &str) -> Result<ClientCredentials, Box<dyn StdError>> {
 }
 
 #[test]
-fn a_grant_reads_every_key_and_its_secret_file() -> Result<(), Box<dyn StdError>> {
+fn a_grant_reads_every_key_and_its_secret_file() -> Result<(), Box<dyn std::error::Error>> {
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "synthetic-secret")?;
     let oauth = grant(&text(
@@ -110,7 +109,7 @@ fn a_grant_reads_every_key_and_its_secret_file() -> Result<(), Box<dyn StdError>
 
 #[test]
 fn a_grant_defaults_to_client_secret_basic_and_a_thirty_second_margin()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     // NOTE: RFC 6749 §2.3.1, every authorization server supports HTTP Basic.
     let oauth = grant(&text(
         "",
@@ -128,7 +127,7 @@ fn a_grant_defaults_to_client_secret_basic_and_a_thirty_second_margin()
 }
 
 #[test]
-fn a_grant_is_reachable_through_the_environment() -> Result<(), Box<dyn StdError>> {
+fn a_grant_is_reachable_through_the_environment() -> Result<(), Box<dyn std::error::Error>> {
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "synthetic-secret")?;
     let environment = BTreeMap::from([
@@ -165,21 +164,21 @@ fn a_grant_is_reachable_through_the_environment() -> Result<(), Box<dyn StdError
 }
 
 #[test]
-fn an_unknown_oauth_key_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn an_unknown_oauth_key_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&text(
         "",
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\ngrant_type = \"password\"\n",
     ))?;
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
     assert!(
-        format!("{:?}", StdError::source(&error)).contains("grant_type"),
+        format!("{:?}", std::error::Error::source(&error)).contains("grant_type"),
         "the refusal names the key: {error:?}"
     );
     Ok(())
 }
 
 #[test]
-fn an_unknown_client_auth_method_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn an_unknown_client_auth_method_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     // NOTE: RFC 7523 §2.2's symmetric `client_secret_jwt` is no method the crate
     // supports, so the table does not parse.
     let error = refusal(&text(
@@ -191,7 +190,7 @@ fn an_unknown_client_auth_method_refuses_to_boot() -> Result<(), Box<dyn StdErro
 }
 
 #[test]
-fn a_mutual_tls_client_needs_its_certificate() -> Result<(), Box<dyn StdError>> {
+fn a_mutual_tls_client_needs_its_certificate() -> Result<(), Box<dyn std::error::Error>> {
     // NOTE: RFC 8705 §2, the client authenticates with the certificate the TLS
     // handshake carries.
     let error = refusal(&text(
@@ -211,7 +210,7 @@ fn a_mutual_tls_client_needs_its_certificate() -> Result<(), Box<dyn StdError>> 
 }
 
 #[test]
-fn a_private_key_jwt_client_needs_its_key_file() -> Result<(), Box<dyn StdError>> {
+fn a_private_key_jwt_client_needs_its_key_file() -> Result<(), Box<dyn std::error::Error>> {
     // NOTE: RFC 7523 §2.2, the client authenticates with an assertion it signs.
     let error = refusal(&text(
         "",
@@ -241,7 +240,7 @@ fn a_private_key_jwt_client_needs_its_key_file() -> Result<(), Box<dyn StdError>
 }
 
 #[test]
-fn a_grant_without_a_secret_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_grant_without_a_secret_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&text(
         "",
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\n",
@@ -259,7 +258,7 @@ fn a_grant_without_a_secret_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&text(
         "",
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret_file = \"/nonexistent/secret\"\n",
@@ -272,7 +271,7 @@ fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn Std
 }
 
 #[test]
-fn a_secret_and_its_file_together_refuse_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_secret_and_its_file_together_refuse_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&text(
         "",
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\nclient_secret_file = \"/run/secrets/s\"\n",
@@ -290,7 +289,7 @@ fn a_secret_and_its_file_together_refuse_to_boot() -> Result<(), Box<dyn StdErro
 }
 
 #[test]
-fn a_grant_without_a_client_id_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_grant_without_a_client_id_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&text(
         "",
         "token_endpoint = \"https://as.example.org/token\"\nclient_secret = \"s\"\n",
@@ -308,7 +307,7 @@ fn a_grant_without_a_client_id_refuses_to_boot() -> Result<(), Box<dyn StdError>
 }
 
 #[test]
-fn a_grant_with_no_endpoint_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_grant_with_no_endpoint_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&text("", "client_id = \"c\"\nclient_secret = \"s\"\n"))?;
     assert!(
         matches!(
@@ -323,7 +322,8 @@ fn a_grant_with_no_endpoint_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn a_grant_with_an_issuer_and_a_token_endpoint_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_grant_with_an_issuer_and_a_token_endpoint_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&text(
         "",
         "issuer = \"https://as.example.org\"\ntoken_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\n",
@@ -342,8 +342,8 @@ fn a_grant_with_an_issuer_and_a_token_endpoint_refuses_to_boot() -> Result<(), B
 }
 
 #[test]
-fn an_issuer_that_is_not_https_or_carries_a_query_refuses_to_boot() -> Result<(), Box<dyn StdError>>
-{
+fn an_issuer_that_is_not_https_or_carries_a_query_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
     // NOTE: RFC 8414 §2, an issuer is an https URL with no query or fragment.
     for issuer in [
         "http://as.example.org",
@@ -366,7 +366,7 @@ fn an_issuer_that_is_not_https_or_carries_a_query_refuses_to_boot() -> Result<()
 }
 
 #[test]
-fn a_scope_that_is_not_scope_tokens_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_scope_that_is_not_scope_tokens_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     // NOTE: RFC 6749 §3.3, scope tokens of NQCHAR separated by one space.
     for scope in ["a  b", "a\\\\b", "a \\\"b\\\"", " a"] {
         let error = refusal(&text(
@@ -394,7 +394,7 @@ fn a_scope_that_is_not_scope_tokens_refuses_to_boot() -> Result<(), Box<dyn StdE
 }
 
 #[test]
-fn a_resource_with_a_fragment_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_resource_with_a_fragment_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     // NOTE: RFC 8707 §2, a resource indicator carries no fragment.
     let error = refusal(&text(
         "",
@@ -413,7 +413,7 @@ fn a_resource_with_a_fragment_refuses_to_boot() -> Result<(), Box<dyn StdError>>
 }
 
 #[test]
-fn a_grant_beside_a_static_scheme_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_grant_beside_a_static_scheme_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&text(
         "user = \"bridge\"\npassword = \"p\"\n",
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\n",
@@ -440,7 +440,8 @@ fn terminology_text(credentials: &str, oauth: &str) -> String {
 }
 
 #[test]
-fn the_terminology_lane_obtains_its_token_with_the_grant() -> Result<(), Box<dyn StdError>> {
+fn the_terminology_lane_obtains_its_token_with_the_grant() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "synthetic-tx-secret")?;
     let text = terminology_text(
@@ -477,7 +478,8 @@ fn the_terminology_lane_obtains_its_token_with_the_grant() -> Result<(), Box<dyn
 }
 
 #[test]
-fn the_terminology_grant_is_reachable_through_the_environment() -> Result<(), Box<dyn StdError>> {
+fn the_terminology_grant_is_reachable_through_the_environment()
+-> Result<(), Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([
         (
             String::from("FERROBRIDGE__TERMINOLOGY__BASE_URL"),
@@ -506,7 +508,7 @@ fn the_terminology_grant_is_reachable_through_the_environment() -> Result<(), Bo
 }
 
 #[test]
-fn a_terminology_grant_beside_a_user_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_terminology_grant_beside_a_user_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&terminology_text(
         "user = \"bridge\"\npassword = \"p\"\n",
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\n",
@@ -525,7 +527,8 @@ fn a_terminology_grant_beside_a_user_refuses_to_boot() -> Result<(), Box<dyn Std
 }
 
 #[test]
-fn a_terminology_grant_refusal_names_the_terminology_key() -> Result<(), Box<dyn StdError>> {
+fn a_terminology_grant_refusal_names_the_terminology_key() -> Result<(), Box<dyn std::error::Error>>
+{
     let error = refusal(&terminology_text(
         "",
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\n",
@@ -543,7 +546,7 @@ fn a_terminology_grant_refusal_names_the_terminology_key() -> Result<(), Box<dyn
 }
 
 #[test]
-fn an_unknown_terminology_oauth_key_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn an_unknown_terminology_oauth_key_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&terminology_text(
         "",
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret = \"s\"\ngrant_type = \"password\"\n",

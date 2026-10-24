@@ -9,7 +9,8 @@
 //! path is correct only when it produces exactly the bytes the document path
 //! produces, over every resource the operations answer with, per version.
 
-use fhir_types::codec::{Json, Object, Path as ElementPath, Value};
+use fhir_types::codec;
+use fhir_types::codec::{Json, Object, Value};
 use proptest::prelude::*;
 
 use crate::codec::{decode_file, root_set_files};
@@ -115,7 +116,7 @@ fn every_r6_root_set_resource_writes_the_same_bytes() {
 
 /// The two paths over one `Parameters` document, decoded in one version.
 fn parity_of_parameters<T: Json + serde::Serialize>(object: &Object) -> Result<(), String> {
-    let mut path = ElementPath::root("Parameters");
+    let mut path = codec::Path::root("Parameters");
     let typed = T::from_json(object, &mut path).map_err(|e| e.to_string())?;
     let (document, direct) = both_paths(&typed)?;
     if document == direct {
@@ -262,7 +263,7 @@ const ORDERED_BYTES: &str = concat!(
 
 /// The direct path's bytes for `object`, decoded as `T`.
 fn direct_bytes<T: Json + serde::Serialize>(object: &Object) -> String {
-    let mut path = ElementPath::root("Parameters");
+    let mut path = codec::Path::root("Parameters");
     let typed = T::from_json(object, &mut path).expect("the document decodes");
     serde_json::to_string(&typed).expect("the typed resource writes")
 }
@@ -310,7 +311,7 @@ const ELEMENT_ONLY_BYTES: &str =
 
 /// Both paths' bytes for `object`, decoded as `T`, asserted equal.
 fn agreed_bytes<T: Json + serde::Serialize>(object: &Object) -> String {
-    let mut path = ElementPath::root("Parameters");
+    let mut path = codec::Path::root("Parameters");
     let typed = T::from_json(object, &mut path).expect("the document decodes");
     let (document, direct) = both_paths(&typed).expect("the typed resource writes");
     assert_eq!(document, direct, "{}", first_difference(&document, &direct));

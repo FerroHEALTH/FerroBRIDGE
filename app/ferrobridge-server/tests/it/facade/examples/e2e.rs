@@ -9,7 +9,7 @@
 //! through a facade whose client reaches the real CDR, and holds when the
 //! read is an R4 instance and `PutGet` changes nothing the example carried.
 
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -45,7 +45,7 @@ const SAMPLE: usize = 3;
 const SUBJECT_NAMESPACE: &str = "http://example.org/fhir/sid/ferrobridge-subject";
 
 /// Returns the first [`SAMPLE`] ids the committed pass list records.
-fn sample() -> Result<Vec<String>, Box<dyn StdError>> {
+fn sample() -> Result<Vec<String>, Box<dyn Error>> {
     let text = std::fs::read_to_string(Corpus::FhirR4Facade.pass_list())?;
     Ok(text
         .lines()
@@ -57,7 +57,7 @@ fn sample() -> Result<Vec<String>, Box<dyn StdError>> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn the_first_passing_facade_examples_round_trip_through_a_real_cdr()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     if !containers::e2e_enabled() || !super::fetched() {
         return Ok(());
     }

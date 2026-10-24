@@ -25,6 +25,12 @@ crates on crates.io.
 
 ### Added
 
+- `WebTemplateIndex::ordinal_options` returns the options an OPT 1.4
+  `C_DV_ORDINAL` constrains at a `DV_ORDINAL` node, in template order: each
+  `OrdinalOption` carries the ordinal `value` and the code and terminology
+  of its symbol, and a node with no ordinal constraint answers `None`.
+  `openehr-mapping-core` moves to 0.1.127, `fhirconnect` to 0.1.186 and
+  `ferrobridge-hl7v2` to 0.1.135 with it (#1090).
 - The facade shows a write's declared losses to the client that wrote it: a
   committed transaction entry carries them in `response.outcome`, and a
   single create or update asked for `Prefer: return=OperationOutcome` lists
