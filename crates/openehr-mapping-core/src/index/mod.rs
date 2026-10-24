@@ -378,7 +378,7 @@ impl WebTemplateIndex {
     ///
     /// An OPT 1.4 `C_DV_ORDINAL` lists each `DV_ORDINAL` the node admits, a
     /// `value` and a coded `symbol`, and FHIRconnect
-    /// `types-of-mappings/data-type/DV_ORDINAL.adoc` §CodeableConcept keeps
+    /// `types-of-mappings/data-type/DV_ORDINAL.adoc` §`CodeableConcept` keeps
     /// the `value` "maintained by the archetype itself". This answers `None`
     /// when `node` is no `DV_ORDINAL` node, when the template constrains no
     /// list there, when the template is an OPT2, and when the index was built
