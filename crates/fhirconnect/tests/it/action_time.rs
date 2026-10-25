@@ -188,3 +188,41 @@ fn a_procedures_performed_time_is_the_actions_time_both_ways() -> Result<(), Box
     );
     Ok(())
 }
+
+#[test]
+fn a_run_into_openehr_names_every_element_it_read_with_the_node_it_wrote()
+-> Result<(), Box<dyn Error>> {
+    let index = template()?;
+    let program = program(&index)?;
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &procedure(),
+        &Seams::default(),
+        &laws::defaults(),
+        &CallContext::new(),
+    )?;
+    let reads: Vec<(Option<&str>, Option<&str>)> = inbound
+        .reads()
+        .iter()
+        .map(|read| (read.fhir(), read.openehr()))
+        .collect();
+    assert_eq!(
+        vec![
+            (
+                Some("Procedure.code"),
+                Some(
+                    "/content[openEHR-EHR-ACTION.procedure.v1]/description[at0001]/items[at0002]/value"
+                )
+            ),
+            (
+                Some("Procedure.performed"),
+                Some("/content[openEHR-EHR-ACTION.procedure.v1]/time")
+            ),
+        ],
+        reads,
+        "the name and the time are read; the state is written from a condition"
+    );
+    Ok(())
+}

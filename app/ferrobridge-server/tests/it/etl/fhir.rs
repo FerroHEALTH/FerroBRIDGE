@@ -194,6 +194,7 @@ async fn a_condition_lands_in_the_cdm_with_no_cdr_and_a_rerun_changes_nothing()
         "{first}"
     );
     assert_eq!(1, first.compositions.committed, "{first}");
+    assert_eq!(2, first.ledger.len(), "a ledger per resource read: {first}");
     assert_eq!(1, count(&pool, "condition_occurrence").await?);
     assert_eq!(
         1,
@@ -517,4 +518,76 @@ async fn a_patient_a_condition_and_a_procedure_land_in_their_cdm_tables()
         "the procedure date is the performed date"
     );
     Ok(())
+}
+
+/// Returns the ledger of `resource` through the synthetic Condition context
+/// and OMOCL mapping, the whole chain run without a database.
+fn condition_ledger(
+    resource: &Value,
+) -> Result<ferrobridge_server::etl::ledger::ResourceLedger, Box<dyn Error>> {
+    let tree = mapping_tree()?;
+    let programs = mappings::load(&MappingSettings {
+        directory: tree.path().join("mappings"),
+        templates: tree.path().join("templates"),
+    })?;
+    let side = FhirSide {
+        programs: &programs,
+        device: "Device/ferrobridge-test",
+        composer: "FHIRconnect",
+        language: Some("en"),
+        territory: Some("NL"),
+        now: UPDATED,
+    };
+    let fhir::Outcome::Mapped {
+        template,
+        warnings,
+        reads,
+        ..
+    } = fhir::composition_of(&side, resource)
+    else {
+        return Err("the Condition maps".into());
+    };
+    let index = programs
+        .template(&template)
+        .ok_or("the template is loaded")?;
+    let omocl = tempfile::tempdir()?;
+    std::fs::write(
+        omocl.path().join("Synthetic_problem_diagnosis_v1.yml"),
+        CONDITION_OMOCL,
+    )?;
+    let program = omocl::resolve::compile(
+        &read_set(omocl.path())?,
+        index,
+        &omocl::model::semantic::FirstPartyConverters,
+    )
+    .map_err(|errors| format!("{errors:?}"))?;
+    let columns = program.column_reads();
+    Ok(ferrobridge_server::etl::ledger::of(
+        resource,
+        ferrobridge_server::etl::ledger::Fate::Written {
+            reads: &reads,
+            warnings: &warnings,
+            columns: &columns,
+        },
+    ))
+}
+
+#[test]
+fn the_ledger_names_the_outcome_of_every_element_of_a_condition() -> Result<(), Box<dyn Error>> {
+    let mut resource = condition("c-1", "1");
+    resource["note"] = json!([{"text": "Synthetic note"}]);
+    let ledger = condition_ledger(&resource)?;
+    insta::assert_json_snapshot!("condition_ledger", ledger);
+    Ok(())
+}
+
+#[test]
+fn a_refused_resource_refuses_every_element_with_the_reason() {
+    let resource = json!({"resourceType": "Observation", "id": "o-1", "status": "final",
+                          "code": {"text": "Synthetic observation"}});
+    let ledger = ferrobridge_server::etl::ledger::of(
+        &resource,
+        ferrobridge_server::etl::ledger::Fate::Refused("the resource names no subject"),
+    );
+    insta::assert_json_snapshot!("refused_ledger", ledger);
 }

@@ -1,0 +1,74 @@
+---
+source: app/ferrobridge-server/tests/it/etl/fhir.rs
+expression: ledger
+---
+{
+  "resource": "Condition/c-1",
+  "elements": [
+    {
+      "path": "Condition.id",
+      "outcome": "unmapped"
+    },
+    {
+      "path": "Condition.meta.profile[0]",
+      "outcome": "unmapped"
+    },
+    {
+      "path": "Condition.meta.versionId",
+      "outcome": "unmapped"
+    },
+    {
+      "path": "Condition.meta.lastUpdated",
+      "outcome": "unmapped"
+    },
+    {
+      "path": "Condition.code.coding[0].system",
+      "outcome": "mapped",
+      "node": "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value",
+      "targets": [
+        "condition_occurrence.condition_concept_id",
+        "condition_occurrence.condition_source_concept_id",
+        "condition_occurrence.condition_source_value"
+      ]
+    },
+    {
+      "path": "Condition.code.coding[0].code",
+      "outcome": "mapped",
+      "node": "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value",
+      "targets": [
+        "condition_occurrence.condition_concept_id",
+        "condition_occurrence.condition_source_concept_id",
+        "condition_occurrence.condition_source_value"
+      ]
+    },
+    {
+      "path": "Condition.code.coding[0].display",
+      "outcome": "mapped",
+      "node": "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value",
+      "targets": [
+        "condition_occurrence.condition_concept_id",
+        "condition_occurrence.condition_source_concept_id",
+        "condition_occurrence.condition_source_value"
+      ]
+    },
+    {
+      "path": "Condition.code.text",
+      "outcome": "mapped",
+      "node": "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value",
+      "targets": [
+        "condition_occurrence.condition_concept_id",
+        "condition_occurrence.condition_source_concept_id",
+        "condition_occurrence.condition_source_value"
+      ]
+    },
+    {
+      "path": "Condition.subject.reference",
+      "outcome": "dropped",
+      "reason": "the mapping subject did not run: its unidirectional marker names the other direction"
+    },
+    {
+      "path": "Condition.note[0].text",
+      "outcome": "unmapped"
+    }
+  ]
+}

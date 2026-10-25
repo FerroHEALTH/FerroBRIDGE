@@ -25,6 +25,8 @@ use std::path::PathBuf;
 use fhir_types::codec::Json;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::library::Library;
+use fhirconnect::engine::outcome::Location;
+use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::operations::contract::ToOpenehrRequest;
 use fhirconnect::operations::error::OperationError;
@@ -46,6 +48,7 @@ use crate::etl::Mapper;
 use crate::etl::MappingContext;
 use crate::etl::RunError;
 use crate::etl::SourceComposition;
+use crate::etl::ledger::{self, Fate, ResourceLedger};
 use crate::etl::report::RunReport;
 
 /// The `creating_system_id` of every composition version the run derives.
@@ -292,7 +295,9 @@ pub enum Outcome {
         /// The template it was built against.
         template: TemplateId,
         /// The losses the run declared.
-        losses: u64,
+        warnings: Vec<Warning>,
+        /// The input elements the run read.
+        reads: Vec<Location>,
     },
     /// No program maps the resource.
     Unmapped(String),
@@ -323,7 +328,8 @@ pub fn composition_of(side: &FhirSide<'_>, resource: &Value) -> Outcome {
         }
         Err(error) => return Outcome::Refused(crate::chain(&error)),
     };
-    let losses = u64::try_from(transformed.warnings().len()).unwrap_or(u64::MAX);
+    let warnings = transformed.warnings().to_vec();
+    let reads = transformed.reads().to_vec();
     let response = transformed.into_response();
     let composition: Value = match serde_json::from_str(response.composition()) {
         Ok(composition) => composition,
@@ -339,7 +345,8 @@ pub fn composition_of(side: &FhirSide<'_>, resource: &Value) -> Outcome {
         Some(template) => Outcome::Mapped {
             composition,
             template,
-            losses,
+            warnings,
+            reads,
         },
         None => Outcome::Refused(String::from("the composition names no template")),
     }
@@ -368,83 +375,134 @@ pub async fn run<M: Mapper>(
     let context = MappingContext {
         type_concept_id: settings.type_concept_id,
     };
+    let mut ledgers = Vec::new();
     for resource in resources {
         counts.read = counts.read.saturating_add(1);
-        let kind = resource_type(resource).unwrap_or_default();
-        let source = match source_of(resource, kind) {
-            Ok(source) => source,
-            Err(reason) => {
-                counts.refused = counts.refused.saturating_add(1);
-                report.composition_refused(None, &Refusal::new(reason));
-                continue;
-            }
-        };
-        let (composition, template, losses) = match composition_of(side, resource) {
-            Outcome::Mapped {
-                composition,
-                template,
-                losses,
-            } => (composition, template, losses),
-            Outcome::Unmapped(reason) => {
-                counts.unmapped = counts.unmapped.saturating_add(1);
-                report.composition_refused(Some(&source), &Refusal::new(reason));
-                continue;
-            }
-            Outcome::Refused(reason) => {
-                counts.refused = counts.refused.saturating_add(1);
-                report.composition_refused(Some(&source), &Refusal::new(reason));
-                continue;
-            }
-        };
-        counts.mapped = counts.mapped.saturating_add(1);
-        counts.losses = counts.losses.saturating_add(losses);
-        report.compositions.read = report.compositions.read.saturating_add(1);
-        let Some(index) = side.programs.template(&template) else {
-            report.composition_refused(
-                Some(&source),
-                &Refusal::new(format!("no template {} is loaded", template.as_str())),
-            );
-            continue;
-        };
-        let canonical = match index.accept(composition) {
-            Ok(canonical) => canonical,
-            Err(error) => {
-                report.composition_refused(Some(&source), &Refusal::new(crate::chain(&error)));
-                continue;
-            }
-        };
-        let graph = match mapper
-            .map(&SourceComposition {
-                source: source.clone(),
-                composition: &canonical,
-                template: index,
-                visit: None,
-                context,
-            })
-            .await
-        {
-            Ok(graph) => graph,
-            Err(refusal) => {
-                report.composition_refused(Some(&source), &refusal);
-                continue;
-            }
-        };
-        let Some(origin) = origin_of(resource, kind) else {
-            report.composition_refused(Some(&source), &Refusal::new("the resource carries no id"));
-            continue;
-        };
-        match writer.commit_from(&graph, run_id, Some(&origin)).await {
-            Ok(written) => report.committed(&source, &written),
-            Err(error) if writer.is_closed() => return Err(RunError::Database(error)),
-            Err(error) => {
-                report.engine_outcomes(Some(&source), graph.report());
-                report.composition_refused(Some(&source), &Refusal::new(crate::chain(&error)));
-            }
-        }
+        let ledger = load_one(
+            resource,
+            side,
+            writer,
+            mapper,
+            run_id,
+            context,
+            &mut report,
+            &mut counts,
+        )
+        .await?;
+        ledgers.push(ledger);
     }
+    report.ledger = ledgers;
     report.resources = Some(counts);
     crate::etl::derive(settings, writer, &mut report, None).await?;
     Ok(report)
+}
+
+/// Loads one resource, recording its outcome in `report` and `counts`, and
+/// returns its element ledger.
+///
+/// # Errors
+///
+/// Returns [`RunError::Database`] when the CDM database stops the run.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one resource meets every seam of the run, each a separate borrow of it"
+)]
+async fn load_one<M: Mapper>(
+    resource: &Value,
+    side: &FhirSide<'_>,
+    writer: &mut CdmWriter,
+    mapper: &M,
+    run_id: &RunId,
+    context: MappingContext,
+    report: &mut RunReport,
+    counts: &mut Resources,
+) -> Result<ResourceLedger, RunError> {
+    let kind = resource_type(resource).unwrap_or_default();
+    let refused = |report: &mut RunReport, source: Option<&Source>, reason: &str| {
+        report.composition_refused(source, &Refusal::new(reason));
+        ledger::of(resource, Fate::Refused(reason))
+    };
+    let source = match source_of(resource, kind) {
+        Ok(source) => source,
+        Err(reason) => {
+            counts.refused = counts.refused.saturating_add(1);
+            return Ok(refused(report, None, &reason));
+        }
+    };
+    let (composition, template, warnings, reads) = match composition_of(side, resource) {
+        Outcome::Mapped {
+            composition,
+            template,
+            warnings,
+            reads,
+        } => (composition, template, warnings, reads),
+        Outcome::Unmapped(reason) => {
+            counts.unmapped = counts.unmapped.saturating_add(1);
+            report.composition_refused(Some(&source), &Refusal::new(reason.clone()));
+            return Ok(ledger::of(resource, Fate::Unmapped(&reason)));
+        }
+        Outcome::Refused(reason) => {
+            counts.refused = counts.refused.saturating_add(1);
+            return Ok(refused(report, Some(&source), &reason));
+        }
+    };
+    counts.mapped = counts.mapped.saturating_add(1);
+    counts.losses = counts
+        .losses
+        .saturating_add(u64::try_from(warnings.len()).unwrap_or(u64::MAX));
+    report.compositions.read = report.compositions.read.saturating_add(1);
+    let Some(index) = side.programs.template(&template) else {
+        let reason = format!("no template {} is loaded", template.as_str());
+        return Ok(refused(report, Some(&source), &reason));
+    };
+    let canonical = match index.accept(composition) {
+        Ok(canonical) => canonical,
+        Err(error) => return Ok(refused(report, Some(&source), &crate::chain(&error))),
+    };
+    let graph = match mapper
+        .map(&SourceComposition {
+            source: source.clone(),
+            composition: &canonical,
+            template: index,
+            visit: None,
+            context,
+        })
+        .await
+    {
+        Ok(graph) => graph,
+        Err(refusal) => {
+            report.composition_refused(Some(&source), &refusal);
+            return Ok(ledger::of(resource, Fate::Refused(refusal.reason())));
+        }
+    };
+    let columns = match mapper.column_reads(index) {
+        Ok(columns) => columns,
+        Err(refusal) => {
+            report.composition_refused(Some(&source), &refusal);
+            return Ok(ledger::of(resource, Fate::Refused(refusal.reason())));
+        }
+    };
+    let Some(origin) = origin_of(resource, kind) else {
+        return Ok(refused(report, Some(&source), "the resource carries no id"));
+    };
+    match writer.commit_from(&graph, run_id, Some(&origin)).await {
+        Ok(written) => {
+            report.committed(&source, &written);
+            Ok(ledger::of(
+                resource,
+                Fate::Written {
+                    reads: &reads,
+                    warnings: &warnings,
+                    columns: &columns,
+                },
+            ))
+        }
+        Err(error) if writer.is_closed() => Err(RunError::Database(error)),
+        Err(error) => {
+            report.engine_outcomes(Some(&source), graph.report());
+            Ok(refused(report, Some(&source), &crate::chain(&error)))
+        }
+    }
 }
 
 #[cfg(test)]

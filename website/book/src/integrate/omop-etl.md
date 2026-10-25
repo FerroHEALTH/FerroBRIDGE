@@ -383,6 +383,14 @@ design, and each hop stays governed by its own specification.
   OMOCL refuses are each counted and listed in the run report, which adds a
   `resources` line (read, mapped, unmapped, refused, and the losses the
   FHIRconnect run declared).
+- **Every element has an outcome.** The JSON report carries a `ledger`: per
+  input resource, every element with a value and one of four outcomes:
+  `mapped` (with the openEHR node it reached and the `table.column` targets
+  that read it), `dropped` (a mapping declared it does not run, with the
+  loss), `refused` (with the reason), or `unmapped` (no mapping names it, or
+  no OMOCL column reads where it went). A data-type cell reads its element
+  whole, so the elements below one share its outcome, and the text report
+  adds a `ledger` line with the counts.
 - **Every row names its resource.** The bridge schema's `resource_origin`
   table ties each composition to the resource type, id and `meta.versionId`
   it was mapped from, and through the natural-key side table each CDM row to

@@ -40,6 +40,7 @@ pub struct Outcome<T> {
     created: Vec<Value>,
     consumed: Vec<String>,
     subject: Vec<SubjectIdentifier>,
+    reads: Vec<Location>,
 }
 
 impl<T> Outcome<T> {
@@ -52,6 +53,7 @@ impl<T> Outcome<T> {
             created: Vec::new(),
             consumed: Vec::new(),
             subject: Vec::new(),
+            reads: Vec::new(),
         }
     }
 
@@ -64,6 +66,7 @@ impl<T> Outcome<T> {
             created: Vec::new(),
             consumed: Vec::new(),
             subject: Vec::new(),
+            reads: Vec::new(),
         }
     }
 
@@ -88,6 +91,26 @@ impl<T> Outcome<T> {
     pub fn with_subject(mut self, subject: Vec<SubjectIdentifier>) -> Self {
         self.subject = subject;
         self
+    }
+
+    /// Returns this outcome with the input elements the run read.
+    #[must_use]
+    pub fn with_reads(mut self, reads: Vec<Location>) -> Self {
+        self.reads = reads;
+        self
+    }
+
+    /// Returns every FHIR element a mapping read going into openEHR, with the
+    /// openEHR node it wrote, in the order the run read them.
+    ///
+    /// A data-type cell reads its element whole, so an element below one listed
+    /// here travelled with it. An element a mapping does not name is never
+    /// listed: FHIRconnect is silent on unnamed input, so this list is how a
+    /// caller tells what the run took from what it left (no specification
+    /// governs this: our own design). Empty going out of openEHR.
+    #[must_use]
+    pub fn reads(&self) -> &[Location] {
+        &self.reads
     }
 
     /// Returns the identifiers the run offered as the subject reference of
@@ -155,6 +178,7 @@ impl<T> Outcome<T> {
             created: self.created,
             consumed: self.consumed,
             subject: self.subject,
+            reads: self.reads,
         }
     }
 }

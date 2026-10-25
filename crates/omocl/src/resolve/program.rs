@@ -51,6 +51,102 @@ impl Program {
     pub fn unbound(&self) -> &[Unbound] {
         &self.unbound
     }
+
+    /// Returns every composition node a CDM column of the program reads, as
+    /// the template path the column's path reaches from where its record is
+    /// anchored, sorted and without repeats.
+    ///
+    /// A caller joins what reached a composition node with the CDM columns
+    /// that read it; no specification governs the join: our own design.
+    #[must_use]
+    pub fn column_reads(&self) -> Vec<ColumnRead> {
+        let mut reads = Vec::new();
+        for scope in &self.roots {
+            scope_reads(scope, &mut reads);
+        }
+        reads.sort();
+        reads.dedup();
+        reads
+    }
+}
+
+/// One composition node a CDM column reads.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ColumnRead {
+    /// The CDM table.
+    pub table: &'static str,
+    /// The CDM column.
+    pub column: &'static str,
+    /// The template path of the node, absolute.
+    pub node: String,
+}
+
+/// Returns the segments `hop` reaches from the segments `from`, `None` when
+/// it climbs above the root.
+fn reached(from: &[PathSegment], hop: &Hop) -> Option<Vec<PathSegment>> {
+    let kept = from.len().checked_sub(hop.up)?;
+    let mut segments = from.get(..kept)?.to_vec();
+    segments.extend(hop.down.iter().cloned());
+    Some(segments)
+}
+
+/// Appends the column reads of `scope` and of every scope it includes.
+fn scope_reads(scope: &Scope, reads: &mut Vec<ColumnRead>) {
+    for entry in &scope.entries {
+        match *entry {
+            BoundEntry::Record(ref record) => {
+                let anchor = match record.base {
+                    None => Some(scope.root.segments.clone()),
+                    Some(ref hop) => reached(&scope.root.segments, hop),
+                };
+                let Some(anchor) = anchor else {
+                    continue;
+                };
+                for column in &record.columns {
+                    for path in column.alternatives.iter().flat_map(alternative_paths) {
+                        let Some(segments) = reached(&anchor, &path.hop) else {
+                            continue;
+                        };
+                        let node = RmPath {
+                            absolute: true,
+                            segments,
+                        }
+                        .to_string();
+                        for projected in column.projection.columns {
+                            reads.push(ColumnRead {
+                                table: record.target.table(),
+                                column: projected.column,
+                                node: node.clone(),
+                            });
+                        }
+                    }
+                }
+            }
+            BoundEntry::Include(ref include) => {
+                for child in include.scopes() {
+                    scope_reads(child, reads);
+                }
+            }
+            BoundEntry::Custom(_) => {}
+        }
+    }
+}
+
+/// Returns the paths one alternative reads.
+fn alternative_paths(alternative: &BoundAlternative) -> Vec<&BoundPath> {
+    match *alternative {
+        BoundAlternative::Path(ref path) | BoundAlternative::ConceptMap { ref path, .. } => {
+            vec![path]
+        }
+        BoundAlternative::Multiplication(ref factors) => factors
+            .iter()
+            .filter_map(|factor| match *factor {
+                BoundFactor::Path(ref path) => Some(path),
+                BoundFactor::Code(_) => None,
+            })
+            .collect(),
+        BoundAlternative::Code(_) | BoundAlternative::Unbound { .. } => Vec::new(),
+    }
 }
 
 /// A walk from an anchor: `up` parent steps, then `down` segments.

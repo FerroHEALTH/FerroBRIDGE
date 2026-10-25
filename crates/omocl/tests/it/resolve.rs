@@ -218,3 +218,16 @@ fn the_self_step_names_the_anchor() -> Result<(), Box<dyn Error>> {
     );
     Ok(())
 }
+
+#[test]
+fn every_column_names_the_composition_node_it_reads() -> Result<(), Box<dyn Error>> {
+    let index = template()?;
+    let program = compiled(&set(LABORATORY, &[])?, &index)?;
+    let reads: Vec<String> = program
+        .column_reads()
+        .iter()
+        .map(|read| format!("{}.{} <- {}", read.table, read.column, read.node))
+        .collect();
+    insta::assert_snapshot!("laboratory_column_reads", reads.join("\n"));
+    Ok(())
+}

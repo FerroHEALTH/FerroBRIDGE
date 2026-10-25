@@ -1825,9 +1825,20 @@ The shape:
   `resource_origin` table records each composition's resource type, id and
   version in the commit's transaction, so every row traces to its resource
   and back through the natural-key side table (#409).
-- **Every element accounted for.** FHIRconnect reports each loss as a typed
-  outcome and OMOCL counts unmapped fields and refusals, so the run report
-  joins the two into one ledger per input resource (#408).
+- **Every element accounted for.** The run report carries one ledger per
+  input resource that gives every element exactly one of four outcomes
+  (#408): mapped, naming the openEHR node a FHIRconnect mapping read it into
+  and the CDM columns an OMOCL column reads there; dropped, where a mapping
+  declared it does not run (a FHIRconnect `Loss::Skipped`); refused, with the
+  reason the resource or its composition was refused; and unmapped, where no
+  mapping names the element or no column reads where it went. FHIRconnect
+  v1.0.0 is silent on an input element no mapping names, so `unmapped` is an
+  outcome of its own rather than a kind of `dropped`: our own design. The
+  FHIRconnect engine records every element a mapping reads going into
+  openEHR (`Outcome::reads`), a data-type cell reading its element whole, and
+  the OMOCL program names the node each column reads
+  (`Program::column_reads`); a column counts for a node it reads or an
+  attribute of it, never for every node below an ancestor it reads.
 - **Visits.** With no AQL to read visits from, a run derives no
   `VISIT_OCCURRENCE` until an Encounter mapping exists in both languages; the
   rows carry no visit, as a CDR run without `[etl.visits]` does.

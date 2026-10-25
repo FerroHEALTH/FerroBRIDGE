@@ -25,6 +25,7 @@ pub mod aql;
 pub mod deletions;
 pub mod fhir;
 pub mod job;
+pub mod ledger;
 pub mod mapper;
 pub mod report;
 pub mod tie;
@@ -119,6 +120,21 @@ pub trait Mapper {
         &self,
         composition: &SourceComposition<'_>,
     ) -> impl Future<Output = Result<RecordGraph, Refusal>>;
+
+    /// Returns the composition node each CDM column the mapper writes reads,
+    /// for the template given, so the element ledger can name
+    /// where an element went ([`ledger`]); empty when the mapper cannot say.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Refusal`] the mapper answers for a template it cannot
+    /// map.
+    fn column_reads(
+        &self,
+        _template: &WebTemplateIndex,
+    ) -> Result<Vec<omocl::resolve::program::ColumnRead>, Refusal> {
+        Ok(Vec::new())
+    }
 }
 
 /// How one run reads the CDR.

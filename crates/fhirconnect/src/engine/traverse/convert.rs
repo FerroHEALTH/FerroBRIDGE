@@ -102,6 +102,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
         };
         for (input, binding) in inputs.iter().zip(bindings.iter()) {
             self.convert(mapping, input, binding)?;
+            if self.direction == Direction::FhirToOpenehr {
+                self.reads.push(self.locate(mapping, input));
+            }
         }
         Ok(bindings)
     }

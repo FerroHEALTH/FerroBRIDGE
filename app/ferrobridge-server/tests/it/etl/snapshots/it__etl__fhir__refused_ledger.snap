@@ -1,0 +1,24 @@
+---
+source: app/ferrobridge-server/tests/it/etl/fhir.rs
+expression: ledger
+---
+{
+  "resource": "Observation/o-1",
+  "elements": [
+    {
+      "path": "Observation.id",
+      "outcome": "refused",
+      "reason": "the resource names no subject"
+    },
+    {
+      "path": "Observation.status",
+      "outcome": "refused",
+      "reason": "the resource names no subject"
+    },
+    {
+      "path": "Observation.code.text",
+      "outcome": "refused",
+      "reason": "the resource names no subject"
+    }
+  ]
+}

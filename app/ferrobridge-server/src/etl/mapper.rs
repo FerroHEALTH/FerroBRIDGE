@@ -281,4 +281,11 @@ impl<S: ConceptSource> Mapper for OmoclMapper<S> {
     ) -> impl Future<Output = Result<RecordGraph, Refusal>> {
         self.graph(composition)
     }
+
+    fn column_reads(
+        &self,
+        template: &WebTemplateIndex,
+    ) -> Result<Vec<omocl::resolve::program::ColumnRead>, Refusal> {
+        Ok(self.program(template)?.column_reads())
+    }
 }
