@@ -36,6 +36,7 @@ database = [
     "dep:webpki-roots",
     "dep:tokio",
     "dep:futures-util",
+    "dep:tempfile",
 ]
 
 [dependencies]
@@ -46,12 +47,14 @@ sqlx = { workspace = true, optional = true }
 thiserror.workspace = true
 # The CDM writer's client: binary COPY inside one transaction per composition,
 # on a connection of its own beside the sqlx pool.
-tokio = { workspace = true, optional = true, features = ["rt", "fs", "io-util"] }
+tokio = { workspace = true, optional = true, features = ["rt", "fs", "net", "io-util"] }
 tokio-postgres = { workspace = true, optional = true }
 # The writer's TLS, after the connection URL's `sslmode`.
 rustls = { workspace = true, optional = true }
 tokio-postgres-rustls = { workspace = true, optional = true }
 webpki-roots = { workspace = true, optional = true }
+# The private directory the pool's TLS relay puts its socket in.
+tempfile = { workspace = true, optional = true }
 
 [dev-dependencies]
 # The Data Quality Dashboard thresholds quote cells that hold commas.
@@ -61,6 +64,10 @@ ferrobridge-testkit.workspace = true
 sha2.workspace = true
 # The loader tests copy the synthetic download into directories of their own.
 tempfile.workspace = true
+# The pool relay tests: a synthetic root and a TLS stand-in server.
+rcgen.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time"] }
 tokio-postgres.workspace = true
 

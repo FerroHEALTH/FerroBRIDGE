@@ -32,6 +32,10 @@ pub enum JobError {
     /// The CDR client could not be built.
     #[error("building the CDR client the run reads through")]
     Client(#[source] crate::cdr::error::CdrError),
+    /// The concept resolver's connection to the CDM database could not be
+    /// prepared.
+    #[error("preparing the concept resolver's connection to the CDM database")]
+    Connection(#[source] omop_cdm::connection::ConnectionError),
     /// The concept resolver could not connect to the CDM database.
     #[error("connecting the concept resolver to the CDM database")]
     Resolver(#[source] ConnectError),
@@ -118,7 +122,9 @@ pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport,
     let client = crate::cdr::CdrClient::new(cdr).map_err(JobError::Client)?;
     let pool = CdmPool::connect(
         sqlx::postgres::PgPoolOptions::new().max_connections(2),
-        cdm.connection.pool_options(),
+        cdm.connection
+            .pool_options()
+            .map_err(JobError::Connection)?,
         cdm.schema.clone(),
     )
     .await

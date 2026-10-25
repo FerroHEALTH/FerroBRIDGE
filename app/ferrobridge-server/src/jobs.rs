@@ -45,7 +45,9 @@ pub(crate) fn cdm_init_command(
         );
         let pool = database::CdmPool::connect(
             sqlx::postgres::PgPoolOptions::new().max_connections(1),
-            cdm.connection.pool_options(),
+            cdm.connection
+                .pool_options()
+                .context("preparing the connection to the CDM database")?,
             cdm.schema.clone(),
         )
         .await
@@ -138,7 +140,9 @@ pub(crate) fn vocab_load_command(
         );
         let pool = omop_cdm::database::CdmPool::connect(
             sqlx::postgres::PgPoolOptions::new().max_connections(1),
-            cdm.connection.pool_options(),
+            cdm.connection
+                .pool_options()
+                .context("preparing the connection to the CDM database")?,
             schema.clone(),
         )
         .await

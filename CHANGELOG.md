@@ -57,6 +57,15 @@ crates on crates.io.
   writer that remains. `cdm init` adds the `death_row` side table and lets
   several compositions of a person record a `DEATH` row.
 
+### Fixed
+
+- With `[cdm] tls_ca` set, the concept resolver's pool now trusts that CA
+  alone, as the CDM writer does (#266). The pool no longer runs its
+  PostgreSQL client's own TLS, which added a built-in root set to the CA: it
+  reaches the database through a relay on a private Unix socket that
+  handshakes with the writer's TLS configuration. A URL that asks for TLS
+  names one host and one port; a list of hosts is refused at start.
+
 ## [0.0.12] - 2026-10-25
 
 The FHIRconnect and facade outcomes release. A write through the facade now

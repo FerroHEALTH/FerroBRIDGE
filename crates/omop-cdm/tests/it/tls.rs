@@ -46,7 +46,7 @@ async fn pool(connection: &CdmConnection) -> Result<CdmPool, Box<dyn Error>> {
         PgPoolOptions::new()
             .max_connections(1)
             .acquire_timeout(Duration::from_secs(10)),
-        connection.pool_options(),
+        connection.pool_options()?,
         SchemaName::new("cdm")?,
     )
     .await?)
