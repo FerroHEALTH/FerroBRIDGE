@@ -25,6 +25,10 @@ crates on crates.io.
 
 ### Added
 
+- `ferrobridge mapping check --vocabulary` checks every literal concept id of
+  the OMOCL files against the vocabulary loaded in the `[cdm]` database: a
+  literal the vocabulary does not hold, or whose domain is not one the CDM
+  field definitions name for its column, is a diagnostic (#97).
 - `ferrobridge-hl7v2` 0.1.143 serves a consumer of its listener and parser
   alone. `parse::structure::structure_declared` selects the structure
   MSH-9.3 names over the message definition where the two disagree, so an

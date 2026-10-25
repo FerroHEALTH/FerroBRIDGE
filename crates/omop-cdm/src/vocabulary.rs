@@ -344,6 +344,28 @@ impl ConceptResolver {
         }
     }
 
+    /// Returns the `domain_id` of every concept of `concepts` the vocabulary
+    /// holds, by concept id; a concept it does not hold is absent.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LookupError::Query`] when the database fails the query.
+    pub async fn domains(
+        &self,
+        concepts: &[i32],
+    ) -> Result<std::collections::BTreeMap<i32, String>, LookupError> {
+        let rows: Vec<(i32, String)> =
+            sqlx::query_as("SELECT concept_id, domain_id FROM concept WHERE concept_id = ANY($1)")
+                .bind(concepts)
+                .fetch_all(self.pool.pool())
+                .await
+                .map_err(|source| LookupError::Query {
+                    what: String::from("the domains of the literal concepts"),
+                    source: Box::new(source),
+                })?;
+        Ok(rows.into_iter().collect())
+    }
+
     /// Returns the `domain_concept_id` the `DOMAIN` table holds for `domain`,
     /// `None` when it holds no such domain.
     ///

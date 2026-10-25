@@ -436,6 +436,19 @@ is consistent with. A `CustomMapping` names a converter compiled into the
 binary, and an unknown name refuses the file. A mapping that fails validation
 is refused at load time.
 
+A literal concept id (`code: 3004249`, or a value of a `conceptMap`) is a
+concept of the OHDSI vocabulary, so it can only be checked against a loaded
+one. With `[cdm]` configured and a vocabulary loaded,
+
+```sh
+ferrobridge mapping check --vocabulary
+```
+
+adds a diagnostic for every literal the vocabulary does not hold and every
+literal whose domain is not one the CDM field definitions name for its column
+(`omocl-unknown-concept`, `omocl-domain-mismatch`). Concept `0` is exempt.
+Without `[cdm]` or `[mappings] omocl` the flag refuses to start.
+
 ## What you need in place
 
 A PostgreSQL CDM v5.4 database built from the OHDSI DDLs, an Athena vocabulary
