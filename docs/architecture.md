@@ -2153,6 +2153,32 @@ draft upstream change.
   The CDM has no provenance element, so the OMOP side records provenance in
   the bridge-owned side table only. No specification governs the shape beyond
   those two: our own design.
+- **The caller at the CDR.** The bridge validates each caller's token and
+  reaches the CDR with its own credential, never the caller's token, which
+  names the bridge as its audience (RFC 9068 §4). The caller still reaches
+  every write the CDR records: ITS-REST 1.1.0 (§openehr-version and
+  openehr-audit-details) has a service accept a client-supplied
+  `committer` and "merge" it into the version's `AUDIT_DETAILS`, and makes
+  it "RECOMMENDED to provision these headers based on authentication and
+  authorization runtime data". So a write the facade makes for an
+  authenticated caller, a single write as `openehr-audit-details` and a
+  transaction as each `UPDATE_AUDIT` of its CONTRIBUTION, states the caller
+  as a `PARTY_IDENTIFIED` named by the token's `sub` (or the Basic user-id),
+  with a `PARTY_REF` of type `PARTY` (openEHR BASE: "Abstract supertypes are
+  allowed", since a token does not say whether its subject is a person or a
+  client) and a `GENERIC_ID` of the subject in the namespace of the issuer
+  that vouched for it, or of the bridge's `system_id` for a Basic user the
+  bridge checked. A namespace outside the `OBJECT_REF.namespace` regex
+  leaves the name alone. `system_id` keeps naming the bridge, so each
+  version records who asked and which system committed. An HL7 v2 message
+  and a request on an open surface carry no caller and commit under the
+  bridge's name (#532). Reads carry no audit metadata in ITS-REST, so the
+  CDR's access log still names the bridge for them; carrying the caller there
+  needs a per-caller token the CDR accepts, such as an OAuth 2.0 Token
+  Exchange (RFC 8693) token with an `act` claim, which needs an
+  authorization server that issues it and a CDR that reads it, and stays
+  open until both exist. The mapping of a caller onto `committer` is no
+  specification's: our own design.
 - **Tenancy.** The reference CDR scopes its mapping rows per tenant with
   row-level security and keeps its outbound watermark deliberately unscoped
   (one integer, no tenant data). FerroBRIDGE's mapping set is a file tree per

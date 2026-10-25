@@ -25,6 +25,16 @@ crates on crates.io.
 
 ### Added
 
+- A write the facade makes for an authenticated caller states that caller as
+  the version's committer, as ITS-REST 1.1.0 recommends ("provision these
+  headers based on authentication and authorization runtime data"): a
+  single write sends `openehr-audit-details` with `committer.name` set to the
+  token's `sub` (or the Basic user-id) and a `committer.external_ref` in the
+  issuer's namespace, and a transaction states the same committer in every
+  `UPDATE_AUDIT` of its CONTRIBUTION. `system_id` keeps naming the bridge.
+  A write no caller made (an HL7 v2 message, an open surface) still commits
+  under the bridge's name. Reads still reach the CDR under the bridge's own
+  credential (#532).
 - `ferrobridge vocab load DIR --schema NAME` loads an OHDSI Athena vocabulary
   download into the vocabulary tables of the CDM schema (#233). It takes the
   nine files every download carries and `SOURCE_TO_CONCEPT_MAP.csv` when

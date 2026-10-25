@@ -314,6 +314,14 @@ source resource's `id` and type as an `originating_system_item_ids` entry, its
 recorded as unknown, never given one. So a reader of the CDR can tell which
 FHIR resource a composition came from without asking the bridge.
 
+Each version also names who asked for it. The committer the facade states
+in `AUDIT_DETAILS` is the caller the request authenticated: the token's
+`sub`, or the Basic user-id, with a reference into the namespace of the
+issuer that vouched for it. `system_id` keeps naming the bridge. A write no
+caller made, such as an HL7 v2 message or a request while `[auth]` is off,
+commits under the bridge's name. Reads reach the CDR under the bridge's own
+credential, so the CDR's access log names the bridge for them.
+
 ## Writes
 
 A create resolves the subject to an EHR: the identity map first, then the CDR

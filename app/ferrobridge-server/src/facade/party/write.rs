@@ -32,6 +32,7 @@ use crate::cdr::commit::CommitContext;
 use crate::cdr::demographic::Demographic;
 use crate::facade::Facade;
 use crate::facade::commit::Change;
+use crate::facade::commit::Committer;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::Refusal;
 use crate::facade::handlers::read::parse;
@@ -61,7 +62,7 @@ pub(crate) async fn create(
     let built = build(facade, loaded, inbound.document()).await?;
     let client = facade.client_for(headers);
     let demographic = party::demographic(&client)?;
-    let commit = commit(facade, loaded, Change::Creation)?;
+    let commit = commit(facade, access, loaded, Change::Creation)?;
     let version = commit_party(demographic, class_of(loaded)?, &built, &commit, None).await?;
     party::provision::provision(facade, &client, resource_type, &version).await?;
     respond(
@@ -100,7 +101,7 @@ pub(crate) async fn update(
     let latest = party::get(demographic, class, resource_type, uid.value()).await?;
     party::accept(loaded, resource_type, id, &latest)?;
     let preceding = preceding(headers, &latest.version)?;
-    let commit = commit(facade, loaded, Change::Modification)?;
+    let commit = commit(facade, access, loaded, Change::Modification)?;
     let version = commit_party(
         demographic,
         class,
@@ -138,7 +139,7 @@ pub(crate) async fn delete(
     let class = class_of(loaded)?;
     let latest = party::get(demographic, class, resource_type, uid.value()).await?;
     party::accept(loaded, resource_type, id, &latest)?;
-    let commit = commit(facade, loaded, Change::Deleted)?;
+    let commit = commit(facade, access, loaded, Change::Deleted)?;
     macro_rules! delete_as {
         ($call:ident, $outcome:ident) => {{
             use openehr_its::rest::generated::demographic::client::$outcome;
@@ -184,10 +185,17 @@ async fn build(
 }
 
 /// Returns the commit headers one party write carries.
-fn commit(facade: &Facade, loaded: &Loaded, change: Change) -> Result<CommitContext, Refusal> {
+fn commit(
+    facade: &Facade,
+    access: &Access,
+    loaded: &Loaded,
+    change: Change,
+) -> Result<CommitContext, Refusal> {
+    let system_id = &facade.settings().system_id;
     crate::facade::commit::context(
         change,
-        &facade.settings().system_id,
+        system_id,
+        &Committer::of(access, system_id),
         loaded.program().template().id().as_str(),
     )
     .map_err(|error| {
