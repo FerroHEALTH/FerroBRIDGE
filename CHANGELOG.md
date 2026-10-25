@@ -25,6 +25,13 @@ crates on crates.io.
 
 ### Added
 
+- The first HL7 Europe profile context: `ferrobridge_eu_condition.context`
+  targets Base and Core 2.0.0 `condition-eu-core` over the published
+  `KDS_Diagnose` template, with the published diagnosis, qualifier and
+  composition model mappings and FerroBRIDGE's extensions for the profile's
+  `assertedDate` extension and `onsetDateTime` slices and its canonical. The
+  round trip asserts the code, both slices, `clinicalStatus` and
+  `verificationStatus` (#116).
 - `ferrobridge mapping check --vocabulary` checks every literal concept id of
   the OMOCL files against the vocabulary loaded in the `[cdm]` database: a
   literal the vocabulary does not hold, or whose domain is not one the CDM

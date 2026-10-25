@@ -939,6 +939,7 @@ if [ -f LICENSE ]; then
   # so a header claim is caught while the same text quoted inside a string
   # literal (the emitter that writes that crate's header) is not.
   # The KDS project fixtures (FHIRconnect and OMOCL) are modified copies of Apache-2.0 mapping-library files, so they keep that licence.
+  # So do the EU profile fixtures that copy library methods; a file there of FerroBRIDGE's own design names BUSL-1.1.
   # The omop-cdm era scripts are the PostgreSQL form of OHDSI's Apache-2.0 SQL, so they keep it too.
   while IFS= read -r hit; do
     [ -n "$hit" ] || continue
@@ -948,9 +949,10 @@ if [ -f LICENSE ]; then
     -- ':!LICENSE' ':!CHANGELOG.md' ':!scripts/checks/versions.sh' ':(glob,exclude)**/vendor/**' \
     ':(glob,exclude)docs/specs/**' ':(glob,exclude)crates/fhir-types/**' ':(glob,exclude)crates/hl7v2-types/**' \
     ':(glob,exclude)crates/fhirconnect/tests/fixtures/projects/ferrobridge/kds_*/**' \
+    ':(glob,exclude)crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_*/**' \
     ':(glob,exclude)crates/omocl/tests/fixtures/projects/ferrobridge/kds_*/**' \
     ':(glob,exclude)crates/omop-cdm/sql/*.sql' || true)
-  [ "$stale" -eq 0 ] && note "OK: every first-party file names BUSL-1.1 (crates/fhir-types, crates/hl7v2-types, the KDS project fixtures and the omop-cdm era scripts excepted, Apache-2.0)"
+  [ "$stale" -eq 0 ] && note "OK: every first-party file names BUSL-1.1 (crates/fhir-types, crates/hl7v2-types, the KDS and EU project fixtures that copy library files and the omop-cdm era scripts excepted, Apache-2.0)"
 else
   note "no LICENSE yet, skipped"
 fi

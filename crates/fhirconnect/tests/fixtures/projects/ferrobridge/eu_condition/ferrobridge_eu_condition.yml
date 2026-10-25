@@ -1,0 +1,109 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# FerroBRIDGE's extension of model/evaluation/org.openehr/problem_diagnosis.v1.yml
+# for condition-eu-core 2.0.0, with methods copied from
+# projects/org.highmed/KDS/diagnose/KDS_problem_diagnose.yml, a derivative of
+# both under their licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# files carry no copyright line to keep.
+# The `assertedDate` extension and `onsetDateTime` are the two slices
+# condition-eu-core profiles on Condition.extension and Condition.onset[x];
+# `meta.profile` names the profile. The participation, body site and onset
+# overwrites are the ones projects/ferrobridge/kds_diagnose records against
+# the published model by line, without the KDS ICD-10-GM, Diagnosesicherheit
+# and Lebensphase branches.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_condition
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: EVALUATION.problem_diagnosis.v1
+
+mappings:
+  - name: "metaURL"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/base/StructureDefinition/condition-eu-core"
+
+  - name: "assertedDate"
+    extension: "add"
+    with:
+      fhir: "$resource.extension"
+      openehr: "$archetype/data[at0001]/items[at0003]"
+    fhirCondition:
+      targetRoot: "$resource.extension"
+      targetAttribute: "url"
+      operator: "one of"
+      criteria: "http://hl7.org/fhir/StructureDefinition/condition-assertedDate"
+    followedBy:
+      mappings:
+        - name: "assertedDateValue"
+          with:
+            fhir: "value.as(DateTime)"
+            openehr: "$archetype/data[at0001]/items[at0003]"
+
+        - name: "assertedDateUrl"
+          with:
+            fhir: "$fhirRoot"
+          manual:
+            - name: "url"
+              fhir:
+                - path: "url"
+                  value: "http://hl7.org/fhir/StructureDefinition/condition-assertedDate"
+
+  - name: "dateTime"
+    extension: "overwrite"
+    with:
+      fhir: "$resource.onset.as(DateTime)"
+      openehr: "$archetype/data[at0001]/items[at0077]"
+
+  - name: "problemQualifier"
+    extension: "add"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]"
+    slotArchetype: "CLUSTER.problem_qualifier.v2"
+
+  # The published model maps `$archetype/diagnose/other_participations`, and
+  # EVALUATION has no `diagnose` attribute; ENTRY.other_participations is the
+  # attribute it means (openEHR RM 1.1.0, ENTRY; #101), written in the form
+  # concept-mappings.adoc, Participation mappings, gives.
+  - name: "other_participations"
+    extension: "overwrite"
+    with:
+      fhir: "$resource.asserter"
+      openehr: "$archetype/other_participations"
+    participationsFunction: "asserter"
+
+  - name: "participations"
+    extension: "overwrite"
+    with:
+      fhir: "$resource.asserter"
+      openehr: "$composition/context/participations"
+    participationsFunction: "asserter"
+
+  # The published model maps `$archetype/data[at0012]`, which KDS_Diagnose
+  # does not carry, and slots CLUSTER.anatomical_location.v1, which does not
+  # compile under a slot (#173); the body site name is the cluster's at0001.
+  - name: "bodySite"
+    extension: "overwrite"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype"
+      type: "NONE"
+
+  - name: "bodySiteCluster"
+    extension: "overwrite"
+    with:
+      fhir: "$resource.bodySite"
+      openehr: "$archetype/data[at0001]/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0001]"

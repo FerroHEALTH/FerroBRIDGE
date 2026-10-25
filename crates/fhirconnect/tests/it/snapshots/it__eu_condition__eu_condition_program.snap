@@ -1,0 +1,149 @@
+---
+source: crates/fhirconnect/tests/it/eu_condition.rs
+expression: program.to_string()
+---
+program ferrobridge_eu_condition.context
+  profile http://hl7.eu/fhir/base/StructureDefinition/condition-eu-core version 2.0.0
+  template KDS_Diagnose sem_ver unpinned generation adl1.4
+  resource Condition
+  start EVALUATION.problem_diagnosis.v1
+  root axes [diagnose/diagnose]
+  model EVALUATION.problem_diagnosis.v1 version 0.0.1-alpha archetype openEHR-EHR-EVALUATION.problem_diagnosis.v1 revision 1.4.1
+    extension ferrobridge_eu_condition
+  model CLUSTER.problem_qualifier.v2 version 0.0.1-alpha archetype openEHR-EHR-CLUSTER.problem_qualifier.v2 revision 2.0.1
+    extension ferrobridge_eu_problem_qualifier
+  preprocessor EVALUATION.problem_diagnosis.v1
+    fhirCondition not of [entered-in-error] on fhir $resource -> Condition complex writable (element)
+      attribute fhir $resource.verificationStatus.coding.code -> Coding.code primitive writable
+  mapping contextStartTime from EVALUATION.problem_diagnosis.v1
+    fhir $resource.recordedDate -> Condition.recordedDate primitive writable
+    openehr /context/start_time -> /context/start_time DV_DATE_TIME
+    derived dateTime
+  mapping participations from ferrobridge_eu_condition
+    fhir $resource.asserter -> Condition.asserter complex writable
+    openehr /context/participations -> /context EVENT_CONTEXT tail participations
+    participationsFunction asserter
+  mapping composer from EVALUATION.problem_diagnosis.v1
+    fhir $resource.recorder -> Condition.recorder complex writable
+    openehr /composer -> /composer PARTY_PROXY
+    derived Reference
+  mapping other_participations from ferrobridge_eu_condition
+    fhir $resource.asserter -> Condition.asserter complex writable
+    openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/other_participations -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose'] EVALUATION tail other_participations occurrences [diagnose/diagnose]
+    participationsFunction asserter
+  mapping provider from EVALUATION.problem_diagnosis.v1
+    fhir $resource.recorder -> Condition.recorder complex writable
+    openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/provider -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose'] EVALUATION tail provider occurrences [diagnose/diagnose]
+    derived Reference
+  mapping problemDiagnose from EVALUATION.problem_diagnosis.v1
+    fhir $resource.code -> Condition.code complex writable
+    openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0002] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0002,'Kodierte Diagnose']/value DV_CODED_TEXT occurrences [diagnose/diagnose]
+    derived CodeableConcept
+  mapping note from EVALUATION.problem_diagnosis.v1
+    fhir $resource.note.text -> Annotation.text primitive writable
+    openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0069] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0069,'Diagnoseerläuterung']/value DV_TEXT occurrences [diagnose/diagnose]
+    derived string
+  mapping dateTime from ferrobridge_eu_condition
+    fhir $resource.onset.as(DateTime) -> Condition.onset[x] primitive writable
+    openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0077] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0077,'Klinisch relevanter Zeitraum (Zeitpunkt des Auftretens)']/value DV_DATE_TIME occurrences [diagnose/diagnose]
+    derived dateTime
+  mapping bodySite from ferrobridge_eu_condition
+    fhir $resource -> Condition complex writable
+    openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose'] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose'] EVALUATION occurrences [diagnose/diagnose]
+    type NONE
+  mapping bodySiteCluster from ferrobridge_eu_condition
+    fhir $resource.bodySite -> Condition.bodySite complex writable
+    openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0001] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0001]/value DV_CODED_TEXT occurrences [diagnose/diagnose]
+    derived CodeableConcept
+  mapping severity from EVALUATION.problem_diagnosis.v1
+    fhir $resource.severity -> Condition.severity complex writable
+    openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0005] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0005]/value DV_CODED_TEXT occurrences [diagnose/diagnose]
+    derived CodeableConcept
+  mapping metaURL from ferrobridge_eu_condition
+    fhir $resource.meta -> Condition.meta complex writable
+    unidirectional openehr->fhir
+    manual profileUrl
+      fhir $resource.meta.profile -> Meta.profile primitive writable = http://hl7.eu/fhir/base/StructureDefinition/condition-eu-core
+  mapping assertedDate from ferrobridge_eu_condition
+    fhir $resource.extension -> Condition.extension complex writable
+    openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0003] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0003,'Feststellungsdatum']/value DV_DATE_TIME occurrences [diagnose/diagnose]
+    derived choice read $resource.extension.value -> Extension.value[x] choice writable write dateTime as $resource.extension.value.as(DateTime) -> Extension.value[x] primitive writable
+    fhirCondition one of [http://hl7.org/fhir/StructureDefinition/condition-assertedDate] on fhir $resource.extension -> Condition.extension complex writable (element)
+      attribute fhir $resource.extension.url -> Extension.url attribute writable
+    mapping assertedDate.assertedDateValue from ferrobridge_eu_condition
+      fhir $resource.extension.value.as(DateTime) -> Extension.value[x] primitive writable
+      openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0003] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0003,'Feststellungsdatum']/value DV_DATE_TIME occurrences [diagnose/diagnose]
+      derived dateTime
+    mapping assertedDate.assertedDateUrl from ferrobridge_eu_condition
+      fhir $resource.extension -> Condition.extension complex writable
+      manual url
+        fhir $resource.extension.url -> Extension.url attribute writable = http://hl7.org/fhir/StructureDefinition/condition-assertedDate
+  mapping problemQualifier from ferrobridge_eu_condition
+    fhir $resource -> Condition complex writable
+    openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status'] CLUSTER occurrences [diagnose/diagnose]
+    slotArchetype CLUSTER.problem_qualifier.v2
+      mapping statusCoded from ferrobridge_eu_problem_qualifier
+        fhir $resource.verificationStatus.coding -> CodeableConcept.coding complex writable
+        openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT occurrences [diagnose/diagnose]
+        fhirCondition not of [entered-in-error] on fhir $resource.verificationStatus -> Condition.verificationStatus complex writable (ancestor)
+          attribute fhir $resource.verificationStatus.coding.code -> Coding.code primitive writable
+        manual provisional
+          fhir $resource.verificationStatus.coding.code -> Coding.code primitive writable = provisional
+          fhir $resource.verificationStatus.coding.display -> Coding.display primitive writable = Provisional
+          fhir $resource.verificationStatus.coding.system -> Coding.system primitive writable = http://terminology.hl7.org/CodeSystem/condition-ver-status
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/terminology_id/value -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [diagnose/diagnose] = local
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/code_string occurrences [diagnose/diagnose] = at0017
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/value -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT occurrences [diagnose/diagnose] = Working
+          fhirCondition one of [provisional] on fhir $resource.verificationStatus.coding -> CodeableConcept.coding complex writable (element)
+            attribute fhir $resource.verificationStatus.coding.code -> Coding.code primitive writable
+          openehrCondition one of [at0017] on openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status'] CLUSTER occurrences [diagnose/diagnose] (ancestor)
+            attribute openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/code_string occurrences [diagnose/diagnose]
+        manual differential
+          fhir $resource.verificationStatus.coding.code -> Coding.code primitive writable = differential
+          fhir $resource.verificationStatus.coding.display -> Coding.display primitive writable = Differential
+          fhir $resource.verificationStatus.coding.system -> Coding.system primitive writable = http://terminology.hl7.org/CodeSystem/condition-ver-status
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/terminology_id/value -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [diagnose/diagnose] = local
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/code_string occurrences [diagnose/diagnose] = at0017
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/value -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT occurrences [diagnose/diagnose] = Working
+          fhirCondition one of [differential] on fhir $resource.verificationStatus.coding -> CodeableConcept.coding complex writable (element)
+            attribute fhir $resource.verificationStatus.coding.code -> Coding.code primitive writable
+          openehrCondition one of [at0017] on openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status'] CLUSTER occurrences [diagnose/diagnose] (ancestor)
+            attribute openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/code_string occurrences [diagnose/diagnose]
+        manual preliminary
+          fhir $resource.verificationStatus.coding.code -> Coding.code primitive writable = unconfirmed
+          fhir $resource.verificationStatus.coding.display -> Coding.display primitive writable = Unconfirmed
+          fhir $resource.verificationStatus.coding.system -> Coding.system primitive writable = http://terminology.hl7.org/CodeSystem/condition-ver-status
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/terminology_id/value -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [diagnose/diagnose] = local
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/code_string occurrences [diagnose/diagnose] = at0016
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/value -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT occurrences [diagnose/diagnose] = Preliminary
+          fhirCondition one of [unconfirmed] on fhir $resource.verificationStatus.coding -> CodeableConcept.coding complex writable (element)
+            attribute fhir $resource.verificationStatus.coding.code -> Coding.code primitive writable
+          openehrCondition one of [at0016] on openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status'] CLUSTER occurrences [diagnose/diagnose] (ancestor)
+            attribute openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/code_string occurrences [diagnose/diagnose]
+        manual established
+          fhir $resource.verificationStatus.coding.code -> Coding.code primitive writable = confirmed
+          fhir $resource.verificationStatus.coding.display -> Coding.display primitive writable = Confirmed
+          fhir $resource.verificationStatus.coding.system -> Coding.system primitive writable = http://terminology.hl7.org/CodeSystem/condition-ver-status
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/terminology_id/value -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [diagnose/diagnose] = local
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/code_string occurrences [diagnose/diagnose] = at0018
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/value -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT occurrences [diagnose/diagnose] = Established
+          fhirCondition one of [confirmed] on fhir $resource.verificationStatus.coding -> CodeableConcept.coding complex writable (element)
+            attribute fhir $resource.verificationStatus.coding.code -> Coding.code primitive writable
+          openehrCondition one of [at0018] on openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status'] CLUSTER occurrences [diagnose/diagnose] (ancestor)
+            attribute openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/code_string occurrences [diagnose/diagnose]
+        manual refuted
+          fhir $resource.verificationStatus.coding.code -> Coding.code primitive writable = refuted
+          fhir $resource.verificationStatus.coding.display -> Coding.display primitive writable = Refuted
+          fhir $resource.verificationStatus.coding.system -> Coding.system primitive writable = http://terminology.hl7.org/CodeSystem/condition-ver-status
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/terminology_id/value -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [diagnose/diagnose] = local
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/code_string occurrences [diagnose/diagnose] = at0088
+          openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/value -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT occurrences [diagnose/diagnose] = Refuted
+          fhirCondition one of [refuted] on fhir $resource.verificationStatus.coding -> CodeableConcept.coding complex writable (element)
+            attribute fhir $resource.verificationStatus.coding.code -> Coding.code primitive writable
+          openehrCondition one of [at0088] on openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status'] CLUSTER occurrences [diagnose/diagnose] (ancestor)
+            attribute openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0004]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0004]/value DV_CODED_TEXT tail defining_code/code_string occurrences [diagnose/diagnose]
+      mapping clinicalStatus from ferrobridge_eu_problem_qualifier
+        fhir $resource.clinicalStatus -> Condition.clinicalStatus complex writable
+        openehr /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]/items[at0003] -> /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0003,'Klinischer Status']/value DV_CODED_TEXT occurrences [diagnose/diagnose]
+        derived CodeableConcept
+  warning fc-unreached-extension: `ferrobridge_eu_composition.Condition` extends `COMPOSITION.report.v1.Condition`, which no mapping of this context reaches, so the extension changes nothing

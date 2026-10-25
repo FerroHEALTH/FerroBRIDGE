@@ -10,6 +10,7 @@
 mod corpus;
 mod derive;
 mod engine;
+mod eu_condition;
 mod event_time;
 mod events;
 mod kds_coding;

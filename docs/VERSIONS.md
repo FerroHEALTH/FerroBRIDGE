@@ -261,9 +261,10 @@ wrote into the `PROVENANCE.md` when the tree is not on disk.
 `scripts/checks/versions.sh` reads the `Version`, `Files` and digest lines of
 every `PROVENANCE.md` back against its row.
 
-No context mapping targets these packages yet (`docs/architecture.md` §4.8
-names the candidates and their order; the mapping library's own contexts
-target the MII Kerndatensatz modules at 2025.0.0).
+`docs/architecture.md` §4.8 names the EU targets and their order. The first
+FerroBRIDGE context targets `condition-eu-core` 2.0.0 of `hl7.fhir.eu.base`;
+the mapping library's own contexts target the MII Kerndatensatz modules at
+2025.0.0.
 
 | Item | Pin | Repeated in |
 |---|---|---|
