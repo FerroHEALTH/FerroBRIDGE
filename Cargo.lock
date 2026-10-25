@@ -1481,7 +1481,7 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "ferrobridge-console"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1574,7 +1574,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-server"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1653,7 +1653,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-testkit"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "anyhow",
  "aws-lc-rs",
@@ -1753,7 +1753,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-codegen"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "anyhow",
  "clap",
@@ -3563,7 +3563,7 @@ dependencies = [
 
 [[package]]
 name = "omop-cdm-codegen"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "anyhow",
  "clap",

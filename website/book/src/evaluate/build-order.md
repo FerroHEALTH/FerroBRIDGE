@@ -26,21 +26,21 @@ has every change of every release.
 | [v0.0.9](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.9) | 2026-10-19 | The profile validator finished: STU3 profiles validating STU3 resources over the release-neutral definition read, and the validator, terminology client and FHIRPath crates on the crate line at 0.1.126. FHIRconnect sub-contexts, and the openEHR RM pinned to Release 1.1.0. And the first of the openEHR demographics work planned for v0.0.10: the Demographic API behind `[cdr] demographic`, the configured patient-to-EHR link, and demographic references resolved on the way into openEHR. |
 | [v0.0.10](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.10) | 2026-10-19 | openEHR demographics: FHIRconnect party contexts that build a `PERSON`, `ORGANISATION` or `ROLE`, and `Patient`, `Practitioner`, `PractitionerRole` and `Organization` on the facade over the Demographic API, searched by identifier and name through the Cadasto AQL demographic extension. Clinical searches chained through the patient identifier, a created `Patient` given its EHR, OAuth 2.0 client credentials toward the terminology server, and the static bearer token removed. |
 | [v0.0.11](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.11) | 2026-10-24 | The operator console rebuilt on FerroUI 0.3.6 and renamed `ferrobridge-console`. Release images scanned before they are tagged, a vulnerability record with every finding judged, the support period and the CRA user information in the notes. The last `mappingCode` functions of the published FHIRconnect library, display resolution, `NULL_FLAVOUR`, the `EVENT` choice and the quantity, temporal, URI, string and interval data-type pairs. |
+| [v0.0.12](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.12) | 2026-10-25 | FHIRconnect and facade outcomes: a write shows the client the losses its mapping declared, a transaction names why it refuses a linked resource, the operations answer `502` on a failed terminology server, a `DV_TEXT` display looked up through `$lookup`, a direct data-type pair over the text fallback, the `DV_ORDINAL` options of a template node, and the XML narrative `div` held to XHTML. The terminology client gains `$expand`, `$subsumes`, the `date` input, mutual TLS and context-aware `$validate-code`. |
 
 ## Next
 
-The milestones after v0.0.11, each one theme:
+The milestones after v0.0.12, each one theme:
 
-1. **v0.0.12, FHIRconnect and OMOP breadth.** The `DV_ORDINAL` pair and the
-   open facade outcomes, the remaining OMOCL targets, the Athena vocabulary
-   loader, and the data quality checks.
-2. **v0.0.13, security.** The caller's identity reaching the CDR and token
-   introspection.
-3. **v0.0.14, the EU profile targets.** HL7 Europe Base and Core, then the
+1. **v0.0.13, security and OMOP breadth.** The caller's identity reaching the
+   CDR and token introspection, beside the OMOP work moved from v0.0.12: the
+   remaining OMOCL targets, the Athena vocabulary loader, and the data quality
+   checks.
+2. **v0.0.14, the EU profile targets.** HL7 Europe Base and Core, then the
    Laboratory Report, then Medication Prescription and Dispense.
-4. **v0.0.15, the change feed.** The change-feed adapter driving the
+3. **v0.0.15, the change feed.** The change-feed adapter driving the
    incremental OMOP load and an outbound FHIR lane.
-5. **v0.0.16, console breadth.** Mapping-set revisions with history and
+4. **v0.0.16, console breadth.** Mapping-set revisions with history and
    rollback, and more of the console.
 
 ## How correctness is measured

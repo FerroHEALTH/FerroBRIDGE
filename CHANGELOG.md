@@ -23,6 +23,26 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.12] - 2026-10-25
+
+The FHIRconnect and facade outcomes release. A write through the facade now
+shows the client the losses its mapping declared, a transaction names why it
+refuses a linked resource, and the FHIRconnect operations answer `502` when
+the terminology server fails. FHIRconnect looks up the display of a `DV_TEXT`
+that fell back to a code, ranks a direct data-type pair above the text
+fallback, and `openehr-mapping-core` exposes the `DV_ORDINAL` options a
+template constrains. The `fhir-types` XML codec holds the narrative `div` to
+well-formed XHTML both ways. The terminology client gains `$expand`,
+`$subsumes`, the `date` input, a caller-built HTTP client for mutual TLS or a
+private trust root, and context-aware `$validate-code`, and the operator
+console draws the running configuration.
+
+The library crates publish at `fhir-types` 0.1.128, `openehr-mapping-core`
+0.1.128, `fhirconnect` 0.1.190, `ferrobridge-term` 0.1.134,
+`ferrobridge-validator` 0.1.134, `ferrobridge-fhirpath` 0.1.128 and
+`ferrobridge-hl7v2` 0.1.141, and `hl7v2-types` stays at 0.1.127. A crate
+version an entry below names is the step at which that change came in.
+
 ### Added
 
 - `WebTemplateIndex::ordinal_options` returns the options an OPT 1.4
@@ -4707,7 +4727,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.11...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.12...HEAD
+[0.0.12]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.11...v0.0.12
 [0.0.11]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.10...v0.0.11
 [0.0.10]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.9...v0.0.10
 [0.0.9]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.8...v0.0.9
