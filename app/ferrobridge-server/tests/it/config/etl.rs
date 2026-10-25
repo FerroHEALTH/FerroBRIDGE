@@ -407,3 +407,33 @@ fn the_quality_checks_are_off_by_default_and_switch_on() -> Result<(), Box<dyn s
     assert!(etl.quality_checks);
     Ok(())
 }
+
+#[test]
+fn the_derived_tables_rebuild_the_owned_persons_unless_the_whole_table_is_named()
+-> Result<(), Box<dyn std::error::Error>> {
+    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
+    let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
+    assert_eq!(omop_cdm::derived::Scope::OwnedPersons, etl.derived_tables);
+    let text = format!("{ETL}derived_tables = \"whole_table\"\n");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
+    assert_eq!(omop_cdm::derived::Scope::WholeTable, etl.derived_tables);
+    Ok(())
+}
+
+#[test]
+fn an_unknown_derived_tables_scope_is_refused_naming_the_key()
+-> Result<(), Box<dyn std::error::Error>> {
+    let text = format!("{ETL}derived_tables = \"everything\"\n");
+    let refusal = Config::from_sources(Some(&text), &BTreeMap::new())?
+        .resolve()
+        .err()
+        .ok_or("the scope is refused")?;
+    assert!(
+        refusal
+            .to_string()
+            .contains("etl.derived_tables is `everything`"),
+        "{refusal}"
+    );
+    Ok(())
+}

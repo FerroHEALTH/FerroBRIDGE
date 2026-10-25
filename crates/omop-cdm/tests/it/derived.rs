@@ -11,7 +11,7 @@
 use ferrobridge_testkit::containers::{self, Postgres};
 use omop_cdm::database::{self, CdmPool};
 use omop_cdm::ddl::SchemaName;
-use omop_cdm::derived;
+use omop_cdm::derived::{self, Scope};
 use omop_cdm::graph::{
     RecordGraph, key::ArchetypeRootPath, key::Discriminator, key::MappingName, key::OccurrencePath,
     key::RecordKey, key::Source, row::Reference, row::Row, row::Value,
@@ -139,10 +139,13 @@ async fn the_observation_period_spans_the_first_to_the_last_event() -> Result<()
     }
     let (postgres, mut writer) = database().await?;
     writer.commit(&clinical()?, &RunId::new("run-1")?).await?;
-    assert_eq!(1, derived::observation_period(&mut writer, 32880).await?);
     assert_eq!(
         1,
-        derived::observation_period(&mut writer, 32880).await?,
+        derived::observation_period(&mut writer, 32880, Scope::OwnedPersons).await?
+    );
+    assert_eq!(
+        1,
+        derived::observation_period(&mut writer, 32880, Scope::OwnedPersons).await?,
         "a rebuild replaces"
     );
     assert_eq!(
@@ -167,10 +170,13 @@ async fn the_condition_era_script_joins_conditions_within_thirty_days() -> Resul
     }
     let (postgres, mut writer) = database().await?;
     writer.commit(&clinical()?, &RunId::new("run-1")?).await?;
-    assert_eq!(1, derived::condition_era(&mut writer).await?);
     assert_eq!(
         1,
-        derived::condition_era(&mut writer).await?,
+        derived::condition_era(&mut writer, Scope::OwnedPersons).await?
+    );
+    assert_eq!(
+        1,
+        derived::condition_era(&mut writer, Scope::OwnedPersons).await?,
         "a rebuild replaces"
     );
     assert_eq!(
@@ -206,7 +212,10 @@ async fn the_drug_era_script_rolls_exposures_up_to_their_ingredient() -> Result<
         ))
         .await?;
     writer.commit(&clinical()?, &RunId::new("run-1")?).await?;
-    assert_eq!(1, derived::drug_era(&mut writer).await?);
+    assert_eq!(
+        1,
+        derived::drug_era(&mut writer, Scope::OwnedPersons).await?
+    );
     assert_eq!(
         vec!["1", "5001", "2026-05-01", "2026-06-02", "2", "20"],
         row(
@@ -214,6 +223,92 @@ async fn the_drug_era_script_rolls_exposures_up_to_their_ingredient() -> Result<
             "SELECT person_id::text, drug_concept_id::text, drug_era_start_date::text,
                     drug_era_end_date::text, drug_exposure_count::text, gap_days::text
              FROM cdm.drug_era"
+        )
+        .await?
+    );
+    Ok(())
+}
+
+/// Adds person 900, whom no composition writes, with a condition era of
+/// another ETL under id 1, the id the rebuild gives the bridge's first era.
+async fn foreign_era(postgres: &Postgres) -> Result<(), Box<dyn Error>> {
+    let (client, connection) =
+        tokio_postgres::connect(postgres.url(), tokio_postgres::NoTls).await?;
+    tokio::spawn(connection);
+    client
+        .batch_execute(
+            "INSERT INTO cdm.person (person_id, gender_concept_id, year_of_birth,
+                 race_concept_id, ethnicity_concept_id)
+             VALUES (900, 0, 1960, 0, 0);
+             INSERT INTO cdm.condition_era (condition_era_id, person_id, condition_concept_id,
+                 condition_era_start_date, condition_era_end_date, condition_occurrence_count)
+             VALUES (1, 900, 1002, '2020-01-01', '2020-01-31', 3)",
+        )
+        .await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_rebuild_keeps_the_derived_rows_of_a_person_the_bridge_does_not_write()
+-> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let (postgres, mut writer) = database().await?;
+    foreign_era(&postgres).await?;
+    writer.commit(&clinical()?, &RunId::new("run-1")?).await?;
+    assert_eq!(
+        2,
+        derived::condition_era(&mut writer, Scope::OwnedPersons).await?
+    );
+    assert_eq!(
+        vec!["1", "2020-01-01", "3"],
+        row(
+            &postgres,
+            "SELECT condition_era_id::text, condition_era_start_date::text,
+                    condition_occurrence_count::text
+             FROM cdm.condition_era WHERE person_id = 900"
+        )
+        .await?,
+        "the other ETL's era is kept as it was"
+    );
+    assert_eq!(
+        vec!["2", "2026-05-01", "2"],
+        row(
+            &postgres,
+            "SELECT condition_era_id::text, condition_era_start_date::text,
+                    condition_occurrence_count::text
+             FROM cdm.condition_era WHERE person_id = 1"
+        )
+        .await?,
+        "the bridge's era is derived again, under an id clear of the kept one"
+    );
+    assert_eq!(
+        2,
+        derived::condition_era(&mut writer, Scope::OwnedPersons).await?,
+        "a second rebuild keeps both"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_whole_table_rebuild_replaces_every_derived_row() -> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let (postgres, mut writer) = database().await?;
+    foreign_era(&postgres).await?;
+    writer.commit(&clinical()?, &RunId::new("run-1")?).await?;
+    assert_eq!(
+        1,
+        derived::condition_era(&mut writer, Scope::WholeTable).await?,
+        "person 900 has no condition, so the script derives no era for it"
+    );
+    assert_eq!(
+        vec!["1", "1"],
+        row(
+            &postgres,
+            "SELECT condition_era_id::text, person_id::text FROM cdm.condition_era"
         )
         .await?
     );

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The derived tables: `OBSERVATION_PERIOD`, `CONDITION_ERA` and `DRUG_ERA`,
-//! each rebuilt whole from the clinical tables of the CDM schema.
+//! rebuilt from the clinical tables of the CDM schema for the persons the
+//! bridge writes, or whole.
 //!
 //! The CDM leaves the observation period to the ETL, with suggestions
 //! (<https://ohdsi.github.io/CommonDataModel/ehrObsPeriods.html>); the one
@@ -12,9 +13,26 @@
 //! (<https://ohdsi.github.io/CommonDataModel/sqlScripts.html>) in their
 //! PostgreSQL form, [`CONDITION_ERA_SQL`] and [`DRUG_ERA_SQL`]. Each rebuild
 //! runs in one transaction, so a refusal leaves the earlier table in place.
+//!
+//! Under [`Scope::OwnedPersons`] the derived rows of a person the bridge's
+//! person map does not name are kept as they are, so another ETL's rows
+//! survive; no specification governs which rows a rebuild replaces: our own
+//! design.
 
 use crate::ddl::{self, SchemaName};
 use crate::writer::{CdmWriter, error::Step, error::WriteError};
+
+/// Which derived rows a rebuild replaces.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Scope {
+    /// The rows of the persons the bridge's person map names, derived again
+    /// from those persons' rows; every other row of the table stays.
+    #[default]
+    OwnedPersons,
+    /// Every row of the table, derived again from every row of the schema,
+    /// for a deployment where the bridge is the only writer.
+    WholeTable,
+}
 
 /// The PostgreSQL form of the CDM's "Condition Eras" script
 /// (`sql/PROVENANCE.md`), with the `@cdmDatabaseSchema` placeholder.
@@ -79,13 +97,45 @@ async fn count(
     Ok(rows.unsigned_abs())
 }
 
-/// Rebuilds `table` from the statements of `script` and returns its rows.
+/// Returns the statements that set aside the rows of `table` whose person the
+/// person map in `bridge` does not name, before the rebuild empties it.
+fn keep_foreign(cdm: &SchemaName, bridge: &SchemaName, table: &str) -> String {
+    format!(
+        "CREATE TEMP TABLE ferrobridge_kept_{table} ON COMMIT DROP AS
+             SELECT * FROM {cdm}.{table}
+             WHERE person_id NOT IN (SELECT person_id FROM {bridge}.person_map)"
+    )
+}
+
+/// Returns the statements that drop what the rebuild derived for a person the
+/// person map does not name, move the derived ids past every kept id, and put
+/// the kept rows back.
+///
+/// The derived rows hold ids from 1 up; adding the larger of the two highest
+/// ids keeps every moved id clear of a kept one and of one not yet moved.
+fn restore_foreign(cdm: &SchemaName, bridge: &SchemaName, table: &str) -> String {
+    let key = format!("{table}_id");
+    format!(
+        "DELETE FROM {cdm}.{table}
+             WHERE person_id NOT IN (SELECT person_id FROM {bridge}.person_map);
+         UPDATE {cdm}.{table} SET {key} = {key} + GREATEST(
+             (SELECT COALESCE(max({key}), 0) FROM pg_temp.ferrobridge_kept_{table}),
+             (SELECT COALESCE(max({key}), 0) FROM {cdm}.{table}))
+             WHERE EXISTS (SELECT 1 FROM pg_temp.ferrobridge_kept_{table});
+         INSERT INTO {cdm}.{table} SELECT * FROM pg_temp.ferrobridge_kept_{table}"
+    )
+}
+
+/// Rebuilds the rows of `table` that `scope` names from the statements of
+/// `script`, and returns the rows the table holds.
 async fn rebuild(
     writer: &mut CdmWriter,
     table: &'static str,
     script: &str,
     parameter: Option<i32>,
+    scope: Scope,
 ) -> Result<u64, WriteError> {
+    let bridge = writer.bridge_schema().clone();
     let (client, cdm) = writer.parts();
     let refused = |source| WriteError::Database {
         step: Step::Derive(table),
@@ -98,6 +148,12 @@ async fn rebuild(
             step: Step::Begin,
             source,
         })?;
+    if scope == Scope::OwnedPersons {
+        transaction
+            .batch_execute(&keep_foreign(cdm, &bridge, table))
+            .await
+            .map_err(refused)?;
+    }
     transaction
         .execute(&format!("DELETE FROM {cdm}.{table}"), &[])
         .await
@@ -113,6 +169,12 @@ async fn rebuild(
             .batch_execute(&ddl::in_schema(script, cdm))
             .await
             .map_err(refused)?,
+    }
+    if scope == Scope::OwnedPersons {
+        transaction
+            .batch_execute(&restore_foreign(cdm, &bridge, table))
+            .await
+            .map_err(refused)?;
     }
     let rows = count(&transaction, cdm, table).await?;
     transaction
@@ -153,7 +215,8 @@ fn observation_period_sql() -> String {
 }
 
 /// Rebuilds `OBSERVATION_PERIOD`: one period per person, from the first to
-/// the last clinical event, typed `period_type_concept_id`.
+/// the last clinical event, typed `period_type_concept_id`, for the rows
+/// `scope` names.
 ///
 /// # Errors
 ///
@@ -162,32 +225,35 @@ fn observation_period_sql() -> String {
 pub async fn observation_period(
     writer: &mut CdmWriter,
     period_type_concept_id: i32,
+    scope: Scope,
 ) -> Result<u64, WriteError> {
     rebuild(
         writer,
         "observation_period",
         &observation_period_sql(),
         Some(period_type_concept_id),
+        scope,
     )
     .await
 }
 
-/// Rebuilds `CONDITION_ERA` with [`CONDITION_ERA_SQL`].
+/// Rebuilds the rows of `CONDITION_ERA` that `scope` names with
+/// [`CONDITION_ERA_SQL`].
 ///
 /// # Errors
 ///
 /// Returns [`WriteError::Database`] naming the table when PostgreSQL refuses
 /// the rebuild; the earlier rows stay.
-pub async fn condition_era(writer: &mut CdmWriter) -> Result<u64, WriteError> {
-    rebuild(writer, "condition_era", CONDITION_ERA_SQL, None).await
+pub async fn condition_era(writer: &mut CdmWriter, scope: Scope) -> Result<u64, WriteError> {
+    rebuild(writer, "condition_era", CONDITION_ERA_SQL, None, scope).await
 }
 
-/// Rebuilds `DRUG_ERA` with [`DRUG_ERA_SQL`].
+/// Rebuilds the rows of `DRUG_ERA` that `scope` names with [`DRUG_ERA_SQL`].
 ///
 /// # Errors
 ///
 /// Returns [`WriteError::Database`] naming the table when PostgreSQL refuses
 /// the rebuild; the earlier rows stay.
-pub async fn drug_era(writer: &mut CdmWriter) -> Result<u64, WriteError> {
-    rebuild(writer, "drug_era", DRUG_ERA_SQL, None).await
+pub async fn drug_era(writer: &mut CdmWriter, scope: Scope) -> Result<u64, WriteError> {
+    rebuild(writer, "drug_era", DRUG_ERA_SQL, None, scope).await
 }

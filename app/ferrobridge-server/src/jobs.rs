@@ -98,6 +98,17 @@ pub(crate) fn cdm_init_command(
             .await
             .with_context(|| format!("creating the bridge schema {}", cdm.bridge_schema))?;
         println!("bridge schema {}: in place", cdm.bridge_schema);
+        for foreign in writer
+            .foreign_rows()
+            .await
+            .context("counting the CDM rows the bridge does not own")?
+        {
+            println!(
+                "warning: {} holds {} rows the bridge did not write; one bridge owns the tables \
+                 it writes",
+                foreign.table, foreign.rows
+            );
+        }
         tracing::info!(
             schema = %cdm.schema,
             bridge_schema = %cdm.bridge_schema,

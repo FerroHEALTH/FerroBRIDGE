@@ -257,6 +257,7 @@ async fn the_laboratory_round_trip_writes_the_reviewed_rows_and_a_rerun_changes_
     let first = etl_run(&config).await?;
     assert_eq!(3, first.compositions.committed, "{first}");
     assert!(first.refusals.is_empty(), "{first}");
+    assert!(first.foreign_rows.is_empty(), "{first}");
     assert_eq!(3, first.compositions.with_visit, "{first}");
     assert_eq!(Some(&6), first.rows.get("measurement"), "{first}");
     assert_eq!(Some(&1), first.rows.get("specimen"), "{first}");

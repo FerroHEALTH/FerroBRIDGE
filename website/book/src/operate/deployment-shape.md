@@ -110,6 +110,29 @@ FerroBRIDGE ships none of it, in the image, a release asset or a test.
 - Check the licence of every vocabulary you select before you load it into a
   database you share, and record which ones the database holds.
 
+### One writer per CDM table
+
+FerroBRIDGE assumes it owns the id space of every CDM table it writes. It
+takes each primary key from a sequence of its own per table, kept in the
+bridge schema, and records which source record holds which id. Another ETL
+that loads rows into the same tables can pick ids the bridge assigns next, and
+the bridge's commit then fails on the primary key. Run one bridge per set of
+CDM tables, or load other sources into a separate CDM schema.
+
+`cdm init` and every `etl run` count the rows of those tables that no entry of
+the bridge's side table owns, and log a warning naming each table and its
+count. Treat a warning as a sign that something else writes the tables.
+
+After a run the bridge rebuilds `OBSERVATION_PERIOD`, `CONDITION_ERA` and
+`DRUG_ERA` for the persons it writes, the persons its person map names: their
+derived rows are deleted and derived again, and every other person's derived
+rows stay as another ETL wrote them. With `[etl] derived_tables =
+"whole_table"` it rebuilds each table whole from every row in the schema, for a
+deployment where the bridge is the only writer. The
+era scripts the CDM publishes number eras by `person_id` alone, so two eras of
+one person can swap ids between rebuilds. A re-run writes the same rows, but
+an era id is not stable across rebuilds; never store one outside the database.
+
 ## Process model
 
 No specification governs the process model, the storage mechanics, or the
