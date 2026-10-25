@@ -188,6 +188,45 @@ pub(crate) fn etl_run_command(
     Ok(())
 }
 
+/// Runs every ported Data Quality Dashboard check against the configured
+/// database and prints the result in `format`; returns whether every check
+/// passed or did not apply.
+#[expect(
+    clippy::print_stdout,
+    reason = "the check result is the job's output, written to stdout for the operator"
+)]
+pub(crate) fn dq_check_command(
+    cdm: &config::CdmSettings,
+    format: crate::cli::ReportFormat,
+) -> anyhow::Result<bool> {
+    use anyhow::Context;
+
+    let plan = crate::quality::plan(None).context("planning the checks")?;
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async {
+        let pool = omop_cdm::database::CdmPool::connect(
+            sqlx::postgres::PgPoolOptions::new().max_connections(1),
+            cdm.connection
+                .pool_options()
+                .context("preparing the connection to the CDM database")?,
+            cdm.schema.clone(),
+        )
+        .await
+        .context("connecting to the CDM database")?;
+        let run = crate::quality::run(&pool, &plan).await;
+        pool.pool().close().await;
+        match format {
+            crate::cli::ReportFormat::Text => print!("{run}"),
+            crate::cli::ReportFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&run.dashboard_json())?);
+            }
+        }
+        Ok(run.clean())
+    })
+}
+
 /// Why `mapping check` stopped before it printed a report.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum CheckFailure {

@@ -48,6 +48,9 @@ pub enum JobError {
     /// The run stopped.
     #[error("running the ETL")]
     Run(#[source] RunError),
+    /// The quality checks could not be planned.
+    #[error("planning the quality checks")]
+    Quality(#[source] omop_cdm::quality::plan::PlanError),
 }
 
 /// Returns the section `etl run` needs and `settings` lacks, the first
@@ -131,7 +134,7 @@ pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport,
     .map_err(JobError::Resolver)?;
     let mapper = OmoclMapper::new(
         set,
-        CdmVocabulary::new(ConceptResolver::new(pool)),
+        CdmVocabulary::new(ConceptResolver::new(pool.clone())),
         etl.aliases.clone(),
     );
     let mut writer = CdmWriter::connect_with(
@@ -143,7 +146,15 @@ pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport,
     .await
     .map_err(JobError::Writer)?;
     let run_id = RunId::new(uuid::Uuid::new_v4().to_string()).map_err(JobError::RunId)?;
-    crate::etl::run(etl, options, &client, &mut writer, &mapper, &run_id)
+    let mut report = crate::etl::run(etl, options, &client, &mut writer, &mapper, &run_id)
         .await
-        .map_err(JobError::Run)
+        .map_err(JobError::Run)?;
+    if etl.quality_checks {
+        let written = report.rows.keys().cloned().collect();
+        let plan = crate::quality::plan(Some(&written)).map_err(JobError::Quality)?;
+        // NOTE: no specification governs this: our own design; a failed check never rolls
+        // the committed load back, it is reported.
+        report.quality = Some(crate::quality::run(&pool, &plan).await.verdicts());
+    }
+    Ok(report)
 }

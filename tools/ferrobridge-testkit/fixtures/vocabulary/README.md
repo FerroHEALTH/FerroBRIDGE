@@ -63,6 +63,7 @@ default end date, for example).
 | `FB-STANDARD` `STD-TYPE-RECORD`, `STD-TYPE-PERIOD` | the record and observation period type concepts the round trip configures |
 | `FB-GENDER` `SYN-GENDER-F` | a standard `Gender` concept, the administrative gender of the synthetic KDS person, reached through a configured vocabulary alias |
 | `VOCABULARY` `None` | the release row whose `vocabulary_version` the loader reports, as a vocabulary build writes it |
+| `None` `NO-MATCH` | concept `0`, which every concept column the CDM tells an ETL to write `0` into references (`race_concept_id`: "If a clear race or ethnic background cannot be established, use Concept_Id 0"), so a row carrying it passes the Dashboard's `isForeignKey` check |
 
 The laboratory rows sit under the vocabulary identifiers `LOINC`, `UCUM` and
 `SNOMED`, because the OMOCL engine looks a code up under the vocabulary its

@@ -397,6 +397,9 @@ pub struct Etl {
     /// The OHDSI `vocabulary_id` each terminology id names, a URI or an OID
     /// among them, added over the engine's defaults.
     pub vocabulary_aliases: BTreeMap<String, String>,
+    /// Whether `etl run` runs the ported Data Quality Dashboard checks over
+    /// the tables it wrote once the load is done.
+    pub quality_checks: bool,
 }
 
 impl Default for Etl {
@@ -411,6 +414,7 @@ impl Default for Etl {
             // record the source deleted is the defect, so a confirmed deletion removes them.
             deletions: String::from("remove"),
             vocabulary_aliases: BTreeMap::new(),
+            quality_checks: false,
         }
     }
 }

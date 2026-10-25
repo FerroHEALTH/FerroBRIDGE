@@ -608,6 +608,7 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
         visits,
         deletions,
         aliases: resolve_aliases(&etl.vocabulary_aliases)?,
+        quality_checks: etl.quality_checks,
     })
 }
 

@@ -75,6 +75,22 @@ crates on crates.io.
   reaches the database through a relay on a private Unix socket that
   handshakes with the writer's TLS configuration. A URL that asks for TLS
   names one host and one port; a list of hosts is refused at start.
+- The Data Quality Dashboard's six completeness checks run in Rust beside its
+  conformance checks (#405): `measurePersonCompleteness`,
+  `measureConditionEraCompleteness`, `measureValueCompleteness`,
+  `standardConceptRecordCompleteness`, `sourceConceptRecordCompleteness` and
+  `sourceValueCompleteness`, each planned where the Dashboard's v2.9.0
+  settings enable it, with its threshold, and translated from its SQL
+  template. A run now carries the Dashboard's not-applicable status: a check
+  of a missing or empty table, or of a missing or unpopulated field, is
+  neither failed nor passed and names why.
+- `ferrobridge dq check` runs the ported Data Quality Dashboard checks against
+  the database `[cdm]` names and prints the failing checks and the counts, or
+  with `--format json` the run in the Dashboard's own result fields
+  (`CheckResults`, `Overview`, `startTimestamp`), so the Dashboard's viewer
+  reads it. It exits non-zero when a check fails or cannot be evaluated
+  (#406). With `[etl] quality_checks = true`, `etl run` runs the same checks
+  over the tables it wrote and adds the verdicts to its report.
 
 ## [0.0.12] - 2026-10-25
 

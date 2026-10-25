@@ -35,6 +35,7 @@ mod mapping_walk;
 mod omop;
 mod operations;
 mod operator;
+mod quality;
 mod readiness;
 mod run;
 mod search_e2e;

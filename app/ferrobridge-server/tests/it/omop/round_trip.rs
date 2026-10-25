@@ -142,6 +142,77 @@ async fn dump(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
     crate::etl::dump(postgres).await
 }
 
+/// Runs the ported Data Quality Dashboard plan over the round trip's CDM and
+/// asserts that every conformance check passes and that the concept record
+/// completeness checks count the concept 0 rows the run report counted,
+/// column by column.
+///
+/// A column whose template also counts a NULL beside a source value is
+/// compared as at least the report's count.
+async fn assert_quality_agrees(
+    postgres: &Postgres,
+    report: &RunReport,
+) -> Result<(), Box<dyn Error>> {
+    use omop_cdm::quality::check::{CheckName, CheckParameters};
+    use omop_cdm::quality::plan::{Plan, PlanOptions};
+
+    let pool = omop_cdm::database::CdmPool::connect(
+        sqlx::postgres::PgPoolOptions::new().max_connections(1),
+        postgres.url().parse()?,
+        omop_cdm::ddl::SchemaName::new("cdm")?,
+    )
+    .await?;
+    let plan = Plan::new(&PlanOptions::default())?;
+    let results = omop_cdm::quality::run::run(&pool, &plan).await;
+    for result in &results {
+        assert!(
+            !result.is_error,
+            "{} erred: {:?}",
+            result.check_id, result.error
+        );
+    }
+    let failing: Vec<&str> = results
+        .iter()
+        .filter(|result| {
+            result.category == omop_cdm::quality::definitions::KahnCategory::Conformance
+                && result.failed
+        })
+        .map(|result| result.check_id.as_str())
+        .collect();
+    assert!(failing.is_empty(), "conformance checks failed: {failing:?}");
+    let mut reported: BTreeMap<String, u64> = BTreeMap::new();
+    for totals in report.mappings.values() {
+        for (column, count) in &totals.concept_zero {
+            *reported.entry(column.to_uppercase()).or_default() += count;
+        }
+    }
+    assert!(!reported.is_empty(), "the round trip counts a concept 0");
+    for (column, count) in &reported {
+        let (table, field) = column.split_once('.').ok_or("a table.column key")?;
+        let check = plan
+            .checks()
+            .iter()
+            .find(|check| {
+                check.name() == CheckName::StandardConceptRecordCompleteness
+                    && check.cdm_table_name() == table
+                    && check.cdm_field_name().as_deref() == Some(field)
+            })
+            .ok_or_else(|| format!("no standardConceptRecordCompleteness on {column}"))?;
+        let result = results
+            .iter()
+            .find(|result| result.check_id == check.id())
+            .ok_or("the check ran")?;
+        let violated = result.counts.ok_or("counts")?.violated;
+        if check.parameters() == CheckParameters::SourceValue(None) {
+            assert_eq!(*count, violated, "{column}: the check and the report agree");
+        } else {
+            assert!(violated >= *count, "{column}: {violated} below {count}");
+        }
+    }
+    pool.pool().close().await;
+    Ok(())
+}
+
 #[tokio::test]
 async fn the_laboratory_round_trip_writes_the_reviewed_rows_and_a_rerun_changes_nothing()
 -> Result<(), Box<dyn Error>> {
@@ -194,6 +265,7 @@ async fn the_laboratory_round_trip_writes_the_reviewed_rows_and_a_rerun_changes_
                 .get("measurement.measurement_concept_id")
         });
     assert_eq!(Some(&1), zero, "the unmapped analyte is counted: {first}");
+    assert_quality_agrees(&postgres, &first).await?;
     assert_eq!(
         vec![vec![String::from("0")]],
         rows(

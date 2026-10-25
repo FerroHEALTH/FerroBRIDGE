@@ -186,8 +186,6 @@ pub fn evaluate(check: &Check, outcome: Outcome, execution_time: Option<Duration
         Outcome::Absent(error) if name.is_probe() => (None, Some(error), true, false),
         Outcome::Absent(error) | Outcome::Failed(error) => (None, Some(error), false, true),
     };
-    // TODO(#405): the not-applicable status of DQD v2.9.0
-    // `R/calculateNotApplicableStatus.R`, which needs the completeness checks.
     CheckResult {
         counts,
         execution_time,

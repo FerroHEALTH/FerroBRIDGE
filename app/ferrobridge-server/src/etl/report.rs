@@ -160,6 +160,10 @@ pub struct RunReport {
     pub refusals: Vec<RefusalEntry>,
     /// Every source field no mapping wrote.
     pub unmapped_fields: Vec<UnmappedEntry>,
+    /// The verdicts of the quality checks run after the load, when
+    /// `[etl] quality_checks` is set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quality: Option<crate::quality::QualityVerdicts>,
 }
 
 impl RunReport {
@@ -277,6 +281,9 @@ impl fmt::Display for RunReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let compositions = &self.compositions;
         writeln!(f, "run {}", self.run_id)?;
+        if let Some(ref quality) = self.quality {
+            writeln!(f, "{quality}")?;
+        }
         writeln!(
             f,
             "compositions: {} read, {} committed, {} skipped, {} refused",

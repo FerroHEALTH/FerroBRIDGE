@@ -43,9 +43,9 @@ impl Check {
                  1::bigint AS num_denominator_rows FROM {table} AS {CDM_TABLE}",
                 field(column)
             ),
-            // NOTE: DQD v2.9.0 `inst/sql/sql_server/field_is_not_nullable.sql`
-            // lines 19 to 54: a NULL is a violation, over every row.
-            Kind::IsRequired(column) => counts(
+            // NOTE: DQD v2.9.0 `field_is_not_nullable.sql` lines 19 to 54 and
+            // `field_measure_value_completeness.sql` lines 18 to 55: a NULL, over every row.
+            Kind::IsRequired(column) | Kind::MeasureValueCompleteness(column) => counts(
                 &format!("{all_rows} WHERE {} IS NULL", field(column)),
                 &all_rows,
             ),
@@ -127,8 +127,91 @@ impl Check {
                 ),
                 &format!("{all_rows} WHERE {} IS NOT NULL", field(column)),
             ),
+            Kind::MeasurePersonCompleteness => person_completeness(&table),
+            Kind::MeasureConditionEraCompleteness => condition_era_completeness(&table),
+            Kind::StandardConceptRecordCompleteness {
+                column,
+                source_value,
+            }
+            | Kind::SourceConceptRecordCompleteness {
+                column,
+                source_value,
+            } => concept_record_completeness(&all_rows, column, *source_value),
+            Kind::SourceValueCompleteness { column, standard } => {
+                source_value_completeness(&table, column, standard)
+            }
         }
     }
+}
+
+/// Returns the `measurePersonCompleteness` query of the quoted `table`.
+fn person_completeness(table: &str) -> String {
+    // NOTE: DQD v2.9.0 `table_person_completeness.sql` lines 18 to 56: a person
+    // with no row in the table, over every person.
+    counts(
+        &format!(
+            "SELECT count(*) FROM \"person\" AS {CDM_TABLE} LEFT JOIN {table} AS cdm_table2 \
+             ON {CDM_TABLE}.\"person_id\" = cdm_table2.\"person_id\" \
+             WHERE cdm_table2.\"person_id\" IS NULL"
+        ),
+        &format!("SELECT count(*) FROM \"person\" AS {CDM_TABLE}"),
+    )
+}
+
+/// Returns the `measureConditionEraCompleteness` query of the quoted `table`.
+fn condition_era_completeness(table: &str) -> String {
+    // NOTE: DQD v2.9.0 `table_condition_era_completeness.sql` lines 17 to 57: a
+    // person with a condition other than concept 0 and no era, over those persons.
+    counts(
+        &format!(
+            "SELECT count(*) FROM (SELECT DISTINCT co.\"person_id\" \
+             FROM \"condition_occurrence\" AS co LEFT JOIN {table} AS {CDM_TABLE} \
+             ON co.\"person_id\" = {CDM_TABLE}.\"person_id\" \
+             WHERE {CDM_TABLE}.\"person_id\" IS NULL \
+             AND co.\"condition_concept_id\" != 0) AS violated_rows"
+        ),
+        "SELECT count(DISTINCT co.\"person_id\") FROM \"condition_occurrence\" AS co \
+         WHERE co.\"condition_concept_id\" != 0",
+    )
+}
+
+/// Returns the concept record completeness query of `column`, with the
+/// source value column the template names beside it.
+fn concept_record_completeness(
+    all_rows: &str,
+    column: &ColumnMeta,
+    source_value: Option<&ColumnMeta>,
+) -> String {
+    // NOTE: DQD v2.9.0 `field_concept_record_completeness.sql` lines 17 to 95:
+    // concept 0, or a NULL beside a source value the template names, over every row.
+    let field = field(column);
+    let beside = source_value.map_or_else(String::new, |source| {
+        format!(
+            " OR ({field} IS NULL AND {CDM_TABLE}.{} IS NOT NULL)",
+            ident(source.name)
+        )
+    });
+    counts(&format!("{all_rows} WHERE {field} = 0{beside}"), all_rows)
+}
+
+/// Returns the `sourceValueCompleteness` query of `column` in the quoted
+/// `table`, mapped through `standard`.
+fn source_value_completeness(table: &str, column: &ColumnMeta, standard: &ColumnMeta) -> String {
+    // NOTE: DQD v2.9.0 `field_source_value_completeness.sql` lines 17 to 51: the
+    // distinct source values, NULL as one, whose standard concept is 0.
+    let field = field(column);
+    counts(
+        &format!(
+            "SELECT count(*) FROM (SELECT DISTINCT {field} FROM {table} AS {CDM_TABLE} \
+             WHERE {CDM_TABLE}.{} = 0) AS violated_rows",
+            ident(standard.name)
+        ),
+        &format!(
+            "SELECT count(DISTINCT {field}) \
+             + count(DISTINCT CASE WHEN {field} IS NULL THEN 1 END) \
+             FROM {table} AS {CDM_TABLE}"
+        ),
+    )
 }
 
 /// Returns the query that reports the two counts as one row.

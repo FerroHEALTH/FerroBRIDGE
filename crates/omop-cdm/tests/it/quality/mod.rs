@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The port of the Data Quality Dashboard's conformance checks: the generated
+//! The port of the Data Quality Dashboard's conformance and completeness
+//! checks: the generated
 //! catalogue, the plan, the evaluation, and, with the `database` feature, the
 //! checks run against PostgreSQL.
 
+mod applicable;
 mod catalogue;
 mod evaluate;
 mod plan;

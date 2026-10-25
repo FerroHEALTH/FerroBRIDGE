@@ -22,10 +22,15 @@ fn the_catalogue_carries_every_check_of_the_description_file() {
 }
 
 #[test]
-fn the_ported_checks_are_the_conformance_checks_of_the_catalogue() {
+fn the_ported_checks_are_the_conformance_and_completeness_checks_of_the_catalogue() {
     let conformance: Vec<&str> = dqd::CHECK_DESCRIPTIONS
         .iter()
-        .filter(|check| check.kahn_category == KahnCategory::Conformance)
+        .filter(|check| {
+            matches!(
+                check.kahn_category,
+                KahnCategory::Conformance | KahnCategory::Completeness
+            )
+        })
         .map(|check| check.name)
         .collect();
     let ported: Vec<&str> = CheckName::ALL.iter().map(|name| name.as_str()).collect();
