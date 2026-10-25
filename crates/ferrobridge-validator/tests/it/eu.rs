@@ -58,9 +58,63 @@ fn patient() -> serde_json::Value {
 fn the_eu_closure_loads_complete() -> TestResult {
     let Some(set) = eu_set()? else { return Ok(()) };
     assert!(
-        set.packages().len() >= 18,
-        "R4 core and the 17 profile packages"
+        set.packages().len() >= 20,
+        "R4 core and the 19 profile packages"
     );
+    Ok(())
+}
+
+#[test]
+fn the_laboratory_and_mpd_profiles_resolve_by_canonical_and_version() -> TestResult {
+    let Some(set) = eu_set()? else { return Ok(()) };
+    for (canonical, kind) in [
+        (
+            "http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu-lab|2.0.0",
+            "Bundle",
+        ),
+        (
+            "http://hl7.eu/fhir/laboratory/StructureDefinition/Composition-eu-lab|2.0.0",
+            "Composition",
+        ),
+        (
+            "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab|2.0.0",
+            "DiagnosticReport",
+        ),
+        (
+            "http://hl7.eu/fhir/laboratory/StructureDefinition/Observation-resultslab-eu-lab|2.0.0",
+            "Observation",
+        ),
+        (
+            "http://hl7.eu/fhir/laboratory/StructureDefinition/Specimen-eu-lab|2.0.0",
+            "Specimen",
+        ),
+        (
+            "http://hl7.eu/fhir/mpd/StructureDefinition/MedicationRequest-eu-mpd|1.0.0",
+            "MedicationRequest",
+        ),
+        (
+            "http://hl7.eu/fhir/mpd/StructureDefinition/MedicationDispense-eu-mpd|1.0.0",
+            "MedicationDispense",
+        ),
+        (
+            "http://hl7.eu/fhir/mpd/StructureDefinition/Medication-eu-mpd|1.0.0",
+            "Medication",
+        ),
+        (
+            "http://hl7.eu/fhir/mpd/StructureDefinition/Dosage-eu-mpd|1.0.0",
+            "Dosage",
+        ),
+    ] {
+        let definition = set.structure_definition(canonical)?;
+        let found = serde_json::to_value(definition.as_ref())?;
+        assert_eq!(Some(kind), found["type"].as_str(), "{canonical}");
+        assert!(
+            found["snapshot"]["element"]
+                .as_array()
+                .is_some_and(|elements| !elements.is_empty()),
+            "{canonical} carries a snapshot"
+        );
+    }
     Ok(())
 }
 

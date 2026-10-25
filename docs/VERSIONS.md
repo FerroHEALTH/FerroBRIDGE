@@ -235,8 +235,11 @@ verbatim from the FHIR package registry at build time by
 `docs/specs/fhir-packages/<package>#<version>/package/`, which reads its pins
 from this table (#435). At about 570 MB unpacked they are never committed;
 only each `PROVENANCE.md` is, and CI restores the trees from a cache keyed on
-`scripts/vendor/profile-packages.sh --cache-key`. The three roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
-one published version), `hl7.fhir.eu.base` 2.0.1 and `hl7.fhir.uv.ips` 2.0.0;
+`scripts/vendor/profile-packages.sh --cache-key`. The five roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
+one published version), `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.uv.ips` 2.0.0,
+and the two guides the EU profile contexts target, `hl7.fhir.eu.laboratory`
+2.0.0 and `hl7.fhir.eu.mpd` 1.0.0 (#116), whose dependencies the set already
+held;
 every other row is in the set because a vendored package's `package.json`
 `dependencies` names it at that version. A package two dependents name at
 different versions has a row per version: EPS 1.0.0-ballot depends on EU Base
@@ -268,6 +271,8 @@ target the MII Kerndatensatz modules at 2025.0.0).
 | `hl7.fhir.eu.base` | 2.0.1 files `75` digest `05d7ea672cac41eaa5efb7806c6ce9e4638b1604a811a0aea78f84685efff91d` | `docs/specs/fhir-packages/hl7.fhir.eu.base#2.0.1/PROVENANCE.md` (a root) |
 | `hl7.fhir.eu.base` | 2.0.0 files `77` digest `0b2e85a498e4f0df5ed8f122d97737c824250cb247792db9e392f4186245ea01` | `docs/specs/fhir-packages/hl7.fhir.eu.base#2.0.0/PROVENANCE.md` |
 | `hl7.fhir.uv.ips` | 2.0.0 files `154` digest `86dbd916617c60642e0296c33bea0d1aa6497c4ca46a2db285a0e5c975f28316` | `docs/specs/fhir-packages/hl7.fhir.uv.ips#2.0.0/PROVENANCE.md` (a root) |
+| `hl7.fhir.eu.laboratory` | 2.0.0 files `94` digest `f142bbdac038895d90841bb92b7865fdf0eb16b9b0b84a8db702998b36636263` | `docs/specs/fhir-packages/hl7.fhir.eu.laboratory#2.0.0/PROVENANCE.md` (a root) |
+| `hl7.fhir.eu.mpd` | 1.0.0 files `51` digest `e44ea93f6506fc118287051120ae9bfa737cff3a2791cde5ea1f222bf43e88fa` | `docs/specs/fhir-packages/hl7.fhir.eu.mpd#1.0.0/PROVENANCE.md` (a root) |
 | `hl7.fhir.uv.ipa` | 1.1.0 files `53` digest `70a5f0881a37859ef7fefd5502c0db05c6ce6c2d6dfa1e71828785f523ba7021` | `docs/specs/fhir-packages/hl7.fhir.uv.ipa#1.1.0/PROVENANCE.md` |
 | `hl7.fhir.uv.smart-app-launch` | 2.0.0 files `8` digest `68fd66519d2ff373d8f9e58bfa62455f3e0aeb95a780f2218e5ffee5c4b49c3e` | `docs/specs/fhir-packages/hl7.fhir.uv.smart-app-launch#2.0.0/PROVENANCE.md` (CC-BY-4.0) |
 | `hl7.fhir.eu.extensions.r4` | 1.3.1 files `33` digest `740cad8a7c5a182a4f37fd7877ffbb38f1f9769468a4a5d292fe12a78c26bb18` | `docs/specs/fhir-packages/hl7.fhir.eu.extensions.r4#1.3.1/PROVENANCE.md` |
