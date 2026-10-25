@@ -15,6 +15,7 @@ mod compartment;
 mod discovery;
 mod forwarding;
 mod grants;
+mod introspection;
 mod routes;
 mod scope;
 mod search;

@@ -731,12 +731,50 @@ algorithms = ["RS256"]
 scopeless_subjects = ["service-account-ferrofed"]
 ```
 
+An authorization server whose access tokens are opaque, so the bridge cannot
+check them against a key set, is checked by OAuth 2.0 Token Introspection
+(RFC 7662) instead: `mode = "introspection"` with an `[auth.introspection]`
+table. The bridge posts each token to the issuer's introspection endpoint
+under its own credential, admits it when the answer is `active: true` with
+`scope`, `client_id` and `exp` (SMART App Launch 2.2.0, Token
+Introspection), checks an `iss` and an `aud` the answer carries against
+`issuer` and `audience`, and reads the scopes and the `patient` launch
+context as it reads a JWT's. An answer is held until its `exp` and never
+longer than `cache_max_age_seconds`, so a revoked token passes for at most
+that long. An inactive token is refused with `401`; an endpoint that fails
+answers `503`. The mode takes the flat `issuer` alone, and refuses
+`[[auth.issuer]]` tables and `jwks_file`.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `mode` | `jwt` | `jwt` checks JWT access tokens against the issuer's key set; `introspection` asks the issuer's introspection endpoint |
+| `introspection.endpoint` | the metadata's | The introspection endpoint, an `https` URL, when the issuer's metadata names none or another |
+| `introspection.cache_max_age_seconds` | `60` | The longest an active answer is used before the endpoint is asked again; `0` asks on every request |
+| `introspection.cache_capacity` | `10000` | The most answers held at once |
+| `introspection.client` | none | The bridge's client authentication at the endpoint: the keys of [`[cdr.credentials.oauth]`](#cdrcredentialsoauth-and-terminologycredentialsoauth) (`client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`, the TLS files); `issuer` defaults to the section's |
+| `introspection.bearer` | none | Instead of `client`: a client credentials grant, in the same keys, whose token the bridge sends as `Authorization: Bearer`, the form SMART App Launch 2.2.0 has an EHR accept |
+
+```toml
+[auth]
+issuer = "https://auth.example.org/realms/clinic"
+audience = ["https://bridge.example.org/fhir"]
+mode = "introspection"
+
+[auth.introspection]
+cache_max_age_seconds = 30
+
+[auth.introspection.client]
+client_id = "ferrobridge-rs"
+client_secret_file = "/run/secrets/introspection-secret"
+```
+
 As environment variables, the same section reads
 `FERROBRIDGE__AUTH__ENABLED`, `FERROBRIDGE__AUTH__ISSUER`,
 `FERROBRIDGE__AUTH__AUDIENCE` (a list, such as
 `["https://bridge.example.org/fhir"]`) and `FERROBRIDGE__AUTH__ALGORITHMS`.
-Apart from the Basic users' hashes the section holds no secret: the resource
-server checks signatures with the issuer's public keys.
+Apart from the Basic users' hashes and the introspection credential the
+section holds no secret: the resource server checks signatures with the
+issuer's public keys.
 
 ### `[hl7v2]`
 

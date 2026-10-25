@@ -5,8 +5,10 @@
 //! `ferrohealth-smart`.
 //!
 //! The crate reads each configured issuer's metadata and key set, validates
-//! every access token, checks the Basic users of `[[auth.basic.users]]`, and
-//! builds the SMART discovery document; this module holds what is the
+//! every access token, or under `[auth] mode = "introspection"` asks the
+//! issuer's introspection endpoint (RFC 7662), checks the Basic users of
+//! `[[auth.basic.users]]`, and builds the SMART discovery document; this
+//! module holds what is the
 //! bridge's own: the R4 resource types a clinical scope may name, the
 //! operator scope, and the token endpoint the `CapabilityStatement` names.
 //! The facade's route table and its `OperationOutcome` refusals are
@@ -25,14 +27,19 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use ferrohealth_smart::basic::PasswordStore;
 use ferrohealth_smart::guard::Gate;
+use ferrohealth_smart::metadata::ServerMetadata;
 use ferrohealth_smart::resource::IssuerSet;
 use ferrohealth_smart::resource::ResourceError;
 use ferrohealth_smart::resource::ResourceServer;
 use ferrohealth_smart::resource::Settings;
+use ferrohealth_smart::resource::Verifier;
 use ferrohealth_smart::resource::configuration::OpenIdConnect;
 use ferrohealth_smart::resource::configuration::PermissionCapability;
 use ferrohealth_smart::resource::configuration::SMART_CONFIGURATION;
 use ferrohealth_smart::resource::configuration::SmartOptions;
+use ferrohealth_smart::resource::introspection::IntrospectionError;
+use ferrohealth_smart::resource::introspection::IntrospectionSettings;
+use ferrohealth_smart::resource::introspection::Introspector;
 use fhir_types::r4::schema::SCHEMAS;
 
 use crate::facade::BASE_PATH;
@@ -56,6 +63,9 @@ pub struct SmartSettings {
     /// The resource-server settings of each trusted issuer, the first of
     /// which the discovery document and the `CapabilityStatement` name.
     pub issuers: Vec<Settings>,
+    /// The introspection check of `[auth] mode = "introspection"`, in place
+    /// of the issuers.
+    pub introspection: Option<IntrospectionSettings>,
     /// The Basic users, when the surface admits Basic.
     pub basic: Option<Arc<PasswordStore>>,
     /// The realm every challenge names, when one is set.
@@ -76,6 +86,7 @@ impl SmartSettings {
     pub fn new(issuer: Settings) -> Self {
         Self {
             issuers: vec![issuer],
+            introspection: None,
             basic: None,
             realm: None,
             options: SmartOptions::default(),
@@ -100,6 +111,16 @@ pub enum SmartError {
         #[source]
         source: Box<ResourceError>,
     },
+    /// The introspection check could not start: the issuer's metadata could
+    /// not be read, or it names no usable introspection endpoint.
+    #[error("the introspection check of {issuer} could not start")]
+    Introspection {
+        /// The issuer identifier.
+        issuer: String,
+        /// What the check reported.
+        #[source]
+        source: Box<IntrospectionError>,
+    },
     /// The issuer the discovery document names publishes no token endpoint,
     /// which the document requires (SMART App Launch 2.2.0, Conformance,
     /// §Metadata, `token_endpoint`: REQUIRED).
@@ -110,14 +131,43 @@ pub enum SmartError {
     },
 }
 
+/// The check whose authorization server the two discovery documents name.
+#[derive(Debug)]
+enum Primary {
+    /// The first issuer whose JWT access tokens are checked against its key
+    /// set.
+    Jwt(Arc<ResourceServer>),
+    /// The issuer whose tokens its introspection endpoint checks.
+    Introspection(Arc<Introspector>),
+}
+
+impl Primary {
+    /// Returns the authorization server's metadata.
+    fn metadata(&self) -> &ServerMetadata {
+        match self {
+            Self::Jwt(server) => server.metadata(),
+            Self::Introspection(introspector) => introspector.metadata(),
+        }
+    }
+
+    /// Returns the SMART discovery document under `options`.
+    fn smart_configuration(&self, options: &SmartOptions) -> serde_json::Value {
+        match self {
+            Self::Jwt(server) => server.smart_configuration(options),
+            Self::Introspection(introspector) => introspector.smart_configuration(options),
+        }
+    }
+}
+
 /// The started resource server: the gate in front of every guarded route and
 /// what the two discovery documents name.
 #[derive(Debug)]
 pub struct Smart {
     /// The credentials every guarded route admits.
     gate: Gate,
-    /// The issuer the discovery document and the `CapabilityStatement` name.
-    primary: Arc<ResourceServer>,
+    /// The check whose issuer the discovery document and the
+    /// `CapabilityStatement` name.
+    primary: Primary,
     /// The token endpoint that issuer's metadata names.
     token_endpoint: String,
     /// What the discovery document adds.
@@ -136,31 +186,35 @@ impl Smart {
     ///
     /// Returns [`SmartError::NoIssuer`] for settings without an issuer,
     /// [`SmartError::Issuer`] for an issuer whose metadata or key set could
-    /// not be read or that breaks a rule, and [`SmartError::NoTokenEndpoint`]
-    /// when the first issuer names no token endpoint.
+    /// not be read or that breaks a rule, [`SmartError::Introspection`] when
+    /// the introspection check cannot start, and
+    /// [`SmartError::NoTokenEndpoint`] when the first issuer names no token
+    /// endpoint.
     pub async fn discover(settings: SmartSettings) -> Result<Self, SmartError> {
-        let mut issuers = IssuerSet::new();
-        let mut primary = None;
-        for issuer in settings.issuers {
-            let name = issuer.issuer.clone();
-            let server = ResourceServer::discover(issuer)
-                .await
-                .map_err(|source| SmartError::Issuer {
-                    issuer: name,
-                    source: Box::new(source),
-                })?
-                .with_resource_types(|resource_type| SCHEMAS.is_resource(resource_type));
-            let server = Arc::new(server);
-            primary.get_or_insert_with(|| Arc::clone(&server));
-            issuers = issuers.with(server);
-        }
-        let primary = primary.ok_or(SmartError::NoIssuer)?;
+        let (bearer, primary): (Arc<dyn Verifier>, Primary) =
+            if let Some(introspection) = settings.introspection {
+                let issuer = introspection.issuer.clone();
+                let introspector = Introspector::discover(introspection)
+                    .await
+                    .map_err(|source| SmartError::Introspection {
+                        issuer,
+                        source: Box::new(source),
+                    })?
+                    .with_resource_types(|resource_type| SCHEMAS.is_resource(resource_type));
+                let introspector = Arc::new(introspector);
+                let held = Arc::clone(&introspector);
+                let bearer: Arc<dyn Verifier> = held;
+                (bearer, Primary::Introspection(introspector))
+            } else {
+                let (issuers, primary) = Self::issuers(settings.issuers).await?;
+                (Arc::new(issuers), Primary::Jwt(primary))
+            };
         let token_endpoint = primary.metadata().token_endpoint.clone().ok_or_else(|| {
             SmartError::NoTokenEndpoint {
-                issuer: primary.settings().issuer.clone(),
+                issuer: primary.metadata().issuer.clone(),
             }
         })?;
-        let mut gate = Gate::open().with_bearer(Arc::new(issuers));
+        let mut gate = Gate::open().with_bearer(bearer);
         if let Some(store) = settings.basic {
             gate = gate.with_basic(store);
         }
@@ -174,6 +228,30 @@ impl Smart {
             options: settings.options,
             operator_scope: settings.operator_scope,
         })
+    }
+
+    /// Reads the metadata and the key set of every issuer of `settings`, and
+    /// returns the set of them and the first.
+    async fn issuers(
+        settings: Vec<Settings>,
+    ) -> Result<(IssuerSet, Arc<ResourceServer>), SmartError> {
+        let mut issuers = IssuerSet::new();
+        let mut primary = None;
+        for issuer in settings {
+            let name = issuer.issuer.clone();
+            let server = ResourceServer::discover(issuer)
+                .await
+                .map_err(|source| SmartError::Issuer {
+                    issuer: name,
+                    source: Box::new(source),
+                })?
+                .with_resource_types(|resource_type| SCHEMAS.is_resource(resource_type));
+            let server = Arc::new(server);
+            primary.get_or_insert_with(|| Arc::clone(&server));
+            issuers = issuers.with(server);
+        }
+        let primary = primary.ok_or(SmartError::NoIssuer)?;
+        Ok((issuers, primary))
     }
 
     /// Returns the credentials every guarded route admits.
