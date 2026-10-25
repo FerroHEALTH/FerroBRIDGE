@@ -24,6 +24,7 @@ pub mod ack;
 pub mod batch;
 pub mod decode;
 pub mod inbound;
+#[cfg(feature = "map")]
 pub mod map;
 pub mod mllp;
 pub mod parse;

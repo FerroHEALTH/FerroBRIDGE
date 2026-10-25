@@ -19,6 +19,7 @@
 
 use core::future::Future;
 use core::time::Duration;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -278,9 +279,26 @@ impl Encoder<&[u8]> for Codec {
 #[derive(Debug, Default)]
 pub struct Connection {
     refused: AtomicUsize,
+    peer: Option<SocketAddr>,
 }
 
 impl Connection {
+    /// The counts of a connection from `peer`.
+    #[must_use]
+    pub fn with_peer(peer: Option<SocketAddr>) -> Self {
+        Self {
+            refused: AtomicUsize::new(0),
+            peer,
+        }
+    }
+
+    /// Returns the address of the connection's peer, as the socket reported
+    /// it when the connection was accepted; `None` when it could not.
+    #[must_use]
+    pub const fn peer(&self) -> Option<SocketAddr> {
+        self.peer
+    }
+
     /// Counts one frame the handler refused by its own policy.
     pub fn refuse(&self) {
         self.refused.fetch_add(1, Ordering::Relaxed);
@@ -419,7 +437,9 @@ async fn connection<H: Handler>(
     mut stopped: watch::Receiver<bool>,
 ) -> Result<(), FrameError> {
     let mut buffer = BytesMut::new();
-    let counts = Connection::default();
+    // NOTE: no specification governs this: our own design; a peer address the operating
+    // system cannot report is absent, and the handler is told so.
+    let counts = Connection::with_peer(stream.peer_addr().ok());
     let mut messages = 0usize;
     let mut idle_since = Instant::now();
     let mut frame_since: Option<Instant> = None;

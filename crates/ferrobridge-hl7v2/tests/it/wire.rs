@@ -407,3 +407,54 @@ async fn a_frame_that_stalls_past_its_timeout_is_answered_ar_and_closed() {
     assert_closed(&mut stream).await;
     listener.stop().await;
 }
+
+/// A handler that answers each frame with the peer address its connection
+/// reports.
+struct PeerEcho;
+
+impl ferrobridge_hl7v2::mllp::Handler for PeerEcho {
+    fn handle(
+        &self,
+        _message: Vec<u8>,
+        connection: &ferrobridge_hl7v2::mllp::Connection,
+    ) -> impl Future<Output = Option<Vec<u8>>> {
+        std::future::ready(Some(
+            connection
+                .peer()
+                .map_or_else(String::new, |peer| peer.to_string())
+                .into_bytes(),
+        ))
+    }
+}
+
+#[tokio::test]
+async fn a_handler_reads_the_address_of_its_connections_peer() {
+    let socket = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("a local port");
+    let address = socket.local_addr().expect("an address");
+    let (stop, stopped) = oneshot::channel::<()>();
+    let task = tokio::spawn(serve_with(
+        socket,
+        Arc::new(PeerEcho),
+        Codec::default(),
+        Timeouts::default(),
+        async {
+            let _signal = stopped.await;
+        },
+    ));
+    let mut stream = TcpStream::connect(address).await.expect("a connection");
+    let client = stream.local_addr().expect("the client's address");
+    stream
+        .write_all(&frame(&fixtures::adt_a01()))
+        .await
+        .expect("the frame is sent");
+    assert_eq!(read_ack(&mut stream).await, client.to_string());
+    drop(stream);
+    stop.send(()).expect("the listener is running");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("the listener stops")
+        .expect("the task joins")
+        .expect("the listener ends cleanly");
+}

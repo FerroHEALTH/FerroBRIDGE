@@ -6,7 +6,7 @@
 use ferrobridge_hl7v2::parse::Unplaced;
 use ferrobridge_hl7v2::parse::structure::StructureError;
 
-use super::{select, with_type, with_type_at};
+use super::{select, select_declared, with_type, with_type_at};
 use crate::{fixtures, support};
 
 #[test]
@@ -108,5 +108,45 @@ fn a_message_definition_naming_a_variant_of_another_structure_is_refused() {
     assert!(matches!(
         select(&with_type("ADT^A04^ADT_A05")),
         Err(StructureError::Variant { .. })
+    ));
+}
+
+// NOTE: IHE ITI TF-2 §3.8.4.1.2.1 sends every ITI-8 add or revise with MSH-9.3 `ADT_A01`.
+#[test]
+fn a_declared_structure_selects_the_variant_its_code_and_event_name() {
+    assert!(matches!(
+        select(&with_type_at("ADT^A05^ADT_A01", "2.9.1")),
+        Err(StructureError::Variant { .. })
+    ));
+    for event in ["A01", "A04", "A05", "A08"] {
+        let message_type = format!("ADT^{event}^ADT_A01");
+        assert_eq!(
+            select_declared(&with_type_at(&message_type, "2.5")),
+            Ok("ADT_A01"),
+            "{message_type} at 2.5"
+        );
+    }
+    assert_eq!(
+        select_declared(&with_type_at("ADT^A05^ADT_A01", "2.9.1")),
+        select_declared(&with_type_at("ADT^A01^ADT_A01", "2.9.1")),
+        "A05 takes the variant ADT^A01 names"
+    );
+    assert_eq!(
+        select_declared(&with_type_at("ADT^A04^ADT_A01", "2.9.1")),
+        Ok("ADT_A01-B"),
+        "a variant the definition names is kept"
+    );
+}
+
+#[test]
+fn a_declared_structure_is_trusted_over_the_event_and_an_unknown_one_still_refused() {
+    assert_eq!(
+        select_declared(&with_type_at("ORU^Z99^ORU_R01", "2.9.1")),
+        Ok("ORU_R01-A"),
+        "MSH-9.3 spells ORU^R01, whose definition names ORU_R01-A"
+    );
+    assert!(matches!(
+        select_declared(&with_type("ORM^O01^ORM_Z01")),
+        Err(StructureError::Unknown { .. })
     ));
 }

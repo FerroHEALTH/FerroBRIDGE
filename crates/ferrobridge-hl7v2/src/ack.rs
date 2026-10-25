@@ -340,6 +340,21 @@ mod tests {
     }
 
     #[test]
+    fn an_unknown_key_identifier_is_err_3_204() {
+        let header = Header::from_text(MESSAGE).expect("a header");
+        let error = Error {
+            location: Some(Location::segment("QPD", 1).with_field(3)),
+            code: ErrorCode::UnknownKeyIdentifier,
+            text: String::from("the identifier is not known"),
+        };
+        let ack = render(&header, Code::Error, &[error], stamp());
+        assert!(
+            ack.contains("|204^Unknown key identifier^HL70357|"),
+            "{ack}"
+        );
+    }
+
+    #[test]
     fn the_type_code_joins_the_message_code_and_the_event() {
         let header = Header::from_text(MESSAGE).expect("a header");
         assert_eq!(header.type_code().as_deref(), Some("ORU^R01"));

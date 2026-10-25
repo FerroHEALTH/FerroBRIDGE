@@ -25,6 +25,17 @@ crates on crates.io.
 
 ### Added
 
+- `ferrobridge-hl7v2` 0.1.143 serves a consumer of its listener and parser
+  alone. `parse::structure::structure_declared` selects the structure
+  MSH-9.3 names over the message definition where the two disagree, so an
+  IHE ITI-8 `ADT^A05^ADT_A01` groups by the A01 structure (IHE ITI TF-2
+  §3.8.4.1.2.1; HL7 v2.5.1 chapter 2 §2.15.9.9) (#1217).
+  `parse::ErrorCode::UnknownKeyIdentifier` is table 0357's `204` (#1218).
+  `mllp::Connection::peer` gives a handler the address of its connection's
+  peer (#1220). `map` and its dependencies (`fhirconnect`,
+  `ferrobridge-term`, `fhir-types` and the openEHR crates) sit behind the
+  default `map` feature, so `default-features = false` drops them (#1221).
+  A consumer that matches `ErrorCode` exhaustively adds the new variant.
 - A write the facade makes for an authenticated caller states that caller as
   the version's committer, as ITS-REST 1.1.0 recommends ("provision these
   headers based on authentication and authorization runtime data"): a

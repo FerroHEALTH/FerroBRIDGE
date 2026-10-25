@@ -312,6 +312,9 @@ pub enum ErrorCode {
     UnsupportedMessageType,
     /// `203`, unsupported version id.
     UnsupportedVersion,
+    /// `204`, unknown key identifier: a query names an identifier or a
+    /// domain the application does not hold.
+    UnknownKeyIdentifier,
     /// `207`, application error.
     Application,
 }
@@ -326,6 +329,7 @@ impl ErrorCode {
             Self::DataType => "102",
             Self::UnsupportedMessageType => "200",
             Self::UnsupportedVersion => "203",
+            Self::UnknownKeyIdentifier => "204",
             Self::Application => "207",
         }
     }
@@ -339,6 +343,7 @@ impl ErrorCode {
             Self::DataType => "Data type error",
             Self::UnsupportedMessageType => "Unsupported message type",
             Self::UnsupportedVersion => "Unsupported version id",
+            Self::UnknownKeyIdentifier => "Unknown key identifier",
             Self::Application => "Application error",
         }
     }
