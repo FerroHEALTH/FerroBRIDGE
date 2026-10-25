@@ -11,6 +11,7 @@
 
 use core::fmt;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::ModelPath;
@@ -137,6 +138,36 @@ fn claimed_twice(
             }
         }
     }
+}
+
+/// Returns every literal concept id the set writes into a concept column,
+/// concept `0` left out, so a caller can look their domains up at once
+/// before [`check_concept_domains`].
+#[must_use]
+pub fn concept_literals(set: &MappingSet) -> BTreeSet<ConceptId> {
+    let mut found = BTreeSet::new();
+    for file in set.files() {
+        for entity in &file.entities {
+            let Entity::Record(ref record) = *entity else {
+                continue;
+            };
+            for column in &record.columns {
+                let concept = column.projection.columns.iter().any(|projected| {
+                    matches!(projected.part, Part::Concept | Part::Units | Part::Operator)
+                });
+                if !concept {
+                    continue;
+                }
+                let path = ModelPath::root();
+                for (_, literal, _) in literals(&column.alternatives, &path) {
+                    if literal != ConceptId::NO_MATCHING_CONCEPT {
+                        found.insert(literal);
+                    }
+                }
+            }
+        }
+    }
+    found
 }
 
 /// Checks every literal concept id of the set against a loaded vocabulary.

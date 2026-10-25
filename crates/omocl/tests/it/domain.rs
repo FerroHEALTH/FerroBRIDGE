@@ -161,3 +161,20 @@ fn a_numeric_literal_under_a_non_concept_key_is_not_a_concept() -> Result<(), Bo
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     Ok(())
 }
+
+#[test]
+fn the_literals_of_the_concept_columns_are_collected_without_concept_zero()
+-> Result<(), Box<dyn Error>> {
+    let body = format!(
+        "{}{}{}",
+        measurement(1_000_001),
+        measurement(0),
+        measurement(1_000_002)
+    );
+    let literals: Vec<i32> = omocl::model::semantic::concept_literals(&set(&body)?)
+        .into_iter()
+        .map(ConceptId::get)
+        .collect();
+    assert_eq!(vec![1_000_001, 1_000_002], literals);
+    Ok(())
+}

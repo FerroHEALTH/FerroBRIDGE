@@ -30,7 +30,8 @@
 # Usage:
 #   scripts/vendor/profile-packages.sh             # verify every pinned tree, fetch what is missing
 #   scripts/vendor/profile-packages.sh --stamp     # after moving a pin: fetch every package, rewrite
-#                                                  # each PROVENANCE.md, print the count and digest
+#                                                  # each PROVENANCE.md whose facts moved (a new
+#                                                  # pin, a count, a digest), print the count and digest
 #   scripts/vendor/profile-packages.sh --check     # offline: every PROVENANCE.md against its pin, every
 #                                                  # fetched tree at its count and digest, no unpinned
 #                                                  # tree, and the closure complete
@@ -230,13 +231,31 @@ fetch_one() {
 }
 
 # Writes the PROVENANCE.md of the package $1 at version $2 from what its fetch
-# read.
+# read, and leaves a file that already records the same facts as it is: only
+# its `Stamped:` date would differ, and a pin that did not move keeps its file
+# byte for byte.
 write_provenance() {
   local pkg="$1" ver="$2" meta_url="$3" tarball_url="$4" shasum="$5" sha256="$6" license="$7" files="$8" digest="$9"
   local dir="$vendor_dir/$pkg#$ver" author deps
   author="$(jq -r '.author // "unstated"' "$dir/package/package.json")"
   deps="$(jq -r '.dependencies // {} | to_entries | map("`\(.key)` \(.value)") | join(", ")' "$dir/package/package.json")"
-  cat > "$dir/PROVENANCE.md" << PROV
+  render_provenance > "$dir/PROVENANCE.md.new"
+  keep_or_replace "$dir/PROVENANCE.md"
+}
+
+# Moves $1.new over $1, unless $1 exists and differs from it in its
+# `Stamped:` line alone, in which case $1.new is dropped.
+keep_or_replace() {
+  if [[ -f "$1" ]] && cmp -s <(grep -v '^- Stamped: ' "$1") <(grep -v '^- Stamped: ' "$1.new"); then
+    rm -f "$1.new"
+    return 0
+  fi
+  mv "$1.new" "$1"
+}
+
+# Prints the PROVENANCE.md write_provenance writes, from its locals.
+render_provenance() {
+  cat << PROV
 <!-- This file describes third-party material fetched at build time; the bytes
      it describes keep their upstream terms and are never committed. -->
 
@@ -492,6 +511,20 @@ self_test() {
 PINS
   out="$(pinned_rows "$work/pins.md")"
   [[ "$out" = "example.dep#2.0.0 3 abc" ]] || die "self-test: the pin rows read as '$out'"
+
+  # A provenance file whose facts did not move keeps its Stamped date; one
+  # whose facts moved, or that is new, is written.
+  printf -- '- Files: 3\n- Stamped: 2026-01-01\n' > "$work/prov.md"
+  printf -- '- Files: 3\n- Stamped: 2026-10-25\n' > "$work/prov.md.new"
+  keep_or_replace "$work/prov.md"
+  grep -qx -- '- Stamped: 2026-01-01' "$work/prov.md" || die "self-test: an unchanged provenance file was rewritten"
+  [[ ! -e "$work/prov.md.new" ]] || die "self-test: the dropped provenance rendering was left behind"
+  printf -- '- Files: 4\n- Stamped: 2026-10-25\n' > "$work/prov.md.new"
+  keep_or_replace "$work/prov.md"
+  grep -qx -- '- Files: 4' "$work/prov.md" || die "self-test: a provenance file whose facts moved was kept"
+  printf -- '- Files: 5\n- Stamped: 2026-10-25\n' > "$work/fresh.md.new"
+  keep_or_replace "$work/fresh.md"
+  grep -qx -- '- Files: 5' "$work/fresh.md" || die "self-test: a new provenance file was not written"
 
   # A stamp answers an unchanged tree, and a changed file is hashed again.
   mkdir -p "$work/stamped/package"

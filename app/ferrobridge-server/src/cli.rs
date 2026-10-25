@@ -132,6 +132,10 @@ pub enum Mapping {
         /// How the report is written to stdout.
         #[arg(long, value_enum, default_value_t = ReportFormat::Text)]
         format: ReportFormat,
+        /// Also checks every literal concept id of the OMOCL files against the
+        /// vocabulary loaded in the `[cdm]` database.
+        #[arg(long)]
+        vocabulary: bool,
     },
 }
 
@@ -196,7 +200,7 @@ mod tests {
 
     #[test]
     fn every_documented_subcommand_parses() {
-        let cases: [(&[&str], Command); 9] = [
+        let cases: [(&[&str], Command); 10] = [
             (&["ferrobridge", "serve"], Command::Serve),
             (
                 &["ferrobridge", "etl", "run"],
@@ -268,6 +272,16 @@ mod tests {
                 Command::Mapping {
                     command: Mapping::Check {
                         format: ReportFormat::Text,
+                        vocabulary: false,
+                    },
+                },
+            ),
+            (
+                &["ferrobridge", "mapping", "check", "--vocabulary"],
+                Command::Mapping {
+                    command: Mapping::Check {
+                        format: ReportFormat::Text,
+                        vocabulary: true,
                     },
                 },
             ),
@@ -276,6 +290,7 @@ mod tests {
                 Command::Mapping {
                     command: Mapping::Check {
                         format: ReportFormat::Json,
+                        vocabulary: false,
                     },
                 },
             ),
@@ -353,7 +368,8 @@ mod tests {
             None,
             Command::Mapping {
                 command: Mapping::Check {
-                    format: ReportFormat::Text
+                    format: ReportFormat::Text,
+                    vocabulary: false,
                 }
             }
             .pending_issue(),
