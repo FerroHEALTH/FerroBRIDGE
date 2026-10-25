@@ -882,6 +882,10 @@ jobs:
           target: wasm32-unknown-unknown
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo clippy --locked -p ferrobridge-console --lib --target wasm32-unknown-unknown -- -D warnings
+      # The bridge's operator documents and the mapping core under them compile
+      # for the browser, so the console's browser half can draw them (#1256).
+      - name: The operator contract compiles for wasm32
+        run: cargo check --locked -p ferrobridge-operator-api --target wasm32-unknown-unknown
       - name: Install cargo-leptos
         uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:

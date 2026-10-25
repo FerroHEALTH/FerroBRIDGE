@@ -37,6 +37,15 @@ crates on crates.io.
   program names the composition node each CDM column reads
   (`Program::column_reads`), and `ferrobridge-hl7v2` moves to 0.1.147.
 
+### Changed
+
+- `openehr-mapping-core` and `ferrobridge-operator-api` compile for
+  `wasm32-unknown-unknown`, so the operator console's browser half can draw
+  the bridge's documents. The workspace takes `openehr-its` without its
+  ITS-REST client, which only the server adds, and the console CI lane
+  checks the operator contract for wasm32
+  ([#1256](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1256)).
+
 ## [0.0.13] - 2026-10-25
 
 The security and OMOP release. A write the facade makes for an authenticated
