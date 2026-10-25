@@ -11,8 +11,6 @@
 [What ships today](#what-ships-today) ·
 [Licensing](https://ferrobridge.eu/docs/evaluate/licensing.html)
 
-</div>
-
 <!-- badges:begin -->
 **Project**<br>
 [![Release](https://img.shields.io/github/v/release/FerroHEALTH/FerroBRIDGE?sort=semver&logo=github&label=release)](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest)
@@ -78,6 +76,8 @@
 
 </details>
 <!-- badges:end -->
+
+</div>
 
 ## What FerroBRIDGE does
 
