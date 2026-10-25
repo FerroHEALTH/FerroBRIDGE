@@ -1,0 +1,386 @@
+---
+source: crates/fhirconnect/tests/it/eu_patient.rs
+expression: program.to_string()
+---
+program ferrobridge_eu_patient.context
+  profile http://hl7.eu/fhir/base/StructureDefinition/patient-eu-core version 2.0.0
+  template KDS_Person sem_ver 58.0.0 generation adl1.4
+  resource Patient
+  start ADMIN_ENTRY.person_data.v0
+  model ADMIN_ENTRY.person_data.v0 version 0.0.1-alpha archetype openEHR-EHR-ADMIN_ENTRY.person_data.v0 revision 0.0.1-alpha
+    extension ferrobridge_kds_admin_entry_person
+  model CLUSTER.person.v1 version 0.0.1-alpha archetype openEHR-EHR-CLUSTER.person.v1 revision 1.0.3
+    extension ferrobridge_kds_cluster_person
+  model CLUSTER.structured_name.v1 version 0.0.1-alpha archetype openEHR-EHR-CLUSTER.structured_name.v1 revision 1.0.1
+    extension ferrobridge_kds_structured_name
+  model CLUSTER.address.v1 version 0.0.1-alpha archetype openEHR-EHR-CLUSTER.address.v1 revision 1.1.2
+    extension ferrobridge_kds_address
+  model CLUSTER.death_details.v1 version 0.0.1-alpha archetype openEHR-EHR-CLUSTER.death_details.v1 revision 1.0.3
+  model CLUSTER.person_birth_data_iso.v0 version 0.0.1-alpha archetype openEHR-EHR-CLUSTER.person_birth_data_iso.v0 revision 0.0.1-alpha
+  model COMPOSITION.person.v0 version 0.0.1-alpha archetype openEHR-EHR-COMPOSITION.person.v0 revision 1.0.1
+    extension KDS_composition_person.v0
+  model EVALUATION.gender.v1 version 0.0.1-alpha archetype openEHR-EHR-EVALUATION.gender.v1 revision 1.1.1
+    extension ferrobridge_eu_gender
+  model ADMIN_ENTRY.versicherungsinformationen.v0 version 0.0.1-alpha archetype openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0 revision 0.0.1-alpha
+  preprocessor ADMIN_ENTRY.person_data.v0
+    fhirCondition not of [false] on fhir $resource -> Patient complex writable (element)
+      attribute fhir $resource.active -> Patient.active primitive writable
+  mapping personData from ADMIN_ENTRY.person_data.v0
+    fhir $resource -> Patient complex writable
+    openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1] CLUSTER
+    slotArchetype CLUSTER.person.v1
+      mapping name from ferrobridge_kds_cluster_person
+        fhir $resource.name -> Patient.name complex writable
+        openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name'] CLUSTER occurrences [person/personendaten/person/name]
+        fhirCondition one of [official] on fhir $resource.name -> Patient.name complex writable (element)
+          attribute fhir $resource.name.use -> HumanName.use primitive writable
+        slotArchetype CLUSTER.structured_name.v1
+          mapping typeOfName from ferrobridge_kds_structured_name
+            fhir $resource.name -> Patient.name complex writable
+            openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name'] CLUSTER occurrences [person/personendaten/person/name]
+            unidirectional openehr->fhir
+            manual official
+              fhir $resource.name.use -> HumanName.use primitive writable = official
+              openehrCondition one of [Name] on openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name'] CLUSTER occurrences [person/personendaten/person/name] (element)
+                attribute openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/name/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name'] CLUSTER tail name/value occurrences [person/personendaten/person/name]
+            manual maiden
+              fhir $resource.name.use -> HumanName.use primitive writable = maiden
+              openehrCondition one of [Geburtsname] on openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name'] CLUSTER occurrences [person/personendaten/person/name] (element)
+                attribute openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/name/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name'] CLUSTER tail name/value occurrences [person/personendaten/person/name]
+          mapping firstName from CLUSTER.structured_name.v1
+            fhir $resource.name.given -> HumanName.given primitive writable
+            openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/items[at0002] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/items[at0002]/value DV_TEXT occurrences [person/personendaten/person/name, person/personendaten/person/name/vorname]
+            derived string
+          mapping prefix from ferrobridge_kds_structured_name
+            fhir $resource.name.prefix -> HumanName.prefix primitive writable
+            openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/items[at0001,'Prefix'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/items[at0001,'Prefix']/value DV_TEXT occurrences [person/personendaten/person/name, person/personendaten/person/name/prefix]
+            derived string
+          mapping familyName from ferrobridge_kds_structured_name
+            fhir $resource.name.family -> HumanName.family primitive writable
+            openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name'] CLUSTER occurrences [person/personendaten/person/name]
+            derived anchor
+            mapping familyName.family from ferrobridge_kds_structured_name
+              fhir $resource.name.family -> HumanName.family primitive writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/items[at0005,'Familienname'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/items[at0005,'Familienname']/value DV_TEXT occurrences [person/personendaten/person/name]
+              derived string
+            mapping familyName.familiennameZusatz from ferrobridge_kds_structured_name
+              fhir $resource.name.family.extension -> HumanName.family.extension complex writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/items[at0005,'Familienname-Namenszusatz'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/items[at0005,'Familienname-Namenszusatz']/value DV_TEXT occurrences [person/personendaten/person/name]
+              derived choice read $resource.name.family.extension.value -> Extension.value[x] choice writable write string as $resource.name.family.extension.value.as(String) -> Extension.value[x] primitive writable
+              fhirCondition one of [http://fhir.de/StructureDefinition/humanname-namenszusatz] on fhir $resource.name.family.extension -> HumanName.family.extension complex writable (element)
+                attribute fhir $resource.name.family.extension.url -> Extension.url attribute writable
+              mapping familyName.familiennameZusatz.staticExtensionUrl from ferrobridge_kds_structured_name
+                fhir $resource.name.family.extension -> HumanName.family.extension complex writable
+                manual staticUrl
+                  fhir $resource.name.family.extension.url -> Extension.url attribute writable = http://fhir.de/StructureDefinition/humanname-namenszusatz
+            mapping familyName.nachnameOhneZusätze from ferrobridge_kds_structured_name
+              fhir $resource.name.family.extension -> HumanName.family.extension complex writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/items[at0005,'Familienname-Nachname'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/items[at0005,'Familienname-Nachname']/value DV_TEXT occurrences [person/personendaten/person/name]
+              derived choice read $resource.name.family.extension.value -> Extension.value[x] choice writable write string as $resource.name.family.extension.value.as(String) -> Extension.value[x] primitive writable
+              fhirCondition one of [http://hl7.org/fhir/StructureDefinition/humanname-own-name] on fhir $resource.name.family.extension -> HumanName.family.extension complex writable (element)
+                attribute fhir $resource.name.family.extension.url -> Extension.url attribute writable
+              mapping familyName.nachnameOhneZusätze.staticExtensionUrl from ferrobridge_kds_structured_name
+                fhir $resource.name.family.extension -> HumanName.family.extension complex writable
+                manual staticUrl
+                  fhir $resource.name.family.extension.url -> Extension.url attribute writable = http://hl7.org/fhir/StructureDefinition/humanname-own-name
+            mapping familyName.vorsatzwort from ferrobridge_kds_structured_name
+              fhir $resource.name.family.extension -> HumanName.family.extension complex writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/items[at0005,'Familienname-Vorsatzwort'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Name']/items[at0005,'Familienname-Vorsatzwort']/value DV_TEXT occurrences [person/personendaten/person/name]
+              derived choice read $resource.name.family.extension.value -> Extension.value[x] choice writable write string as $resource.name.family.extension.value.as(String) -> Extension.value[x] primitive writable
+              fhirCondition one of [http://hl7.org/fhir/StructureDefinition/humanname-own-prefix] on fhir $resource.name.family.extension -> HumanName.family.extension complex writable (element)
+                attribute fhir $resource.name.family.extension.url -> Extension.url attribute writable
+              mapping familyName.vorsatzwort.staticExtensionUrl from ferrobridge_kds_structured_name
+                fhir $resource.name.family.extension -> HumanName.family.extension complex writable
+                manual staticUrl
+                  fhir $resource.name.family.extension.url -> Extension.url attribute writable = http://hl7.org/fhir/StructureDefinition/humanname-own-prefix
+      mapping address from ferrobridge_kds_cluster_person
+        fhir $resource.address -> Patient.address complex writable
+        openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift'] CLUSTER occurrences [person/personendaten/person/straßenanschrift]
+        fhirCondition one of [both] on fhir $resource.address -> Patient.address complex writable (element)
+          attribute fhir $resource.address.type -> Address.type primitive writable
+        slotArchetype CLUSTER.address.v1
+          mapping streetaddress from ferrobridge_kds_address
+            fhir $resource.address -> Patient.address complex writable
+            openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift'] CLUSTER occurrences [person/personendaten/person/straßenanschrift]
+            derived anchor
+            mapping streetaddress.city from ferrobridge_kds_address
+              fhir $resource.address.city -> Address.city primitive writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0002] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0002,'Stadtteil / Stadt / Gemeindeschlüssel']/value DV_TEXT occurrences [person/personendaten/person/straßenanschrift, person/personendaten/person/straßenanschrift/stadtteil_stadt_gemeindeschlüssel]
+              derived string
+            mapping streetaddress.postalCode from ferrobridge_kds_address
+              fhir $resource.address.postalCode -> Address.postalCode primitive writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0005] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0005]/value DV_TEXT occurrences [person/personendaten/person/straßenanschrift]
+              derived string
+            mapping streetaddress.line from ferrobridge_kds_address
+              fhir $resource.address.line -> Address.line primitive writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0001] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0001]/value DV_TEXT occurrences [person/personendaten/person/straßenanschrift, person/personendaten/person/straßenanschrift/adresszeile]
+              derived string
+            mapping streetaddress.type from ferrobridge_kds_address
+              fhir $resource.address.type -> Address.type primitive writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/straßenanschrift]
+              type NONE
+              mapping streetaddress.type.manual from ferrobridge_kds_address
+                fhir $resource.address.type -> Address.type primitive writable
+                openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/straßenanschrift]
+                manual physical
+                  fhir $resource.address.type.value -> Address.type primitive writable = physical
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010]/defining_code/terminology_id/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [person/personendaten/person/straßenanschrift] = local
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010]/defining_code/code_string -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/code_string occurrences [person/personendaten/person/straßenanschrift] = at0011
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010]/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/straßenanschrift] = Physical
+                  fhirCondition one of [physical] on fhir $resource.address.type -> Address.type primitive writable (element)
+                    attribute fhir $resource.address.type.value -> Address.type primitive writable
+                  openehrCondition one of [at0011] on openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/straßenanschrift] (element)
+                    attribute openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010]/defining_code/code_string -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/code_string occurrences [person/personendaten/person/straßenanschrift]
+                manual postal
+                  fhir $resource.address.type.value -> Address.type primitive writable = postal
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010]/defining_code/terminology_id/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [person/personendaten/person/straßenanschrift] = local
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010]/defining_code/code_string -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/code_string occurrences [person/personendaten/person/straßenanschrift] = at0012
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010]/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/straßenanschrift] = Postal
+                  fhirCondition one of [postal] on fhir $resource.address.type -> Address.type primitive writable (element)
+                    attribute fhir $resource.address.type.value -> Address.type primitive writable
+                  openehrCondition one of [at0012] on openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/straßenanschrift] (element)
+                    attribute openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010]/defining_code/code_string -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/code_string occurrences [person/personendaten/person/straßenanschrift]
+                manual both
+                  fhir $resource.address.type.value -> Address.type primitive writable = both
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010]/defining_code/terminology_id/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [person/personendaten/person/straßenanschrift] = local
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010]/defining_code/code_string -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/code_string occurrences [person/personendaten/person/straßenanschrift] = at0013
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010]/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/straßenanschrift] = Both
+                  fhirCondition one of [both] on fhir $resource.address.type -> Address.type primitive writable (element)
+                    attribute fhir $resource.address.type.value -> Address.type primitive writable
+                  openehrCondition one of [at0013] on openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/straßenanschrift] (element)
+                    attribute openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010]/defining_code/code_string -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Straßenanschrift']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/code_string occurrences [person/personendaten/person/straßenanschrift]
+      mapping geburtsname from ferrobridge_kds_cluster_person
+        fhir $resource.name -> Patient.name complex writable
+        openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname'] CLUSTER
+        fhirCondition one of [maiden] on fhir $resource.name -> Patient.name complex writable (element)
+          attribute fhir $resource.name.use -> HumanName.use primitive writable
+        slotArchetype CLUSTER.structured_name.v1
+          mapping typeOfName from ferrobridge_kds_structured_name
+            fhir $resource.name -> Patient.name complex writable
+            openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname'] CLUSTER
+            unidirectional openehr->fhir
+            manual official
+              fhir $resource.name.use -> HumanName.use primitive writable = official
+              openehrCondition one of [Name] on openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname'] CLUSTER (element)
+                attribute openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/name/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname'] CLUSTER tail name/value
+            manual maiden
+              fhir $resource.name.use -> HumanName.use primitive writable = maiden
+              openehrCondition one of [Geburtsname] on openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname'] CLUSTER (element)
+                attribute openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/name/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname'] CLUSTER tail name/value
+          mapping firstName from CLUSTER.structured_name.v1
+            fhir $resource.name.given -> HumanName.given primitive writable
+            openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/items[at0002] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/items[at0002]/value DV_TEXT occurrences [person/personendaten/person/geburtsname/vorname]
+            derived string
+          mapping prefix from ferrobridge_kds_structured_name
+            fhir $resource.name.prefix -> HumanName.prefix primitive writable
+            openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/items[at0001,'Prefix'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/items[at0001,'Prefix']/value DV_TEXT occurrences [person/personendaten/person/geburtsname/prefix]
+            derived string
+          mapping familyName from ferrobridge_kds_structured_name
+            fhir $resource.name.family -> HumanName.family primitive writable
+            openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname'] CLUSTER
+            derived anchor
+            mapping familyName.family from ferrobridge_kds_structured_name
+              fhir $resource.name.family -> HumanName.family primitive writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/items[at0005,'Familienname'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/items[at0005,'Familienname']/value DV_TEXT
+              derived string
+            mapping familyName.familiennameZusatz from ferrobridge_kds_structured_name
+              fhir $resource.name.family.extension -> HumanName.family.extension complex writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/items[at0005,'Familienname-Namenszusatz'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/items[at0005,'Familienname-Namenszusatz']/value DV_TEXT
+              derived choice read $resource.name.family.extension.value -> Extension.value[x] choice writable write string as $resource.name.family.extension.value.as(String) -> Extension.value[x] primitive writable
+              fhirCondition one of [http://fhir.de/StructureDefinition/humanname-namenszusatz] on fhir $resource.name.family.extension -> HumanName.family.extension complex writable (element)
+                attribute fhir $resource.name.family.extension.url -> Extension.url attribute writable
+              mapping familyName.familiennameZusatz.staticExtensionUrl from ferrobridge_kds_structured_name
+                fhir $resource.name.family.extension -> HumanName.family.extension complex writable
+                manual staticUrl
+                  fhir $resource.name.family.extension.url -> Extension.url attribute writable = http://fhir.de/StructureDefinition/humanname-namenszusatz
+            mapping familyName.nachnameOhneZusätze from ferrobridge_kds_structured_name
+              fhir $resource.name.family.extension -> HumanName.family.extension complex writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/items[at0005,'Familienname-Nachname'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/items[at0005,'Familienname-Nachname']/value DV_TEXT
+              derived choice read $resource.name.family.extension.value -> Extension.value[x] choice writable write string as $resource.name.family.extension.value.as(String) -> Extension.value[x] primitive writable
+              fhirCondition one of [http://hl7.org/fhir/StructureDefinition/humanname-own-name] on fhir $resource.name.family.extension -> HumanName.family.extension complex writable (element)
+                attribute fhir $resource.name.family.extension.url -> Extension.url attribute writable
+              mapping familyName.nachnameOhneZusätze.staticExtensionUrl from ferrobridge_kds_structured_name
+                fhir $resource.name.family.extension -> HumanName.family.extension complex writable
+                manual staticUrl
+                  fhir $resource.name.family.extension.url -> Extension.url attribute writable = http://hl7.org/fhir/StructureDefinition/humanname-own-name
+            mapping familyName.vorsatzwort from ferrobridge_kds_structured_name
+              fhir $resource.name.family.extension -> HumanName.family.extension complex writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/items[at0005,'Familienname-Vorsatzwort'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.structured_name.v1,'Geburtsname']/items[at0005,'Familienname-Vorsatzwort']/value DV_TEXT
+              derived choice read $resource.name.family.extension.value -> Extension.value[x] choice writable write string as $resource.name.family.extension.value.as(String) -> Extension.value[x] primitive writable
+              fhirCondition one of [http://hl7.org/fhir/StructureDefinition/humanname-own-prefix] on fhir $resource.name.family.extension -> HumanName.family.extension complex writable (element)
+                attribute fhir $resource.name.family.extension.url -> Extension.url attribute writable
+              mapping familyName.vorsatzwort.staticExtensionUrl from ferrobridge_kds_structured_name
+                fhir $resource.name.family.extension -> HumanName.family.extension complex writable
+                manual staticUrl
+                  fhir $resource.name.family.extension.url -> Extension.url attribute writable = http://hl7.org/fhir/StructureDefinition/humanname-own-prefix
+      mapping addressPostfach from ferrobridge_kds_cluster_person
+        fhir $resource.address -> Patient.address complex writable
+        openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach'] CLUSTER occurrences [person/personendaten/person/postfach]
+        fhirCondition one of [postal] on fhir $resource.address -> Patient.address complex writable (element)
+          attribute fhir $resource.address.type -> Address.type primitive writable
+        slotArchetype CLUSTER.address.v1
+          mapping streetaddress from ferrobridge_kds_address
+            fhir $resource.address -> Patient.address complex writable
+            openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach'] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach'] CLUSTER occurrences [person/personendaten/person/postfach]
+            derived anchor
+            mapping streetaddress.city from ferrobridge_kds_address
+              fhir $resource.address.city -> Address.city primitive writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0002] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0002,'Stadtteil / Stadt / Gemeindeschlüssel']/value DV_TEXT occurrences [person/personendaten/person/postfach, person/personendaten/person/postfach/stadtteil_stadt_gemeindeschlüssel]
+              derived string
+            mapping streetaddress.postalCode from ferrobridge_kds_address
+              fhir $resource.address.postalCode -> Address.postalCode primitive writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0005] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0005]/value DV_TEXT occurrences [person/personendaten/person/postfach]
+              derived string
+            mapping streetaddress.line from ferrobridge_kds_address
+              fhir $resource.address.line -> Address.line primitive writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0001] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0001]/value DV_TEXT occurrences [person/personendaten/person/postfach, person/personendaten/person/postfach/adresszeile]
+              derived string
+            mapping streetaddress.type from ferrobridge_kds_address
+              fhir $resource.address.type -> Address.type primitive writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/postfach]
+              type NONE
+              mapping streetaddress.type.manual from ferrobridge_kds_address
+                fhir $resource.address.type -> Address.type primitive writable
+                openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/postfach]
+                manual physical
+                  fhir $resource.address.type.value -> Address.type primitive writable = physical
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010]/defining_code/terminology_id/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [person/personendaten/person/postfach] = local
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010]/defining_code/code_string -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/code_string occurrences [person/personendaten/person/postfach] = at0011
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010]/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/postfach] = Physical
+                  fhirCondition one of [physical] on fhir $resource.address.type -> Address.type primitive writable (element)
+                    attribute fhir $resource.address.type.value -> Address.type primitive writable
+                  openehrCondition one of [at0011] on openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/postfach] (element)
+                    attribute openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010]/defining_code/code_string -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/code_string occurrences [person/personendaten/person/postfach]
+                manual postal
+                  fhir $resource.address.type.value -> Address.type primitive writable = postal
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010]/defining_code/terminology_id/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [person/personendaten/person/postfach] = local
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010]/defining_code/code_string -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/code_string occurrences [person/personendaten/person/postfach] = at0012
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010]/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/postfach] = Postal
+                  fhirCondition one of [postal] on fhir $resource.address.type -> Address.type primitive writable (element)
+                    attribute fhir $resource.address.type.value -> Address.type primitive writable
+                  openehrCondition one of [at0012] on openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/postfach] (element)
+                    attribute openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010]/defining_code/code_string -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/code_string occurrences [person/personendaten/person/postfach]
+                manual both
+                  fhir $resource.address.type.value -> Address.type primitive writable = both
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010]/defining_code/terminology_id/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [person/personendaten/person/postfach] = local
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010]/defining_code/code_string -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/code_string occurrences [person/personendaten/person/postfach] = at0013
+                  openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010]/value -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/postfach] = Both
+                  fhirCondition one of [both] on fhir $resource.address.type -> Address.type primitive writable (element)
+                    attribute fhir $resource.address.type.value -> Address.type primitive writable
+                  openehrCondition one of [at0013] on openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT occurrences [person/personendaten/person/postfach] (element)
+                    attribute openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010]/defining_code/code_string -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]/items[openEHR-EHR-CLUSTER.address.v1,'Postfach']/items[at0010,'Adresstyp']/value DV_CODED_TEXT tail defining_code/code_string occurrences [person/personendaten/person/postfach]
+  mapping death from ADMIN_ENTRY.person_data.v0
+    fhir $resource -> Patient complex writable
+    openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[at0024] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[at0024] CLUSTER
+    derived anchor
+    mapping death.deathBoolean from ADMIN_ENTRY.person_data.v0
+      fhir $resource.deceased.as(Boolean) -> Patient.deceased[x] primitive writable
+      openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[at0024]/items[at0025] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[at0024]/items[at0025]/value DV_BOOLEAN
+      derived boolean
+      openehrCondition empty [] on openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[at0024] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[at0024] CLUSTER (ancestor)
+        attribute openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[at0024]/items[openEHR-EHR-CLUSTER.death_details.v1]/items[at0001] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[at0024]/items[openEHR-EHR-CLUSTER.death_details.v1]/items[at0001]/value DV_DATE_TIME
+    mapping death.deathTime from ADMIN_ENTRY.person_data.v0
+      fhir $resource.deceased.as(DateTime) -> Patient.deceased[x] primitive writable
+      openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[at0024]/items[openEHR-EHR-CLUSTER.death_details.v1] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[at0024]/items[openEHR-EHR-CLUSTER.death_details.v1] CLUSTER
+      slotArchetype CLUSTER.death_details.v1
+        mapping deathDate from CLUSTER.death_details.v1
+          fhir $resource.deceased.as(DateTime) -> Patient.deceased[x] primitive writable
+          openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[at0024]/items[openEHR-EHR-CLUSTER.death_details.v1]/items[at0001] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[at0024]/items[openEHR-EHR-CLUSTER.death_details.v1]/items[at0001]/value DV_DATE_TIME
+          derived dateTime
+  mapping personBirthDate from ADMIN_ENTRY.person_data.v0
+    fhir $resource.birthDate -> Patient.birthDate primitive writable
+    openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person_birth_data_iso.v0] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person_birth_data_iso.v0] CLUSTER
+    slotArchetype CLUSTER.person_birth_data_iso.v0
+      mapping birthdate from CLUSTER.person_birth_data_iso.v0
+        fhir $resource.birthDate -> Patient.birthDate primitive writable
+        openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person_birth_data_iso.v0]/items[at0001] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]/data[at0001]/items[openEHR-EHR-CLUSTER.person_birth_data_iso.v0]/items[at0001]/value DV_DATE
+        derived date
+  mapping link from ferrobridge_kds_admin_entry_person
+    fhir $resource -> Patient complex writable
+    openehr /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0] -> /content[openEHR-EHR-ADMIN_ENTRY.person_data.v0] ADMIN_ENTRY
+    type NONE
+  mapping compositionMapping from ferrobridge_kds_admin_entry_person
+    fhir $resource -> Patient complex writable
+    openehr / ->  COMPOSITION
+    slotArchetype COMPOSITION.person.v0
+      mapping healthcareFacility from COMPOSITION.person.v0
+        fhir $resource.managingOrganization -> Patient.managingOrganization complex writable
+        openehr /context/health_care_facility -> /context EVENT_CONTEXT tail health_care_facility
+        derived Reference
+      mapping pid from KDS_composition_person.v0
+        fhir $resource.identifier -> Patient.identifier complex writable
+        openehr /context/other_context[at0003]/items[at0004] -> /context/other_context[at0003]/items[at0004,'Patient ID']/value DV_IDENTIFIER
+        derived Identifier
+        fhirCondition not of [http://fhir.de/sid/gkv/kvid-10] on fhir $resource.identifier -> Patient.identifier complex writable (element)
+          attribute fhir $resource.identifier.system -> Identifier.system primitive writable
+      mapping gender from KDS_composition_person.v0
+        fhir $resource -> Patient complex writable
+        openehr /content[openEHR-EHR-EVALUATION.gender.v1] -> /content[openEHR-EHR-EVALUATION.gender.v1] EVALUATION
+        slotArchetype EVALUATION.gender.v1
+          mapping gender from EVALUATION.gender.v1
+            fhir $resource.gender -> Patient.gender primitive writable
+            openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022] -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT
+            manual male
+              fhir $resource.gender.value -> Patient.gender primitive writable = male
+              openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/defining_code/terminology_id/value -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/administrative-gender
+              openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT tail defining_code/code_string = male
+              openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT = Male
+              fhirCondition one of [male] on fhir $resource.gender -> Patient.gender primitive writable (element)
+                attribute fhir $resource.gender.value -> Patient.gender primitive writable
+              openehrCondition one of [male] on openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022] -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT (element)
+                attribute openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT tail defining_code/code_string
+            manual female
+              fhir $resource.gender.value -> Patient.gender primitive writable = female
+              openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/defining_code/terminology_id/value -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/administrative-gender
+              openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT tail defining_code/code_string = female
+              openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT = Female
+              fhirCondition one of [female] on fhir $resource.gender -> Patient.gender primitive writable (element)
+                attribute fhir $resource.gender.value -> Patient.gender primitive writable
+              openehrCondition one of [female] on openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022] -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT (element)
+                attribute openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT tail defining_code/code_string
+            manual other
+              fhir $resource.gender.value -> Patient.gender primitive writable = other
+              openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/defining_code/terminology_id/value -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/administrative-gender
+              openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT tail defining_code/code_string = other
+              openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT = Other
+              fhirCondition one of [other] on fhir $resource.gender -> Patient.gender primitive writable (element)
+                attribute fhir $resource.gender.value -> Patient.gender primitive writable
+              openehrCondition one of [other] on openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022] -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT (element)
+                attribute openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT tail defining_code/code_string
+            manual unknown
+              fhir $resource.gender.value -> Patient.gender primitive writable = unknown
+              openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/defining_code/terminology_id/value -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/administrative-gender
+              openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT tail defining_code/code_string = unknown
+              openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT = Unknown
+              fhirCondition one of [unknown] on fhir $resource.gender -> Patient.gender primitive writable (element)
+                attribute fhir $resource.gender.value -> Patient.gender primitive writable
+              openehrCondition one of [unknown] on openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022] -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT (element)
+                attribute openehr /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/defining_code/code_string -> /content[openEHR-EHR-EVALUATION.gender.v1]/data[at0002]/items[at0022]/value DV_CODED_TEXT tail defining_code/code_string
+          mapping metaURL from ferrobridge_eu_gender
+            fhir $resource.meta -> Patient.meta complex writable
+            unidirectional openehr->fhir
+            manual profileUrl
+              fhir $resource.meta.profile -> Meta.profile primitive writable = http://hl7.eu/fhir/base/StructureDefinition/patient-eu-core
+      mapping versicherungsInformationen from KDS_composition_person.v0
+        fhir $resource.identifier -> Patient.identifier complex writable
+        openehr /content[openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0] -> /content[openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0] ADMIN_ENTRY
+        fhirCondition one of [http://fhir.de/sid/gkv/kvid-10] on fhir $resource.identifier -> Patient.identifier complex writable (element)
+          attribute fhir $resource.identifier.system -> Identifier.system primitive writable
+        slotArchetype ADMIN_ENTRY.versicherungsinformationen.v0
+          mapping versicherungsId from ADMIN_ENTRY.versicherungsinformationen.v0
+            fhir $resource.identifier -> Patient.identifier complex writable
+            openehr /content[openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0]/data[at0001]/items[at0006] -> /content[openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0]/data[at0001]/items[at0006] ELEMENT
+            derived Identifier into DV_IDENTIFIER
+            fhirCondition one of [http://fhir.de/sid/gkv/kvid-10] on fhir $resource.identifier -> Patient.identifier complex writable (element)
+              attribute fhir $resource.identifier.system -> Identifier.system primitive writable
+            mapping versicherungsId.staticUrl from ADMIN_ENTRY.versicherungsinformationen.v0
+              fhir $resource.identifier -> Patient.identifier complex writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0]/data[at0001]/items[at0006] -> /content[openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0]/data[at0001]/items[at0006] ELEMENT
+              manual system
+                fhir $resource.identifier.system -> Identifier.system primitive writable = http://fhir.de/sid/gkv/kvid-10
+            mapping versicherungsId.typeCoding from ADMIN_ENTRY.versicherungsinformationen.v0
+              fhir $resource.identifier.type.coding -> CodeableConcept.coding complex writable
+              openehr /content[openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0] -> /content[openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0] ADMIN_ENTRY
+              manual type
+                fhir $resource.identifier.type.coding.system -> Coding.system primitive writable = http://fhir.de/CodeSystem/identifier-type-de-basis
+                fhir $resource.identifier.type.coding.code -> Coding.code primitive writable = KVZ10

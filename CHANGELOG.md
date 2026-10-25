@@ -36,6 +36,12 @@ crates on crates.io.
   the OMOCL files against the vocabulary loaded in the `[cdm]` database: a
   literal the vocabulary does not hold, or whose domain is not one the CDM
   field definitions name for its column, is a diagnostic (#97).
+- `ferrobridge_eu_patient.context` targets HL7 Europe Base and Core 2.0.0
+  `patient-eu-core` over the published `KDS_Person` template, loading the
+  person chain of the KDS person context with a gender extension that names
+  the EU profile in place of the MII one and leaves out the German
+  gender-amtlich extension. The round trip asserts the required `name` and
+  `birthDate`, `gender` and the canonical (#116).
 - The profile package set pins `hl7.fhir.eu.laboratory` 2.0.0 and
   `hl7.fhir.eu.mpd` 1.0.0, the HL7 Europe Laboratory Report and Medication
   Prescription and Dispense guides the EU profile contexts target, fetched

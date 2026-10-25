@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of projects/org.highmed/KDS/person/KDS_gender.yml, a
+# derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name and version are FerroBRIDGE's; `metaURL` names
+# patient-eu-core 2.0.0 in place of the MII Patient profile; the
+# `other-amtlich` method, which writes the German gender-amtlich-de
+# extension, is left out.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_gender
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: EVALUATION.gender.v1
+
+mappings:
+  - name: "metaURL"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/base/StructureDefinition/patient-eu-core"
