@@ -51,6 +51,11 @@ crates on crates.io.
   the visit. A record that names a visit detail without a visit is refused.
   The bridge schema gains the `provider` and `visit_detail` key tables, which
   `cdm init` creates on an existing schema.
+- The OMOCL `Death` target writes its `DEATH` row (#1208): the row takes the
+  person's `person_id` as its id, the newest composition that writes one gives
+  it its columns, and removing that composition restores the row of the
+  writer that remains. `cdm init` adds the `death_row` side table and lets
+  several compositions of a person record a `DEATH` row.
 
 ## [0.0.12] - 2026-10-25
 

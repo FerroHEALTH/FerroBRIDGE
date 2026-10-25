@@ -255,6 +255,16 @@ The run report counts the committed compositions tied to a visit, those
 inside no visit, and those inside several that the facility did not decide.
 A run without `[etl.visits]` ties nothing and counts nothing.
 
+## The DEATH row
+
+The OMOCL `Death` target writes DEATH, which the CDM gives no key of its own:
+a person has at most one DEATH row, identified by `person_id`. When several
+compositions of a person write one, the composition committed last gives the
+row its columns. When that composition is removed, or a new version of it no
+longer writes a death, the newest of the remaining writers rewrites the row,
+and the row goes when none remains. This rule is FerroBRIDGE's own design:
+the CDM leaves the choice among several death records to the ETL.
+
 ## Providers and visit details
 
 An OMOCL mapping may write `provider_id` (under `ConditionOccurrence` and

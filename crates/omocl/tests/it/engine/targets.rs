@@ -13,7 +13,6 @@
 
 use std::error::Error;
 
-use omocl::engine::RefusalKind;
 use omop_cdm::graph::RecordGraph;
 use omop_cdm::graph::row::Row;
 
@@ -217,35 +216,14 @@ async fn a_visit_writes_its_concept_and_both_dates() -> Result<(), Box<dyn Error
 }
 
 #[tokio::test]
-async fn a_death_is_refused_until_the_graph_keys_it_by_its_person() -> Result<(), Box<dyn Error>> {
-    // TODO(#1208): DEATH has no surrogate key, so the graph refuses the row;
-    // the case asserts the one DEATH row once the person keys it.
-    let stub = StubSource::laboratory()?;
-    let index = template()?;
-    let composition = composition(&index, &flat(&[], &[])?)?;
-    let file = mapping(
-        "Synthetic_target_v1",
-        RESULT,
-        &format!(
-            "  - type: \"Death\"\n{}",
-            path("death_date", "/data[at0001]/events[at0002]")
-        ),
-    );
-    let (graph, refusals) = outcome(
-        &[("Synthetic_target_v1.yml", &file)],
-        &index,
-        &composition,
-        &stub,
-    )
-    .await?;
-    assert_eq!(0, rows(&graph, "death").len());
-    let [refusal] = refusals.as_slice() else {
-        panic!("one refusal, got {refusals:?}");
+async fn a_death_writes_its_date_for_the_person() -> Result<(), Box<dyn Error>> {
+    let keys = path("death_date", "/data[at0001]/events[at0002]");
+    let graph = run_target(RESULT, "Death", &keys).await?;
+    let found = rows(&graph, "death");
+    let [row] = found.as_slice() else {
+        panic!("one DEATH row, got {}", found.len());
     };
-    assert_eq!(RefusalKind::InvalidValue, refusal.kind);
-    assert!(
-        refusal.message.contains("no single integer primary key"),
-        "{refusal:?}"
-    );
+    assert_eq!(Some(EVENT_DATE.to_owned()), date(row, "death_date"));
+    assert!(row.cell("person_id").is_some(), "the row names its person");
     Ok(())
 }

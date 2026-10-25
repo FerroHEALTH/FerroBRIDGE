@@ -227,6 +227,22 @@ pub fn primary_key(table: &TableMeta) -> Option<&'static ColumnMeta> {
     }
 }
 
+/// Returns whether `table` holds at most one row per person and has no key
+/// of its own: no single integer primary key and a required `person_id` that
+/// references `PERSON`.
+///
+/// CDM v5.4 `DEATH` is one: its rows are identified by `person_id`
+/// (<https://ohdsi.github.io/CommonDataModel/cdm54.html#death>). The writer
+/// takes the person's `person_id` as such a row's id. No specification
+/// governs that identity: our own design.
+#[must_use]
+pub fn person_keyed(table: &TableMeta) -> bool {
+    primary_key(table).is_none()
+        && table.column("person_id").is_some_and(|column| {
+            column.required && column.foreign_key == Some(("person", "person_id"))
+        })
+}
+
 /// One CDM row, keyed by its source, with every column checked against the
 /// table's metadata.
 #[derive(Debug, Clone, PartialEq)]
@@ -245,7 +261,7 @@ impl Row {
     /// Returns [`GraphError::UnknownTable`] when `table` is not a CDM-schema
     /// table and [`GraphError::NotWritable`] for `fact_relationship` (a
     /// [`Link`](crate::graph::link::Link) writes it), a derived table, or a table without a single
-    /// integer primary key.
+    /// integer primary key that is not keyed by its person ([`person_keyed`]).
     pub fn builder(table: &str, key: RecordKey) -> Result<RowBuilder, GraphError> {
         let table = cdm_table(table)?;
         if table.name == "fact_relationship" {
@@ -260,7 +276,7 @@ impl Row {
                 why: "the derivations rebuild it whole",
             });
         }
-        if primary_key(table).is_none() {
+        if primary_key(table).is_none() && !person_keyed(table) {
             return Err(GraphError::NotWritable {
                 table: table.name,
                 why: "it has no single integer primary key",

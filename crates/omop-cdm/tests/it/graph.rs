@@ -354,3 +354,14 @@ fn a_provider_and_a_visit_detail_fit_their_foreign_keys() -> Result<(), Box<dyn 
     );
     Ok(())
 }
+
+#[test]
+fn death_is_the_one_table_its_person_keys() {
+    let keyed: Vec<&str> = omop_cdm::generated::TABLES
+        .iter()
+        .filter(|table| table.cdm_schema == omop_cdm::meta::CdmSchema::Cdm)
+        .filter(|table| omop_cdm::graph::row::person_keyed(table))
+        .map(|table| table.name)
+        .collect();
+    assert_eq!(vec!["death"], keyed);
+}

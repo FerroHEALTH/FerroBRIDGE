@@ -49,7 +49,7 @@ pub(super) async fn allocate(
 ///
 /// Every statement leaves what already exists, and a schema an earlier
 /// release created is brought to this shape: `record` loses the uniqueness of
-/// `(cdm_table, surrogate_id)` for `person`, the one table several
+/// `(cdm_table, surrogate_id)` for `person` and `death`, the two tables several
 /// compositions write the same row of.
 pub(super) fn bridge_ddl(bridge: &SchemaName) -> String {
     let mut statements = vec![
@@ -73,32 +73,26 @@ pub(super) fn bridge_ddl(bridge: &SchemaName) -> String {
                 PRIMARY KEY (versioned_object_uid, archetype_root_path, occurrence_path,
                     mapping, entry, branch, cdm_table))"
         ),
-        // NOTE: no specification governs this: our own design; every composition of a
-        // person may write its PERSON row, so an id is unique in every other table only.
+        // NOTE: no specification governs this: our own design; every composition of a person
+        // may write its PERSON and DEATH rows, so an id is unique in every other table only.
         format!(
             "ALTER TABLE {bridge}.record DROP CONSTRAINT IF EXISTS record_cdm_table_surrogate_id_key"
         ),
+        format!("DROP INDEX IF EXISTS {bridge}.record_surrogate_id"),
         format!(
-            "CREATE UNIQUE INDEX IF NOT EXISTS record_surrogate_id
-                ON {bridge}.record (cdm_table, surrogate_id) WHERE cdm_table <> 'person'"
+            "CREATE UNIQUE INDEX IF NOT EXISTS record_surrogate_id_keyed
+                ON {bridge}.record (cdm_table, surrogate_id)
+                WHERE cdm_table NOT IN ('person', 'death')"
         ),
         format!(
             "CREATE INDEX IF NOT EXISTS record_person_writer
                 ON {bridge}.record (surrogate_id) WHERE cdm_table = 'person'"
         ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS record_death_writer
+                ON {bridge}.record (surrogate_id) WHERE cdm_table = 'death'"
+        ),
         format!("CREATE SEQUENCE IF NOT EXISTS {bridge}.person_row_written_seq AS bigint"),
-        format!(
-            "CREATE TABLE IF NOT EXISTS {bridge}.person_row (
-                versioned_object_uid text NOT NULL,
-                person_id integer NOT NULL,
-                written bigint NOT NULL,
-                columns jsonb NOT NULL,
-                PRIMARY KEY (versioned_object_uid, person_id))"
-        ),
-        format!(
-            "CREATE INDEX IF NOT EXISTS person_row_newest
-                ON {bridge}.person_row (person_id, written DESC)"
-        ),
         format!(
             "CREATE TABLE IF NOT EXISTS {bridge}.link (
                 versioned_object_uid text NOT NULL,
@@ -119,8 +113,56 @@ pub(super) fn bridge_ddl(bridge: &SchemaName) -> String {
                 visit_occurrence_id integer NOT NULL UNIQUE,
                 PRIMARY KEY (ehr_id, visit_source))"
         ),
-        // NOTE: no specification governs this: our own design; a provider and a visit
-        // detail are rows several compositions name, keyed by their source.
+        format!(
+            "CREATE TABLE IF NOT EXISTS {bridge}.watermark (
+                versioned_object_uid text PRIMARY KEY,
+                ehr_id text NOT NULL,
+                version_uid text NOT NULL,
+                run_id text NOT NULL,
+                committed_at timestamptz NOT NULL)"
+        ),
+    ];
+    for table in ["person", "death"] {
+        statements.extend(written_rows_ddl(bridge, table));
+    }
+    statements.extend(shared_ddl(bridge));
+    for table in &crate::generated::TABLES {
+        if graph::row::cdm_table(table.name).is_ok() && graph::row::primary_key(table).is_some() {
+            statements.push(format!(
+                "CREATE SEQUENCE IF NOT EXISTS {} AS integer",
+                sequence(bridge, table.name)
+            ));
+        }
+    }
+    statements.join(";\n")
+}
+
+/// The table that keeps the columns each composition wrote into the row of
+/// `table`, `person` or `death`, which every composition of a person may
+/// write.
+fn written_rows_ddl(bridge: &SchemaName, table: &str) -> [String; 2] {
+    [
+        format!(
+            "CREATE TABLE IF NOT EXISTS {bridge}.{table}_row (
+                versioned_object_uid text NOT NULL,
+                person_id integer NOT NULL,
+                written bigint NOT NULL,
+                columns jsonb NOT NULL,
+                PRIMARY KEY (versioned_object_uid, person_id))"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS {table}_row_newest
+                ON {bridge}.{table}_row (person_id, written DESC)"
+        ),
+    ]
+}
+
+/// The key tables of the rows several compositions name: a provider by its
+/// source, and a visit detail by its visit and source.
+fn shared_ddl(bridge: &SchemaName) -> [String; 2] {
+    // NOTE: no specification governs this: our own design; a provider and a visit
+    // detail are rows several compositions name, keyed by their source.
+    [
         format!(
             "CREATE TABLE IF NOT EXISTS {bridge}.provider (
                 source text PRIMARY KEY,
@@ -134,24 +176,7 @@ pub(super) fn bridge_ddl(bridge: &SchemaName) -> String {
                 visit_detail_id integer NOT NULL UNIQUE,
                 PRIMARY KEY (ehr_id, visit_source, source))"
         ),
-        format!(
-            "CREATE TABLE IF NOT EXISTS {bridge}.watermark (
-                versioned_object_uid text PRIMARY KEY,
-                ehr_id text NOT NULL,
-                version_uid text NOT NULL,
-                run_id text NOT NULL,
-                committed_at timestamptz NOT NULL)"
-        ),
-    ];
-    for table in &crate::generated::TABLES {
-        if graph::row::cdm_table(table.name).is_ok() && graph::row::primary_key(table).is_some() {
-            statements.push(format!(
-                "CREATE SEQUENCE IF NOT EXISTS {} AS integer",
-                sequence(bridge, table.name)
-            ));
-        }
-    }
-    statements.join(";\n")
+    ]
 }
 
 /// The id of every row of one graph, by table and natural key.
@@ -169,7 +194,7 @@ pub(super) async fn assign_ids<'g>(
     for row in graph.rows() {
         let table = row.table().name;
         let key = row.key();
-        let id = if table == "person" {
+        let id = if table == "person" || graph::row::person_keyed(row.table()) {
             mapped(transaction, bridge, key.ehr_id(), true).await?
         } else if let Some(id) = earlier.ids.get(&EarlierKey::of(table, key)) {
             *id
@@ -241,9 +266,11 @@ pub(super) async fn earlier_rows(
         let id: i32 = row.try_get(6).map_err(database(Step::Read))?;
         let meta = graph::row::cdm_table(&table)
             .ok()
-            .filter(|meta| graph::row::primary_key(meta).is_some())
+            .filter(|meta| {
+                graph::row::primary_key(meta).is_some() || graph::row::person_keyed(meta)
+            })
             .ok_or_else(|| WriteError::SideTable {
-                what: "a CDM table with an integer key",
+                what: "a CDM table with an integer key or keyed by its person",
                 value: table.clone(),
             })?;
         ids.insert(
@@ -269,9 +296,12 @@ pub(super) struct Deleted {
     /// composition wrote, whose `PERSON` row [`retire_persons`] may remove.
     pub(super) persons: BTreeSet<i32>,
     /// The `person_id` of every `PERSON` row the composition wrote, whose
-    /// columns [`restore_persons`](crate::writer::person::restore_persons)
+    /// columns [`restore_rows`](crate::writer::person::restore_rows)
     /// takes from the newest writer that remains.
     pub(super) written: BTreeSet<i32>,
+    /// The `person_id` of every `DEATH` row the composition wrote, whose row
+    /// the newest writer that remains rewrites, or [`retire_deaths`] removes.
+    pub(super) deaths: BTreeSet<i32>,
 }
 
 /// The column every row of a person names its person by.
@@ -304,6 +334,7 @@ pub(super) async fn delete_earlier(
     let mut deleted = BTreeMap::new();
     let mut persons = BTreeSet::new();
     let mut written = BTreeSet::new();
+    let mut deaths = BTreeSet::new();
     let mut by_table: BTreeMap<&'static str, Vec<i32>> = BTreeMap::new();
     for (key, id) in &earlier.ids {
         by_table.entry(key.table).or_default().push(*id);
@@ -315,6 +346,11 @@ pub(super) async fn delete_earlier(
             continue;
         }
         let meta = graph::row::cdm_table(table)?;
+        if graph::row::person_keyed(meta) {
+            persons.extend(ids.iter().copied());
+            deaths.extend(ids.iter().copied());
+            continue;
+        }
         let Some(key) = graph::row::primary_key(meta) else {
             return Err(WriteError::SideTable {
                 what: "a table with an integer key",
@@ -363,7 +399,7 @@ pub(super) async fn delete_earlier(
     if links > 0 {
         deleted.insert("fact_relationship", links);
     }
-    for table in ["link", "record", "person_row"] {
+    for table in ["link", "record", "person_row", "death_row"] {
         transaction
             .execute(
                 &format!("DELETE FROM {bridge}.{table} WHERE versioned_object_uid = $1"),
@@ -376,6 +412,7 @@ pub(super) async fn delete_earlier(
         rows: deleted,
         persons,
         written,
+        deaths,
     })
 }
 
@@ -424,17 +461,19 @@ pub(super) async fn retire_persons(
         .map_err(database(Step::Delete("person")))
 }
 
-/// Deletes the `PERSON` rows `graph` writes before they are copied in again,
-/// so the newest writer's columns replace a `PERSON` row a person kept, the
-/// placeholder or the row another composition of the person wrote.
-pub(super) async fn replace_persons(
+/// Deletes the rows of `table`, `person` or `death`, that `graph` writes
+/// before they are copied in again, so the newest writer's columns replace
+/// the row a person kept: a placeholder or the row another composition of
+/// the person wrote.
+pub(super) async fn replace_rows(
     transaction: &Transaction<'_>,
     cdm: &SchemaName,
     ids: &Ids<'_>,
+    table: &'static str,
 ) -> Result<(), WriteError> {
     let persons: Vec<i32> = ids
         .iter()
-        .filter(|((table, _), _)| *table == "person")
+        .filter(|((written, _), _)| *written == table)
         .map(|(_, id)| *id)
         .collect();
     if persons.is_empty() {
@@ -442,12 +481,39 @@ pub(super) async fn replace_persons(
     }
     transaction
         .execute(
-            &format!("DELETE FROM {cdm}.person WHERE person_id = ANY($1)"),
+            &format!("DELETE FROM {cdm}.{table} WHERE person_id = ANY($1)"),
             &[&persons],
         )
         .await
-        .map_err(database(Step::Delete("person")))?;
+        .map_err(database(Step::Delete(table)))?;
     Ok(())
+}
+
+/// Removes the `DEATH` row of each of `persons` that no composition writes
+/// any more, and returns how many it removed.
+pub(super) async fn retire_deaths(
+    transaction: &Transaction<'_>,
+    cdm: &SchemaName,
+    bridge: &SchemaName,
+    persons: &BTreeSet<i32>,
+) -> Result<u64, WriteError> {
+    if persons.is_empty() {
+        return Ok(0);
+    }
+    let ids: Vec<i32> = persons.iter().copied().collect();
+    // NOTE: no specification governs this: our own design; a DEATH row stays while a
+    // composition of the person writes one.
+    transaction
+        .execute(
+            &format!(
+                "DELETE FROM {cdm}.death AS d WHERE d.person_id = ANY($1) AND NOT EXISTS (
+                    SELECT 1 FROM {bridge}.record AS r
+                    WHERE r.cdm_table = 'death' AND r.surrogate_id = d.person_id)"
+            ),
+            &[&ids],
+        )
+        .await
+        .map_err(database(Step::Delete("death")))
 }
 
 /// Records the natural key and id of every row of `graph`.
