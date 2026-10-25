@@ -6,7 +6,6 @@
 //! refusal of them.
 
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 use std::time::Duration;
 
 use ferrobridge_server::config::Config;
@@ -27,7 +26,7 @@ const GUARDED: &str =
 const MINIMAL: &str = "[auth]\nenabled = true\nissuer = \"https://as.example.org/realms/ferro\"\naudience = [\"https://bridge.example.org/fhir\"]\n";
 
 /// Returns the settings `text` resolves to, beside a guarded surface.
-fn settings(text: &str) -> Result<Option<SmartSettings>, Box<dyn StdError>> {
+fn settings(text: &str) -> Result<Option<SmartSettings>, Box<dyn std::error::Error>> {
     Ok(
         Config::from_sources(Some(&format!("{GUARDED}{text}")), &BTreeMap::new())?
             .resolve()?
@@ -36,7 +35,7 @@ fn settings(text: &str) -> Result<Option<SmartSettings>, Box<dyn StdError>> {
 }
 
 /// Returns the refusal `text` boots into, beside a guarded surface.
-fn refusal(text: &str) -> Result<Error, Box<dyn StdError>> {
+fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
     match Config::from_sources(Some(&format!("{GUARDED}{text}")), &BTreeMap::new()) {
         Err(error) => Ok(error),
         Ok(config) => Ok(config
@@ -63,7 +62,8 @@ fn issuer_rule(error: &Error) -> Option<&ResourceError> {
 }
 
 #[test]
-fn auth_is_on_by_default_and_a_guarded_surface_needs_an_issuer() -> Result<(), Box<dyn StdError>> {
+fn auth_is_on_by_default_and_a_guarded_surface_needs_an_issuer()
+-> Result<(), Box<dyn std::error::Error>> {
     // NOTE: no specification governs this: our own design, a surface the
     // section guards never runs open unless `enabled = false` says so.
     let error = refusal("")?;
@@ -78,7 +78,7 @@ fn auth_is_on_by_default_and_a_guarded_surface_needs_an_issuer() -> Result<(), B
 }
 
 #[test]
-fn enabled_false_turns_auth_off() -> Result<(), Box<dyn StdError>> {
+fn enabled_false_turns_auth_off() -> Result<(), Box<dyn std::error::Error>> {
     assert!(settings("[auth]\nenabled = false\n")?.is_none());
     assert!(settings("[auth]\nenabled = false\nissuer = \"not checked while off\"\n")?.is_none());
     Ok(())
@@ -86,14 +86,14 @@ fn enabled_false_turns_auth_off() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 fn a_server_that_serves_no_guarded_surface_resolves_no_resource_server()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(Some(""), &BTreeMap::new())?.resolve()?;
     assert!(settings.auth.is_none());
     Ok(())
 }
 
 #[test]
-fn a_minimal_section_takes_the_defaults() -> Result<(), Box<dyn StdError>> {
+fn a_minimal_section_takes_the_defaults() -> Result<(), Box<dyn std::error::Error>> {
     let auth = settings(MINIMAL)?.ok_or("auth is on")?;
     assert_eq!(1, auth.issuers.len());
     let issuer = &auth.issuers[0];
@@ -129,7 +129,7 @@ fn a_minimal_section_takes_the_defaults() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn every_key_reads() -> Result<(), Box<dyn StdError>> {
+fn every_key_reads() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!(
         concat!(
             "{}",
@@ -170,7 +170,8 @@ fn every_key_reads() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn several_issuers_read_each_over_the_sections_defaults() -> Result<(), Box<dyn StdError>> {
+fn several_issuers_read_each_over_the_sections_defaults() -> Result<(), Box<dyn std::error::Error>>
+{
     let auth = settings(concat!(
         "[auth]\naudience = [\"https://bridge.example.org/fhir\"]\nclock_skew_seconds = 30\n\n",
         "[[auth.issuer]]\nissuer = \"https://one.example.org\"\n\n",
@@ -189,7 +190,7 @@ fn several_issuers_read_each_over_the_sections_defaults() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn a_basic_user_needs_exactly_one_hash_form() -> Result<(), Box<dyn StdError>> {
+fn a_basic_user_needs_exactly_one_hash_form() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&format!(
         concat!(
             "{}",
@@ -214,7 +215,7 @@ fn a_basic_user_needs_exactly_one_hash_form() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn the_environment_turns_auth_on() -> Result<(), Box<dyn StdError>> {
+fn the_environment_turns_auth_on() -> Result<(), Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([
         (
             String::from("FERROBRIDGE__MAPPINGS__DIRECTORY"),
@@ -252,7 +253,7 @@ fn the_environment_turns_auth_on() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn an_issuer_that_is_no_https_url_is_refused() -> Result<(), Box<dyn StdError>> {
+fn an_issuer_that_is_no_https_url_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     for issuer in [
         "http://as.example.org",
         "https://as.example.org/?realm=x",
@@ -280,7 +281,7 @@ fn an_issuer_that_is_no_https_url_is_refused() -> Result<(), Box<dyn StdError>> 
 }
 
 #[test]
-fn a_loopback_issuer_may_be_plain_http() -> Result<(), Box<dyn StdError>> {
+fn a_loopback_issuer_may_be_plain_http() -> Result<(), Box<dyn std::error::Error>> {
     // NOTE: no specification governs this: our own design, the crate's, a test
     // issuer on a loopback host has a transport nobody can observe.
     let text = MINIMAL.replace(
@@ -293,7 +294,7 @@ fn a_loopback_issuer_may_be_plain_http() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn a_missing_audience_is_refused() -> Result<(), Box<dyn StdError>> {
+fn a_missing_audience_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal("[auth]\nenabled = true\nissuer = \"https://as.example.org\"\n")?;
     assert!(
         matches!(issuer_rule(&error), Some(ResourceError::NoAudience)),
@@ -303,7 +304,7 @@ fn a_missing_audience_is_refused() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn a_symmetric_or_unknown_algorithm_is_refused() -> Result<(), Box<dyn StdError>> {
+fn a_symmetric_or_unknown_algorithm_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&format!("{MINIMAL}algorithms = [\"HS256\"]\n"))?;
     assert!(
         matches!(
@@ -330,14 +331,14 @@ fn a_symmetric_or_unknown_algorithm_is_refused() -> Result<(), Box<dyn StdError>
 }
 
 #[test]
-fn an_unknown_token_profile_is_refused() -> Result<(), Box<dyn StdError>> {
+fn an_unknown_token_profile_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&format!("{MINIMAL}token_profile = \"opaque\"\n"))?;
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
     Ok(())
 }
 
 #[test]
-fn a_clock_skew_over_five_minutes_is_refused() -> Result<(), Box<dyn StdError>> {
+fn a_clock_skew_over_five_minutes_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&format!("{MINIMAL}clock_skew_seconds = 301\n"))?;
     assert!(
         matches!(issuer_rule(&error), Some(ResourceError::ClockSkew { .. })),
@@ -348,7 +349,7 @@ fn a_clock_skew_over_five_minutes_is_refused() -> Result<(), Box<dyn StdError>> 
 
 #[test]
 fn an_operator_scope_or_capability_that_is_no_scope_token_is_refused()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     for scope in ["two words", "__two words"] {
         let error = refusal(&format!("{MINIMAL}product_scope = \"{scope}\"\n"))?;
         assert!(
@@ -365,8 +366,8 @@ fn an_operator_scope_or_capability_that_is_no_scope_token_is_refused()
 }
 
 #[test]
-fn an_operator_scope_outside_the_smart_extension_forms_is_refused() -> Result<(), Box<dyn StdError>>
-{
+fn an_operator_scope_outside_the_smart_extension_forms_is_refused()
+-> Result<(), Box<dyn std::error::Error>> {
     // NOTE: SMART App Launch 2.2.0 scopes-and-launch-context.html,
     // Extensibility: an extension scope is a full URI or starts with `__`.
     for scope in ["ferrobridge.operator", "bridge:operator"] {
@@ -388,7 +389,7 @@ fn an_operator_scope_outside_the_smart_extension_forms_is_refused() -> Result<()
 }
 
 #[test]
-fn an_unknown_key_is_refused() -> Result<(), Box<dyn StdError>> {
+fn an_unknown_key_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     for key in [
         "audiences = [\"x\"]",
         "jwks_refresh_interval_ms = 1000",
@@ -407,7 +408,7 @@ fn an_unknown_key_is_refused() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 fn a_basic_only_section_is_refused_because_the_facade_names_an_issuer()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     // NOTE: SMART App Launch 2.2.0, Conformance, Metadata, `token_endpoint` is
     // required, and only an issuer's metadata names it for the facade.
     let error = refusal(concat!(

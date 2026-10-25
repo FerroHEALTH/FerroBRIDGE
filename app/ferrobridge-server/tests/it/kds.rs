@@ -10,7 +10,7 @@
 //! those suites, with the published `KDS_Diagnose` and `KDS_Person`
 //! templates of the testkit.
 
-use std::error::Error as StdError;
+use std::error::Error;
 use std::path::Path;
 
 /// The vendored mapping library, relative to this crate's manifest.
@@ -55,7 +55,7 @@ pub(crate) const PROFILE: &str = "https://www.medizininformatik-initiative.de/fh
 /// # Errors
 ///
 /// Returns the I/O error of a file that cannot be copied.
-pub(crate) fn write_mappings(directory: &Path) -> Result<(), Box<dyn StdError>> {
+pub(crate) fn write_mappings(directory: &Path) -> Result<(), Box<dyn Error>> {
     std::fs::create_dir_all(directory)?;
     for file in PUBLISHED {
         let source = Path::new(CORPUS).join(file);
@@ -107,7 +107,7 @@ pub(crate) const PERSON_PROFILE: &str = "https://www.medizininformatik-initiativ
 /// # Errors
 ///
 /// Returns the I/O error of a file that cannot be copied.
-pub(crate) fn write_person_mappings(directory: &Path) -> Result<(), Box<dyn StdError>> {
+pub(crate) fn write_person_mappings(directory: &Path) -> Result<(), Box<dyn Error>> {
     std::fs::create_dir_all(directory)?;
     for file in PERSON_PUBLISHED {
         let source = Path::new(CORPUS).join(file);
@@ -126,7 +126,7 @@ pub(crate) fn write_person_mappings(directory: &Path) -> Result<(), Box<dyn StdE
 ///
 /// Returns the I/O or JSON error of a fixture that cannot be read.
 pub(crate) fn flat_composition()
--> Result<serde_json::Map<String, serde_json::Value>, Box<dyn StdError>> {
+-> Result<serde_json::Map<String, serde_json::Value>, Box<dyn Error>> {
     let text = std::fs::read_to_string(Path::new(PROJECT).join("kds_diagnose.flat.json"))?;
     Ok(serde_json::from_str(&text)?)
 }

@@ -13,7 +13,7 @@ use axum::body::Body;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
@@ -71,7 +71,7 @@ async fn entry_ids(
     composition: &serde_json::Value,
     first: &serde_json::Value,
     second: &serde_json::Value,
-) -> Result<(String, String), Box<dyn StdError>> {
+) -> Result<(String, String), Box<dyn Error>> {
     for (code, node) in [("SYN-001", first), ("SYN-002", second)] {
         Mock::given(matchers::method("POST"))
             .and(matchers::path(AQL))
@@ -130,7 +130,7 @@ fn put(
     id: &str,
     body: &serde_json::Value,
     if_match: Option<&str>,
-) -> Result<Request<Body>, Box<dyn StdError>> {
+) -> Result<Request<Body>, Box<dyn Error>> {
     let mut request = Request::put(format!("/fhir/Condition/{id}"))
         .header(header::CONTENT_TYPE, "application/fhir+json");
     if let Some(if_match) = if_match {
@@ -158,7 +158,7 @@ fn carries(item: &serde_json::Value, code: &str) -> bool {
 }
 
 /// Returns the composition the stub CDR was sent by the one update it took.
-async fn updated(harness: &Harness) -> Result<serde_json::Value, Box<dyn StdError>> {
+async fn updated(harness: &Harness) -> Result<serde_json::Value, Box<dyn Error>> {
     let requests = harness.cdr.received_requests().await.unwrap_or_default();
     let puts: Vec<&wiremock::Request> = requests
         .iter()
@@ -195,7 +195,7 @@ async fn mount_version_two_read(harness: &Harness, composition: &serde_json::Val
 }
 
 /// Returns the code of the resource `GET /fhir/Condition/{id}` answers.
-async fn code_read(harness: &Harness, id: &str) -> Result<Option<String>, Box<dyn StdError>> {
+async fn code_read(harness: &Harness, id: &str) -> Result<Option<String>, Box<dyn Error>> {
     let (status, body) = get(harness, &format!("Condition/{id}")).await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     assert_eq!(Some(id), body["id"].as_str(), "{body}");
@@ -206,7 +206,7 @@ async fn code_read(harness: &Harness, id: &str) -> Result<Option<String>, Box<dy
 
 #[tokio::test]
 async fn an_update_of_the_second_entry_keeps_the_first_and_replaces_the_second()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = searching().await;
     let (composition, first, second) = two_diagnoses(&harness);
     let (first_id, second_id) = entry_ids(&harness, &composition, &first, &second).await?;
@@ -274,7 +274,7 @@ async fn an_update_of_the_second_entry_keeps_the_first_and_replaces_the_second()
 }
 
 #[tokio::test]
-async fn an_update_of_the_first_entry_keeps_the_second() -> Result<(), Box<dyn StdError>> {
+async fn an_update_of_the_first_entry_keeps_the_second() -> Result<(), Box<dyn Error>> {
     let harness = searching().await;
     let (composition, first, second) = two_diagnoses(&harness);
     let (first_id, second_id) = entry_ids(&harness, &composition, &first, &second).await?;
@@ -317,7 +317,7 @@ async fn an_update_of_the_first_entry_keeps_the_second() -> Result<(), Box<dyn S
 
 #[tokio::test]
 async fn an_update_of_one_entry_naming_a_stale_composition_version_is_four_hundred_and_twelve()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // If-Match names the version of the composition, which every entry
     // shares (<https://hl7.org/fhir/R4/http.html#concurrency>).
     let harness = searching().await;
@@ -353,7 +353,7 @@ async fn an_update_of_one_entry_naming_a_stale_composition_version_is_four_hundr
 
 #[tokio::test]
 async fn a_replayed_create_of_the_second_entry_writes_nothing_and_answers_that_entry()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // A create of a known source with no `meta.versionId` whose mapping is the
     // entry as it stands is a replay, judged against that entry alone.
     let harness = searching().await;
@@ -402,7 +402,7 @@ async fn a_replayed_create_of_the_second_entry_writes_nothing_and_answers_that_e
 
 #[tokio::test]
 async fn a_create_revising_the_source_of_the_second_entry_keeps_the_first()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // A create of a source id the map consumed at another `meta.versionId`
     // is an update in effect, so it follows the same rule.
     let harness = searching().await;

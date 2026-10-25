@@ -12,7 +12,6 @@ use ferrobridge_term::error::Error;
 use ferrobridge_term::outcome::{ExpandOutcome, Expanded, Expansion};
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
-use std::error::Error as StdError;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -26,7 +25,7 @@ async fn mount(server: &MockServer, version: WireVersion, response: ResponseTemp
 }
 
 /// Returns how many requests `server` received.
-async fn received(server: &MockServer) -> Result<usize, Box<dyn StdError>> {
+async fn received(server: &MockServer) -> Result<usize, Box<dyn std::error::Error>> {
     Ok(server
         .received_requests()
         .await
@@ -35,7 +34,7 @@ async fn received(server: &MockServer) -> Result<usize, Box<dyn StdError>> {
 }
 
 /// Returns the expansion `outcome` carries, or the error naming what it was.
-fn expanded(outcome: ExpandOutcome) -> Result<Expanded, Box<dyn StdError>> {
+fn expanded(outcome: ExpandOutcome) -> Result<Expanded, Box<dyn std::error::Error>> {
     match outcome {
         ExpandOutcome::Expanded(expanded) => Ok(expanded),
         other => Err(format!("expected an expansion, got {other:?}").into()),
@@ -53,8 +52,8 @@ fn member() -> serde_json::Value {
 }
 
 #[tokio::test]
-async fn a_nested_expansion_keeps_its_hierarchy_in_both_releases() -> Result<(), Box<dyn StdError>>
-{
+async fn a_nested_expansion_keeps_its_hierarchy_in_both_releases()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         let mut child = member();
@@ -107,7 +106,7 @@ async fn a_nested_expansion_keeps_its_hierarchy_in_both_releases() -> Result<(),
 
 #[tokio::test]
 async fn the_request_carries_every_input_it_sets_under_its_declared_name()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -163,7 +162,7 @@ async fn the_request_carries_every_input_it_sets_under_its_declared_name()
 }
 
 #[tokio::test]
-async fn an_input_left_unset_is_not_sent() -> Result<(), Box<dyn StdError>> {
+async fn an_input_left_unset_is_not_sent() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -191,7 +190,7 @@ async fn an_input_left_unset_is_not_sent() -> Result<(), Box<dyn StdError>> {
 
 #[tokio::test]
 async fn a_page_answers_its_offset_and_the_total_of_the_whole_expansion()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -219,7 +218,7 @@ async fn a_page_answers_its_offset_and_the_total_of_the_whole_expansion()
 }
 
 #[tokio::test]
-async fn a_count_of_zero_answers_the_size_alone() -> Result<(), Box<dyn StdError>> {
+async fn a_count_of_zero_answers_the_size_alone() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -244,7 +243,8 @@ async fn a_count_of_zero_answers_the_size_alone() -> Result<(), Box<dyn StdError
 }
 
 #[tokio::test]
-async fn the_filter_is_sent_and_the_filtered_codes_come_back() -> Result<(), Box<dyn StdError>> {
+async fn the_filter_is_sent_and_the_filtered_codes_come_back()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -277,7 +277,8 @@ async fn the_filter_is_sent_and_the_filtered_codes_come_back() -> Result<(), Box
 }
 
 #[tokio::test]
-async fn included_designations_are_read_from_each_entry() -> Result<(), Box<dyn StdError>> {
+async fn included_designations_are_read_from_each_entry() -> Result<(), Box<dyn std::error::Error>>
+{
     for version in RELEASES {
         let server = MockServer::start().await;
         let mut entry = member();
@@ -318,7 +319,7 @@ async fn included_designations_are_read_from_each_entry() -> Result<(), Box<dyn 
 
 #[tokio::test]
 async fn an_unknown_value_set_is_a_not_found_outcome_carrying_its_tx_issue()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -349,7 +350,7 @@ async fn an_unknown_value_set_is_a_not_found_outcome_carrying_its_tx_issue()
 }
 
 #[tokio::test]
-async fn a_bare_404_is_a_not_found_outcome() -> Result<(), Box<dyn StdError>> {
+async fn a_bare_404_is_a_not_found_outcome() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -369,7 +370,8 @@ async fn a_bare_404_is_a_not_found_outcome() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn an_expansion_error_is_a_refusal_carrying_the_outcome() -> Result<(), Box<dyn StdError>> {
+async fn an_expansion_error_is_a_refusal_carrying_the_outcome()
+-> Result<(), Box<dyn std::error::Error>> {
     for version in RELEASES {
         let server = MockServer::start().await;
         mount(
@@ -414,7 +416,7 @@ async fn an_expansion_error_is_a_refusal_carrying_the_outcome() -> Result<(), Bo
 
 #[tokio::test]
 async fn an_invalid_code_issue_is_a_refusal_and_not_an_unknown_value_set()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -432,7 +434,7 @@ async fn an_invalid_code_issue_is_a_refusal_and_not_an_unknown_value_set()
 }
 
 #[tokio::test]
-async fn a_parameters_answer_is_a_decode_error() -> Result<(), Box<dyn StdError>> {
+async fn a_parameters_answer_is_a_decode_error() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let wrapped = serde_json::json!({
         "resourceType": "Parameters",
@@ -459,7 +461,8 @@ async fn a_parameters_answer_is_a_decode_error() -> Result<(), Box<dyn StdError>
 }
 
 #[tokio::test]
-async fn a_value_set_with_no_expansion_is_a_decode_error() -> Result<(), Box<dyn StdError>> {
+async fn a_value_set_with_no_expansion_is_a_decode_error() -> Result<(), Box<dyn std::error::Error>>
+{
     let server = MockServer::start().await;
     let bare = serde_json::json!({
         "resourceType": "ValueSet",
@@ -483,7 +486,7 @@ async fn a_value_set_with_no_expansion_is_a_decode_error() -> Result<(), Box<dyn
 
 #[tokio::test]
 async fn a_page_beyond_a_fhir_integer_is_refused_and_nothing_is_sent()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let error = client(&server, WireVersion::R4)?
         .expand(&Expansion::new(fixtures::TERM_VALUE_SET_URL).with_page(u32::MAX, 10))
@@ -505,7 +508,7 @@ async fn a_page_beyond_a_fhir_integer_is_refused_and_nothing_is_sent()
 
 #[tokio::test]
 async fn an_stu3_expansion_sends_its_inputs_and_reads_the_value_set()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     mount(
         &server,
@@ -541,7 +544,7 @@ async fn an_stu3_expansion_sends_its_inputs_and_reads_the_value_set()
 
 #[tokio::test]
 async fn a_value_set_version_is_refused_in_stu3_and_nothing_is_sent()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
     let error = client(&server, WireVersion::Stu3)?
         .expand(&Expansion::new(fixtures::TERM_VALUE_SET_URL).with_version("2.0.0"))

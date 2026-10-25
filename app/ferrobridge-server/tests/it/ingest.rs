@@ -30,7 +30,7 @@ use fhirconnect::engine::origin::MessageControlId;
 use fhirconnect::engine::origin::MessageType;
 use fhirconnect::engine::origin::SourceItem;
 use http::StatusCode;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use wiremock::Mock;
 use wiremock::MockServer;
@@ -72,13 +72,13 @@ fn message() -> Provenance {
 
 /// Returns a facade over the Observation mapping set and a stub CDR that
 /// serves its template, resolves the EHR and takes a contribution.
-async fn facade() -> Result<(MockServer, Facade), Box<dyn StdError>> {
+async fn facade() -> Result<(MockServer, Facade), Box<dyn Error>> {
     facade_answering(Echo::Sent).await
 }
 
 /// Returns the facade of [`facade`] over a CDR that lists what it committed
 /// as `echo` says.
-async fn facade_answering(echo: Echo) -> Result<(MockServer, Facade), Box<dyn StdError>> {
+async fn facade_answering(echo: Echo) -> Result<(MockServer, Facade), Box<dyn Error>> {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(
@@ -154,8 +154,8 @@ async fn contributions(cdr: &MockServer) -> usize {
 }
 
 #[tokio::test]
-async fn skip_and_count_commits_the_mapped_entry_and_types_every_skip()
--> Result<(), Box<dyn StdError>> {
+async fn skip_and_count_commits_the_mapped_entry_and_types_every_skip() -> Result<(), Box<dyn Error>>
+{
     let (cdr, facade) = facade().await?;
     let provenance = message();
     let ingested = facade
@@ -216,8 +216,7 @@ async fn skip_and_count_commits_the_mapped_entry_and_types_every_skip()
 }
 
 #[tokio::test]
-async fn a_message_origin_names_the_control_id_in_the_feeder_audit() -> Result<(), Box<dyn StdError>>
-{
+async fn a_message_origin_names_the_control_id_in_the_feeder_audit() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = facade().await?;
     let provenance = message();
     facade
@@ -250,7 +249,7 @@ async fn a_message_origin_names_the_control_id_in_the_feeder_audit() -> Result<(
 }
 
 #[tokio::test]
-async fn refuse_names_every_unmapped_entry_and_commits_nothing() -> Result<(), Box<dyn StdError>> {
+async fn refuse_names_every_unmapped_entry_and_commits_nothing() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = facade().await?;
     let refused = facade
         .ingest(facade.client().clone())
@@ -298,7 +297,7 @@ async fn refuse_names_every_unmapped_entry_and_commits_nothing() -> Result<(), B
 }
 
 #[tokio::test]
-async fn skip_and_count_types_a_profile_no_program_claims() -> Result<(), Box<dyn StdError>> {
+async fn skip_and_count_types_a_profile_no_program_claims() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = facade().await?;
     let mut unclaimed = observation();
     unclaimed["meta"] = serde_json::json!({ "profile": ["http://example.org/other"] });
@@ -333,7 +332,7 @@ async fn skip_and_count_types_a_profile_no_program_claims() -> Result<(), Box<dy
 
 #[tokio::test]
 async fn a_bundle_whose_every_entry_is_skipped_commits_nothing_and_is_refused()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let (cdr, facade) = facade().await?;
     let document = serde_json::json!({
         "resourceType": "Bundle",
@@ -380,7 +379,7 @@ async fn a_bundle_whose_every_entry_is_skipped_commits_nothing_and_is_refused()
 
 #[tokio::test]
 async fn a_redelivered_message_is_recognised_by_its_control_id_and_commits_once()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let (cdr, facade) = facade().await?;
     let ingest = facade.ingest(facade.client().clone());
     let first = ingest
@@ -426,7 +425,7 @@ async fn a_redelivered_message_is_recognised_by_its_control_id_and_commits_once(
 }
 
 #[tokio::test]
-async fn a_message_with_another_control_id_commits_again() -> Result<(), Box<dyn StdError>> {
+async fn a_message_with_another_control_id_commits_again() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = facade().await?;
     let ingest = facade.ingest(facade.client().clone());
     ingest
@@ -456,7 +455,7 @@ async fn a_message_with_another_control_id_commits_again() -> Result<(), Box<dyn
 
 #[tokio::test]
 async fn the_entries_of_one_message_bind_by_content_whatever_the_version_order()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // Every entry of one message names the same item in its FEEDER_AUDIT, so
     // a reversed version list is told apart by what each composition carries.
     let (cdr, facade) = facade_answering(Echo::Reversed).await?;
@@ -504,7 +503,7 @@ async fn the_entries_of_one_message_bind_by_content_whatever_the_version_order()
 
 #[tokio::test]
 async fn the_entries_of_one_message_bind_on_retry_from_the_contribution_read_back()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The retry maps each entry again at a later instant, so the content that
     // tells the two entries apart is compared with the clock-filled times
     // masked.
@@ -568,8 +567,8 @@ async fn the_entries_of_one_message_bind_on_retry_from_the_contribution_read_bac
 }
 
 #[tokio::test]
-async fn an_entry_the_program_refuses_is_counted_as_a_mapping_failure()
--> Result<(), Box<dyn StdError>> {
+async fn an_entry_the_program_refuses_is_counted_as_a_mapping_failure() -> Result<(), Box<dyn Error>>
+{
     let (cdr, facade) = facade().await?;
     let usage = Arc::new(Window::default());
     let facade = facade.with_usage(Arc::clone(&usage));

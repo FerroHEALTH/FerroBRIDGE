@@ -10,7 +10,7 @@ use ferrobridge_server::facade::identity::PersonId;
 use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::search::Limits;
 use http::StatusCode;
-use std::error::Error as StdError;
+use std::error::Error;
 
 use ferrobridge_testkit::stubs::terminology;
 use wiremock::matchers;
@@ -102,7 +102,7 @@ fn ids(body: &serde_json::Value) -> Vec<String> {
 }
 
 #[tokio::test]
-async fn a_split_entry_lists_every_resource_it_answers_once() -> Result<(), Box<dyn StdError>> {
+async fn a_split_entry_lists_every_resource_it_answers_once() -> Result<(), Box<dyn Error>> {
     // HierarchyMappings.adoc §split: each occurrence is a resource of its own,
     // and R4 search.html §3.1.1: each matching resource is in the searchset.
     let harness = splitting(Limits::default()).await;
@@ -120,7 +120,7 @@ async fn a_split_entry_lists_every_resource_it_answers_once() -> Result<(), Box<
 
 #[tokio::test]
 async fn a_page_ends_inside_a_split_entry_and_the_next_page_resumes_there()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.5.3: a page holds no more than `_count`
     // resources, so the further occurrence opens the next page.
     let harness = splitting(Limits::default()).await;
@@ -151,7 +151,7 @@ async fn a_page_ends_inside_a_split_entry_and_the_next_page_resumes_there()
 }
 
 #[tokio::test]
-async fn an_id_that_names_a_created_resource_answers_it_alone() -> Result<(), Box<dyn StdError>> {
+async fn an_id_that_names_a_created_resource_answers_it_alone() -> Result<(), Box<dyn Error>> {
     // R4 search.html §3.2.1.5.1: `_id` matches the logical id of the resource.
     let harness = splitting(Limits::default()).await;
     let composition = two_sites(&harness);
@@ -177,7 +177,7 @@ const CONCEPT_MAP: &str = "http://example.org/fhir/ConceptMap/ferrobridge-create
 
 /// Writes the split context, its search and its model into a temporary tree,
 /// the model's problem name translated through [`CONCEPT_MAP`].
-fn translating_fixtures() -> Result<tempfile::TempDir, Box<dyn StdError>> {
+fn translating_fixtures() -> Result<tempfile::TempDir, Box<dyn Error>> {
     let root = tempfile::tempdir()?;
     for name in [
         "ferrobridge_created_split.context.yml",
@@ -210,7 +210,7 @@ fn translating_fixtures() -> Result<tempfile::TempDir, Box<dyn StdError>> {
 
 #[tokio::test]
 async fn a_code_shared_by_the_entries_of_a_page_and_its_total_is_translated_once()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // NOTE: no specification governs this: our own design; one request
     // translates a code its page and its total share through one session.
     let composition = two_sites(&splitting(Limits::default()).await);

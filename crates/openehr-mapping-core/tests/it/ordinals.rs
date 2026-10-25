@@ -8,7 +8,7 @@
 //! options, each a `value` and a `local` symbol (the openEHR OPT 1.4 XML
 //! schema, `C_DV_ORDINAL`; RM Release 1.1.0, data types, `DV_ORDINAL`).
 
-use std::error::Error as StdError;
+use std::error::Error;
 
 use ferrobridge_testkit::fixtures::MINIMAL_EVALUATION_OPT;
 use openehr_mapping_core::index::WebTemplateIndex;
@@ -35,7 +35,7 @@ fn entry(value: i32, code: &str, rubric: &str) -> String {
 }
 
 /// Returns the fixture with its element's value a `DV_ORDINAL` of two options.
-fn ordinal_template() -> Result<String, Box<dyn StdError>> {
+fn ordinal_template() -> Result<String, Box<dyn Error>> {
     let (head, rest) = MINIMAL_EVALUATION_OPT
         .split_once(TEXT_VALUE)
         .ok_or("the fixture no longer spells its text value as expected")?;
@@ -64,7 +64,7 @@ fn ordinal_template() -> Result<String, Box<dyn StdError>> {
 }
 
 #[test]
-fn a_dv_ordinal_node_returns_its_options_in_template_order() -> Result<(), Box<dyn StdError>> {
+fn a_dv_ordinal_node_returns_its_options_in_template_order() -> Result<(), Box<dyn Error>> {
     let index = WebTemplateIndex::build(&TemplateSource::opt14(&ordinal_template()?)?)?;
     let node = index
         .nodes()
@@ -83,7 +83,7 @@ fn a_dv_ordinal_node_returns_its_options_in_template_order() -> Result<(), Box<d
 }
 
 #[test]
-fn a_node_with_no_ordinal_constraint_returns_none() -> Result<(), Box<dyn StdError>> {
+fn a_node_with_no_ordinal_constraint_returns_none() -> Result<(), Box<dyn Error>> {
     let index = WebTemplateIndex::build(&TemplateSource::opt14(MINIMAL_EVALUATION_OPT)?)?;
     assert!(
         index
@@ -97,7 +97,7 @@ fn a_node_with_no_ordinal_constraint_returns_none() -> Result<(), Box<dyn StdErr
 }
 
 #[test]
-fn an_index_over_a_built_web_template_has_no_ordinals_to_read() -> Result<(), Box<dyn StdError>> {
+fn an_index_over_a_built_web_template_has_no_ordinals_to_read() -> Result<(), Box<dyn Error>> {
     let built = web_template(&TemplateSource::opt14(&ordinal_template()?)?)?;
     let index = WebTemplateIndex::over(built, Generation::Adl14)?;
     let node = index

@@ -17,7 +17,7 @@ use ferrobridge_server::facade::identity::store::Store;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use std::collections::BTreeSet;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
@@ -75,7 +75,7 @@ fn id_of(entry: &serde_json::Value) -> Option<&str> {
 
 #[tokio::test]
 async fn a_match_on_the_second_entry_answers_that_entry_with_its_own_id()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = searching().await;
     let (composition, first, second) = two_diagnoses(&harness);
     for (code, node) in [("SYN-001", &first), ("SYN-002", &second)] {
@@ -127,7 +127,7 @@ async fn a_match_on_the_second_entry_answers_that_entry_with_its_own_id()
 }
 
 #[tokio::test]
-async fn both_entries_matching_answer_two_resources() -> Result<(), Box<dyn StdError>> {
+async fn both_entries_matching_answer_two_resources() -> Result<(), Box<dyn Error>> {
     let harness = searching().await;
     let (composition, first, second) = two_diagnoses(&harness);
     mount_rows(
@@ -151,8 +151,8 @@ async fn both_entries_matching_answer_two_resources() -> Result<(), Box<dyn StdE
 }
 
 #[tokio::test]
-async fn a_page_boundary_inside_a_composition_answers_each_entry_once()
--> Result<(), Box<dyn StdError>> {
+async fn a_page_boundary_inside_a_composition_answers_each_entry_once() -> Result<(), Box<dyn Error>>
+{
     // One composition, two matching entries, pages of one: the next page
     // starts at the composition's first row and skips the entry page one
     // answered.
@@ -222,7 +222,7 @@ fn second_version() -> String {
 
 #[tokio::test]
 async fn a_search_binding_no_node_answers_every_entry_of_each_composition()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // #658, R4 search.html §3.1.1: every resource that meets the criteria is
     // in the searchset, so a subject search answers both diagnoses of each
     // composition, each with its own id.
@@ -260,8 +260,7 @@ async fn a_search_binding_no_node_answers_every_entry_of_each_composition()
 }
 
 #[tokio::test]
-async fn paging_a_search_binding_no_node_answers_each_entry_once() -> Result<(), Box<dyn StdError>>
-{
+async fn paging_a_search_binding_no_node_answers_each_entry_once() -> Result<(), Box<dyn Error>> {
     // One composition, two entries, pages of one: page two starts at the
     // composition's row and skips the entry page one answered.
     let harness = searching().await;
@@ -310,7 +309,7 @@ async fn paging_a_search_binding_no_node_answers_each_entry_once() -> Result<(),
 }
 
 #[tokio::test]
-async fn a_count_of_a_search_binding_no_node_counts_entries() -> Result<(), Box<dyn StdError>> {
+async fn a_count_of_a_search_binding_no_node_counts_entries() -> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.5.3: _count=0 reports in Bundle.total the number
     // of resources that match, here three entries in two compositions.
     // The count is one AQL query over the entry and reads no composition (#661).
@@ -340,7 +339,7 @@ async fn a_count_of_a_search_binding_no_node_counts_entries() -> Result<(), Box<
 
 #[tokio::test]
 async fn an_accurate_total_is_one_count_query_for_one_and_two_entry_compositions()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 search.html §3.1.1.5.2: _total=accurate asks for the exact number;
     // a page that leaves a next page gets it from one count query (#661).
     for (two_entries, one_entry, expected) in [(0_usize, 2_usize, 2_u64), (2, 0, 4), (1, 1, 3)] {
@@ -386,7 +385,7 @@ fn record_earlier(
     harness: &super::super::Harness,
     path: &str,
     id: &FhirResourceId,
-) -> Result<(), Box<dyn StdError>> {
+) -> Result<(), Box<dyn Error>> {
     let key = EntryKey::new(HierObjectId::new(super::super::CONTAINER)?, path, 0);
     harness
         .store
@@ -411,7 +410,7 @@ fn record_earlier(
 
 #[tokio::test]
 async fn an_id_an_earlier_build_recorded_under_the_comma_path_keeps_answering_its_entry()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // A build up to 0.0.6 keyed the second diagnosis by
     // `/content[<archetype>, 2]`, a path the BASE grammar refuses; the map
     // wins once written, so that id still names the second diagnosis.
@@ -443,7 +442,7 @@ async fn an_id_an_earlier_build_recorded_under_the_comma_path_keeps_answering_it
 
 #[tokio::test]
 async fn a_later_entry_is_bound_by_the_positional_path_of_its_place_in_content()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // openEHR BASE Release 1.2.0, Paths and Locators, §Using Positional
     // Parameters: the second diagnosis is the second `content` item.
     let harness = searching().await;
@@ -487,7 +486,7 @@ fn with_foreign(composition: &serde_json::Value, count: usize) -> serde_json::Va
 
 #[tokio::test]
 async fn a_comma_path_a_build_up_to_0_0_5_recorded_reads_as_the_first_entry_at_its_place()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // Builds up to 0.0.5 bound the first diagnosis by its place in content:
     // the third item here, and the composition holds no third diagnosis.
     let harness = searching().await;
@@ -507,8 +506,8 @@ async fn a_comma_path_a_build_up_to_0_0_5_recorded_reads_as_the_first_entry_at_i
 }
 
 #[tokio::test]
-async fn a_comma_path_whose_two_readings_name_two_entries_is_reported()
--> Result<(), Box<dyn StdError>> {
+async fn a_comma_path_whose_two_readings_name_two_entries_is_reported() -> Result<(), Box<dyn Error>>
+{
     // `/content[<archetype>, 2]` is the first diagnosis as builds up to 0.0.5
     // wrote it and the second as 0.0.6 wrote it; the read reports the binding.
     let harness = searching().await;
@@ -528,8 +527,8 @@ async fn a_comma_path_whose_two_readings_name_two_entries_is_reported()
 }
 
 #[tokio::test]
-async fn a_search_meeting_a_comma_key_with_two_readings_is_reported()
--> Result<(), Box<dyn StdError>> {
+async fn a_search_meeting_a_comma_key_with_two_readings_is_reported() -> Result<(), Box<dyn Error>>
+{
     // The second diagnosis's 0.0.6 key is the first diagnosis's key as builds
     // up to 0.0.5 wrote it, so binding it would move an id between entries.
     let harness = searching().await;

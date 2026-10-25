@@ -7,7 +7,6 @@
 use ferrobridge_server::check::{self, Inputs, Templates};
 use ferrobridge_server::{EXIT_CHECK_UNAVAILABLE, EXIT_CONFIG};
 use openehr_mapping_core::diagnostic::Severity;
-use std::error::Error as StdError;
 use std::path::Path;
 use wiremock::matchers;
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -56,7 +55,7 @@ struct Tree {
 impl Tree {
     /// Copies the clean fixtures, the testkit template and the laboratory
     /// OMOCL files into a fresh tree.
-    fn clean() -> Result<Self, Box<dyn StdError>> {
+    fn clean() -> Result<Self, Box<dyn std::error::Error>> {
         let root = tempfile::tempdir()?;
         for directory in ["mappings", "templates", "omocl"] {
             std::fs::create_dir_all(root.path().join(directory))?;
@@ -94,7 +93,7 @@ impl Tree {
     }
 
     /// Runs the binary's `mapping check` over the tree with `extra` arguments.
-    fn run(&self, extra: &[&str]) -> Result<std::process::Output, Box<dyn StdError>> {
+    fn run(&self, extra: &[&str]) -> Result<std::process::Output, Box<dyn std::error::Error>> {
         Ok(
             std::process::Command::new(env!("CARGO_BIN_EXE_ferrobridge"))
                 .args(["mapping", "check"])
@@ -110,7 +109,7 @@ impl Tree {
 }
 
 /// Checks the tree's three directories through the library.
-async fn library_check(tree: &Tree) -> Result<check::Report, Box<dyn StdError>> {
+async fn library_check(tree: &Tree) -> Result<check::Report, Box<dyn std::error::Error>> {
     let (mappings, templates, omocl) = tree.inputs();
     Ok(check::check(Inputs {
         fhirconnect: Some(&mappings),
@@ -121,8 +120,8 @@ async fn library_check(tree: &Tree) -> Result<check::Report, Box<dyn StdError>> 
 }
 
 #[tokio::test]
-async fn a_clean_set_reports_no_diagnostic_and_counts_what_it_read() -> Result<(), Box<dyn StdError>>
-{
+async fn a_clean_set_reports_no_diagnostic_and_counts_what_it_read()
+-> Result<(), Box<dyn std::error::Error>> {
     let tree = Tree::clean()?;
     let report = library_check(&tree).await?;
     assert!(report.is_clean(), "{report}");
@@ -137,8 +136,8 @@ async fn a_clean_set_reports_no_diagnostic_and_counts_what_it_read() -> Result<(
 }
 
 #[tokio::test]
-async fn a_path_no_template_node_carries_is_a_compile_diagnostic() -> Result<(), Box<dyn StdError>>
-{
+async fn a_path_no_template_node_carries_is_a_compile_diagnostic()
+-> Result<(), Box<dyn std::error::Error>> {
     let tree = Tree::clean()?;
     std::fs::write(
         tree.path("mappings/ferrobridge_facade.yml"),
@@ -162,7 +161,7 @@ async fn a_path_no_template_node_carries_is_a_compile_diagnostic() -> Result<(),
 
 #[tokio::test]
 async fn a_file_that_does_not_load_is_reported_with_every_other_failure()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let tree = Tree::clean()?;
     std::fs::write(tree.path("mappings/broken.yml"), "grammar: [unclosed\n")?;
     std::fs::write(tree.path("omocl/broken.yml"), "grammar: [unclosed\n")?;
@@ -191,7 +190,7 @@ async fn a_file_that_does_not_load_is_reported_with_every_other_failure()
 
 #[tokio::test]
 async fn a_context_whose_template_no_directory_provides_is_reported()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let tree = Tree::clean()?;
     std::fs::remove_file(tree.path("templates/diagnose.opt"))?;
     let report = library_check(&tree).await?;
@@ -215,8 +214,8 @@ async fn a_context_whose_template_no_directory_provides_is_reported()
 }
 
 #[tokio::test]
-async fn a_template_that_does_not_build_is_a_template_diagnostic() -> Result<(), Box<dyn StdError>>
-{
+async fn a_template_that_does_not_build_is_a_template_diagnostic()
+-> Result<(), Box<dyn std::error::Error>> {
     let tree = Tree::clean()?;
     std::fs::write(tree.path("templates/broken.opt"), "<template>")?;
     let report = library_check(&tree).await?;
@@ -255,7 +254,9 @@ async fn cdr_answering(status: u16) -> MockServer {
 }
 
 /// Returns a CDR client over `cdr`, retrying nothing.
-fn client(cdr: &MockServer) -> Result<ferrobridge_server::cdr::CdrClient, Box<dyn StdError>> {
+fn client(
+    cdr: &MockServer,
+) -> Result<ferrobridge_server::cdr::CdrClient, Box<dyn std::error::Error>> {
     let text = format!(
         "[cdr]\nbase_url = \"{}/\"\ntimeout_ms = 2000\n\n[cdr.retry]\nmax_attempts = 1\n",
         cdr.uri()
@@ -271,7 +272,7 @@ fn client(cdr: &MockServer) -> Result<ferrobridge_server::cdr::CdrClient, Box<dy
 
 #[tokio::test]
 async fn the_templates_come_from_the_cdr_without_a_template_directory()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let cdr = cdr_answering(200).await;
     let client = client(&cdr)?;
     let fixtures = Path::new(FIXTURES);
@@ -288,7 +289,7 @@ async fn the_templates_come_from_the_cdr_without_a_template_directory()
 
 #[tokio::test]
 async fn a_template_the_cdr_does_not_hold_is_a_diagnostic_naming_the_status()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let cdr = cdr_answering(404).await;
     let client = client(&cdr)?;
     let report = check::check(Inputs {
@@ -313,7 +314,7 @@ async fn a_template_the_cdr_does_not_hold_is_a_diagnostic_naming_the_status()
 
 #[tokio::test]
 async fn a_cdr_that_fails_the_fetch_is_an_error_carrying_the_upstream_failure()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let cdr = cdr_answering(503).await;
     let client = client(&cdr)?;
     let error = check::check(Inputs {
@@ -331,7 +332,8 @@ async fn a_cdr_that_fails_the_fetch_is_an_error_carrying_the_upstream_failure()
 }
 
 #[test]
-fn the_binary_exits_zero_on_a_clean_set_and_prints_the_summary() -> Result<(), Box<dyn StdError>> {
+fn the_binary_exits_zero_on_a_clean_set_and_prints_the_summary()
+-> Result<(), Box<dyn std::error::Error>> {
     let tree = Tree::clean()?;
     let output = tree.run(&[])?;
     let stdout = String::from_utf8(output.stdout)?;
@@ -345,7 +347,7 @@ fn the_binary_exits_zero_on_a_clean_set_and_prints_the_summary() -> Result<(), B
 
 #[test]
 fn the_binary_exits_one_and_prints_every_diagnostic_on_a_broken_set()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let tree = Tree::clean()?;
     std::fs::write(
         tree.path("mappings/ferrobridge_facade.yml"),
@@ -372,7 +374,8 @@ fn the_binary_exits_one_and_prints_every_diagnostic_on_a_broken_set()
 }
 
 #[test]
-fn the_json_report_is_one_document_with_every_diagnostic() -> Result<(), Box<dyn StdError>> {
+fn the_json_report_is_one_document_with_every_diagnostic() -> Result<(), Box<dyn std::error::Error>>
+{
     let tree = Tree::clean()?;
     std::fs::write(
         tree.path("mappings/ferrobridge_facade.yml"),
@@ -407,7 +410,7 @@ fn the_json_report_is_one_document_with_every_diagnostic() -> Result<(), Box<dyn
 }
 
 #[test]
-fn the_json_report_of_a_clean_set_says_so() -> Result<(), Box<dyn StdError>> {
+fn the_json_report_of_a_clean_set_says_so() -> Result<(), Box<dyn std::error::Error>> {
     let tree = Tree::clean()?;
     let output = tree.run(&["--format", "json"])?;
     assert_eq!(Some(0), output.status.code());
@@ -418,7 +421,7 @@ fn the_json_report_of_a_clean_set_says_so() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn nothing_to_check_exits_seventy_eight() -> Result<(), Box<dyn StdError>> {
+fn nothing_to_check_exits_seventy_eight() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_ferrobridge"))
         .args(["mapping", "check"])
         .env_remove("FERROBRIDGE_CONFIG")
@@ -430,7 +433,7 @@ fn nothing_to_check_exits_seventy_eight() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn an_unreadable_directory_exits_sixty_nine() -> Result<(), Box<dyn StdError>> {
+fn an_unreadable_directory_exits_sixty_nine() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_ferrobridge"))
         .args(["mapping", "check"])
         .env_remove("FERROBRIDGE_CONFIG")

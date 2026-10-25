@@ -4,7 +4,7 @@
 name = "ferrobridge-hl7v2"
 description = "The FerroBRIDGE HL7 v2 face: MLLP framing, MSH-18 decoding, positional parsing over the generated v2 tables, the acknowledgment, and the v2-to-FHIR ConceptMap interpreter"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.135"
+version = "0.1.139"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

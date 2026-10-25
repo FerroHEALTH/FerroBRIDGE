@@ -5,7 +5,7 @@
 //! reads before it holds a token, and the boot refusals of an authorization
 //! server the resource server cannot trust.
 
-use std::error::Error as StdError;
+use std::error::Error;
 
 use ferrobridge_server::smart::Smart;
 use ferrobridge_server::smart::SmartError;
@@ -30,7 +30,7 @@ use crate::facade::raw;
 async fn read_open(
     app: axum::Router,
     path: &str,
-) -> Result<(StatusCode, Option<String>, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, Option<String>, serde_json::Value), Box<dyn Error>> {
     let response = raw(app, get(path)).await?;
     let status = response.status();
     let media = response
@@ -44,7 +44,7 @@ async fn read_open(
 
 #[tokio::test]
 async fn the_smart_configuration_names_the_authorization_server_without_a_token()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -103,7 +103,7 @@ async fn the_smart_configuration_names_the_authorization_server_without_a_token(
 
 #[tokio::test]
 async fn the_smart_configuration_names_the_issuer_only_with_openid_connect_sign_in()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -129,8 +129,8 @@ async fn the_smart_configuration_names_the_issuer_only_with_openid_connect_sign_
 }
 
 #[tokio::test]
-async fn the_smart_configuration_lists_the_scopes_the_bridge_honours()
--> Result<(), Box<dyn StdError>> {
+async fn the_smart_configuration_lists_the_scopes_the_bridge_honours() -> Result<(), Box<dyn Error>>
+{
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -164,7 +164,7 @@ async fn the_smart_configuration_lists_the_scopes_the_bridge_honours()
 
 #[tokio::test]
 async fn the_capability_statement_states_the_smart_service_without_a_token()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -208,7 +208,7 @@ async fn the_capability_statement_states_the_smart_service_without_a_token()
 }
 
 #[tokio::test]
-async fn an_open_facade_states_no_security() -> Result<(), Box<dyn StdError>> {
+async fn an_open_facade_states_no_security() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let (status, _, body) = read_open(harness.app(), "/fhir/metadata").await?;
     assert_eq!(StatusCode::OK, status);
@@ -217,8 +217,8 @@ async fn an_open_facade_states_no_security() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn the_openid_connect_location_answers_when_rfc_8414_has_none()
--> Result<(), Box<dyn StdError>> {
+async fn the_openid_connect_location_answers_when_rfc_8414_has_none() -> Result<(), Box<dyn Error>>
+{
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::bare().await;
     issuer
@@ -230,7 +230,7 @@ async fn the_openid_connect_location_answers_when_rfc_8414_has_none()
 }
 
 #[tokio::test]
-async fn metadata_naming_another_issuer_refuses_the_start() -> Result<(), Box<dyn StdError>> {
+async fn metadata_naming_another_issuer_refuses_the_start() -> Result<(), Box<dyn Error>> {
     let issuer = Issuer::bare().await;
     let mut metadata = issuer.metadata();
     metadata["issuer"] = serde_json::json!("https://another-issuer.invalid");
@@ -248,7 +248,7 @@ async fn metadata_naming_another_issuer_refuses_the_start() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn metadata_without_a_key_set_refuses_the_start() -> Result<(), Box<dyn StdError>> {
+async fn metadata_without_a_key_set_refuses_the_start() -> Result<(), Box<dyn Error>> {
     let issuer = Issuer::bare().await;
     let mut metadata = issuer.metadata();
     metadata
@@ -269,7 +269,7 @@ async fn metadata_without_a_key_set_refuses_the_start() -> Result<(), Box<dyn St
 }
 
 #[tokio::test]
-async fn an_unreachable_key_set_refuses_the_start() -> Result<(), Box<dyn StdError>> {
+async fn an_unreachable_key_set_refuses_the_start() -> Result<(), Box<dyn Error>> {
     let issuer = Issuer::bare().await;
     issuer
         .mount_metadata("/.well-known/oauth-authorization-server")
@@ -286,7 +286,7 @@ async fn an_unreachable_key_set_refuses_the_start() -> Result<(), Box<dyn StdErr
 }
 
 #[tokio::test]
-async fn metadata_without_a_token_endpoint_refuses_the_start() -> Result<(), Box<dyn StdError>> {
+async fn metadata_without_a_token_endpoint_refuses_the_start() -> Result<(), Box<dyn Error>> {
     // NOTE: SMART App Launch 2.2.0 conformance.html, `token_endpoint` is
     // REQUIRED in the discovery document the bridge serves.
     let key = ec_key("k1", Algorithm::ES256);
@@ -311,7 +311,7 @@ async fn metadata_without_a_token_endpoint_refuses_the_start() -> Result<(), Box
 }
 
 #[tokio::test]
-async fn a_second_trusted_issuer_is_admitted_beside_the_first() -> Result<(), Box<dyn StdError>> {
+async fn a_second_trusted_issuer_is_admitted_beside_the_first() -> Result<(), Box<dyn Error>> {
     let first_key = ec_key("k1", Algorithm::ES256);
     let second_key = ec_key("k2", Algorithm::ES256);
     let first = Issuer::start(&[&first_key]).await;

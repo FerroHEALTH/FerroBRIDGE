@@ -17,7 +17,7 @@ use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::code::{Code, Gravity, LineDiagnostic, code_viewer};
 use ferrohealth_ui::view::form::{ERROR, Field, error_id};
-use ferrohealth_ui::view::load_report::Outcome as Verdict;
+use ferrohealth_ui::view::load_report;
 use ferrohealth_ui::view::segmented::choice_group;
 use ferrohealth_ui::view::surface::{Header, page_heading};
 use ferrohealth_ui::view::tabs::{Tab, binder};
@@ -332,7 +332,7 @@ fn answer_pane(
             );
             (
                 Some(AnswerState {
-                    outcome: Verdict::Ok,
+                    outcome: load_report::Outcome::Ok,
                     word: tr(Msg::Answered),
                     detail: Some(operation.to_owned()),
                 }),
@@ -341,7 +341,7 @@ fn answer_pane(
         }
         Some(PlaygroundAnswer::Answered(Ok(Outcome::Refused(refusal)))) => (
             Some(AnswerState {
-                outcome: Verdict::Bad,
+                outcome: load_report::Outcome::Bad,
                 word: tr(Msg::Refused),
                 detail: refusal
                     .status()
@@ -351,7 +351,7 @@ fn answer_pane(
         ),
         Some(PlaygroundAnswer::Answered(Err(fault))) => (
             Some(AnswerState {
-                outcome: Verdict::Bad,
+                outcome: load_report::Outcome::Bad,
                 word: tr(Msg::NotRun),
                 detail: None,
             }),

@@ -61,7 +61,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
     ) -> Result<(), EngineError> {
         let node = openehr.node();
         let segments = tail_segments(openehr);
-        if openehr.on_element() && segments == [rm::NULL_FLAVOUR] {
+        if openehr.on_element() && segments == [rm::null_flavour::NULL_FLAVOUR] {
             let refuse = |source: LensError| EngineError::Cell {
                 mapping: String::from(mapping.name()),
                 element: String::from(target.expression().as_str()),

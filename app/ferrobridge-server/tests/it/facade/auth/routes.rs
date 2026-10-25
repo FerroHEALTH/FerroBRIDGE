@@ -10,7 +10,7 @@
 //! deployment, where the guard would refuse it.
 
 use std::collections::BTreeSet;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::path::Path;
 
 use axum::Router;
@@ -116,7 +116,7 @@ fn methods_of(call: &str) -> Vec<Method> {
 
 /// Returns every `(method, template)` the server's sources mount under
 /// `/fhir`.
-fn mounted_routes() -> Result<BTreeSet<(String, String)>, Box<dyn StdError>> {
+fn mounted_routes() -> Result<BTreeSet<(String, String)>, Box<dyn Error>> {
     let mut files = Vec::new();
     rust_files(Path::new(SOURCES), &mut files)?;
     let mut routes = BTreeSet::new();
@@ -138,7 +138,7 @@ fn mounted_routes() -> Result<BTreeSet<(String, String)>, Box<dyn StdError>> {
 }
 
 #[test]
-fn every_route_mounted_under_the_fhir_base_is_classified() -> Result<(), Box<dyn StdError>> {
+fn every_route_mounted_under_the_fhir_base_is_classified() -> Result<(), Box<dyn Error>> {
     let mounted = mounted_routes()?;
     let classified: BTreeSet<(String, String)> = CLASSIFIED
         .iter()
@@ -163,7 +163,7 @@ fn every_route_mounted_under_the_fhir_base_is_classified() -> Result<(), Box<dyn
 
 #[tokio::test]
 async fn every_classified_route_reaches_its_handler_under_a_full_scope()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -194,7 +194,7 @@ async fn every_classified_route_reaches_its_handler_under_a_full_scope()
 
 #[tokio::test]
 async fn an_unclassified_route_is_refused_under_auth_and_open_without_it()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let authority = authority(issuer.settings()).await;

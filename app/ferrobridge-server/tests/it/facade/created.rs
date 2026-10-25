@@ -12,7 +12,7 @@ use fhirconnect::engine::seam::IdentityRequest;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 
 use super::Harness;
 use super::VERSION_ONE;
@@ -108,7 +108,7 @@ async fn create(
     harness: &Harness,
     resource: &serde_json::Value,
     composition: &serde_json::Value,
-) -> Result<serde_json::Value, Box<dyn StdError>> {
+) -> Result<serde_json::Value, Box<dyn Error>> {
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, composition).await;
     mount_read(&harness.cdr, VERSION_ONE, composition).await;
@@ -133,7 +133,7 @@ fn evidence_reference(condition: &serde_json::Value) -> Option<&str> {
 /// id with the parent's body.
 async fn created_observation(
     harness: &Harness,
-) -> Result<(String, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(String, serde_json::Value), Box<dyn Error>> {
     let composition = composition_under(
         harness,
         "ferrobridge_created_reference.context",
@@ -151,7 +151,7 @@ async fn created_observation(
 
 #[tokio::test]
 async fn a_created_resource_is_referenced_by_type_and_id_and_never_contained()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 references.html §2.3.0.8: a contained resource has no independent
     // existence, so a resource served on its own is referenced literally.
     let harness = harness_over(CREATED, settings()).await;
@@ -168,7 +168,7 @@ async fn a_created_resource_is_referenced_by_type_and_id_and_never_contained()
 }
 
 #[tokio::test]
-async fn a_created_resource_answers_a_read_of_its_own() -> Result<(), Box<dyn StdError>> {
+async fn a_created_resource_answers_a_read_of_its_own() -> Result<(), Box<dyn Error>> {
     // R4 http.html §read: GET [base]/[type]/[id] answers the resource.
     let harness = harness_over(CREATED, settings()).await;
     let (id, parent) = created_observation(&harness).await?;
@@ -208,7 +208,7 @@ async fn a_created_resource_answers_a_read_of_its_own() -> Result<(), Box<dyn St
 }
 
 #[tokio::test]
-async fn a_re_run_derives_the_same_created_id() -> Result<(), Box<dyn StdError>> {
+async fn a_re_run_derives_the_same_created_id() -> Result<(), Box<dyn Error>> {
     // The derivation is a digest over the parent's entry and the request, so
     // a fresh identity map over the same composition names the same id.
     let first = harness_over(CREATED, settings()).await;
@@ -234,7 +234,7 @@ async fn a_re_run_derives_the_same_created_id() -> Result<(), Box<dyn StdError>>
 }
 
 #[tokio::test]
-async fn a_further_split_occurrence_answers_a_read_of_its_own() -> Result<(), Box<dyn StdError>> {
+async fn a_further_split_occurrence_answers_a_read_of_its_own() -> Result<(), Box<dyn Error>> {
     // HierarchyMappings.adoc §split: each occurrence creates a resource, and
     // the further one is served at the id the identity map derived for it.
     let harness = harness_over(CREATED, settings()).await;
@@ -268,7 +268,7 @@ async fn a_further_split_occurrence_answers_a_read_of_its_own() -> Result<(), Bo
 }
 
 #[tokio::test]
-async fn an_update_of_a_created_resource_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn an_update_of_a_created_resource_is_refused() -> Result<(), Box<dyn Error>> {
     // No specification governs this: our own design, a created resource is
     // content of its parent's entry, so only the parent is revised.
     let harness = harness_over(CREATED, settings()).await;
@@ -298,7 +298,7 @@ async fn an_update_of_a_created_resource_is_refused() -> Result<(), Box<dyn StdE
 }
 
 #[tokio::test]
-async fn a_type_only_a_reference_creates_is_declared_readable() -> Result<(), Box<dyn StdError>> {
+async fn a_type_only_a_reference_creates_is_declared_readable() -> Result<(), Box<dyn Error>> {
     // R4 capabilitystatement.html: the statement names the interactions each
     // type supports, and a created Observation answers read and vread alone.
     let harness = harness_over(CREATED, settings()).await;
