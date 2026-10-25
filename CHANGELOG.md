@@ -51,6 +51,13 @@ crates on crates.io.
   `dq check` and the post-load step of `etl run` report them. A person whose
   year of birth is 0, as a placeholder `PERSON` row carries, has no birth date
   for these checks instead of failing them.
+- `[cdm.pseudonymisation]` pseudonymises every row the CDM writer writes
+  (#410): the columns the CDM field definitions describe as a link back to the
+  source carry an HMAC-SHA-256 pseudonym under a `_file` secret key, stable
+  across runs so incremental loads join, the provider's name, `npi` and `dea`
+  and a location's address are NULL, and `date_shift_days` moves every date
+  of a person by one per-person shift, so intervals within a person stay
+  intact. The Integrate and Operate pages state what it does not de-identify.
 - `cdm init` and every `etl run` and `etl fhir` count the rows of each CDM
   table whose ids the bridge assigns that no entry of its side table owns,
   rows another load wrote, and warn of each table; the run report carries the

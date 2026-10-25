@@ -483,6 +483,11 @@ pub(super) fn resolve_cdm(cdm: &Cdm) -> Result<CdmSettings, Error> {
         })?),
         (None, None) => None,
     };
+    let pseudonymiser = cdm
+        .pseudonymisation
+        .as_ref()
+        .map(pseudonymiser_of)
+        .transpose()?;
     let connection = omop_cdm::connection::CdmConnection::new(url.expose_secret(), ca.as_deref())
         .map_err(|source| Error::CdmConnection {
         key: String::from(cdm_connection_key(&source, cdm)),
@@ -494,6 +499,29 @@ pub(super) fn resolve_cdm(cdm: &Cdm) -> Result<CdmSettings, Error> {
         schema: schema_of("cdm.schema", &cdm.schema)?,
         bridge_schema: schema_of("cdm.bridge_schema", &cdm.bridge_schema)?,
         person_policy,
+        pseudonymiser,
+    })
+}
+
+/// Returns the pseudonymiser `section` describes, its key read and checked.
+fn pseudonymiser_of(
+    section: &crate::config::section::CdmPseudonymisation,
+) -> Result<omop_cdm::writer::pseudonym::Pseudonymiser, Error> {
+    let key = secret(
+        "cdm.pseudonymisation.key",
+        section.key.as_ref(),
+        section.key_file.as_deref(),
+    )?
+    .ok_or(Error::Missing {
+        key: String::from("cdm.pseudonymisation.key"),
+    })?;
+    omop_cdm::writer::pseudonym::Pseudonymiser::new(
+        key.expose_secret().as_bytes(),
+        section.date_shift_days,
+    )
+    .map_err(|source| Error::Pseudonymisation {
+        key: String::from("cdm.pseudonymisation"),
+        source,
     })
 }
 

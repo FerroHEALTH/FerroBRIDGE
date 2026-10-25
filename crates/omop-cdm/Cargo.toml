@@ -37,6 +37,7 @@ database = [
     "dep:tokio",
     "dep:futures-util",
     "dep:tempfile",
+    "dep:aws-lc-rs",
 ]
 
 [dependencies]
@@ -55,6 +56,8 @@ tokio-postgres-rustls = { workspace = true, optional = true }
 webpki-roots = { workspace = true, optional = true }
 # The private directory the pool's TLS relay puts its socket in.
 tempfile = { workspace = true, optional = true }
+# The keyed pseudonyms and date shifts of a pseudonymised write (HMAC-SHA-256).
+aws-lc-rs = { workspace = true, optional = true }
 
 [dev-dependencies]
 # The Data Quality Dashboard thresholds quote cells that hold commas.

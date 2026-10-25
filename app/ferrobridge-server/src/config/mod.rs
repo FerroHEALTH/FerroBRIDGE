@@ -440,6 +440,8 @@ pub struct CdmSettings {
     pub bridge_schema: omop_cdm::ddl::SchemaName,
     /// What the writer does for an EHR with no `PERSON`.
     pub person_policy: omop_cdm::writer::input::PersonPolicy,
+    /// The pseudonymisation every ETL writer applies, when configured.
+    pub pseudonymiser: Option<omop_cdm::writer::pseudonym::Pseudonymiser>,
 }
 
 /// The mapping set, resolved.

@@ -3547,6 +3547,7 @@ dependencies = [
 name = "omop-cdm"
 version = "0.0.0"
 dependencies = [
+ "aws-lc-rs",
  "csv",
  "ferrobridge-testkit",
  "futures-util",
