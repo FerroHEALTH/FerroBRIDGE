@@ -6,7 +6,11 @@
 //!
 //! The concept resolver's `sqlx` pool and the writer's `tokio-postgres`
 //! connection read one [`CdmConnection`], so the two clients agree on whether
-//! the connection is encrypted and what it trusts. The modes are the four
+//! the connection is encrypted and what it trusts: the writer handshakes with
+//! the TLS configuration built here, and the pool reaches the server through
+//! a relay that handshakes with the same configuration (`relay`), so sqlx
+//! never runs TLS and its built-in roots never join a configured CA. The
+//! modes are the four
 //! libpq modes that never fall back to a plaintext connection
 //! (<https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-SSLMODE-STATEMENTS>);
 //! `prefer` and `allow` are refused, because a client that honours them
@@ -23,7 +27,11 @@ use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{CertificateError, ClientConfig, DigitallySignedStruct, RootCertStore};
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
+
+mod relay;
+
+use relay::{Relay, Upstream};
 
 /// How the connection is secured, after libpq's `sslmode`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,6 +162,25 @@ pub enum ConnectionError {
         #[source]
         source: sqlx::Error,
     },
+    /// A URL that asks for TLS names other than one TCP host and one port,
+    /// the one server the pool's relay reaches.
+    #[error(
+        "a URL that asks for TLS names one TCP host and one port for the CDM clients; \
+         this one names {hosts} hosts and {ports} ports"
+    )]
+    Hosts {
+        /// The hosts the URL names, Unix sockets counted.
+        hosts: usize,
+        /// The ports the URL names.
+        ports: usize,
+    },
+    /// The pool's TLS relay could not be started.
+    #[error("the TLS relay the pool connects through could not be started")]
+    Relay {
+        /// What the operating system or the runtime reported.
+        #[source]
+        source: std::io::Error,
+    },
 }
 
 /// The CDM database both clients connect to, with its TLS settled.
@@ -168,6 +195,8 @@ pub struct CdmConnection {
     writer: tokio_postgres::Config,
     pool: PgConnectOptions,
     tls: Arc<ClientConfig>,
+    upstream: Option<Upstream>,
+    relay: Arc<Mutex<Option<Relay>>>,
 }
 
 impl fmt::Debug for CdmConnection {
@@ -186,11 +215,11 @@ impl CdmConnection {
     /// The URL must name its `sslmode`: libpq's default when it names none is
     /// `prefer`, which these clients never honour.
     ///
-    /// Without a CA, `verify-ca` and `verify-full` trust the webpki root set,
-    /// the one the pool's client carries. sqlx reads `PGSSLROOTCERT`,
+    /// Without a CA, `verify-ca` and `verify-full` trust the webpki root set;
+    /// with one, they trust the CA alone. sqlx reads `PGSSLROOTCERT`,
     /// `PGSSLCERT` and `PGSSLKEY` from the environment whatever the options
-    /// say, so a process that sets one is refused, which keeps the two clients
-    /// on one trust set.
+    /// say, so a process that sets one is refused, which keeps the TLS
+    /// settings in one place.
     ///
     /// # Errors
     ///
@@ -202,10 +231,11 @@ impl CdmConnection {
     /// for any other `ssl` parameter, [`ConnectionError::CaWithoutTls`] for a
     /// CA with `disable`, the CA errors when `ca` does not parse, and
     /// [`ConnectionError::Url`] or [`ConnectionError::PoolUrl`] when a client
-    /// refuses the URL.
+    /// refuses the URL, and [`ConnectionError::Hosts`] for a URL that asks
+    /// for TLS and names other than one TCP host and port.
     pub fn new(url: &str, ca: Option<&[u8]>) -> Result<Self, ConnectionError> {
         // NOTE: rustls docs, `CryptoProvider`: a process with two providers
-        // compiled in has no default, and sqlx 0.9's verify-ca check reads it.
+        // compiled in has no default, and the process's other rustls clients read it.
         if CryptoProvider::get_default().is_none() {
             // An `Err` means another caller installed one first, which serves.
             drop(CryptoProvider::install_default(
@@ -236,26 +266,26 @@ impl CdmConnection {
                 tokio_postgres::config::SslMode::Require
             }
         });
-        let mut pool: PgConnectOptions = bare
+        let upstream = match mode {
+            SslMode::Disable => None,
+            SslMode::Require | SslMode::VerifyCa | SslMode::VerifyFull => {
+                Some(upstream_of(&writer)?)
+            }
+        };
+        let pool: PgConnectOptions = bare
             .parse()
             .map_err(|source| ConnectionError::PoolUrl { source })?;
-        // NOTE: sqlx 0.9 `PgSslMode::Require` never checks the certificate, so
-        // a configured CA asks it for `VerifyCa`, the check libpq makes.
-        pool = pool.ssl_mode(match (mode, ca) {
-            (SslMode::Disable, _) => PgSslMode::Disable,
-            (SslMode::Require, None) => PgSslMode::Require,
-            (SslMode::Require | SslMode::VerifyCa, _) => PgSslMode::VerifyCa,
-            (SslMode::VerifyFull, _) => PgSslMode::VerifyFull,
-        });
-        if let Some(pem) = ca {
-            pool = pool.ssl_root_cert_from_pem(pem.to_vec());
-        }
+        // NOTE: no specification governs this: our own design; sqlx never runs
+        // TLS, so its built-in roots never join the configured CA.
+        let pool = pool.ssl_mode(PgSslMode::Disable);
         Ok(Self {
             mode,
             ca: ca.map(<[u8]>::to_vec),
             writer,
             pool,
             tls,
+            upstream,
+            relay: Arc::default(),
         })
     }
 
@@ -272,9 +302,33 @@ impl CdmConnection {
     }
 
     /// Returns the options a [`crate::database::CdmPool`] connects with.
-    #[must_use]
-    pub fn pool_options(&self) -> PgConnectOptions {
-        self.pool.clone()
+    ///
+    /// Over TLS the options point at the pool's relay, a Unix socket that
+    /// reaches the server with the writer's TLS configuration. The relay is
+    /// started on the current Tokio runtime the first time it is needed, and
+    /// again once the runtime that ran it has ended; it runs while any clone
+    /// of this connection lives.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConnectionError::Relay`] when the relay cannot be started,
+    /// outside a Tokio runtime among other causes.
+    pub fn pool_options(&self) -> Result<PgConnectOptions, ConnectionError> {
+        let Some(upstream) = &self.upstream else {
+            return Ok(self.pool.clone());
+        };
+        let mut relay = self.relay.lock().unwrap_or_else(PoisonError::into_inner);
+        let running = match relay.take() {
+            Some(running) if running.is_running() => running,
+            _ => Relay::start(
+                upstream.clone(),
+                tokio_postgres_rustls::MakeRustlsConnect::new(ClientConfig::clone(&self.tls)),
+            )
+            .map_err(|source| ConnectionError::Relay { source })?,
+        };
+        let options = self.pool.clone().socket(running.directory());
+        *relay = Some(running);
+        Ok(options)
     }
 
     /// Returns the writer's client configuration and its TLS connector.
@@ -288,6 +342,34 @@ impl CdmConnection {
             &self.writer,
             tokio_postgres_rustls::MakeRustlsConnect::new(ClientConfig::clone(&self.tls)),
         )
+    }
+}
+
+/// Returns the one TCP host and port `writer` names, which the pool's relay
+/// reaches.
+fn upstream_of(writer: &tokio_postgres::Config) -> Result<Upstream, ConnectionError> {
+    let hosts = writer.get_hosts();
+    let ports = writer.get_ports();
+    // NOTE: PostgreSQL docs, libpq "Parameter Key Words", `port`: 5432 when the URL names none.
+    let port = match ports {
+        [] => 5432,
+        [port] => *port,
+        _ => {
+            return Err(ConnectionError::Hosts {
+                hosts: hosts.len(),
+                ports: ports.len(),
+            });
+        }
+    };
+    match hosts {
+        [tokio_postgres::config::Host::Tcp(host)] => Ok(Upstream {
+            host: host.clone(),
+            port,
+        }),
+        _ => Err(ConnectionError::Hosts {
+            hosts: hosts.len(),
+            ports: ports.len(),
+        }),
     }
 }
 

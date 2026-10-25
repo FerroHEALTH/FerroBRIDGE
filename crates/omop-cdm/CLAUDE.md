@@ -62,14 +62,19 @@ Full discipline: `.claude/rules/codegen.md`.
   replaced in a transaction of its own through CSV `COPY`.
 - `connection::CdmConnection` is the one place TLS is settled: both the sqlx
   pool (`pool_options`) and the writer (`CdmWriter::connect_with`) read it,
-  so they agree on the mode and the trust. The modes are libpq's four that
+  so they agree on the mode and the trust. sqlx never runs TLS: over TLS the
+  pool's options point at `connection::relay`, a Unix socket in a `0700`
+  directory whose connections are upgraded with `SSLRequest` and the
+  writer's rustls configuration, so sqlx's built-in roots never join a
+  configured CA; the relay starts on the current runtime the first time
+  `pool_options` runs, which is why it returns a `Result`. The modes are libpq's four that
   never fall back to plaintext; `prefer`, `allow` and every other `ssl*` URL
   parameter are refused, and so is a URL with no mode and a process whose
   environment sets `PGSSLROOTCERT`, `PGSSLCERT` or `PGSSLKEY` (sqlx reads
   them into every `PgConnectOptions`). The rustls provider
   is aws-lc-rs, the one reqwest and sqlx carry; `CdmConnection::new` installs
-  it as the process default when none is set, because sqlx's `verify-ca`
-  check reads the default and a test binary also links `ring`.
+  it as the process default when none is set, because a test binary also
+  links `ring` and a client that builds from the default would find none.
 - `graph` is the seam the OMOCL engine (#90) emits and the writer consumes:
   `RecordGraph` of `Row`s keyed by `RecordKey`, `Reference` for every column
   that names another row, `Link` for `FACT_RELATIONSHIP`, and the `Report`.
