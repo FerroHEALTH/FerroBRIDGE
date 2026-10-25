@@ -3551,6 +3551,7 @@ dependencies = [
  "ferrobridge-testkit",
  "futures-util",
  "openehr-base",
+ "rcgen",
  "rustls",
  "sha2 0.11.1",
  "sqlx",
@@ -3559,6 +3560,7 @@ dependencies = [
  "tokio",
  "tokio-postgres",
  "tokio-postgres-rustls",
+ "tokio-rustls",
  "webpki-roots",
 ]
 

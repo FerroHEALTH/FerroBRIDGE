@@ -81,14 +81,21 @@ impl Cdm {
     /// Returns a probe of the database `connection` reaches.
     ///
     /// Nothing is opened until the first check.
-    #[must_use]
-    pub fn new(connection: &omop_cdm::connection::CdmConnection) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`omop_cdm::connection::ConnectionError`] of
+    /// `CdmConnection::pool_options`, when the pool's TLS relay cannot be
+    /// started.
+    pub fn new(
+        connection: &omop_cdm::connection::CdmConnection,
+    ) -> Result<Self, omop_cdm::connection::ConnectionError> {
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(1)
             .min_connections(0)
             .acquire_timeout(crate::health::CHECK_TIMEOUT)
-            .connect_lazy_with(connection.pool_options());
-        Self { pool }
+            .connect_lazy_with(connection.pool_options()?);
+        Ok(Self { pool })
     }
 }
 

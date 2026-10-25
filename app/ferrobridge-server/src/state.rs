@@ -231,7 +231,13 @@ impl AppState {
             terminology = Some(client);
         }
         if let Some(cdm) = settings.cdm.as_ref() {
-            indicators.push(Arc::new(indicators::Cdm::new(&cdm.connection)));
+            let probe = indicators::Cdm::new(&cdm.connection).map_err(|source| {
+                crate::config::error::Error::CdmConnection {
+                    key: String::from("cdm.url"),
+                    source,
+                }
+            })?;
+            indicators.push(Arc::new(probe));
         }
         let programs = crate::mappings::load_configured(settings, cdr.as_ref())
             .await
