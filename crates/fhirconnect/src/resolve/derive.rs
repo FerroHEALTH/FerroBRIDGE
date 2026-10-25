@@ -34,6 +34,8 @@ use crate::model::ast::keyword::DataType;
 /// class name that carries no parameter.
 /// `DV_BOOLEAN` against `boolean` is a primitive pair the chapter leaves out
 /// as "straight forward" (`data-mappings.adoc`).
+/// `DV_ORDINAL` against `CodeableConcept` carries the symbol, the value coming
+/// from the options the template lists (`DV_ORDINAL.adoc` §`CodeableConcept`).
 /// `PARTY_REF` against `Reference` is no row of the chapter: it carries
 /// `ROLE.performer` in a party context, and no specification governs it, so
 /// it is our own design.
@@ -52,6 +54,7 @@ pub const PAIRS: &[(&str, &[&str])] = &[
     ("DV_PROPORTION", &["Quantity"]),
     ("DV_QUANTITY", &["Quantity", "decimal", "integer"]),
     ("DV_COUNT", &["integer", "Quantity", "Count"]),
+    ("DV_ORDINAL", &["CodeableConcept"]),
     ("DV_TIME", &["time"]),
     ("DV_DURATION", &["Duration"]),
     ("DV_URI", &["url"]),

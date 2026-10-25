@@ -12,6 +12,7 @@
 use fhir_types::r4::attachment::Attachment;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
+use openehr_mapping_core::index::ordinals::OrdinalOption;
 use openehr_rm::v1_2::data_types::encapsulated::dv_multimedia::DvMultimedia;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
@@ -32,6 +33,7 @@ use crate::engine::lens::date_time::PeriodStartLens;
 use crate::engine::lens::duration::DurationLens;
 use crate::engine::lens::encapsulated::EncapsulatedLens;
 use crate::engine::lens::interval::DateTimeIntervalLens;
+use crate::engine::lens::ordinal::OrdinalLens;
 use crate::engine::lens::party::IdentifierLens;
 use crate::engine::lens::party::PartyLens;
 use crate::engine::lens::proportion::PercentLens;
@@ -56,6 +58,7 @@ use crate::engine::cell::held::held_duration;
 use crate::engine::cell::held::held_identifier;
 use crate::engine::cell::held::held_interval;
 use crate::engine::cell::held::held_multimedia;
+use crate::engine::cell::held::held_ordinal;
 use crate::engine::cell::held::held_parsable;
 use crate::engine::cell::held::held_party;
 use crate::engine::cell::held::held_proportion;
@@ -148,6 +151,9 @@ pub fn get(
         (RmValue::Count(count), FhirKind::Count) => CountLens
             .get(count.as_ref())
             .map(|count| FhirValue::Count(Box::new(count))),
+        (RmValue::Ordinal(ordinal), FhirKind::CodeableConcept) => OrdinalLens::new(coded, &[])
+            .get(ordinal.as_ref())
+            .map(|concept| FhirValue::CodeableConcept(Box::new(concept))),
         (RmValue::Time(time), FhirKind::Time) => TimeLens.get(time.as_ref()).map(FhirValue::Time),
         (RmValue::Duration(duration), FhirKind::Duration) => DurationLens
             .get(duration.as_ref())
@@ -255,6 +261,9 @@ pub fn withheld(source: &RmValue, kind: FhirKind, binding: Option<&str>) -> Vec<
         (RmValue::CodedText(text), FhirKind::CodeableConcept) => {
             Lens::<DvCodedText, CodeableConcept>::withheld(&coded_lens(binding), text.as_ref())
         }
+        (RmValue::Ordinal(ordinal), FhirKind::CodeableConcept) => {
+            OrdinalLens::new(coded_lens(binding), &[]).withheld(ordinal.as_ref())
+        }
         (_source, _kind) => Vec::new(),
     }
 }
@@ -277,7 +286,8 @@ pub fn uncarried_code(source: &RmValue, kind: FhirKind) -> Option<&CodePhrase> {
 /// Writes a FHIR element back into the openEHR class `rm_type` names.
 ///
 /// `existing` is the value the target already holds, which carries the
-/// attributes the cell's table marks as having no FHIR counterpart.
+/// attributes the cell's table marks as having no FHIR counterpart, and
+/// `ordinals` the options the template constrains at a `DV_ORDINAL` node.
 ///
 /// # Errors
 ///
@@ -288,6 +298,7 @@ pub fn put(
     rm_type: &str,
     existing: Option<&RmValue>,
     binding: Option<&str>,
+    ordinals: &[OrdinalOption],
 ) -> Result<Produced<RmValue>, LensError> {
     let coded = coded_lens(binding);
     let value = match (derive::base_class(rm_type), view) {
@@ -353,6 +364,9 @@ pub fn put(
         ("DV_COUNT", FhirValue::Count(count)) => CountLens
             .put(count.as_ref(), held_count(existing))
             .map(|count| RmValue::Count(Box::new(count))),
+        ("DV_ORDINAL", FhirValue::CodeableConcept(concept)) => OrdinalLens::new(coded, ordinals)
+            .put(concept.as_ref(), held_ordinal(existing))
+            .map(|ordinal| RmValue::Ordinal(Box::new(ordinal))),
         ("DV_TIME", FhirValue::Time(time)) => TimeLens
             .put(time, held_time(existing))
             .map(|time| RmValue::Time(Box::new(time))),
@@ -411,6 +425,9 @@ fn fallbacks(
         ("DV_TEXT", FhirValue::CodeableConcept(concept)) => TextLens.fallbacks(concept.as_ref()),
         ("DV_CODED_TEXT", FhirValue::Coding(coding)) => coded.fallbacks(coding.as_ref()),
         ("DV_CODED_TEXT", FhirValue::CodeableConcept(concept)) => coded.fallbacks(concept.as_ref()),
+        ("DV_ORDINAL", FhirValue::CodeableConcept(concept)) => {
+            OrdinalLens::new(coded, &[]).fallbacks(concept.as_ref())
+        }
         ("CODE_PHRASE", FhirValue::Coding(coding)) => CodePhraseLens.fallbacks(coding.as_ref()),
         ("DV_DATE", FhirValue::Date(date)) => DateLens.fallbacks(date),
         ("DV_BOOLEAN", FhirValue::Boolean(boolean)) => BooleanLens.fallbacks(boolean),
@@ -531,6 +548,7 @@ mod tests {
             "CODE_PHRASE",
             None,
             None,
+            &[],
         )
         .expect("the CODE_PHRASE cell carries the pair");
         assert_eq!(produced.value.rm_type(), "CODE_PHRASE");
@@ -558,7 +576,7 @@ mod tests {
         .expect("a quantity interval with no bounds");
         assert!(matches!(held, RmValue::QuantityInterval(_)));
         let view = FhirValue::Range(Box::default());
-        let produced = put(&view, "DV_INTERVAL<DV_QUANTITY>", Some(&held), None)
+        let produced = put(&view, "DV_INTERVAL<DV_QUANTITY>", Some(&held), None, &[])
             .expect("the Range cell carries the node");
         assert_eq!(produced.value, held);
     }
@@ -567,15 +585,15 @@ mod tests {
     fn the_interval_parameter_refuses_the_other_cell() {
         // RM 1.1.0 data_types §DV_INTERVAL: the bound class is the parameter.
         let period = FhirValue::Period(Box::default());
-        let error = put(&period, "DV_INTERVAL<DV_QUANTITY>", None, None)
+        let error = put(&period, "DV_INTERVAL<DV_QUANTITY>", None, None, &[])
             .expect_err("a Period builds no quantity interval");
         assert!(error.to_string().contains("Period"), "{error}");
         let range = FhirValue::Range(Box::default());
-        let error = put(&range, "DV_INTERVAL<DV_DATE_TIME>", None, None)
+        let error = put(&range, "DV_INTERVAL<DV_DATE_TIME>", None, None, &[])
             .expect_err("a Range builds no date-time interval");
         assert!(error.to_string().contains("Range"), "{error}");
         assert!(
-            put(&period, "DV_INTERVAL<DV_DATE_TIME>", None, None).is_ok(),
+            put(&period, "DV_INTERVAL<DV_DATE_TIME>", None, None, &[]).is_ok(),
             "a Period builds a date-time interval"
         );
     }
@@ -612,7 +630,7 @@ mod tests {
                 let view = get(value, kind, None).expect("the chapter has the row");
                 assert_eq!(view.kind(), kind);
                 let back =
-                    put(&view, value.rm_type(), Some(value), None).expect("the row runs back");
+                    put(&view, value.rm_type(), Some(value), None, &[]).expect("the row runs back");
                 assert_eq!(&back.value, value, "{kind:?} round trips");
             }
         }
@@ -623,10 +641,10 @@ mod tests {
     #[test]
     fn a_primitive_declares_the_unity_units_only_when_nothing_is_held() {
         let view = FhirValue::Integer(fhir_types::r4::primitives::Integer::from(3));
-        let fresh = put(&view, "DV_QUANTITY", None, None).expect("the integer travels");
+        let fresh = put(&view, "DV_QUANTITY", None, None, &[]).expect("the integer travels");
         assert_eq!(fresh.fallbacks.len(), 1, "units is the specification's 1");
         let held =
-            put(&view, "DV_QUANTITY", Some(&fresh.value), None).expect("the integer travels");
+            put(&view, "DV_QUANTITY", Some(&fresh.value), None, &[]).expect("the integer travels");
         assert!(held.fallbacks.is_empty(), "the held units return");
     }
 

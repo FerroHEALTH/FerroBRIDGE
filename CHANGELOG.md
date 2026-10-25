@@ -35,6 +35,14 @@ crates on crates.io.
   application writes, read from its source at a pinned commit and vendored
   under `docs/specs/athena/` by `scripts/vendor/athena.sh` (#88). The Operate
   pages describe the load and the vocabulary licences you accept.
+- FHIRconnect converts `DV_ORDINAL` against `CodeableConcept`
+  (`DV_ORDINAL.adoc` §CodeableConcept, #93): the coding carries the symbol,
+  and going into openEHR the ordinal value is the one the template's
+  `C_DV_ORDINAL` lists for the symbol's code. A symbol the template does not
+  list, or a node whose template lists no options, is refused.
+  `fhirconnect` 0.1.191 adds `RmValue::Ordinal`, `lens::ordinal` and a
+  fifth parameter to `cell::put`, the node's ordinal options; a caller of
+  `cell::put` passes `&[]` where it has none.
 
 ## [0.0.12] - 2026-10-25
 
