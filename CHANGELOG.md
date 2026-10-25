@@ -206,6 +206,11 @@ crates on crates.io.
 
 ### Changed
 
+- The bridge and `ferrobridge-term`'s `smart` feature take
+  `ferrohealth-smart` 0.7.0 in place of 0.6.0, the line the family moves to
+  together: `ferrobridge-term` 0.1.136, `ferrobridge-hl7v2` 0.1.146 and
+  `ferrobridge-validator` 0.1.136. No configuration key or behaviour changes.
+
 - The operator console's search answers under the field as you type: a panel
   anchored under the top bar's search asks the console's `/search/answer`
   route and shows the running load's contexts, mapping files and templates
