@@ -31,6 +31,7 @@ use openehr_rm::v1_2::data_types::quantity::date_time::dv_duration::DvDuration;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_time::DvTime;
 use openehr_rm::v1_2::data_types::quantity::dv_count::DvCount;
 use openehr_rm::v1_2::data_types::quantity::dv_interval::DvInterval;
+use openehr_rm::v1_2::data_types::quantity::dv_ordinal::DvOrdinal;
 use openehr_rm::v1_2::data_types::quantity::dv_proportion::DvProportion;
 use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
@@ -81,6 +82,8 @@ pub enum RmValue {
     Quantity(Box<DvQuantity>),
     /// A `DV_COUNT`.
     Count(Box<DvCount>),
+    /// A `DV_ORDINAL`.
+    Ordinal(Box<DvOrdinal>),
     /// A `DV_TIME`.
     Time(Box<DvTime>),
     /// A `DV_DURATION`.
@@ -155,6 +158,7 @@ impl RmValue {
             Self::Proportion(_) => "DV_PROPORTION",
             Self::Quantity(_) => "DV_QUANTITY",
             Self::Count(_) => "DV_COUNT",
+            Self::Ordinal(_) => "DV_ORDINAL",
             Self::Time(_) => "DV_TIME",
             Self::Duration(_) => "DV_DURATION",
             Self::Uri(_) => "DV_URI",
@@ -227,6 +231,9 @@ impl RmValue {
             "DV_COUNT" => from_canonical_value(value)
                 .map(|count| Self::Count(Box::new(count)))
                 .map_err(refuse),
+            "DV_ORDINAL" => from_canonical_value(value)
+                .map(|ordinal| Self::Ordinal(Box::new(ordinal)))
+                .map_err(refuse),
             "DV_TIME" => from_canonical_value(value)
                 .map(|time| Self::Time(Box::new(time)))
                 .map_err(refuse),
@@ -291,6 +298,7 @@ impl RmValue {
                 to_canonical_value(quantity.as_ref())
             }
             Self::Count(ref count) => to_canonical_value(count.as_ref()),
+            Self::Ordinal(ref ordinal) => to_canonical_value(ordinal.as_ref()),
             Self::Time(ref time) => to_canonical_value(time.as_ref()),
             Self::Duration(ref duration) => to_canonical_value(duration.as_ref()),
             Self::Uri(ref uri) => to_canonical_value(uri),

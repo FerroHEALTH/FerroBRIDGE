@@ -180,3 +180,13 @@ pub(super) fn held_proportion(
         _other => None,
     }
 }
+
+/// Returns the held `DV_ORDINAL`, when the target holds one.
+pub(super) fn held_ordinal(
+    existing: Option<&RmValue>,
+) -> Option<&openehr_rm::v1_2::data_types::quantity::dv_ordinal::DvOrdinal> {
+    match existing {
+        Some(RmValue::Ordinal(ordinal)) => Some(ordinal.as_ref()),
+        _other => None,
+    }
+}

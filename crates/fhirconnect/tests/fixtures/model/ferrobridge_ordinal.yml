@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that writes the CodeableConcept
+# alternative of Observation.value[x] into the problem name value, which the
+# test turns into a DV_ORDINAL with two synthetic options: DV_ORDINAL against
+# CodeableConcept, the pair derived from the node with no type key.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_ordinal
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+mappings:
+  - name: "score"
+    with:
+      fhir: "$resource.value.as(CodeableConcept)"
+      openehr: "$archetype/data[at0001]/items[at0002]/value"

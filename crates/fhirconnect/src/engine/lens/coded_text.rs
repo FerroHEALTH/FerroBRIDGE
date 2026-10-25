@@ -225,7 +225,7 @@ fn value_of<'view>(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::CODEABLE_CONCEPT_CELL;
     use super::CodedTextLens;
     use crate::engine::lens::Fallback;

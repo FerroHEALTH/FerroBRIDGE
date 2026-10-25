@@ -345,7 +345,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         view: &FhirValue,
         rm_type: &str,
     ) -> Result<RmValue, EngineError> {
-        cell::put(view, rm_type, None, None)
+        cell::put(view, rm_type, None, None, &[])
             .map(|produced| produced.value)
             .map_err(|source| EngineError::Cell {
                 mapping: String::from(mapping.name()),
