@@ -25,6 +25,19 @@ crates on crates.io.
 
 ### Added
 
+- Every CDM row `etl fhir` writes names the FHIR resource it was mapped from
+  (#409): the bridge schema's `resource_origin` table records each
+  composition's resource type, id and `meta.versionId` in the commit's
+  transaction, and `CdmWriter::origins_of_row` and `rows_of_resource` look a
+  row's resources and a resource's rows up. `cdm init` adds the table.
+- `ferrobridge-term` 0.1.135 takes the client credentials token of
+  `ferrohealth-smart` as its `TokenProvider` behind the new `smart` feature
+  (#1227): `smart::SmartToken`, built from a `TokenSource`, sends the cached
+  token and drops one the server refuses with `401`, so the repeated request
+  carries a token fetched anew. The server's terminology lane uses it in
+  place of its own adapter. `ferrobridge-hl7v2` 0.1.144 and
+  `ferrobridge-validator` 0.1.135 move with it.
+
 - The first HL7 Europe profile context: `ferrobridge_eu_condition.context`
   targets Base and Core 2.0.0 `condition-eu-core` over the published
   `KDS_Diagnose` template, with the published diagnosis, qualifier and
@@ -36,6 +49,12 @@ crates on crates.io.
   the OMOCL files against the vocabulary loaded in the `[cdm]` database: a
   literal the vocabulary does not hold, or whose domain is not one the CDM
   field definitions name for its column, is a diagnostic (#97).
+- `ferrobridge_eu_patient.context` targets HL7 Europe Base and Core 2.0.0
+  `patient-eu-core` over the published `KDS_Person` template, loading the
+  person chain of the KDS person context with a gender extension that names
+  the EU profile in place of the MII one and leaves out the German
+  gender-amtlich extension. The round trip asserts the required `name` and
+  `birthDate`, `gender` and the canonical (#116).
 - The profile package set pins `hl7.fhir.eu.laboratory` 2.0.0 and
   `hl7.fhir.eu.mpd` 1.0.0, the HL7 Europe Laboratory Report and Medication
   Prescription and Dispense guides the EU profile contexts target, fetched
@@ -51,6 +70,13 @@ crates on crates.io.
   `dq check` and the post-load step of `etl run` report them. A person whose
   year of birth is 0, as a placeholder `PERSON` row carries, has no birth date
   for these checks instead of failing them.
+- `[cdm.pseudonymisation]` pseudonymises every row the CDM writer writes
+  (#410): the columns the CDM field definitions describe as a link back to the
+  source carry an HMAC-SHA-256 pseudonym under a `_file` secret key, stable
+  across runs so incremental loads join, the provider's name, `npi` and `dea`
+  and a location's address are NULL, and `date_shift_days` moves every date
+  of a person by one per-person shift, so intervals within a person stay
+  intact. The Integrate and Operate pages state what it does not de-identify.
 - `cdm init` and every `etl run` and `etl fhir` count the rows of each CDM
   table whose ids the bridge assigns that no entry of its side table owns,
   rows another load wrote, and warn of each table; the run report carries the

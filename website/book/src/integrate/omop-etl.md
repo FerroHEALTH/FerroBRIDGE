@@ -289,6 +289,36 @@ schema keeps their keys in `provider` and `visit_detail`. Neither row is
 removed when a composition that named it is removed, because other
 compositions may still name it.
 
+## Pseudonymisation
+
+An OMOP database is usually handed to researchers, and the identifiers and
+dates the bridge writes are personal data. With `[cdm.pseudonymisation]` set
+([the section](../operate/configuration.md#cdmpseudonymisation)), the writer
+transforms every row before it reaches the CDM. The CDM defines no
+pseudonymisation, so what is transformed is FerroBRIDGE's own design over the
+CDM field definitions:
+
+- `person_source_value`, `provider_source_value`, `care_site_source_value`,
+  `location_source_value`, `specimen_source_id`, `visit_source_value`,
+  `visit_detail_source_value` and `family_source_value`, the columns the field
+  definitions describe as a link back to the source, carry an HMAC-SHA-256
+  pseudonym under the configured key, 40 hex characters. The placeholder
+  `PERSON` row's EHR id and every derived visit's source are pseudonymised the
+  same way.
+- The provider's `provider_name`, `npi` and `dea`, and a location's
+  `address_1`, `address_2`, `zip`, `latitude` and `longitude`, are NULL.
+- With `date_shift_days = N`, every date and datetime of a person's rows moves
+  by one whole number of days in `[-N, N]`, taken from the key and the
+  person's EHR id. The birth year, month and day move with it when all three
+  are known. Intervals within a person stay as they were, and the derived
+  tables, rebuilt from the shifted rows, agree with them.
+
+What it does not de-identify: free text (`note_text`, `value_as_string`), the
+code `*_source_value` columns, a year of birth with no month or day, and the
+concepts of rare conditions. The bridge schema keeps the source identifiers it
+needs to replace a composition's rows. Treat the CDM as pseudonymised personal
+data, and apply your own suppression where you need anonymised data.
+
 ## The composition query
 
 The `[etl] aql` query selects each composition whole beside its `ehr_id` and
@@ -342,16 +372,34 @@ design, and each hop stays governed by its own specification.
 - **Time.** A resource is mapped at its `meta.lastUpdated`, so a composition
   field FHIRconnect defaults to the run time takes the same value on every
   run. A resource without one takes the time the job started.
-- **What reaches the CDM** is what the two mapping sets cover. Over the
-  published libraries that is Patient, Condition, Procedure, the laboratory
-  DiagnosticReport, MedicationStatement and MedicationAdministration; an
-  Encounter reaches no VISIT_OCCURRENCE, and the job derives no visit, since
-  the visit query reads a CDR.
+- **What reaches the CDM** is what the two mapping sets cover. The published
+  FHIRconnect library's Procedure and MedicationAdministration mappings are
+  left out at load (`mapping check` names why), so a site maps those
+  resources with mappings of its own; a Procedure's `performed[x]` does not
+  yet reach `ACTION.time` (#1226). An Encounter reaches no VISIT_OCCURRENCE,
+  and the job derives no visit, since the visit query reads a CDR.
 - **Nothing disappears.** A resource no FHIRconnect program maps, one the
   FHIRconnect run refuses, one with no id or no subject, and a composition
   OMOCL refuses are each counted and listed in the run report, which adds a
   `resources` line (read, mapped, unmapped, refused, and the losses the
   FHIRconnect run declared).
+- **Every row names its resource.** The bridge schema's `resource_origin`
+  table ties each composition to the resource type, id and `meta.versionId`
+  it was mapped from, and through the natural-key side table each CDM row to
+  that resource. To find where a row came from, or every row a resource
+  became:
+
+  ```sql
+  SELECT o.resource_type, o.resource_id, o.resource_version
+  FROM ferrobridge.record r
+  JOIN ferrobridge.resource_origin o USING (versioned_object_uid)
+  WHERE r.cdm_table = 'condition_occurrence' AND r.surrogate_id = 1;
+
+  SELECT r.cdm_table, r.surrogate_id
+  FROM ferrobridge.resource_origin o
+  JOIN ferrobridge.record r USING (versioned_object_uid)
+  WHERE o.resource_type = 'Condition' AND o.resource_id = 'c-1';
+  ```
 
 ## Checking a populated database with the Data Quality Dashboard
 

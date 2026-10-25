@@ -1125,7 +1125,11 @@ FerroBRIDGE's extensions under `projects/ferrobridge/eu_condition` add the
 profile's `assertedDate` and `onsetDateTime` slices and its canonical, and
 leave out the KDS ICD-10-GM, Diagnosesicherheit and Lebensphase branches.
 Its round trip asserts the code, both slices and the two status bindings
-(#116).
+(#116). `patient-eu-core` 2.0.0 follows over the published `KDS_Person`
+template (its person, structured name and address clusters are CKM's),
+loading the KDS person chain with a gender extension that names the EU
+profile and leaves out the German gender-amtlich extension; its round trip
+asserts the required name and birth date.
 
 **Decision:** profile mappings are authored in this repository, in the
 specification's own customisation mechanism (a context and its extensions per
@@ -1778,7 +1782,12 @@ maps, Patient (`person_data` into `PERSON`), Condition (`problem_diagnosis`
 into `CONDITION_OCCURRENCE`), Procedure (`ACTION.procedure` into
 `PROCEDURE_OCCURRENCE`), the laboratory DiagnosticReport (the analytes into
 `MEASUREMENT`) and MedicationStatement and MedicationAdministration (into
-`DRUG_EXPOSURE`) reach a CDM table end to end. Encounter reaches none,
+`DRUG_EXPOSURE`) have an archetype both libraries map. Two of those do not
+reach the CDM through the published files: the FHIRconnect library's
+`procedure.v1` and `report.v1.MedicationAdministration` are left out of every
+context at load (`fc-condition-target-root-mismatch`), and the engine cannot
+yet write `ACTION.time` (#1226), so a site maps those resources itself.
+Encounter reaches none,
 because the two libraries map sibling archetypes
 (`episode_institution_local.v0` against `episode_institution.v0`), and
 MedicationRequest has no FHIRconnect mapping. A site extends the path with
@@ -1799,8 +1808,10 @@ The shape:
   `ferrobridge.fhir`. A re-run of the same input is idempotent and a new
   numeric version of a resource replaces its rows. The EHR id is the same kind
   of UUID of the resource's subject reference (`Patient/{id}` for a Patient),
-  so every resource of one patient lands on one person. The lineage back to
-  the resource is #409.
+  so every resource of one patient lands on one person. The bridge schema's
+  `resource_origin` table records each composition's resource type, id and
+  version in the commit's transaction, so every row traces to its resource
+  and back through the natural-key side table (#409).
 - **Every element accounted for.** FHIRconnect reports each loss as a typed
   outcome and OMOCL counts unmapped fields and refusals, so the run report
   joins the two into one ledger per input resource (#408).
@@ -1809,6 +1820,40 @@ The shape:
   rows carry no visit, as a CDR run without `[etl.visits]` does.
 
 The work is filed as sub-issues of #407.
+
+### 5.7 Pseudonymisation
+
+An OMOP database is usually handed to researchers, and the identifiers and
+dates the bridge writes are personal data. With `[cdm.pseudonymisation]` set,
+the writer transforms every row before it reaches the CDM. The CDM defines no
+pseudonymisation; the columns follow its field definitions
+(`OMOP_CDMv5.4_Field_Level.csv`), which describe `person_source_value` and
+`provider_source_value` as the field "to link back to persons/providers in the
+source data". No specification governs the rest: our own design.
+
+- **Keyed pseudonyms.** `person_source_value`, `provider_source_value`,
+  `care_site_source_value`, `location_source_value`, `specimen_source_id`,
+  `visit_source_value`, `visit_detail_source_value` and `family_source_value`
+  carry HMAC-SHA-256 under the configured key (a `_file` secret of at least
+  32 bytes) over the value, as 40 lowercase hex characters. One value under
+  one key gives one pseudonym on every run, so an incremental load joins.
+- **Erased.** The provider's `provider_name`, `npi` and `dea`, and a
+  location's `address_1`, `address_2`, `zip`, `latitude` and `longitude`,
+  are written as NULL.
+- **One shift per person.** With `date_shift_days = N` (at most 3650), every
+  date and datetime of a person's rows moves by a whole number of days in
+  `[-N, N]`, taken from the same HMAC over the person's EHR id. The shift is
+  applied in the `INSERT ... SELECT` the writer already runs, so the crate
+  still does no calendar arithmetic. The birth year, month and day move with
+  it when all three are known. Intervals within a person stay intact, and the
+  derived tables, rebuilt from the shifted rows, agree with them.
+
+Limits, stated on the Operate page: the result is pseudonymised data, still
+personal data. Free text (`note_text`, `value_as_string`), the code
+`*_source_value` columns, a birth year with no month or day, and the concepts
+of rare conditions are written as mapped. The bridge schema keeps the source
+identifiers it needs to replace a composition's rows, so it is never handed
+out with the CDM.
 
 ## 6. Terminology
 

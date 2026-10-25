@@ -126,6 +126,7 @@ pub(super) fn bridge_ddl(bridge: &SchemaName) -> String {
         statements.extend(written_rows_ddl(bridge, table));
     }
     statements.extend(shared_ddl(bridge));
+    statements.extend(crate::writer::origin::origin_ddl(bridge));
     for table in &crate::generated::TABLES {
         if graph::row::cdm_table(table.name).is_ok() && graph::row::primary_key(table).is_some() {
             statements.push(format!(

@@ -79,7 +79,7 @@ omop-cdm = { path = "crates/omop-cdm", version = "0.0.0", default-features = fal
 ferrobridge-testkit = { path = "tools/ferrobridge-testkit" }
 # Published from this workspace and consumed by the published
 # ferrobridge-hl7v2, so the requirement carries both a path and a version.
-ferrobridge-term = { path = "crates/ferrobridge-term", version = "0.1.134" }
+ferrobridge-term = { path = "crates/ferrobridge-term", version = "0.1.135" }
 # Published from this workspace and consumed by the published
 # ferrobridge-validator, so the requirement carries both a path and a version.
 ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "0.1.128" }
@@ -122,7 +122,9 @@ backon = "1.6.0"
 # "introspection"`. Pinned exactly; verified against crates.io on 2026-10-25
 # (0.6.0, published 2026-10-25). `fetch` reads each issuer's metadata and key
 # set and runs the client credentials token client and the introspector.
-ferrohealth-smart = { version = "=0.6.0", default-features = false, features = ["axum", "fetch"] }
+# The server adds `axum` for its guard; ferrobridge-term's `smart` feature
+# takes the token client alone.
+ferrohealth-smart = { version = "=0.6.0", default-features = false, features = ["fetch"] }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off. Verified against crates.io on 2026-10-16 (11.1.0,
