@@ -184,7 +184,7 @@ impl Ingest<'_> {
             None => {}
         }
         current.subject.external_ref = Some(reference);
-        let context = commit::status_context(&self.settings.system_id);
+        let context = commit::status_context(&self.settings.system_id, &self.committer);
         let answered = self
             .client
             .update_ehr_status(ehr_id, &version, &current, &context, Prefer::Minimal)

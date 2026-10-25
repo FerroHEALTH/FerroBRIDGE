@@ -48,6 +48,7 @@ use crate::cdr::ids::ContributionUid;
 use crate::cdr::ids::EhrId;
 use crate::facade::Settings;
 use crate::facade::commit;
+use crate::facade::commit::Committer;
 use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::PersonId;
 use crate::facade::identity::claims::Claims;
@@ -433,6 +434,8 @@ pub struct Ingest<'a> {
     usage: Option<&'a Window>,
     /// The demographics endpoint every party reference resolves through.
     demographics: &'a dyn Demographics,
+    /// Who every commit of this ingest is attributed to.
+    committer: Committer,
 }
 
 /// The translator of an ingest built with none: no server, so a
@@ -593,7 +596,18 @@ impl<'a> Ingest<'a> {
             references: &NoReferences,
             usage: None,
             demographics: &NoDemographics,
+            committer: Committer::Bridge,
         }
+    }
+
+    /// Returns this ingest attributing every commit to `committer`, the
+    /// caller of the request it serves.
+    ///
+    /// The default is the bridge, for a face no caller authenticates.
+    #[must_use]
+    pub fn with_committer(mut self, committer: Committer) -> Self {
+        self.committer = committer;
+        self
     }
 
     /// Returns this ingest counting every unit its programs refuse to map in

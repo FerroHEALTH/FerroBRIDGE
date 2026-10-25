@@ -478,7 +478,7 @@ impl Ingest<'_> {
                 lifecycle_state: commit::lifecycle(),
                 attestations: None,
                 data: Some(Versionable::Composition(entry.composition.as_ref().clone())),
-                commit_audit: commit::audit(change_of(prior.as_ref()), system_id),
+                commit_audit: commit::audit(change_of(prior.as_ref()), system_id, &self.committer),
                 additional_properties: BTreeMap::new(),
             })
             .collect();
@@ -492,7 +492,7 @@ impl Ingest<'_> {
         let contribution = NewContribution {
             uid: None,
             versions,
-            audit: commit::audit(change, system_id),
+            audit: commit::audit(change, system_id, &self.committer),
             additional_properties: BTreeMap::new(),
         };
         let answered = match self

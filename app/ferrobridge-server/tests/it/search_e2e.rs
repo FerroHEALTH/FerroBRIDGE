@@ -288,6 +288,7 @@ async fn commit_two_diagnoses(
     let commit = ferrobridge_server::facade::commit::context(
         ferrobridge_server::facade::commit::Change::Creation,
         "ferrobridge.e2e",
+        &ferrobridge_server::facade::commit::Committer::Bridge,
         fixtures::KDS_DIAGNOSE_TEMPLATE_ID,
     )?;
     let committed = client
