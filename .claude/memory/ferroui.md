@@ -1,6 +1,6 @@
 ---
 name: ferroui
-description: One shared UI component library, FerroHEALTH/FerroUI, for every FerroHEALTH console, linked by a pinned Cargo dependency; the owner signed off on migrating FerroEHR, FerroFED and FerroTERM to it from here
+description: One shared UI component library, FerroHEALTH/FerroUI, for every FerroHEALTH console, linked by a pinned Cargo dependency; every console is reactive; the owner signed off on migrating the sibling consoles to it from here
 metadata:
   type: project
 ---
@@ -8,13 +8,13 @@ metadata:
 <!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
-The operator UIs of FerroBRIDGE, FerroFED, FerroEHR and FerroTERM move onto
-one component library in its own repository, `FerroHEALTH/FerroUI` (owner,
+Every FerroHEALTH console (FerroBRIDGE, FerroFED, FerroEHR, FerroPIX and
+FerroTERM) draws in one component library in its own repository, `FerroHEALTH/FerroUI` (owner,
 2026-10-18: "i want to have an uniform ui compoanats libary for all the
 different UI's so all the products look and feel the same", name chosen
 "FerroUI").
 
-**Why:** four consoles drifted apart, and every fix was made once per repo.
+**Why:** the consoles drifted apart, and every fix was made once per repo.
 The owner found FerroBRIDGE's console missing the Lucide icons and editor
 highlighting the others have, which a shared library prevents by
 construction.
@@ -31,12 +31,16 @@ construction.
   FerroUI exactly (crates.io through Trusted Publishing, or a git dependency
   at a release tag), the lockfile records it, and Dependabot proposes the
   update. The crate ships its stylesheet and tokens.
-- **All four switch in one coordinated change**, not one product at a time.
+- **Every console switches in one coordinated change**, not one product at a time.
 - **FerroTERM's console becomes server rendered** like the others (owner,
   2026-10-18: "yes do that then while you do the rewrite"): its own
   `ferroterm-viewer` binary and image, a backend-for-frontend holding the
   operator's session, the terminology server serving no UI files, so FerroUI
-  targets one rendering model (server rendered and hydrated).
+  targets one rendering model.
+- **Every console is reactive** (owner, 2026-10-25,
+  [[reactive-console-ui]], [[family-architecture]]): a link, a form or an
+  action never reloads the whole document. WebAssembly is the normal path
+  and the no-WebAssembly page only the fallback (FerroUI #410).
 - **The owner signed off on editing the sibling repositories for this
   migration** (2026-10-18: "it's an sign off you are allwed to update there
   repo's"). Each change is made in that repository's own checkout, branch and
@@ -63,7 +67,7 @@ construction.
   done ([[autonomous-loop]]).
 - **The best of each product, in one harmonized style** (owner,
   2026-10-18: "we just need to take the best of each product … create an
-  harmonized UI style"). Each component compares the four products' versions
+  harmonized UI style"). Each component compares the products' versions
   and takes the best on its merits; FerroBRIDGE's console is the newest and
   usually loses. The chosen piece is restyled to the one type scale, spacing,
   radius, hover and focus treatment, so no component looks foreign.
@@ -78,11 +82,11 @@ construction.
   yourself"). The orchestrator reads every image, has the defects fixed and
   recaptured, and approves the tag or merge itself without waiting for the
   owner, who still gets the final set shown.
-- **All four consoles move in lockstep** (owner, 2026-10-18: "if you update
+- **Every console moves in lockstep** (owner, 2026-10-18: "if you update
   FerroUI from here then you also need to keep updating the others …
   otherwise it will never be the same"). Every FerroUI release made from
-  here gets a pin-bump PR in FerroBRIDGE, FerroFED, FerroEHR and FerroTERM,
+  here gets a pin-bump PR in every product that has a console,
   each with the visual loop and screenshots the orchestrator reviews, and
-  the four merge together. Only the FerroUI pin, its API changes and the
+  they merge together. Only the FerroUI pin, its API changes and the
   visual fixes it brings are changed in a sibling; anything else found there
   is filed on its tracker.

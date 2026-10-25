@@ -49,11 +49,14 @@ Rust projects can reuse, and the sibling's lane is proven.
   sibling's half of the move; a separate repository for the crate was
   refused ("we will not have an own thing"). The bridge is the crate's
   largest consumer, so the generator lives where the root set is widest.
-- **Seven published crates, never more without a second consumer.** Owner
+- **Seven published crates at the ruling, eleven today, never more without a
+  second consumer.** Owner
   ruling 2026-09-05 after asking "are you really sure we need all these
   crates?": the twelve-way split (model, resolve, engine, tree per language)
   collapsed to one crate per language with modules (`fhirconnect`, `omocl`),
   one shared foundation (`openehr-mapping-core`), `omop-cdm`, the two clients
-  and `fhir-types`. Before proposing a crate, check both siblings for an
-  existing one and say in plain words what the crate does; the owner wants to
+  and `fhir-types`. Before proposing a crate, check the family's products and
+  shared-crate repositories for an existing one ([[family-architecture]]:
+  nothing is hand-written that a shared crate provides) and say in plain
+  words what the crate does; the owner wants to
   understand each boundary, and a finer split is a cost with no consumer.

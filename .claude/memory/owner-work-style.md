@@ -20,8 +20,10 @@ from the start. **How to apply:**
   default to the conventional answer.
 - Do NOT scaffold code or a workspace while the design is still open. On
   FerroTERM the owner stopped an early scaffold with "still in the discover
-  phase". Build only after the direction is confirmed. FerroBRIDGE is in
-  exactly that phase now (`CLAUDE.md` §Status).
+  phase". Build only after the direction is confirmed. FerroBRIDGE's design
+  phase closed with `docs/architecture.md`, the design of record, and the
+  workspace landed in v0.0.2; a new foundational question goes back to
+  research before any code.
 - Take the owner's design intuitions seriously and test them against evidence.
   On FerroTERM the owner's graph-model call was correct and the research
   refined how to implement it. Reconcile rather than dismiss.

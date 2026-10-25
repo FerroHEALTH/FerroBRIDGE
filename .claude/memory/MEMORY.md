@@ -3,11 +3,15 @@
 
 # Memory index
 
+- [Family architecture](family-architecture.md): five separate servers that
+  reach each other only over published protocols, shared crates for
+  cross-cutting work, nothing hand-written that a shared crate covers,
+  reactive consoles; FerroFORMS, the umbrella and Veredictum out of scope;
+  owner 2026-10-25
 - [Product scope](product-scope.md): the owner's product statement is the
   ceiling on what this repository may claim; standalone server and
-  mapping-driven are decided, everything else is research on issue #1;
-  FerroEHR's in-tree FHIR extension is expected to retire in favour of the
-  bridge
+  mapping-driven are decided, the rest is the architecture of record from
+  issue #1; FHIR and OMOP are FerroBRIDGE's lane, FerroEHR carries none
 - [OMOP target](omop-target.md): the owner confirmed OMOP as a first-class
   target beside FHIR on 2026-09-03; FHIRconnect covers FHIR (openFHIR is its
   reference implementation) and OMOCL covers OMOP (Eos is its reference
@@ -23,9 +27,10 @@
   inbound equals outbound, no contributor licence agreement
 - [Sibling projects](sibling-projects.md): FerroEHR at `../ferroehr` is the
   reference CDR and FerroTERM at `../FerroTERM` the reference terminology
-  server; both are read-only prior art from here and never edited from this
-  repository; a tracker issue in a sibling may be filed from here when the
-  owner asks (2026-09-05, FerroTERM #300)
+  server, FerroFED and FerroPIX the other products; all are read-only prior
+  art reached over their protocols, never edited from this repository; a
+  tracker issue in a sibling may be filed from here when the owner asks
+  (2026-09-05, FerroTERM #300)
 - [Domain ferrobridge.eu](domain-ferrobridge-eu.md): the public domain is a
   Pages setting mirroring ferroterm.eu, never a `CNAME` file; owner 2026-09-04
 - [Milestones 0.0.x](milestones-0-0-x.md): milestones start at v0.0.1 and step
@@ -70,16 +75,15 @@
 - [HL7 v2 test corpora](hl7v2-test-corpora.md) — the vendored v2 message sets, their licences, and that no real traffic is public
 - [File-length rule](file-length-rule.md) — hand-written .rs ≤ 1000 lines, split at 750 into module folders; guard with ratchet allow-list (#351)
 - [Repo moved to FerroHEALTH](repo-moved-to-ferrohealth.md) — 2026-10-01 transfer; ghcr.io/ferrohealth image, org board #3, what keeps the old owner
-- [FerroHEALTH is the mother name](ferrohealth-umbrella.md) — family-level docs (manufacturer, EHDS system, CRA overview, licensing) go to the FerroHEALTH book
 - [PR licence box](pr-licence-box.md) — tick the contribution-licence checkbox in every pull request body; owner standing consent 2026-10-08
 - [Native issue types and fields](native-issue-types-and-priority.md): type, priority and effort are the native issue type and the FerroHEALTH Priority and Effort fields, set with scripts/gh/fields.sh; bug, enhancement and P0 to P3 retired; owner 2026-10-08 (#416)
-- [Remove worktrees after merge](remove-worktrees-after-merge.md) — remove each worktree, its branches and its target/ as soon as its PR merges, in all six family repos; cargo clean the locked ones; owner 2026-10-15 and 2026-10-19
+- [Remove worktrees after merge](remove-worktrees-after-merge.md): remove each worktree, its branches and its target/ as soon as its PR merges, in every FerroHEALTH repository; cargo clean the locked ones; owner 2026-10-15 and 2026-10-19
 - [Worktree target dir](worktree-target-dir.md) — each worktree builds into its own target/; a shared CARGO_TARGET_DIR mixes two checkouts' builds; 2026-10-19
 - [PR merge watch](pr-merge-watch.md) — watch every PR until merged with scripts/gh/watch-prs.sh; fix red checks, conflicts and BEHIND at once; owner 2026-10-15
 - [Worker wait loops](worker-wait-loops.md) — worker briefs forbid self-matching pgrep waits; find and kill stuck shells by working directory; owner 2026-10-16
 - [PR backlog discipline](pr-backlog-discipline.md) — several open PRs are fine if each merges cleanly; no stacked PRs, overlapping work in sequence, every open PR tracked to its merge; owner 2026-10-17
 - [Autonomous loop](autonomous-loop.md) — never stop, never wait idle, never ask the owner; keep working the issues while PRs drain; owner 2026-10-17
-- [FerroUI](ferroui.md) — one shared UI component library for every console, pinned Cargo dependency, owner sign-off to migrate the siblings; owner 2026-10-18
+- [FerroUI](ferroui.md): one shared UI component library for every console, pinned Cargo dependency, reactive, owner sign-off to migrate the siblings; owner 2026-10-18
 - [One milestone at a time](one-milestone-at-a-time.md) — every worker on the current milestone until it is cut; an externally blocked straggler moves to the next
 - [Release closes milestone](release-closes-milestone.md): release.yml refuses a tag whose milestone is missing or not empty and closes it after every leg; check it after a manual or recovery release; owner 2026-10-19 (#983)
 - [Worker scratch subfolders](worker-scratch-subfolders.md): each worker writes scratch files under its own scratchpad subfolder, never the root; check a file is yours before `--body-file` and re-read the PR body after; 2026-10-20 (#1021)

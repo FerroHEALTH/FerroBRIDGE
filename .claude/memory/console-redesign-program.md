@@ -32,4 +32,4 @@ FerroUI is finished completely before any console is rewritten (owner decision, 
 - preferences behind the user's name;
 - no top-bar theme toggle.
 
-Related: [[ferroui-lockstep]].
+Related: [[ferroui]], [[reactive-console-ui]].

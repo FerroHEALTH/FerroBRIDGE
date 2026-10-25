@@ -32,10 +32,11 @@ sibling as the reason for a public statement; give the project's own reason.
 Update 2026-10-08 (owner): every Ferro product works on its own and works
 with the others only through the official specifications. FerroEHR (the
 openEHR CDR), FerroTERM (the FHIR terminology server), FerroBRIDGE, FerroFED
-(the federation tier) and FerroPIX (planned) form one family, and each must
-serve anyone who uses one of them alone. So an interface between them is the
+(the federation gateway) and FerroPIX (the master patient index) form one
+family ([[family-architecture]]), and each must serve anyone who uses one of
+them alone. So an interface between them is the
 published one (FHIR R4, SMART App Launch, openEHR ITS-REST, the OMOP CDM,
 OAuth 2.0), never a private shortcut. When a sibling needs something from
-FerroBRIDGE (FerroEHR's chart, FerroFED's patient summary), build the
+FerroBRIDGE (FerroFED's patient summary), build the
 standard capability and describe it generically: "a Kubernetes deployment",
 "a SMART client", never the sibling by name in public prose.

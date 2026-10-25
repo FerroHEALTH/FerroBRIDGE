@@ -14,7 +14,7 @@ its scratch files (PR bodies, issue comments, notes, reports) under its own
 subfolder of that scratchpad, named for its task (`<scratchpad>/<task>/`),
 and never at the scratchpad root.
 
-**Why:** on 2026-10-20 a FerroSMART worker left `pr1.md` (Closes #27 to #31
+**Why:** on 2026-10-20 a FerroAUTH (then FerroSMART) worker left `pr1.md` (Closes #27 to #31
 and #22) at the scratchpad root, and a FerroBRIDGE worker's
 `gh pr edit 998 --body-file pr1.md` published it. #998 merged with that
 body, so its own issue #997 did not auto-close and had to be closed by hand
