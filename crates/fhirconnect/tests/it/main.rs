@@ -7,6 +7,7 @@
 
 #![allow(clippy::panic_in_result_fn, reason = "test assertions")]
 
+mod action_time;
 mod corpus;
 mod derive;
 mod engine;

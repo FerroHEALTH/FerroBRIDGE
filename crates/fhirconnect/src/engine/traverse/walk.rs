@@ -448,7 +448,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             };
             if !matches!(
                 carried,
-                Carried::Value | Carried::Family | Carried::HistoryOrigin
+                Carried::Value | Carried::Family | Carried::EntryTime
             ) {
                 return Ok(scalar(found).map(Leaf::Scalar));
             }

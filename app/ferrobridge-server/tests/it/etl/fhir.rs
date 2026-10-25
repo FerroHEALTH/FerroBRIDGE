@@ -302,7 +302,8 @@ context:
   start: "ferrobridge_etl_procedure"
 "#;
 
-/// A synthetic model mapping: the procedure's name and its completed state.
+/// A synthetic model mapping: the procedure's name, its completed state and
+/// when it was performed.
 const PROCEDURE_MODEL: &str = r#"grammar: FHIRConnect/v1.0.0
 type: model
 metadata:
@@ -343,6 +344,11 @@ mappings:
           targetAttribute: "status"
           operator: "one of"
           criteria: "completed"
+
+  - name: "performed"
+    with:
+      fhir: "$resource.performed.as(DateTime)"
+      openehr: "$archetype/time"
 "#;
 
 /// The logical id of the synthetic MII Person `Patient` of the testkit.
@@ -503,6 +509,12 @@ async fn a_patient_a_condition_and_a_procedure_land_in_their_cdm_tables()
     assert_eq!(1, count(&pool, "person").await?, "one patient, one person");
     assert_eq!(1, count(&pool, "condition_occurrence").await?);
     assert_eq!(1, count(&pool, "procedure_occurrence").await?);
-    // TODO(#1226): assert procedure_date is 2026-10-02 once ACTION.time is carried.
+    let date: String = sqlx::query_scalar("SELECT procedure_date::text FROM procedure_occurrence")
+        .fetch_one(pool.pool())
+        .await?;
+    assert_eq!(
+        "2026-10-02", date,
+        "the procedure date is the performed date"
+    );
     Ok(())
 }

@@ -147,8 +147,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
             node: String::from(node.aql_path().as_str()),
             source: Box::new(source),
         };
-        if carried == Carried::HistoryOrigin {
-            return self.history_origin(mapping, target, node, view, binding);
+        if carried == Carried::EntryTime {
+            let key = rm::entry_time_key(class, &segments.join("/"))
+                .ok_or_else(|| unsupported_tail(mapping, openehr))?;
+            return self.entry_time(mapping, target, node, view, binding, key);
         }
         if carried == Carried::Family {
             return self.convert_family(mapping, target, openehr, view, binding);
@@ -272,19 +274,21 @@ impl<T: Table + ?Sized> Run<'_, T> {
         })
     }
 
-    /// Writes the origin of an observation's history as the `history_origin`
-    /// FLAT attribute of the observation's node.
+    /// Writes a date-time attribute of an entry, an observation's history origin
+    /// or an action's time, as the FLAT attribute `key` of the entry's node.
     ///
     /// Simplified Formats sets the origin "to the time of the earliest event
-    /// if not explicitly set" (master05 §OBSERVATION), so a mapping that names
-    /// it sets it explicitly; the FLAT form carries the time alone.
-    fn history_origin(
+    /// if not explicitly set" (master05 §OBSERVATION) and an action's time from
+    /// the context default (master06), so a mapping that names either sets it
+    /// explicitly; the FLAT form carries the time alone.
+    fn entry_time(
         &mut self,
         mapping: &Mapping,
         target: &FhirTarget,
         node: &ResolvedNode,
         view: &FhirValue,
         binding: &Binding,
+        key: &str,
     ) -> Result<(), EngineError> {
         let produced =
             cell::put(view, DV_DATE_TIME, None, None, &[]).map_err(|source| EngineError::Cell {
@@ -311,7 +315,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             NodeValue::new(node, serde_json::Value::String(time.value.clone()))
                 .with_occurrences(binding.openehr.clone())
                 .under(vec![Segment {
-                    name: String::from(rm::HISTORY_ORIGIN_KEY),
+                    name: String::from(key),
                     index: None,
                 }]),
         );
@@ -444,7 +448,7 @@ fn scalar_json(
     };
     match carried {
         Carried::Text if written.as_str().is_some() => Ok(serde_json::Value::String(text)),
-        Carried::Text | Carried::Value | Carried::Family | Carried::HistoryOrigin => {
+        Carried::Text | Carried::Value | Carried::Family | Carried::EntryTime => {
             Err(refuse("text"))
         }
         Carried::Real => serde_json::from_str::<serde_json::Number>(&text)
