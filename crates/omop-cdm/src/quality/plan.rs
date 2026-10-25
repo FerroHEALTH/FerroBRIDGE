@@ -8,9 +8,9 @@
 //! where the column is required, `cdmDatatype` where it is an integer,
 //! `isPrimaryKey` where it is the primary key, `isForeignKey` where it is a
 //! foreign key, and `fkDomain` and `fkClass` where a foreign key names a
-//! domain or a class. `isStandardValidConcept` and the completeness checks
-//! have no fact in the definitions and run where the Dashboard's table or
-//! field settings enable them. The thresholds and
+//! domain or a class. `isStandardValidConcept`, the completeness checks and
+//! the temporal plausibility checks have no fact in the definitions and run
+//! where the Dashboard's table or field settings enable them. The thresholds and
 //! the notes always come from the Dashboard's settings.
 
 use std::collections::BTreeSet;
@@ -138,8 +138,12 @@ fn table_checks(table: &'static TableMeta, checks: &mut Vec<Check>) {
             CheckName::MeasureConditionEraCompleteness,
             Kind::MeasureConditionEraCompleteness,
         ),
+        (
+            CheckName::MeasureObservationPeriodOverlap,
+            Kind::MeasureObservationPeriodOverlap,
+        ),
     ] {
-        // NOTE: DQD v2.9.0 `OMOP_CDMv5.4_Check_Descriptions.csv` filters both
+        // NOTE: DQD v2.9.0 `OMOP_CDMv5.4_Check_Descriptions.csv` filters the three
         // checks on the table setting being `Yes`.
         if let Some(setting) = settings
             .and_then(|settings| settings.setting(name.as_str()))
@@ -242,7 +246,94 @@ fn field_checks(
             Kind::SourceValueCompleteness { column, standard },
         );
     }
+    for (name, kind) in temporal_kinds(table, column, &enabled)? {
+        push(name, kind);
+    }
     Ok(())
+}
+
+/// Returns the temporal plausibility checks of `table.column` that `enabled`
+/// admits, in catalogue order, with the columns their settings name.
+///
+/// # Errors
+///
+/// Returns [`PlanError::UnknownColumn`] when a setting names a column its
+/// table lacks, or `withinVisitDates` is enabled on a table with no visit.
+fn temporal_kinds(
+    table: &'static TableMeta,
+    column: &'static ColumnMeta,
+    enabled: &dyn Fn(CheckName) -> bool,
+) -> Result<Vec<(CheckName, Kind)>, PlanError> {
+    let settings = definitions::field_thresholds(table.name, column.name);
+    let parameter = |name: &str| {
+        settings
+            .and_then(|settings| settings.parameter(name))
+            .unwrap_or_default()
+    };
+    let mut kinds = Vec::new();
+    if enabled(CheckName::PlausibleTemporalAfter) {
+        let name = CheckName::PlausibleTemporalAfter;
+        let after = parameter("plausibleTemporalAfterTableName");
+        let after_table = crate::meta::table(&after.to_lowercase())
+            .ok_or_else(|| unknown(name, table, column, after))?;
+        // NOTE: DQD v2.9.0 `field_plausible_temporal_after.sql` lines 46 to 53 read
+        // the earlier date from PERSON when it is named, and from the checked table otherwise.
+        let holder = if after_table.name == "person" {
+            after_table
+        } else {
+            table
+        };
+        let field = parameter("plausibleTemporalAfterFieldName");
+        let after_field = holder
+            .column(&field.to_lowercase())
+            .ok_or_else(|| unknown(name, table, column, field))?;
+        kinds.push((
+            name,
+            Kind::PlausibleTemporalAfter {
+                column,
+                after_table,
+                after_field,
+            },
+        ));
+    }
+    if enabled(CheckName::PlausibleDuringLife) {
+        kinds.push((
+            CheckName::PlausibleDuringLife,
+            Kind::PlausibleDuringLife(column),
+        ));
+    }
+    if enabled(CheckName::WithinVisitDates) {
+        if table.column("visit_occurrence_id").is_none() {
+            return Err(unknown(
+                CheckName::WithinVisitDates,
+                table,
+                column,
+                "visit_occurrence_id",
+            ));
+        }
+        kinds.push((CheckName::WithinVisitDates, Kind::WithinVisitDates(column)));
+    }
+    if enabled(CheckName::PlausibleAfterBirth) {
+        kinds.push((
+            CheckName::PlausibleAfterBirth,
+            Kind::PlausibleAfterBirth(column),
+        ));
+    }
+    if enabled(CheckName::PlausibleBeforeDeath) {
+        kinds.push((
+            CheckName::PlausibleBeforeDeath,
+            Kind::PlausibleBeforeDeath(column),
+        ));
+    }
+    if enabled(CheckName::PlausibleStartBeforeEnd) {
+        let name = CheckName::PlausibleStartBeforeEnd;
+        let field = parameter("plausibleStartBeforeEndFieldName");
+        let end = table
+            .column(&field.to_lowercase())
+            .ok_or_else(|| unknown(name, table, column, field))?;
+        kinds.push((name, Kind::PlausibleStartBeforeEnd { column, end }));
+    }
+    Ok(kinds)
 }
 
 /// Returns the refusal of a `name` check on `table.column` whose settings or

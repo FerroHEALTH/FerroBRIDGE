@@ -30,6 +30,16 @@ crates on crates.io.
   Prescription and Dispense guides the EU profile contexts target, fetched
   with their provenance by `scripts/vendor/profile-packages.sh`; every
   package they depend on was already in the set (#116).
+- The Data Quality Dashboard's seven temporal plausibility checks run in Rust
+  beside its conformance and completeness checks (#1222):
+  `measureObservationPeriodOverlap`, `plausibleTemporalAfter`,
+  `plausibleDuringLife`, `withinVisitDates`, `plausibleAfterBirth`,
+  `plausibleBeforeDeath` and `plausibleStartBeforeEnd`, each planned where the
+  Dashboard's v2.9.0 settings enable it, with its threshold, and translated
+  from its SQL template, which `scripts/vendor/dqd.sh` now vendors.
+  `dq check` and the post-load step of `etl run` report them. A person whose
+  year of birth is 0, as a placeholder `PERSON` row carries, has no birth date
+  for these checks instead of failing them.
 - `ferrobridge-hl7v2` 0.1.143 serves a consumer of its listener and parser
   alone. `parse::structure::structure_declared` selects the structure
   MSH-9.3 names over the message definition where the two disagree, so an

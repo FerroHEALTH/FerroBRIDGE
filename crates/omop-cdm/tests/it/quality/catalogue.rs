@@ -8,7 +8,7 @@ use std::error::Error;
 
 use omop_cdm::generated::dqd;
 use omop_cdm::quality::check::CheckName;
-use omop_cdm::quality::definitions::{self, CheckLevel, KahnCategory, Percentage};
+use omop_cdm::quality::definitions::{self, CheckLevel, KahnCategory, KahnSubcategory, Percentage};
 
 /// The Dashboard's vendored provenance note, which names the pinned tag.
 const PROVENANCE: &str = concat!(
@@ -22,19 +22,22 @@ fn the_catalogue_carries_every_check_of_the_description_file() {
 }
 
 #[test]
-fn the_ported_checks_are_the_conformance_and_completeness_checks_of_the_catalogue() {
-    let conformance: Vec<&str> = dqd::CHECK_DESCRIPTIONS
+fn the_ported_checks_are_the_conformance_completeness_and_temporal_checks_of_the_catalogue() {
+    // The temporal plausibility checks are the Temporal subcategory and
+    // `withinVisitDates`, the one other check that compares a record's dates.
+    let scope: Vec<&str> = dqd::CHECK_DESCRIPTIONS
         .iter()
-        .filter(|check| {
-            matches!(
-                check.kahn_category,
-                KahnCategory::Conformance | KahnCategory::Completeness
-            )
+        .filter(|check| match check.kahn_category {
+            KahnCategory::Conformance | KahnCategory::Completeness => true,
+            KahnCategory::Plausibility => {
+                check.kahn_subcategory == Some(KahnSubcategory::Temporal)
+                    || check.name == "withinVisitDates"
+            }
         })
         .map(|check| check.name)
         .collect();
     let ported: Vec<&str> = CheckName::ALL.iter().map(|name| name.as_str()).collect();
-    assert_eq!(conformance, ported);
+    assert_eq!(scope, ported);
 }
 
 #[test]

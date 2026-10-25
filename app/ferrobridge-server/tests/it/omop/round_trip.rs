@@ -143,7 +143,7 @@ async fn dump(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
 }
 
 /// Runs the ported Data Quality Dashboard plan over the round trip's CDM and
-/// asserts that every conformance check passes and that the concept record
+/// asserts that every conformance and temporal plausibility check passes and that the concept record
 /// completeness checks count the concept 0 rows the run report counted,
 /// column by column.
 ///
@@ -174,12 +174,19 @@ async fn assert_quality_agrees(
     let failing: Vec<&str> = results
         .iter()
         .filter(|result| {
-            result.category == omop_cdm::quality::definitions::KahnCategory::Conformance
-                && result.failed
+            result.failed
+                && matches!(
+                    result.category,
+                    omop_cdm::quality::definitions::KahnCategory::Conformance
+                        | omop_cdm::quality::definitions::KahnCategory::Plausibility
+                )
         })
         .map(|result| result.check_id.as_str())
         .collect();
-    assert!(failing.is_empty(), "conformance checks failed: {failing:?}");
+    assert!(
+        failing.is_empty(),
+        "conformance or temporal checks failed: {failing:?}"
+    );
     let mut reported: BTreeMap<String, u64> = BTreeMap::new();
     for totals in report.mappings.values() {
         for (column, count) in &totals.concept_zero {

@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The port of the Data Quality Dashboard's conformance and completeness
-//! checks: the generated
+//! The port of the Data Quality Dashboard's conformance, completeness and
+//! temporal plausibility checks: the generated
 //! catalogue, the plan, the evaluation, and, with the `database` feature, the
 //! checks run against PostgreSQL.
 
@@ -12,6 +12,8 @@ mod evaluate;
 mod plan;
 #[cfg(feature = "database")]
 mod run;
+#[cfg(feature = "database")]
+mod temporal;
 
 use std::error::Error;
 
