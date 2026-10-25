@@ -1,0 +1,91 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/observation/org.openehr/laboratory_test_result.v1.yml,
+# a derivative of it and of projects/org.highmed/KDS/laborbericht/KDS_laborbericht.yml
+# under their licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# files carry no copyright line to keep.
+# Changed: the model keeps the published methods that compile against
+# KDS_Laborbericht: the event's code, conclusion and time, its specimen,
+# and the analyte results, which become Specimen and Observation resources
+# the report references, in the form of the published KDS extension's
+# `resultAppendToParent`. The
+# published composer, performer, participation and period methods walk
+# attributes the reference model or the template do not carry
+# (`$composition/perfomer`, `$archetype/other_participations` without a
+# performer form, `context/end_time`) and are left out, as are the category
+# and status tables, which the EU extension writes.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: OBSERVATION.laboratory_test_result.v1
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-OBSERVATION.laboratory_test_result.v1
+    revision: 1.2.5
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/DiagnosticReport
+
+mappings:
+  - name: "eventParent"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0001]/events[at0002]"
+    followedBy:
+      mappings:
+        - name: "eventTime"
+          with:
+            fhir: "effective.as(DateTime)"
+            openehr: "time"
+
+        - name: "code"
+          with:
+            fhir: "code"
+            openehr: "data[at0003]/items[at0005]"
+
+        - name: "conclusion"
+          with:
+            fhir: "conclusion"
+            openehr: "data[at0003]/items[at0057]"
+
+        - name: "specimen"
+          with:
+            fhir: "specimen"
+            openehr: "data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1]"
+          followedBy:
+            mappings:
+              - name: "specimenReference"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$reference"
+                reference:
+                  resourceType: "Specimen"
+                  mappings:
+                    - name: "specimenRecurring"
+                      with:
+                        fhir: "$fhirRoot"
+                        openehr: "$openehrRoot"
+                      slotArchetype: "CLUSTER.specimen.v1"
+
+        - name: "result"
+          with:
+            fhir: "result"
+            openehr: "data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]"
+          followedBy:
+            mappings:
+              - name: "observationReference"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$reference"
+                reference:
+                  resourceType: "Observation"
+                  mappings:
+                    - name: "observationRecurring"
+                      with:
+                        fhir: "$fhirRoot"
+                        openehr: "$openehrRoot"
+                      slotArchetype: "CLUSTER.laboratory_test_analyte.v1"

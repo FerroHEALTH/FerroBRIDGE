@@ -1129,7 +1129,20 @@ Its round trip asserts the code, both slices and the two status bindings
 template (its person, structured name and address clusters are CKM's),
 loading the KDS person chain with a gender extension that names the EU
 profile and leaves out the German gender-amtlich extension; its round trip
-asserts the required name and birth date.
+asserts the required name and birth date. Laboratory Report 2.0.0 follows over the published
+`KDS_Laborbericht` template, which carries the CKM laboratory result,
+analyte and specimen archetypes: the mapping library's own `eehrxf_lab`
+context targets Laboratory 0.1.1, names a `sem_ver` its template does not
+carry, and its template does not parse strictly (#1235), so it is recorded as
+refused. FerroBRIDGE's context maps the result OBSERVATION to a
+`DiagnosticReport-eu-lab` that references one `Observation-resultslab-eu-lab`
+per analyte (a profile derived from `medicalTestResult-eu-core`) and one
+`Specimen-eu-lab` per specimen; the KDS template keeps the report status in
+the composition's `other_context` bound to the R4 `diagnostic-report-status`
+value set, which a `manual` table carries, because a FHIR `code` cannot
+convert to a DV_CODED_TEXT. The profile's required
+`DiagnosticReportCompositionR5` extension references a `Composition-eu-lab`,
+which the document context of the next step writes.
 
 **Decision:** profile mappings are authored in this repository, in the
 specification's own customisation mechanism (a context and its extensions per

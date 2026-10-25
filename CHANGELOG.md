@@ -30,6 +30,17 @@ crates on crates.io.
   composition's resource type, id and `meta.versionId` in the commit's
   transaction, and `CdmWriter::origins_of_row` and `rows_of_resource` look a
   row's resources and a resource's rows up. `cdm init` adds the table.
+- `ferrobridge_eu_laboratory.context` targets HL7 Europe Laboratory Report
+  2.0.0 over the published `KDS_Laborbericht` template: the laboratory
+  result becomes a `DiagnosticReport-eu-lab` that references one
+  `Observation-resultslab-eu-lab` per analyte and one `Specimen-eu-lab` per
+  specimen. The round trip asserts each profile's canonical and elements:
+  the report's identifier, status, code, effective time, conclusion and
+  references; the result's status, `laboratory` category, code, quantity,
+  interpretation and method; the specimen's type, accession identifier,
+  received time and collection. The mapping library's `eehrxf_lab` context
+  is recorded as refused (#1235). The testkit exposes the template as
+  `KDS_LABORBERICHT_OPT` (#116).
 - `ferrobridge-term` 0.1.135 takes the client credentials token of
   `ferrohealth-smart` as its `TokenProvider` behind the new `smart` feature
   (#1227): `smart::SmartToken`, built from a `TokenSource`, sends the cached
