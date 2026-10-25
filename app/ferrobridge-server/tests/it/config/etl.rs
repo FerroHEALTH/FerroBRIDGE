@@ -449,6 +449,19 @@ fn a_pseudonymisation_key_file_is_read_and_its_pseudonyms_follow_the_key()
 }
 
 #[test]
+fn the_derived_tables_rebuild_the_owned_persons_unless_the_whole_table_is_named()
+-> Result<(), Box<dyn std::error::Error>> {
+    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
+    let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
+    assert_eq!(omop_cdm::derived::Scope::OwnedPersons, etl.derived_tables);
+    let text = format!("{ETL}derived_tables = \"whole_table\"\n");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
+    assert_eq!(omop_cdm::derived::Scope::WholeTable, etl.derived_tables);
+    Ok(())
+}
+
+#[test]
 fn a_short_pseudonymisation_key_refuses_to_boot_naming_the_section()
 -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&pseudonymised("key = \"too-short\"\n"))?;
@@ -467,5 +480,22 @@ fn a_pseudonymisation_section_with_no_key_refuses_to_boot() -> Result<(), Box<dy
         Error::Missing { key } => assert_eq!("cdm.pseudonymisation.key", key),
         other => return Err(format!("expected a missing key, got {other:?}").into()),
     }
+    Ok(())
+}
+
+#[test]
+fn an_unknown_derived_tables_scope_is_refused_naming_the_key()
+-> Result<(), Box<dyn std::error::Error>> {
+    let text = format!("{ETL}derived_tables = \"everything\"\n");
+    let refusal = Config::from_sources(Some(&text), &BTreeMap::new())?
+        .resolve()
+        .err()
+        .ok_or("the scope is refused")?;
+    assert!(
+        refusal
+            .to_string()
+            .contains("etl.derived_tables is `everything`"),
+        "{refusal}"
+    );
     Ok(())
 }

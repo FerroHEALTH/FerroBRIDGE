@@ -40,6 +40,8 @@ pub enum Step {
     Watermark,
     /// Rebuilding a derived table.
     Derive(&'static str),
+    /// Counting the rows of a table no side table entry owns.
+    Survey(&'static str),
     /// Committing the transaction.
     Commit,
 }
@@ -58,6 +60,9 @@ impl fmt::Display for Step {
             Self::Insert(table) => write!(f, "inserting the rows of `{table}`"),
             Self::Watermark => f.write_str("advancing the watermark"),
             Self::Derive(table) => write!(f, "deriving `{table}`"),
+            Self::Survey(table) => {
+                write!(f, "counting the rows of `{table}` the bridge does not own")
+            }
             Self::Commit => f.write_str("committing the transaction"),
         }
     }

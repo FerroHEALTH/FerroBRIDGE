@@ -82,6 +82,8 @@ pub struct EtlSettings {
     pub aliases: VocabularyAliases,
     /// Whether `etl run` runs the quality checks after the load.
     pub quality_checks: bool,
+    /// Which rows of the derived tables a run rebuilds.
+    pub derived_tables: derived::Scope,
 }
 
 /// What a mapper is handed besides the composition.
@@ -462,14 +464,17 @@ pub(crate) async fn derive(
         report.derived.visit_occurrence_removed = retired.removed;
         report.derived.visit_occurrence_referenced = retired.referenced;
     }
-    report.derived.observation_period =
-        derived::observation_period(writer, settings.observation_period_type_concept_id)
-            .await
-            .map_err(RunError::Database)?;
-    report.derived.condition_era = derived::condition_era(writer)
+    report.derived.observation_period = derived::observation_period(
+        writer,
+        settings.observation_period_type_concept_id,
+        settings.derived_tables,
+    )
+    .await
+    .map_err(RunError::Database)?;
+    report.derived.condition_era = derived::condition_era(writer, settings.derived_tables)
         .await
         .map_err(RunError::Database)?;
-    report.derived.drug_era = derived::drug_era(writer)
+    report.derived.drug_era = derived::drug_era(writer, settings.derived_tables)
         .await
         .map_err(RunError::Database)?;
     let persons = writer.persons().await.map_err(RunError::Database)?;

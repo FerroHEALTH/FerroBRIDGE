@@ -47,6 +47,11 @@ crates on crates.io.
   and a location's address are NULL, and `date_shift_days` moves every date
   of a person by one per-person shift, so intervals within a person stay
   intact. The Integrate and Operate pages state what it does not de-identify.
+- `cdm init` and every `etl run` and `etl fhir` count the rows of each CDM
+  table whose ids the bridge assigns that no entry of its side table owns,
+  rows another load wrote, and warn of each table; the run report carries the
+  counts as `foreign_rows` (#240). The Operate page states that one bridge owns
+  the tables it writes and that era ids are not stable across rebuilds.
 - `ferrobridge-hl7v2` 0.1.143 serves a consumer of its listener and parser
   alone. `parse::structure::structure_declared` selects the structure
   MSH-9.3 names over the message definition where the two disagree, so an
@@ -120,6 +125,11 @@ crates on crates.io.
 
 ### Fixed
 
+- A run rebuilds `OBSERVATION_PERIOD`, `CONDITION_ERA` and `DRUG_ERA` only for
+  the persons the bridge writes, so the derived rows another ETL wrote into
+  those tables survive it (#1223). `[etl] derived_tables = "whole_table"`
+  keeps the whole-table rebuild for a deployment where the bridge is the only
+  writer.
 - With `[cdm] tls_ca` set, the concept resolver's pool now trusts that CA
   alone, as the CDM writer does (#266). The pool no longer runs its
   PostgreSQL client's own TLS, which added a built-in root set to the CA: it

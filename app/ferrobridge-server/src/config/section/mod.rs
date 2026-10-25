@@ -418,6 +418,9 @@ pub struct Etl {
     /// Whether `etl run` runs the ported Data Quality Dashboard checks over
     /// the tables it wrote once the load is done.
     pub quality_checks: bool,
+    /// Which rows of the derived tables a run rebuilds: `owned_persons`, the
+    /// rows of the persons the bridge writes, or `whole_table`.
+    pub derived_tables: String,
 }
 
 impl Default for Etl {
@@ -433,6 +436,9 @@ impl Default for Etl {
             deletions: String::from("remove"),
             vocabulary_aliases: BTreeMap::new(),
             quality_checks: false,
+            // NOTE: no specification governs this: our own design; another ETL's derived rows
+            // survive a run unless the deployment says the bridge is the only writer.
+            derived_tables: String::from("owned_persons"),
         }
     }
 }

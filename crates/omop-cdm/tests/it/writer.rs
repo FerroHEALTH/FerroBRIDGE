@@ -11,6 +11,7 @@
 //! `FERROBRIDGE_E2E=1` admits the harness.
 
 mod death;
+mod foreign;
 mod person;
 mod pseudonym;
 mod removal;

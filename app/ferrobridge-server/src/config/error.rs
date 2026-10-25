@@ -233,6 +233,14 @@ pub enum Error {
         #[source]
         source: omop_cdm::writer::pseudonym::PseudonymError,
     },
+    /// The derived-table scope names neither of the two values.
+    #[error("{key} is `{value}`; the scopes are owned_persons and whole_table")]
+    DerivedTables {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: String,
+    },
     /// A vocabulary alias names an empty terminology id.
     #[error("{key} names an empty terminology id")]
     AliasTerminology {
