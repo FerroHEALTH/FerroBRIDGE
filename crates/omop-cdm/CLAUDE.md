@@ -99,11 +99,13 @@ Full discipline: `.claude/rules/codegen.md`.
   (integers binary, everything else text) and one `INSERT ... SELECT` casts
   the dates, datetimes and floats, so the crate still does no calendar or
   decimal arithmetic.
-- `quality` is the port of the Dashboard's nine conformance checks. The
+- `quality` is the port of the Dashboard's nine conformance and six
+  completeness checks. The
   structural facts (required, datatype, keys, `fk_domain`, `fk_class`) come
   from the CDM v5.4.3 definitions through `ColumnMeta`; the thresholds, the
-  notes and the enablement of `isStandardValidConcept` come from the
-  Dashboard's settings. Where the two disagree the definitions win, and
+  notes and the enablement of `isStandardValidConcept` and the completeness
+  checks come from the Dashboard's settings (a completeness check whose
+  settings or template name a column its table lacks refuses the plan). Where the two disagree the definitions win, and
   `tests/it/dqd.rs` pins every disagreement. `check::CheckName` is the closed
   set of ported checks and reads its spelling and Kahn classification from
   the generated catalogue; never copy a catalogue value by hand. The plan,
@@ -114,8 +116,9 @@ Full discipline: `.claude/rules/codegen.md`.
   literal from the generated metadata, never from a caller. A query that
   fails or yields no counts is an error result and never a pass; only
   SQLSTATE 42P01 or 42703 on a `cdmTable` or `cdmField` probe is a failure
-  without error. The completeness checks and the not-applicable status are
-  #405.
+  without error. `quality::applicable` sets the not-applicable status from
+  the run's own `cdmTable`, `cdmField` and `measureValueCompleteness`
+  results, as the Dashboard does, and `run` applies it.
 - `sql/condition_era.sql` and `sql/drug_era.sql` are the PostgreSQL form of
   the CDM's published era scripts (`sql/PROVENANCE.md`). `tests/it/eras.rs`
   pins the digest of each published script in the vendored

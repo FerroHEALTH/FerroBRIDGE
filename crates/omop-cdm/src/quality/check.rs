@@ -38,12 +38,29 @@ pub enum CheckName {
     /// `isStandardValidConcept`: a concept field names a standard, valid
     /// concept.
     IsStandardValidConcept,
+    /// `measurePersonCompleteness`: every person has a row in the table.
+    MeasurePersonCompleteness,
+    /// `measureConditionEraCompleteness`: every person with a condition has a
+    /// condition era.
+    MeasureConditionEraCompleteness,
+    /// `measureValueCompleteness`: a field holds a value.
+    MeasureValueCompleteness,
+    /// `standardConceptRecordCompleteness`: a standard concept field names a
+    /// concept other than 0.
+    StandardConceptRecordCompleteness,
+    /// `sourceConceptRecordCompleteness`: a source concept field names a
+    /// concept other than 0.
+    SourceConceptRecordCompleteness,
+    /// `sourceValueCompleteness`: a source value maps to a standard concept.
+    SourceValueCompleteness,
 }
 
 impl CheckName {
     /// Every check the port runs, in catalogue order.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 15] = [
         Self::CdmTable,
+        Self::MeasurePersonCompleteness,
+        Self::MeasureConditionEraCompleteness,
         Self::CdmField,
         Self::IsRequired,
         Self::CdmDatatype,
@@ -52,6 +69,10 @@ impl CheckName {
         Self::FkDomain,
         Self::FkClass,
         Self::IsStandardValidConcept,
+        Self::MeasureValueCompleteness,
+        Self::StandardConceptRecordCompleteness,
+        Self::SourceConceptRecordCompleteness,
+        Self::SourceValueCompleteness,
     ];
 
     /// Returns the check's record in the generated catalogue.
@@ -67,6 +88,12 @@ impl CheckName {
             Self::FkDomain => &dqd::FK_DOMAIN,
             Self::FkClass => &dqd::FK_CLASS,
             Self::IsStandardValidConcept => &dqd::IS_STANDARD_VALID_CONCEPT,
+            Self::MeasurePersonCompleteness => &dqd::MEASURE_PERSON_COMPLETENESS,
+            Self::MeasureConditionEraCompleteness => &dqd::MEASURE_CONDITION_ERA_COMPLETENESS,
+            Self::MeasureValueCompleteness => &dqd::MEASURE_VALUE_COMPLETENESS,
+            Self::StandardConceptRecordCompleteness => &dqd::STANDARD_CONCEPT_RECORD_COMPLETENESS,
+            Self::SourceConceptRecordCompleteness => &dqd::SOURCE_CONCEPT_RECORD_COMPLETENESS,
+            Self::SourceValueCompleteness => &dqd::SOURCE_VALUE_COMPLETENESS,
         }
     }
 
@@ -107,6 +134,17 @@ impl CheckName {
         self.description().sql_file
     }
 
+    /// Returns whether the Dashboard's not-applicable rules read this check's
+    /// results, one of the three they need present
+    /// (DQD v2.9.0 `R/calculateNotApplicableStatus.R` lines 35 to 43).
+    #[must_use]
+    pub fn feeds_not_applicable(self) -> bool {
+        matches!(
+            self,
+            Self::CdmTable | Self::CdmField | Self::MeasureValueCompleteness
+        )
+    }
+
     /// Returns whether the check probes for a table or field rather than
     /// counting rows, so that a missing one fails the check instead of being
     /// an error.
@@ -134,6 +172,13 @@ pub enum CheckParameters {
     Domains(&'static [&'static str]),
     /// The concept class a concept must belong to (`fkClass`).
     ConceptClass(&'static str),
+    /// The source value column that also violates the check where the
+    /// concept field beside it is NULL (`standardConceptRecordCompleteness`
+    /// and `sourceConceptRecordCompleteness`), when the template names one.
+    SourceValue(Option<&'static str>),
+    /// The standard concept field a source value maps through
+    /// (`sourceValueCompleteness`).
+    StandardConceptField(&'static str),
 }
 
 /// One check's subject and parameters, each check's shape a variant of its
@@ -175,6 +220,33 @@ pub(crate) enum Kind {
     },
     /// `isStandardValidConcept` on the column.
     IsStandardValidConcept(&'static ColumnMeta),
+    /// `measurePersonCompleteness` of the table.
+    MeasurePersonCompleteness,
+    /// `measureConditionEraCompleteness` of the table.
+    MeasureConditionEraCompleteness,
+    /// `measureValueCompleteness` on the column.
+    MeasureValueCompleteness(&'static ColumnMeta),
+    /// `standardConceptRecordCompleteness` on the column.
+    StandardConceptRecordCompleteness {
+        /// The checked column.
+        column: &'static ColumnMeta,
+        /// The source value column beside it, when the template names one.
+        source_value: Option<&'static ColumnMeta>,
+    },
+    /// `sourceConceptRecordCompleteness` on the column.
+    SourceConceptRecordCompleteness {
+        /// The checked column.
+        column: &'static ColumnMeta,
+        /// The source value column beside it, when the template names one.
+        source_value: Option<&'static ColumnMeta>,
+    },
+    /// `sourceValueCompleteness` on the column.
+    SourceValueCompleteness {
+        /// The checked source value column.
+        column: &'static ColumnMeta,
+        /// The standard concept column it maps through.
+        standard: &'static ColumnMeta,
+    },
 }
 
 /// One check for one table or one field.
@@ -220,6 +292,16 @@ impl Check {
             Kind::FkDomain { .. } => CheckName::FkDomain,
             Kind::FkClass { .. } => CheckName::FkClass,
             Kind::IsStandardValidConcept(_) => CheckName::IsStandardValidConcept,
+            Kind::MeasurePersonCompleteness => CheckName::MeasurePersonCompleteness,
+            Kind::MeasureConditionEraCompleteness => CheckName::MeasureConditionEraCompleteness,
+            Kind::MeasureValueCompleteness(_) => CheckName::MeasureValueCompleteness,
+            Kind::StandardConceptRecordCompleteness { .. } => {
+                CheckName::StandardConceptRecordCompleteness
+            }
+            Kind::SourceConceptRecordCompleteness { .. } => {
+                CheckName::SourceConceptRecordCompleteness
+            }
+            Kind::SourceValueCompleteness { .. } => CheckName::SourceValueCompleteness,
         }
     }
 
@@ -233,7 +315,9 @@ impl Check {
     #[must_use]
     pub fn column(&self) -> Option<&'static ColumnMeta> {
         match self.kind {
-            Kind::CdmTable => None,
+            Kind::CdmTable
+            | Kind::MeasurePersonCompleteness
+            | Kind::MeasureConditionEraCompleteness => None,
             Kind::CdmField(column)
             | Kind::IsRequired(column)
             | Kind::CdmDatatype(column)
@@ -241,7 +325,11 @@ impl Check {
             | Kind::IsForeignKey { column, .. }
             | Kind::FkDomain { column, .. }
             | Kind::FkClass { column, .. }
-            | Kind::IsStandardValidConcept(column) => Some(column),
+            | Kind::IsStandardValidConcept(column)
+            | Kind::MeasureValueCompleteness(column)
+            | Kind::StandardConceptRecordCompleteness { column, .. }
+            | Kind::SourceConceptRecordCompleteness { column, .. }
+            | Kind::SourceValueCompleteness { column, .. } => Some(column),
         }
     }
 
@@ -252,7 +340,17 @@ impl Check {
             Kind::IsForeignKey { table, field, .. } => CheckParameters::ForeignKey { table, field },
             Kind::FkDomain { domains, .. } => CheckParameters::Domains(domains),
             Kind::FkClass { class, .. } => CheckParameters::ConceptClass(class),
+            Kind::StandardConceptRecordCompleteness { source_value, .. }
+            | Kind::SourceConceptRecordCompleteness { source_value, .. } => {
+                CheckParameters::SourceValue(source_value.map(|column| column.name))
+            }
+            Kind::SourceValueCompleteness { standard, .. } => {
+                CheckParameters::StandardConceptField(standard.name)
+            }
             Kind::CdmTable
+            | Kind::MeasurePersonCompleteness
+            | Kind::MeasureConditionEraCompleteness
+            | Kind::MeasureValueCompleteness(_)
             | Kind::CdmField(_)
             | Kind::IsRequired(_)
             | Kind::CdmDatatype(_)

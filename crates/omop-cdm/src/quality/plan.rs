@@ -8,8 +8,9 @@
 //! where the column is required, `cdmDatatype` where it is an integer,
 //! `isPrimaryKey` where it is the primary key, `isForeignKey` where it is a
 //! foreign key, and `fkDomain` and `fkClass` where a foreign key names a
-//! domain or a class. `isStandardValidConcept` has no fact in the definitions
-//! and runs where the Dashboard's field settings enable it. The thresholds and
+//! domain or a class. `isStandardValidConcept` and the completeness checks
+//! have no fact in the definitions and run where the Dashboard's table or
+//! field settings enable them. The thresholds and
 //! the notes always come from the Dashboard's settings.
 
 use std::collections::BTreeSet;
@@ -62,6 +63,18 @@ pub enum PlanError {
         /// The name the caller gave.
         table: String,
     },
+    /// A check's settings or template name a column its table does not have.
+    #[error("the {check} check of {table}.{field} names the column {column}, which {table} lacks")]
+    UnknownColumn {
+        /// The check.
+        check: &'static str,
+        /// The table.
+        table: &'static str,
+        /// The checked field.
+        field: &'static str,
+        /// The column the settings or the template name.
+        column: String,
+    },
 }
 
 /// The check instances for the CDM, in table order, then column order, then
@@ -77,7 +90,9 @@ impl Plan {
     /// # Errors
     ///
     /// Returns [`PlanError::UnknownTable`] when an excluded table names no
-    /// table of [`generated::TABLES`].
+    /// table of [`generated::TABLES`], and [`PlanError::UnknownColumn`] when
+    /// a completeness check's settings or template name a column its table
+    /// lacks.
     pub fn new(options: &PlanOptions) -> Result<Self, PlanError> {
         let mut excluded = BTreeSet::new();
         for table in &options.excluded_tables {
@@ -95,8 +110,9 @@ impl Plan {
             .filter(|table| !excluded.contains(table.name))
         {
             checks.push(Check::new(table, Kind::CdmTable, None, None));
+            table_checks(table, &mut checks);
             for column in table.columns {
-                field_checks(table, column, &mut checks);
+                field_checks(table, column, &mut checks)?;
             }
         }
         Ok(Self { checks })
@@ -109,12 +125,43 @@ impl Plan {
     }
 }
 
+/// Appends the table-level completeness checks the Dashboard's table
+/// settings enable for `table`, in catalogue order.
+fn table_checks(table: &'static TableMeta, checks: &mut Vec<Check>) {
+    let settings = definitions::table_thresholds(table.name);
+    for (name, kind) in [
+        (
+            CheckName::MeasurePersonCompleteness,
+            Kind::MeasurePersonCompleteness,
+        ),
+        (
+            CheckName::MeasureConditionEraCompleteness,
+            Kind::MeasureConditionEraCompleteness,
+        ),
+    ] {
+        // NOTE: DQD v2.9.0 `OMOP_CDMv5.4_Check_Descriptions.csv` filters both
+        // checks on the table setting being `Yes`.
+        if let Some(setting) = settings
+            .and_then(|settings| settings.setting(name.as_str()))
+            .filter(|setting| setting.value == Some("Yes"))
+        {
+            checks.push(Check::new(table, kind, setting.threshold, setting.notes));
+        }
+    }
+}
+
 /// Appends the field checks of `column`, in catalogue order.
-fn field_checks(table: &'static TableMeta, column: &'static ColumnMeta, checks: &mut Vec<Check>) {
+fn field_checks(
+    table: &'static TableMeta,
+    column: &'static ColumnMeta,
+    checks: &mut Vec<Check>,
+) -> Result<(), PlanError> {
     let settings = definitions::field_thresholds(table.name, column.name);
     let setting = |name: CheckName| -> Option<&'static CheckSetting> {
         settings.and_then(|settings| settings.setting(name.as_str()))
     };
+    let enabled =
+        |name: CheckName| setting(name).is_some_and(|setting| setting.value == Some("Yes"));
     let mut push = |name: CheckName, kind: Kind| {
         let setting = setting(name);
         checks.push(Check::new(
@@ -161,14 +208,121 @@ fn field_checks(table: &'static TableMeta, column: &'static ColumnMeta, checks: 
             push(CheckName::FkClass, Kind::FkClass { column, class });
         }
     }
-    // NOTE: DQD v2.9.0 `OMOP_CDMv5.4_Check_Descriptions.csv` filters this check on
-    // `isStandardValidConcept=='Yes'`; the CDM definitions carry no such fact.
-    let standard = setting(CheckName::IsStandardValidConcept)
-        .is_some_and(|setting| setting.value == Some("Yes"));
-    if standard {
+    // NOTE: DQD v2.9.0 `OMOP_CDMv5.4_Check_Descriptions.csv` filters this check and
+    // the four completeness checks below on the field setting being `Yes`.
+    if enabled(CheckName::IsStandardValidConcept) {
         push(
             CheckName::IsStandardValidConcept,
             Kind::IsStandardValidConcept(column),
         );
     }
+    if enabled(CheckName::MeasureValueCompleteness) {
+        push(
+            CheckName::MeasureValueCompleteness,
+            Kind::MeasureValueCompleteness(column),
+        );
+    }
+    for name in [
+        CheckName::StandardConceptRecordCompleteness,
+        CheckName::SourceConceptRecordCompleteness,
+    ] {
+        if enabled(name) {
+            push(name, concept_record_kind(name, table, column)?);
+        }
+    }
+    if enabled(CheckName::SourceValueCompleteness) {
+        let named = settings
+            .and_then(|settings| settings.parameter("standardConceptFieldName"))
+            .unwrap_or_default();
+        let standard = table
+            .column(&named.to_lowercase())
+            .ok_or_else(|| unknown(CheckName::SourceValueCompleteness, table, column, named))?;
+        push(
+            CheckName::SourceValueCompleteness,
+            Kind::SourceValueCompleteness { column, standard },
+        );
+    }
+    Ok(())
+}
+
+/// Returns the refusal of a `name` check on `table.column` whose settings or
+/// template name `missing`, a column `table` lacks.
+fn unknown(
+    name: CheckName,
+    table: &'static TableMeta,
+    column: &'static ColumnMeta,
+    missing: &str,
+) -> PlanError {
+    PlanError::UnknownColumn {
+        check: name.as_str(),
+        table: table.name,
+        field: column.name,
+        column: missing.to_owned(),
+    }
+}
+
+/// Returns the `name` concept record completeness check of `table.column`,
+/// with the source value column its template names.
+fn concept_record_kind(
+    name: CheckName,
+    table: &'static TableMeta,
+    column: &'static ColumnMeta,
+) -> Result<Kind, PlanError> {
+    let source_value = match source_value_rule(table.name, column.name) {
+        Some(named) => Some(
+            table
+                .column(named)
+                .ok_or_else(|| unknown(name, table, column, named))?,
+        ),
+        None => None,
+    };
+    Ok(if name == CheckName::StandardConceptRecordCompleteness {
+        Kind::StandardConceptRecordCompleteness {
+            column,
+            source_value,
+        }
+    } else {
+        Kind::SourceConceptRecordCompleteness {
+            column,
+            source_value,
+        }
+    })
+}
+
+/// Returns the source value column whose value, beside a NULL concept field,
+/// also violates a concept record completeness check of `table.field`.
+///
+/// The rules are the conditional `OR` clauses of DQD v2.9.0
+/// `inst/sql/sql_server/field_concept_record_completeness.sql` lines 42 to 61,
+/// matched on the upper-case names as the template matches them.
+fn source_value_rule(table: &str, field: &str) -> Option<&'static str> {
+    let table = table.to_uppercase();
+    let field = field.to_uppercase();
+    let either = |base: &str| {
+        field == format!("{base}_CONCEPT_ID") || field == format!("{base}_SOURCE_CONCEPT_ID")
+    };
+    let rule = match field.as_str() {
+        "UNIT_CONCEPT_ID" | "UNIT_SOURCE_CONCEPT_ID" if table != "DOSE_ERA" => "unit_source_value",
+        "ADMITTED_FROM_CONCEPT_ID" => "admitted_from_source_value",
+        "ADMITTING_SOURCE_CONCEPT_ID" => "admitting_source_value",
+        "DISCHARGED_TO_CONCEPT_ID" => "discharged_to_source_value",
+        "DISCHARGE_TO_CONCEPT_ID" => "discharge_to_source_value",
+        "CONDITION_STATUS_CONCEPT_ID" => "condition_status_source_value",
+        "ROUTE_CONCEPT_ID" => "route_source_value",
+        "MODIFIER_CONCEPT_ID" => "modifier_source_value",
+        "QUALIFIER_CONCEPT_ID" => "qualifier_source_value",
+        "ANATOMIC_SITE_CONCEPT_ID" => "anatomic_site_source_value",
+        "DISEASE_STATUS_CONCEPT_ID" => "disease_status_source_value",
+        "COUNTRY_CONCEPT_ID" => "country_source_value",
+        "PLACE_OF_SERVICE_CONCEPT_ID" => "place_of_service_source_value",
+        _ if either("CAUSE") => "cause_source_value",
+        _ if either("SPECIALTY") => "specialty_source_value",
+        _ if table == "PROVIDER" && either("GENDER") => "gender_source_value",
+        _ if either("PAYER") => "payer_source_value",
+        _ if either("PLAN") => "plan_source_value",
+        _ if either("SPONSOR") => "sponsor_source_value",
+        _ if either("STOP_REASON") => "stop_reason_source_value",
+        _ => return None,
+    };
+    Some(rule)
 }

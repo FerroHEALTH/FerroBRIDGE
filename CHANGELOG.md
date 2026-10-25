@@ -75,6 +75,15 @@ crates on crates.io.
   reaches the database through a relay on a private Unix socket that
   handshakes with the writer's TLS configuration. A URL that asks for TLS
   names one host and one port; a list of hosts is refused at start.
+- The Data Quality Dashboard's six completeness checks run in Rust beside its
+  conformance checks (#405): `measurePersonCompleteness`,
+  `measureConditionEraCompleteness`, `measureValueCompleteness`,
+  `standardConceptRecordCompleteness`, `sourceConceptRecordCompleteness` and
+  `sourceValueCompleteness`, each planned where the Dashboard's v2.9.0
+  settings enable it, with its threshold, and translated from its SQL
+  template. A run now carries the Dashboard's not-applicable status: a check
+  of a missing or empty table, or of a missing or unpopulated field, is
+  neither failed nor passed and names why.
 
 ## [0.0.12] - 2026-10-25
 

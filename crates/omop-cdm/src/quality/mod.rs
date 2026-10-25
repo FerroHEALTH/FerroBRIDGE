@@ -8,9 +8,10 @@
 //! [`definitions`] is the vocabulary the generated catalogue and settings are
 //! written in ([`crate::generated::dqd`]). [`check`] names the ported checks
 //! and one check instance, [`plan`] decides which instances exist for the
-//! CDM, [`sql`] renders each instance as a PostgreSQL query, and [`evaluate`]
+//! CDM, [`sql`] renders each instance as a PostgreSQL query, [`evaluate`]
 //! turns the counts a query returns into a result with the Dashboard's
-//! verdict. With the `database` feature, `run` executes a plan on a
+//! verdict, and [`applicable`] marks the results whose table or field does
+//! not exist or holds nothing. With the `database` feature, `run` executes a plan on a
 //! `CdmPool`.
 //!
 //! The structural facts a check reads (required, datatype, keys, domain,
@@ -20,6 +21,7 @@
 //! FerroBRIDGE's own PostgreSQL translation of the Dashboard's SQL Server
 //! templates; no specification governs that translation: our own design.
 
+pub mod applicable;
 pub mod check;
 pub mod definitions;
 pub mod evaluate;

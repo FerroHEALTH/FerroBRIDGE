@@ -277,7 +277,7 @@ fn the_plan_runs_in_table_then_column_then_catalogue_order() -> Result<(), Box<d
     let head: Vec<(CheckName, Option<&str>)> = plan
         .checks()
         .iter()
-        .take(9)
+        .take(10)
         .map(|check| (check.name(), check.column().map(|column| column.name)))
         .collect();
     assert_eq!(
@@ -287,6 +287,7 @@ fn the_plan_runs_in_table_then_column_then_catalogue_order() -> Result<(), Box<d
             (CheckName::IsRequired, Some("person_id")),
             (CheckName::CdmDatatype, Some("person_id")),
             (CheckName::IsPrimaryKey, Some("person_id")),
+            (CheckName::MeasureValueCompleteness, Some("person_id")),
             (CheckName::CdmField, Some("gender_concept_id")),
             (CheckName::IsRequired, Some("gender_concept_id")),
             (CheckName::CdmDatatype, Some("gender_concept_id")),
@@ -306,5 +307,127 @@ fn every_planned_check_id_is_unique() -> Result<(), Box<dyn Error>> {
         .map(omop_cdm::quality::check::Check::id)
         .collect();
     assert_eq!(plan.checks().len(), ids.len());
+    Ok(())
+}
+
+#[test]
+fn person_completeness_runs_where_the_table_settings_enable_it() -> Result<(), Box<dyn Error>> {
+    let check = planned(
+        CheckName::MeasurePersonCompleteness,
+        "visit_occurrence",
+        None,
+    )?;
+    assert_eq!(Percentage::new(95), check.threshold());
+    assert!(
+        find(
+            &plan()?,
+            CheckName::MeasurePersonCompleteness,
+            "person",
+            None
+        )
+        .is_none(),
+        "the person table's setting says No"
+    );
+    Ok(())
+}
+
+#[test]
+fn condition_era_completeness_runs_on_the_condition_era_alone() -> Result<(), Box<dyn Error>> {
+    let plan = plan()?;
+    let tables: Vec<&str> = plan
+        .checks()
+        .iter()
+        .filter(|check| check.name() == CheckName::MeasureConditionEraCompleteness)
+        .map(|check| check.table().name)
+        .collect();
+    assert_eq!(vec!["condition_era"], tables);
+    Ok(())
+}
+
+#[test]
+fn a_concept_record_check_names_the_source_value_its_template_names() -> Result<(), Box<dyn Error>>
+{
+    let route = planned(
+        CheckName::StandardConceptRecordCompleteness,
+        "drug_exposure",
+        Some("route_concept_id"),
+    )?;
+    assert_eq!(
+        CheckParameters::SourceValue(Some("route_source_value")),
+        route.parameters()
+    );
+    assert_eq!(Percentage::new(100), route.threshold());
+    let condition = planned(
+        CheckName::StandardConceptRecordCompleteness,
+        "condition_occurrence",
+        Some("condition_concept_id"),
+    )?;
+    assert_eq!(CheckParameters::SourceValue(None), condition.parameters());
+    Ok(())
+}
+
+#[test]
+fn the_dose_era_unit_is_not_paired_with_a_source_value() -> Result<(), Box<dyn Error>> {
+    let plan = plan()?;
+    for check in plan.checks().iter().filter(|check| {
+        check.table().name == "dose_era"
+            && matches!(
+                check.name(),
+                CheckName::StandardConceptRecordCompleteness
+                    | CheckName::SourceConceptRecordCompleteness
+            )
+    }) {
+        assert_eq!(
+            CheckParameters::SourceValue(None),
+            check.parameters(),
+            "{}",
+            check.id()
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_source_value_check_maps_through_its_standard_concept_field() -> Result<(), Box<dyn Error>> {
+    let check = planned(
+        CheckName::SourceValueCompleteness,
+        "person",
+        Some("gender_source_value"),
+    )?;
+    assert_eq!(
+        CheckParameters::StandardConceptField("gender_concept_id"),
+        check.parameters()
+    );
+    Ok(())
+}
+
+#[test]
+fn every_completeness_check_the_settings_enable_is_planned() -> Result<(), Box<dyn Error>> {
+    let plan = plan()?;
+    let completeness = [
+        CheckName::MeasureValueCompleteness,
+        CheckName::StandardConceptRecordCompleteness,
+        CheckName::SourceConceptRecordCompleteness,
+        CheckName::SourceValueCompleteness,
+    ];
+    let excluded = PlanOptions::default().excluded_tables;
+    for field in omop_cdm::generated::dqd::FIELD_THRESHOLDS {
+        if excluded.contains(field.table) {
+            continue;
+        }
+        for name in completeness {
+            let enabled = field
+                .setting(name.as_str())
+                .is_some_and(|setting| setting.value == Some("Yes"));
+            assert_eq!(
+                enabled,
+                find(&plan, name, field.table, Some(field.field)).is_some(),
+                "{} on {}.{}",
+                name.as_str(),
+                field.table,
+                field.field
+            );
+        }
+    }
     Ok(())
 }

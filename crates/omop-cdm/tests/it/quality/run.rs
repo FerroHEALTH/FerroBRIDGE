@@ -21,7 +21,7 @@ use omop_cdm::quality::plan::{Plan, PlanOptions};
 use omop_cdm::quality::run;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 
-use super::planned;
+use super::{find, planned};
 
 /// The schema the tests build the CDM in.
 const SCHEMA: &str = "cdm";
@@ -56,8 +56,10 @@ async fn cdm() -> Result<Option<Cdm>, Box<dyn Error>> {
 
 impl Cdm {
     /// Runs `sql` on the CDM schema.
-    async fn execute(&self, sql: &'static str) -> Result<(), Box<dyn Error>> {
-        sqlx::raw_sql(sql).execute(self.pool.pool()).await?;
+    async fn execute(&self, sql: &str) -> Result<(), Box<dyn Error>> {
+        sqlx::raw_sql(sqlx::AssertSqlSafe(sql.to_owned()))
+            .execute(self.pool.pool())
+            .await?;
         Ok(())
     }
 
@@ -122,16 +124,17 @@ const CONCEPTS: &str = "INSERT INTO concept (concept_id, concept_name, domain_id
     (9102, 'Test clinical drug', 'Drug', 'Test', 'Clinical Drug', 'S', 'D1', '1970-01-01', '2099-12-31', NULL)";
 
 #[tokio::test]
-async fn every_planned_query_runs_and_passes_on_an_empty_cdm() -> Result<(), Box<dyn Error>> {
+async fn every_planned_query_runs_and_none_fails_on_an_empty_cdm() -> Result<(), Box<dyn Error>> {
     let Some(cdm) = cdm().await? else {
         return Ok(());
     };
     let plan = Plan::new(&PlanOptions::default())?;
     for result in run::run(&cdm.pool, &plan).await {
         assert!(
-            result.passed,
-            "{} did not pass on an empty CDM: {:?}",
-            result.check_id, result.error
+            !result.failed && !result.is_error,
+            "{} failed or erred on an empty CDM: {:?}",
+            result.check_id,
+            result.error
         );
     }
     Ok(())
@@ -439,5 +442,290 @@ async fn is_standard_valid_concept_fails_on_a_retired_concept() -> Result<(), Bo
         )
         .await?;
     assert_failed(&result, Some(counts(1, 2)));
+    Ok(())
+}
+
+/// One visit for person 1.
+const VISIT: &str = "INSERT INTO visit_occurrence (visit_occurrence_id, person_id, \
+    visit_concept_id, visit_start_date, visit_end_date, visit_type_concept_id) \
+    VALUES (1, 1, 0, '2026-01-01', '2026-01-02', 0)";
+
+/// Conditions for persons 1 and 2, the second with concept 0.
+const CONDITIONS: &str = "INSERT INTO condition_occurrence (condition_occurrence_id, person_id, \
+    condition_concept_id, condition_start_date, condition_type_concept_id) \
+    VALUES (1, 1, 9002, '2026-01-01', 0), (2, 2, 0, '2026-01-01', 0)";
+
+/// Drug exposures for person 1; `route` is the second row's route concept
+/// and source value.
+fn drugs(route: &str) -> String {
+    format!(
+        "INSERT INTO drug_exposure (drug_exposure_id, person_id, drug_concept_id, \
+         drug_exposure_start_date, drug_exposure_end_date, drug_type_concept_id, \
+         route_concept_id, route_source_value) VALUES \
+         (1, 1, 9102, '2026-01-01', '2026-01-02', 0, 9101, 'oral'), \
+         (2, 1, 9102, '2026-01-01', '2026-01-02', 0, {route})"
+    )
+}
+
+#[tokio::test]
+async fn person_completeness_passes_when_every_person_has_a_row() -> Result<(), Box<dyn Error>> {
+    let Some(cdm) = cdm().await? else {
+        return Ok(());
+    };
+    cdm.execute(
+        "INSERT INTO person (person_id, gender_concept_id, year_of_birth, \
+                 race_concept_id, ethnicity_concept_id) VALUES (1, 9001, 1980, 0, 0)",
+    )
+    .await?;
+    cdm.execute(VISIT).await?;
+    let result = cdm
+        .check(
+            CheckName::MeasurePersonCompleteness,
+            "visit_occurrence",
+            None,
+        )
+        .await?;
+    assert_passed(&result, counts(0, 1));
+    Ok(())
+}
+
+#[tokio::test]
+async fn person_completeness_fails_above_its_threshold() -> Result<(), Box<dyn Error>> {
+    let Some(cdm) = cdm().await? else {
+        return Ok(());
+    };
+    cdm.execute(PERSONS).await?;
+    let result = cdm
+        .check(
+            CheckName::MeasurePersonCompleteness,
+            "visit_occurrence",
+            None,
+        )
+        .await?;
+    assert_failed(&result, Some(counts(2, 2)));
+    Ok(())
+}
+
+#[tokio::test]
+async fn condition_era_completeness_passes_when_every_condition_has_an_era()
+-> Result<(), Box<dyn Error>> {
+    let Some(cdm) = cdm().await? else {
+        return Ok(());
+    };
+    cdm.execute(PERSONS).await?;
+    cdm.execute(CONDITIONS).await?;
+    cdm.execute(
+        "INSERT INTO condition_era (condition_era_id, person_id, condition_concept_id, \
+         condition_era_start_date, condition_era_end_date) \
+         VALUES (1, 1, 9002, '2026-01-01', '2026-01-01')",
+    )
+    .await?;
+    let result = cdm
+        .check(
+            CheckName::MeasureConditionEraCompleteness,
+            "condition_era",
+            None,
+        )
+        .await?;
+    assert_passed(&result, counts(0, 1));
+    Ok(())
+}
+
+#[tokio::test]
+async fn condition_era_completeness_fails_on_a_person_with_no_era() -> Result<(), Box<dyn Error>> {
+    let Some(cdm) = cdm().await? else {
+        return Ok(());
+    };
+    cdm.execute(PERSONS).await?;
+    cdm.execute(CONDITIONS).await?;
+    let result = cdm
+        .check(
+            CheckName::MeasureConditionEraCompleteness,
+            "condition_era",
+            None,
+        )
+        .await?;
+    assert_failed(&result, Some(counts(1, 1)));
+    Ok(())
+}
+
+#[tokio::test]
+async fn value_completeness_passes_below_its_threshold() -> Result<(), Box<dyn Error>> {
+    let Some(cdm) = cdm().await? else {
+        return Ok(());
+    };
+    cdm.execute(PERSONS).await?;
+    cdm.execute(&drugs("NULL, NULL")).await?;
+    let result = cdm
+        .check(
+            CheckName::MeasureValueCompleteness,
+            "drug_exposure",
+            Some("route_concept_id"),
+        )
+        .await?;
+    assert_passed(&result, counts(1, 2));
+    Ok(())
+}
+
+#[tokio::test]
+async fn value_completeness_fails_above_its_threshold() -> Result<(), Box<dyn Error>> {
+    let Some(cdm) = cdm().await? else {
+        return Ok(());
+    };
+    cdm.execute(PERSONS).await?;
+    cdm.execute(&drugs("NULL, NULL")).await?;
+    let check = planned(
+        CheckName::MeasureValueCompleteness,
+        "drug_exposure",
+        Some("route_source_value"),
+    )?;
+    cdm.execute("UPDATE drug_exposure SET route_source_value = NULL")
+        .await?;
+    let result = run::run_check(&cdm.pool, &check).await;
+    let threshold = result
+        .threshold_value
+        .map(omop_cdm::quality::definitions::Percentage::value);
+    assert_eq!(Some(counts(2, 2)), result.counts);
+    assert_eq!(threshold != Some(100), result.failed, "{threshold:?}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn standard_concept_record_completeness_passes_without_concept_zero()
+-> Result<(), Box<dyn Error>> {
+    let Some(cdm) = cdm().await? else {
+        return Ok(());
+    };
+    cdm.execute(PERSONS).await?;
+    cdm.execute(&drugs("9101, 'oral'")).await?;
+    let result = cdm
+        .check(
+            CheckName::StandardConceptRecordCompleteness,
+            "drug_exposure",
+            Some("route_concept_id"),
+        )
+        .await?;
+    assert_passed(&result, counts(0, 2));
+    Ok(())
+}
+
+#[tokio::test]
+async fn standard_concept_record_completeness_counts_zero_and_a_null_beside_a_source_value()
+-> Result<(), Box<dyn Error>> {
+    let Some(cdm) = cdm().await? else {
+        return Ok(());
+    };
+    cdm.execute(PERSONS).await?;
+    cdm.execute(&drugs("NULL, 'rectal'")).await?;
+    cdm.execute("UPDATE drug_exposure SET route_concept_id = 0 WHERE drug_exposure_id = 1")
+        .await?;
+    let check = planned(
+        CheckName::StandardConceptRecordCompleteness,
+        "drug_exposure",
+        Some("route_concept_id"),
+    )?;
+    let result = run::run_check(&cdm.pool, &check).await;
+    assert_eq!(
+        Some(counts(2, 2)),
+        result.counts,
+        "concept 0 and a NULL beside 'rectal' both violate"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn source_concept_record_completeness_fails_on_concept_zero() -> Result<(), Box<dyn Error>> {
+    let Some(cdm) = cdm().await? else {
+        return Ok(());
+    };
+    cdm.execute(PERSONS).await?;
+    cdm.execute(
+        "INSERT INTO condition_occurrence (condition_occurrence_id, person_id, \
+         condition_concept_id, condition_start_date, condition_type_concept_id, \
+         condition_source_concept_id) VALUES (1, 1, 9002, '2026-01-01', 0, 0)",
+    )
+    .await?;
+    let check = find(
+        &Plan::new(&PlanOptions::default())?,
+        CheckName::SourceConceptRecordCompleteness,
+        "condition_occurrence",
+        Some("condition_source_concept_id"),
+    )
+    .ok_or("the plan checks condition_source_concept_id")?;
+    let result = run::run_check(&cdm.pool, &check).await;
+    assert_eq!(Some(counts(1, 1)), result.counts);
+    cdm.execute("UPDATE condition_occurrence SET condition_source_concept_id = 9002")
+        .await?;
+    let result = run::run_check(&cdm.pool, &check).await;
+    assert_eq!(Some(counts(0, 1)), result.counts);
+    Ok(())
+}
+
+#[tokio::test]
+async fn source_value_completeness_counts_distinct_unmapped_values() -> Result<(), Box<dyn Error>> {
+    let Some(cdm) = cdm().await? else {
+        return Ok(());
+    };
+    cdm.execute(
+        "INSERT INTO person (person_id, gender_concept_id, year_of_birth, race_concept_id, \
+         ethnicity_concept_id, gender_source_value) VALUES \
+         (1, 9001, 1980, 0, 0, 'F'), (2, 9001, 1990, 0, 0, 'F'), \
+         (3, 0, 1990, 0, 0, 'X'), (4, 0, 1990, 0, 0, NULL)",
+    )
+    .await?;
+    let result = cdm
+        .check(
+            CheckName::SourceValueCompleteness,
+            "person",
+            Some("gender_source_value"),
+        )
+        .await?;
+    assert_eq!(
+        Some(counts(2, 3)),
+        result.counts,
+        "'X' and NULL are unmapped, of 'F', 'X' and NULL"
+    );
+    cdm.execute("UPDATE person SET gender_concept_id = 9001")
+        .await?;
+    let result = cdm
+        .check(
+            CheckName::SourceValueCompleteness,
+            "person",
+            Some("gender_source_value"),
+        )
+        .await?;
+    assert_passed(&result, counts(0, 3));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_run_marks_the_checks_of_an_empty_table_not_applicable() -> Result<(), Box<dyn Error>> {
+    let Some(cdm) = cdm().await? else {
+        return Ok(());
+    };
+    cdm.execute(PERSONS).await?;
+    let plan = Plan::new(&PlanOptions::default())?;
+    let results = run::run(&cdm.pool, &plan).await;
+    let route = results
+        .iter()
+        .find(|result| {
+            result.check_name == CheckName::StandardConceptRecordCompleteness
+                && result.cdm_field_name.as_deref() == Some("ROUTE_CONCEPT_ID")
+        })
+        .ok_or("the route check ran")?;
+    assert!(route.not_applicable, "{route:?}");
+    assert_eq!(
+        Some("Table DRUG_EXPOSURE is empty."),
+        route.not_applicable_reason.as_deref()
+    );
+    let year = results
+        .iter()
+        .find(|result| {
+            result.check_name == CheckName::MeasureValueCompleteness
+                && result.cdm_table_name == "PERSON"
+                && result.cdm_field_name.as_deref() == Some("YEAR_OF_BIRTH")
+        })
+        .ok_or("the year of birth check ran")?;
+    assert!(year.passed && !year.not_applicable, "{year:?}");
     Ok(())
 }

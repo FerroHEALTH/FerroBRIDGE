@@ -13,6 +13,7 @@ use std::time::Instant;
 use sqlx::error::DatabaseError;
 
 use crate::database::CdmPool;
+use crate::quality::applicable;
 use crate::quality::check::Check;
 use crate::quality::evaluate::{self, CheckError, CheckResult, Counts, Outcome};
 use crate::quality::plan::Plan;
@@ -26,12 +27,14 @@ const UNDEFINED_COLUMN: &str = "42703";
 /// Runs every check of `plan` on `pool`, in plan order.
 ///
 /// A check whose query fails is an error result in the returned list; the run
-/// itself does not fail.
+/// itself does not fail. The results then carry the not-applicable status
+/// ([`applicable::apply`]).
 pub async fn run(pool: &CdmPool, plan: &Plan) -> Vec<CheckResult> {
     let mut results = Vec::with_capacity(plan.checks().len());
     for check in plan.checks() {
         results.push(run_check(pool, check).await);
     }
+    applicable::apply(&mut results);
     results
 }
 
