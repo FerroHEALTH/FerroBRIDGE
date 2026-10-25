@@ -6,6 +6,11 @@
 
 **The bridge from openEHR health records to HL7 FHIR and the OMOP research model, driven by mapping files.**
 
+[Documentation](https://ferrobridge.eu/docs/) ·
+[Quick start](#quick-start) ·
+[What ships today](#what-ships-today) ·
+[Licensing](https://ferrobridge.eu/docs/evaluate/licensing.html)
+
 <!-- badges:begin -->
 **Project**<br>
 [![Release](https://img.shields.io/github/v/release/FerroHEALTH/FerroBRIDGE?sort=semver&logo=github&label=release)](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest)
@@ -71,11 +76,6 @@
 
 </details>
 <!-- badges:end -->
-
-[Documentation](https://ferrobridge.eu/docs/) ·
-[Quick start](#quick-start) ·
-[What ships today](#what-ships-today) ·
-[Licensing](https://ferrobridge.eu/docs/evaluate/licensing.html)
 
 </div>
 
