@@ -14,6 +14,10 @@ its rules for a change, and the parts it publishes under another licence. The
 contribution terms every FerroHEALTH product shares are in the family book at
 <https://ferrohealth.eu/docs/licensing.html#contributions>.
 
+A contribution need not be code. A specification citation, a measurement,
+or first-hand experience with FHIRconnect, OMOCL or an openEHR CDR in
+production is as useful.
+
 ## The two layers
 
 - **The generated model layers**: `crates/fhir-types` from the vendored HL7

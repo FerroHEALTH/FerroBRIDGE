@@ -131,15 +131,25 @@ readonly OUT=target/conformance
 readonly BADGES=conformance/badges
 # The shields.io endpoint prefix every conformance badge file is read through.
 readonly ENDPOINT='https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2F'
-# The build badges, the first row of the README block.
-readonly BUILD_BADGES=(
-  '[![CI](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/ci.yml/badge.svg)](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/ci.yml)'
-  '[![CodeQL](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/codeql.yml/badge.svg)](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/codeql.yml)'
+# The project and quality badges, the first two rows of the README block.
+readonly PROJECT_BADGES=(
+  '[![Release](https://img.shields.io/github/v/release/FerroHEALTH/FerroBRIDGE?sort=semver&logo=github&label=release)](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest)'
+  '[![CI](https://img.shields.io/github/actions/workflow/status/FerroHEALTH/FerroBRIDGE/ci.yml?branch=main&logo=githubactions&logoColor=white&label=CI)](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/ci.yml)'
+  '[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue)](LICENSE)'
+  '[![Docs](https://img.shields.io/badge/docs-ferrobridge.eu-blue?logo=mdbook)](https://ferrobridge.eu/docs/)'
+  '[![GHCR](https://img.shields.io/badge/ghcr.io-ferrobridge-2496ED?logo=docker&logoColor=white)](https://github.com/FerroHEALTH/FerroBRIDGE/pkgs/container/ferrobridge)'
+)
+# The compliance markers, on their own line under the conformance badges.
+readonly COMPLIANCE_BADGES=(
+  '[![CRA](https://img.shields.io/badge/CRA-information%20for%20users-blue?logo=europeanunion)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)'
+)
+readonly QUALITY_BADGES=(
   '[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/FerroHEALTH/FerroBRIDGE/badge)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroBRIDGE)'
-  '[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=FerroHEALTH_FerroBRIDGE&metric=alert_status)](https://sonarcloud.io/summary/overall?id=FerroHEALTH_FerroBRIDGE)'
-  '[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=FerroHEALTH_FerroBRIDGE&metric=coverage)](https://sonarcloud.io/summary/new_code?id=FerroHEALTH_FerroBRIDGE)'
-  '[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)'
-  '[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/FerroHEALTH/FerroBRIDGE?sort=semver)](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest)'
+  '[![Quality gate](https://img.shields.io/sonar/quality_gate/FerroHEALTH_FerroBRIDGE?server=https%3A%2F%2Fsonarcloud.io&logo=sonarqubecloud&label=quality%20gate)](https://sonarcloud.io/summary/overall?id=FerroHEALTH_FerroBRIDGE)'
+  '[![Coverage](https://img.shields.io/sonar/coverage/FerroHEALTH_FerroBRIDGE?server=https%3A%2F%2Fsonarcloud.io&logo=sonarqubecloud&label=coverage)](https://sonarcloud.io/summary/new_code?id=FerroHEALTH_FerroBRIDGE)'
+  '[![CodeQL](https://img.shields.io/github/actions/workflow/status/FerroHEALTH/FerroBRIDGE/codeql.yml?branch=main&logo=github&label=CodeQL)](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/codeql.yml)'
+  '[![Signed releases](https://img.shields.io/badge/releases-signed-brightgreen?logo=github)](SECURITY.md#verifying-a-release)'
+  '[![SLSA Build L3](https://slsa.dev/images/gh-badge-level3.svg)](SECURITY.md#verifying-a-release)'
 )
 
 # The badge label of a corpus.
@@ -376,37 +386,23 @@ badge_link() {
   echo "[![$1](${ENDPOINT}${2}.json)]($3)"
 }
 
-# The README block with its markers, in a fixed order: the build badges, then
-# one row per standard, the HL7 v2 row closing on its family and version badges.
+# The README block with its markers, in a fixed order: the project and quality
+# rows, then the conformance row, closing on the HL7 v2 family and version badges.
 render_block() {
   local name
   echo '<!-- badges:begin -->'
-  printf '%s\n' "${BUILD_BADGES[@]}"
+  echo '**Project**<br>'
+  printf '%s\n' "${PROJECT_BADGES[@]}"
   echo
-  echo "**Conformance**, measured by the corpus tests under \`conformance/\`; each badge links to its pass list."
+  echo '**Quality and security**<br>'
+  printf '%s\n' "${QUALITY_BADGES[@]}"
   echo
-  echo 'FHIRconnect 1.0.0:'
-  badge_link "$(label_of fhirconnect-mapping-lib)" fhirconnect-mapping-lib conformance/fhirconnect-mapping-lib/pass-list.txt
-  badge_link "$(label_of rest-api)" rest-api conformance/rest-api/pass-list.txt
-  echo
-  echo 'OMOCL 1.0.0:'
-  badge_link "$(label_of omocl)" omocl conformance/omocl/pass-list.txt
-  echo
-  echo 'FHIR, the model per version through fhir-types, then R4 through the mappings and the facade:'
-  for name in fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6 roundtrip fhir-r4-facade; do
+  echo '**Conformance and compliance**<br>'
+  for name in fhirconnect-mapping-lib rest-api omocl fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6 roundtrip fhir-r4-facade fhirpath-r4 fhirpath-r4-stu3 validator-agreement hl7v2 hl7v2-smoke; do
     badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
   done
-  echo
-  echo 'FHIRPath with the FHIR R4 additions, N1 2.0.0, then the tests of the functions 3.0.0 adds as STU, behind their opt-in:'
-  badge_link "$(label_of fhirpath-r4)" fhirpath-r4 conformance/fhirpath-r4/pass-list.txt
-  badge_link "$(label_of fhirpath-r4-stu3)" fhirpath-r4-stu3 conformance/fhirpath-r4-stu3/pass-list.txt
-  echo
-  echo 'The R4 profile validator against the HL7 FHIR Validator 6.10.4 on a synthetic corpus, every disagreement adjudicated:'
-  badge_link "$(label_of validator-agreement)" validator-agreement conformance/validator-agreement/pass-list.txt
-  echo
-  echo 'HL7 v2, by corpus:'
-  badge_link "$(label_of hl7v2)" hl7v2 conformance/hl7v2/pass-list.txt
-  badge_link "$(label_of hl7v2-smoke)" hl7v2-smoke conformance/hl7v2-smoke/pass-list.txt
+  echo '<br>'
+  printf '%s\n' "${COMPLIANCE_BADGES[@]}"
   # The per-family and per-version badges fold into a collapsed block, so the
   # per-corpus badges stay in view; GitHub renders Markdown inside <details>
   # only after a blank line.
