@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 <div align="center">
 
-<img src="assets/brand/ferrobridge-lockup-auto.svg" alt="FerroBRIDGE" height="64">
+<img src="assets/brand/ferrobridge-lockup-auto.svg" alt="FerroBRIDGE" width="290">
 
 **The bridge from openEHR health records to HL7 FHIR and the OMOP research model, driven by mapping files.**
 
