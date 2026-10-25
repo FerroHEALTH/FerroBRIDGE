@@ -118,10 +118,11 @@ backon = "1.6.0"
 # The FerroHEALTH family's SMART App Launch and OAuth 2.0 resource-server
 # crate: the token check of the facade and the operator API, the scopes, the
 # audit line, and the client credentials token of the CDR and terminology
-# lanes. Pinned exactly; verified against crates.io on 2026-10-20 (0.4.0,
-# published 2026-10-20). `fetch` reads each issuer's metadata and key set
-# and runs the client credentials token client.
-ferrohealth-smart = { version = "=0.4.0", default-features = false, features = ["axum", "fetch"] }
+# lanes, and the RFC 7662 introspection check of `[auth] mode =
+# "introspection"`. Pinned exactly; verified against crates.io on 2026-10-25
+# (0.6.0, published 2026-10-25). `fetch` reads each issuer's metadata and key
+# set and runs the client credentials token client and the introspector.
+ferrohealth-smart = { version = "=0.6.0", default-features = false, features = ["axum", "fetch"] }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off. Verified against crates.io on 2026-10-16 (11.1.0,
@@ -201,8 +202,8 @@ console_error_panic_hook = "0.1.7"
 # the table model, the highlighter, the Lucide icons, the stylesheet and the
 # role tokens, shared by every FerroHEALTH console. Pinned exactly, so the
 # console moves to a new version deliberately. Verified against crates.io on
-# 2026-10-23.
-ferrohealth-ui = "=0.3.6"
+# 2026-10-25.
+ferrohealth-ui = "=0.4.0"
 # The console's string catalogs (#956): Project Fluent messages embedded at
 # build time from app/ferrobridge-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
@@ -384,3 +385,4 @@ opt-level = 0
 
 [profile.emit.package.hl7v2-types]
 opt-level = 0
+

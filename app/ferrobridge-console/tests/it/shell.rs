@@ -232,16 +232,46 @@ async fn your_preferences_draws_the_three_tabs_and_says_what_it_kept() -> Result
 }
 
 #[tokio::test]
-async fn the_search_answers_contexts_files_and_templates_in_the_page() -> Result<(), Box<dyn Error>>
+async fn the_search_page_lists_contexts_files_and_templates_in_the_page()
+-> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(&service, get_with("/search?q=observation", &cookie)?).await?;
+    assert!(page.contains("matches for “observation”"), "{page}");
+    assert!(page.contains(CONTEXT), "{page}");
+    assert!(
+        page.contains("fui-find-results"),
+        "the hits are in the page: {page}"
+    );
+    let main = page.split("<main").nth(1).unwrap_or_default();
+    assert!(
+        !main.contains("fui-search-results"),
+        "never an overlay in the page: {page}"
+    );
+    let (_response, none) = send(&service, get_with("/search?q=nothing-here", &cookie)?).await?;
+    assert!(none.contains("Nothing found for “nothing-here”"), "{none}");
+    assert!(!none.contains(BROKEN), "{none}");
+    let (_response, dashboard) = send(&service, get_with("/?q=observation", &cookie)?).await?;
+    assert!(
+        dashboard.contains(r#"action="/search""#),
+        "the top bar's search submits to the search page: {dashboard}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_search_answers_the_panel_as_json_and_only_with_a_session() -> Result<(), Box<dyn Error>>
 {
     let bridge = bridge().await;
     let (service, cookie) = signed_in(&bridge).await?;
-    let (_response, page) = send(&service, get_with("/?q=observation", &cookie)?).await?;
-    assert!(page.contains("matches for “observation”"), "{page}");
-    assert!(page.contains(CONTEXT), "{page}");
-    let (_response, none) = send(&service, get_with("/?q=nothing-here", &cookie)?).await?;
-    assert!(none.contains("Nothing found for “nothing-here”"), "{none}");
-    assert!(!none.contains(BROKEN), "{none}");
+    let (response, body) =
+        send(&service, get_with("/search/answer?q=observation", &cookie)?).await?;
+    assert_eq!(StatusCode::OK, response.status(), "{body}");
+    let answer: serde_json::Value = serde_json::from_str(&body)?;
+    assert_eq!(Some("observation"), answer["query"].as_str(), "{body}");
+    assert!(body.contains(CONTEXT), "{body}");
+    let (response, _body) = send(&service, get("/search/answer?q=observation")?).await?;
+    assert_eq!(StatusCode::UNAUTHORIZED, response.status());
     Ok(())
 }
 

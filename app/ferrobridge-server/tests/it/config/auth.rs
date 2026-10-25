@@ -425,3 +425,33 @@ fn a_basic_only_section_is_refused_because_the_facade_names_an_issuer()
     );
     Ok(())
 }
+
+#[test]
+fn introspection_mode_resolves_the_introspection_check_in_place_of_the_issuers()
+-> Result<(), Box<dyn std::error::Error>> {
+    let settings = settings(
+        "[auth]\nissuer = \"https://as.example.org/realms/ferro\"\naudience = [\"https://bridge.example.org/fhir\"]\nmode = \"introspection\"\n\n[auth.introspection]\ncache_max_age_seconds = 30\n\n[auth.introspection.client]\nclient_id = \"ferrobridge-rs\"\nclient_secret = \"synthetic-secret\"\n",
+    )?
+    .ok_or("auth is on")?;
+    assert!(settings.issuers.is_empty(), "no key set is read");
+    let introspection = settings.introspection.ok_or("the introspection check")?;
+    assert_eq!("https://as.example.org/realms/ferro", introspection.issuer);
+    assert_eq!(Duration::from_secs(30), introspection.cache_max_age);
+    assert_eq!(OPERATOR_SCOPE, settings.operator_scope);
+    Ok(())
+}
+
+#[test]
+fn introspection_mode_without_its_table_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+    let error = refusal(&format!("{MINIMAL}mode = \"introspection\"\n"))?;
+    assert!(
+        matches!(
+            rule(&error),
+            Some(ConfigError::Missing {
+                key: "auth.introspection"
+            })
+        ),
+        "{error:?}"
+    );
+    Ok(())
+}

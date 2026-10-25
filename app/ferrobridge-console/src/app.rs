@@ -312,6 +312,11 @@ fn routes(session: SessionState) -> AnyView {
                 ssr=SsrMode::Async
             />
             <Route
+                path=path!("/search")
+                view=guarded(session, crate::pages::search::page)
+                ssr=SsrMode::Async
+            />
+            <Route
                 path=path!("/about")
                 view=guarded(session, crate::pages::about::page)
                 ssr=SsrMode::Async

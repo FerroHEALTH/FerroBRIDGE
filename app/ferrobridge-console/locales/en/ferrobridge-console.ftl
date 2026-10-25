@@ -51,6 +51,8 @@ search-every-file = Every mapping file
 search-files = Mapping files
 search-file-line = Mapping file
 search-template-line = Operational template
+search-title = Search
+search-empty = Type a context, a mapping file or a template in the search above.
 
 ## Words several pages share
 
@@ -654,8 +656,6 @@ row-visit-concepts-desc = The concept and the type of every visit.
 row-visit-query = Visit query
 row-visit-query-desc = The AQL that derives each visit.
 see-its-settings = See its settings
-source-default = default
-source-environment = from the environment
 tab-logging = Logging
 tab-mappings = Mappings
 tab-server-access = Server and access

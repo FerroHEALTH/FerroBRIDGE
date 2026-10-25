@@ -1703,9 +1703,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.4.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ffe8ec80408ba7026bae4480d6e4ea13380e056f4d6a0704c1698e5ef40b14d"
+checksum = "cb2825bac4f7555da8a6e047f1454bc21b200ede6d6b0a3482363723e264928c"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -1727,9 +1727,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-ui"
-version = "0.3.6"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "807b1ccb3be3e8176946e85aefbf5c44cf8dbb0d883a28dc7e942ebc6c61937c"
+checksum = "4a52b63a48efb590636fdd163dfa049a6230a0bb757a36bf0e22e7850cdf3440"
 dependencies = [
  "fluent-templates",
  "intl-memoizer",

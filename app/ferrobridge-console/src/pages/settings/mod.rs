@@ -27,7 +27,7 @@ use ferrohealth_ui::view::secret;
 use ferrohealth_ui::view::secret::secret_state;
 use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::template::settings::{
-    How, Setting, file_line, setting_row, settings_panel,
+    How, Setting, ValueSource, file_line, setting_row, settings_panel,
 };
 use leptos::prelude::*;
 
@@ -97,32 +97,30 @@ pub fn setting(configuration: &Configuration, row: &Row) -> Setting {
             view! { {joint} {value} }.into_any()
         })
         .collect_view();
-    let source = origin(&entries);
     Setting {
         label: tr(row.label),
         description: tr(row.description),
-        value: view! { {values} {source} }.into_any(),
+        value: values.into_any(),
+        source: origin(&entries),
         keys: row.keys.iter().map(|(key, _)| (*key).to_owned()).collect(),
         next_start: false,
     }
 }
 
-/// Returns where the row's values came from, when that is not the file: the
+/// Where the row's values came from, when that is not the file: the
 /// environment wins over it, and a default is named as one.
-fn origin(entries: &[(Option<&Entry>, Shape)]) -> Option<AnyView> {
+fn origin(entries: &[(Option<&Entry>, Shape)]) -> Option<ValueSource> {
     let sources = entries
         .iter()
         .map(|(entry, _)| entry.map_or(Source::Default, |entry| entry.source))
         .collect::<Vec<_>>();
-    let words = if sources.contains(&Source::Environment) {
-        Msg::SourceEnvironment
+    if sources.contains(&Source::Environment) {
+        Some(ValueSource::Environment)
     } else if sources.iter().all(|source| *source == Source::Default) {
-        Msg::SourceDefault
+        Some(ValueSource::Default)
     } else {
-        return None;
-    };
-    // TODO(#1176): draw the source through FerroUI's `Setting` once it carries one.
-    Some(view! { " " <span class="fui-muted fui-small">{tr(words)}</span> }.into_any())
+        None
+    }
 }
 
 /// Returns the quiet dash of a key the configuration leaves unset.

@@ -128,6 +128,10 @@ pub fn router(state: ConsoleState) -> axum::Router {
         .route(crate::app::MARK_LIGHT, get(mark_light))
         .route(crate::app::MARK_DARK, get(mark_dark))
         .route(crate::pages::about::INFO_JSON, get(info_json))
+        .route(
+            crate::pages::search::ANSWER,
+            get(crate::pages::search::answer_route),
+        )
         .route(crate::prefs::PREFERENCE, post(crate::prefs::choose))
         .route(crate::prefs::RESET, post(crate::prefs::reset))
         .route(crate::prefs::SIDEBAR, post(crate::prefs::rail))

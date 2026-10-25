@@ -77,6 +77,13 @@ is a word as well as a colour: `Bridge up` with the version beside it,
 answer. The Mapping set entry counts the errors of the running load.
 The user menu holds Your preferences, the theme and Sign out.
 
+The search finds contexts by name or resource type, mapping files by path
+and templates by id, and never takes a patient identifier. As you type, a
+panel opens under the field with the matches grouped by kind, five of each
+at most; the arrow keys walk them, Enter opens the chosen one, and Enter
+with none chosen, or "See all results", opens the search page, which lists
+every match in the page.
+
 The console draws every page on its server and sends it whole. The
 browser runs WebAssembly for the interactive parts alone (the menus, the
 code editor, the JSON input), so every page and every action works before
@@ -379,6 +386,11 @@ Your preferences, Appearance. [Dark theme](img/console/preferences-dark.png).
 
 Your preferences, Language and region.
 [Dark theme](img/console/preferences-language-dark.png).
+
+![The search page](img/console/search.png)
+
+The search page, every match of the words searched for, one card per kind.
+[Dark theme](img/console/search-dark.png).
 
 ![The About page](img/console/about.png)
 
