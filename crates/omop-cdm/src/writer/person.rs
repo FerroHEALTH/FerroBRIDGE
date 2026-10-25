@@ -22,8 +22,10 @@ use crate::writer::error::WriteError;
 use crate::writer::input::PersonPolicy;
 use crate::writer::side_table::allocate;
 
-/// The width of `person.person_source_value`, `varchar(50)` in CDM v5.4.
-const SOURCE_VALUE_WIDTH: usize = 50;
+/// The width of the `*_source_value` columns the writer fills itself
+/// (`person_source_value`, `provider_source_value`,
+/// `visit_detail_source_value`), `varchar(50)` in CDM v5.4.
+pub(super) const SOURCE_VALUE_WIDTH: usize = 50;
 
 /// Resolves `ehr_id` to its `person_id` in the person map, assigning one when
 /// `create` allows.

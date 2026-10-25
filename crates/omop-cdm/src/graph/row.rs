@@ -9,7 +9,9 @@ use std::collections::BTreeMap;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 
 use crate::graph::key::MappingName;
+use crate::graph::key::ProviderSource;
 use crate::graph::key::RecordKey;
+use crate::graph::key::VisitDetailKey;
 use crate::graph::key::VisitKey;
 use crate::graph::varchar_limit;
 use crate::meta::CdmSchema;
@@ -27,6 +29,11 @@ pub enum Reference {
     Visit(VisitKey),
     /// Another row, in the table the column's foreign key names.
     Row(RecordKey),
+    /// A `PROVIDER` by its source, for a column that references `provider`.
+    Provider(ProviderSource),
+    /// A `VISIT_DETAIL` of a derived visit, for a column that references
+    /// `visit_detail`.
+    VisitDetail(VisitDetailKey),
 }
 
 /// A column value in the form its CDM datatype takes.
@@ -399,8 +406,11 @@ impl RowBuilder {
     ///
     /// A [`Reference::Person`] fits a column whose foreign key is
     /// `person.person_id`, a [`Reference::Visit`] one whose foreign key is
-    /// `visit_occurrence.visit_occurrence_id`, and a [`Reference::Row`] one
-    /// whose foreign key names any other CDM table with an integer key.
+    /// `visit_occurrence.visit_occurrence_id`, a [`Reference::Provider`] one
+    /// whose foreign key is `provider.provider_id`, a
+    /// [`Reference::VisitDetail`] one whose foreign key is
+    /// `visit_detail.visit_detail_id`, and a [`Reference::Row`] one whose
+    /// foreign key names any other CDM table with an integer key.
     ///
     /// # Errors
     ///
@@ -413,13 +423,17 @@ impl RowBuilder {
         let target = meta.foreign_key.map(|(table, _)| table);
         let fits = match (&reference, target) {
             (Reference::Person(_), Some("person"))
-            | (Reference::Visit(_), Some("visit_occurrence")) => true,
+            | (Reference::Visit(_), Some("visit_occurrence"))
+            | (Reference::Provider(_), Some("provider"))
+            | (Reference::VisitDetail(_), Some("visit_detail")) => true,
             (Reference::Row(_), Some(table)) => {
-                !matches!(table, "person" | "visit_occurrence")
-                    && crate::meta::table(table)
-                        .filter(|target| target.cdm_schema == CdmSchema::Cdm)
-                        .and_then(primary_key)
-                        .is_some()
+                !matches!(
+                    table,
+                    "person" | "visit_occurrence" | "provider" | "visit_detail"
+                ) && crate::meta::table(table)
+                    .filter(|target| target.cdm_schema == CdmSchema::Cdm)
+                    .and_then(primary_key)
+                    .is_some()
             }
             _ => false,
         };
@@ -431,6 +445,8 @@ impl RowBuilder {
                     Reference::Person(_) => "person",
                     Reference::Visit(_) => "visit",
                     Reference::Row(_) => "row",
+                    Reference::Provider(_) => "provider",
+                    Reference::VisitDetail(_) => "visit detail",
                 },
             });
         }

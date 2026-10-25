@@ -36,6 +36,7 @@ pub mod error;
 pub mod input;
 pub mod person;
 pub mod removal;
+mod shared;
 pub mod side_table;
 pub mod stage;
 
@@ -527,6 +528,12 @@ impl Resolver<'_, '_> {
                     Some(row) => row.try_get(0).map_err(database(Step::Read)),
                     None => Err(WriteError::UnknownVisit { key: key.clone() }),
                 }
+            }
+            Reference::Provider(source) => {
+                shared::provider_id(self.transaction, self.cdm, self.bridge, source).await
+            }
+            Reference::VisitDetail(key) => {
+                shared::visit_detail_id(self.transaction, self.cdm, self.bridge, key).await
             }
             Reference::Row(key) => {
                 let table = graph::row::cdm_table(target)?;

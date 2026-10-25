@@ -98,6 +98,51 @@ identifier!(
     "visit source"
 );
 
+identifier!(
+    /// The source a `PROVIDER` row is keyed by: the provider's identifier as
+    /// the composition states it, written to `provider_source_value` when it
+    /// fits.
+    ProviderSource,
+    "provider source"
+);
+identifier!(
+    /// The source a `VISIT_DETAIL` row is keyed by within its visit, written
+    /// to `visit_detail_source_value` when it fits.
+    VisitDetailSource,
+    "visit detail source"
+);
+
+/// The key of one `VISIT_DETAIL`: the visit it lies in and its source.
+///
+/// No specification governs the key: our own design over the CDM's
+/// `VISIT_DETAIL` definition, which places every detail in one
+/// `VISIT_OCCURRENCE` (<https://ohdsi.github.io/CommonDataModel/cdm54.html#visit_detail>).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct VisitDetailKey {
+    visit: VisitKey,
+    source: VisitDetailSource,
+}
+
+impl VisitDetailKey {
+    /// Names the detail `source` of `visit`.
+    #[must_use]
+    pub fn new(visit: VisitKey, source: VisitDetailSource) -> Self {
+        Self { visit, source }
+    }
+
+    /// Returns the visit.
+    #[must_use]
+    pub fn visit(&self) -> &VisitKey {
+        &self.visit
+    }
+
+    /// Returns the source.
+    #[must_use]
+    pub fn source(&self) -> &VisitDetailSource {
+        &self.source
+    }
+}
+
 /// The composition version a graph was mapped from.
 ///
 /// The EHR is RM EHR §`EHR.ehr_id` and the version RM Common §`VERSION.uid`,

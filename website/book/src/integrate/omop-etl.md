@@ -255,6 +255,30 @@ The run report counts the committed compositions tied to a visit, those
 inside no visit, and those inside several that the facility did not decide.
 A run without `[etl.visits]` ties nothing and counts nothing.
 
+## Providers and visit details
+
+An OMOCL mapping may write `provider_id` (under `ConditionOccurrence` and
+`DrugExposure`) and `visit_detail_id` (under `ConditionOccurrence` and
+`DeviceExposure`). The CDM keys PROVIDER and VISIT_DETAIL by integers no
+composition carries, so the bridge keys them by the text the mapping's path
+reads. No specification governs these keys: they are FerroBRIDGE's own design.
+
+- **A provider** is keyed by that text alone. The first composition that
+  names it creates a PROVIDER row with the text in `provider_source_value`
+  (when it fits the column's 50 characters), and every later row that names
+  the same text refers to that row.
+- **A visit detail** is keyed by the composition's visit and the text. The
+  first row that names it creates a VISIT_DETAIL row inside the visit, taking
+  the person, `visit_detail_concept_id`, dates and type concept from the
+  visit as it stands at that moment, with the text in
+  `visit_detail_source_value`. A composition tied to no visit cannot name a
+  visit detail, so such a row is refused and counted in the run report.
+
+Both rows are created in the composition's own transaction, and the bridge
+schema keeps their keys in `provider` and `visit_detail`. Neither row is
+removed when a composition that named it is removed, because other
+compositions may still name it.
+
 ## The composition query
 
 The `[etl] aql` query selects each composition whole beside its `ehr_id` and

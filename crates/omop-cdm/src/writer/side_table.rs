@@ -119,6 +119,21 @@ pub(super) fn bridge_ddl(bridge: &SchemaName) -> String {
                 visit_occurrence_id integer NOT NULL UNIQUE,
                 PRIMARY KEY (ehr_id, visit_source))"
         ),
+        // NOTE: no specification governs this: our own design; a provider and a visit
+        // detail are rows several compositions name, keyed by their source.
+        format!(
+            "CREATE TABLE IF NOT EXISTS {bridge}.provider (
+                source text PRIMARY KEY,
+                provider_id integer NOT NULL UNIQUE)"
+        ),
+        format!(
+            "CREATE TABLE IF NOT EXISTS {bridge}.visit_detail (
+                ehr_id text NOT NULL,
+                visit_source text NOT NULL,
+                source text NOT NULL,
+                visit_detail_id integer NOT NULL UNIQUE,
+                PRIMARY KEY (ehr_id, visit_source, source))"
+        ),
         format!(
             "CREATE TABLE IF NOT EXISTS {bridge}.watermark (
                 versioned_object_uid text PRIMARY KEY,

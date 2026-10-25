@@ -1609,6 +1609,13 @@ Every rule here fills a silence; OMOCL states none of them.
   (the reference engine hard-codes `32817`; the CDM says the type concept
   records the provenance of the record, which a deployment knows and an engine
   does not).
+- **`provider_id` and `visit_detail_id` name rows no composition owns.** A
+  `PROVIDER` is keyed by the text the mapping's path reads and a
+  `VISIT_DETAIL` by the composition's visit and that text; each is created on
+  first sight in the composition's transaction, the detail taking its person,
+  concept, dates and type concept from the visit. A composition with no visit
+  cannot name a detail and the record is refused. Our own design over the
+  CDM's `PROVIDER` and `VISIT_DETAIL` definitions.
 - **A required standard concept column that no OMOCL key writes takes concept
   `0`.** The CDM conventions write the "no information" concept `0` in a
   required standard concept field "if there is no information available for

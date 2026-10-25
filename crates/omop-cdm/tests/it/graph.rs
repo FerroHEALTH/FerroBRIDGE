@@ -7,9 +7,9 @@
 
 use omop_cdm::graph::{
     RecordGraph, key::ArchetypeRootPath, key::Discriminator, key::MappingName, key::OccurrencePath,
-    key::RecordKey, key::Source, key::Visit, key::VisitKey, key::VisitSource, link::Link,
-    link::LinkEnd, report::Refusal, row::GraphError, row::Reference, row::Row, row::RowBuilder,
-    row::Value,
+    key::ProviderSource, key::RecordKey, key::Source, key::Visit, key::VisitDetailKey,
+    key::VisitDetailSource, key::VisitKey, key::VisitSource, link::Link, link::LinkEnd,
+    report::Refusal, row::GraphError, row::Reference, row::Row, row::RowBuilder, row::Value,
 };
 use omop_cdm::value::CdmDate;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
@@ -318,6 +318,39 @@ fn a_source_takes_its_versioned_composition_from_the_version_as_written()
     assert_eq!(
         format!("{upper}::ferrobridge.test::2"),
         source.version_uid().value()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_provider_and_a_visit_detail_fit_their_foreign_keys() -> Result<(), Box<dyn Error>> {
+    let provider = Reference::Provider(ProviderSource::new("synthetic-prescriber-1")?);
+    let detail = Reference::VisitDetail(VisitDetailKey::new(
+        VisitKey::new(HierObjectId::new(EHR)?, VisitSource::new("encounter-1")?),
+        VisitDetailSource::new("ward-3")?,
+    ));
+    measurement("/")?
+        .reference("provider_id", provider.clone())?
+        .reference("visit_detail_id", detail.clone())?;
+    let builder = Row::builder("measurement", key("/")?)?;
+    for (column, reference) in [
+        ("person_id", provider.clone()),
+        ("visit_occurrence_id", detail.clone()),
+        ("provider_id", detail),
+        ("visit_detail_id", provider),
+    ] {
+        let error = builder
+            .clone()
+            .reference(column, reference)
+            .expect_err("the foreign key decides the reference");
+        assert!(
+            matches!(error, GraphError::Reference { .. }),
+            "{column}: {error:?}"
+        );
+    }
+    assert!(
+        ProviderSource::new("").is_err(),
+        "an empty source is refused"
     );
     Ok(())
 }

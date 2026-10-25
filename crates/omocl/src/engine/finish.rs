@@ -414,19 +414,9 @@ impl Finisher<'_> {
                 _ => return Err(unsupported()),
             },
             Part::Operator => self.operator(projection)?,
-            // TODO(#243): a provider or visit detail row has no natural key the
-            // graph's references can name yet, so a present value refuses.
-            Part::Reference => {
-                return Err(Refused::new(
-                    RefusalKind::UnsupportedValue,
-                    Some(chosen.projection.key),
-                    chosen.path.clone(),
-                    format!(
-                        "`{}` references a row no natural key of the graph names",
-                        column.column
-                    ),
-                ));
-            }
+            // NOTE: no specification governs this: our own design; a provider or a visit
+            // detail is keyed by the text the record carries for it.
+            Part::Reference => Some(Cell::Reference(text_of(datum).ok_or_else(unsupported)?)),
         };
         Ok(cell)
     }
