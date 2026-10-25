@@ -75,11 +75,7 @@ pub fn shell(content: AnyView) -> AnyView {
         <Suspense>
             {move || Suspend::new(async move {
                 let info = crate::load::info().await;
-                let searched = leptos_router::hooks::use_query_map()
-                    .with_untracked(|query| query.get("q"))
-                    .is_some_and(|words| !words.trim().is_empty());
-                let state = if searched { Some(crate::load::state().await) } else { None };
-                top_bar(&info, state.as_ref())
+                top_bar(&info)
             })}
         </Suspense>
     }
@@ -110,14 +106,15 @@ pub fn shell(content: AnyView) -> AnyView {
 }
 
 /// The top bar, with the bridge's state from `info`.
-fn top_bar(
-    info: &Loaded<ferrobridge_operator_api::health::Info>,
-    state: Option<&Loaded<EngineState>>,
-) -> AnyView {
+fn top_bar(info: &Loaded<ferrobridge_operator_api::health::Info>) -> AnyView {
     let path = use_location().pathname.get_untracked();
-    let query = leptos_router::hooks::use_query_map()
-        .with_untracked(|query| query.get("q"))
-        .unwrap_or_default();
+    let words = if path == crate::pages::search::SEARCH {
+        leptos_router::hooks::use_query_map()
+            .with_untracked(|query| query.get("q"))
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
     let chosen = crate::prefs::requested().preferences;
     let operator = crate::session::request::operator().unwrap_or_else(crate::app::unnamed_operator);
     let menu = user_menu(UserMenu {
@@ -143,11 +140,7 @@ fn top_bar(
         {menu}
     }
     .into_any();
-    let running = match state {
-        Some(Ok(Outcome::Shown(state))) => Some(state),
-        _ => None,
-    };
-    let search = crate::pages::search::search_box(&path, &query, running);
+    let search = crate::pages::search::search_box(&words);
     topbar(TopBar {
         sidebar: SIDEBAR_ID,
         lockup: console_lockup(),

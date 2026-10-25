@@ -92,6 +92,18 @@ crates on crates.io.
   (#406). With `[etl] quality_checks = true`, `etl run` runs the same checks
   over the tables it wrote and adds the verdicts to its report.
 
+### Changed
+
+- The operator console's search answers under the field as you type: a panel
+  anchored under the top bar's search asks the console's `/search/answer`
+  route and shows the running load's contexts, mapping files and templates
+  grouped by kind, five of each, with the words searched for emphasised;
+  the arrow keys walk them and Enter opens one. Enter with none chosen, or
+  "See all results", opens the new search page (`/search`), which lists
+  every match in the page. The console moves to FerroUI 0.4.0, and a
+  setting row says where its value came from through FerroUI's own marker
+  (#1219, #1176).
+
 ## [0.0.12] - 2026-10-25
 
 The FHIRconnect and facade outcomes release. A write through the facade now
