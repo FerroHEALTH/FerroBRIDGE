@@ -1118,6 +1118,15 @@ back"), and a FHIRconnect v1.0.0 context addresses a profile by canonical URL
 and version with no grammar change; what it cannot express is an R5 target
 (`spec.version` is the enum `["R4"]`), and no EHDS-category guide is R5-only.
 
+**Progress.** The first EU context targets `condition-eu-core` 2.0.0 over
+the published `KDS_Diagnose` template, whose diagnosis and qualifier
+archetypes are CKM's: the published model mappings load verbatim, and
+FerroBRIDGE's extensions under `projects/ferrobridge/eu_condition` add the
+profile's `assertedDate` and `onsetDateTime` slices and its canonical, and
+leave out the KDS ICD-10-GM, Diagnosesicherheit and Lebensphase branches.
+Its round trip asserts the code, both slices and the two status bindings
+(#116).
+
 **Decision:** profile mappings are authored in this repository, in the
 specification's own customisation mechanism (a context and its extensions per
 target), one target at a time in the order above, each with a round-trip test

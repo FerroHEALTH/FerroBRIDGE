@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the HL7 Europe Base and Core 2.0.0
+# condition-eu-core profile over the published KDS_Diagnose template, whose
+# EVALUATION.problem_diagnosis.v1 and CLUSTER.problem_qualifier.v2 are CKM
+# archetypes. The model mappings load verbatim from SevKohler/FHIRconnect-
+# mapping-lib at commit 6bd4c19a (vendored under
+# docs/specs/fhirconnect-mapping-lib, Apache License 2.0); the three
+# extensions are this directory's.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_eu_condition.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/base/StructureDefinition/condition-eu-core"
+    version: "2.0.0"
+  template:
+    id: "KDS_Diagnose"
+  archetypes:
+    - "EVALUATION.problem_diagnosis.v1"
+    - "CLUSTER.problem_qualifier.v2"
+    - "COMPOSITION.report.v1.Condition"
+  extensions:
+    - "ferrobridge_eu_condition"
+    - "ferrobridge_eu_problem_qualifier"
+    - "ferrobridge_eu_composition.Condition"
+  start: "EVALUATION.problem_diagnosis.v1"
