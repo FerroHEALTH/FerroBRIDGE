@@ -49,9 +49,10 @@ openehr-adl.workspace = true
 # The AOM2 operational template the adl2 route serves.
 openehr-am.workspace = true
 openehr-base.workspace = true
-# The ITS wire layer, the generated ITS-REST client the CDR is called through
-# included.
-openehr-its.workspace = true
+# The ITS wire layer, with the generated ITS-REST 1.1.0 transport DTOs and the
+# client the CDR is called through, which the workspace entry leaves out so the
+# mapping core compiles for the browser.
+openehr-its = { workspace = true, features = ["rest", "rest-client"] }
 openehr-mapping-core.workspace = true
 # The ETL checks its configured AQL at load (docs/architecture.md section 5.4).
 openehr-query.workspace = true

@@ -68,7 +68,7 @@ socket2 = "0.6.5"
 # version: cargo resolves the path locally and the version on crates.io.
 fhir-types = { path = "crates/fhir-types", version = "0.1.128", default-features = false }
 hl7v2-types = { path = "crates/hl7v2-types", version = "0.1.127" }
-openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "0.1.128" }
+openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "0.1.129" }
 # The health and operator documents the server writes and the console reads.
 ferrobridge-operator-api = { path = "crates/ferrobridge-operator-api", version = "0.0.0" }
 # The OMOP CDM layer, taken metadata-only by default: a consumer that writes
@@ -86,22 +86,25 @@ ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "0.1.12
 # The HL7 v2 face's crate (MLLP, MSH-18 decoding, parsing, the ACK and the
 # v2-to-FHIR ConceptMap interpreter): published from this workspace, so the
 # requirement carries both a path and a version.
-ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "0.1.147" }
+ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "0.1.148" }
 # The FHIRconnect language crate: the facade, the operations surface and the
 # published ferrobridge-hl7v2 consume it, so the requirement carries both a
 # path and a version.
-fhirconnect = { path = "crates/fhirconnect", version = "0.1.193" }
+fhirconnect = { path = "crates/fhirconnect", version = "0.1.194" }
 # The OMOCL language crate: the ETL runner is its one in-process consumer, so
 # the requirement is path-only too.
 omocl = { path = "crates/omocl" }
 # The openEHR model, from the published crates (docs/architecture.md section 3).
-# openehr-its is the ITS wire layer: the OPT 1.4 reader (`opt14`), canonical
-# JSON (`json`), the generated ITS-REST 1.1.0 transport DTOs (`rest`) and the
-# generated ITS-REST client over its runtime (`rest-client`); the alternative is a hand-written copy of a generated model, which
+# openehr-its is the ITS wire layer: the OPT 1.4 reader (`opt14`) and canonical
+# JSON (`json`) for every member, so the mapping core and the operator contract
+# above it compile for wasm32 and the operator console's browser half can link
+# them (#1256). The server adds the generated ITS-REST 1.1.0 transport DTOs
+# (`rest`) and the generated client over its runtime (`rest-client`) in its own
+# manifest; the alternative is a hand-written copy of a generated model, which
 # .claude/rules/codegen.md forbids. From 0.0.69 the Simplified Data Template
 # engines (FLAT, STRUCTURED, Web Template, TDD, RM-instance validation) live in
 # openehr-sdt, taken without its `cache` feature (`moka`).
-openehr-its = { version = "0.0.90", default-features = false, features = ["opt14", "json", "rest", "rest-client"] }
+openehr-its = { version = "0.0.90", default-features = false, features = ["opt14", "json"] }
 openehr-sdt = { version = "0.0.90", default-features = false, features = ["flat"] }
 openehr-am = "0.0.90"
 # The AQL 1.1.0 parser: the ETL checks its configured queries at load
