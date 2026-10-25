@@ -9,8 +9,8 @@
 //! and examples, except where a FHIR required binding fixes the system.
 //!
 //! Some fixtures name systems outside that domain. [`KDS_DIAGNOSE_OPT`],
-//! [`KDS_PERSON_OPT`] and [`KDS_LABORAUFTRAG_OPT`] are published operational
-//! templates vendored verbatim
+//! [`KDS_PERSON_OPT`], [`KDS_LABORAUFTRAG_OPT`] and [`KDS_LABORBERICHT_OPT`]
+//! are published operational templates vendored verbatim
 //! with their provenance beside them: a template carries constraints, never
 //! patient content.
 //! [`KDS_DIAGNOSE_CONDITION`] is synthetic, and names the profile and the
@@ -139,6 +139,17 @@ pub const KDS_LABORAUFTRAG_OPT: &str =
 
 /// The template identifier [`KDS_LABORAUFTRAG_OPT`] declares.
 pub const KDS_LABORAUFTRAG_TEMPLATE_ID: &str = "KDS_Laborauftrag";
+
+/// The published `KDS_Laborbericht` operational template.
+///
+/// One `COMPOSITION.report-result.v1` holding
+/// `OBSERVATION.laboratory_test_result.v1` with its analyte and specimen
+/// clusters, the template the HL7 Europe Laboratory 2.0.0 round trip runs
+/// against. `scripts/vendor/kds-laborbericht-opt.sh` fetches it at the commit
+/// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside it records its source
+/// and licence.
+pub const KDS_LABORBERICHT_OPT: &str =
+    include_str!("../fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt");
 
 /// A synthetic FLAT composition of [`KDS_PERSON_OPT`]: one person with a
 /// name, the birth date `1984-03-17` and the administrative gender

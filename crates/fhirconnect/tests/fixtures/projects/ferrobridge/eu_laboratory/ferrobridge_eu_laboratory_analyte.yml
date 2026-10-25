@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension of CLUSTER.laboratory_test_analyte.v1 for the
+# Laboratory Report 2.0.0 Observation-resultslab-eu-lab profile: the
+# canonical, and the `laboratory` category slice the profile fixes by
+# pattern (min 1, max 1), written out of openEHR, where a laboratory
+# analyte is a laboratory result by its archetype.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_laboratory_analyte
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: CLUSTER.laboratory_test_analyte.v1
+
+mappings:
+  - name: "metaURL"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/laboratory/StructureDefinition/Observation-resultslab-eu-lab"
+
+  - name: "categoryLaboratory"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.category.coding"
+    manual:
+      - name: "laboratory"
+        fhir:
+          - path: "system"
+            value: "http://terminology.hl7.org/CodeSystem/observation-category"
+          - path: "code"
+            value: "laboratory"

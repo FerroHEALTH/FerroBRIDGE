@@ -1,0 +1,349 @@
+---
+source: crates/fhirconnect/tests/it/eu_laboratory.rs
+expression: program.to_string()
+---
+program ferrobridge_eu_laboratory.context
+  profile http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab version 2.0.0
+  template KDS_Laborbericht sem_ver unpinned generation adl1.4
+  resource DiagnosticReport
+  start OBSERVATION.laboratory_test_result.v1
+  model OBSERVATION.laboratory_test_result.v1 version 0.0.1-alpha archetype openEHR-EHR-OBSERVATION.laboratory_test_result.v1 revision 1.2.5
+    extension ferrobridge_eu_laboratory_result
+  model CLUSTER.specimen.v1 version 0.0.1-alpha archetype openEHR-EHR-CLUSTER.specimen.v1 revision 1.1.2
+    extension ferrobridge_eu_laboratory_specimen
+  model CLUSTER.laboratory_test_analyte.v1 version 0.0.1-alpha archetype openEHR-EHR-CLUSTER.laboratory_test_analyte.v1 revision 1.1.8
+    extension ferrobridge_eu_laboratory_analyte
+  model COMPOSITION.report_result.v1.DiagnosticReport version 0.0.1-alpha archetype openEHR-EHR-COMPOSITION.report-result.v1 revision 1.0.6
+    extension ferrobridge_eu_composition.DiagnosticReport
+  mapping eventParent from OBSERVATION.laboratory_test_result.v1
+    fhir $resource -> DiagnosticReport complex writable
+    openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002] EVENT occurrences [laborbericht/laborbefund/any_event]
+    derived anchor
+    mapping eventParent.eventTime from OBSERVATION.laboratory_test_result.v1
+      fhir $resource.effective.as(DateTime) -> DiagnosticReport.effective[x] primitive writable
+      openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/time -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/time DV_DATE_TIME occurrences [laborbericht/laborbefund/any_event]
+      derived dateTime
+    mapping eventParent.code from OBSERVATION.laboratory_test_result.v1
+      fhir $resource.code -> DiagnosticReport.code complex writable
+      openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[at0005] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[at0005,'Labortest-Bezeichnung']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event]
+      derived CodeableConcept
+    mapping eventParent.conclusion from OBSERVATION.laboratory_test_result.v1
+      fhir $resource.conclusion -> DiagnosticReport.conclusion primitive writable
+      openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[at0057] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[at0057]/value DV_TEXT occurrences [laborbericht/laborbefund/any_event]
+      derived string
+    mapping eventParent.specimen from OBSERVATION.laboratory_test_result.v1
+      fhir $resource.specimen -> DiagnosticReport.specimen complex writable
+      openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1,'Probenmaterial'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/probenmaterial]
+      derived anchor
+      mapping eventParent.specimen.specimenReference from OBSERVATION.laboratory_test_result.v1
+        fhir $resource.specimen -> DiagnosticReport.specimen complex writable
+        reference Specimen
+          mapping eventParent.specimen.specimenReference.specimenRecurring from OBSERVATION.laboratory_test_result.v1
+            fhir $resource -> Specimen complex writable
+            openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1,'Probenmaterial'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/probenmaterial]
+            slotArchetype CLUSTER.specimen.v1
+              mapping collection from CLUSTER.specimen.v1
+                fhir $resource.collection -> Specimen.collection complex writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1,'Probenmaterial'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/probenmaterial]
+                derived anchor
+                mapping collection.collected from CLUSTER.specimen.v1
+                  fhir $resource.collection.collected.as(DateTime) -> Specimen.collection.collected[x] primitive writable
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1]/items[at0015] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1,'Probenmaterial']/items[at0015] ELEMENT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/probenmaterial]
+                  derived dateTime into DV_DATE_TIME
+                mapping collection.specimenCollectionMethod from CLUSTER.specimen.v1
+                  fhir $resource.collection.method -> Specimen.collection.method complex writable
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1]/items[at0007] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1,'Probenmaterial']/items[at0007]/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/probenmaterial]
+                  derived CodeableConcept
+                mapping collection.specimenCollectionBodySite from CLUSTER.specimen.v1
+                  fhir $resource.collection.bodySite -> Specimen.collection.bodySite complex writable
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1]/items[at0087] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1,'Probenmaterial']/items[at0087,'Körperstelle']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/probenmaterial]
+                  derived CodeableConcept
+              mapping type from CLUSTER.specimen.v1
+                fhir $resource.type -> Specimen.type complex writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1]/items[at0029] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1,'Probenmaterial']/items[at0029]/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/probenmaterial]
+                derived CodeableConcept
+              mapping note from CLUSTER.specimen.v1
+                fhir $resource.note.text -> Annotation.text primitive writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1]/items[at0045] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1,'Probenmaterial']/items[at0045]/value DV_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/probenmaterial]
+                derived string
+              mapping descriptionOfSpecimen from CLUSTER.specimen.v1
+                fhir $resource.condition -> Specimen.condition complex writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1]/items[at0097] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1,'Probenmaterial']/items[at0097]/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/probenmaterial]
+                derived CodeableConcept
+              mapping identifierOfSpecimen from CLUSTER.specimen.v1
+                fhir $resource.accessionIdentifier -> Specimen.accessionIdentifier complex writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1]/items[at0001] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1,'Probenmaterial']/items[at0001]/value DV_IDENTIFIER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/probenmaterial]
+                derived Identifier
+              mapping dateReceived from CLUSTER.specimen.v1
+                fhir $resource.receivedTime -> Specimen.receivedTime primitive writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1]/items[at0034] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.specimen.v1,'Probenmaterial']/items[at0034]/value DV_DATE_TIME occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/probenmaterial]
+                derived dateTime
+              mapping metaURL from ferrobridge_eu_laboratory_specimen
+                fhir $resource.meta -> Specimen.meta complex writable
+                unidirectional openehr->fhir
+                manual profileUrl
+                  fhir $resource.meta.profile -> Meta.profile primitive writable = http://hl7.eu/fhir/laboratory/StructureDefinition/Specimen-eu-lab
+    mapping eventParent.result from OBSERVATION.laboratory_test_result.v1
+      fhir $resource.result -> DiagnosticReport.result complex writable
+      openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+      derived anchor
+      mapping eventParent.result.observationReference from OBSERVATION.laboratory_test_result.v1
+        fhir $resource.result -> DiagnosticReport.result complex writable
+        reference Observation
+          mapping eventParent.result.observationReference.observationRecurring from OBSERVATION.laboratory_test_result.v1
+            fhir $resource -> Observation complex writable
+            openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+            slotArchetype CLUSTER.laboratory_test_analyte.v1
+              mapping status from CLUSTER.laboratory_test_analyte.v1
+                fhir $resource -> Observation complex writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                manual registered
+                  fhir $resource.status -> Observation.status primitive writable = registered
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/terminology_id/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = local
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = at0015
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = Registered
+                  fhirCondition one of [registered] on fhir $resource -> Observation complex writable (element)
+                    attribute fhir $resource.status -> Observation.status primitive writable
+                  openehrCondition one of [at0015] on openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] (ancestor)
+                    attribute openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                manual partial
+                  fhir $resource.status -> Observation.status primitive writable = partial
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/terminology_id/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = local
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = at0016
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = Partial
+                  fhirCondition one of [partial] on fhir $resource -> Observation complex writable (element)
+                    attribute fhir $resource.status -> Observation.status primitive writable
+                  openehrCondition one of [at0016] on openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] (ancestor)
+                    attribute openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                manual preliminary
+                  fhir $resource.status -> Observation.status primitive writable = preliminary
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/terminology_id/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = local
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = at0017
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = Preliminary
+                  fhirCondition one of [preliminary] on fhir $resource -> Observation complex writable (element)
+                    attribute fhir $resource.status -> Observation.status primitive writable
+                  openehrCondition one of [at0017] on openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] (ancestor)
+                    attribute openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                manual final
+                  fhir $resource.status -> Observation.status primitive writable = final
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/terminology_id/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = local
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = at0018
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = Final
+                  fhirCondition one of [final] on fhir $resource -> Observation complex writable (element)
+                    attribute fhir $resource.status -> Observation.status primitive writable
+                  openehrCondition one of [at0018] on openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] (ancestor)
+                    attribute openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                manual amended
+                  fhir $resource.status -> Observation.status primitive writable = amended
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/terminology_id/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = local
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = at0020
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = Amended
+                  fhirCondition one of [amended] on fhir $resource -> Observation complex writable (element)
+                    attribute fhir $resource.status -> Observation.status primitive writable
+                  openehrCondition one of [at0020] on openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] (ancestor)
+                    attribute openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                manual corrected
+                  fhir $resource.status -> Observation.status primitive writable = corrected
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/terminology_id/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = local
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = at0019
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = Corrected
+                  fhirCondition one of [corrected] on fhir $resource -> Observation complex writable (element)
+                    attribute fhir $resource.status -> Observation.status primitive writable
+                  openehrCondition one of [at0019] on openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] (ancestor)
+                    attribute openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                manual appended
+                  fhir $resource.status -> Observation.status primitive writable = appended
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/terminology_id/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = local
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = at0021
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = Appended
+                  fhirCondition one of [appended] on fhir $resource -> Observation complex writable (element)
+                    attribute fhir $resource.status -> Observation.status primitive writable
+                  openehrCondition one of [at0021] on openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] (ancestor)
+                    attribute openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                manual cancelled
+                  fhir $resource.status -> Observation.status primitive writable = cancelled
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/terminology_id/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = local
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = at0023
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = Cancelled
+                  fhirCondition one of [cancelled] on fhir $resource -> Observation complex writable (element)
+                    attribute fhir $resource.status -> Observation.status primitive writable
+                  openehrCondition one of [at0023] on openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] (ancestor)
+                    attribute openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                manual entered-in-error
+                  fhir $resource.status -> Observation.status primitive writable = entered-in-error
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/terminology_id/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/terminology_id/value occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = local
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = at0022
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/value -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] = entered-in-error
+                  fhirCondition one of [entered-in-error] on fhir $resource -> Observation complex writable (element)
+                    attribute fhir $resource.status -> Observation.status primitive writable
+                  openehrCondition one of [at0022] on openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt'] CLUSTER occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt] (ancestor)
+                    attribute openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0005]/defining_code/code_string -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0005,'Result status']/value DV_CODED_TEXT tail defining_code/code_string occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+              mapping issued from CLUSTER.laboratory_test_analyte.v1
+                fhir $resource.issued -> Observation.issued primitive writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0006] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0006]/value DV_DATE_TIME occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                derived string
+              mapping analyteMeasurement from CLUSTER.laboratory_test_analyte.v1
+                fhir $resource.value -> Observation.value[x] choice writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0001] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0001,'Messwert'] ELEMENT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt, laborbericht/laborbefund/any_event/pro_laboranalyt/messwert]
+                derived choice read $resource.value -> Observation.value[x] choice writable Quantity into DV_QUANTITY integer into DV_QUANTITY CodeableConcept into DV_CODED_TEXT string into DV_TEXT CodeableConcept into DV_TEXT
+              mapping analyteName from CLUSTER.laboratory_test_analyte.v1
+                fhir $resource.code -> Observation.code complex writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0024] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0024]/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                derived CodeableConcept
+              mapping interpretation from CLUSTER.laboratory_test_analyte.v1
+                fhir $resource.interpretation -> Observation.interpretation complex writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0004] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0004,'Interpretation']/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                derived CodeableConcept
+              mapping testmethod from CLUSTER.laboratory_test_analyte.v1
+                fhir $resource.method -> Observation.method complex writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0028] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0028]/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
+                derived CodeableConcept
+              mapping comment from CLUSTER.laboratory_test_analyte.v1
+                fhir $resource.note.text -> Annotation.text primitive writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0003] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0003]/value DV_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt, laborbericht/laborbefund/any_event/pro_laboranalyt/comment]
+                derived string
+              mapping metaURL from ferrobridge_eu_laboratory_analyte
+                fhir $resource.meta -> Observation.meta complex writable
+                unidirectional openehr->fhir
+                manual profileUrl
+                  fhir $resource.meta.profile -> Meta.profile primitive writable = http://hl7.eu/fhir/laboratory/StructureDefinition/Observation-resultslab-eu-lab
+              mapping categoryLaboratory from ferrobridge_eu_laboratory_analyte
+                fhir $resource.category.coding -> CodeableConcept.coding complex writable
+                unidirectional openehr->fhir
+                manual laboratory
+                  fhir $resource.category.coding.system -> Coding.system primitive writable = http://terminology.hl7.org/CodeSystem/observation-category
+                  fhir $resource.category.coding.code -> Coding.code primitive writable = laboratory
+  mapping compositionMapping from ferrobridge_eu_laboratory_result
+    fhir $resource -> DiagnosticReport complex writable
+    openehr / ->  COMPOSITION
+    slotArchetype COMPOSITION.report_result.v1.DiagnosticReport
+      mapping healthCareFacility from ferrobridge_eu_composition.DiagnosticReport
+        fhir $resource -> DiagnosticReport complex writable
+        openehr / ->  COMPOSITION
+        type NONE
+      mapping participations from ferrobridge_eu_composition.DiagnosticReport
+        fhir $resource -> DiagnosticReport complex writable
+        openehr / ->  COMPOSITION
+        type NONE
+      mapping composer from ferrobridge_eu_composition.DiagnosticReport
+        fhir $resource -> DiagnosticReport complex writable
+        openehr / ->  COMPOSITION
+        type NONE
+      mapping composerEmpty from ferrobridge_eu_composition.DiagnosticReport
+        fhir $resource -> DiagnosticReport complex writable
+        openehr / ->  COMPOSITION
+        type NONE
+      mapping performer from ferrobridge_eu_composition.DiagnosticReport
+        fhir $resource -> DiagnosticReport complex writable
+        openehr / ->  COMPOSITION
+        type NONE
+      mapping context from ferrobridge_eu_composition.DiagnosticReport
+        fhir $resource -> DiagnosticReport complex writable
+        openehr / ->  COMPOSITION
+        type NONE
+      mapping contextStartTimeEmpty from ferrobridge_eu_composition.DiagnosticReport
+        fhir $resource -> DiagnosticReport complex writable
+        openehr /context -> /context EVENT_CONTEXT
+        type NONE
+  mapping metaURL from ferrobridge_eu_laboratory_result
+    fhir $resource.meta -> DiagnosticReport.meta complex writable
+    unidirectional openehr->fhir
+    manual profileUrl
+      fhir $resource.meta.profile -> Meta.profile primitive writable = http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab
+  mapping reportIdentifier from ferrobridge_eu_laboratory_result
+    fhir $resource.identifier.value -> Identifier.value primitive writable
+    openehr /context/other_context[at0001]/items[at0002] -> /context/other_context[at0001]/items[at0002,'ID']/value DV_TEXT
+    derived string
+  mapping status from ferrobridge_eu_laboratory_result
+    fhir $resource -> DiagnosticReport complex writable
+    openehr /context/other_context[at0001]/items[at0005] -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT
+    manual registered
+      fhir $resource.status -> DiagnosticReport.status primitive writable = registered
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/terminology_id/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/diagnostic-report-status
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string = registered
+      openehr /context/other_context[at0001]/items[at0005]/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT = Registered
+      fhirCondition one of [registered] on fhir $resource -> DiagnosticReport complex writable (element)
+        attribute fhir $resource.status -> DiagnosticReport.status primitive writable
+      openehrCondition one of [registered] on openehr /context/other_context[at0001]/items[at0005] -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT (element)
+        attribute openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string
+    manual partial
+      fhir $resource.status -> DiagnosticReport.status primitive writable = partial
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/terminology_id/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/diagnostic-report-status
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string = partial
+      openehr /context/other_context[at0001]/items[at0005]/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT = Partial
+      fhirCondition one of [partial] on fhir $resource -> DiagnosticReport complex writable (element)
+        attribute fhir $resource.status -> DiagnosticReport.status primitive writable
+      openehrCondition one of [partial] on openehr /context/other_context[at0001]/items[at0005] -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT (element)
+        attribute openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string
+    manual preliminary
+      fhir $resource.status -> DiagnosticReport.status primitive writable = preliminary
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/terminology_id/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/diagnostic-report-status
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string = preliminary
+      openehr /context/other_context[at0001]/items[at0005]/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT = Preliminary
+      fhirCondition one of [preliminary] on fhir $resource -> DiagnosticReport complex writable (element)
+        attribute fhir $resource.status -> DiagnosticReport.status primitive writable
+      openehrCondition one of [preliminary] on openehr /context/other_context[at0001]/items[at0005] -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT (element)
+        attribute openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string
+    manual final
+      fhir $resource.status -> DiagnosticReport.status primitive writable = final
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/terminology_id/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/diagnostic-report-status
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string = final
+      openehr /context/other_context[at0001]/items[at0005]/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT = Final
+      fhirCondition one of [final] on fhir $resource -> DiagnosticReport complex writable (element)
+        attribute fhir $resource.status -> DiagnosticReport.status primitive writable
+      openehrCondition one of [final] on openehr /context/other_context[at0001]/items[at0005] -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT (element)
+        attribute openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string
+    manual amended
+      fhir $resource.status -> DiagnosticReport.status primitive writable = amended
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/terminology_id/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/diagnostic-report-status
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string = amended
+      openehr /context/other_context[at0001]/items[at0005]/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT = Amended
+      fhirCondition one of [amended] on fhir $resource -> DiagnosticReport complex writable (element)
+        attribute fhir $resource.status -> DiagnosticReport.status primitive writable
+      openehrCondition one of [amended] on openehr /context/other_context[at0001]/items[at0005] -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT (element)
+        attribute openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string
+    manual corrected
+      fhir $resource.status -> DiagnosticReport.status primitive writable = corrected
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/terminology_id/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/diagnostic-report-status
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string = corrected
+      openehr /context/other_context[at0001]/items[at0005]/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT = Corrected
+      fhirCondition one of [corrected] on fhir $resource -> DiagnosticReport complex writable (element)
+        attribute fhir $resource.status -> DiagnosticReport.status primitive writable
+      openehrCondition one of [corrected] on openehr /context/other_context[at0001]/items[at0005] -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT (element)
+        attribute openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string
+    manual appended
+      fhir $resource.status -> DiagnosticReport.status primitive writable = appended
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/terminology_id/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/diagnostic-report-status
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string = appended
+      openehr /context/other_context[at0001]/items[at0005]/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT = Appended
+      fhirCondition one of [appended] on fhir $resource -> DiagnosticReport complex writable (element)
+        attribute fhir $resource.status -> DiagnosticReport.status primitive writable
+      openehrCondition one of [appended] on openehr /context/other_context[at0001]/items[at0005] -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT (element)
+        attribute openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string
+    manual cancelled
+      fhir $resource.status -> DiagnosticReport.status primitive writable = cancelled
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/terminology_id/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/diagnostic-report-status
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string = cancelled
+      openehr /context/other_context[at0001]/items[at0005]/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT = Cancelled
+      fhirCondition one of [cancelled] on fhir $resource -> DiagnosticReport complex writable (element)
+        attribute fhir $resource.status -> DiagnosticReport.status primitive writable
+      openehrCondition one of [cancelled] on openehr /context/other_context[at0001]/items[at0005] -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT (element)
+        attribute openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string
+    manual entered-in-error
+      fhir $resource.status -> DiagnosticReport.status primitive writable = entered-in-error
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/terminology_id/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/diagnostic-report-status
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string = entered-in-error
+      openehr /context/other_context[at0001]/items[at0005]/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT = Entered in Error
+      fhirCondition one of [entered-in-error] on fhir $resource -> DiagnosticReport complex writable (element)
+        attribute fhir $resource.status -> DiagnosticReport.status primitive writable
+      openehrCondition one of [entered-in-error] on openehr /context/other_context[at0001]/items[at0005] -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT (element)
+        attribute openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string
+    manual unknown
+      fhir $resource.status -> DiagnosticReport.status primitive writable = unknown
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/terminology_id/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/terminology_id/value = http://hl7.org/fhir/diagnostic-report-status
+      openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string = unknown
+      openehr /context/other_context[at0001]/items[at0005]/value -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT = Unknown
+      fhirCondition one of [unknown] on fhir $resource -> DiagnosticReport complex writable (element)
+        attribute fhir $resource.status -> DiagnosticReport.status primitive writable
+      openehrCondition one of [unknown] on openehr /context/other_context[at0001]/items[at0005] -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT (element)
+        attribute openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string

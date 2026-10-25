@@ -1,0 +1,80 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# FerroBRIDGE's extension of model/composition/org.openehr/report_result.v1.DiagnosticReport.yml
+# for the Laboratory Report 2.0.0 profiles, a derivative of it under its
+# licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# The published `composerEmpty` and `contextStartTimeEmpty` write
+# `null_flavour` below `composer` (a PARTY_PROXY) and `context/start_time` (a
+# DV_DATE_TIME), and the openEHR RM carries `null_flavour` on ELEMENT only
+# (#101); `performer` walks `$composition/perfomer`, which COMPOSITION does
+# not define; `participations` names `function` and `performer` below the
+# EVENT_CONTEXT, which the engine cannot carry as one value
+# (fc-uncarried-tail); `context` reads `effective.ofType(DateTimeType)`, and
+# `DiagnosticReport.effective[x]` admits `dateTime` and `Period`.
+# `composer` and `healthCareFacility` both write `DiagnosticReport.performer`
+# and the engine cannot place the second one (an occurrence gap at index 1),
+# so out of openEHR neither runs, and the composer stays the one the engine
+# fills going in. The seven map nothing here; the report's effective time is
+# the event's.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_composition.DiagnosticReport
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: COMPOSITION.report_result.v1.DiagnosticReport
+
+mappings:
+  - name: "composerEmpty"
+    extension: "overwrite"
+    with:
+      fhir: "$resource"
+      openehr: "$composition"
+      type: "NONE"
+
+  - name: "contextStartTimeEmpty"
+    extension: "overwrite"
+    with:
+      fhir: "$resource"
+      openehr: "$composition/context"
+      type: "NONE"
+
+  - name: "performer"
+    extension: "overwrite"
+    with:
+      fhir: "$resource"
+      openehr: "$composition"
+      type: "NONE"
+
+  - name: "participations"
+    extension: "overwrite"
+    with:
+      fhir: "$resource"
+      openehr: "$composition"
+      type: "NONE"
+
+  - name: "context"
+    extension: "overwrite"
+    with:
+      fhir: "$resource"
+      openehr: "$composition"
+      type: "NONE"
+
+  - name: "composer"
+    extension: "overwrite"
+    with:
+      fhir: "$resource"
+      openehr: "$composition"
+      type: "NONE"
+
+  - name: "healthCareFacility"
+    extension: "overwrite"
+    with:
+      fhir: "$resource"
+      openehr: "$composition"
+      type: "NONE"
