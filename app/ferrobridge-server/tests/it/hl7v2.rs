@@ -23,6 +23,7 @@ use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::mllp::Timeouts;
 use ferrobridge_server::config::Hl7v2Settings;
 use ferrobridge_server::facade::Facade;
+use ferrobridge_server::facade::ehr::Policy;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::ingest::UnmappedEntries;
 use ferrobridge_server::facade::programs;
@@ -30,6 +31,7 @@ use ferrobridge_server::hl7v2::Face;
 use ferrobridge_server::hl7v2::Listener;
 use ferrobridge_server::hl7v2::Listening;
 use ferrobridge_server::usage_report::window::{Counts, Window};
+use ferrobridge_testkit::stubs::its_rest;
 use ferrobridge_testkit::stubs::terminology;
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -76,6 +78,31 @@ fn oru_r01(control_id: &str) -> Vec<u8> {
         ),
         String::from("ORC|RE|PLC-1|FIL-1"),
         String::from("OBR|1|PLC-1|FIL-1|2345-7^Glucose^LN|||20260925120000+0200"),
+        String::from(
+            "OBX|1|NM|2345-7^Glucose^LN^^^^^^Synthetic glucose||5.4|mmol/L^mmol/L^UCUM|3.9-5.8|N|||F|||20260925130000+0200",
+        ),
+    ];
+    let mut bytes = Vec::new();
+    for segment in segments {
+        bytes.extend_from_slice(segment.as_bytes());
+        bytes.push(b'\r');
+    }
+    bytes
+}
+
+/// An admission, ADT^A01 from a 2.5.1 sender: one patient, one inpatient
+/// visit and one observation made at admission, every value invented for the
+/// test.
+fn adt_a01(control_id: &str) -> Vec<u8> {
+    let segments = [
+        format!(
+            "MSH|^~\\&|ADT|NORTHLAB|EHR|SOUTHCLINIC|20260925143000+0200||ADT^A01^ADT_A01|{control_id}|P|2.5.1"
+        ),
+        String::from("EVN||20260925143000+0200"),
+        String::from(
+            "PID|1||synthetic-subject-0001^^^NORTHLAB^MR||Synthetic^Sam^^^^^L||19800101|M",
+        ),
+        String::from("PV1|1|I|WARD-1^ROOM-1^BED-1"),
         String::from(
             "OBX|1|NM|2345-7^Glucose^LN^^^^^^Synthetic glucose||5.4|mmol/L^mmol/L^UCUM|3.9-5.8|N|||F|||20260925130000+0200",
         ),
@@ -627,6 +654,74 @@ async fn a_message_in_flight_when_the_stop_arrives_is_committed_and_answered()
     Ok(())
 }
 
+// HL7 v2.5.1 chapter 3 §3.3.1: A01 signals the start of a patient's stay; the face resolves
+// the subject's EHR under `[hl7v2] ehr_policy` as the facade does (no specification governs
+// the policy: our own design).
+#[tokio::test]
+async fn an_adt_a01_admits_its_patient_creating_the_ehr_under_the_face_policy()
+-> Result<(), Box<dyn Error>> {
+    let mut lane = face_settings(true);
+    lane.ehr_policy = Some(Policy::CreateOnFirstWrite);
+    let running = Running::start_with(lane, its_rest::not_found("no EHR for the subject")).await?;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path("/ehr"))
+        .respond_with(ResponseTemplate::new(201).insert_header("ETag", format!("\"{EHR_ID}\"")))
+        .mount(&running.cdr)
+        .await;
+    let control = "MSG-V2-A01-0001";
+    let ack = running.send(&adt_a01(control)).await?;
+    assert_eq!(
+        vec![format!("MSA|AA|{control}")],
+        segments(&ack, "MSA"),
+        "{ack}"
+    );
+    let created = running.requests("POST", "/ehr").await;
+    assert_eq!(1, created.len(), "the admission created one EHR");
+    let status: serde_json::Value =
+        serde_json::from_slice(created.first().ok_or("an EHR_STATUS body")?)?;
+    assert_eq!(Some("EHR_STATUS"), status["_type"].as_str(), "{status}");
+    assert_eq!(
+        Some("synthetic-subject-0001"),
+        status["subject"]["external_ref"]["id"]["value"].as_str(),
+        "the EHR names the PID-3 subject: {status}"
+    );
+    assert_eq!(1, running.contributions().await, "one commit into the EHR");
+    let committed = running
+        .requests("POST", &format!("/ehr/{EHR_ID}/contribution"))
+        .await;
+    let body = String::from_utf8(committed.first().cloned().unwrap_or_default())?;
+    assert!(
+        body.contains(control) && body.contains("ADT^A01"),
+        "the FEEDER_AUDIT names the admission by MSH-10 and its type"
+    );
+    assert_counted(&running.serving.usage(), (1, 0, 0), 0);
+    running.stop().await
+}
+
+#[tokio::test]
+async fn an_adt_a01_for_an_unknown_patient_creates_no_ehr_under_the_default_policy()
+-> Result<(), Box<dyn Error>> {
+    let running = Running::start_with(
+        face_settings(true),
+        its_rest::not_found("no EHR for the subject"),
+    )
+    .await?;
+    let control = "MSG-V2-A01-0002";
+    let ack = running.send(&adt_a01(control)).await?;
+    assert_ne!(
+        vec![format!("MSA|AA|{control}")],
+        segments(&ack, "MSA"),
+        "an unknown subject is not accepted under the existing-EHR policy: {ack}"
+    );
+    assert!(!segments(&ack, "ERR").is_empty(), "{ack}");
+    assert!(
+        running.requests("POST", "/ehr").await.is_empty(),
+        "no EHR is created the policy does not allow"
+    );
+    assert_eq!(0, running.contributions().await, "nothing is committed");
+    running.stop().await
+}
+
 #[tokio::test]
 async fn an_oru_r01_over_mllp_commits_a_composition_into_a_real_cdr() -> Result<(), Box<dyn Error>>
 {
@@ -644,7 +739,7 @@ async fn an_oru_r01_over_mllp_commits_a_composition_into_a_real_cdr() -> Result<
     let templates = programs::fetch_templates(&set, &client).await?;
     let compiled = programs::compile_set(&set, &templates)?;
     let mut facade_settings = settings();
-    facade_settings.ehr_policy = ferrobridge_server::facade::ehr::Policy::CreateOnFirstWrite;
+    facade_settings.ehr_policy = Policy::CreateOnFirstWrite;
     let facade = Arc::new(Facade::new(
         compiled,
         Arc::new(MemoryStore::new()),
