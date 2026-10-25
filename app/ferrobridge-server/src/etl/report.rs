@@ -160,6 +160,10 @@ pub struct RunReport {
     pub refusals: Vec<RefusalEntry>,
     /// Every source field no mapping wrote.
     pub unmapped_fields: Vec<UnmappedEntry>,
+    /// The rows of each CDM table whose ids the writer assigns that no entry
+    /// of the bridge's side table owns: rows another load wrote.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub foreign_rows: BTreeMap<String, u64>,
     /// The verdicts of the quality checks run after the load, when
     /// `[etl] quality_checks` is set.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -280,16 +284,31 @@ fn add(total: &mut u64, count: u64) {
     *total = total.saturating_add(count);
 }
 
-impl fmt::Display for RunReport {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let compositions = &self.compositions;
-        writeln!(f, "run {}", self.run_id)?;
+impl RunReport {
+    /// Writes the lines a run adds only when it has them: the rows the bridge
+    /// does not own, the quality verdicts and the FHIR resources read.
+    fn write_notices(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (table, rows) in &self.foreign_rows {
+            writeln!(
+                f,
+                "warning: {table} holds {rows} rows the bridge did not write"
+            )?;
+        }
         if let Some(ref quality) = self.quality {
             writeln!(f, "{quality}")?;
         }
         if let Some(ref resources) = self.resources {
             writeln!(f, "{resources}")?;
         }
+        Ok(())
+    }
+}
+
+impl fmt::Display for RunReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let compositions = &self.compositions;
+        writeln!(f, "run {}", self.run_id)?;
+        self.write_notices(f)?;
         writeln!(
             f,
             "compositions: {} read, {} committed, {} skipped, {} refused",

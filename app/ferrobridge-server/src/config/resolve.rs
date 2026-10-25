@@ -603,6 +603,16 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
             });
         }
     };
+    let derived_tables = match etl.derived_tables.as_str() {
+        "owned_persons" => omop_cdm::derived::Scope::OwnedPersons,
+        "whole_table" => omop_cdm::derived::Scope::WholeTable,
+        _ => {
+            return Err(Error::DerivedTables {
+                key: String::from("etl.derived_tables"),
+                value: etl.derived_tables.clone(),
+            });
+        }
+    };
     Ok(crate::etl::EtlSettings {
         compositions,
         page_size,
@@ -615,6 +625,7 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
         deletions,
         aliases: resolve_aliases(&etl.vocabulary_aliases)?,
         quality_checks: etl.quality_checks,
+        derived_tables,
     })
 }
 
