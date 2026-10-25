@@ -230,3 +230,24 @@ async fn the_visits_and_the_derived_tables_are_populated() -> Result<(), Box<dyn
     );
     Ok(())
 }
+
+#[test]
+fn the_report_warns_of_each_table_holding_rows_the_bridge_did_not_write()
+-> Result<(), Box<dyn Error>> {
+    let mut report = RunReport::default();
+    report.foreign_rows.insert(String::from("measurement"), 2);
+    let text = report.to_string();
+    assert!(
+        text.contains("warning: measurement holds 2 rows the bridge did not write"),
+        "{text}"
+    );
+    let json = serde_json::to_value(&report)?;
+    assert_eq!(2, json["foreign_rows"]["measurement"]);
+    assert!(
+        serde_json::to_value(RunReport::default())?
+            .get("foreign_rows")
+            .is_none(),
+        "a run with no foreign rows carries no field"
+    );
+    Ok(())
+}

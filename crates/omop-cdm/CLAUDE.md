@@ -99,12 +99,13 @@ Full discipline: `.claude/rules/codegen.md`.
   (integers binary, everything else text) and one `INSERT ... SELECT` casts
   the dates, datetimes and floats, so the crate still does no calendar or
   decimal arithmetic.
-- `quality` is the port of the Dashboard's nine conformance and six
-  completeness checks. The
+- `quality` is the port of the Dashboard's nine conformance, six
+  completeness and seven temporal plausibility checks (`withinVisitDates` and
+  the Temporal subcategory, `scripts/vendor/dqd.sh` vendors their templates). The
   structural facts (required, datatype, keys, `fk_domain`, `fk_class`) come
   from the CDM v5.4.3 definitions through `ColumnMeta`; the thresholds, the
-  notes and the enablement of `isStandardValidConcept` and the completeness
-  checks come from the Dashboard's settings (a completeness check whose
+  notes and the enablement of `isStandardValidConcept`, the completeness
+  and the temporal checks come from the Dashboard's settings (a completeness check whose
   settings or template name a column its table lacks refuses the plan). Where the two disagree the definitions win, and
   `tests/it/dqd.rs` pins every disagreement. `check::CheckName` is the closed
   set of ported checks and reads its spelling and Kahn classification from

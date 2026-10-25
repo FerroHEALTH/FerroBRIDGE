@@ -98,6 +98,17 @@ pub(crate) fn cdm_init_command(
             .await
             .with_context(|| format!("creating the bridge schema {}", cdm.bridge_schema))?;
         println!("bridge schema {}: in place", cdm.bridge_schema);
+        for foreign in writer
+            .foreign_rows()
+            .await
+            .context("counting the CDM rows the bridge does not own")?
+        {
+            println!(
+                "warning: {} holds {} rows the bridge did not write; one bridge owns the tables \
+                 it writes",
+                foreign.table, foreign.rows
+            );
+        }
         tracing::info!(
             schema = %cdm.schema,
             bridge_schema = %cdm.bridge_schema,
@@ -245,6 +256,31 @@ pub(crate) fn etl_fhir_command(settings: &Settings, input: &std::path::Path) -> 
     Ok(())
 }
 
+/// Checks the OMOCL literals of `files` against the vocabulary of the `cdm`
+/// database.
+async fn vocabulary_diagnostics(
+    cdm: &config::CdmSettings,
+    files: &[std::path::PathBuf],
+) -> anyhow::Result<Vec<openehr_mapping_core::diagnostic::Diagnostic>> {
+    use anyhow::Context;
+
+    let pool = omop_cdm::database::CdmPool::connect(
+        sqlx::postgres::PgPoolOptions::new().max_connections(1),
+        cdm.connection
+            .pool_options()
+            .context("preparing the connection to the CDM database")?,
+        cdm.schema.clone(),
+    )
+    .await
+    .context("connecting to the CDM database")?;
+    let resolver = omop_cdm::vocabulary::ConceptResolver::new(pool.clone());
+    let diagnostics = crate::check::concept_domains(files, &resolver)
+        .await
+        .context("looking the literal concepts up in the vocabulary")?;
+    pool.pool().close().await;
+    Ok(diagnostics)
+}
+
 /// Why `mapping check` stopped before it printed a report.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum CheckFailure {
@@ -267,6 +303,7 @@ pub(crate) enum CheckFailure {
 pub(crate) fn mapping_check_command(
     settings: &Settings,
     format: crate::cli::ReportFormat,
+    vocabulary: bool,
 ) -> Result<bool, CheckFailure> {
     use anyhow::Context;
 
@@ -286,10 +323,32 @@ pub(crate) fn mapping_check_command(
         .build()
         .context("building the runtime")
         .map_err(CheckFailure::Run)?;
-    let report = runtime
+    let omocl = inputs.omocl.map(std::path::Path::to_path_buf);
+    let mut report = runtime
         .block_on(crate::check::check(inputs))
         .context("checking the mapping set")
         .map_err(CheckFailure::Run)?;
+    if vocabulary {
+        let cdm = settings.cdm.as_ref().ok_or(CheckFailure::Configuration(
+            crate::check::Error::NoVocabulary,
+        ))?;
+        let files = match omocl {
+            Some(directory) => {
+                crate::check::omocl_files(&directory).map_err(CheckFailure::Configuration)?
+            }
+            None => {
+                return Err(CheckFailure::Configuration(
+                    crate::check::Error::NoVocabulary,
+                ));
+            }
+        };
+        let diagnostics = runtime
+            .block_on(vocabulary_diagnostics(cdm, &files))
+            .map_err(CheckFailure::Run)?;
+        for diagnostic in diagnostics {
+            report = report.with_diagnostic(diagnostic);
+        }
+    }
     match format {
         crate::cli::ReportFormat::Text => println!("{report}"),
         crate::cli::ReportFormat::Json => println!(

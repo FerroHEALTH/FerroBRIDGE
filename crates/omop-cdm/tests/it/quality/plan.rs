@@ -431,3 +431,106 @@ fn every_completeness_check_the_settings_enable_is_planned() -> Result<(), Box<d
     }
     Ok(())
 }
+
+#[test]
+fn every_temporal_check_the_settings_enable_is_planned() -> Result<(), Box<dyn Error>> {
+    let plan = plan()?;
+    let temporal = [
+        CheckName::PlausibleTemporalAfter,
+        CheckName::PlausibleDuringLife,
+        CheckName::WithinVisitDates,
+        CheckName::PlausibleAfterBirth,
+        CheckName::PlausibleBeforeDeath,
+        CheckName::PlausibleStartBeforeEnd,
+    ];
+    let excluded = PlanOptions::default().excluded_tables;
+    for field in omop_cdm::generated::dqd::FIELD_THRESHOLDS {
+        if excluded.contains(field.table) {
+            continue;
+        }
+        for name in temporal {
+            let enabled = field
+                .setting(name.as_str())
+                .is_some_and(|setting| setting.value == Some("Yes"));
+            assert_eq!(
+                enabled,
+                find(&plan, name, field.table, Some(field.field)).is_some(),
+                "{} on {}.{}",
+                name.as_str(),
+                field.table,
+                field.field
+            );
+        }
+    }
+    assert!(
+        find(
+            &plan,
+            CheckName::MeasureObservationPeriodOverlap,
+            "observation_period",
+            None
+        )
+        .is_some()
+    );
+    Ok(())
+}
+
+#[test]
+fn temporal_after_reads_the_earlier_date_from_person_or_from_its_own_table()
+-> Result<(), Box<dyn Error>> {
+    let plan = plan()?;
+    let after = |table: &str, field: &str| {
+        find(&plan, CheckName::PlausibleTemporalAfter, table, Some(field))
+            .map(|check| check.parameters())
+    };
+    assert_eq!(
+        Some(CheckParameters::TemporalAfter {
+            table: "person",
+            field: "birth_datetime"
+        }),
+        after("measurement", "measurement_date")
+    );
+    assert_eq!(
+        Some(CheckParameters::TemporalAfter {
+            table: "visit_occurrence",
+            field: "visit_start_date"
+        }),
+        after("visit_occurrence", "visit_end_date")
+    );
+    let check = find(
+        &plan,
+        CheckName::PlausibleTemporalAfter,
+        "measurement",
+        Some("measurement_date"),
+    )
+    .ok_or("a planned check")?;
+    assert_eq!(
+        "The number and percent of records with a value in the MEASUREMENT_DATE field of the \
+         MEASUREMENT that occurs prior to the date in the BIRTH_DATETIME field of the PERSON table.",
+        check.description()
+    );
+    Ok(())
+}
+
+#[test]
+fn start_before_end_names_its_end_field() -> Result<(), Box<dyn Error>> {
+    let plan = plan()?;
+    let check = find(
+        &plan,
+        CheckName::PlausibleStartBeforeEnd,
+        "condition_era",
+        Some("condition_era_start_date"),
+    )
+    .ok_or("a planned check")?;
+    assert_eq!(
+        CheckParameters::EndField("condition_era_end_date"),
+        check.parameters()
+    );
+    assert!(
+        check
+            .description()
+            .ends_with("in the CONDITION_ERA_END_DATE."),
+        "{}",
+        check.description()
+    );
+    Ok(())
+}

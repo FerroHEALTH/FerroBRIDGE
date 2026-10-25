@@ -324,6 +324,7 @@ fn settings(visits: bool) -> Result<EtlSettings, Box<dyn Error>> {
         deletions: DeletionPolicy::Remove,
         aliases: omocl::engine::concept::VocabularyAliases::default(),
         quality_checks: false,
+        derived_tables: omop_cdm::derived::Scope::OwnedPersons,
     })
 }
 

@@ -36,6 +36,9 @@ const OMOCL_EXTENSIONS: [&str; 2] = ["yml", "yaml"];
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// `--vocabulary` is asked for without `[cdm]` or `[mappings] omocl`.
+    #[error("checking against the vocabulary needs a [cdm] section and [mappings] omocl")]
+    NoVocabulary,
     /// Neither `[mappings] directory` nor `[mappings] omocl` is set.
     #[error("there is nothing to check: set [mappings] directory, [mappings] omocl, or both")]
     NothingConfigured,
@@ -411,4 +414,43 @@ async fn check_fhirconnect(
 /// Returns the check error a refused walk describes.
 fn read_error(crate::walk::Error { path, source }: crate::walk::Error) -> Error {
     Error::Read { path, source }
+}
+
+/// Checks every literal concept id the OMOCL files `files` write against the
+/// vocabulary `resolver` reads, and returns a diagnostic per disagreement.
+///
+/// A file set that does not load yields no diagnostic here: its load
+/// diagnostics are [`check_files`]'s. The rule is
+/// [`omocl::model::semantic::check_concept_domains`]'s: a literal must be a
+/// concept of the vocabulary and, where the CDM field definitions name a
+/// domain for its column, a concept of that domain.
+///
+/// # Errors
+///
+/// Returns [`omop_cdm::vocabulary::LookupError`] when the database fails the
+/// lookup.
+pub async fn concept_domains(
+    files: &[PathBuf],
+    resolver: &omop_cdm::vocabulary::ConceptResolver,
+) -> Result<Vec<Diagnostic>, omop_cdm::vocabulary::LookupError> {
+    // NOTE: no specification governs this: our own design; a set that does not load is
+    // reported by `check_files`, so the vocabulary pass has nothing of it to check.
+    let Ok(set) =
+        omocl::model::load::load_set(files, &omocl::model::semantic::FirstPartyConverters)
+    else {
+        return Ok(Vec::new());
+    };
+    let literals: Vec<i32> = omocl::model::semantic::concept_literals(&set)
+        .into_iter()
+        .map(omocl::model::ast::ConceptId::get)
+        .collect();
+    let domains = resolver.domains(&literals).await?;
+    let domain_of = |concept: omocl::model::ast::ConceptId| {
+        domains
+            .get(&concept.get())
+            .map(|domain| omocl::model::ast::DomainId::new(domain.as_str()))
+    };
+    Ok(omocl::model::semantic::check_concept_domains(
+        &set, &domain_of,
+    ))
 }

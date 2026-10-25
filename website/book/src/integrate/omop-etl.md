@@ -356,8 +356,11 @@ design, and each hop stays governed by its own specification.
 ## Checking a populated database with the Data Quality Dashboard
 
 The bridge carries a Rust port of the OHDSI Data Quality Dashboard's
-conformance and completeness checks (v2.9.0, Blacketer et al., JAMIA 2021),
-planned where the Dashboard's own settings enable them, with their
+conformance and completeness checks and its seven temporal plausibility
+checks (v2.9.0, Blacketer et al., JAMIA 2021): observation periods that
+overlap, dates before birth or the date they must follow, dates more than 60
+days after death, dates a week outside their visit, and starts after their
+ends. Each is planned where the Dashboard's own settings enable them, with their
 thresholds:
 
 ```sh
@@ -435,6 +438,19 @@ the first present value wins, which is the only reading the published library
 is consistent with. A `CustomMapping` names a converter compiled into the
 binary, and an unknown name refuses the file. A mapping that fails validation
 is refused at load time.
+
+A literal concept id (`code: 3004249`, or a value of a `conceptMap`) is a
+concept of the OHDSI vocabulary, so it can only be checked against a loaded
+one. With `[cdm]` configured and a vocabulary loaded,
+
+```sh
+ferrobridge mapping check --vocabulary
+```
+
+adds a diagnostic for every literal the vocabulary does not hold and every
+literal whose domain is not one the CDM field definitions name for its column
+(`omocl-unknown-concept`, `omocl-domain-mismatch`). Concept `0` is exempt.
+Without `[cdm]` or `[mappings] omocl` the flag refuses to start.
 
 ## What you need in place
 

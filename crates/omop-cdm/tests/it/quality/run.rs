@@ -28,14 +28,14 @@ const SCHEMA: &str = "cdm";
 
 /// A container and a pool on an initialised CDM in it; the container lives as
 /// long as the pool is used.
-struct Cdm {
+pub(super) struct Cdm {
     _postgres: Postgres,
     pool: CdmPool,
 }
 
 /// Starts PostgreSQL and initialises the CDM, or returns `None` when the
 /// end-to-end harness is not admitted.
-async fn cdm() -> Result<Option<Cdm>, Box<dyn Error>> {
+pub(super) async fn cdm() -> Result<Option<Cdm>, Box<dyn Error>> {
     if !containers::e2e_enabled() {
         return Ok(None);
     }
@@ -56,7 +56,7 @@ async fn cdm() -> Result<Option<Cdm>, Box<dyn Error>> {
 
 impl Cdm {
     /// Runs `sql` on the CDM schema.
-    async fn execute(&self, sql: &str) -> Result<(), Box<dyn Error>> {
+    pub(super) async fn execute(&self, sql: &str) -> Result<(), Box<dyn Error>> {
         sqlx::raw_sql(sqlx::AssertSqlSafe(sql.to_owned()))
             .execute(self.pool.pool())
             .await?;
@@ -64,7 +64,7 @@ impl Cdm {
     }
 
     /// Runs the default plan's `name` check on `table` or `field`.
-    async fn check(
+    pub(super) async fn check(
         &self,
         name: CheckName,
         table: &str,
@@ -75,7 +75,7 @@ impl Cdm {
 }
 
 /// The counts `violated` of `denominator`.
-fn counts(violated: u64, denominator: u64) -> Counts {
+pub(super) fn counts(violated: u64, denominator: u64) -> Counts {
     Counts {
         violated,
         denominator,
@@ -83,7 +83,7 @@ fn counts(violated: u64, denominator: u64) -> Counts {
 }
 
 /// Asserts a result passed with `expected` counts.
-fn assert_passed(result: &CheckResult, expected: Counts) {
+pub(super) fn assert_passed(result: &CheckResult, expected: Counts) {
     assert_eq!(Some(expected), result.counts, "{:?}", result.error);
     assert!(
         result.passed,
@@ -95,7 +95,7 @@ fn assert_passed(result: &CheckResult, expected: Counts) {
 }
 
 /// Asserts a result failed with `expected` counts.
-fn assert_failed(result: &CheckResult, expected: Option<Counts>) {
+pub(super) fn assert_failed(result: &CheckResult, expected: Option<Counts>) {
     assert_eq!(expected, result.counts, "{:?}", result.error);
     assert!(
         result.failed,
@@ -107,7 +107,7 @@ fn assert_failed(result: &CheckResult, expected: Option<Counts>) {
 }
 
 /// Two synthetic persons; the concept ids are the tests' own.
-const PERSONS: &str = "INSERT INTO person \
+pub(super) const PERSONS: &str = "INSERT INTO person \
     (person_id, gender_concept_id, year_of_birth, race_concept_id, ethnicity_concept_id) \
     VALUES (1, 9001, 1980, 0, 0), (2, 9001, 1990, 0, 0)";
 

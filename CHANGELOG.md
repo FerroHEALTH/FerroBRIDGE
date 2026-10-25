@@ -32,11 +32,30 @@ crates on crates.io.
   `assertedDate` extension and `onsetDateTime` slices and its canonical. The
   round trip asserts the code, both slices, `clinicalStatus` and
   `verificationStatus` (#116).
+- `ferrobridge mapping check --vocabulary` checks every literal concept id of
+  the OMOCL files against the vocabulary loaded in the `[cdm]` database: a
+  literal the vocabulary does not hold, or whose domain is not one the CDM
+  field definitions name for its column, is a diagnostic (#97).
 - The profile package set pins `hl7.fhir.eu.laboratory` 2.0.0 and
   `hl7.fhir.eu.mpd` 1.0.0, the HL7 Europe Laboratory Report and Medication
   Prescription and Dispense guides the EU profile contexts target, fetched
   with their provenance by `scripts/vendor/profile-packages.sh`; every
   package they depend on was already in the set (#116).
+- The Data Quality Dashboard's seven temporal plausibility checks run in Rust
+  beside its conformance and completeness checks (#1222):
+  `measureObservationPeriodOverlap`, `plausibleTemporalAfter`,
+  `plausibleDuringLife`, `withinVisitDates`, `plausibleAfterBirth`,
+  `plausibleBeforeDeath` and `plausibleStartBeforeEnd`, each planned where the
+  Dashboard's v2.9.0 settings enable it, with its threshold, and translated
+  from its SQL template, which `scripts/vendor/dqd.sh` now vendors.
+  `dq check` and the post-load step of `etl run` report them. A person whose
+  year of birth is 0, as a placeholder `PERSON` row carries, has no birth date
+  for these checks instead of failing them.
+- `cdm init` and every `etl run` and `etl fhir` count the rows of each CDM
+  table whose ids the bridge assigns that no entry of its side table owns,
+  rows another load wrote, and warn of each table; the run report carries the
+  counts as `foreign_rows` (#240). The Operate page states that one bridge owns
+  the tables it writes and that era ids are not stable across rebuilds.
 - `ferrobridge-hl7v2` 0.1.143 serves a consumer of its listener and parser
   alone. `parse::structure::structure_declared` selects the structure
   MSH-9.3 names over the message definition where the two disagree, so an
@@ -110,6 +129,11 @@ crates on crates.io.
 
 ### Fixed
 
+- A run rebuilds `OBSERVATION_PERIOD`, `CONDITION_ERA` and `DRUG_ERA` only for
+  the persons the bridge writes, so the derived rows another ETL wrote into
+  those tables survive it (#1223). `[etl] derived_tables = "whole_table"`
+  keeps the whole-table rebuild for a deployment where the bridge is the only
+  writer.
 - With `[cdm] tls_ca` set, the concept resolver's pool now trusts that CA
   alone, as the CDM writer does (#266). The pool no longer runs its
   PostgreSQL client's own TLS, which added a built-in root set to the CA: it

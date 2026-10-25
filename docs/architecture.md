@@ -1700,7 +1700,13 @@ the first and last clinical event per person, runs the published era SQL
 verbatim, and takes visits from a configured AQL that is parsed and checked at
 load with `openehr-query`. The visit type concept is configuration, never the
 reference engine's hard-coded "inpatient". Each derivation is labelled as
-FerroBRIDGE's own where the CDM gives discretion.
+FerroBRIDGE's own where the CDM gives discretion. A rebuild replaces only
+the derived rows of the persons the bridge's person map names, so another
+ETL's derived rows in the same tables survive; `[etl] derived_tables =
+"whole_table"` rebuilds the tables whole. Rows of a table the writer assigns
+the ids of that no side-table entry owns are counted by `cdm init` and every
+run and reported as a warning (#240, #1223). No specification governs either:
+our own design.
 
 ### 5.5 The PERSON row
 
