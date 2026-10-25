@@ -21,9 +21,10 @@ use crate::smart::SmartSettings;
 /// §Capabilities, every listed scope, and the product scope in an extension
 /// form of Scopes and Launch Context, §Extensibility. The product scope is
 /// the bridge's operator scope, [`OPERATOR_SCOPE`] when the section names
-/// none. A section the crate resolves to Basic users alone is refused: the
-/// bridge names an issuer's token endpoint in its discovery document and its
-/// `CapabilityStatement`.
+/// none. Under `mode = "introspection"` the crate resolves the introspection
+/// check (RFC 7662) in place of the issuers. A section the crate resolves to
+/// Basic users alone is refused: the bridge names an issuer's token endpoint
+/// in its discovery document and its `CapabilityStatement`.
 pub(super) fn resolve_auth(auth: &AuthSection) -> Result<Option<SmartSettings>, Error> {
     let resolved = auth.resolve().map_err(|source| Error::Auth {
         source: Box::new(source),
@@ -33,7 +34,7 @@ pub(super) fn resolve_auth(auth: &AuthSection) -> Result<Option<SmartSettings>, 
     }
     // NOTE: SMART App Launch 2.2.0, Conformance, Metadata, `token_endpoint` is
     // required, and only an issuer's metadata names it for the bridge.
-    if resolved.issuers.is_empty() {
+    if resolved.issuers.is_empty() && resolved.introspection.is_none() {
         return Err(Error::Auth {
             source: Box::new(ConfigError::Missing { key: "auth.issuer" }),
         });
@@ -41,6 +42,7 @@ pub(super) fn resolve_auth(auth: &AuthSection) -> Result<Option<SmartSettings>, 
     let options = resolved.smart_options();
     Ok(Some(SmartSettings {
         issuers: resolved.issuers,
+        introspection: resolved.introspection,
         basic: resolved.basic.map(Arc::new),
         realm: resolved.realm,
         options,

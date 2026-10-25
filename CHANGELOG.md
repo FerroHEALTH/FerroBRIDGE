@@ -46,6 +46,16 @@ crates on crates.io.
   A write no caller made (an HL7 v2 message, an open surface) still commits
   under the bridge's name. Reads still reach the CDR under the bridge's own
   credential (#532).
+- `[auth] mode = "introspection"` with an `[auth.introspection]` table
+  checks opaque access tokens by OAuth 2.0 Token Introspection (RFC 7662)
+  through `ferrohealth-smart`'s introspector: each token is posted to the
+  issuer's introspection endpoint under the bridge's client authentication
+  (`[auth.introspection.client]`) or a client credentials token
+  (`[auth.introspection.bearer]`), an active answer with `scope`,
+  `client_id` and `exp` admits the caller with its scopes and `patient`
+  context, the answer is held until its `exp` and at most
+  `cache_max_age_seconds`, an inactive token answers `401` and an endpoint
+  that fails `503` (#533). The Operate configuration page lists the keys.
 - `ferrobridge vocab load DIR --schema NAME` loads an OHDSI Athena vocabulary
   download into the vocabulary tables of the CDM schema (#233). It takes the
   nine files every download carries and `SOURCE_TO_CONCEPT_MAP.csv` when
