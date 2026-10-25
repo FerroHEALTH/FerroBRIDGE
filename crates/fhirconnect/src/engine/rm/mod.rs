@@ -347,10 +347,11 @@ pub enum Carried {
     /// node (`_provider` on an `ENTRY`) and the engine writes through
     /// [`crate::engine::family::provider`].
     Family,
-    /// The origin of an `OBSERVATION`'s `HISTORY`, a `DV_DATE_TIME` the Web
-    /// Template carries no node for, which FLAT writes as the
-    /// `history_origin` of the observation's node.
-    HistoryOrigin,
+    /// A `DV_DATE_TIME` attribute of an entry the Web Template carries no
+    /// node for, an `OBSERVATION`'s history origin or an `ACTION`'s time,
+    /// which FLAT writes under the entry's node with the key [`ENTRY_TIMES`]
+    /// names.
+    EntryTime,
 }
 
 /// Returns the class a tail below a node of `rm_type` is written as, and what
@@ -372,8 +373,11 @@ pub enum Carried {
 pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> {
     let wanted = tail.join("/");
     let class = derive::base_class(rm_type);
-    if wanted == HISTORY_ORIGIN.1 && model::is_a(class, HISTORY_ORIGIN.0) {
-        return Some((HISTORY_ORIGIN.0, Carried::HistoryOrigin));
+    if let Some(&(owner, _, _)) = ENTRY_TIMES
+        .iter()
+        .find(|&&(owner, path, _)| path == wanted && model::is_a(class, owner))
+    {
+        return Some((owner, Carried::EntryTime));
     }
     if let Some(&(owner, _)) = FAMILIES
         .iter()
@@ -481,18 +485,33 @@ pub const FAMILIES: &[(&str, &str)] = &[
     ("ELEMENT", NULL_FLAVOUR),
 ];
 
-/// The tail below an `OBSERVATION` that names its history's origin.
+/// The date-time attributes of an entry a Web Template carries no node for.
+///
+/// Each row is the entry class, the tail that names the attribute, and the
+/// FLAT key Simplified Formats writes it under.
 ///
 /// `HISTORY.origin` is a `DV_DATE_TIME`
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_structures.html#_history_class>),
-/// a Web Template carries no node for it, and Simplified Formats spells
-/// it `history_origin` under the observation's node
+/// spelled `history_origin` under the observation's node, and `ACTION.time`
+/// is a mandatory `DV_DATE_TIME`
+/// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/ehr.html#_action_class>),
+/// spelled `time` under the action's node
 /// (`docs/specs/its-rest/docs/simplified_formats/master05-rm_mapping.adoc`,
-/// §OBSERVATION).
-pub const HISTORY_ORIGIN: (&str, &str) = ("OBSERVATION", "data/origin");
+/// §OBSERVATION and §ACTION).
+pub const ENTRY_TIMES: &[(&str, &str, &str)] = &[
+    ("OBSERVATION", "data/origin", "history_origin"),
+    ("ACTION", "time", "time"),
+];
 
-/// The FLAT attribute [`HISTORY_ORIGIN`] is written under.
-pub const HISTORY_ORIGIN_KEY: &str = "history_origin";
+/// Returns the FLAT key the date-time attribute `tail` of an `owner` entry is
+/// written under, `None` when [`ENTRY_TIMES`] names no such attribute.
+#[must_use]
+pub fn entry_time_key(owner: &str, tail: &str) -> Option<&'static str> {
+    ENTRY_TIMES
+        .iter()
+        .find(|&&(entry, path, _)| entry == owner && path == tail)
+        .map(|&(_, _, key)| key)
+}
 
 /// The attributes of a party root a party context maps although no template
 /// node holds them, which the party build places on the root.
@@ -529,6 +548,7 @@ mod tests {
     use super::Carried;
     use super::RmValue;
     use super::carried;
+    use super::entry_time_key;
     use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 
@@ -732,9 +752,19 @@ mod tests {
     fn the_history_origin_is_carried_on_an_observation_alone() {
         assert_eq!(
             carried("OBSERVATION", &["data", "origin"]),
-            Some(("OBSERVATION", Carried::HistoryOrigin))
+            Some(("OBSERVATION", Carried::EntryTime))
         );
         assert_eq!(carried("EVALUATION", &["data", "origin"]), None);
         assert_eq!(carried("OBSERVATION", &["data", "period"]), None);
+    }
+
+    #[test]
+    fn the_time_of_an_action_is_carried_on_an_action_alone() {
+        assert_eq!(
+            carried("ACTION", &["time"]),
+            Some(("ACTION", Carried::EntryTime))
+        );
+        assert_eq!(entry_time_key("ACTION", "time"), Some("time"));
+        assert_eq!(carried("INSTRUCTION", &["time"]), None);
     }
 }

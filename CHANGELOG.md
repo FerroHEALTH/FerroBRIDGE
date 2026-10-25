@@ -129,6 +129,13 @@ crates on crates.io.
 
 ### Fixed
 
+- A FHIRconnect mapping can write an `ACTION`'s time (#1226): `$archetype/time`
+  under an `ACTION` no longer refuses with `fc-uncarried-tail`, and the engine
+  writes and reads it as the action's `time`, the way it carries an
+  observation's history origin. A FHIR `Procedure`'s `performedDateTime` now
+  reaches `ACTION.time`, and on the `etl fhir` path the
+  `PROCEDURE_OCCURRENCE.procedure_date` OMOCL reads from it. `fhirconnect`
+  moves to 0.1.192 and `ferrobridge-hl7v2` to 0.1.144.
 - A run rebuilds `OBSERVATION_PERIOD`, `CONDITION_ERA` and `DRUG_ERA` only for
   the persons the bridge writes, so the derived rows another ETL wrote into
   those tables survive it (#1223). `[etl] derived_tables = "whole_table"`

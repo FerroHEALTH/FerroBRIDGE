@@ -247,10 +247,11 @@ the node the element shares with its value, with `_null_reason` beside it
 compacted into its value reaches the element's `links`
 (`OpenehrTarget::on_element`): the `_link:i` family sits on the one FLAT node
 the two share, and the engine reads it from the element
-(`WebTemplateIndex::read_element`). `HISTORY.origin` has no Web Template
-node either: a mapping names it as `$archetype/data/origin`, which
-`rm::HISTORY_ORIGIN` carries as `Carried::HistoryOrigin`, and the engine
-writes it as the observation's `history_origin` (master05 §OBSERVATION).
+(`WebTemplateIndex::read_element`). `HISTORY.origin` and `ACTION.time` have no Web
+Template node either: a mapping names them as `$archetype/data/origin` and
+`$archetype/time`, which `rm::ENTRY_TIMES` carries as `Carried::EntryTime`,
+and the engine writes them as the entry's `history_origin` and `time`
+(master05 §OBSERVATION, §ACTION).
 These families are the one place the engine still spells FLAT keys, because the
 builder takes no `|raw` on a `_`-prefixed family (the `TODO(#618)` in
 `engine::family`). Reading them back decodes typed `LINK` and
