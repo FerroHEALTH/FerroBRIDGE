@@ -22,6 +22,8 @@ mod lookup;
 mod oauth;
 mod pins;
 mod search;
+#[cfg(feature = "smart")]
+mod smart;
 mod stu3;
 mod subsumes;
 mod support;

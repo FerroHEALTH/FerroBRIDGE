@@ -106,6 +106,15 @@ client. The configured timeout still bounds each request, and the
 credentials, the retry budget and the typed errors apply as for
 `Client::new`.
 
+## The client credentials token of ferrohealth-smart
+
+Behind the `smart` feature, `smart::SmartToken` turns the `TokenSource` of
+`ferrohealth-smart`'s client credentials grant into the client's
+`TokenProvider`: each request carries the cached token, and a token the
+server refuses with `401` is dropped, so the repeated request carries one
+fetched anew (RFC 6750 §3.1). Pass it as `Credentials::OAuth`; no product
+writes this adapter itself.
+
 ## Status
 
 The crate is on the crate line (`docs/VERSIONS.md`): every change moves it one

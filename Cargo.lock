@@ -1539,7 +1539,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.143"
+version = "0.1.144"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1631,11 +1631,12 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.1.134"
+version = "0.1.135"
 dependencies = [
  "async-trait",
  "backon",
  "ferrobridge-testkit",
+ "ferrohealth-smart",
  "fhir-types",
  "http",
  "rcgen",
@@ -1683,7 +1684,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.1.134"
+version = "0.1.135"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
