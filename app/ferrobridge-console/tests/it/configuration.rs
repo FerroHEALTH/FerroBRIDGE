@@ -27,7 +27,7 @@ async fn the_configuration_page_draws_each_tab_read_only_with_its_keys()
         "Server and access",
         "telemetry.format",
         "/etc/ferrobridge/ferrobridge.toml",
-        "from the environment",
+        "From the environment",
     ] {
         assert!(logging.contains(words), "{words}: {logging}");
     }
@@ -80,7 +80,7 @@ async fn each_face_draws_its_settings_from_the_running_configuration() -> Result
     let (_response, hl7) = send(&service, get_with("/hl7v2/settings", &cookie)?).await?;
     let hl7 = hl7.replace("<!>", "");
     assert!(hl7.contains("300 s · 30 s"), "{hl7}");
-    assert!(hl7.contains("from the environment"), "{hl7}");
+    assert!(hl7.contains("From the environment"), "{hl7}");
     let (_response, omop) = send(&service, get_with("/omop/settings", &cookie)?).await?;
     let omop = omop.replace("<!>", "");
     assert!(omop.contains("SELECT e/ehr_id/value"), "{omop}");
