@@ -112,6 +112,17 @@ crates on crates.io.
 
 ### Fixed
 
+- The `fhir-types` XML codec holds a narrative `div` to well-formed XHTML
+  both ways: `xml::to_xml` refuses a `div` that is no well-formed XHTML
+  `div` in the XHTML namespace with an `EncodeError` naming its element path,
+  such as `Basic.text.div`, and `xml::from_xml` refuses a start tag whose
+  attributes are not well-formed XML (no whitespace between two attributes,
+  a name that is no XML name, a `<` in a value), in the narrative and in
+  every other element, where it accepted them and wrote them back repaired.
+  `fhir-types` moves to 0.1.128, `fhirconnect` to 0.1.189,
+  `ferrobridge-term` and `ferrobridge-validator` to 0.1.134,
+  `ferrobridge-fhirpath` to 0.1.128 and `ferrobridge-hl7v2` to 0.1.140 with
+  it (#1178).
 - A coding with no `display` written into a `DV_TEXT`, whose value would
   otherwise fall back to the coding's code, is looked up through
   `CodeSystem/$lookup` as one written into a `DV_CODED_TEXT` is: the display
