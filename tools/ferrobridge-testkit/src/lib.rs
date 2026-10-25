@@ -15,12 +15,9 @@
 //! console signs in at;
 //! [`stubs`] carries the upstream response shapes for `wiremock`;
 //! [`tls`] generates the throwaway certificates a TLS-only PostgreSQL starts
-//! with; and [`vocabulary`] holds the synthetic OHDSI vocabulary and its
-//! loader.
+//! with; and [`vocabulary`] holds the synthetic OHDSI vocabulary in the shape of
+//! an Athena download.
 #![doc(test(attr(deny(warnings))))]
-
-// TODO(#88): the synthetic vocabulary takes the observed Athena export shape
-// once it is recorded, so the production loader is what the tests exercise.
 
 pub mod conformance;
 pub mod containers;
