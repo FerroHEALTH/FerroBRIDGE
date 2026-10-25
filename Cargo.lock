@@ -1539,7 +1539,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.139"
+version = "0.1.141"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1780,7 +1780,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.188"
+version = "0.1.190"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
@@ -3672,7 +3672,7 @@ dependencies = [
 
 [[package]]
 name = "openehr-mapping-core"
-version = "0.1.127"
+version = "0.1.128"
 dependencies = [
  "ferrobridge-testkit",
  "insta",
