@@ -33,6 +33,7 @@
 //! and provenance to the ETL, <https://ohdsi.github.io/CommonDataModel/cdm54.html>).
 
 pub mod error;
+pub mod foreign;
 pub mod input;
 pub mod person;
 pub mod removal;
@@ -209,6 +210,21 @@ impl CdmWriter {
     #[must_use]
     pub fn is_closed(&self) -> bool {
         self.client.is_closed()
+    }
+
+    /// Returns, for every CDM table whose ids the writer assigns, how many
+    /// rows no entry of the side table owns, leaving out the tables with
+    /// none.
+    ///
+    /// Such rows were loaded by something other than this bridge, and an id
+    /// among them can collide with one the writer assigns next.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError::Database`] with [`Step::Survey`] when PostgreSQL
+    /// refuses a count, as it does before [`CdmWriter::init`] has run.
+    pub async fn foreign_rows(&self) -> Result<Vec<foreign::ForeignRows>, WriteError> {
+        foreign::count(&self.client, &self.cdm, &self.bridge).await
     }
 
     /// Returns the client and the CDM schema, for the derivations.

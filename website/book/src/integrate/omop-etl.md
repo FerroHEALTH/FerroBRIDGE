@@ -356,8 +356,11 @@ design, and each hop stays governed by its own specification.
 ## Checking a populated database with the Data Quality Dashboard
 
 The bridge carries a Rust port of the OHDSI Data Quality Dashboard's
-conformance and completeness checks (v2.9.0, Blacketer et al., JAMIA 2021),
-planned where the Dashboard's own settings enable them, with their
+conformance and completeness checks and its seven temporal plausibility
+checks (v2.9.0, Blacketer et al., JAMIA 2021): observation periods that
+overlap, dates before birth or the date they must follow, dates more than 60
+days after death, dates a week outside their visit, and starts after their
+ends. Each is planned where the Dashboard's own settings enable them, with their
 thresholds:
 
 ```sh

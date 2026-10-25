@@ -6,7 +6,8 @@
 # Vendors the OHDSI Data Quality Dashboard's CDM v5.4 check definitions into
 # docs/specs/dqd/ (.claude/rules/vendored-inputs.md): the check catalogue, the
 # table, field and concept threshold files, the SQL templates of the
-# conformance and completeness checks the bridge ports to Rust (issue #97,
+# conformance, completeness and temporal plausibility checks the bridge ports
+# to Rust (issue #97,
 # docs/architecture.md section 11), and the R sources and vignettes that hold
 # the pass, fail, not-applicable and result-shape semantics, which live in no
 # CSV or SQL file.
@@ -35,13 +36,19 @@ dest="docs/specs/dqd"
 sql="inst/sql/sql_server"
 
 # The fifteen checks whose Kahn category is Conformance or Completeness in
-# OMOP_CDMv5.4_Check_Descriptions.csv: the port's scope.
+# OMOP_CDMv5.4_Check_Descriptions.csv, then the seven Plausibility checks that
+# compare dates (subcategory Temporal, and withinVisitDates): the port's scope.
 checks=(
   cdmTable cdmField isRequired cdmDatatype isPrimaryKey isForeignKey fkDomain
   fkClass isStandardValidConcept measurePersonCompleteness
   measureConditionEraCompleteness measureValueCompleteness
   standardConceptRecordCompleteness sourceConceptRecordCompleteness
   sourceValueCompleteness
+)
+temporal=(
+  measureObservationPeriodOverlap plausibleTemporalAfter plausibleDuringLife
+  plausibleAfterBirth plausibleBeforeDeath plausibleStartBeforeEnd
+  withinVisitDates
 )
 
 paths=(
@@ -64,6 +71,13 @@ paths=(
   "$sql/field_measure_value_completeness.sql"
   "$sql/field_concept_record_completeness.sql"
   "$sql/field_source_value_completeness.sql"
+  "$sql/table_observation_period_overlap.sql"
+  "$sql/field_plausible_temporal_after.sql"
+  "$sql/field_plausible_during_life.sql"
+  "$sql/field_plausible_after_birth.sql"
+  "$sql/field_plausible_before_death.sql"
+  "$sql/field_plausible_start_before_end.sql"
+  "$sql/field_within_visit_dates.sql"
   "$sql/result_dataframe_ddl.sql"
   "R/evaluateThresholds.R"
   "R/calculateNotApplicableStatus.R"
@@ -77,8 +91,9 @@ paths=(
   "vignettes/CheckStatusDefinitions.rmd"
   "vignettes/Thresholds.rmd"
 )
-for check in "${checks[@]}"; do
-  paths+=("vignettes/checks/$check.Rmd")
+for check in "${checks[@]}" "${temporal[@]}"; do
+  # plausibleDuringLife is deprecated upstream and ships no vignette.
+  [ "$check" = plausibleDuringLife ] || paths+=("vignettes/checks/$check.Rmd")
 done
 
 pin="$(corpus_pin_cell "OHDSI Data Quality Dashboard")"
@@ -111,6 +126,10 @@ records="$(awk '/^(TABLE|FIELD|CONCEPT),/ { if (r != "") print r; r = $0; next }
 for check in "${checks[@]}"; do
   grep -qE "^(TABLE|FIELD),$check,.*,(Verification|Validation),(Conformance|Completeness)," <<< "$records" ||
     die "$check is no Conformance or Completeness check in the catalogue"
+done
+for check in "${temporal[@]}"; do
+  grep -qE "^(TABLE|FIELD),$check,.*,Verification,Plausibility,(Temporal)?," <<< "$records" ||
+    die "$check is no date-comparing Plausibility check in the catalogue"
 done
 
 rm -rf "$dest"

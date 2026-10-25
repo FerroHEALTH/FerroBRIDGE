@@ -48,6 +48,9 @@ pub enum JobError {
     /// The run stopped.
     #[error("running the ETL")]
     Run(#[source] RunError),
+    /// The rows the bridge does not own could not be counted.
+    #[error("counting the CDM rows the bridge does not own")]
+    Foreign(#[source] WriteError),
     /// The quality checks could not be planned.
     #[error("planning the quality checks")]
     Quality(#[source] omop_cdm::quality::plan::PlanError),
@@ -164,8 +167,27 @@ pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport,
     let mut report = crate::etl::run(etl, options, &client, &mut writer, &mapper, &run_id)
         .await
         .map_err(JobError::Run)?;
+    foreign_step(&writer, &mut report).await?;
     quality_step(etl, &pool, &mut report).await?;
     Ok(report)
+}
+
+/// Counts the rows of the CDM tables the writer assigns the ids of that no
+/// side-table entry owns, adds them to `report` and warns once per table.
+async fn foreign_step(writer: &CdmWriter, report: &mut RunReport) -> Result<(), JobError> {
+    for foreign in writer.foreign_rows().await.map_err(JobError::Foreign)? {
+        // NOTE: no specification governs this: our own design; the bridge assumes it owns
+        // the id space of the tables it writes, so another load's rows are a warning.
+        tracing::warn!(
+            table = foreign.table,
+            rows = foreign.rows,
+            "a CDM table holds rows the bridge did not write"
+        );
+        report
+            .foreign_rows
+            .insert(foreign.table.to_owned(), foreign.rows);
+    }
+    Ok(())
 }
 
 /// Runs the quality checks over the tables `report` names when `etl` asks
@@ -268,6 +290,7 @@ pub async fn run_fhir(settings: &Settings, input: &std::path::Path) -> Result<Ru
     let mut report = crate::etl::fhir::run(&resources, &side, etl, &mut writer, &mapper, &run_id)
         .await
         .map_err(JobError::Run)?;
+    foreign_step(&writer, &mut report).await?;
     quality_step(etl, &pool, &mut report).await?;
     Ok(report)
 }

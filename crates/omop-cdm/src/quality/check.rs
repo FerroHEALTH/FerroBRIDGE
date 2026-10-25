@@ -53,14 +53,33 @@ pub enum CheckName {
     SourceConceptRecordCompleteness,
     /// `sourceValueCompleteness`: a source value maps to a standard concept.
     SourceValueCompleteness,
+    /// `measureObservationPeriodOverlap`: no person has overlapping or
+    /// back-to-back observation periods.
+    MeasureObservationPeriodOverlap,
+    /// `plausibleTemporalAfter`: a date falls on or after the date it must
+    /// follow.
+    PlausibleTemporalAfter,
+    /// `plausibleDuringLife`: a date falls no more than 60 days after death.
+    PlausibleDuringLife,
+    /// `withinVisitDates`: a date falls within a week of its visit.
+    WithinVisitDates,
+    /// `plausibleAfterBirth`: a date falls on or after birth.
+    PlausibleAfterBirth,
+    /// `plausibleBeforeDeath`: a date falls no more than 60 days after death,
+    /// of the persons who died.
+    PlausibleBeforeDeath,
+    /// `plausibleStartBeforeEnd`: a start date falls on or before its end
+    /// date.
+    PlausibleStartBeforeEnd,
 }
 
 impl CheckName {
     /// Every check the port runs, in catalogue order.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 22] = [
         Self::CdmTable,
         Self::MeasurePersonCompleteness,
         Self::MeasureConditionEraCompleteness,
+        Self::MeasureObservationPeriodOverlap,
         Self::CdmField,
         Self::IsRequired,
         Self::CdmDatatype,
@@ -73,6 +92,12 @@ impl CheckName {
         Self::StandardConceptRecordCompleteness,
         Self::SourceConceptRecordCompleteness,
         Self::SourceValueCompleteness,
+        Self::PlausibleTemporalAfter,
+        Self::PlausibleDuringLife,
+        Self::WithinVisitDates,
+        Self::PlausibleAfterBirth,
+        Self::PlausibleBeforeDeath,
+        Self::PlausibleStartBeforeEnd,
     ];
 
     /// Returns the check's record in the generated catalogue.
@@ -94,6 +119,13 @@ impl CheckName {
             Self::StandardConceptRecordCompleteness => &dqd::STANDARD_CONCEPT_RECORD_COMPLETENESS,
             Self::SourceConceptRecordCompleteness => &dqd::SOURCE_CONCEPT_RECORD_COMPLETENESS,
             Self::SourceValueCompleteness => &dqd::SOURCE_VALUE_COMPLETENESS,
+            Self::MeasureObservationPeriodOverlap => &dqd::MEASURE_OBSERVATION_PERIOD_OVERLAP,
+            Self::PlausibleTemporalAfter => &dqd::PLAUSIBLE_TEMPORAL_AFTER,
+            Self::PlausibleDuringLife => &dqd::PLAUSIBLE_DURING_LIFE,
+            Self::WithinVisitDates => &dqd::WITHIN_VISIT_DATES,
+            Self::PlausibleAfterBirth => &dqd::PLAUSIBLE_AFTER_BIRTH,
+            Self::PlausibleBeforeDeath => &dqd::PLAUSIBLE_BEFORE_DEATH,
+            Self::PlausibleStartBeforeEnd => &dqd::PLAUSIBLE_START_BEFORE_END,
         }
     }
 
@@ -179,6 +211,17 @@ pub enum CheckParameters {
     /// The standard concept field a source value maps through
     /// (`sourceValueCompleteness`).
     StandardConceptField(&'static str),
+    /// The table and field whose date the checked date must not precede
+    /// (`plausibleTemporalAfter`).
+    TemporalAfter {
+        /// The table of the earlier date.
+        table: &'static str,
+        /// The field of the earlier date.
+        field: &'static str,
+    },
+    /// The end date field the checked start date must not follow
+    /// (`plausibleStartBeforeEnd`).
+    EndField(&'static str),
 }
 
 /// One check's subject and parameters, each check's shape a variant of its
@@ -247,6 +290,32 @@ pub(crate) enum Kind {
         /// The standard concept column it maps through.
         standard: &'static ColumnMeta,
     },
+    /// `measureObservationPeriodOverlap` of the table.
+    MeasureObservationPeriodOverlap,
+    /// `plausibleTemporalAfter` on the column.
+    PlausibleTemporalAfter {
+        /// The checked column.
+        column: &'static ColumnMeta,
+        /// The table of the earlier date.
+        after_table: &'static TableMeta,
+        /// The column of the earlier date.
+        after_field: &'static ColumnMeta,
+    },
+    /// `plausibleDuringLife` on the column.
+    PlausibleDuringLife(&'static ColumnMeta),
+    /// `withinVisitDates` on the column.
+    WithinVisitDates(&'static ColumnMeta),
+    /// `plausibleAfterBirth` on the column.
+    PlausibleAfterBirth(&'static ColumnMeta),
+    /// `plausibleBeforeDeath` on the column.
+    PlausibleBeforeDeath(&'static ColumnMeta),
+    /// `plausibleStartBeforeEnd` on the column.
+    PlausibleStartBeforeEnd {
+        /// The checked start column.
+        column: &'static ColumnMeta,
+        /// The end column.
+        end: &'static ColumnMeta,
+    },
 }
 
 /// One check for one table or one field.
@@ -302,6 +371,13 @@ impl Check {
                 CheckName::SourceConceptRecordCompleteness
             }
             Kind::SourceValueCompleteness { .. } => CheckName::SourceValueCompleteness,
+            Kind::MeasureObservationPeriodOverlap => CheckName::MeasureObservationPeriodOverlap,
+            Kind::PlausibleTemporalAfter { .. } => CheckName::PlausibleTemporalAfter,
+            Kind::PlausibleDuringLife(_) => CheckName::PlausibleDuringLife,
+            Kind::WithinVisitDates(_) => CheckName::WithinVisitDates,
+            Kind::PlausibleAfterBirth(_) => CheckName::PlausibleAfterBirth,
+            Kind::PlausibleBeforeDeath(_) => CheckName::PlausibleBeforeDeath,
+            Kind::PlausibleStartBeforeEnd { .. } => CheckName::PlausibleStartBeforeEnd,
         }
     }
 
@@ -317,7 +393,8 @@ impl Check {
         match self.kind {
             Kind::CdmTable
             | Kind::MeasurePersonCompleteness
-            | Kind::MeasureConditionEraCompleteness => None,
+            | Kind::MeasureConditionEraCompleteness
+            | Kind::MeasureObservationPeriodOverlap => None,
             Kind::CdmField(column)
             | Kind::IsRequired(column)
             | Kind::CdmDatatype(column)
@@ -329,7 +406,13 @@ impl Check {
             | Kind::MeasureValueCompleteness(column)
             | Kind::StandardConceptRecordCompleteness { column, .. }
             | Kind::SourceConceptRecordCompleteness { column, .. }
-            | Kind::SourceValueCompleteness { column, .. } => Some(column),
+            | Kind::SourceValueCompleteness { column, .. }
+            | Kind::PlausibleTemporalAfter { column, .. }
+            | Kind::PlausibleDuringLife(column)
+            | Kind::WithinVisitDates(column)
+            | Kind::PlausibleAfterBirth(column)
+            | Kind::PlausibleBeforeDeath(column)
+            | Kind::PlausibleStartBeforeEnd { column, .. } => Some(column),
         }
     }
 
@@ -347,9 +430,23 @@ impl Check {
             Kind::SourceValueCompleteness { standard, .. } => {
                 CheckParameters::StandardConceptField(standard.name)
             }
+            Kind::PlausibleTemporalAfter {
+                after_table,
+                after_field,
+                ..
+            } => CheckParameters::TemporalAfter {
+                table: after_table.name,
+                field: after_field.name,
+            },
+            Kind::PlausibleStartBeforeEnd { end, .. } => CheckParameters::EndField(end.name),
             Kind::CdmTable
             | Kind::MeasurePersonCompleteness
             | Kind::MeasureConditionEraCompleteness
+            | Kind::MeasureObservationPeriodOverlap
+            | Kind::PlausibleDuringLife(_)
+            | Kind::WithinVisitDates(_)
+            | Kind::PlausibleAfterBirth(_)
+            | Kind::PlausibleBeforeDeath(_)
             | Kind::MeasureValueCompleteness(_)
             | Kind::CdmField(_)
             | Kind::IsRequired(_)
@@ -428,12 +525,20 @@ impl Check {
         if let Some(column) = self.column() {
             let upper = |value: Option<&str>| value.map(str::to_uppercase).unwrap_or_default();
             let (fk_table, fk_field) = column.foreign_key.unzip();
+            let (after_table, after_field, end_field) = match self.parameters() {
+                CheckParameters::TemporalAfter { table, field } => (Some(table), Some(field), None),
+                CheckParameters::EndField(field) => (None, None, Some(field)),
+                _ => (None, None, None),
+            };
             for (placeholder, value) in [
                 ("@cdmFieldName", upper(Some(column.name))),
                 ("@fkTableName", upper(fk_table)),
                 ("@fkFieldName", upper(fk_field)),
                 ("@fkDomain", column.fk_domain.join(", ").to_uppercase()),
                 ("@fkClass", upper(column.fk_class)),
+                ("@plausibleTemporalAfterTableName", upper(after_table)),
+                ("@plausibleTemporalAfterFieldName", upper(after_field)),
+                ("@plausibleStartBeforeEndFieldName", upper(end_field)),
             ] {
                 text = text.replace(placeholder, &value);
             }
