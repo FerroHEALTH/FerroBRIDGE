@@ -14,7 +14,10 @@
 
 use std::collections::BTreeMap;
 
+use omop_cdm::graph::key::ProviderSource;
 use omop_cdm::graph::key::RecordKey;
+use omop_cdm::graph::key::VisitDetailKey;
+use omop_cdm::graph::key::VisitDetailSource;
 use omop_cdm::graph::key::VisitKey;
 use omop_cdm::graph::row::GraphError;
 use omop_cdm::graph::row::Reference;
@@ -43,6 +46,9 @@ pub(crate) enum Cell {
     Date(CdmDate),
     /// A date and time.
     Datetime(CdmDatetime),
+    /// The source a `PROVIDER` or a `VISIT_DETAIL` row is keyed by, for a
+    /// column that references one.
+    Reference(String),
 }
 
 /// Why a row could not be built.
@@ -113,6 +119,39 @@ fn typed(cell: &Cell, column: &ColumnMeta) -> Result<Value, RowError> {
     })
 }
 
+/// Returns the reference a column that names a `PROVIDER` or a
+/// `VISIT_DETAIL` takes from the `source` the record carries.
+///
+/// A visit detail lies in the composition's visit, so a record with no visit
+/// cannot name one. No specification governs the keys: our own design.
+fn reference(
+    column: &ColumnMeta,
+    source: &str,
+    filled: &Filled<'_>,
+) -> Result<Reference, RowError> {
+    let invalid = |reason| RowError::Invalid {
+        column: column.name,
+        reason,
+    };
+    match column.foreign_key {
+        Some(("provider", _)) => ProviderSource::new(source)
+            .map(Reference::Provider)
+            .map_err(|_empty| invalid("the provider source is empty")),
+        Some(("visit_detail", _)) => {
+            let visit = filled
+                .visit
+                .ok_or_else(|| invalid("a visit detail needs the composition's visit"))?;
+            let source = VisitDetailSource::new(source)
+                .map_err(|_empty| invalid("the visit detail source is empty"))?;
+            Ok(Reference::VisitDetail(VisitDetailKey::new(
+                visit.clone(),
+                source,
+            )))
+        }
+        _ => Err(invalid("the column names no provider or visit detail")),
+    }
+}
+
 /// Builds the row of `table` from `cells`.
 pub(crate) fn build(
     table: &str,
@@ -127,7 +166,12 @@ pub(crate) fn build(
             table: meta.name,
             column: name.to_owned(),
         })?;
-        builder = builder.value(name, typed(cell, column)?)?;
+        builder = match cell {
+            Cell::Reference(source) => {
+                builder.reference(name, reference(column, source, filled)?)?
+            }
+            _ => builder.value(name, typed(cell, column)?)?,
+        };
     }
     for column in meta.columns {
         if column.primary_key || cells.map.contains_key(column.name) {

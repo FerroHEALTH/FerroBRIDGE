@@ -9,7 +9,9 @@ use std::collections::BTreeMap;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 
 use crate::graph::key::MappingName;
+use crate::graph::key::ProviderSource;
 use crate::graph::key::RecordKey;
+use crate::graph::key::VisitDetailKey;
 use crate::graph::key::VisitKey;
 use crate::graph::varchar_limit;
 use crate::meta::CdmSchema;
@@ -27,6 +29,11 @@ pub enum Reference {
     Visit(VisitKey),
     /// Another row, in the table the column's foreign key names.
     Row(RecordKey),
+    /// A `PROVIDER` by its source, for a column that references `provider`.
+    Provider(ProviderSource),
+    /// A `VISIT_DETAIL` of a derived visit, for a column that references
+    /// `visit_detail`.
+    VisitDetail(VisitDetailKey),
 }
 
 /// A column value in the form its CDM datatype takes.
@@ -220,6 +227,22 @@ pub fn primary_key(table: &TableMeta) -> Option<&'static ColumnMeta> {
     }
 }
 
+/// Returns whether `table` holds at most one row per person and has no key
+/// of its own: no single integer primary key and a required `person_id` that
+/// references `PERSON`.
+///
+/// CDM v5.4 `DEATH` is one: its rows are identified by `person_id`
+/// (<https://ohdsi.github.io/CommonDataModel/cdm54.html#death>). The writer
+/// takes the person's `person_id` as such a row's id. No specification
+/// governs that identity: our own design.
+#[must_use]
+pub fn person_keyed(table: &TableMeta) -> bool {
+    primary_key(table).is_none()
+        && table.column("person_id").is_some_and(|column| {
+            column.required && column.foreign_key == Some(("person", "person_id"))
+        })
+}
+
 /// One CDM row, keyed by its source, with every column checked against the
 /// table's metadata.
 #[derive(Debug, Clone, PartialEq)]
@@ -238,7 +261,7 @@ impl Row {
     /// Returns [`GraphError::UnknownTable`] when `table` is not a CDM-schema
     /// table and [`GraphError::NotWritable`] for `fact_relationship` (a
     /// [`Link`](crate::graph::link::Link) writes it), a derived table, or a table without a single
-    /// integer primary key.
+    /// integer primary key that is not keyed by its person ([`person_keyed`]).
     pub fn builder(table: &str, key: RecordKey) -> Result<RowBuilder, GraphError> {
         let table = cdm_table(table)?;
         if table.name == "fact_relationship" {
@@ -253,7 +276,7 @@ impl Row {
                 why: "the derivations rebuild it whole",
             });
         }
-        if primary_key(table).is_none() {
+        if primary_key(table).is_none() && !person_keyed(table) {
             return Err(GraphError::NotWritable {
                 table: table.name,
                 why: "it has no single integer primary key",
@@ -399,8 +422,11 @@ impl RowBuilder {
     ///
     /// A [`Reference::Person`] fits a column whose foreign key is
     /// `person.person_id`, a [`Reference::Visit`] one whose foreign key is
-    /// `visit_occurrence.visit_occurrence_id`, and a [`Reference::Row`] one
-    /// whose foreign key names any other CDM table with an integer key.
+    /// `visit_occurrence.visit_occurrence_id`, a [`Reference::Provider`] one
+    /// whose foreign key is `provider.provider_id`, a
+    /// [`Reference::VisitDetail`] one whose foreign key is
+    /// `visit_detail.visit_detail_id`, and a [`Reference::Row`] one whose
+    /// foreign key names any other CDM table with an integer key.
     ///
     /// # Errors
     ///
@@ -413,13 +439,17 @@ impl RowBuilder {
         let target = meta.foreign_key.map(|(table, _)| table);
         let fits = match (&reference, target) {
             (Reference::Person(_), Some("person"))
-            | (Reference::Visit(_), Some("visit_occurrence")) => true,
+            | (Reference::Visit(_), Some("visit_occurrence"))
+            | (Reference::Provider(_), Some("provider"))
+            | (Reference::VisitDetail(_), Some("visit_detail")) => true,
             (Reference::Row(_), Some(table)) => {
-                !matches!(table, "person" | "visit_occurrence")
-                    && crate::meta::table(table)
-                        .filter(|target| target.cdm_schema == CdmSchema::Cdm)
-                        .and_then(primary_key)
-                        .is_some()
+                !matches!(
+                    table,
+                    "person" | "visit_occurrence" | "provider" | "visit_detail"
+                ) && crate::meta::table(table)
+                    .filter(|target| target.cdm_schema == CdmSchema::Cdm)
+                    .and_then(primary_key)
+                    .is_some()
             }
             _ => false,
         };
@@ -431,6 +461,8 @@ impl RowBuilder {
                     Reference::Person(_) => "person",
                     Reference::Visit(_) => "visit",
                     Reference::Row(_) => "row",
+                    Reference::Provider(_) => "provider",
+                    Reference::VisitDetail(_) => "visit detail",
                 },
             });
         }

@@ -36,6 +36,7 @@ pub mod error;
 pub mod input;
 pub mod person;
 pub mod removal;
+mod shared;
 pub mod side_table;
 pub mod stage;
 
@@ -63,8 +64,8 @@ use crate::writer::input::PersonPolicy;
 use crate::writer::input::RunId;
 use crate::writer::input::VisitConcepts;
 use crate::writer::person::person_id;
-use crate::writer::person::record_person_rows;
-use crate::writer::person::restore_persons;
+use crate::writer::person::record_rows;
+use crate::writer::person::restore_rows;
 use crate::writer::side_table::Ids;
 use crate::writer::side_table::allocate;
 use crate::writer::side_table::assign_ids;
@@ -72,7 +73,8 @@ use crate::writer::side_table::bridge_ddl;
 use crate::writer::side_table::delete_earlier;
 use crate::writer::side_table::earlier_rows;
 use crate::writer::side_table::record_keys;
-use crate::writer::side_table::replace_persons;
+use crate::writer::side_table::replace_rows;
+use crate::writer::side_table::retire_deaths;
 use crate::writer::side_table::retire_persons;
 use crate::writer::side_table::write_links;
 use crate::writer::stage::Staged;
@@ -320,9 +322,10 @@ impl CdmWriter {
             delete_earlier(&transaction, cdm, bridge, versioned_object_uid, &earlier).await?;
 
         let ids = assign_ids(&transaction, bridge, graph, &earlier).await?;
-        // NOTE: no specification governs this: our own design; the newest version that
-        // writes a PERSON row rewrites its columns, and a kept PERSON row is replaced.
-        replace_persons(&transaction, cdm, &ids).await?;
+        // NOTE: no specification governs this: our own design; the newest version that writes
+        // a PERSON or DEATH row rewrites its columns, and a kept row of either is replaced.
+        replace_rows(&transaction, cdm, &ids, "person").await?;
+        replace_rows(&transaction, cdm, &ids, "death").await?;
         let mut report = graph.report().clone();
         let mut resolver = Resolver {
             transaction: &transaction,
@@ -341,9 +344,31 @@ impl CdmWriter {
         report.record_links(links);
         let writes: BTreeSet<i32> = written_persons(&ids).into_values().collect();
         let recorded: Vec<i32> = writes.iter().copied().collect();
-        record_person_rows(&transaction, cdm, bridge, versioned_object_uid, &recorded).await?;
+        record_rows(
+            &transaction,
+            cdm,
+            bridge,
+            "person",
+            versioned_object_uid,
+            &recorded,
+        )
+        .await?;
         let stopped: Vec<i32> = deleted.written.difference(&writes).copied().collect();
-        restore_persons(&transaction, cdm, bridge, &stopped).await?;
+        restore_rows(&transaction, cdm, bridge, "person", &stopped).await?;
+        let deaths: BTreeSet<i32> = written_rows(&ids, "death").into_iter().collect();
+        let recorded: Vec<i32> = deaths.iter().copied().collect();
+        record_rows(
+            &transaction,
+            cdm,
+            bridge,
+            "death",
+            versioned_object_uid,
+            &recorded,
+        )
+        .await?;
+        let stopped: Vec<i32> = deleted.deaths.difference(&deaths).copied().collect();
+        restore_rows(&transaction, cdm, bridge, "death", &stopped).await?;
+        retire_deaths(&transaction, cdm, bridge, &deleted.deaths).await?;
         retire_persons(&transaction, cdm, bridge, &deleted.persons).await?;
 
         transaction
@@ -487,6 +512,15 @@ fn written_persons(ids: &Ids<'_>) -> BTreeMap<String, i32> {
         .collect()
 }
 
+/// Returns the `person_id` of every row of `table` that `ids` holds, a
+/// person-keyed table whose id is its person's.
+fn written_rows(ids: &Ids<'_>, table: &str) -> Vec<i32> {
+    ids.iter()
+        .filter(|((written, _), _)| *written == table)
+        .map(|(_, id)| *id)
+        .collect()
+}
+
 /// Resolves the references of one commit.
 struct Resolver<'a, 't> {
     transaction: &'a Transaction<'t>,
@@ -527,6 +561,12 @@ impl Resolver<'_, '_> {
                     Some(row) => row.try_get(0).map_err(database(Step::Read)),
                     None => Err(WriteError::UnknownVisit { key: key.clone() }),
                 }
+            }
+            Reference::Provider(source) => {
+                shared::provider_id(self.transaction, self.cdm, self.bridge, source).await
+            }
+            Reference::VisitDetail(key) => {
+                shared::visit_detail_id(self.transaction, self.cdm, self.bridge, key).await
             }
             Reference::Row(key) => {
                 let table = graph::row::cdm_table(target)?;

@@ -43,6 +43,19 @@ crates on crates.io.
   `fhirconnect` 0.1.191 adds `RmValue::Ordinal`, `lens::ordinal` and a
   fifth parameter to `cell::put`, the node's ordinal options; a caller of
   `cell::put` passes `&[]` where it has none.
+- An OMOCL mapping's `provider_id` and `visit_detail_id` now write (#243):
+  the record graph names a `PROVIDER` by the text the mapping reads and a
+  `VISIT_DETAIL` by the composition's visit and that text, and the CDM
+  writer resolves or creates each row inside the composition's transaction,
+  the visit detail taking its person, concept, dates and type concept from
+  the visit. A record that names a visit detail without a visit is refused.
+  The bridge schema gains the `provider` and `visit_detail` key tables, which
+  `cdm init` creates on an existing schema.
+- The OMOCL `Death` target writes its `DEATH` row (#1208): the row takes the
+  person's `person_id` as its id, the newest composition that writes one gives
+  it its columns, and removing that composition restores the row of the
+  writer that remains. `cdm init` adds the `death_row` side table and lets
+  several compositions of a person record a `DEATH` row.
 
 ### Fixed
 
