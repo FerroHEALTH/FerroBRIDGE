@@ -9,14 +9,14 @@ docs/VERSIONS.md and re-run the script.
 
 - Source: <https://github.com/OHDSI/DataQualityDashboard>
 - Pin: tag `v2.9.0`, which resolves to commit `b9d2a9b4a4736f7ea81415d974c72119b6f0bd11`
-- Fetched: 2026-10-08
+- Fetched: 2026-10-25
 - Upstream licence: `Apache License 2.0`. **The repository has no `LICENSE` file.**
   `DESCRIPTION` is the only place the licence is declared, which is why that
   file is vendored here and the script fails if a `LICENSE` file ever appears.
 - Layout: the upstream paths, unchanged
-- Files: 46
+- Files: 59
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `17e0fca8deae7bb353fb3e7e5ea7e39e94dcf0dd41ffac9e77a6a35bac8c7155`
+  `PROVENANCE.md` excluded): `da93478b110eed0c15cec3abcb6af0ef2c7bd44003c4928d0923762ce0dbc437`
 
 ## What is here
 
@@ -54,6 +54,13 @@ legacy check columns of the CDM's own `OMOP_CDMv5.4_Table_Level.csv`.
 | `inst/sql/sql_server/field_measure_value_completeness.sql` | `c4adbe23c6977b1c14225161646a4999c8bfd46616b7aec497b79464121edb5d` | `410b4492bc867e56018501ed502314efb43c79e7` |
 | `inst/sql/sql_server/field_concept_record_completeness.sql` | `0c25537d081ff28854a145ac4cc17b875222cadc9dc0d37c31829437e181e342` | `c11a6b405c6b9de894a7654b3dc7f518bbe5407e` |
 | `inst/sql/sql_server/field_source_value_completeness.sql` | `e5367662577872ca6462790c5185b4e29d9cb2a1dfc58c36a6f889af6f4c562b` | `04b223d1127c505459facbffd9e0ab182b013cca` |
+| `inst/sql/sql_server/table_observation_period_overlap.sql` | `66bf293fbf5dbc8be6d34721ede4d4b8e5651a820ab192fc2433599998a06587` | `49df5cb21f00564bdcb8be9cbebbc543de44decf` |
+| `inst/sql/sql_server/field_plausible_temporal_after.sql` | `59f7d5b9b886779f708a58ea05793e851c67cce024b059c9090a4fcdd459f6d1` | `fb92b0fef5e9dd1cbe6094e80ca40743d6d8f249` |
+| `inst/sql/sql_server/field_plausible_during_life.sql` | `93a11a94d831bc07b3c57f5365ff5e9ae70b417ebaf0d041825c3683f1150099` | `46993bcae5a46707bc5642ca76dfeec24849fa9c` |
+| `inst/sql/sql_server/field_plausible_after_birth.sql` | `c7821e2c03a08baa4c8d7cdad715099b48610106bcfe32c8f6795a6440e02c14` | `097b0a243b0a154050c6c7d0a5270809b873ba76` |
+| `inst/sql/sql_server/field_plausible_before_death.sql` | `565689896e35194b609a41869a88877ca7e641cd663b6d0f39dcb64f5ad77a37` | `293ca26a294567fc5dec598bc13c3a7472a525f2` |
+| `inst/sql/sql_server/field_plausible_start_before_end.sql` | `967cdf24254ea8ee8f260a53a2bd0fa1f7736134f6ffa1d47bdf47525c4016b9` | `f89004d9331cf1065084410c5f91fdd6b67425f8` |
+| `inst/sql/sql_server/field_within_visit_dates.sql` | `552c7713e4d7ff0757cd0fc36134ab104c9ce31e50592a3bf55dca6b50b2007b` | `875f55af9d515cc7652148e9b330e5c8ba01a298` |
 | `inst/sql/sql_server/result_dataframe_ddl.sql` | `595c41d47b81a64130c3d52f5fcf8776c891e93f42effff3f5cd78cd2521dbcd` | `13ac645f7acdc5af59aa98b0a66c177c0f994e44` |
 | `R/evaluateThresholds.R` | `1cb28d906370f6bfd12acab8b96c0c854572e3dfb59d4e4aaad8005aca41a840` | `e866eb9dbdc10c5db0910c9b786f842bf9e95592` |
 | `R/calculateNotApplicableStatus.R` | `237956091867fa4b3898916e8d87cc4f27c08aeca169dfe9abb4b52c749ea78f` | `e47ffe6a427de722df4f71cf259bacbd9195b61b` |
@@ -81,3 +88,9 @@ legacy check columns of the CDM's own `OMOP_CDMv5.4_Table_Level.csv`.
 | `vignettes/checks/standardConceptRecordCompleteness.Rmd` | `ce811c54e0a96e103c63d152d6593d73cd01064acfcbe1fb05df621e90c6d22e` | `782b26ccd7269f63291804a204d3936625af0d87` |
 | `vignettes/checks/sourceConceptRecordCompleteness.Rmd` | `c9f4d3aa0891a70a1a6ef86ce32c580ffb91eb613b02b061477d3a79f92c36bf` | `9b3c9ced94487599bde0e183b74b92160573f294` |
 | `vignettes/checks/sourceValueCompleteness.Rmd` | `4228ec15f446116d188a23e68ea44c49f204a956e3d4aa9a1647880080e70b19` | `6001516c3f31392fcd82f5a68123c5c921098f27` |
+| `vignettes/checks/measureObservationPeriodOverlap.Rmd` | `fcef69c0719b2e21fad5e24120e4c69e7229888c0212d680c085acc7b7796656` | `fa1df104acc17bb590e302b485c2ed8aa4cc167e` |
+| `vignettes/checks/plausibleTemporalAfter.Rmd` | `9423e98f41843e2f4874beb4135bad33a59493d0b8db5ce24cf9ed226cf3e6f0` | `729a2c5c5e7767322a7c058a1dd45774e28086cc` |
+| `vignettes/checks/plausibleAfterBirth.Rmd` | `d64a420b65d923a3d54269b6eedeb0d019933e5922c474b8607d196b9d8acdf5` | `6e0eeced890df5264fe79d2aae92e6dbe2f3c9d8` |
+| `vignettes/checks/plausibleBeforeDeath.Rmd` | `e499c16934863e3eeccb90fba0bde62ca61849e053cf9567b094288801925035` | `dfd20699449ba2218730e8f4d10c1ea02452f6aa` |
+| `vignettes/checks/plausibleStartBeforeEnd.Rmd` | `a1dbe437e0e48bf6ab5a46c3a0f7ca1f7c939757beff26cc43f4ba57fc55ea35` | `0a5115bb6880a9b6871423e23eb4fb2141ebb5f3` |
+| `vignettes/checks/withinVisitDates.Rmd` | `228cd044549a1796c0ac9c64972b2345116f3451156945dcf5bfa1cf70782c2d` | `dc594b8243bac1343accf6fc0c7ce4f44990a433` |
