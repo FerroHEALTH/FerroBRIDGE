@@ -86,14 +86,13 @@ and value sets. FerroEHR is the reference CDR and FerroTERM the reference
 terminology server; neither is a compile-time dependency.
 
 The latest release is
-[v0.0.11](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.11),
-cut on 2026-10-24. It rebuilds the operator console on FerroUI 0.3.6 and
-renames it `ferrobridge-console`, with its image at
-`ghcr.io/ferrohealth/ferrobridge-console`. Every image is scanned before it
-is tagged, each release carries a vulnerability record, and its notes state
-the support period and link the CRA user information. FHIRconnect gains the
-last `mappingCode` functions of the published library and more data-type
-pairs.
+[v0.0.12](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.12),
+cut on 2026-10-25. A write through the FHIR facade now shows the client the
+losses its mapping declared, and the FHIRconnect operations answer `502` when
+the terminology server fails. FHIRconnect looks up the display of a `DV_TEXT`
+that fell back to a code, the `fhir-types` XML codec holds the narrative
+`div` to well-formed XHTML, and the terminology client gains `$expand`,
+`$subsumes` and mutual TLS.
 [`CHANGELOG.md`](CHANGELOG.md) lists what every release added, changed and
 fixed.
 
@@ -159,7 +158,7 @@ docker compose --profile console up
 ```
 
 To run the image without compose, pull
-`ghcr.io/ferrohealth/ferrobridge:0.0.11`. To run the binary, download the
+`ghcr.io/ferrohealth/ferrobridge:0.0.12`. To run the binary, download the
 archive for your architecture from the
 [release](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest). The
 binary's subcommands are `serve`, `cdm init`, `etl run`, `mapping check` and
