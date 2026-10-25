@@ -21,7 +21,15 @@ fi
 
 [ -n "${file_path:-}" ] || exit 0
 
-repo_root="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
+# shellcheck source=.claude/hooks/lib/target.sh
+. "$(dirname "$0")/lib/target.sh"
+
+# An edit of a file in another repository is not this hook's (lib/target.sh);
+# a file of this repository is judged in its own checkout.
+[ -n "${file_path:-}" ] || exit 0
+in_this_repository "$(dirname "$file_path")" || exit 0
+repo_root="$(toplevel_of "$(dirname "$file_path")")"
+[ -n "$repo_root" ] || exit 0
 rel="${file_path#"$repo_root"/}"
 base="$(basename "$file_path")"
 
