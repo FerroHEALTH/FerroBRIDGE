@@ -161,7 +161,7 @@ crates on crates.io.
   observation's history origin. A FHIR `Procedure`'s `performedDateTime` now
   reaches `ACTION.time`, and on the `etl fhir` path the
   `PROCEDURE_OCCURRENCE.procedure_date` OMOCL reads from it. `fhirconnect`
-  moves to 0.1.192 and `ferrobridge-hl7v2` to 0.1.144. Breaking for a consumer of
+  moves to 0.1.192 and `ferrobridge-hl7v2` to 0.1.145. Breaking for a consumer of
   `fhirconnect::engine::rm`: `Carried::HistoryOrigin` is `Carried::EntryTime`,
   and `HISTORY_ORIGIN` and `HISTORY_ORIGIN_KEY` are `ENTRY_TIMES` and
   `entry_time_key`.
