@@ -438,6 +438,7 @@ jobs:
           bash scripts/deploy-probe.sh --self-test
           bash scripts/release/milestone.sh --self-test
           bash .claude/hooks/block_dangerous.sh --self-test
+          bash .claude/hooks/lib/target_test.sh
 
   # ---- Tier 2: the Rust lanes, gated on the workspace existing --------------
   # The one job that decides whether the cargo tier runs at all, and which of
