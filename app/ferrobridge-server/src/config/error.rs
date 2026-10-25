@@ -224,6 +224,15 @@ pub enum Error {
         /// The value it holds.
         value: String,
     },
+    /// The pseudonymisation section is refused.
+    #[error("{key}: the pseudonymisation is refused")]
+    Pseudonymisation {
+        /// The section that holds it.
+        key: String,
+        /// Why it is refused.
+        #[source]
+        source: omop_cdm::writer::pseudonym::PseudonymError,
+    },
     /// The derived-table scope names neither of the two values.
     #[error("{key} is `{value}`; the scopes are owned_persons and whole_table")]
     DerivedTables {

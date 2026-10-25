@@ -4,7 +4,7 @@
 name = "ferrobridge-term"
 description = "The FerroBRIDGE FHIR terminology client for $lookup, $translate, $validate-code, $expand and $subsumes"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.134"
+version = "0.1.135"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -19,8 +19,14 @@ categories = ["web-programming::http-client", "science"]
 publish = true
 include = ["src/**", "README.md", "LICENSE"]
 
+[features]
+# The client credentials token of ferrohealth-smart as the client's
+# TokenProvider (`smart`), so a product writes no adapter of its own.
+smart = ["dep:ferrohealth-smart"]
+
 [dependencies]
 async-trait.workspace = true
+ferrohealth-smart = { workspace = true, optional = true }
 backon.workspace = true
 # The three wire versions the client speaks, with the terminology root set that
 # carries Parameters, OperationOutcome, Bundle and the operation contracts.
@@ -35,6 +41,7 @@ url.workspace = true
 
 [dev-dependencies]
 ferrobridge-testkit.workspace = true
+ferrohealth-smart.workspace = true
 http.workspace = true
 secrecy.workspace = true
 serde_json.workspace = true

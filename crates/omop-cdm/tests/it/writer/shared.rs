@@ -19,7 +19,7 @@ use super::{EHR, analyte, count, database, reader, source};
 
 /// Returns a drug exposure under `key` prescribed by the provider `source`,
 /// in the detail `detail` of `visit` when one is given.
-fn drug_exposure(
+pub(super) fn drug_exposure(
     key: RecordKey,
     provider: &str,
     detail: Option<(&VisitKey, &str)>,

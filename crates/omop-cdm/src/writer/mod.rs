@@ -37,6 +37,7 @@ pub mod foreign;
 pub mod input;
 pub mod origin;
 pub mod person;
+pub mod pseudonym;
 pub mod removal;
 mod shared;
 pub mod side_table;
@@ -57,6 +58,7 @@ use crate::graph;
 use crate::graph::RecordGraph;
 use crate::graph::key::RecordKey;
 use crate::graph::key::Visit;
+use crate::graph::key::VisitKey;
 use crate::graph::report::Report;
 use crate::graph::row::Reference;
 
@@ -68,6 +70,7 @@ use crate::writer::input::VisitConcepts;
 use crate::writer::person::person_id;
 use crate::writer::person::record_rows;
 use crate::writer::person::restore_rows;
+use crate::writer::pseudonym::Pseudonymiser;
 use crate::writer::side_table::Ids;
 use crate::writer::side_table::allocate;
 use crate::writer::side_table::assign_ids;
@@ -105,6 +108,16 @@ impl Watermark {
     }
 }
 
+/// Returns the date shift of the person of `key` and the source value its
+/// visit is written with, both under `pseudonymiser` when there is one.
+fn visit_identity(pseudonymiser: Option<&Pseudonymiser>, key: &VisitKey) -> (i32, String) {
+    let source = key.source().as_str();
+    match pseudonymiser {
+        Some(p) => (p.shift(key.ehr_id().value()), p.pseudonym(source)),
+        None => (0, source.to_owned()),
+    }
+}
+
 /// Returns the refusal of `step`, or the exhaustion of `table`'s sequence.
 fn database(step: Step) -> impl FnOnce(tokio_postgres::Error) -> WriteError {
     move |source| match step {
@@ -138,6 +151,7 @@ pub struct CdmWriter {
     cdm: SchemaName,
     bridge: SchemaName,
     policy: PersonPolicy,
+    pseudonymiser: Option<Pseudonymiser>,
 }
 
 impl Drop for CdmWriter {
@@ -191,7 +205,19 @@ impl CdmWriter {
             cdm,
             bridge,
             policy,
+            pseudonymiser: None,
         })
+    }
+
+    /// Returns the writer with every later write pseudonymised by
+    /// `pseudonymiser`: each column that links a row back to its source
+    /// carries a keyed pseudonym, the columns that name a provider or an
+    /// address are NULL, and every date of a person moves by the person's
+    /// shift ([`pseudonym`]).
+    #[must_use]
+    pub fn pseudonymise(mut self, pseudonymiser: Pseudonymiser) -> Self {
+        self.pseudonymiser = Some(pseudonymiser);
+        self
     }
 
     /// Returns the CDM schema.
@@ -334,6 +360,7 @@ impl CdmWriter {
             cdm,
             bridge,
             policy,
+            pseudonymiser,
             ..
         } = self;
         let transaction = client.transaction().await.map_err(database(Step::Begin))?;
@@ -365,6 +392,7 @@ impl CdmWriter {
             cdm,
             bridge,
             policy: *policy,
+            pseudonymiser: pseudonymiser.as_ref(),
             persons: written_persons(&ids),
             ids: &ids,
         };
@@ -454,6 +482,7 @@ impl CdmWriter {
             cdm,
             bridge,
             policy,
+            pseudonymiser,
             ..
         } = self;
         let table = graph::row::cdm_table("visit_occurrence")?;
@@ -488,43 +517,52 @@ impl CdmWriter {
                     .map_err(database(Step::Record))?;
                 id
             };
-            let person = person_id(&transaction, cdm, bridge, key.ehr_id(), *policy).await?;
+            let person = person_id(
+                &transaction,
+                cdm,
+                bridge,
+                key.ehr_id(),
+                *policy,
+                pseudonymiser.as_ref(),
+            )
+            .await?;
+            let (shift, source) = visit_identity(pseudonymiser.as_ref(), key);
             ids.push(id);
-            rows.push(stage_row(
-                table,
-                BTreeMap::from([
-                    ("visit_occurrence_id", Staged::Integer(Some(id))),
-                    ("person_id", Staged::Integer(Some(person))),
-                    (
-                        "visit_concept_id",
-                        Staged::Integer(Some(concepts.visit_concept_id)),
-                    ),
-                    (
-                        "visit_start_date",
-                        Staged::Text(Some(visit.start().as_str().to_owned())),
-                    ),
-                    (
-                        "visit_start_datetime",
-                        Staged::Text(visit.start_datetime().map(|at| at.as_str().to_owned())),
-                    ),
-                    (
-                        "visit_end_date",
-                        Staged::Text(Some(visit.end().as_str().to_owned())),
-                    ),
-                    (
-                        "visit_end_datetime",
-                        Staged::Text(visit.end_datetime().map(|at| at.as_str().to_owned())),
-                    ),
-                    (
-                        "visit_type_concept_id",
-                        Staged::Integer(Some(concepts.visit_type_concept_id)),
-                    ),
-                    (
-                        "visit_source_value",
-                        Staged::Text(Some(key.source().as_str().to_owned())),
-                    ),
-                ]),
-            ));
+            rows.push(
+                stage_row(
+                    table,
+                    BTreeMap::from([
+                        ("visit_occurrence_id", Staged::Integer(Some(id))),
+                        ("person_id", Staged::Integer(Some(person))),
+                        (
+                            "visit_concept_id",
+                            Staged::Integer(Some(concepts.visit_concept_id)),
+                        ),
+                        (
+                            "visit_start_date",
+                            Staged::Text(Some(visit.start().as_str().to_owned())),
+                        ),
+                        (
+                            "visit_start_datetime",
+                            Staged::Text(visit.start_datetime().map(|at| at.as_str().to_owned())),
+                        ),
+                        (
+                            "visit_end_date",
+                            Staged::Text(Some(visit.end().as_str().to_owned())),
+                        ),
+                        (
+                            "visit_end_datetime",
+                            Staged::Text(visit.end_datetime().map(|at| at.as_str().to_owned())),
+                        ),
+                        (
+                            "visit_type_concept_id",
+                            Staged::Integer(Some(concepts.visit_type_concept_id)),
+                        ),
+                        ("visit_source_value", Staged::Text(Some(source))),
+                    ]),
+                )
+                .shifted(shift),
+            );
         }
         transaction
             .execute(
@@ -563,6 +601,7 @@ struct Resolver<'a, 't> {
     cdm: &'a SchemaName,
     bridge: &'a SchemaName,
     policy: PersonPolicy,
+    pseudonymiser: Option<&'a Pseudonymiser>,
     persons: BTreeMap<String, i32>,
     ids: &'a BTreeMap<(&'static str, &'a RecordKey), i32>,
 }
@@ -575,8 +614,15 @@ impl Resolver<'_, '_> {
                 if let Some(id) = self.persons.get(ehr_id.value()) {
                     return Ok(*id);
                 }
-                let id =
-                    person_id(self.transaction, self.cdm, self.bridge, ehr_id, self.policy).await?;
+                let id = person_id(
+                    self.transaction,
+                    self.cdm,
+                    self.bridge,
+                    ehr_id,
+                    self.policy,
+                    self.pseudonymiser,
+                )
+                .await?;
                 self.persons.insert(ehr_id.value().to_owned(), id);
                 Ok(id)
             }
@@ -599,10 +645,24 @@ impl Resolver<'_, '_> {
                 }
             }
             Reference::Provider(source) => {
-                shared::provider_id(self.transaction, self.cdm, self.bridge, source).await
+                shared::provider_id(
+                    self.transaction,
+                    self.cdm,
+                    self.bridge,
+                    source,
+                    self.pseudonymiser,
+                )
+                .await
             }
             Reference::VisitDetail(key) => {
-                shared::visit_detail_id(self.transaction, self.cdm, self.bridge, key).await
+                shared::visit_detail_id(
+                    self.transaction,
+                    self.cdm,
+                    self.bridge,
+                    key,
+                    self.pseudonymiser,
+                )
+                .await
             }
             Reference::Row(key) => {
                 let table = graph::row::cdm_table(target)?;

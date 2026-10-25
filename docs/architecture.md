@@ -1817,6 +1817,40 @@ The shape:
 
 The work is filed as sub-issues of #407.
 
+### 5.7 Pseudonymisation
+
+An OMOP database is usually handed to researchers, and the identifiers and
+dates the bridge writes are personal data. With `[cdm.pseudonymisation]` set,
+the writer transforms every row before it reaches the CDM. The CDM defines no
+pseudonymisation; the columns follow its field definitions
+(`OMOP_CDMv5.4_Field_Level.csv`), which describe `person_source_value` and
+`provider_source_value` as the field "to link back to persons/providers in the
+source data". No specification governs the rest: our own design.
+
+- **Keyed pseudonyms.** `person_source_value`, `provider_source_value`,
+  `care_site_source_value`, `location_source_value`, `specimen_source_id`,
+  `visit_source_value`, `visit_detail_source_value` and `family_source_value`
+  carry HMAC-SHA-256 under the configured key (a `_file` secret of at least
+  32 bytes) over the value, as 40 lowercase hex characters. One value under
+  one key gives one pseudonym on every run, so an incremental load joins.
+- **Erased.** The provider's `provider_name`, `npi` and `dea`, and a
+  location's `address_1`, `address_2`, `zip`, `latitude` and `longitude`,
+  are written as NULL.
+- **One shift per person.** With `date_shift_days = N` (at most 3650), every
+  date and datetime of a person's rows moves by a whole number of days in
+  `[-N, N]`, taken from the same HMAC over the person's EHR id. The shift is
+  applied in the `INSERT ... SELECT` the writer already runs, so the crate
+  still does no calendar arithmetic. The birth year, month and day move with
+  it when all three are known. Intervals within a person stay intact, and the
+  derived tables, rebuilt from the shifted rows, agree with them.
+
+Limits, stated on the Operate page: the result is pseudonymised data, still
+personal data. Free text (`note_text`, `value_as_string`), the code
+`*_source_value` columns, a birth year with no month or day, and the concepts
+of rare conditions are written as mapped. The bridge schema keeps the source
+identifiers it needs to replace a composition's rows, so it is never handed
+out with the CDM.
+
 ## 6. Terminology
 
 The FHIR side needs three operations on a FHIR terminology server: `$lookup`

@@ -362,6 +362,24 @@ key onto `vocabulary (vocabulary_id)` that the primary keys file gives no key
 (SQLSTATE `42830`), so the flag exits 1, prints that statement, and leaves the
 tables in place and no foreign key behind.
 
+### `[cdm.pseudonymisation]`
+
+With this section present, the CDM writer pseudonymises every row before it
+reaches the CDM: each column the CDM field definitions describe as a link
+back to the source carries a keyed pseudonym, the provider's name, `npi` and
+`dea` and a location's address are written as NULL, and every date of a
+person moves by that person's shift. The result is pseudonymised data, still
+personal data: free text, the code `*_source_value` columns and the concepts
+of rare conditions are written as mapped, and the bridge schema keeps the
+source identifiers it needs to replace a composition's rows, so never hand it
+out with the CDM ([Pseudonymisation](../integrate/omop-etl.md#pseudonymisation)).
+
+| Key | Default | Secret | Meaning |
+|---|---|---|---|
+| `key` | none, required when the section is present | yes | The HMAC-SHA-256 key, at least 32 bytes. One source value under one key gives one pseudonym on every run, so an incremental load joins; a new key renames every person |
+| `key_file` | none | yes | A file holding the key, read at boot |
+| `date_shift_days` | `0` | no | The largest shift of a person's dates either way, in whole days, at most 3650; `0` leaves dates as they are |
+
 ### `[etl]`
 
 The OMOP ETL jobs `ferrobridge etl run` and `ferrobridge etl fhir` run. Both queries are parsed and

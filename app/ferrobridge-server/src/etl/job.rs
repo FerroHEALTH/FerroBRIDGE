@@ -163,6 +163,9 @@ pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport,
     )
     .await
     .map_err(JobError::Writer)?;
+    if let Some(ref pseudonymiser) = cdm.pseudonymiser {
+        writer = writer.pseudonymise(pseudonymiser.clone());
+    }
     let run_id = RunId::new(uuid::Uuid::new_v4().to_string()).map_err(JobError::RunId)?;
     let mut report = crate::etl::run(etl, options, &client, &mut writer, &mapper, &run_id)
         .await
@@ -276,6 +279,9 @@ pub async fn run_fhir(settings: &Settings, input: &std::path::Path) -> Result<Ru
     )
     .await
     .map_err(JobError::Writer)?;
+    if let Some(ref pseudonymiser) = cdm.pseudonymiser {
+        writer = writer.pseudonymise(pseudonymiser.clone());
+    }
     let run_id = RunId::new(uuid::Uuid::new_v4().to_string()).map_err(JobError::RunId)?;
     let operations = &settings.operations;
     let now = jiff::Timestamp::now().to_string();

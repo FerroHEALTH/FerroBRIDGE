@@ -289,6 +289,36 @@ schema keeps their keys in `provider` and `visit_detail`. Neither row is
 removed when a composition that named it is removed, because other
 compositions may still name it.
 
+## Pseudonymisation
+
+An OMOP database is usually handed to researchers, and the identifiers and
+dates the bridge writes are personal data. With `[cdm.pseudonymisation]` set
+([the section](../operate/configuration.md#cdmpseudonymisation)), the writer
+transforms every row before it reaches the CDM. The CDM defines no
+pseudonymisation, so what is transformed is FerroBRIDGE's own design over the
+CDM field definitions:
+
+- `person_source_value`, `provider_source_value`, `care_site_source_value`,
+  `location_source_value`, `specimen_source_id`, `visit_source_value`,
+  `visit_detail_source_value` and `family_source_value`, the columns the field
+  definitions describe as a link back to the source, carry an HMAC-SHA-256
+  pseudonym under the configured key, 40 hex characters. The placeholder
+  `PERSON` row's EHR id and every derived visit's source are pseudonymised the
+  same way.
+- The provider's `provider_name`, `npi` and `dea`, and a location's
+  `address_1`, `address_2`, `zip`, `latitude` and `longitude`, are NULL.
+- With `date_shift_days = N`, every date and datetime of a person's rows moves
+  by one whole number of days in `[-N, N]`, taken from the key and the
+  person's EHR id. The birth year, month and day move with it when all three
+  are known. Intervals within a person stay as they were, and the derived
+  tables, rebuilt from the shifted rows, agree with them.
+
+What it does not de-identify: free text (`note_text`, `value_as_string`), the
+code `*_source_value` columns, a year of birth with no month or day, and the
+concepts of rare conditions. The bridge schema keeps the source identifiers it
+needs to replace a composition's rows. Treat the CDM as pseudonymised personal
+data, and apply your own suppression where you need anonymised data.
+
 ## The composition query
 
 The `[etl] aql` query selects each composition whole beside its `ehr_id` and
