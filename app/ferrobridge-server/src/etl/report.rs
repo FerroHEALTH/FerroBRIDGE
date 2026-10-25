@@ -171,6 +171,10 @@ pub struct RunReport {
     /// The FHIR resources an `etl fhir` run read, absent from an `etl run`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resources: Option<crate::etl::fhir::Resources>,
+    /// The element ledger of every resource an `etl fhir` run read, empty for
+    /// an `etl run`.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ledger: Vec<crate::etl::ledger::ResourceLedger>,
 }
 
 impl RunReport {
@@ -299,6 +303,14 @@ impl RunReport {
         }
         if let Some(ref resources) = self.resources {
             writeln!(f, "{resources}")?;
+        }
+        if !self.ledger.is_empty() {
+            let counts = crate::etl::ledger::LedgerCounts::of(&self.ledger);
+            writeln!(
+                f,
+                "ledger: {} mapped, {} dropped, {} refused, {} unmapped elements",
+                counts.mapped, counts.dropped, counts.refused, counts.unmapped
+            )?;
         }
         Ok(())
     }

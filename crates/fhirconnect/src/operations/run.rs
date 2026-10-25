@@ -27,6 +27,7 @@ use openehr_mapping_core::index::WebTemplateIndex;
 use crate::engine::context::CallContext;
 use crate::engine::origin::Origin;
 use crate::engine::origin::SourceItem;
+use crate::engine::outcome::Location;
 use crate::engine::outcome::Warning;
 use crate::engine::seam::BundleReferences;
 use crate::engine::seam::ResourceRequest;
@@ -124,6 +125,7 @@ impl Settings {
 pub struct Transformed<R> {
     response: R,
     warnings: Vec<Warning>,
+    reads: Vec<Location>,
 }
 
 impl<R> Transformed<R> {
@@ -138,6 +140,13 @@ impl<R> Transformed<R> {
     #[must_use]
     pub fn warnings(&self) -> &[Warning] {
         &self.warnings
+    }
+
+    /// Returns the FHIR elements the run read going into openEHR
+    /// ([`crate::engine::outcome::Outcome::reads`]); empty going out.
+    #[must_use]
+    pub fn reads(&self) -> &[Location] {
+        &self.reads
     }
 
     /// Returns the operation's answer, consuming the result.
@@ -256,6 +265,7 @@ pub fn to_fhir_with_warnings<T: Table + ?Sized>(
             ..Bundle::default()
         }),
         warnings: outcome.warnings().to_vec(),
+        reads: Vec::new(),
     })
 }
 
@@ -339,6 +349,7 @@ pub fn to_openehr_with_warnings<T: Table + ?Sized>(
     Ok(Transformed {
         response,
         warnings: outcome.warnings().to_vec(),
+        reads: outcome.reads().to_vec(),
     })
 }
 

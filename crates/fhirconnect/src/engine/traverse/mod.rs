@@ -325,7 +325,8 @@ pub fn to_openehr<T: Table + ?Sized>(
     run.carried_whole(&built, &routed)?;
     Ok(Outcome::new(built, run.warnings)
         .with_consumed(run.consumed)
-        .with_subject(run.subject))
+        .with_subject(run.subject)
+        .with_reads(run.reads))
 }
 
 /// Runs `program` over a composition, producing a FHIR resource.
@@ -464,6 +465,8 @@ struct Run<'a, T: Table + ?Sized> {
     subject: Vec<SubjectIdentifier>,
     /// The interval events the run wrote, set on the built composition.
     intervals: Vec<event::Interval>,
+    /// The FHIR elements the run read going into openEHR.
+    reads: Vec<Location>,
 }
 
 impl<'a, T: Table + ?Sized> Run<'a, T> {
@@ -507,6 +510,7 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             translations: BTreeMap::new(),
             subject: Vec::new(),
             intervals: Vec::new(),
+            reads: Vec::new(),
         }
     }
 }
