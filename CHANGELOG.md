@@ -25,6 +25,11 @@ crates on crates.io.
 
 ### Added
 
+- The profile package set pins `hl7.fhir.eu.laboratory` 2.0.0 and
+  `hl7.fhir.eu.mpd` 1.0.0, the HL7 Europe Laboratory Report and Medication
+  Prescription and Dispense guides the EU profile contexts target, fetched
+  with their provenance by `scripts/vendor/profile-packages.sh`; every
+  package they depend on was already in the set (#116).
 - `ferrobridge-hl7v2` 0.1.143 serves a consumer of its listener and parser
   alone. `parse::structure::structure_declared` selects the structure
   MSH-9.3 names over the message definition where the two disagree, so an
