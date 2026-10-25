@@ -25,6 +25,11 @@ crates on crates.io.
 
 ### Added
 
+- Every CDM row `etl fhir` writes names the FHIR resource it was mapped from
+  (#409): the bridge schema's `resource_origin` table records each
+  composition's resource type, id and `meta.versionId` in the commit's
+  transaction, and `CdmWriter::origins_of_row` and `rows_of_resource` look a
+  row's resources and a resource's rows up. `cdm init` adds the table.
 - `ferrobridge-term` 0.1.135 takes the client credentials token of
   `ferrohealth-smart` as its `TokenProvider` behind the new `smart` feature
   (#1227): `smart::SmartToken`, built from a `TokenSource`, sends the cached

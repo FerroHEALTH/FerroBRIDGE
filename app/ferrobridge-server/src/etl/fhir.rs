@@ -34,6 +34,7 @@ use omop_cdm::graph::key::Source;
 use omop_cdm::graph::report::Refusal;
 use omop_cdm::writer::CdmWriter;
 use omop_cdm::writer::input::RunId;
+use omop_cdm::writer::origin::ResourceOrigin;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use serde::Serialize;
@@ -209,6 +210,22 @@ impl FhirSide<'_> {
             now,
         )
     }
+}
+
+/// Returns the FHIR resource `resource` names, of type `kind`, as its rows'
+/// lineage records it, or `None` when it carries no id.
+fn origin_of(resource: &Value, kind: &str) -> Option<ResourceOrigin> {
+    let text = |pointer: &str| {
+        resource
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    };
+    Some(ResourceOrigin {
+        resource_type: kind.to_owned(),
+        id: text("/id")?,
+        version: text("/meta/versionId"),
+    })
 }
 
 /// Returns the composition version `resource` becomes, or why it cannot be
@@ -412,7 +429,11 @@ pub async fn run<M: Mapper>(
                 continue;
             }
         };
-        match writer.commit(&graph, run_id).await {
+        let Some(origin) = origin_of(resource, kind) else {
+            report.composition_refused(Some(&source), &Refusal::new("the resource carries no id"));
+            continue;
+        };
+        match writer.commit_from(&graph, run_id, Some(&origin)).await {
             Ok(written) => report.committed(&source, &written),
             Err(error) if writer.is_closed() => return Err(RunError::Database(error)),
             Err(error) => {

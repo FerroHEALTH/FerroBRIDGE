@@ -112,6 +112,29 @@ async fn cdm(postgres: &containers::Postgres) -> Result<(CdmPool, CdmWriter), Bo
     Ok((pool, writer))
 }
 
+/// Asserts the Condition row names its resource at version 2 and the
+/// resource names the row.
+async fn assert_lineage(writer: &CdmWriter) -> Result<(), Box<dyn Error>> {
+    assert_eq!(
+        vec![omop_cdm::writer::origin::ResourceOrigin {
+            resource_type: String::from("Condition"),
+            id: String::from("c-1"),
+            version: Some(String::from("2")),
+        }],
+        writer.origins_of_row("condition_occurrence", 1).await?,
+        "the row names its resource"
+    );
+    assert_eq!(
+        vec![omop_cdm::writer::origin::WrittenRow {
+            table: String::from("condition_occurrence"),
+            id: 1,
+        }],
+        writer.rows_of_resource("Condition", "c-1").await?,
+        "the resource names its row"
+    );
+    Ok(())
+}
+
 #[tokio::test]
 async fn a_condition_lands_in_the_cdm_with_no_cdr_and_a_rerun_changes_nothing()
 -> Result<(), Box<dyn Error>> {
@@ -213,6 +236,7 @@ async fn a_condition_lands_in_the_cdm_with_no_cdr_and_a_rerun_changes_nothing()
         .fetch_one(pool.pool())
         .await?;
     assert!(version.ends_with("::ferrobridge.fhir::2"), "{version}");
+    assert_lineage(&writer).await?;
     assert_eq!(1, count(&pool, "condition_occurrence").await?);
     Ok(())
 }

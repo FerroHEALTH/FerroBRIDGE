@@ -1778,7 +1778,12 @@ maps, Patient (`person_data` into `PERSON`), Condition (`problem_diagnosis`
 into `CONDITION_OCCURRENCE`), Procedure (`ACTION.procedure` into
 `PROCEDURE_OCCURRENCE`), the laboratory DiagnosticReport (the analytes into
 `MEASUREMENT`) and MedicationStatement and MedicationAdministration (into
-`DRUG_EXPOSURE`) reach a CDM table end to end. Encounter reaches none,
+`DRUG_EXPOSURE`) have an archetype both libraries map. Two of those do not
+reach the CDM through the published files: the FHIRconnect library's
+`procedure.v1` and `report.v1.MedicationAdministration` are left out of every
+context at load (`fc-condition-target-root-mismatch`), and the engine cannot
+yet write `ACTION.time` (#1226), so a site maps those resources itself.
+Encounter reaches none,
 because the two libraries map sibling archetypes
 (`episode_institution_local.v0` against `episode_institution.v0`), and
 MedicationRequest has no FHIRconnect mapping. A site extends the path with
@@ -1799,8 +1804,10 @@ The shape:
   `ferrobridge.fhir`. A re-run of the same input is idempotent and a new
   numeric version of a resource replaces its rows. The EHR id is the same kind
   of UUID of the resource's subject reference (`Patient/{id}` for a Patient),
-  so every resource of one patient lands on one person. The lineage back to
-  the resource is #409.
+  so every resource of one patient lands on one person. The bridge schema's
+  `resource_origin` table records each composition's resource type, id and
+  version in the commit's transaction, so every row traces to its resource
+  and back through the natural-key side table (#409).
 - **Every element accounted for.** FHIRconnect reports each loss as a typed
   outcome and OMOCL counts unmapped fields and refusals, so the run report
   joins the two into one ledger per input resource (#408).
