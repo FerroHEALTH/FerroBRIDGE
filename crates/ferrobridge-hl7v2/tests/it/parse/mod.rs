@@ -11,7 +11,7 @@ mod selection;
 
 use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::parse::lex::lex;
-use ferrobridge_hl7v2::parse::structure::{StructureError, structure_for};
+use ferrobridge_hl7v2::parse::structure::{StructureError, structure_declared, structure_for};
 use ferrobridge_hl7v2::parse::{ErrorCode, Item, Parsed, Unplaced};
 
 use crate::{fixtures, support};
@@ -210,6 +210,14 @@ fn select(bytes: &[u8]) -> Result<&'static str, StructureError> {
         ferrobridge_hl7v2::decode::decode(bytes, Charset::Ascii).expect("the message decodes");
     let lexed = lex(&decoded.text, decoded.charset).expect("it lexes");
     structure_for(&lexed.message).map(|structure| structure.id)
+}
+
+/// The structure [`structure_declared`] selects for `bytes`.
+fn select_declared(bytes: &[u8]) -> Result<&'static str, StructureError> {
+    let decoded =
+        ferrobridge_hl7v2::decode::decode(bytes, Charset::Ascii).expect("the message decodes");
+    let lexed = lex(&decoded.text, decoded.charset).expect("it lexes");
+    structure_declared(&lexed.message).map(|structure| structure.id)
 }
 
 /// A synthetic header with `message_type` as MSH-9, and an EVN, a PID and a PV1.

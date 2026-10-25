@@ -98,6 +98,48 @@ pub fn structure_for(message: &Message) -> Result<&'static Structure, StructureE
     Ok(own.unwrap_or(structure))
 }
 
+/// Selects the message structure MSH-9.3 names, trusting it over the
+/// message definition of MSH-9.1 and MSH-9.2 where the two disagree.
+///
+/// [`structure_for`] refuses an MSH-9.3 whose variants the message
+/// definition does not name (`ADT^A05^ADT_A01`). A profile that fixes
+/// MSH-9.3 for several events takes this instead: IHE ITI-8 sends every add
+/// or revise, A01, A04, A05 and A08, as `ADT_A01` (IHE ITI TF-2
+/// §3.8.4.1.2.1). An MSH-9.3 of the form `CODE_EVENT` then selects the
+/// variant the message definition of `CODE^EVENT` names, and the version's
+/// own tables apply as [`structure_for`] applies them. Every other message
+/// is selected as [`structure_for`] selects it.
+///
+/// # Errors
+///
+/// Returns the [`StructureError`] of [`structure_for`] when MSH-9.3 spells
+/// no message definition naming one of its variants.
+pub fn structure_declared(message: &Message) -> Result<&'static Structure, StructureError> {
+    let refused = match structure_for(message) {
+        Ok(structure) => return Ok(structure),
+        Err(refused) => refused,
+    };
+    let StructureError::Variant { ref candidates, .. } = refused else {
+        return Err(refused);
+    };
+    // NOTE: HL7 v2.5.1 chapter 2 §2.15.9.9 makes MSH-9.3 the message structure, so the
+    // definition of the code and event it spells answers for it (IHE ITI TF-2 §3.8.4.1.2.1).
+    let Some(structure) = message
+        .message_type(3)
+        .and_then(|name| name.split_once('_'))
+        .and_then(|(code, event)| hl7v2_types::message::find(code, event))
+        .and_then(|definition| definition.structure)
+        .filter(|structure| candidates.contains(&structure.id))
+    else {
+        return Err(refused);
+    };
+    let own = message
+        .version()
+        .filter(|declared| *declared != crate::DEFINITIONS_VERSION)
+        .and_then(|declared| hl7v2_types::legacy::find(base_name(structure.id), declared));
+    Ok(own.unwrap_or(structure))
+}
+
 /// Selects the structure of the v2.9.1 definitions, or of the legacy tables
 /// for one they no longer carry, by the rules of [`structure_for`].
 fn definitions_structure(message: &Message) -> Result<&'static Structure, StructureError> {

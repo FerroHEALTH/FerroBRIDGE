@@ -4,7 +4,7 @@
 name = "ferrobridge-hl7v2"
 description = "The FerroBRIDGE HL7 v2 face: MLLP framing, MSH-18 decoding, positional parsing over the generated v2 tables, the acknowledgment, and the v2-to-FHIR ConceptMap interpreter"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.142"
+version = "0.1.143"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -23,26 +23,42 @@ categories = ["parser-implementations", "network-programming", "science"]
 publish = true
 include = ["/src/**", "/supplements/**", "/README.md", "/LICENSE"]
 
+[features]
+# The v2-to-FHIR mapping (`map`), on by default. A consumer that takes only the
+# listener, the decoder, the parser and the acknowledgment turns it off and
+# drops fhirconnect, ferrobridge-term, fhir-types and the openEHR crates.
+default = ["map"]
+map = [
+    "dep:chumsky",
+    "dep:fhirconnect",
+    "dep:fhir-types",
+    "dep:ferrobridge-term",
+    "dep:logos",
+    "dep:serde_json",
+    "dep:sha2",
+    "dep:uuid",
+]
+
 [dependencies]
 bytes.workspace = true
 # The parser of the condition and target grammars, over the logos tokens.
-chumsky.workspace = true
+chumsky = { workspace = true, optional = true }
 encoding_rs.workspace = true
-logos.workspace = true
+logos = { workspace = true, optional = true }
 # The FHIR writer: the path model over the fhir-types element table.
-fhirconnect.workspace = true
+fhirconnect = { workspace = true, optional = true }
 # The R4 model the ConceptMaps decode into and the output is checked against.
-fhir-types = { workspace = true, features = ["r4", "resources"] }
-ferrobridge-term.workspace = true
+fhir-types = { workspace = true, features = ["r4", "resources"], optional = true }
+ferrobridge-term = { workspace = true, optional = true }
 hl7v2-types.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, optional = true }
 # The digest a created resource's urn:uuid is derived from.
-sha2.workspace = true
+sha2 = { workspace = true, optional = true }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["net", "io-util", "rt", "sync", "macros", "time"] }
 tokio-util.workspace = true
 tracing.workspace = true
-uuid.workspace = true
+uuid = { workspace = true, optional = true }
 
 [dev-dependencies]
 ferrobridge-testkit.workspace = true

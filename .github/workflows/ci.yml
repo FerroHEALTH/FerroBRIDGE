@@ -567,6 +567,10 @@ jobs:
           args=()
           for package in "${packages[@]}"; do args+=(-p "$package"); done
           cargo hack clippy "${args[@]}" --all-targets --locked -- -D warnings
+      # ferrobridge-hl7v2 without its default `map` feature, the surface of a
+      # consumer that takes only the listener, the parser and the ack (#1221).
+      - if: contains(matrix.packages, 'ferrobridge-hl7v2')
+        run: cargo clippy -p ferrobridge-hl7v2 --lib --no-default-features --locked -- -D warnings
 
   clippy-fhir-types:
     name: clippy-fhir-types (${{ matrix.version }}, resources)
