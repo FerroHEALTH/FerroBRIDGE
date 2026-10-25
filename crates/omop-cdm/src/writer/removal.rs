@@ -170,6 +170,7 @@ impl CdmWriter {
         let earlier = earlier_rows(&transaction, bridge, versioned_object_uid).await?;
         let deleted =
             delete_earlier(&transaction, cdm, bridge, versioned_object_uid, &earlier).await?;
+        crate::writer::origin::forget(&transaction, bridge, versioned_object_uid).await?;
         let written: Vec<i32> = deleted.written.iter().copied().collect();
         restore_rows(&transaction, cdm, bridge, "person", &written).await?;
         let deaths: Vec<i32> = deleted.deaths.iter().copied().collect();

@@ -35,6 +35,7 @@
 pub mod error;
 pub mod foreign;
 pub mod input;
+pub mod origin;
 pub mod person;
 pub mod removal;
 mod shared;
@@ -312,6 +313,22 @@ impl CdmWriter {
     /// every case the transaction is rolled back and nothing of the
     /// composition is written.
     pub async fn commit(&mut self, graph: &RecordGraph, run: &RunId) -> Result<Report, WriteError> {
+        self.commit_from(graph, run, None).await
+    }
+
+    /// Commits the record graph of one composition version as [`CdmWriter::commit`]
+    /// does, and records in the same transaction the FHIR resource `origin`
+    /// it was mapped from, when there is one ([`origin`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns what [`CdmWriter::commit`] returns.
+    pub async fn commit_from(
+        &mut self,
+        graph: &RecordGraph,
+        run: &RunId,
+        origin: Option<&origin::ResourceOrigin>,
+    ) -> Result<Report, WriteError> {
         let Self {
             client,
             cdm,
@@ -387,6 +404,9 @@ impl CdmWriter {
         retire_deaths(&transaction, cdm, bridge, &deleted.deaths).await?;
         retire_persons(&transaction, cdm, bridge, &deleted.persons).await?;
 
+        if let Some(origin) = origin {
+            origin::record(&transaction, bridge, versioned_object_uid, origin).await?;
+        }
         transaction
             .execute(
                 &format!(

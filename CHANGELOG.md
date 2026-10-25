@@ -25,6 +25,11 @@ crates on crates.io.
 
 ### Added
 
+- Every CDM row `etl fhir` writes names the FHIR resource it was mapped from
+  (#409): the bridge schema's `resource_origin` table records each
+  composition's resource type, id and `meta.versionId` in the commit's
+  transaction, and `CdmWriter::origins_of_row` and `rows_of_resource` look a
+  row's resources and a resource's rows up. `cdm init` adds the table.
 - The first HL7 Europe profile context: `ferrobridge_eu_condition.context`
   targets Base and Core 2.0.0 `condition-eu-core` over the published
   `KDS_Diagnose` template, with the published diagnosis, qualifier and

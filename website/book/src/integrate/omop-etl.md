@@ -342,16 +342,34 @@ design, and each hop stays governed by its own specification.
 - **Time.** A resource is mapped at its `meta.lastUpdated`, so a composition
   field FHIRconnect defaults to the run time takes the same value on every
   run. A resource without one takes the time the job started.
-- **What reaches the CDM** is what the two mapping sets cover. Over the
-  published libraries that is Patient, Condition, Procedure, the laboratory
-  DiagnosticReport, MedicationStatement and MedicationAdministration; an
-  Encounter reaches no VISIT_OCCURRENCE, and the job derives no visit, since
-  the visit query reads a CDR.
+- **What reaches the CDM** is what the two mapping sets cover. The published
+  FHIRconnect library's Procedure and MedicationAdministration mappings are
+  left out at load (`mapping check` names why), so a site maps those
+  resources with mappings of its own; a Procedure's `performed[x]` does not
+  yet reach `ACTION.time` (#1226). An Encounter reaches no VISIT_OCCURRENCE,
+  and the job derives no visit, since the visit query reads a CDR.
 - **Nothing disappears.** A resource no FHIRconnect program maps, one the
   FHIRconnect run refuses, one with no id or no subject, and a composition
   OMOCL refuses are each counted and listed in the run report, which adds a
   `resources` line (read, mapped, unmapped, refused, and the losses the
   FHIRconnect run declared).
+- **Every row names its resource.** The bridge schema's `resource_origin`
+  table ties each composition to the resource type, id and `meta.versionId`
+  it was mapped from, and through the natural-key side table each CDM row to
+  that resource. To find where a row came from, or every row a resource
+  became:
+
+  ```sql
+  SELECT o.resource_type, o.resource_id, o.resource_version
+  FROM ferrobridge.record r
+  JOIN ferrobridge.resource_origin o USING (versioned_object_uid)
+  WHERE r.cdm_table = 'condition_occurrence' AND r.surrogate_id = 1;
+
+  SELECT r.cdm_table, r.surrogate_id
+  FROM ferrobridge.resource_origin o
+  JOIN ferrobridge.record r USING (versioned_object_uid)
+  WHERE o.resource_type = 'Condition' AND o.resource_id = 'c-1';
+  ```
 
 ## Checking a populated database with the Data Quality Dashboard
 
