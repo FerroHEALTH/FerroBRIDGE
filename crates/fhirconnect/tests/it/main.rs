@@ -11,6 +11,7 @@ mod corpus;
 mod derive;
 mod engine;
 mod eu_condition;
+mod eu_patient;
 mod event_time;
 mod events;
 mod kds_coding;

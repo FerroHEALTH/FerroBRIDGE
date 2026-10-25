@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the HL7 Europe Base and Core 2.0.0
+# patient-eu-core profile over the published KDS_Person template, whose
+# person, structured name and address clusters are CKM archetypes. It loads
+# what projects/ferrobridge/kds_person loads, with this directory's gender
+# extension in place of the published KDS_gender.v1, whose metaURL names the
+# MII profile and whose other-amtlich method writes a German extension.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_eu_patient.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/base/StructureDefinition/patient-eu-core"
+    version: "2.0.0"
+  template:
+    id: "KDS_Person"
+    sem_ver: "58.0.0"
+  archetypes:
+    - "EVALUATION.gender.v1"
+    - "ADMIN_ENTRY.person_data.v0"
+    - "CLUSTER.person.v1"
+    - "CLUSTER.structured_name.v1"
+    - "CLUSTER.address.v1"
+    - "CLUSTER.organisation.v1"
+    - "CLUSTER.person_birth_data_iso.v0"
+    - "CLUSTER.death_details.v1"
+    - "COMPOSITION.person.v0"
+    - "ADMIN_ENTRY.versicherungsinformationen.v0"
+  extensions:
+    - "ferrobridge_eu_gender"
+    - "ferrobridge_kds_cluster_person"
+    - "ferrobridge_kds_address"
+    - "ferrobridge_kds_structured_name"
+    - "ferrobridge_kds_admin_entry_person"
+    - "KDS_composition_person.v0"
+  start: "ADMIN_ENTRY.person_data.v0"

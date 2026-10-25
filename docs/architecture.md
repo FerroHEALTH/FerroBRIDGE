@@ -1125,7 +1125,11 @@ FerroBRIDGE's extensions under `projects/ferrobridge/eu_condition` add the
 profile's `assertedDate` and `onsetDateTime` slices and its canonical, and
 leave out the KDS ICD-10-GM, Diagnosesicherheit and Lebensphase branches.
 Its round trip asserts the code, both slices and the two status bindings
-(#116).
+(#116). `patient-eu-core` 2.0.0 follows over the published `KDS_Person`
+template (its person, structured name and address clusters are CKM's),
+loading the KDS person chain with a gender extension that names the EU
+profile and leaves out the German gender-amtlich extension; its round trip
+asserts the required name and birth date.
 
 **Decision:** profile mappings are authored in this repository, in the
 specification's own customisation mechanism (a context and its extensions per
