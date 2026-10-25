@@ -3,7 +3,7 @@
 
 # The synthetic OHDSI vocabulary
 
-Ten CSV files, one per vocabulary table of the OMOP CDM v5.4
+Ten files, one per vocabulary table of the OMOP CDM v5.4
 (<https://ohdsi.github.io/CommonDataModel/cdm54.html#Vocabulary_Tables>),
 that the `omop-cdm` concept resolver tests load into a PostgreSQL built from
 the vendored OHDSI DDL.
@@ -23,17 +23,17 @@ domains that way. The relationship identifiers `Maps to` and `Mapped from`
 are the ones the CDM conventions name
 (<https://ohdsi.github.io/CommonDataModel/dataModelConventions.html>).
 
-## The file shape is FerroBRIDGE's own
+## The file shape is an Athena download's
 
-Each file is named after its table and carries a header row with the table's
-columns in DDL order, then comma-separated rows in UTF-8, quoted where a value
-holds a comma, with ISO 8601 dates and an unquoted empty field for NULL. That
-is the shape PostgreSQL's `COPY ... FROM STDIN (FORMAT csv, HEADER MATCH)`
-reads, and `ferrobridge_testkit::vocabulary::load` loads it that way.
-
-It is not the Athena export format. That format has no public specification,
-and #88 records it from an observed export. The production vocabulary loader
-lands with #88 and reads that observed shape.
+The files have the shape the Athena application writes a download in, read
+from its source (`docs/specs/athena/PROVENANCE.md`): each is named after its
+table in upper case (`CONCEPT.csv`) and carries a header row of the table's
+column names, then rows of tab-separated, unquoted values in UTF-8, `\n` after
+each row, `yyyyMMdd` dates and an empty field for NULL. A download carries the
+nine tables Athena serves; `SOURCE_TO_CONCEPT_MAP.csv` is a site's own table,
+which the loader takes when it is present. The tests load the directory with
+the production loader, `omop_cdm::athena`, which `ferrobridge vocab load`
+runs, so the fixture exercises the loader a deployment uses.
 
 ## What the rows cover
 
@@ -62,6 +62,7 @@ default end date, for example).
 | `FB-STANDARD` `STD-VISIT` | the `visit_concept_id` the round trip configures |
 | `FB-STANDARD` `STD-TYPE-RECORD`, `STD-TYPE-PERIOD` | the record and observation period type concepts the round trip configures |
 | `FB-GENDER` `SYN-GENDER-F` | a standard `Gender` concept, the administrative gender of the synthetic KDS person, reached through a configured vocabulary alias |
+| `VOCABULARY` `None` | the release row whose `vocabulary_version` the loader reports, as a vocabulary build writes it |
 
 The laboratory rows sit under the vocabulary identifiers `LOINC`, `UCUM` and
 `SNOMED`, because the OMOCL engine looks a code up under the vocabulary its

@@ -62,11 +62,53 @@ answering R4 or R4B.
 
 ## What the OMOP side asks of the database
 
-A CDM v5.4 schema built from the OHDSI DDLs, and an Athena vocabulary export
+A CDM v5.4 schema built from the OHDSI DDLs, and an Athena vocabulary download
 loaded into the vocabulary tables. Concept resolution is SQL over CONCEPT,
 `standard_concept`, the domain, and the CONCEPT_RELATIONSHIP "Maps to"
 traversal. Without a loaded vocabulary every source code resolves to
 `concept_id = 0`, which is legal in the CDM and useless for analysis.
+
+### Loading the vocabulary
+
+You download the vocabulary from <https://athena.ohdsi.org> under your own
+account, unpack it, and load the directory:
+
+```sh
+ferrobridge vocab load /srv/athena/2026-10 --schema cdm
+```
+
+The job reads the `[cdm]` section for the connection and loads into the
+schema `--schema` names, which is normally `[cdm] schema`. It needs the nine
+files every download carries (`CONCEPT.csv`, `VOCABULARY.csv`, `DOMAIN.csv`,
+`CONCEPT_CLASS.csv`, `CONCEPT_RELATIONSHIP.csv`, `RELATIONSHIP.csv`,
+`CONCEPT_SYNONYM.csv`, `CONCEPT_ANCESTOR.csv`, `DRUG_STRENGTH.csv`) and loads
+`SOURCE_TO_CONCEPT_MAP.csv` when you put one beside them. Every other file is
+named in the output and left alone. Each table is replaced in a transaction of
+its own, so a refused table keeps its rows and the tables before it keep their
+new ones; the job prints the rows of each table and the vocabulary version.
+
+Load the vocabulary before `cdm init --with-constraints`: PostgreSQL refuses
+to `TRUNCATE` a table another table's foreign key references.
+
+The format the loader reads is the one the Athena application writes, read
+from its source at a pinned commit: tab-separated, unquoted, UTF-8, with a
+header row and `yyyyMMdd` dates. OHDSI publishes no format document, so a
+download that the loader refuses for its shape is worth reporting on issue
+#88.
+
+### Vocabulary licences
+
+The vocabulary is a licensed deployment input you obtain and accept yourself;
+FerroBRIDGE ships none of it, in the image, a release asset or a test.
+
+- Athena offers some vocabularies only to an account whose licence request
+  their owner has granted. The terms are the owner's, and you accept them
+  when you request the vocabulary.
+- CPT4 arrives as `CONCEPT_CPT4.csv` with every `concept_name` empty. The
+  loader leaves that file alone, so CPT4 concepts are absent until you
+  produce their names under your own licence and load them into `CONCEPT`.
+- Check the licence of every vocabulary you select before you load it into a
+  database you share, and record which ones the database holds.
 
 ## Process model
 

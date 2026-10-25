@@ -16,9 +16,9 @@ fn rendered(code: ExitCode) -> String {
     format!("{code:?}")
 }
 
-/// The jobs that parse and do not run yet, with the issue each names.
-const PENDING: [(&[&str], &str); 1] =
-    [(&["vocab", "load", "/srv/athena", "--schema", "cdm"], "#233")];
+/// The jobs that parse and do not run yet, with the issue each names; every
+/// job runs today.
+const PENDING: [(&[&str], &str); 0] = [];
 
 #[test]
 fn every_pending_job_exits_two() {
@@ -63,6 +63,21 @@ fn etl_run_without_an_etl_section_exits_seventy_eight() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("[etl]"),
+        "the refusal names the section: {stderr}"
+    );
+}
+
+#[test]
+fn vocab_load_without_a_cdm_section_exits_seventy_eight() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_ferrobridge"))
+        .args(["vocab", "load", "/srv/athena", "--schema", "cdm"])
+        .env_remove("FERROBRIDGE_CONFIG")
+        .output()
+        .expect("the binary runs");
+    assert_eq!(Some(i32::from(EXIT_CONFIG)), output.status.code());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("[cdm]"),
         "the refusal names the section: {stderr}"
     );
 }

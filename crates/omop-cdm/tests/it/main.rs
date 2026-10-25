@@ -11,6 +11,8 @@
 
 #![allow(clippy::panic_in_result_fn, reason = "test assertions")]
 
+#[cfg(feature = "database")]
+mod athena;
 mod catalogue;
 mod ddl;
 #[cfg(feature = "database")]
