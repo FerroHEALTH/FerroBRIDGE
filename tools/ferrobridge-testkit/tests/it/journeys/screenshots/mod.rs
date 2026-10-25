@@ -6,7 +6,7 @@
 //! has one.
 //!
 //! With `FERROBRIDGE_SCREENSHOTS=1` the capture drives the journeys' stack
-//! and browser through every shot of [`shots`], in the light and the dark
+//! and browser through every shot of [`catalogue::shots`], in the light and the dark
 //! theme, at 1440 CSS pixels wide and the full height of the page, and
 //! writes each as `<image>.png` and `<image>-dark.png` under [`IMAGES`]; it
 //! takes each again at 390 CSS pixels, a phone, under the ignored
@@ -38,8 +38,23 @@ use crate::journeys::editor::{
     MISSING_TEMPLATE, TEMPLATE, context, context_path, draft, press, reload, save,
 };
 use crate::journeys::playground::{bundle, hydrated, to_fhir, to_openehr};
+use crate::journeys::screenshots::catalogue::EDIT_CHECKED;
+use crate::journeys::screenshots::catalogue::EDIT_CONFIRM;
+use crate::journeys::screenshots::catalogue::EDIT_REFUSED;
+use crate::journeys::screenshots::catalogue::EDIT_SAVED;
+use crate::journeys::screenshots::catalogue::MAPPINGS_RELOADED;
+use crate::journeys::screenshots::catalogue::NOT_FOUND;
+use crate::journeys::screenshots::catalogue::PAGES;
+use crate::journeys::screenshots::catalogue::PLAYGROUND_ANSWERED;
+use crate::journeys::screenshots::catalogue::PLAYGROUND_OFF;
+use crate::journeys::screenshots::catalogue::PLAYGROUND_REFUSED;
+use crate::journeys::screenshots::catalogue::SIGN_IN;
+use crate::journeys::screenshots::catalogue::SIGNED_OUT;
+use crate::journeys::screenshots::catalogue::shots;
 use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::{Lanes, Stack};
+
+mod catalogue;
 
 /// The environment variable that opts in to the capture.
 const SCREENSHOTS_GATE: &str = "FERROBRIDGE_SCREENSHOTS";
@@ -114,281 +129,6 @@ impl Shot {
             shell: true,
         }
     }
-}
-
-/// The sign-in card a visitor reads.
-const SIGN_IN: Shot = Shot {
-    image: "sign-in",
-    route: "/",
-    url: "/",
-    ready: "//a[normalize-space(.) = 'Sign in with your identity provider']",
-    shell: false,
-};
-
-/// The card a signed-out operator reads.
-const SIGNED_OUT: Shot = Shot {
-    image: "signed-out",
-    route: "/signed-out",
-    url: "/signed-out",
-    ready: "//*[contains(., 'You are signed out of the console.')]",
-    shell: false,
-};
-
-/// The wire path of the provisioned context mapping.
-const CONTEXT_FILE: &str = "/mappings/files/fhirconnect/ferrobridge_journey_diagnose.context.yml";
-
-/// The pages a signed-in operator loads and reads as they are.
-const PAGES: [Shot; 32] = [
-    Shot::page("dashboard", "/", "/", "//h1[. = 'Dashboard']"),
-    Shot::page(
-        "mappings",
-        "/mappings",
-        "/mappings",
-        "//h1[. = 'Mapping set']",
-    ),
-    Shot::page(
-        "mappings-omocl",
-        "/mappings/:tab",
-        "/mappings/omocl",
-        "//h1[. = 'Mapping set']",
-    ),
-    Shot::page(
-        "mappings-templates",
-        "/mappings/:tab",
-        "/mappings/templates",
-        "//tr[contains(., 'ferrobridge.diagnose.v1')]",
-    ),
-    Shot::page(
-        "mappings-files",
-        "/mappings/:tab",
-        "/mappings/files",
-        "//table//tbody//tr",
-    ),
-    Shot::page(
-        "mappings-diagnostics",
-        "/mappings/:tab",
-        "/mappings/diagnostics",
-        "//h1[. = 'Mapping set']",
-    ),
-    Shot::page(
-        "file-context",
-        "/mappings/files/*path",
-        CONTEXT_FILE,
-        "//*[@id = 'L1']",
-    ),
-    Shot::page(
-        "file-program",
-        "/mappings/files/*path",
-        "/mappings/files/fhirconnect/ferrobridge_journey_diagnose.context.yml?tab=program",
-        "//h1",
-    ),
-    Shot::page(
-        "file-model",
-        "/mappings/files/*path",
-        "/mappings/files/fhirconnect/ferrobridge_journey_diagnose.yml",
-        "//*[@id = 'L1']",
-    ),
-    Shot::page(
-        "template",
-        "/mappings/templates/:id",
-        "/mappings/templates/ferrobridge.diagnose.v1",
-        "//h1",
-    ),
-    Shot::page(
-        "edit-new",
-        "/mappings/new",
-        "/mappings/new",
-        "//*[@id = 'draft']",
-    ),
-    Shot::page(
-        "edit-provisioned",
-        "/mappings/edit/*path",
-        "/mappings/edit/fhirconnect/ferrobridge_journey_diagnose.yml",
-        "//*[@id = 'draft']",
-    ),
-    Shot::page(
-        "playground",
-        "/playground",
-        "/playground",
-        "//*[@id = 'pg-run']",
-    ),
-    Shot::page(
-        "playground-toopenehr",
-        "/playground/:tab",
-        "/playground/toopenehr",
-        "//*[@id = 'pg-run']",
-    ),
-    Shot::page(
-        "playground-validate",
-        "/playground/:tab",
-        "/playground/validate",
-        "//h1[. = 'Playground']",
-    ),
-    Shot::page("facade", "/facade", "/facade", "//h1[. = 'FHIR facade']"),
-    Shot::page(
-        "facade-capability",
-        "/facade/:tab",
-        "/facade/capability",
-        "//*[contains(., 'From the CapabilityStatement')]",
-    ),
-    Shot::page(
-        "facade-security",
-        "/facade/:tab",
-        "/facade/security",
-        "//h1[. = 'FHIR facade']",
-    ),
-    Shot::page(
-        "facade-settings",
-        "/facade/:tab",
-        "/facade/settings",
-        "//*[contains(., 'facade.base_url')]",
-    ),
-    Shot::page("hl7v2", "/hl7v2", "/hl7v2", "//h1[. = 'HL7 v2']"),
-    Shot::page(
-        "hl7v2-settings",
-        "/hl7v2/:tab",
-        "/hl7v2/settings",
-        "//h1[. = 'HL7 v2']",
-    ),
-    Shot::page("omop", "/omop", "/omop", "//h1[. = 'OMOP ETL']"),
-    Shot::page(
-        "omop-settings",
-        "/omop/:tab",
-        "/omop/settings",
-        "//h1[. = 'OMOP ETL']",
-    ),
-    Shot::page(
-        "connections",
-        "/connections",
-        "/connections",
-        "//h1[. = 'Connections']",
-    ),
-    Shot::page(
-        "connection-cdr",
-        "/connections/:name",
-        "/connections/cdr",
-        "//h1",
-    ),
-    Shot::page(
-        "connection-cdr-settings",
-        "/connections/:name/:tab",
-        "/connections/cdr/settings",
-        "//*[contains(., 'cdr.base_url')]",
-    ),
-    Shot::page(
-        "configuration",
-        "/configuration",
-        "/configuration",
-        "//h1[. = 'Configuration']",
-    ),
-    Shot::page(
-        "configuration-mappings",
-        "/configuration/:tab",
-        "/configuration/mappings",
-        "//*[contains(., 'mappings.directory')]",
-    ),
-    Shot::page(
-        "configuration-core",
-        "/configuration/:tab",
-        "/configuration/core",
-        "//*[contains(., 'server.listen')]",
-    ),
-    Shot::page(
-        "preferences",
-        "/preferences",
-        "/preferences",
-        "//h1[. = 'Your preferences']",
-    ),
-    Shot::page(
-        "preferences-language",
-        "/preferences/:section",
-        "/preferences/language",
-        "//h1[. = 'Your preferences']",
-    ),
-    Shot::page("about", "/about", "/about", "//h1"),
-];
-
-/// The page no route answers.
-const NOT_FOUND: Shot = Shot::page("not-found", "*", "/no/such/page", "//h1");
-
-/// A `$toopenehr` the bridge answered.
-const PLAYGROUND_ANSWERED: Shot = Shot::page(
-    "playground-answered",
-    "/playground/:tab",
-    "/playground/toopenehr",
-    "//*[contains(., 'Synthetic problem one')]",
-);
-
-/// A `$tofhir` the bridge refused.
-const PLAYGROUND_REFUSED: Shot = Shot::page(
-    "playground-refused",
-    "/playground",
-    "/playground",
-    "//*[contains(., 'The bridge refused the request')]",
-);
-
-/// A bridge whose operations lane is off.
-const PLAYGROUND_OFF: Shot = Shot::page(
-    "playground-off",
-    "/playground/:tab",
-    "/playground/toopenehr",
-    "//*[contains(., 'Conversions are off on this bridge.')]",
-);
-
-/// A draft whose check found the set does not compile.
-const EDIT_CHECKED: Shot = Shot::page(
-    "edit-checked",
-    "/mappings/new",
-    "/mappings/new",
-    "//*[contains(., 'The set does not compile with this draft')]",
-);
-
-/// The confirmation a save asks for.
-const EDIT_CONFIRM: Shot = Shot::page(
-    "edit-confirm",
-    "/mappings/new",
-    "/mappings/new",
-    "//button[@name = 'decision' and @value = 'confirm']",
-);
-
-/// A draft the bridge refused to save.
-const EDIT_REFUSED: Shot = Shot::page(
-    "edit-refused",
-    "/mappings/new",
-    "/mappings/new",
-    "//*[contains(., 'Not saved: the set does not compile with your draft')]",
-);
-
-/// A draft the bridge saved and reloaded.
-const EDIT_SAVED: Shot = Shot::page(
-    "edit-saved",
-    "/mappings/new",
-    "/mappings/new",
-    "//*[contains(., 'Saved, and the set reloaded with it.')]",
-);
-
-/// A reload of the set from the Mapping set.
-const MAPPINGS_RELOADED: Shot = Shot::page(
-    "mappings-reloaded",
-    "/mappings",
-    "/mappings",
-    "//*[contains(., 'Reloaded: the set compiled and replaced the running one')]",
-);
-
-/// Every shot the capture takes.
-fn shots() -> impl Iterator<Item = &'static Shot> {
-    [&SIGN_IN].into_iter().chain(PAGES.iter()).chain([
-        &PLAYGROUND_ANSWERED,
-        &PLAYGROUND_REFUSED,
-        &PLAYGROUND_OFF,
-        &EDIT_CHECKED,
-        &EDIT_CONFIRM,
-        &EDIT_REFUSED,
-        &EDIT_SAVED,
-        &MAPPINGS_RELOADED,
-        &NOT_FOUND,
-        &SIGNED_OUT,
-    ])
 }
 
 /// The workspace root.
