@@ -12,6 +12,7 @@
 
 mod death;
 mod person;
+mod pseudonym;
 mod removal;
 mod shared;
 mod visits;

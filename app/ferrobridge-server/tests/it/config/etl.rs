@@ -407,3 +407,65 @@ fn the_quality_checks_are_off_by_default_and_switch_on() -> Result<(), Box<dyn s
     assert!(etl.quality_checks);
     Ok(())
 }
+
+/// A `[cdm]` section with `pseudonymisation` as its pseudonymisation table.
+fn pseudonymised(pseudonymisation: &str) -> String {
+    format!(
+        "[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode=disable\"\n\
+         [cdm.pseudonymisation]\n{pseudonymisation}"
+    )
+}
+
+#[test]
+fn the_pseudonymisation_is_off_until_its_section_is_present()
+-> Result<(), Box<dyn std::error::Error>> {
+    let text = "[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode=disable\"\n";
+    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
+    let cdm = settings.cdm.as_ref().ok_or("the CDM lane is on")?;
+    assert!(cdm.pseudonymiser.is_none());
+    Ok(())
+}
+
+#[test]
+fn a_pseudonymisation_key_file_is_read_and_its_pseudonyms_follow_the_key()
+-> Result<(), Box<dyn std::error::Error>> {
+    let mut file = tempfile::NamedTempFile::new()?;
+    std::io::Write::write_all(&mut file, b"ferrobridge-synthetic-test-key-1\n")?;
+    let text = pseudonymised(&format!(
+        "key_file = {:?}\ndate_shift_days = 30\n",
+        file.path()
+    ));
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let cdm = settings.cdm.as_ref().ok_or("the CDM lane is on")?;
+    let pseudonymiser = cdm.pseudonymiser.as_ref().ok_or("pseudonymisation is on")?;
+    let expected =
+        omop_cdm::writer::pseudonym::Pseudonymiser::new(b"ferrobridge-synthetic-test-key-1", 30)?;
+    assert_eq!(
+        expected.pseudonym("ehr-1"),
+        pseudonymiser.pseudonym("ehr-1")
+    );
+    assert_eq!(expected.shift("ehr-1"), pseudonymiser.shift("ehr-1"));
+    Ok(())
+}
+
+#[test]
+fn a_short_pseudonymisation_key_refuses_to_boot_naming_the_section()
+-> Result<(), Box<dyn std::error::Error>> {
+    let error = refusal(&pseudonymised("key = \"too-short\"\n"))?;
+    match &error {
+        Error::Pseudonymisation { key, .. } => assert_eq!("cdm.pseudonymisation", key),
+        other => return Err(format!("expected a pseudonymisation error, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_pseudonymisation_section_with_no_key_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
+    let error = refusal(&pseudonymised("date_shift_days = 10\n"))?;
+    match &error {
+        Error::Missing { key } => assert_eq!("cdm.pseudonymisation.key", key),
+        other => return Err(format!("expected a missing key, got {other:?}").into()),
+    }
+    Ok(())
+}

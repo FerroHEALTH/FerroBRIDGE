@@ -356,6 +356,9 @@ pub struct Cdm {
     /// What the writer does for an EHR with no `PERSON` row:
     /// `create_on_first_sight` (a placeholder row) or `existing` (a refusal).
     pub person_policy: String,
+    /// The pseudonymisation of every row the writer writes, off until the
+    /// section is present.
+    pub pseudonymisation: Option<CdmPseudonymisation>,
 }
 
 impl Default for Cdm {
@@ -368,8 +371,23 @@ impl Default for Cdm {
             schema: String::from("cdm"),
             bridge_schema: String::from("ferrobridge"),
             person_policy: String::from("create_on_first_sight"),
+            pseudonymisation: None,
         }
     }
+}
+
+/// The pseudonymisation of the rows the CDM writer writes: a keyed pseudonym
+/// for every source identifier and an optional per-person date shift.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct CdmPseudonymisation {
+    /// The HMAC key, at least 32 bytes.
+    pub key: Option<Secret>,
+    /// A file holding the key, read at boot.
+    pub key_file: Option<PathBuf>,
+    /// The largest shift of a person's dates either way, in days; 0 leaves
+    /// dates as they are.
+    pub date_shift_days: u16,
 }
 
 /// The OMOP ETL job.

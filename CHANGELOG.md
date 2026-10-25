@@ -40,6 +40,13 @@ crates on crates.io.
   `dq check` and the post-load step of `etl run` report them. A person whose
   year of birth is 0, as a placeholder `PERSON` row carries, has no birth date
   for these checks instead of failing them.
+- `[cdm.pseudonymisation]` pseudonymises every row the CDM writer writes
+  (#410): the columns the CDM field definitions describe as a link back to the
+  source carry an HMAC-SHA-256 pseudonym under a `_file` secret key, stable
+  across runs so incremental loads join, the provider's name, `npi` and `dea`
+  and a location's address are NULL, and `date_shift_days` moves every date
+  of a person by one per-person shift, so intervals within a person stay
+  intact. The Integrate and Operate pages state what it does not de-identify.
 - `ferrobridge-hl7v2` 0.1.143 serves a consumer of its listener and parser
   alone. `parse::structure::structure_declared` selects the structure
   MSH-9.3 names over the message definition where the two disagree, so an

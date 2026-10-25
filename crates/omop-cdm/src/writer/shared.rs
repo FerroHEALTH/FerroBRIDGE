@@ -25,10 +25,13 @@ use crate::writer::database;
 use crate::writer::error::Step;
 use crate::writer::error::WriteError;
 use crate::writer::person::SOURCE_VALUE_WIDTH;
+use crate::writer::pseudonym::Pseudonymiser;
 use crate::writer::side_table::allocate;
 
-/// Returns `source` when it fits a `varchar(50)` source value column.
-fn fitting(source: &str) -> Option<&str> {
+/// Returns `source` as a `varchar(50)` source value column takes it: its
+/// pseudonym under `pseudonymiser`, and NULL when it does not fit.
+fn fitting(source: &str, pseudonymiser: Option<&Pseudonymiser>) -> Option<String> {
+    let source = pseudonymiser.map_or_else(|| source.to_owned(), |p| p.pseudonym(source));
     (source.chars().count() <= SOURCE_VALUE_WIDTH).then_some(source)
 }
 
@@ -39,6 +42,7 @@ pub(super) async fn provider_id(
     cdm: &SchemaName,
     bridge: &SchemaName,
     source: &ProviderSource,
+    pseudonymiser: Option<&Pseudonymiser>,
 ) -> Result<i32, WriteError> {
     let found = transaction
         .query_opt(
@@ -56,7 +60,7 @@ pub(super) async fn provider_id(
             &format!(
                 "INSERT INTO {cdm}.provider (provider_id, provider_source_value) VALUES ($1, $2)"
             ),
-            &[&id, &fitting(source.as_str())],
+            &[&id, &fitting(source.as_str(), pseudonymiser)],
         )
         .await
         .map_err(database(Step::Insert("provider")))?;
@@ -82,6 +86,7 @@ pub(super) async fn visit_detail_id(
     cdm: &SchemaName,
     bridge: &SchemaName,
     key: &VisitDetailKey,
+    pseudonymiser: Option<&Pseudonymiser>,
 ) -> Result<i32, WriteError> {
     let visit = key.visit();
     let ehr_id = visit.ehr_id().value();
@@ -116,7 +121,7 @@ pub(super) async fn visit_detail_id(
                  JOIN {cdm}.visit_occurrence AS o ON o.visit_occurrence_id = v.visit_occurrence_id
                  WHERE v.ehr_id = $3 AND v.visit_source = $4"
             ),
-            &[&id, &fitting(source), &ehr_id, &visit_source],
+            &[&id, &fitting(source, pseudonymiser), &ehr_id, &visit_source],
         )
         .await
         .map_err(database(Step::Insert("visit_detail")))?;

@@ -48,12 +48,38 @@ pub(super) fn is_integer(column: &ColumnMeta) -> bool {
     column.cdm_datatype == "integer"
 }
 
-/// Returns the SQL that moves the staged `column` into the CDM column.
-pub(super) fn cast(column: &ColumnMeta) -> String {
+/// The staging column that carries each row's date shift in days.
+const SHIFT: &str = "\"ferrobridge_shift\"";
+
+/// Returns the date part `column` of `PERSON` holds, when it is one of the
+/// three birth columns.
+fn birth_part(column: &str) -> Option<&'static str> {
+    match column {
+        "year_of_birth" => Some("year"),
+        "month_of_birth" => Some("month"),
+        "day_of_birth" => Some("day"),
+        _ => None,
+    }
+}
+
+/// Returns the SQL that moves the staged `column` of `table` into the CDM
+/// column, every date and datetime moved by the row's shift.
+///
+/// The three birth columns of `PERSON` follow the shift when all three are
+/// known, so they stay the parts of the shifted birth date.
+pub(super) fn cast(table: &TableMeta, column: &ColumnMeta) -> String {
     let name = quoted(column.name);
+    if let (true, Some(part)) = (table.name == "person", birth_part(column.name)) {
+        return format!(
+            "CASE WHEN {SHIFT} <> 0 AND \"year_of_birth\" > 0 \
+             AND \"month_of_birth\" IS NOT NULL AND \"day_of_birth\" IS NOT NULL \
+             THEN extract({part} FROM make_date(\"year_of_birth\", \"month_of_birth\", \
+             \"day_of_birth\") + {SHIFT})::integer ELSE {name} END"
+        );
+    }
     match column.cdm_datatype {
-        "date" => format!("{name}::date"),
-        "datetime" => format!("{name}::timestamp"),
+        "date" => format!("{name}::date + {SHIFT}"),
+        "datetime" => format!("{name}::timestamp + make_interval(days => {SHIFT})"),
         "float" => format!("{name}::numeric"),
         _ => name,
     }
@@ -72,13 +98,30 @@ pub(super) fn staged(value: &Value) -> Staged {
     }
 }
 
+/// One staged row: its values in column order, and the days its dates move.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct StagedRow {
+    values: Vec<Staged>,
+    shift: i32,
+}
+
+impl StagedRow {
+    /// Returns the row with its dates moved by `days`.
+    pub(super) fn shifted(self, days: i32) -> Self {
+        Self {
+            shift: days,
+            ..self
+        }
+    }
+}
+
 /// Returns one staged row of `table`, in column order, with every column
-/// `values` does not name set to NULL.
+/// `values` does not name set to NULL and its dates unmoved.
 pub(super) fn stage_row(
     table: &TableMeta,
     mut values: BTreeMap<&'static str, Staged>,
-) -> Vec<Staged> {
-    table
+) -> StagedRow {
+    let values = table
         .columns
         .iter()
         .map(|column| {
@@ -88,7 +131,8 @@ pub(super) fn stage_row(
                 Staged::Text(None)
             })
         })
-        .collect()
+        .collect();
+    StagedRow { values, shift: 0 }
 }
 
 /// Copies `rows` of `table` into the CDM through a staging table.
@@ -96,7 +140,7 @@ pub(super) async fn copy_rows(
     transaction: &Transaction<'_>,
     cdm: &SchemaName,
     table: &'static TableMeta,
-    rows: &[Vec<Staged>],
+    rows: &[StagedRow],
 ) -> Result<u64, WriteError> {
     if rows.is_empty() {
         return Ok(0);
@@ -113,6 +157,7 @@ pub(super) async fn copy_rows(
             };
             format!("{} {kind}", quoted(column.name))
         })
+        .chain([format!("{SHIFT} integer")])
         .collect::<Vec<_>>()
         .join(", ");
     let names = table
@@ -124,7 +169,7 @@ pub(super) async fn copy_rows(
     let casts = table
         .columns
         .iter()
-        .map(cast)
+        .map(|column| cast(table, column))
         .collect::<Vec<_>>()
         .join(", ");
     let types: Vec<Type> = table
@@ -137,6 +182,7 @@ pub(super) async fn copy_rows(
                 Type::TEXT
             }
         })
+        .chain([Type::INT4])
         .collect();
     let step = Step::Copy(table.name);
     transaction
@@ -147,14 +193,15 @@ pub(super) async fn copy_rows(
         .map_err(database(step))?;
     let sink = transaction
         .copy_in(&format!(
-            "COPY pg_temp.{stage} ({names}) FROM STDIN (FORMAT binary)"
+            "COPY pg_temp.{stage} ({names}, {SHIFT}) FROM STDIN (FORMAT binary)"
         ))
         .await
         .map_err(database(step))?;
     let writer = BinaryCopyInWriter::new(sink, &types);
     let mut writer = std::pin::pin!(writer);
     for row in rows {
-        let fields: Vec<&(dyn ToSql + Sync)> = row.iter().map(Staged::as_sql).collect();
+        let mut fields: Vec<&(dyn ToSql + Sync)> = row.values.iter().map(Staged::as_sql).collect();
+        fields.push(&row.shift);
         writer
             .as_mut()
             .write(&fields)
@@ -180,7 +227,7 @@ pub(super) async fn copy_rows(
 }
 
 /// The staged rows of one graph, by table.
-pub(super) type Tables = BTreeMap<&'static str, (&'static TableMeta, Vec<Vec<Staged>>)>;
+pub(super) type Tables = BTreeMap<&'static str, (&'static TableMeta, Vec<StagedRow>)>;
 
 /// Stages every row of `graph` with its references resolved, recording what
 /// each mapping writes into `report`.
@@ -190,6 +237,8 @@ pub(super) async fn stage_graph(
     report: &mut Report,
 ) -> Result<Tables, WriteError> {
     let mut tables = Tables::new();
+    let pseudonymiser = resolver.pseudonymiser;
+    let shift = pseudonymiser.map_or(0, |p| p.shift(graph.source().ehr_id().value()));
     for row in graph.rows() {
         let table = row.table();
         let key_column = graph::row::primary_key(table);
@@ -223,7 +272,10 @@ pub(super) async fn stage_graph(
                     if concept && matches!(value, Value::Integer(0)) {
                         concept_zero.insert(column, 1);
                     }
-                    staged(value)
+                    match (pseudonymiser, meta) {
+                        (Some(p), Some(meta)) => p.staged(table, meta, staged(value)),
+                        _ => staged(value),
+                    }
                 }
                 Cell::Reference(reference) => {
                     let target = meta
@@ -239,7 +291,7 @@ pub(super) async fn stage_graph(
             .entry(table.name)
             .or_insert_with(|| (table, Vec::new()))
             .1
-            .push(stage_row(table, values));
+            .push(stage_row(table, values).shifted(shift));
     }
     Ok(tables)
 }

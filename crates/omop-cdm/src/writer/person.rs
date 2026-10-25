@@ -20,6 +20,7 @@ use crate::writer::database;
 use crate::writer::error::Step;
 use crate::writer::error::WriteError;
 use crate::writer::input::PersonPolicy;
+use crate::writer::pseudonym::Pseudonymiser;
 use crate::writer::side_table::allocate;
 
 /// The width of the `*_source_value` columns the writer fills itself
@@ -73,6 +74,7 @@ pub(super) async fn person_id(
     bridge: &SchemaName,
     ehr_id: &HierObjectId,
     policy: PersonPolicy,
+    pseudonymiser: Option<&Pseudonymiser>,
 ) -> Result<i32, WriteError> {
     let create = policy == PersonPolicy::CreateOnFirstSight;
     let id = mapped(transaction, bridge, ehr_id, create).await?;
@@ -93,7 +95,10 @@ pub(super) async fn person_id(
     }
     // NOTE: CDM v5.4 PERSON requires these four columns, 0 being "no matching concept";
     // no specification governs year_of_birth 0: our own design, the OMOCL corpus fallback.
-    let source = ehr_id.value();
+    let source = pseudonymiser.map_or_else(
+        || ehr_id.value().to_owned(),
+        |p| p.pseudonym(ehr_id.value()),
+    );
     let source = (source.chars().count() <= SOURCE_VALUE_WIDTH).then_some(source);
     transaction
         .execute(

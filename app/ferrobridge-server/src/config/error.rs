@@ -224,6 +224,15 @@ pub enum Error {
         /// The value it holds.
         value: String,
     },
+    /// The pseudonymisation section is refused.
+    #[error("{key}: the pseudonymisation is refused")]
+    Pseudonymisation {
+        /// The section that holds it.
+        key: String,
+        /// Why it is refused.
+        #[source]
+        source: omop_cdm::writer::pseudonym::PseudonymError,
+    },
     /// A vocabulary alias names an empty terminology id.
     #[error("{key} names an empty terminology id")]
     AliasTerminology {
