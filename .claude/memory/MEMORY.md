@@ -90,3 +90,6 @@
 - [Helm and Kubernetes in Podman](helm-kubernetes-in-podman.md): owner
   2026-10-25, test charts locally on kind over Podman; install helm when
   missing; still never build images locally
+- [Reactive console UI](reactive-console-ui.md): owner 2026-10-25, no full
+  page reload for an interaction; WebAssembly is the normal path, the
+  no-WebAssembly page the fallback (FerroUI #410)
