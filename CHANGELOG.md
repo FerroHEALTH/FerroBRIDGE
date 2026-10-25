@@ -25,6 +25,14 @@ crates on crates.io.
 
 ### Added
 
+- `ferrobridge-term` 0.1.135 takes the client credentials token of
+  `ferrohealth-smart` as its `TokenProvider` behind the new `smart` feature
+  (#1227): `smart::SmartToken`, built from a `TokenSource`, sends the cached
+  token and drops one the server refuses with `401`, so the repeated request
+  carries a token fetched anew. The server's terminology lane uses it in
+  place of its own adapter. `ferrobridge-hl7v2` 0.1.144 and
+  `ferrobridge-validator` 0.1.135 move with it.
+
 - The first HL7 Europe profile context: `ferrobridge_eu_condition.context`
   targets Base and Core 2.0.0 `condition-eu-core` over the published
   `KDS_Diagnose` template, with the published diagnosis, qualifier and

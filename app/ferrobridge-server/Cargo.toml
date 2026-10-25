@@ -26,7 +26,7 @@ anyhow.workspace = true
 async-trait.workspace = true
 axum.workspace = true
 clap.workspace = true
-ferrobridge-term.workspace = true
+ferrobridge-term = { workspace = true, features = ["smart"] }
 # The HL7 v2 face: the MLLP listener, the parse, the acknowledgment and the
 # v2-to-FHIR ConceptMap interpreter.
 ferrobridge-hl7v2.workspace = true
@@ -43,7 +43,7 @@ http.workspace = true
 jiff.workspace = true
 # The SMART resource server in front of the facade and the operator API, and
 # the client credentials token of the CDR and terminology lanes.
-ferrohealth-smart.workspace = true
+ferrohealth-smart = { workspace = true, features = ["axum"] }
 # The ADL 2 HRID parser an adl2 template ETag is read with.
 openehr-adl.workspace = true
 # The AOM2 operational template the adl2 route serves.

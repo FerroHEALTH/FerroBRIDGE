@@ -33,6 +33,8 @@ pub mod config;
 mod decode;
 pub mod error;
 pub mod outcome;
+#[cfg(feature = "smart")]
+pub mod smart;
 mod wire;
 
 /// The HL7 FHIR release this crate targets.

@@ -29,7 +29,8 @@ use super::section::Mappings;
 use super::section::Operator;
 use super::section::Terminology;
 use super::section::facade::Facade;
-use crate::credentials::UpstreamToken;
+use ferrobridge_term::smart::SmartToken;
+use ferrohealth_smart::client::cache::TokenSource;
 
 /// Returns the mapping-set paths `mappings` names, when it names both.
 ///
@@ -434,12 +435,12 @@ pub(super) fn resolve_terminology(
                 .with_credentials(ferrobridge_term::config::Credentials::Basic { user, password });
         }
         Some(Upstream::OAuth(grant)) => {
-            let source = UpstreamToken::new(*grant).map_err(|source| Error::Client {
+            let source = TokenSource::new(*grant).map_err(|source| Error::Client {
                 upstream: "terminology",
                 source: Box::new(source),
             })?;
             config = config.with_credentials(ferrobridge_term::config::Credentials::OAuth(
-                Arc::new(source),
+                Arc::new(SmartToken::from(source)),
             ));
         }
         None => {}
