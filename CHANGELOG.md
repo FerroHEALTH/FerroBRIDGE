@@ -23,6 +23,26 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.13] - 2026-10-25
+
+The security and OMOP release. A write the facade makes for an authenticated
+caller states that caller as its committer, and `[auth] mode =
+"introspection"` checks opaque access tokens (RFC 7662). On the OMOP side,
+`etl fhir` loads FHIR R4 into the CDM with no CDR and every row names its
+resource, `vocab load` loads an Athena download, the OMOCL targets write
+`DEATH`, `provider_id` and `visit_detail_id`, `[cdm.pseudonymisation]`
+pseudonymises source identifiers and shifts dates, and the Data Quality
+Dashboard's conformance, completeness and temporal plausibility checks run in
+Rust through `dq check`. The derived tables keep another ETL's rows, the CDM
+pool trusts the configured CA alone, FHIRconnect converts `DV_ORDINAL` and
+writes an `ACTION`'s time, and the first HL7 Europe profile contexts arrive.
+
+The library crates publish at `fhirconnect` 0.1.192, `ferrobridge-term`
+0.1.136, `ferrobridge-validator` 0.1.136 and `ferrobridge-hl7v2` 0.1.146, and
+`fhir-types` 0.1.128, `openehr-mapping-core` 0.1.128, `ferrobridge-fhirpath`
+0.1.128 and `hl7v2-types` 0.1.127 stay where they are. A crate version an
+entry below names is the step at which that change came in.
+
 ### Added
 
 - Every CDM row `etl fhir` writes names the FHIR resource it was mapped from
@@ -163,6 +183,22 @@ crates on crates.io.
   it its columns, and removing that composition restores the row of the
   writer that remains. `cdm init` adds the `death_row` side table and lets
   several compositions of a person record a `DEATH` row.
+- The Data Quality Dashboard's six completeness checks run in Rust beside its
+  conformance checks (#405): `measurePersonCompleteness`,
+  `measureConditionEraCompleteness`, `measureValueCompleteness`,
+  `standardConceptRecordCompleteness`, `sourceConceptRecordCompleteness` and
+  `sourceValueCompleteness`, each planned where the Dashboard's v2.9.0
+  settings enable it, with its threshold, and translated from its SQL
+  template. A run now carries the Dashboard's not-applicable status: a check
+  of a missing or empty table, or of a missing or unpopulated field, is
+  neither failed nor passed and names why.
+- `ferrobridge dq check` runs the ported Data Quality Dashboard checks against
+  the database `[cdm]` names and prints the failing checks and the counts, or
+  with `--format json` the run in the Dashboard's own result fields
+  (`CheckResults`, `Overview`, `startTimestamp`), so the Dashboard's viewer
+  reads it. It exits non-zero when a check fails or cannot be evaluated
+  (#406). With `[etl] quality_checks = true`, `etl run` runs the same checks
+  over the tables it wrote and adds the verdicts to its report.
 
 ### Fixed
 
@@ -187,22 +223,6 @@ crates on crates.io.
   reaches the database through a relay on a private Unix socket that
   handshakes with the writer's TLS configuration. A URL that asks for TLS
   names one host and one port; a list of hosts is refused at start.
-- The Data Quality Dashboard's six completeness checks run in Rust beside its
-  conformance checks (#405): `measurePersonCompleteness`,
-  `measureConditionEraCompleteness`, `measureValueCompleteness`,
-  `standardConceptRecordCompleteness`, `sourceConceptRecordCompleteness` and
-  `sourceValueCompleteness`, each planned where the Dashboard's v2.9.0
-  settings enable it, with its threshold, and translated from its SQL
-  template. A run now carries the Dashboard's not-applicable status: a check
-  of a missing or empty table, or of a missing or unpopulated field, is
-  neither failed nor passed and names why.
-- `ferrobridge dq check` runs the ported Data Quality Dashboard checks against
-  the database `[cdm]` names and prints the failing checks and the counts, or
-  with `--format json` the run in the Dashboard's own result fields
-  (`CheckResults`, `Overview`, `startTimestamp`), so the Dashboard's viewer
-  reads it. It exits non-zero when a check fails or cannot be evaluated
-  (#406). With `[etl] quality_checks = true`, `etl run` runs the same checks
-  over the tables it wrote and adds the verdicts to its report.
 
 ### Changed
 
@@ -4925,7 +4945,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.12...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.13...HEAD
+[0.0.13]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.12...v0.0.13
 [0.0.12]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.11...v0.0.12
 [0.0.11]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.10...v0.0.11
 [0.0.10]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.9...v0.0.10
