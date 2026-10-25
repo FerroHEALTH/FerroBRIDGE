@@ -49,7 +49,8 @@ Rust projects can reuse, and the sibling's lane is proven.
   sibling's half of the move; a separate repository for the crate was
   refused ("we will not have an own thing"). The bridge is the crate's
   largest consumer, so the generator lives where the root set is widest.
-- **Seven published crates, never more without a second consumer.** Owner
+- **Seven published crates at the ruling, eleven today, never more without a
+  second consumer.** Owner
   ruling 2026-09-05 after asking "are you really sure we need all these
   crates?": the twelve-way split (model, resolve, engine, tree per language)
   collapsed to one crate per language with modules (`fhirconnect`, `omocl`),
