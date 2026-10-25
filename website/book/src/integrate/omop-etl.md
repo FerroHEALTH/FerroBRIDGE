@@ -320,8 +320,33 @@ one row.
 
 ## Checking a populated database with the Data Quality Dashboard
 
-The OHDSI Data Quality Dashboard runs its checks against a populated CDM
-outside CI; the round trip test in CI does not run it. It is an R package
+The bridge carries a Rust port of the OHDSI Data Quality Dashboard's
+conformance and completeness checks (v2.9.0, Blacketer et al., JAMIA 2021),
+planned where the Dashboard's own settings enable them, with their
+thresholds:
+
+```sh
+ferrobridge dq check                 # one line per failing check, then the counts
+ferrobridge dq check --format json   # the Dashboard's result fields
+```
+
+The job reads the `[cdm]` section, runs every check over the CDM schema
+(the vocabulary tables left out, as the Dashboard leaves them out by
+default), and exits `1` when a check fails or cannot be evaluated. A check
+of a missing or empty table, or of a missing or unpopulated field, is marked
+not applicable with its reason, as the Dashboard marks it, and counts as
+neither. The JSON document holds `CheckResults` (one object per check, in the
+Dashboard's result columns), `Overview` (its counts) and the run's
+timestamps. With `[etl] quality_checks = true`, `etl run` runs the same
+checks over the tables it wrote and adds their verdicts to the run report; a
+failed check never rolls a committed load back.
+
+The plausibility checks are not ported. To run them, or the R tool's own
+viewer, run the Dashboard itself as below.
+
+### Running the R package
+
+The Dashboard itself is an R package
 (<https://ohdsi.github.io/DataQualityDashboard/>), with no container image of
 its own, so you run it from any R session that can reach the database:
 

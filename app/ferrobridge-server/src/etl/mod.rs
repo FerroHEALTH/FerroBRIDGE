@@ -78,6 +78,8 @@ pub struct EtlSettings {
     pub deletions: DeletionPolicy,
     /// The OHDSI `vocabulary_id` each terminology id is looked up under.
     pub aliases: VocabularyAliases,
+    /// Whether `etl run` runs the quality checks after the load.
+    pub quality_checks: bool,
 }
 
 /// What a mapper is handed besides the composition.

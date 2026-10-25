@@ -199,3 +199,18 @@ fn a_configuration_file_that_does_not_exist_exits_seventy_eight() {
         "a refused configuration is EX_CONFIG, never a generic failure"
     );
 }
+
+#[test]
+fn dq_check_without_a_cdm_section_exits_seventy_eight() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_ferrobridge"))
+        .args(["dq", "check", "--format", "json"])
+        .env_remove("FERROBRIDGE_CONFIG")
+        .output()
+        .expect("the binary runs");
+    assert_eq!(Some(i32::from(EXIT_CONFIG)), output.status.code());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("`dq check` needs a [cdm] section"),
+        "{stderr}"
+    );
+}

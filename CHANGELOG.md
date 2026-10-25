@@ -84,6 +84,13 @@ crates on crates.io.
   template. A run now carries the Dashboard's not-applicable status: a check
   of a missing or empty table, or of a missing or unpopulated field, is
   neither failed nor passed and names why.
+- `ferrobridge dq check` runs the ported Data Quality Dashboard checks against
+  the database `[cdm]` names and prints the failing checks and the counts, or
+  with `--format json` the run in the Dashboard's own result fields
+  (`CheckResults`, `Overview`, `startTimestamp`), so the Dashboard's viewer
+  reads it. It exits non-zero when a check fails or cannot be evaluated
+  (#406). With `[etl] quality_checks = true`, `etl run` runs the same checks
+  over the tables it wrote and adds the verdicts to its report.
 
 ## [0.0.12] - 2026-10-25
 

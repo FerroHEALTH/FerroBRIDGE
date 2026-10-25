@@ -30,6 +30,7 @@ pub mod mappings;
 pub mod operations;
 pub mod operator;
 pub mod panic;
+pub mod quality;
 pub mod request_id;
 pub mod request_log;
 pub mod smart;
@@ -105,9 +106,11 @@ where
     };
     let resolved = Config::load(cli.config.as_deref()).and_then(|config| match job {
         Job::Serve => config.resolve(),
-        Job::CdmInit { .. } | Job::VocabLoad { .. } | Job::EtlRun(_) | Job::MappingCheck { .. } => {
-            config.resolve_job()
-        }
+        Job::CdmInit { .. }
+        | Job::VocabLoad { .. }
+        | Job::EtlRun(_)
+        | Job::DqCheck { .. }
+        | Job::MappingCheck { .. } => config.resolve_job(),
     });
     let settings = match resolved {
         Ok(settings) => settings,
@@ -184,6 +187,12 @@ impl Job {
                 },
                 None,
             ) => Job::MappingCheck { format: *format },
+            (
+                cli::Command::Dq {
+                    command: cli::Dq::Check { format },
+                },
+                None,
+            ) => Job::DqCheck { format: *format },
             (command, issue) => {
                 let issue = issue.map_or_else(String::new, |issue| {
                     format!("; it lands with issue #{issue}")
@@ -250,6 +259,20 @@ impl Job {
                     }
                 }
             }
+            Job::DqCheck { format } => {
+                let Some(cdm) = settings.cdm else {
+                    eprintln!("ferrobridge: cannot start: `dq check` needs a [cdm] section");
+                    return ExitCode::from(EXIT_CONFIG);
+                };
+                match jobs::dq_check_command(&cdm, format) {
+                    Ok(true) => ExitCode::SUCCESS,
+                    Ok(false) => ExitCode::FAILURE,
+                    Err(error) => {
+                        tracing::error!(error = format!("{error:#}"), "dq check failed");
+                        ExitCode::from(EXIT_CHECK_UNAVAILABLE)
+                    }
+                }
+            }
             Job::MappingCheck { format } => match jobs::mapping_check_command(&settings, format) {
                 Ok(true) => ExitCode::SUCCESS,
                 Ok(false) => ExitCode::FAILURE,
@@ -284,6 +307,11 @@ enum Job {
     },
     /// `etl run`.
     EtlRun(etl::RunOptions),
+    /// `dq check`.
+    DqCheck {
+        /// How the result is written.
+        format: cli::ReportFormat,
+    },
     /// `mapping check`.
     MappingCheck {
         /// How the report is written.

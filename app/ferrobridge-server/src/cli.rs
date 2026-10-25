@@ -49,6 +49,12 @@ pub enum Command {
         #[command(subcommand)]
         command: Vocab,
     },
+    /// Checks the quality of the CDM database.
+    Dq {
+        /// The job to run.
+        #[command(subcommand)]
+        command: Dq,
+    },
     /// Works on the mapping files.
     Mapping {
         /// The job to run.
@@ -99,6 +105,18 @@ pub enum Vocab {
     },
 }
 
+/// The `dq` jobs.
+#[derive(Debug, Subcommand, PartialEq, Eq)]
+pub enum Dq {
+    /// Runs the ported Data Quality Dashboard checks against the configured
+    /// database and exits non-zero when a check fails or cannot be evaluated.
+    Check {
+        /// How the result is written to stdout.
+        #[arg(long, value_enum, default_value_t = ReportFormat::Text)]
+        format: ReportFormat,
+    },
+}
+
 /// The `mapping` jobs.
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 pub enum Mapping {
@@ -131,7 +149,8 @@ impl Command {
             | Self::Cdm { .. }
             | Self::Etl { .. }
             | Self::Mapping { .. }
-            | Self::Vocab { .. } => None,
+            | Self::Vocab { .. }
+            | Self::Dq { .. } => None,
         }
     }
 
@@ -152,6 +171,9 @@ impl Command {
             Self::Mapping {
                 command: Mapping::Check { .. },
             } => "mapping check",
+            Self::Dq {
+                command: Dq::Check { .. },
+            } => "dq check",
         }
     }
 }

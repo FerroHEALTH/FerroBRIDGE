@@ -143,12 +143,13 @@ async fn dump(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
 }
 
 /// Runs the ported Data Quality Dashboard plan over the round trip's CDM and
-/// asserts that the concept record completeness checks count the concept 0
-/// rows the run report counted, column by column.
+/// asserts that every conformance check passes and that the concept record
+/// completeness checks count the concept 0 rows the run report counted,
+/// column by column.
 ///
 /// A column whose template also counts a NULL beside a source value is
 /// compared as at least the report's count.
-async fn assert_completeness_agrees(
+async fn assert_quality_agrees(
     postgres: &Postgres,
     report: &RunReport,
 ) -> Result<(), Box<dyn Error>> {
@@ -170,6 +171,15 @@ async fn assert_completeness_agrees(
             result.check_id, result.error
         );
     }
+    let failing: Vec<&str> = results
+        .iter()
+        .filter(|result| {
+            result.category == omop_cdm::quality::definitions::KahnCategory::Conformance
+                && result.failed
+        })
+        .map(|result| result.check_id.as_str())
+        .collect();
+    assert!(failing.is_empty(), "conformance checks failed: {failing:?}");
     let mut reported: BTreeMap<String, u64> = BTreeMap::new();
     for totals in report.mappings.values() {
         for (column, count) in &totals.concept_zero {
@@ -255,7 +265,7 @@ async fn the_laboratory_round_trip_writes_the_reviewed_rows_and_a_rerun_changes_
                 .get("measurement.measurement_concept_id")
         });
     assert_eq!(Some(&1), zero, "the unmapped analyte is counted: {first}");
-    assert_completeness_agrees(&postgres, &first).await?;
+    assert_quality_agrees(&postgres, &first).await?;
     assert_eq!(
         vec![vec![String::from("0")]],
         rows(

@@ -380,3 +380,15 @@ fn an_alias_that_is_no_string_refuses_to_boot() -> Result<(), Box<dyn std::error
     assert!(source.to_string().contains("LOCAL"), "{source}");
     Ok(())
 }
+
+#[test]
+fn the_quality_checks_are_off_by_default_and_switch_on() -> Result<(), Box<dyn std::error::Error>> {
+    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
+    let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
+    assert!(!etl.quality_checks);
+    let text = format!("{ETL}quality_checks = true\n");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
+    assert!(etl.quality_checks);
+    Ok(())
+}
