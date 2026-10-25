@@ -69,18 +69,22 @@ async fn a_sign_out_ends_the_session_and_removes_the_cookie() -> Result<(), Box<
     )
     .await?;
     assert_eq!(StatusCode::SEE_OTHER, response.status());
-    assert_eq!("/", header(&response, "location"));
+    assert_eq!("/signed-out", header(&response, "location"));
     assert_eq!("no-store", header(&response, "cache-control"));
     let cookies = set_cookies(&response);
     assert!(
-        cookies
-            .iter()
-            .any(|set| set.starts_with("ferrobridge_console_session=;") && set.contains("Max-Age=0")),
+        cookies.iter().any(
+            |set| set.starts_with("ferrobridge_console_session=;") && set.contains("Max-Age=0")
+        ),
         "{cookies:?}"
     );
     assert_eq!(0, state.sessions().occupancy()?.sessions);
-    let (_page, body) = send(&service, get_with("/", &cookie)?).await?;
-    assert!(body.contains("Sign in"), "{body}");
+    let (_page, body) = send(&service, get_with("/signed-out", &cookie)?).await?;
+    assert!(
+        body.contains("You are signed out of the console."),
+        "{body}"
+    );
+    assert!(body.contains("Sign in to the console"), "{body}");
     Ok(())
 }
 

@@ -1,70 +1,124 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The landing page in each state of the request's session: the sign-in for
-//! a visitor, and for a signed-in operator their name, what the bridge says
-//! of itself read with their own token, and the sign-out.
+//! Every page of the console in each state of the request's session: the
+//! sign-in for a visitor, and for a signed-in operator the page drawn whole
+//! on the server in the shell, its title in the document, never a token,
+//! and the islands it hydrates.
 
 use std::error::Error;
 
-use ferrobridge_testkit::oidc::{Provider, TokenAnswer};
 use http::StatusCode;
-use wiremock::matchers::{header, method, path};
-use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use crate::support::{
-    OPERATOR_NAME, OPERATOR_TOKEN, configuration, console, get, get_with, send, sign_in,
-};
+use crate::stub::{CONTEXT, bridge, signed_in};
+use crate::support::{OPERATOR_NAME, OPERATOR_TOKEN, console, get, get_with, send};
+
+/// Every route of the console, each with words its page draws.
+const PAGES: [(&str, &str); 29] = [
+    ("/", ">Dashboard</h1>"),
+    ("/mappings", ">Mapping set</h1>"),
+    ("/mappings/omocl", "measurement.yml"),
+    ("/mappings/templates", "synthetic.vital_signs.v1"),
+    ("/mappings/files", "Path or file name"),
+    ("/mappings/diagnostics", "missing-key"),
+    (
+        "/mappings/files/fhirconnect/contexts/observation.context.yml",
+        "synthetic-observation",
+    ),
+    (
+        "/mappings/templates/synthetic.vital_signs.v1",
+        "Contexts that name it",
+    ),
+    (
+        "/mappings/edit/fhirconnect/contexts/observation.context.yml",
+        ">Edit</h1>",
+    ),
+    ("/mappings/new", ">New mapping file</h1>"),
+    ("/playground", "Convert to FHIR"),
+    ("/playground/toopenehr", "Convert to openEHR"),
+    ("/playground/validate", "Validate a resource"),
+    ("/facade", ">FHIR facade</h1>"),
+    ("/facade/capability", "From the CapabilityStatement"),
+    ("/facade/security", "permission-v2"),
+    ("/facade/settings", "facade.base_url"),
+    ("/hl7v2", "0.0.0.0:2575"),
+    ("/hl7v2/settings", "hl7v2.listen"),
+    ("/omop", "ferrobridge etl run"),
+    ("/omop/settings", "etl.page_size"),
+    ("/connections", ">Connections</h1>"),
+    ("/connections/terminology", "answers 503"),
+    ("/connections/cdr/settings", "cdr.base_url"),
+    ("/configuration", ">Configuration</h1>"),
+    ("/configuration/mappings", "mappings.directory"),
+    ("/configuration/core", "server.listen"),
+    ("/preferences", ">Your preferences</h1>"),
+    ("/about", "0123456789ab"),
+];
 
 #[tokio::test]
-async fn a_visitor_reads_the_sign_in_as_a_link_the_client_router_leaves_alone()
--> Result<(), Box<dyn Error>> {
+async fn a_visitor_reads_the_sign_in_on_every_page() -> Result<(), Box<dyn Error>> {
     let (_state, service) = console("")?;
-    let (response, body) = send(&service, get("/")?).await?;
-    assert_eq!(StatusCode::OK, response.status());
-    assert!(
-        body.contains(r#"<a href="/login" rel="external""#) && body.contains(">Sign in</a>"),
-        "{body}"
-    );
-    assert!(!body.contains("Sign out"), "{body}");
+    for (route, _) in PAGES {
+        let (response, body) = send(&service, get(route)?).await?;
+        assert_eq!(StatusCode::OK, response.status(), "{route}");
+        assert!(body.contains("Sign in to the console"), "{route}: {body}");
+        assert!(!body.contains(">Dashboard</h1>"), "{route}");
+    }
     Ok(())
 }
 
 #[tokio::test]
-async fn a_signed_in_operator_reads_their_name_the_bridge_and_no_token()
--> Result<(), Box<dyn Error>> {
-    let bridge = MockServer::start().await;
-    Mock::given(method("GET"))
-        .and(path("/fhir/metadata"))
-        .and(header("authorization", format!("Bearer {OPERATOR_TOKEN}").as_str()))
-        .respond_with(ResponseTemplate::new(200).set_body_raw(
-            r#"{"resourceType":"CapabilityStatement","status":"active","date":"2026-10-17","kind":"instance","software":{"name":"FerroBRIDGE","version":"0.0.8"},"fhirVersion":"4.0.1","format":["json"]}"#,
-            "application/fhir+json",
-        ))
-        .mount(&bridge)
-        .await;
-    let provider = Provider::start().await?;
-    let base = format!("{}/", bridge.uri());
-    let (_state, service) = console(&configuration(&provider, &base, "", ""))?;
-    let cookie = sign_in(&service, &provider, TokenAnswer::bearer(OPERATOR_TOKEN)).await?;
-    let (response, body) = send(&service, get_with("/", &cookie)?).await?;
-    assert_eq!(StatusCode::OK, response.status());
-    assert!(body.contains(OPERATOR_NAME), "{body}");
-    assert!(body.contains("Bridge UP · v0.0.8"), "{body}");
-    assert!(body.contains(">Dashboard</h1>"), "{body}");
-    assert!(!body.contains(OPERATOR_TOKEN), "{body}");
-    assert!(!body.contains(r#"href="/login""#), "{body}");
+async fn every_page_is_drawn_whole_for_a_signed_in_operator() -> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    for (route, words) in PAGES {
+        let (response, body) = send(&service, get_with(route, &cookie)?).await?;
+        assert_eq!(StatusCode::OK, response.status(), "{route}: {body}");
+        assert!(body.contains(words), "{route} draws {words}: {body}");
+        assert!(body.contains(OPERATOR_NAME), "{route}");
+        assert!(body.contains("Bridge up"), "{route}");
+        assert!(!body.contains(OPERATOR_TOKEN), "{route}");
+        assert!(body.contains("<title>"), "{route}");
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_page_hydrates_islands_alone() -> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, body) = send(
+        &service,
+        get_with(&format!("/mappings/edit/{CONTEXT}"), &cookie)?,
+    )
+    .await?;
+    assert!(body.contains("<leptos-island"), "{body}");
+    assert!(body.contains("MappingEditor"), "{body}");
     Ok(())
 }
 
 #[tokio::test]
 async fn a_bridge_out_of_reach_is_said_on_the_page_never_left_blank() -> Result<(), Box<dyn Error>>
 {
-    let provider = Provider::start().await?;
-    let (_state, service) = console(&configuration(&provider, "http://127.0.0.1:9/", "", ""))?;
-    let cookie = sign_in(&service, &provider, TokenAnswer::bearer(OPERATOR_TOKEN)).await?;
+    let provider = ferrobridge_testkit::oidc::Provider::start().await?;
+    let (_state, service) = console(&crate::support::configuration(
+        &provider,
+        "http://127.0.0.1:9/",
+        "",
+        "",
+    ))?;
+    let cookie = crate::support::sign_in(
+        &service,
+        &provider,
+        ferrobridge_testkit::oidc::TokenAnswer::bearer(OPERATOR_TOKEN),
+    )
+    .await?;
     let (response, body) = send(&service, get_with("/", &cookie)?).await?;
     assert_eq!(StatusCode::OK, response.status());
-    assert!(body.contains("the bridge could not be reached"), "{body}");
+    assert!(
+        body.contains("The bridge could not be reached, so this page cannot be shown."),
+        "{body}"
+    );
+    assert!(body.contains("Bridge unreachable"), "{body}");
     Ok(())
 }

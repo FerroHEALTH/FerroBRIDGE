@@ -17,7 +17,7 @@
 //! own design on RFC 6749, RFC 7636 and OpenID Connect Core 1.0.
 
 use axum::Extension;
-use axum::extract::Query;
+use axum::extract::{Query, Request};
 use axum::response::{IntoResponse, Response};
 use ferrohealth_ui::i18n::Locale;
 use http::header::{CACHE_CONTROL, LOCATION, SET_COOKIE};
@@ -26,7 +26,8 @@ use serde::Deserialize;
 use url::Url;
 
 use crate::config::settings::{OFFLINE_ACCESS, OidcSettings};
-use crate::locale::{Msg, catalog, negotiated, tr_in};
+use crate::locale::messages::Msg;
+use crate::locale::{catalog, negotiated, tr_in};
 use crate::server::ConsoleState;
 use crate::session::{COOKIE, PendingSignIn, SIGN_IN_COOKIE, SessionError, challenge};
 
@@ -127,17 +128,23 @@ pub struct CallbackQuery {
 
 /// Serves `GET /auth/callback`: holds the returned `state` to the pending
 /// sign-in the browser's cookie names, and completes it.
-pub async fn callback(
-    Extension(state): Extension<ConsoleState>,
-    headers: HeaderMap,
-    Query(query): Query<CallbackQuery>,
-) -> Response {
+pub async fn callback(Extension(state): Extension<ConsoleState>, request: Request) -> Response {
+    let (parts, _body) = request.into_parts();
+    let headers = parts.headers.clone();
     let locale = locale_of(&state, &headers);
+    let query = Query::<CallbackQuery>::try_from_uri(&parts.uri)
+        .map(|Query(query)| query)
+        .unwrap_or_default();
     let Some(id) = state.sessions().cookie_in(&headers, SIGN_IN_COOKIE) else {
         return plain(StatusCode::BAD_REQUEST, &locale, Msg::NoSignInPending);
     };
     let mut response = match state.sessions().take_pending(&id) {
-        Ok(Some(pending)) => redirected(&state, &headers, &pending, &query).await,
+        Ok(Some(pending)) => match redirected(&state, &headers, &pending, &query).await {
+            Ok(response) => response,
+            Err(Stopped { status, arrived }) => {
+                stopped_page(state.clone(), parts, status, arrived).await
+            }
+        },
         Ok(None) => plain(StatusCode::BAD_REQUEST, &locale, Msg::NoSignInPending),
         Err(error) => return refused(&locale, &error),
     };
@@ -151,14 +158,73 @@ pub async fn callback(
     response
 }
 
+/// A sign-in the console stopped, which the sign-in page says in its
+/// notice: the status the page answers with and the state it is drawn in.
+#[derive(Debug)]
+struct Stopped {
+    /// The status the page answers with.
+    status: StatusCode,
+    /// The state the sign-in card is drawn in.
+    arrived: crate::pages::sign_in::Arrived,
+}
+
+impl Stopped {
+    /// A sign-in stopped with `status`, drawn in `state`.
+    fn new(status: StatusCode, state: ferrohealth_ui::view::sign_in::State) -> Self {
+        Self {
+            status,
+            arrived: crate::pages::sign_in::Arrived(state),
+        }
+    }
+}
+
+/// The sign-in page in the state `arrived`, answered with `status`.
+async fn stopped_page(
+    state: ConsoleState,
+    parts: http::request::Parts,
+    status: StatusCode,
+    arrived: crate::pages::sign_in::Arrived,
+) -> Response {
+    let mut response = crate::server::render(state, parts, move || {
+        leptos::context::provide_context(arrived.clone());
+    })
+    .await;
+    *response.status_mut() = status;
+    response
+}
+
+/// The notice of a stopped sign-in in `locale`: `text`, and `detail` for
+/// whoever runs the console, with a way to try again when it helps.
+fn stopped_notice(
+    locale: &Locale,
+    text: Msg,
+    detail: Msg,
+    retry: bool,
+) -> ferrohealth_ui::view::sign_in::Notice {
+    ferrohealth_ui::view::sign_in::Notice {
+        text: tr_in(catalog(), locale, text),
+        detail: Some(tr_in(catalog(), locale, detail)),
+        retry: retry.then(|| ferrohealth_ui::view::sign_in::Retry {
+            label: tr_in(catalog(), locale, Msg::TryAgain),
+            href: String::from(LOGIN),
+        }),
+    }
+}
+
 /// The answer to a redirect back for the pending sign-in `pending`: the
 /// code exchanged, the ID Token checked, and a signed-in session begun.
+///
+/// # Errors
+/// Returns the [`Stopped`] sign-in the page says in its notice: refused by
+/// the provider or its ID Token (`401`), not completed at the provider
+/// (`502`), or a full session pool (`503`).
 async fn redirected(
     state: &ConsoleState,
     headers: &HeaderMap,
     pending: &PendingSignIn,
     query: &CallbackQuery,
-) -> Response {
+) -> Result<Response, Stopped> {
+    use ferrohealth_ui::view::sign_in::State;
     let locale = &locale_of(state, headers);
     // NOTE: RFC 6749 §10.12: a redirect whose `state` is not the one the
     // request carried is refused before anything else it says is read.
@@ -167,61 +233,119 @@ async fn redirected(
         .as_deref()
         .is_some_and(|sent| pending.answers(sent))
     {
-        return plain(StatusCode::BAD_REQUEST, locale, Msg::SignInStateMismatch);
+        return Ok(plain(
+            StatusCode::BAD_REQUEST,
+            locale,
+            Msg::SignInStateMismatch,
+        ));
     }
     if query.error.is_some() {
-        return plain(StatusCode::UNAUTHORIZED, locale, Msg::ProviderDidNotSignIn);
+        return Err(Stopped::new(
+            StatusCode::UNAUTHORIZED,
+            State::Rejected(stopped_notice(
+                locale,
+                Msg::SignInRejected,
+                Msg::ProviderDidNotSignIn,
+                false,
+            )),
+        ));
     }
     let Some(code) = query.code.as_deref() else {
-        return plain(StatusCode::BAD_REQUEST, locale, Msg::RedirectCarriesNoCode);
+        return Ok(plain(
+            StatusCode::BAD_REQUEST,
+            locale,
+            Msg::RedirectCarriesNoCode,
+        ));
     };
     let Some(oidc) = state.settings().oidc.as_ref() else {
-        return plain(
+        return Ok(plain(
             StatusCode::SERVICE_UNAVAILABLE,
             locale,
             Msg::SignInNotConfigured,
-        );
+        ));
     };
-    let signed_in = match exchange::exchange(state.provider(), oidc, pending, code).await {
-        Ok(signed_in) => signed_in,
-        Err(error) if error.refuses_the_operator() => {
-            tracing::warn!(error = %error, "a sign-in's ID Token was refused");
-            return plain(StatusCode::UNAUTHORIZED, locale, Msg::IdTokenDidNotVerify);
-        }
-        Err(error) => {
-            tracing::error!(
-                error = %crate::command::chain(&error),
-                "a sign-in could not be completed at the OpenID Provider"
-            );
-            return plain(StatusCode::BAD_GATEWAY, locale, Msg::SignInNotCompleted);
-        }
-    };
+    let signed_in = exchanged(state, oidc, pending, code, locale).await?;
     // NOTE: no specification governs this: our own design; a new sign-in ends
     // the session the browser held, so signing in again never fills the pool.
     if let Some(replaced) = state.sessions().cookie_in(headers, COOKIE)
         && let Err(error) = state.sessions().end(&replaced)
     {
-        return refused(locale, &error);
+        return Ok(refused(locale, &error));
     }
     let id = match state.sessions().establish(signed_in) {
         Ok(id) => id,
-        Err(error) => return refused(locale, &error),
+        Err(SessionError::Full) => {
+            return Err(Stopped::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                State::Full(stopped_notice(
+                    locale,
+                    Msg::SignInFull,
+                    Msg::SessionsFull,
+                    false,
+                )),
+            ));
+        }
+        Err(error) => return Ok(refused(locale, &error)),
     };
     let Ok(cookie) = HeaderValue::from_str(&state.sessions().session_cookie(&id).to_string())
     else {
         tracing::error!("the session cookie could not be written as a header");
-        return plain(
+        return Ok(plain(
             StatusCode::INTERNAL_SERVER_ERROR,
             locale,
             Msg::SessionNotBegun,
-        );
+        ));
     };
     let mut response = StatusCode::SEE_OTHER.into_response();
     let headers = response.headers_mut();
     headers.insert(LOCATION, HeaderValue::from_static("/"));
     headers.insert(SET_COOKIE, cookie);
     headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    response
+    Ok(response)
+}
+
+/// The operator `code` signs in, exchanged at the provider and checked.
+///
+/// # Errors
+/// Returns the [`Stopped`] sign-in when the provider refused the operator or
+/// its ID Token (`401`), or the exchange could not be completed (`502`).
+async fn exchanged(
+    state: &ConsoleState,
+    oidc: &OidcSettings,
+    pending: &PendingSignIn,
+    code: &str,
+    locale: &Locale,
+) -> Result<crate::session::SignedIn, Stopped> {
+    use ferrohealth_ui::view::sign_in::State;
+    exchange::exchange(state.provider(), oidc, pending, code)
+        .await
+        .map_err(|error| {
+            if error.refuses_the_operator() {
+                tracing::warn!(error = %error, "a sign-in's ID Token was refused");
+                return Stopped::new(
+                    StatusCode::UNAUTHORIZED,
+                    State::Rejected(stopped_notice(
+                        locale,
+                        Msg::SignInRejected,
+                        Msg::IdTokenDidNotVerify,
+                        false,
+                    )),
+                );
+            }
+            tracing::error!(
+                error = %crate::command::chain(&error),
+                "a sign-in could not be completed at the OpenID Provider"
+            );
+            Stopped::new(
+                StatusCode::BAD_GATEWAY,
+                State::Refused(stopped_notice(
+                    locale,
+                    Msg::SignInRefused,
+                    Msg::SignInNotCompleted,
+                    true,
+                )),
+            )
+        })
 }
 
 /// The answer to a session store that failed.

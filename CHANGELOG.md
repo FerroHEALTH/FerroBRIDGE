@@ -25,6 +25,219 @@ crates on crates.io.
 
 ### Added
 
+- A write the facade makes for an authenticated caller states that caller as
+  the version's committer, as ITS-REST 1.1.0 recommends ("provision these
+  headers based on authentication and authorization runtime data"): a
+  single write sends `openehr-audit-details` with `committer.name` set to the
+  token's `sub` (or the Basic user-id) and a `committer.external_ref` in the
+  issuer's namespace, and a transaction states the same committer in every
+  `UPDATE_AUDIT` of its CONTRIBUTION. `system_id` keeps naming the bridge.
+  A write no caller made (an HL7 v2 message, an open surface) still commits
+  under the bridge's name. Reads still reach the CDR under the bridge's own
+  credential (#532).
+- `ferrobridge vocab load DIR --schema NAME` loads an OHDSI Athena vocabulary
+  download into the vocabulary tables of the CDM schema (#233). It takes the
+  nine files every download carries and `SOURCE_TO_CONCEPT_MAP.csv` when
+  present, replaces each table in a transaction of its own through `COPY`
+  with the column list from the header row checked against the CDM
+  definitions, names every other file and leaves it alone, and prints the
+  rows per table and the vocabulary version. The format is the one the Athena
+  application writes, read from its source at a pinned commit and vendored
+  under `docs/specs/athena/` by `scripts/vendor/athena.sh` (#88). The Operate
+  pages describe the load and the vocabulary licences you accept.
+- FHIRconnect converts `DV_ORDINAL` against `CodeableConcept`
+  (`DV_ORDINAL.adoc` §CodeableConcept, #93): the coding carries the symbol,
+  and going into openEHR the ordinal value is the one the template's
+  `C_DV_ORDINAL` lists for the symbol's code. A symbol the template does not
+  list, or a node whose template lists no options, is refused.
+  `fhirconnect` 0.1.191 adds `RmValue::Ordinal`, `lens::ordinal` and a
+  fifth parameter to `cell::put`, the node's ordinal options; a caller of
+  `cell::put` passes `&[]` where it has none.
+- An OMOCL mapping's `provider_id` and `visit_detail_id` now write (#243):
+  the record graph names a `PROVIDER` by the text the mapping reads and a
+  `VISIT_DETAIL` by the composition's visit and that text, and the CDM
+  writer resolves or creates each row inside the composition's transaction,
+  the visit detail taking its person, concept, dates and type concept from
+  the visit. A record that names a visit detail without a visit is refused.
+  The bridge schema gains the `provider` and `visit_detail` key tables, which
+  `cdm init` creates on an existing schema.
+- The OMOCL `Death` target writes its `DEATH` row (#1208): the row takes the
+  person's `person_id` as its id, the newest composition that writes one gives
+  it its columns, and removing that composition restores the row of the
+  writer that remains. `cdm init` adds the `death_row` side table and lets
+  several compositions of a person record a `DEATH` row.
+
+### Fixed
+
+- With `[cdm] tls_ca` set, the concept resolver's pool now trusts that CA
+  alone, as the CDM writer does (#266). The pool no longer runs its
+  PostgreSQL client's own TLS, which added a built-in root set to the CA: it
+  reaches the database through a relay on a private Unix socket that
+  handshakes with the writer's TLS configuration. A URL that asks for TLS
+  names one host and one port; a list of hosts is refused at start.
+
+## [0.0.12] - 2026-10-25
+
+The FHIRconnect and facade outcomes release. A write through the facade now
+shows the client the losses its mapping declared, a transaction names why it
+refuses a linked resource, and the FHIRconnect operations answer `502` when
+the terminology server fails. FHIRconnect looks up the display of a `DV_TEXT`
+that fell back to a code, ranks a direct data-type pair above the text
+fallback, and `openehr-mapping-core` exposes the `DV_ORDINAL` options a
+template constrains. The `fhir-types` XML codec holds the narrative `div` to
+well-formed XHTML both ways. The terminology client gains `$expand`,
+`$subsumes`, the `date` input, a caller-built HTTP client for mutual TLS or a
+private trust root, and context-aware `$validate-code`, and the operator
+console draws the running configuration.
+
+The library crates publish at `fhir-types` 0.1.128, `openehr-mapping-core`
+0.1.128, `fhirconnect` 0.1.190, `ferrobridge-term` 0.1.134,
+`ferrobridge-validator` 0.1.134, `ferrobridge-fhirpath` 0.1.128 and
+`ferrobridge-hl7v2` 0.1.141, and `hl7v2-types` stays at 0.1.127. A crate
+version an entry below names is the step at which that change came in.
+
+### Added
+
+- `WebTemplateIndex::ordinal_options` returns the options an OPT 1.4
+  `C_DV_ORDINAL` constrains at a `DV_ORDINAL` node, in template order: each
+  `OrdinalOption` carries the ordinal `value` and the code and terminology
+  of its symbol, and a node with no ordinal constraint answers `None`.
+  `openehr-mapping-core` moves to 0.1.127, `fhirconnect` to 0.1.186 and
+  `ferrobridge-hl7v2` to 0.1.135 with it (#1090).
+- The facade shows a write's declared losses to the client that wrote it: a
+  committed transaction entry carries them in `response.outcome`, and a
+  single create or update asked for `Prefer: return=OperationOutcome` lists
+  them after the committed version, one issue per loss with the FHIRPath in
+  `expression` and the openEHR path in `details` (#1115).
+- `GET /operator/configuration` answers the configuration the bridge started
+  on, behind `[operator]` and the operator scope like the other operator
+  routes: every key with its value and its source (the file, the
+  environment or the default), and each secret by reference alone (set,
+  read from a file, or unset), never its value. The document is
+  `ferrobridge_operator_api::configuration::Configuration`, which the
+  operator console decodes (#1147).
+- The operator console draws the running configuration: a Configuration
+  page with the Logging, Mappings and Server and access tabs, a Settings tab
+  on the FHIR facade, HL7 v2, the OMOP ETL and each connection, and the
+  host and credentials of each upstream in the Connections table. Every
+  value is read-only, with its TOML key and whether it came from the
+  environment or is the default, and every secret is shown by reference
+  alone; How configuration works opens from the line that names the file.
+  An empty `[auth] product_scope` is answered as the scope the bridge runs
+  on, `__ferrobridge.operator` (#1147).
+- `hl7v2-types` (Apache-2.0) and `ferrobridge-hl7v2` (BUSL-1.1) join the
+  crate line at 0.1.127, leaving their 0.0.0 name reservations, so the next
+  publish ships the HL7 v2 tables and the HL7 v2 face (MLLP framing, MSH-18
+  decoding, the positional parser, the acknowledgment and the v2-to-FHIR
+  map) on crates.io for other projects to depend on. Each README carries a
+  worked example, and the entry points of `ferrobridge-hl7v2` carry tested
+  `# Examples`. Pin each exactly, as for every crate of the line (#1131).
+- `ferrobridge-term` 0.1.130 sends `ValueSet/$expand` and
+  `CodeSystem/$subsumes`, on STU3, R4 and R4B and in a `batch`.
+  `Client::expand` takes an `Expansion` (`url`, `valueSetVersion`, `date`,
+  `filter`, `offset` and `count`, `includeDesignations`) and answers the
+  expanded value set with the nesting of `expansion.contains` kept, each
+  entry with its system, version, code, display, `abstract`, `inactive` and
+  designations; a value set the server does not know is
+  `ExpandOutcome::NotFound` carrying the `OperationOutcome` and its
+  `tx-issue-type`, and an expansion the server could not make is a refusal,
+  never an empty expansion. `Client::subsumes` answers `SubsumesOutcome`:
+  `Equivalent`, `Subsumes`, `SubsumedBy` or `NotSubsumed`.
+  `Client::code_system_count` asks
+  `GET [base]/CodeSystem?url=<system>&_summary=count`. `ferrobridge-validator`
+  moves to 0.1.130 and `ferrobridge-hl7v2` to 0.1.128 with it (#1177).
+- `ferrobridge-term` 0.1.131 reaches a terminology server through an HTTP
+  client the caller builds: `Client::with_http(config, reqwest::Client)`
+  sends every request through it, so a deployment can present a client
+  certificate for mutual TLS, trust a private root beside the platform's or
+  use a proxy. The configured timeout still bounds each request, and the
+  credentials, the retry budget and the typed errors apply as for
+  `Client::new` (#1180).
+- `ferrobridge-term` 0.1.131 validates a code whose system its context
+  implies: `Coded::InContext` sends `ValueSet/$validate-code` with
+  `context`, `code` and `display` and no `system`, which R4 and R4B accept
+  ("If a code is provided, a system or a context must be provided"), alone
+  or in a `batch`. STU3 requires a system for a code, so an STU3 client
+  refuses the form with the new `Error::SystemRequired` and sends nothing,
+  and `Client::check` answers the same (#1181). `ferrobridge-validator`
+  moves to 0.1.131 and `ferrobridge-hl7v2` to 0.1.129 with it.
+
+### Changed
+
+- `fhirconnect` 0.1.188 moves `engine::rm::NULL_FLAVOUR`, `NULL_REASON` and
+  `null_flavour_of` to `engine::rm::null_flavour`, which breaks an import of
+  them: name them through `engine::rm::null_flavour::` (#1194).
+- A transaction entry whose mapping links a resource as a composition of its
+  own is refused with `422` and `not-supported`, naming why and the ways that
+  commit it: the resource on its own, or as an entry of a `batch`, whose
+  entries commit one at a time and follow the link as a single create does
+  (#1120).
+- `ferrobridge-term` 0.1.130 carries the `date` input of `CodeSystem/$lookup`
+  and `ValueSet/$validate-code`: `Client::lookup_at` sends it, and
+  `Request::Lookup` and `Validation` gain a `date` field. This breaks a
+  struct literal of either: add `date: None` where no date is meant (#1177).
+- `SECURITY.md` states the fix-time targets every product of the Ferro family
+  commits to, counted from the confirmed assessment: a fixed release within
+  7 days for a Critical vulnerability, 30 days for High, 90 days for Medium
+  and with the next release for Low, beside the acknowledgement within about
+  5 business days and the initial assessment within about 10, both best
+  effort as before.
+
+### Fixed
+
+- The `fhir-types` XML codec holds a narrative `div` to well-formed XHTML
+  both ways: `xml::to_xml` refuses a `div` that is no well-formed XHTML
+  `div` in the XHTML namespace with an `EncodeError` naming its element path,
+  such as `Basic.text.div`, and `xml::from_xml` refuses a start tag whose
+  attributes are not well-formed XML (no whitespace between two attributes,
+  a name that is no XML name, a `<` in a value), in the narrative and in
+  every other element, where it accepted them and wrote them back repaired.
+  `fhir-types` moves to 0.1.128, `fhirconnect` to 0.1.189,
+  `ferrobridge-term` and `ferrobridge-validator` to 0.1.134,
+  `ferrobridge-fhirpath` to 0.1.128 and `ferrobridge-hl7v2` to 0.1.140 with
+  it (#1178).
+- A coding with no `display` written into a `DV_TEXT`, whose value would
+  otherwise fall back to the coding's code, is looked up through
+  `CodeSystem/$lookup` as one written into a `DV_CODED_TEXT` is: the display
+  becomes the value, an unknown code refuses unless
+  `[terminology] display_fallback` is set, a failed call refuses, and with no
+  server the code stands. `fhirconnect` moves to 0.1.185 and
+  `ferrobridge-hl7v2` to 0.1.134 with it (#1188).
+- An untyped `dateTime` mapped onto an `ELEMENT` whose value admits
+  `DV_TEXT` and `DV_DATE_TIME` converts into `DV_DATE_TIME` whatever the
+  template order: a class that pairs with the FHIR type directly outranks
+  the text fallback. `fhirconnect` moves to 0.1.181 and `ferrobridge-hl7v2`
+  to 0.1.130 with it (#1114).
+- `$toopenehr` and `$tofhir` answer `502` with the issue type `transient`
+  when the terminology server fails during the run, with the upstream status
+  in the diagnostics, as the facade's writes do. A translation the server
+  answers with no match stays a `422` (#1119).
+
+## [0.0.11] - 2026-10-24
+
+The operator console release. The console is rebuilt page for page on
+FerroUI 0.3.6 and renamed from `ferrobridge-viewer` to `ferrobridge-console`,
+so its image, environment variables, compose profile, cookies and page
+addresses change: the Changed section below lists each, with what an
+operator changes. Release images are scanned before they are tagged, every
+release carries a vulnerability record in which each finding is judged, and
+the notes state the support period and link the CRA information for users.
+FHIRconnect registers the last `mappingCode` functions of the published
+library and gains display resolution, `NULL_FLAVOUR`, the `EVENT` choice and
+the quantity, temporal, URI, string and interval data-type pairs.
+
+### Added
+
+- The book has a [CRA information for users](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)
+  page (#1152): the information and instructions Annex II of the Cyber
+  Resilience Act (Regulation (EU) 2024/2847) has accompany each release,
+  point by point, from the manufacturer and the vulnerability contact to the
+  support period, secure use, updates, decommissioning and the SBOMs. The
+  release notes `scripts/release/plan.sh` composes now end with a link to it,
+  and the composition refuses when the book does not list the page.
+  `SECURITY.md` names the operator console's release tarballs and site
+  bundle among the supported artefacts.
+
 - The eighth `mappingCode` function of the published FHIRconnect library,
   `ehrStatusAddExternalREF`, is registered (#1065), so
   `KDS_admin_entry_person.yml` loads in the published person context. It
@@ -286,6 +499,55 @@ crates on crates.io.
 
 ### Changed
 
+- The operator console moves to FerroUI 0.3.3 (`ferrohealth-ui = "=0.3.3"`,
+  #1154) with the library's `split` feature on, since its site builds with
+  `cargo leptos build --split`. The parts the 0.3.2 rewrite drew stand-ins
+  for are now drawn as designed (#1146): the Bridge group of the navigation
+  and the dashboard's flow and Upstreams card take the design's `flame`,
+  `message-square`, `table-2` and `plug` glyphs; every state a table cell,
+  a fact or a title shows is the F12 state mark; a context file's subtitle
+  bolds its resource type and links its template. The Files tab's Language
+  and Owner filters are the library's filter menu: a checkbox per choice
+  with the number of files it keeps, sent with the find words, so
+  `?owner=console&owner=provisioned` names several choices and an address
+  with one value keeps working.
+- The operator console moves to FerroUI 0.3.4 (`ferrohealth-ui = "=0.3.4"`,
+  #1155), which carries the two parts the 0.3.3 move still drew stand-ins
+  for. The dashboard's flow draws the design's `send` glyph for the HL7 v2
+  senders and `book-open` for the terminology server, and its head offers
+  How it is drawn, which opens the How the flow is drawn dialog: each state
+  the flow draws, its line and what it means. The mapping editor and the
+  playground's JSON input take keys from the first paint, before the page
+  hydrates.
+- The operator console moves to FerroUI 0.3.5 (`ferrohealth-ui = "=0.3.5"`,
+  #1166). The console draws no part 0.3.5 changes, so its pages look and
+  behave as before.
+- The operator console moves to FerroUI 0.3.6 (`ferrohealth-ui = "=0.3.6"`,
+  #1168). The console draws no activity chart, the one part whose interface
+  0.3.6 changes, so its pages look and behave as before.
+
+- Both container images name their manufacturer: the
+  `org.opencontainers.image.vendor` label and index annotation of
+  `ghcr.io/ferrohealth/ferrobridge` and `ghcr.io/ferrohealth/ferrobridge-console`
+  read `Cadasto B.V.` where they read `FerroBRIDGE` (#1152).
+
+- A release's notes end with its support period (#1149): the month and year
+  until which Cadasto B.V. keeps publishing security fixes, five years from
+  the release date (CRA Art 13(8) and (19)). The release lane refuses a cut
+  whose `### Security` entries name no `GHSA-` advisory or `security/vex/`
+  statement, or that mixes security and functional changes without saying
+  why (CRA Annex I Part II(2)); `scripts/release/preflight.sh vX.Y.Z` runs
+  the same checks before the tag. `SECURITY.md` adds `info@cadasto.com` as a
+  reporting route and describes the advisory each fix is published with.
+- The `ferrobridge` and `ferrobridge-console` images of a release are tagged
+  only after a Trivy scan of each pushed digest finds no fixable HIGH or
+  CRITICAL vulnerability (#1149), and a release carries
+  `ferrobridge-vX.Y.Z-vulnerability-record.json`: every finding of a full
+  scan of both images and the server tarballs, joined with the OpenVEX
+  statement under `security/vex/` that judges it. The release is refused
+  while a finding has none. `security/vex/rust-advisories.openvex.json`
+  publishes the argument for each advisory `deny.toml` accepts, and the
+  published images are scanned every week with those documents applied.
 - **Breaking:** the operator console is renamed from `ferrobridge-viewer`
   to `ferrobridge-console` (#1133), as every FerroHEALTH product names its
   operator UI. The crate and its binary are `ferrobridge-console`
@@ -299,7 +561,11 @@ crates on crates.io.
   `FERROBRIDGE_CONSOLE_CONFIG`; in `compose.yaml` the profile and service
   `viewer` are `console` and the secret file
   `secrets/viewer_oidc_client_secret` is
-  `secrets/console_oidc_client_secret`. The session, sign-in and theme
+  `secrets/console_oidc_client_secret`, mounted at
+  `/run/secrets/console_oidc_client_secret`; the compose variables
+  `FERROBRIDGE_VIEWER_PORT` and `FERROBRIDGE_VIEWER_OIDC_CLIENT_SECRET_FILE`
+  are `FERROBRIDGE_CONSOLE_PORT` and
+  `FERROBRIDGE_CONSOLE_OIDC_CLIENT_SECRET_FILE`. The session, sign-in and theme
   cookies are renamed from `ferrobridge_viewer_*` to
   `ferrobridge_console_*`, so every operator signs in again after the
   upgrade and the theme starts from the system's. The CI job and the build
@@ -307,6 +573,53 @@ crates on crates.io.
   `console-tools.sh`, `scripts/checks/console-bundle.sh`,
   `console-paths.sh`).
 
+- **Breaking:** the operator console is drawn anew on FerroUI 0.3.2
+  (`ferrohealth-ui = "=0.3.2"`, #1143, FerroHEALTH/FerroUI#161), page for
+  page from the FerroBRIDGE design. It runs in Leptos islands mode: the
+  server draws every page whole and the browser hydrates only the menus,
+  the code editor and the JSON input, each island loaded lazily from its
+  own chunk (the entry bundle measured 316603 bytes brotli-compressed). The
+  pages are the dashboard with the flow, the Mapping set with its Contexts,
+  OMOCL, Templates, Files and Diagnostics tabs, each mapping file with its
+  Program tab, each template, the editor, the playground with its
+  `$tofhir`, `$toopenehr` and `$validate` tabs, the FHIR facade, HL7 v2,
+  OMOP ETL, Connections, Your preferences and About. Upgrade note: the
+  addresses moved, and an old bookmark answers the page-not-found page:
+  `/files` is `/mappings/files`, `/files/{path}` is
+  `/mappings/files/{path}`, `/edit` is `/mappings/new`, `/edit/{path}` is
+  `/mappings/edit/{path}`, `/validate` is `/playground/validate`, and
+  `/capability` is `/facade/capability` and `/facade/security`.
+- **Breaking:** the console registers no server function. Every action (a
+  preference, a reload, a check, a save, a playground run) is a plain form
+  post to its page's own address, which the server answers with the page it
+  draws, so every action works before any WebAssembly arrives. Upgrade
+  note: the console's `/api/…` server-function routes no longer exist;
+  the console has no API, and a script reads the bridge's operator API.
+- **Breaking:** the theme toggle is gone from the top bar. The theme is set
+  in the user menu and in Your preferences alone. Your preferences has
+  three tabs (Appearance, Language and region, Keyboard), and each choice is
+  kept in a cookie of its own for a year: `ferrobridge_console_theme`,
+  `_density`, `_motion`, `_language`, `_week-start` and `_hints` (under
+  `__Host-` when the cookies are secure), with Reset to defaults clearing
+  them. The sidebar folds to a rail, kept in `ferrobridge_console_sidebar`.
+  Upgrade note: every operator chooses the theme again; nothing to
+  configure.
+- **Breaking:** a sign-out with no `end_session_endpoint` configured lands
+  on the new signed-out page, `/signed-out`, instead of the sign-in. A
+  sign-in the provider refused, could not complete, or a full session pool
+  now draws the sign-in card with what happened and the way on, with the
+  status `401`, `502` or `503`. Upgrade note: nothing to configure; a
+  monitor that followed the sign-out to `/` follows it to `/signed-out`.
+- The editor saves a draft with LF line ends: a text area posts its line
+  breaks as CRLF (HTML Living Standard §4.10.11), and the console reads the
+  draft back with the LF the editor shows, so the bytes saved are the bytes
+  you edited. A `$toopenehr` answer in the playground shows the composition
+  its `composition` parameter carries, with the issues of its `outcome`
+  above it, and the template is a choice of the running set's templates.
+  The Settings tabs and the Configuration page of the design wait for the
+  operator API's configuration document (#1147); the design's navigation
+  glyphs, its state words and a subtitle with markup wait for FerroUI
+  (#1146).
 - The workspace builds with Rust 1.99.1 in place of 1.98.1, and the MSRV
   stays at 1.98: the FerroHEALTH family builds with the latest stable
   toolchain and declares the release before it as its MSRV. Clippy 1.99's
@@ -682,17 +995,24 @@ crates on crates.io.
 
 ### Security
 
+Shipped with functional changes because: only the newest release is supported (SECURITY.md), so a separate 0.0.10 patch published beside 0.0.11 would be out of support the moment 0.0.11 lands and give no one a release to stay on; each fix is a dependency or base-image bump with no behaviour change of its own.
+
+- `ctutils` moves from 0.4.2 to 0.4.5 (RUSTSEC-2026-0385,
+  GHSA-qq87-xvj3-pfgj): before 0.4.4 its constant-time mask generation could
+  compile to a branch on a secret value. It reaches the build through
+  `digest` 0.11.
 - The TLS stack the bridge calls the CDR, the terminology server and the
   sending sites through no longer trusts the distrusted emSign
   intermediates: `rustls-webpki` 0.103.16 rejects their public keys
   (RUSTSEC-2026-0382), and `webpki-roots` and `webpki-root-certs` 1.0.10
-  drop the root that allowed them (RUSTSEC-2026-0381, RUSTSEC-2026-0383).
+  drop the root that allowed them (RUSTSEC-2026-0381, RUSTSEC-2026-0383,
+  GHSA-6q27-c9m3-vj9m).
 - The bridge and operator console images no longer trust the compromised
   eMudhra (emSign) intermediates in the system trust store (Debian
-  DSA-6572-1, #1140). The distroless base
+  DSA-6572-1, GHSA-6q27-c9m3-vj9m, #1140). The distroless base
   `gcr.io/distroless/static-debian13:nonroot` moves to index digest
   `d620678`, which ships `ca-certificates` 20250419+deb13u1, in the `FROM`
-  of `docker/Dockerfile` and `docker/viewer/Dockerfile` and in the pin row.
+  of `docker/Dockerfile` and `docker/console/Dockerfile` and in the pin row.
 
 ## [0.0.10] - 2026-10-19
 
@@ -4460,7 +4780,9 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.10...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.12...HEAD
+[0.0.12]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.11...v0.0.12
+[0.0.11]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.10...v0.0.11
 [0.0.10]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.9...v0.0.10
 [0.0.9]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.7...v0.0.8

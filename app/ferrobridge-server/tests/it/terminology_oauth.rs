@@ -15,7 +15,6 @@ use ferrobridge_testkit::stubs::terminology;
 use ferrohealth_smart::client::TokenError;
 use http::StatusCode;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 
@@ -30,7 +29,7 @@ const LOOKUP_PATH: &str = "/r4/CodeSystem/$lookup";
 fn client(
     terminology: &MockServer,
     authorization: &MockServer,
-) -> Result<Client, Box<dyn StdError>> {
+) -> Result<Client, Box<dyn std::error::Error>> {
     let text = format!(
         concat!(
             "[terminology]\nbase_url = \"{}/r4\"\n\n",
@@ -105,7 +104,7 @@ async fn lookup(client: &Client) -> Result<LookupOutcome, Error> {
 }
 
 /// Returns how many requests `server` received on `route`.
-async fn received(server: &MockServer, route: &str) -> Result<usize, Box<dyn StdError>> {
+async fn received(server: &MockServer, route: &str) -> Result<usize, Box<dyn std::error::Error>> {
     Ok(server
         .received_requests()
         .await
@@ -117,7 +116,7 @@ async fn received(server: &MockServer, route: &str) -> Result<usize, Box<dyn Std
 
 #[tokio::test]
 async fn the_token_is_fetched_with_the_grant_and_sent_as_a_bearer_token()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let authorization = MockServer::start().await;
     let terminology_server = MockServer::start().await;
     // NOTE: RFC 6749 §4.4.2, the request names the grant; §2.3.1, the client
@@ -146,7 +145,7 @@ async fn the_token_is_fetched_with_the_grant_and_sent_as_a_bearer_token()
 }
 
 #[tokio::test]
-async fn the_token_is_cached_across_calls() -> Result<(), Box<dyn StdError>> {
+async fn the_token_is_cached_across_calls() -> Result<(), Box<dyn std::error::Error>> {
     let authorization = MockServer::start().await;
     let terminology_server = MockServer::start().await;
     mount_token_once(&authorization, issued("synthetic-token-1")).await;
@@ -163,7 +162,7 @@ async fn the_token_is_cached_across_calls() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_terminology_401_renews_the_token_once() -> Result<(), Box<dyn StdError>> {
+async fn a_terminology_401_renews_the_token_once() -> Result<(), Box<dyn std::error::Error>> {
     let authorization = MockServer::start().await;
     let terminology_server = MockServer::start().await;
     mount_token_once(&authorization, issued("synthetic-token-1")).await;
@@ -189,7 +188,8 @@ async fn a_terminology_401_renews_the_token_once() -> Result<(), Box<dyn StdErro
 }
 
 #[tokio::test]
-async fn a_renewed_token_refused_again_is_not_renewed_twice() -> Result<(), Box<dyn StdError>> {
+async fn a_renewed_token_refused_again_is_not_renewed_twice()
+-> Result<(), Box<dyn std::error::Error>> {
     let authorization = MockServer::start().await;
     let terminology_server = MockServer::start().await;
     mount_token_once(&authorization, issued("synthetic-token-1")).await;
@@ -210,7 +210,7 @@ async fn a_renewed_token_refused_again_is_not_renewed_twice() -> Result<(), Box<
 
 #[tokio::test]
 async fn a_renewal_the_authorization_server_refuses_carries_its_error()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let authorization = MockServer::start().await;
     let terminology_server = MockServer::start().await;
     mount_token_once(&authorization, issued("synthetic-token-1")).await;
@@ -230,8 +230,8 @@ async fn a_renewal_the_authorization_server_refuses_carries_its_error()
 
     assert!(matches!(error, Error::Renewal { .. }), "{error:?}");
     assert_eq!(Some(StatusCode::UNAUTHORIZED), error.upstream_status());
-    let cause = StdError::source(&error)
-        .and_then(StdError::source)
+    let cause = std::error::Error::source(&error)
+        .and_then(std::error::Error::source)
         .ok_or("the renewal carries the token error")?;
     let token_error = cause
         .downcast_ref::<TokenError>()

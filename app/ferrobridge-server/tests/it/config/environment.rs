@@ -8,13 +8,12 @@ use ferrobridge_server::config::Config;
 use ferrobridge_server::config::error::Error;
 use ferrobridge_server::telemetry::{DEFAULT_FILTER, FILTER_ENV, FORMAT_ENV, Format};
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 
 use super::FULL;
 use super::env;
 
 #[test]
-fn an_environment_override_wins_over_the_file() -> Result<(), Box<dyn StdError>> {
+fn an_environment_override_wins_over_the_file() -> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(
         Some(FULL),
         &env("FERROBRIDGE__SERVER__LISTEN", "127.0.0.1:7777"),
@@ -26,7 +25,7 @@ fn an_environment_override_wins_over_the_file() -> Result<(), Box<dyn StdError>>
 
 #[test]
 fn an_environment_override_reaches_a_nested_section_and_keeps_its_type()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(
         Some(FULL),
         &env("FERROBRIDGE__CDR__RETRY__MAX_ATTEMPTS", "9"),
@@ -38,7 +37,8 @@ fn an_environment_override_reaches_a_nested_section_and_keeps_its_type()
 }
 
 #[test]
-fn an_environment_override_turns_a_lane_on_with_no_file_at_all() -> Result<(), Box<dyn StdError>> {
+fn an_environment_override_turns_a_lane_on_with_no_file_at_all()
+-> Result<(), Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([
         (
             String::from("FERROBRIDGE__CDR__BASE_URL"),
@@ -68,8 +68,8 @@ fn an_environment_override_turns_a_lane_on_with_no_file_at_all() -> Result<(), B
 }
 
 #[test]
-fn the_console_variables_win_over_the_file_and_the_tree_overrides() -> Result<(), Box<dyn StdError>>
-{
+fn the_console_variables_win_over_the_file_and_the_tree_overrides()
+-> Result<(), Box<dyn std::error::Error>> {
     let file = "[telemetry]\nformat = \"json\"\nfilter = \"warn\"\n";
     let tree = BTreeMap::from([
         (
@@ -104,7 +104,7 @@ fn a_log_format_outside_the_three_is_refused_naming_the_key() {
         .expect_err("xml is not a console format");
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
     assert!(
-        format!("{:?}", StdError::source(&error)).contains("format"),
+        format!("{:?}", std::error::Error::source(&error)).contains("format"),
         "the refusal names the key: {error:?}"
     );
 }
@@ -132,7 +132,7 @@ fn a_log_format_outside_the_three_exits_seventy_eight() {
 }
 
 /// Returns the CDR user name the environment value `user` resolves to.
-fn cdr_user(user: &str) -> Result<String, Box<dyn StdError>> {
+fn cdr_user(user: &str) -> Result<String, Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([
         (
             String::from("FERROBRIDGE__CDR__BASE_URL"),
@@ -156,32 +156,34 @@ fn cdr_user(user: &str) -> Result<String, Box<dyn StdError>> {
 }
 
 #[test]
-fn an_all_digit_value_reaches_a_string_key_as_a_string() -> Result<(), Box<dyn StdError>> {
+fn an_all_digit_value_reaches_a_string_key_as_a_string() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!("12345", cdr_user("12345")?);
     Ok(())
 }
 
 #[test]
-fn a_boolean_looking_value_reaches_a_string_key_as_a_string() -> Result<(), Box<dyn StdError>> {
+fn a_boolean_looking_value_reaches_a_string_key_as_a_string()
+-> Result<(), Box<dyn std::error::Error>> {
     assert_eq!("true", cdr_user("true")?);
     Ok(())
 }
 
 #[test]
-fn a_float_looking_value_reaches_a_string_key_as_a_string() -> Result<(), Box<dyn StdError>> {
+fn a_float_looking_value_reaches_a_string_key_as_a_string() -> Result<(), Box<dyn std::error::Error>>
+{
     assert_eq!("1.5", cdr_user("1.5")?);
     Ok(())
 }
 
 #[test]
-fn a_quoted_value_reaches_a_string_key_with_its_quotes() -> Result<(), Box<dyn StdError>> {
+fn a_quoted_value_reaches_a_string_key_with_its_quotes() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!("\"bridge\"", cdr_user("\"bridge\"")?);
     Ok(())
 }
 
 #[test]
 fn a_digit_string_and_a_number_in_one_environment_each_take_their_key_type()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([
         (
             String::from("FERROBRIDGE__SERVER__BODY_LIMIT_BYTES"),
@@ -227,7 +229,7 @@ fn a_numeric_key_given_text_that_is_no_number_is_refused_naming_the_key() {
     )
     .expect_err("max_attempts is a number");
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
-    let cause = StdError::source(&error).map(ToString::to_string);
+    let cause = std::error::Error::source(&error).map(ToString::to_string);
     assert!(
         cause.is_some_and(|cause| cause.contains("max_attempts")),
         "the refusal names the key: {error:?}"
@@ -244,8 +246,8 @@ fn a_numeric_key_given_a_number_out_of_its_range_is_refused() {
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
 }
 #[test]
-fn the_demographic_api_is_off_unless_the_cdr_section_turns_it_on() -> Result<(), Box<dyn StdError>>
-{
+fn the_demographic_api_is_off_unless_the_cdr_section_turns_it_on()
+-> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(Some(FULL), &BTreeMap::new())?.resolve()?;
     assert!(
         !settings

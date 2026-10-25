@@ -8,7 +8,7 @@ use ferrobridge_server::facade::identity::store::Store;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 
 use super::EHR_ID;
 use super::VERSION_ONE;
@@ -30,7 +30,7 @@ use super::transaction_of;
 use super::writes;
 
 #[tokio::test]
-async fn if_none_exist_creates_when_nothing_matches() -> Result<(), Box<dyn StdError>> {
+async fn if_none_exist_creates_when_nothing_matches() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -44,7 +44,7 @@ async fn if_none_exist_creates_when_nothing_matches() -> Result<(), Box<dyn StdE
 }
 
 #[tokio::test]
-async fn if_none_exist_answers_two_hundred_when_one_matches() -> Result<(), Box<dyn StdError>> {
+async fn if_none_exist_answers_two_hundred_when_one_matches() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -69,7 +69,7 @@ async fn if_none_exist_answers_two_hundred_when_one_matches() -> Result<(), Box<
 
 #[tokio::test]
 async fn if_none_exist_answers_four_hundred_and_twelve_when_several_match()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let first = create_one(&harness).await?;
     let second = ferrobridge_server::facade::identity::FhirResourceId::new("secondmatch")?;
@@ -107,7 +107,7 @@ const CONDITION_IDENTIFIER_VALUE: &str = "synthetic-condition-0001";
 
 #[tokio::test]
 async fn if_none_exist_on_an_identifier_a_committed_resource_carries_answers_two_hundred_and_commits_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // "If the search finds one match, the server returns 200 OK"
     // (<https://hl7.org/fhir/R4/http.html#ccreate>); the token forms are
     // `[system]|[code]` and `[code]` (<https://hl7.org/fhir/R4/search.html#token>).
@@ -135,7 +135,7 @@ async fn if_none_exist_on_an_identifier_a_committed_resource_carries_answers_two
 
 #[tokio::test]
 async fn if_none_exist_on_an_identifier_no_resource_carries_still_creates()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     create_one(&harness).await?;
     for (sender_id, search) in [
@@ -166,7 +166,7 @@ async fn if_none_exist_on_an_identifier_no_resource_carries_still_creates()
 
 #[tokio::test]
 async fn if_none_exist_on_an_identifier_two_resources_carry_is_four_hundred_and_twelve()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // "If it finds more than one match, the server returns 412 Precondition
     // Failed" (<https://hl7.org/fhir/R4/http.html#ccreate>).
     let harness = harness().await;
@@ -209,7 +209,7 @@ async fn if_none_exist_on_an_identifier_two_resources_carry_is_four_hundred_and_
 }
 
 #[tokio::test]
-async fn if_none_exist_on_every_code_of_a_system_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn if_none_exist_on_every_code_of_a_system_is_refused() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let (status, body) = call(
         harness.app(),

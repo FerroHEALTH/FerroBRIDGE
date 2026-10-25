@@ -10,7 +10,7 @@
 //! call sends `reverse=true` and the FHIR-bound call sends none
 //! (<https://hl7.org/fhir/R4/conceptmap-operation-translate.html>).
 
-use std::error::Error as StdError;
+use std::error::Error;
 
 use axum::body::Body;
 use ferrobridge_server::terminology::Translator;
@@ -110,7 +110,7 @@ async fn sent(
     server: &MockServer,
     index: usize,
     name: &str,
-) -> Result<Option<serde_json::Value>, Box<dyn StdError>> {
+) -> Result<Option<serde_json::Value>, Box<dyn Error>> {
     let requests = server
         .received_requests()
         .await
@@ -136,7 +136,7 @@ async fn sent(
 
 #[tokio::test]
 async fn a_conceptmap_translates_both_ways_with_reverse_only_going_into_openehr()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     mount_map(&server).await;
     let root = mapping_tree_with(MODEL_FILE)?;
@@ -212,7 +212,7 @@ async fn a_conceptmap_translates_both_ways_with_reverse_only_going_into_openehr(
 
 #[tokio::test]
 async fn a_refused_translation_refuses_the_run_with_the_upstream_status()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/r4/ConceptMap/$translate"))
@@ -232,15 +232,67 @@ async fn a_refused_translation_refuses_the_run_with_the_upstream_status()
             .body(Body::from(bundle()?))?,
     )
     .await?;
-    assert_ne!(StatusCode::OK, status, "{body}");
+    assert_eq!(StatusCode::BAD_GATEWAY, status, "{body}");
+    assert!(body.contains(r#""code":"transient""#), "{body}");
     assert!(body.contains(CONCEPT_MAP), "{body}");
     assert!(body.contains("404"), "the upstream status travels: {body}");
     Ok(())
 }
 
 #[tokio::test]
+async fn a_failing_terminology_server_answers_502_naming_the_upstream_status()
+-> Result<(), Box<dyn Error>> {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/r4/ConceptMap/$translate"))
+        .respond_with(terminology::outcome(
+            503,
+            "transient",
+            None,
+            "the synthetic terminology server is down",
+        ))
+        .mount(&server)
+        .await;
+    let root = mapping_tree_with(MODEL_FILE)?;
+    let (status, _, body) = call(
+        app_with(&root, translator(&server)?)?,
+        Request::post("/fhir/$toopenehr")
+            .header(header::CONTENT_TYPE, FHIR_JSON)
+            .body(Body::from(bundle()?))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::BAD_GATEWAY, status, "{body}");
+    assert!(body.contains(r#""code":"transient""#), "{body}");
+    assert!(body.contains("503"), "the upstream status travels: {body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_translation_answered_with_no_match_stays_a_422() -> Result<(), Box<dyn Error>> {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/r4/ConceptMap/$translate"))
+        .respond_with(terminology::translate_no_match(
+            "no translation for that code",
+        ))
+        .mount(&server)
+        .await;
+    let root = mapping_tree_with(MODEL_FILE)?;
+    let (status, _, body) = call(
+        app_with(&root, translator(&server)?)?,
+        Request::post("/fhir/$toopenehr")
+            .header(header::CONTENT_TYPE, FHIR_JSON)
+            .body(Body::from(bundle()?))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+    assert!(body.contains(r#""code":"processing""#), "{body}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn with_no_terminology_server_a_conceptmap_refuses_naming_the_missing_server()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let root = mapping_tree_with(MODEL_FILE)?;
     let (status, _, body) = call(
         app_with(&root, Translator::default())?,
@@ -259,8 +311,7 @@ async fn with_no_terminology_server_a_conceptmap_refuses_naming_the_missing_serv
 }
 
 #[tokio::test]
-async fn a_run_the_engine_refuses_is_counted_as_a_mapping_failure() -> Result<(), Box<dyn StdError>>
-{
+async fn a_run_the_engine_refuses_is_counted_as_a_mapping_failure() -> Result<(), Box<dyn Error>> {
     let root = mapping_tree_with(MODEL_FILE)?;
     let state = state_with(&root, Translator::default())?;
     let app = ferrobridge_server::router(std::sync::Arc::clone(&state), &server_settings());

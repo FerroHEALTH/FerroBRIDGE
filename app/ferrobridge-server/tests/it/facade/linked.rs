@@ -6,7 +6,7 @@
 //! into the Condition composition's `LINK.target`
 //! (`types-of-mappings/concept-type/concept-mappings.adoc`, §Linked mappings).
 
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -86,7 +86,7 @@ impl Respond for Committing {
 
 /// Returns a harness over [`FIXTURES`] whose facade fetches references from
 /// `base`, and whose CDR commits as `committing` answers.
-async fn linking(base: &str, committing: Committing) -> Result<Harness, Box<dyn StdError>> {
+async fn linking(base: &str, committing: Committing) -> Result<Harness, Box<dyn Error>> {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(
@@ -175,7 +175,7 @@ fn condition(sender: &MockServer) -> serde_json::Value {
 async fn post(
     harness: &Harness,
     resource: &serde_json::Value,
-) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     call(
         harness.app(),
         Request::post("/fhir/Condition")
@@ -217,7 +217,7 @@ fn link_targets(composition: &serde_json::Value) -> Vec<String> {
 
 #[tokio::test]
 async fn a_linked_resource_is_committed_first_and_its_composition_linked()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // concept-mappings.adoc §Linked mappings: the context the Encounter's
     // profile names "is executed and saved as a separate composition", which
     // "is linked using the openEHR links"; LINK.target is a DV_EHR_URI naming
@@ -253,7 +253,7 @@ async fn a_linked_resource_is_committed_first_and_its_composition_linked()
 
 #[tokio::test]
 async fn a_linked_resource_no_context_maps_commits_one_composition_with_no_link()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // §Linked mappings: only "if a context mapping for this `meta.url` is
     // found" is a composition made; the loss is declared.
     let sender = sender(&["http://example.org/fhir/StructureDefinition/unmapped"]).await;
@@ -278,7 +278,7 @@ async fn a_linked_resource_no_context_maps_commits_one_composition_with_no_link(
 
 #[tokio::test]
 async fn a_linking_commit_the_cdr_refuses_names_the_linked_composition_it_left()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The two commits cannot be one CONTRIBUTION (ITS-REST 1.1.0 gives an
     // UPDATE_VERSION no uid), so a refused second commit reports the first.
     let sender = sender(&[LINKED_PROFILE]).await;
@@ -306,8 +306,8 @@ async fn a_linking_commit_the_cdr_refuses_names_the_linked_composition_it_left()
 }
 
 #[tokio::test]
-async fn a_transaction_entry_that_links_a_resource_is_refused_whole()
--> Result<(), Box<dyn StdError>> {
+async fn a_transaction_entry_that_links_a_resource_is_refused_whole() -> Result<(), Box<dyn Error>>
+{
     // R4 http.html §transaction: all or nothing in one CONTRIBUTION, and the
     // linked composition's id is the CDR's to assign at its commit, so the
     // link cannot be written inside one; the refusal names why.
@@ -358,9 +358,99 @@ async fn a_transaction_entry_that_links_a_resource_is_refused_whole()
         body.to_string().contains("one CONTRIBUTION"),
         "the refusal says why: {body}"
     );
+    let issues = body["issue"].as_array().ok_or("an OperationOutcome")?;
+    assert!(
+        issues.iter().any(|issue| {
+            issue["code"] == "not-supported"
+                && issue["diagnostics"]
+                    .as_str()
+                    .is_some_and(|text| text.contains("as an entry of a batch"))
+        }),
+        "the refusal names the way that commits: {body}"
+    );
     assert!(
         committed(&harness).await.is_empty(),
         "nothing was committed"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_linked_resource_no_context_maps_is_a_loss_the_writer_is_shown()
+-> Result<(), Box<dyn Error>> {
+    // R4 http.html §Managing Return Content: `return=OperationOutcome` asks for
+    // "hints and warnings", and the unmapped link is the run's declared loss.
+    let sender = sender(&["http://example.org/fhir/StructureDefinition/unmapped"]).await;
+    let harness = linking(
+        &format!("{}/fhir", sender.uri()),
+        Committing {
+            taken: Mutex::new(0),
+            fail_at: None,
+        },
+    )
+    .await?;
+    let (status, body) = call(
+        harness.app(),
+        Request::post("/fhir/Condition")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .header("Prefer", "return=OperationOutcome")
+            .body(Body::from(condition(&sender).to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::CREATED, status, "{body}");
+    let issues = body["issue"].as_array().ok_or("an OperationOutcome")?;
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue["severity"] == "warning" && issue["code"] == "incomplete"),
+        "the unmapped link is named as a warning: {body}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_batch_entry_that_links_a_resource_commits_both_compositions()
+-> Result<(), Box<dyn Error>> {
+    // R4 http.html §batch: "each entry is treated as if an individual
+    // interaction or operation", so the entry runs the single create, which
+    // commits the linked composition first and links it.
+    let sender = sender(&[LINKED_PROFILE]).await;
+    let harness = linking(
+        &format!("{}/fhir", sender.uri()),
+        Committing {
+            taken: Mutex::new(0),
+            fail_at: None,
+        },
+    )
+    .await?;
+    let bundle = serde_json::json!({
+        "resourceType": "Bundle",
+        "type": "batch",
+        "entry": [{
+            "resource": condition(&sender),
+            "request": { "method": "POST", "url": "Condition" }
+        }]
+    });
+    let (status, body) = call(
+        harness.app(),
+        Request::post("/fhir")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(bundle.to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(
+        Some("201 Created"),
+        body["entry"][0]["response"]["status"].as_str(),
+        "{body}"
+    );
+    let sent = committed(&harness).await;
+    let [_, ref linking] = *sent.as_slice() else {
+        return Err(format!("two compositions: {sent:?}").into());
+    };
+    assert_eq!(
+        link_targets(linking),
+        [format!("ehr:/{EHR_ID}/compositions/{}", CONTAINERS[0])]
     );
     Ok(())
 }

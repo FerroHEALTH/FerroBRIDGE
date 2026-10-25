@@ -24,9 +24,9 @@ use crate::resolve::program::mapping::EventTime;
 use crate::resolve::program::mapping::Pairing;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
+use crate::tree::element;
 use crate::tree::element::Location;
 use crate::tree::element::Move;
-use crate::tree::element::resolve as resolve_element;
 use crate::tree::path::FhirPath;
 
 use crate::resolve::compile::Compiler;
@@ -229,8 +229,12 @@ impl<'a> Compiler<'a> {
     /// The Web Template gives each data type an `ELEMENT` admits a child node
     /// of its own, so the node holds other nodes; `FollowedBy.adoc` runs the
     /// children after the parent "has been executed", so the parent converts
-    /// its own value first. The alternative is the one whose class pairs with
-    /// the FHIR type earliest in [`derive::PAIRS`], the first in template
+    /// its own value first. A class that pairs with the FHIR type itself
+    /// outranks one reached through the text fallback of [`derive::element`]:
+    /// `types-of-mappings/data-type/DV_DATE_TIME.adoc` §`DateTime` pairs
+    /// `dateTime` with `DV_DATE_TIME`, while `DV_TEXT.adoc` §`String` pairs only
+    /// `string`. Among the rest the alternative is the one whose class pairs
+    /// with the FHIR type earliest in [`derive::PAIRS`], the first in template
     /// order on a tie (no specification governs the tie-break: our own design).
     fn element_value(&self, fhir: &FhirTarget, openehr: &OpenehrTarget) -> Option<Derived> {
         if openehr.node().rm_type() != ELEMENT || !openehr.tail().segments.is_empty() {
@@ -246,7 +250,7 @@ impl<'a> Compiler<'a> {
             | Location::Deferred => return None,
         };
         let code = fhir.resolved().type_code()?;
-        let mut chosen: Option<(usize, &ResolvedNode, &'static str)> = None;
+        let mut chosen: Option<((bool, usize), &ResolvedNode, &'static str)> = None;
         for flat_id in openehr.node().children() {
             let Ok(child) = self.template.node_by_flat_id(flat_id) else {
                 continue;
@@ -259,8 +263,9 @@ impl<'a> Compiler<'a> {
             else {
                 continue;
             };
-            if chosen.is_none_or(|(best, _, _)| rank < best) {
-                chosen = Some((rank, child, pair));
+            let key = (pair != code, rank);
+            if chosen.is_none_or(|(best, _, _)| key < best) {
+                chosen = Some((key, child, pair));
             }
         }
         let (_, child, pair) = chosen?;
@@ -484,7 +489,7 @@ impl<'a> Compiler<'a> {
         let written = format!("{}.{step}", target.expression());
         let (code, reason) = match FhirPath::from_str(&written) {
             Ok(expression) => {
-                match resolve_element(self.table, target.resolved().resource(), &expression) {
+                match element::resolve(self.table, target.resolved().resource(), &expression) {
                     Ok(resolved) => {
                         return Some(
                             FhirTarget::new(expression, resolved).at_level(target.level()),

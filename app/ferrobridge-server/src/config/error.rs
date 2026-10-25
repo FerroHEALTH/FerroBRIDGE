@@ -28,6 +28,13 @@ pub enum Error {
         #[source]
         source: toml::de::Error,
     },
+    /// The running configuration could not be written for the operator API.
+    #[error("the running configuration could not be rendered for the operator API")]
+    Render {
+        /// What the TOML writer reported.
+        #[source]
+        source: toml::ser::Error,
+    },
     /// The merged configuration could not be written back for re-reading.
     #[error("the configuration could not be assembled")]
     Assemble {

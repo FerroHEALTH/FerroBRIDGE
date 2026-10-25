@@ -25,12 +25,15 @@ use fhir_types::codec::Value;
 use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::bundle::BundleEntry;
 use fhir_types::r4::bundle::BundleEntryResponse;
+use fhir_types::r4::resource::Resource;
+use fhirconnect::operations::issues;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
 
 use crate::facade::Facade;
 use crate::facade::commit::Change;
+use crate::facade::commit::Committer;
 use crate::facade::compartment;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::Refusal;
@@ -93,6 +96,7 @@ pub(crate) async fn transaction(
     let ingested = facade
         .ingest(client)
         .with_references(&bundled)
+        .with_committer(Committer::of(access, &facade.settings().system_id))
         .ingest_bundle(
             bundle.document(),
             UnmappedEntries::Refuse,
@@ -190,6 +194,12 @@ fn response_bundle(base_url: &str, ingested: &Ingested) -> Bundle {
 }
 
 /// Returns the response entry of one committed entry.
+///
+/// The losses the entry's mapping declared travel in `response.outcome`, "an
+/// `OperationOutcome` containing hints and warnings produced as part of
+/// processing this entry in a batch or transaction"
+/// (<https://hl7.org/fhir/R4/bundle-definitions.html#Bundle.entry.response.outcome>),
+/// one issue per loss as the FHIRconnect operations render them.
 fn committed_entry(base: &str, entry: &Committed) -> BundleEntry {
     BundleEntry {
         response: Some(BundleEntryResponse {
@@ -209,6 +219,8 @@ fn committed_entry(base: &str, entry: &Committed) -> BundleEntry {
                 .into(),
             ),
             etag: Some(format!("W/\"{}\"", entry.version.version_tree_id().value()).into()),
+            outcome: issues::of_warnings(&entry.losses)
+                .map(|reported| Resource::OperationOutcome(Box::new(reported))),
             ..BundleEntryResponse::default()
         }),
         ..BundleEntry::default()

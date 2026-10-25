@@ -42,6 +42,7 @@ its pin from this table, and `scripts/checks/versions.sh` reads each vendored
 | OMOCL corpus | `SevKohler/OMOCL` commit `c082db8ed81a062a574a2c058366045f600c2ed7` (grammar `OMOCL/v1.0.0`; the git tag `v1.0.0` carries pre-grammar files) | `docs/architecture.md` §2, `scripts/vendor/omocl.sh`, `docs/specs/omocl/PROVENANCE.md` |
 | OMOP CDM definitions and PostgreSQL DDL | `OHDSI/CommonDataModel` tag `v5.4.3` | `docs/architecture.md` §2, `scripts/vendor/omop-cdm.sh`, `docs/specs/omop-cdm/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of every file it emits |
 | OHDSI Data Quality Dashboard | `OHDSI/DataQualityDashboard` tag `v2.9.0` | `docs/architecture.md` §2 and §11, `scripts/vendor/dqd.sh`, `docs/specs/dqd/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of the `dqd` module it emits, the `DQD_TAG` constant of `omop-cdm` |
+| OHDSI Athena vocabulary download | `OHDSI/Athena` commit `2aab8cac738d407211d9f5582827262899dc7603` (the application that writes the download; read from code, never a specification) | `docs/architecture.md` §5.3, `scripts/vendor/athena.sh`, `docs/specs/athena/PROVENANCE.md` |
 | openEHR ITS-REST OpenAPI | `openEHR/specifications-ITS-REST` tag `Release-1.1.0`, modules Overview, System, EHR, Query, Definition (`STABLE`) and Demographic (`DEVELOPMENT`), and the Simplified Formats and Simplified Data Template sources | `docs/architecture.md` §2, `scripts/vendor/its-rest.sh`, `docs/specs/its-rest/PROVENANCE.md` |
 | KDS Diagnose operational template (fixture) | `openFHIR/openfhir` commit `5e4d68007518fcddae1907b333a86f495791aa53` path `core/src/test/resources/kds/diagnose/KDS_Diagnose.opt` sha256 `752483d90c4ba0f0d1e67baacceb67c1f6f698607823f2eebaa876f4f32bd870` | `scripts/vendor/kds-diagnose-opt.sh`, `tools/ferrobridge-testkit/fixtures/opt/kds/PROVENANCE.md` |
 | KDS Person operational template (fixture) | `openFHIR/openfhir` commit `5e4d68007518fcddae1907b333a86f495791aa53` path `core/src/test/resources/kds/person/KDS_Person.opt` sha256 `ef559dde455a36b6282a6f4b2e3ecd4f2e6130acd8be638ce73088739e0bf6c8` | `scripts/vendor/kds-person-opt.sh`, `tools/ferrobridge-testkit/fixtures/opt/kds-person/PROVENANCE.md` |
@@ -313,13 +314,14 @@ change that breaks a public API is a patch too, so a consumer pins a crate of
 the line exactly (owner decision 2026-10-17, #510).
 `openehr-mapping-core` and `fhirconnect` joined the line at 0.1.108 with their
 first publish (#397), and `ferrobridge-term`, `ferrobridge-fhirpath` and
-`ferrobridge-validator` joined it at 0.1.126 (#432). Every other library crate holds its name with a 0.0.0
+`ferrobridge-validator` joined it at 0.1.126 (#432), and `hl7v2-types` and
+`ferrobridge-hl7v2` at 0.1.127 (#1131). Every other library crate holds its name with a 0.0.0
 placeholder (#107), outside the line until its first publish, when it joins
 at the line's current value.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `fhir-types` | 0.1.127 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
+| `fhir-types` | 0.1.128 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
 
 ## Language and runtime
 
@@ -343,11 +345,11 @@ an MSRV is only ever raised.
 
 The product version is the workspace `version` in the root `Cargo.toml`, which
 every member inherits. The milestone line is 0.0.x, so the first product
-version is 0.0.10.
+version is 0.0.12.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| Product version | 0.0.10 | root `Cargo.toml` `[workspace.package]` `version` (#20), `CITATION.cff` `version` (#18), the `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml` (#22) |
+| Product version | 0.0.12 | root `Cargo.toml` `[workspace.package]` `version` (#20), `CITATION.cff` `version` (#18), the `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml` (#22) |
 
 `CITATION.cff` tracks this row exactly, and the guard compares the two whenever
 `CITATION.cff` exists. Once the root `Cargo.toml` lands, the guard also compares
@@ -431,10 +433,14 @@ release without a reviewed change (`docs/release.md`).
 | `cargo-cyclonedx` | 0.5.9 | `.github/workflows/release-build.yml` |
 | `cargo-fuzz` | 0.13.2 | `.github/workflows/fuzz.yml` (the fuzz lane, the one nightly-toolchain job; #155) |
 | `syft` | 1.51.1 | `.github/workflows/release-build.yml`, `.github/workflows/release-image.yml`, `.github/workflows/release-console.yml` |
+| `trivy` | 0.73.0 | `.github/workflows/release.yml` (the vulnerability record), `.github/workflows/scan-and-tag.yml`, `.github/workflows/image-scan.yml` |
 
 `scripts/checks/versions.sh` reads every `tool:` line of the two release
 workflows back against these rows, so a bump moves one row and the workflows
-follow it.
+follow it. `trivy` is installed by the digest-pinned
+`aquasecurity/setup-trivy` at the version each workflow's `TRIVY_VERSION`
+names, and `versions.sh` reads each of those back against its row; it is the
+version FerroEHR's release lane runs.
 
 ## Operator console build tools
 

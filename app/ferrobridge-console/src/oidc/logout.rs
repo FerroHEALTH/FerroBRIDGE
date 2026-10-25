@@ -19,7 +19,7 @@ use secrecy::{ExposeSecret as _, SecretString};
 use url::Url;
 
 use crate::config::settings::OidcSettings;
-use crate::locale::Msg;
+use crate::locale::messages::Msg;
 use crate::server::ConsoleState;
 use crate::session::COOKIE;
 
@@ -51,7 +51,7 @@ pub fn end_session_request(oidc: &OidcSettings, id_token: Option<&SecretString>)
 
 /// Serves `POST /logout`: ends the session the browser holds, removes its
 /// cookie, and redirects to the provider's end-session endpoint or to the
-/// landing page.
+/// signed-out page.
 pub async fn logout(Extension(state): Extension<ConsoleState>, headers: HeaderMap) -> Response {
     let locale = super::locale_of(&state, &headers);
     let Some(oidc) = state.settings().oidc.as_ref() else {
@@ -75,7 +75,7 @@ pub async fn logout(Extension(state): Extension<ConsoleState>, headers: HeaderMa
         }
     };
     let location = end_session_request(oidc, id_token.as_ref())
-        .map_or_else(|| String::from("/"), String::from);
+        .map_or_else(|| String::from(crate::app::SIGNED_OUT), String::from);
     let removal = sessions.session_cookie_removal().to_string();
     let (Ok(location), Ok(removal)) = (
         HeaderValue::from_str(&location),

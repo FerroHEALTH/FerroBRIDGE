@@ -11,6 +11,7 @@
 
 use ferrobridge_testkit::containers::{self, Postgres};
 use ferrobridge_testkit::vocabulary;
+use omop_cdm::athena::{self, Export};
 use omop_cdm::database::{self, CdmPool};
 use omop_cdm::ddl::SchemaName;
 use omop_cdm::generated::concept::Concept;
@@ -41,9 +42,7 @@ async fn loaded() -> Result<Loaded, Box<dyn Error>> {
     let postgres = containers::postgres().await?;
     let pool = connect(&postgres, SCHEMA).await?;
     database::init(&pool).await?;
-    let mut connection = pool.pool().acquire().await?;
-    vocabulary::load(&mut connection).await?;
-    drop(connection);
+    athena::load(&pool, &Export::read(&vocabulary::directory())?).await?;
     Ok(Loaded {
         postgres,
         resolver: ConceptResolver::new(pool),
@@ -436,28 +435,6 @@ async fn a_query_the_database_refuses_is_a_typed_error() -> Result<(), Box<dyn E
     assert!(
         refusal.to_string().contains(RECORD_DATE),
         "the refusal does not name the date: {refusal}"
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn the_loader_writes_every_fixture_row() -> Result<(), Box<dyn Error>> {
-    if !containers::e2e_enabled() {
-        return Ok(());
-    }
-    let postgres = containers::postgres().await?;
-    let pool = connect(&postgres, SCHEMA).await?;
-    database::init(&pool).await?;
-    let mut connection = pool.pool().acquire().await?;
-    let written = vocabulary::load(&mut connection).await?;
-    let expected: usize = vocabulary::TABLES
-        .iter()
-        .map(|table| table.csv.lines().count().saturating_sub(1))
-        .sum();
-    assert_eq!(
-        u64::try_from(expected)?,
-        written,
-        "the loader wrote a different number of rows than the fixture holds"
     );
     Ok(())
 }

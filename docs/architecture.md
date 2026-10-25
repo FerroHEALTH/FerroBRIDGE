@@ -216,10 +216,10 @@ default branch.
 | `openehr-query` | 0.0.90 (BUSL-1.1) | the AQL 1.1.0 parser and canonical printer. `openehr-term` (Apache-2.0 AND CC-BY-SA-3.0) and `openehr-lang` arrive transitively |
 | `openehr-am` | 0.0.90 (Apache-2.0) | the generated AM 2.4 model: the AOM2 `OPERATIONAL_TEMPLATE` and `ARCHETYPE_HRID` types an ADL 2 template decodes into (section 3); taken directly because the bridge names those types |
 | `openehr-adl` | not taken in the first cut (0.0.90, BUSL-1.1) | the ADL 2 text parser, flattener and OPT2 generator; the bridge fetches an ADL 2 template as AOM2 canonical JSON, so it never parses ADL source (section 3); taken later only if a CDR serves ADL 2 templates as text alone |
-| `fhir-types` | 0.1.127 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
+| `fhir-types` | 0.1.128 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
 | openFHIR, the FHIRconnect reference engine | 3.0.1 (2026-09-09), read for behaviour only | never an oracle; section 4.4 records the 3.0.0 behaviour changes and what the bridge takes |
 | Eos, the OMOCL reference engine | 0.0.62 (2024-03-20), last commit 2026-03-09 | never an oracle; dormant, so its behaviour is prior art with no expected movement |
-| FHIR terminology operations | R4, R4B tolerant | `CodeSystem/$lookup`, `ConceptMap/$translate`, `ValueSet/$validate-code`; a server may answer R4 or R4B; the reference server selects the version by path (section 6) |
+| FHIR terminology operations | R4, R4B tolerant | `CodeSystem/$lookup`, `ConceptMap/$translate`, `ValueSet/$validate-code`, `ValueSet/$expand`, `CodeSystem/$subsumes`; a server may answer R4 or R4B; the reference server selects the version by path (section 6) |
 
 **Profile packages, the mapping targets.** No profile package is pinned for
 codegen; each is pinned as the target a context mapping names, and
@@ -1208,8 +1208,12 @@ is for an operator who wants to see what the bridge runs and work with its
 mapping files without a shell on the host.
 
 **The console is its own binary and image.** `app/ferrobridge-console` is a
-Leptos application rendered on the server and hydrated in the browser, with a
-backend-for-frontend, shipped as `ghcr.io/ferrohealth/ferrobridge-console`.
+Leptos application in islands mode: the server draws every page whole, the
+browser hydrates only its islands (the menus, the code editor, the JSON
+input), and every action is a plain form post the server answers with the
+page it draws, so no server function exists. It is a backend-for-frontend,
+shipped as `ghcr.io/ferrohealth/ferrobridge-console`, drawn with FerroUI
+0.3.6.
 The server half and the browser half are chosen by compilation target, never
 by Cargo feature, so a workspace `--all-features` build never enables both.
 The operator's OpenID Connect session (authorization code with PKCE) lives on
@@ -1225,8 +1229,8 @@ renders; and on `ferrobridge-operator-api` (#777), the serde types of the
 bridge's health and operator documents, which the bridge serializes and the
 console decodes, so a field renamed on one side fails the other's build. The
 contract crate carries serde types and nothing else: no engine, no I/O. The
-browser half links none of them and receives view data from server
-functions. A dependency-closure test fails on any other workspace member, so
+browser half links none of them and receives its islands' props in the
+page the server draws. A dependency-closure test fails on any other workspace member, so
 the console can never compile or run a mapping itself: every check,
 transform and save goes through the bridge. Linking these crates is what
 `codegen.md` asks of a consumer, which may not shadow a model the workspace
@@ -1237,9 +1241,9 @@ library** (published on crates.io, pinned exactly in the root
 `[workspace.dependencies]`), which every FerroHEALTH console shares. It is
 not a workspace crate, so the dependency-closure test admits it as it admits
 any other registry crate: it carries views, the stylesheet and the brand
-themes, and fetches nothing. The console keeps only its brand theme
-(`style/theme.css`) and its screens; the server serves the library's
-stylesheet and that theme as two stylesheets of its own origin, so the
+themes, and fetches nothing. The console keeps only its screens; the
+server serves the library's stylesheet and the library's FerroBRIDGE brand
+theme as two stylesheets of its own origin, so the
 Content-Security-Policy keeps `style-src 'self'`.
 
 **The operator API is off by default.** It is mounted under `/operator` on
@@ -1605,6 +1609,21 @@ Every rule here fills a silence; OMOCL states none of them.
   (the reference engine hard-codes `32817`; the CDM says the type concept
   records the provenance of the record, which a deployment knows and an engine
   does not).
+- **`provider_id` and `visit_detail_id` name rows no composition owns.** A
+  `PROVIDER` is keyed by the text the mapping's path reads and a
+  `VISIT_DETAIL` by the composition's visit and that text; each is created on
+  first sight in the composition's transaction, the detail taking its person,
+  concept, dates and type concept from the visit. A composition with no visit
+  cannot name a detail and the record is refused. Our own design over the
+  CDM's `PROVIDER` and `VISIT_DETAIL` definitions.
+- **`DEATH` is keyed by its person.** CDM v5.4 gives `DEATH` no key of its own
+  (<https://ohdsi.github.io/CommonDataModel/cdm54.html#death>), so its row takes
+  the person's `person_id` as its id and holds one row per person. Like the
+  `PERSON` row, the composition committed last that writes one rewrites it, the
+  side table keeps each writer's columns, and when that writer is removed or a
+  new version of it stops writing the row, the newest writer that remains
+  rewrites it; with none left the row goes. Our own design: the CDM leaves the
+  choice among several death records to the ETL.
 - **A required standard concept column that no OMOCL key writes takes concept
   `0`.** The CDM conventions write the "no information" concept `0` in a
   required standard concept field "if there is no information available for
@@ -1633,14 +1652,32 @@ reference engine's query has the right shape and none of the filters (no
 reported upstream. This lives in the `omop-cdm` crate as SQL over the
 vocabulary tables; the FHIR terminology client is a different component.
 
-**The Athena export format is an open research item.** The CDM documentation
-defines the ten vocabulary tables and says only "please visit athena.ohdsi.org"
-about their distribution; the site is an authenticated application. The loader
-is specified against the table definitions in the CDM CSVs, and the observed
-file format of one export is pinned under a `PROVENANCE.md` labelled as
-observed, never as a specification, before v0.0.4 is scheduled. The vocabulary
-is a licence-gated deployment input: never in the image, a release asset, the
-build context or CI.
+**The Athena download format is read from the application that writes it.**
+The CDM documentation defines the ten vocabulary tables and says only "please
+visit athena.ohdsi.org" about their distribution; the site is an authenticated
+application and OHDSI publishes no format document. The application's source
+is public (`OHDSI/Athena`), so the shape is pinned from it at a commit, with
+the files that state it vendored under `docs/specs/athena/` and labelled as
+read from code, never as a specification: one file per table named in upper
+case (`CONCEPT.csv`), a header row of column names, a tab between unquoted
+values, `\n` after each row, UTF-8, an empty field for null, and `yyyyMMdd`
+dates. The download carries the nine tables Athena serves; `SOURCE_TO_CONCEPT_MAP`
+is a site's own table. `CONCEPT_CPT4.csv` holds CPT4 concepts with an empty
+name and is left alone, as are the files that are not CDM v5.4 tables.
+
+`ferrobridge vocab load DIR --schema NAME` (`omop_cdm::athena`) takes the
+files by their exact names, refuses a download that lacks one of the nine,
+and replaces each table in a transaction of its own: `TRUNCATE`, then `COPY`
+in CSV form with a tab delimiter, the column list read from the header row
+and checked against the CDM definitions, and a quote byte the download never
+holds, so a file that carries it is refused before `COPY` reads it. It
+reports the release as the `vocabulary_version` of the `None` row of
+`VOCABULARY`, where the vocabulary build records it (`OHDSI/Vocabulary-v5.0`,
+`working/packages/vocabulary_pack/StartRelease.sql`). The synthetic vocabulary
+in the testkit has the download's shape and is loaded by the same loader. The
+vocabulary is a licence-gated deployment input: never in the image, a release
+asset, the build context or CI. No specification governs the loading: our own
+design.
 
 ### 5.4 Derived tables
 
@@ -1807,12 +1844,12 @@ published `openehr-*` crates do.
 |---|---|---|---|
 | `openehr-mapping-core` | the one shared foundation: the header model; the YAML loader (`serde-saphyr`: anchors, aliases, merge keys, source positions); the archetype-keyed mapping registry; the diagnostic model (file, YAML path, mapping name, model path); the RM-path model with `../` resolution; the `aqlPath` index over a Web Template with leaf RM type resolution; relative path derivation; composition build and read over `openehr-its` and `openehr-rm` | hand-written | yes |
 | `fhir-types` | the FHIR model: per-version resources, datatypes and primitives with the strict JSON and XML codecs, the terminology operation contracts, the public element table; emitted by `tools/fhir-codegen` from the vendored HL7 packages | generated | yes (inherited line) |
-| `hl7v2-types` | the HL7 v2 tables a v2 parser walks: every message structure of the v2 definitions as a segment-group tree (positions, cardinalities, choice groups, `Hxx` slots, segment status), and every segment definition, the batch envelopes included, with its field table (position, name, data type, cardinality, optionality, length and conformance length, table binding), every data type with its component table, and every message definition indexed by code and trigger event with the structure variant it names; emitted by the `v2` root set of `tools/fhir-codegen` from the fetched `HL7/v2ig` definitions | generated | yes (0.0.0 reservation) |
+| `hl7v2-types` | the HL7 v2 tables a v2 parser walks: every message structure of the v2 definitions as a segment-group tree (positions, cardinalities, choice groups, `Hxx` slots, segment status), and every segment definition, the batch envelopes included, with its field table (position, name, data type, cardinality, optionality, length and conformance length, table binding), every data type with its component table, and every message definition indexed by code and trigger event with the structure variant it names; emitted by the `v2` root set of `tools/fhir-codegen` from the fetched `HL7/v2ig` definitions | generated | yes |
 | `fhirconnect` | the FHIRconnect language as one crate with one module per stage: `model` (the AST, FerroBRIDGE's strict schemas, the published schemas vendored and exercised, semantic validation), `resolve` (one immutable program per profile and template, the extension ordering and collision rules), `tree` (the bidirectional path model over the `fhir-types` `Value` tree guided by the element table: choice types, repeating elements, primitive extensions, the three read-side FHIRPath forms, writable versus read-only classification), `engine` (the bidirectional interpreter, the data-type lens matrix, the PROGRAMMED registry), `operations` (the `$tofhir` and `$toopenehr` contracts of section 4.7 over `fhir-types`) | hand-written | yes |
 | `omocl` | the OMOCL language as one crate: `model` (the AST, FerroBRIDGE's authored JSON schema, the key-to-column projection tables, validation) and `engine` (the one-directional interpreter emitting record graphs of typed CDM rows, the `CustomMapping` registry) | hand-written | yes |
 | `omop-cdm` | CDM v5.4 row types and column metadata generated from the OHDSI field definitions; the OHDSI PostgreSQL DDL vendored verbatim and embedded; `graph`, the record graph the OMOCL engine emits and the writer commits; behind the default `database` feature, the vocabulary loader and concept resolver, the derived-table runners and the `COPY` writer, so a metadata-only consumer (`omocl`) takes the crate with `default-features = false` and builds no database client | generated plus hand-written | yes |
 | `ferrobridge-term` | the FHIR terminology client over `fhir-types` | hand-written | yes |
-| `ferrobridge-hl7v2` | the HL7 v2 face (#254): `mllp` (the MLLP Release 1 frame codec on `tokio-util` and the listener), `decode` (MSH-18 through `encoding_rs`, a byte outside the declared set refused), `parse` (positional split, escape decoding, the grouping by the `hl7v2-types` structure tree), `ack` (original-mode `AA`, `AE`, `AR`), `inbound` (one message through those steps), `map` (the interpreter of the `hl7.fhir.uv.v2mappings` ConceptMaps, read from a directory at run time, writing through `fhirconnect::tree` and translating every table value through `ferrobridge-term`; conditions and target notation on `logos` and `chumsky`) | hand-written | yes (0.0.0 reservation) |
+| `ferrobridge-hl7v2` | the HL7 v2 face (#254): `mllp` (the MLLP Release 1 frame codec on `tokio-util` and the listener), `decode` (MSH-18 through `encoding_rs`, a byte outside the declared set refused), `parse` (positional split, escape decoding, the grouping by the `hl7v2-types` structure tree), `ack` (original-mode `AA`, `AE`, `AR`), `inbound` (one message through those steps), `map` (the interpreter of the `hl7.fhir.uv.v2mappings` ConceptMaps, read from a directory at run time, writing through `fhirconnect::tree` and translating every table value through `ferrobridge-term`; conditions and target notation on `logos` and `chumsky`) | hand-written | yes |
 | `ferrobridge-fhirpath` | the FHIRPath evaluator (#436): FHIRPath Normative Release 2.0.0 with the FHIR R4 additions over the `fhir-types` `Value` tree, typed by the element table behind a version trait (`model::r4::R4`); a `logos` and `chumsky` parser, exact decimals, dates and times with their precision, a static path check against the context type, and the outward functions (`resolve()`, `memberOf()`, `conformsTo()` and the rest) over caller-supplied seams | hand-written | yes |
 | `ferrobridge-validator` | the FHIR R4 profile validator (#432, section 4.9): `package` (a FHIR package from a `.tgz` through `flate2` and `tar`, or an unpacked directory), `set` (the dependency closure and canonical resolution into the generated `fhir_types::r4` model), `validate` (the walk over the element table and the profile snapshot), `issue` and `report` (typed issues, the unevaluated list, the R4 `OperationOutcome`) | hand-written | yes |
 | `ferrobridge-operator-api` | the documents of the bridge's health and operator surfaces (#777): the build and lane information, readiness with its indicators, the engine state, the file listing and the load report, as serde types the server serializes and the operator console decodes; each diagnostic is the `openehr-mapping-core` `Diagnostic` in its own serde form | hand-written | yes (0.0.0 reservation) |
@@ -2131,6 +2168,32 @@ draft upstream change.
   The CDM has no provenance element, so the OMOP side records provenance in
   the bridge-owned side table only. No specification governs the shape beyond
   those two: our own design.
+- **The caller at the CDR.** The bridge validates each caller's token and
+  reaches the CDR with its own credential, never the caller's token, which
+  names the bridge as its audience (RFC 9068 §4). The caller still reaches
+  every write the CDR records: ITS-REST 1.1.0 (§openehr-version and
+  openehr-audit-details) has a service accept a client-supplied
+  `committer` and "merge" it into the version's `AUDIT_DETAILS`, and makes
+  it "RECOMMENDED to provision these headers based on authentication and
+  authorization runtime data". So a write the facade makes for an
+  authenticated caller, a single write as `openehr-audit-details` and a
+  transaction as each `UPDATE_AUDIT` of its CONTRIBUTION, states the caller
+  as a `PARTY_IDENTIFIED` named by the token's `sub` (or the Basic user-id),
+  with a `PARTY_REF` of type `PARTY` (openEHR BASE: "Abstract supertypes are
+  allowed", since a token does not say whether its subject is a person or a
+  client) and a `GENERIC_ID` of the subject in the namespace of the issuer
+  that vouched for it, or of the bridge's `system_id` for a Basic user the
+  bridge checked. A namespace outside the `OBJECT_REF.namespace` regex
+  leaves the name alone. `system_id` keeps naming the bridge, so each
+  version records who asked and which system committed. An HL7 v2 message
+  and a request on an open surface carry no caller and commit under the
+  bridge's name (#532). Reads carry no audit metadata in ITS-REST, so the
+  CDR's access log still names the bridge for them; carrying the caller there
+  needs a per-caller token the CDR accepts, such as an OAuth 2.0 Token
+  Exchange (RFC 8693) token with an `act` claim, which needs an
+  authorization server that issues it and a CDR that reads it, and stays
+  open until both exist. The mapping of a caller onto `committer` is no
+  specification's: our own design.
 - **Tenancy.** The reference CDR scopes its mapping rows per tenant with
   row-level security and keeps its outbound watermark deliberately unscoped
   (one integer, no tenant data). FerroBRIDGE's mapping set is a file tree per

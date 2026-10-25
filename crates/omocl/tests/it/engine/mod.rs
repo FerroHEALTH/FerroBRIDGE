@@ -10,7 +10,9 @@ mod forms;
 mod laboratory;
 mod person;
 mod quantity;
+mod references;
 mod run_outcome;
+mod targets;
 mod vocabulary;
 
 use std::error::Error;
@@ -131,6 +133,14 @@ fn cell(cell: &Cell) -> String {
         Cell::Reference(Reference::Person(ehr)) => format!("person {}", ehr.value()),
         Cell::Reference(Reference::Visit(visit)) => format!("visit {}", visit.source()),
         Cell::Reference(Reference::Row(key)) => format!("row {key}"),
+        Cell::Reference(Reference::Provider(source)) => format!("provider {source}"),
+        Cell::Reference(Reference::VisitDetail(detail)) => {
+            format!(
+                "visit detail {} in {}",
+                detail.source(),
+                detail.visit().source()
+            )
+        }
     }
 }
 

@@ -18,6 +18,7 @@ mod demographic;
 mod ehr_status;
 mod examples;
 mod linked;
+mod losses;
 mod party;
 mod patient_ehr;
 mod person;
@@ -55,7 +56,7 @@ use http::Request;
 use http::Response;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use tower::ServiceExt as _;
 use wiremock::Mock;
@@ -363,7 +364,7 @@ pub(crate) fn ehr_body() -> String {
 async fn call(
     app: Router,
     request: Request<Body>,
-) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     let response = raw(app, request).await?;
     let status = response.status();
     let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await?;
@@ -380,7 +381,7 @@ async fn call(
 }
 
 /// Sends `request` through `app` and returns the whole response.
-async fn raw(app: Router, request: Request<Body>) -> Result<Response<Body>, Box<dyn StdError>> {
+async fn raw(app: Router, request: Request<Body>) -> Result<Response<Body>, Box<dyn Error>> {
     Ok(app.oneshot(request).await?)
 }
 
@@ -412,7 +413,7 @@ fn first_issue(body: &serde_json::Value) -> &serde_json::Value {
 }
 
 /// Creates the fixture Condition and returns the logical id it was given.
-async fn create_one(harness: &Harness) -> Result<String, Box<dyn StdError>> {
+async fn create_one(harness: &Harness) -> Result<String, Box<dyn Error>> {
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, &harness.composition()).await;
     let (status, body) = call(harness.app(), post_condition(&condition())).await?;
@@ -427,7 +428,7 @@ async fn create_one(harness: &Harness) -> Result<String, Box<dyn StdError>> {
 async fn get_tagged(
     harness: &Harness,
     path: &str,
-) -> Result<(StatusCode, Option<String>, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, Option<String>, serde_json::Value), Box<dyn Error>> {
     let response = raw(harness.app(), Request::get(path).body(Body::empty())?).await?;
     let status = response.status();
     let tag = response
@@ -468,7 +469,7 @@ fn condition_at(version: &str) -> serde_json::Value {
 async fn post_located(
     harness: &Harness,
     body: &serde_json::Value,
-) -> Result<(StatusCode, Option<String>, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, Option<String>, serde_json::Value), Box<dyn Error>> {
     let response = raw(harness.app(), post_condition(body)).await?;
     let status = response.status();
     let location = response
@@ -499,7 +500,7 @@ async fn writes(harness: &Harness) -> (usize, usize, usize) {
 
 /// Returns a conditional create of the synthetic Condition under another
 /// sender `id`, so the source lookup meets nothing and the search decides.
-fn conditional_create(if_none_exist: &str) -> Result<Request<Body>, Box<dyn StdError>> {
+fn conditional_create(if_none_exist: &str) -> Result<Request<Body>, Box<dyn Error>> {
     conditional_create_as("a-sender-id-the-map-has-not-seen", if_none_exist)
 }
 
@@ -508,7 +509,7 @@ fn conditional_create(if_none_exist: &str) -> Result<Request<Body>, Box<dyn StdE
 fn conditional_create_as(
     sender_id: &str,
     if_none_exist: &str,
-) -> Result<Request<Body>, Box<dyn StdError>> {
+) -> Result<Request<Body>, Box<dyn Error>> {
     let mut fresh = condition();
     fresh["id"] = serde_json::json!(sender_id);
     Ok(Request::post("/fhir/Condition")
@@ -536,7 +537,7 @@ fn transaction_of(resources: &[(&str, serde_json::Value)]) -> serde_json::Value 
 async fn post_transaction(
     harness: &Harness,
     bundle: &serde_json::Value,
-) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     call(
         harness.app(),
         Request::post("/fhir")
@@ -549,7 +550,7 @@ async fn post_transaction(
 /// Returns the consumed-source key of the synthetic Condition at `version`.
 fn condition_source_at(
     version: &str,
-) -> Result<ferrobridge_server::facade::identity::record::SourceVersion, Box<dyn StdError>> {
+) -> Result<ferrobridge_server::facade::identity::record::SourceVersion, Box<dyn Error>> {
     Ok(
         ferrobridge_server::facade::identity::record::SourceVersion::new(
             "Condition",

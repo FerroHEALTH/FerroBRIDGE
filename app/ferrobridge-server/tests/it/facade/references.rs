@@ -12,7 +12,7 @@ use ferrobridge_server::facade::references::Policy;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use wiremock::Mock;
@@ -47,7 +47,7 @@ const OBSERVATION_PROFILE: &str =
 
 #[tokio::test]
 async fn a_transaction_entry_answers_a_reference_to_it_by_full_url_and_by_type_and_id()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // engine/references.adoc: a reference is fetched only when it is "not
     // contained in the Bundle"; R4 bundle.html §references: an entry is
     // referenced by its fullUrl or, relative to the base, by type and id.
@@ -220,7 +220,7 @@ async fn post(
     harness: &Harness,
     resource: &serde_json::Value,
     stored: &serde_json::Value,
-) -> Result<(StatusCode, Option<serde_json::Value>), Box<dyn StdError>> {
+) -> Result<(StatusCode, Option<serde_json::Value>), Box<dyn Error>> {
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, stored).await;
     let (status, body) = call(
@@ -256,7 +256,7 @@ async fn received(server: &MockServer) -> usize {
 
 #[tokio::test]
 async fn a_relative_reference_to_a_committed_resource_is_read_from_this_server()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // R4 references.html §2.3.0.2: a relative reference is relative to the
     // service base, so it names a resource this facade committed.
     let harness = referencing(Policy::default()).await;
@@ -286,7 +286,7 @@ async fn a_relative_reference_to_a_committed_resource_is_read_from_this_server()
 async fn created_observation(
     harness: &Harness,
     stored: &serde_json::Value,
-) -> Result<String, Box<dyn StdError>> {
+) -> Result<String, Box<dyn Error>> {
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, stored).await;
     mount_read(&harness.cdr, VERSION_ONE, stored).await;
@@ -314,8 +314,7 @@ async fn created_observation(
 }
 
 #[tokio::test]
-async fn an_absolute_reference_off_the_allow_list_is_never_fetched() -> Result<(), Box<dyn StdError>>
-{
+async fn an_absolute_reference_off_the_allow_list_is_never_fetched() -> Result<(), Box<dyn Error>> {
     // engine/references.adoc: "If not possible, the engine proceeds with the
     // mapping"; no specification governs the allow-list: our own design.
     let sender = MockServer::start().await;
@@ -332,8 +331,7 @@ async fn an_absolute_reference_off_the_allow_list_is_never_fetched() -> Result<(
 }
 
 #[tokio::test]
-async fn an_absolute_reference_on_the_allow_list_is_fetched_once() -> Result<(), Box<dyn StdError>>
-{
+async fn an_absolute_reference_on_the_allow_list_is_fetched_once() -> Result<(), Box<dyn Error>> {
     // engine/references.adoc: "the engine should attempt to GET it from the
     // sending site", and "keep track of which ones are already resolved".
     let sender = MockServer::start().await;
@@ -360,7 +358,7 @@ async fn an_absolute_reference_on_the_allow_list_is_fetched_once() -> Result<(),
 }
 
 #[tokio::test]
-async fn a_depth_of_zero_fetches_nothing() -> Result<(), Box<dyn StdError>> {
+async fn a_depth_of_zero_fetches_nothing() -> Result<(), Box<dyn Error>> {
     let sender = MockServer::start().await;
     let base = format!("{}/fhir", sender.uri());
     let harness = referencing(allowing(&base, 0)).await;
@@ -393,7 +391,7 @@ type Answer = (StatusCode, serde_json::Value);
 async fn create_and_validate(
     harness: &Harness,
     resource: &serde_json::Value,
-) -> Result<(Answer, Answer), Box<dyn StdError>> {
+) -> Result<(Answer, Answer), Box<dyn Error>> {
     mount_ehr(&harness.cdr).await;
     let created = call(
         harness.app(),
@@ -413,8 +411,8 @@ async fn create_and_validate(
 }
 
 #[tokio::test]
-async fn a_failed_fetch_refuses_the_request_with_the_upstream_status()
--> Result<(), Box<dyn StdError>> {
+async fn a_failed_fetch_refuses_the_request_with_the_upstream_status() -> Result<(), Box<dyn Error>>
+{
     // engine/Fail.adoc: "either all data should be mapped, or the mapping
     // should fail"; a sending site that fails is an upstream failure, never an
     // absence, and answers the facade's UPSTREAM row (R4 http.html, 502).
@@ -454,7 +452,7 @@ async fn a_failed_fetch_refuses_the_request_with_the_upstream_status()
 
 #[tokio::test]
 async fn a_body_that_is_not_the_referenced_resource_refuses_the_request()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let sender = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .respond_with(
@@ -477,7 +475,7 @@ async fn a_body_that_is_not_the_referenced_resource_refuses_the_request()
 
 #[tokio::test]
 async fn a_resource_the_sending_site_does_not_hold_is_a_skip_that_names_the_status()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // engine/references.adoc: "If not possible, the engine proceeds with the
     // mapping"; a 404 says the resource is absent (R4 http.html §read).
     let sender = MockServer::start().await;
@@ -517,7 +515,7 @@ async fn a_resource_the_sending_site_does_not_hold_is_a_skip_that_names_the_stat
 
 #[tokio::test]
 async fn a_transaction_whose_reference_fetch_fails_is_refused_whole_with_502()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let sender = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .respond_with(ResponseTemplate::new(500))
@@ -563,7 +561,7 @@ async fn a_transaction_whose_reference_fetch_fails_is_refused_whole_with_502()
 }
 
 #[tokio::test]
-async fn a_reference_cycle_fetches_each_literal_once() -> Result<(), Box<dyn StdError>> {
+async fn a_reference_cycle_fetches_each_literal_once() -> Result<(), Box<dyn Error>> {
     // engine/references.adoc: the engine "should either stop at a given level
     // of references or keep track of which ones are already resolved"; both
     // hold here, so a cycle inside the depth ends at its first repeat.

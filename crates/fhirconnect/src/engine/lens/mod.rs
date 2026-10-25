@@ -50,6 +50,7 @@ pub mod encapsulated;
 pub mod interval;
 pub mod null_flavour;
 pub mod number;
+pub mod ordinal;
 pub mod party;
 pub mod party_ref;
 pub mod proportion;

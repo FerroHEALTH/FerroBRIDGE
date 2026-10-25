@@ -3,7 +3,7 @@
 [package]
 name = "hl7v2-types"
 description = "Generated HL7 v2 message structure trees, segment field tables, data type components and message definitions"
-version = "0.0.0"
+version = "0.1.127"
 edition.workspace = true
 rust-version.workspace = true
 # Apache-2.0 beside fhir-types: generated Rust is the project's own code
@@ -17,7 +17,7 @@ documentation = "https://docs.rs/hl7v2-types"
 readme = "README.md"
 keywords = ["hl7", "hl7v2", "healthcare", "codegen"]
 categories = ["data-structures", "parser-implementations", "science"]
-# The 0.0.0 name reservation until the first publish; `include` is the
+# The crate line is the fhir-types line (docs/VERSIONS.md); `include` is the
 # packaged content.
 publish = true
 include = ["src/**", "README.md", "LICENSE"]

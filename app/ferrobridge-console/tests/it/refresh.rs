@@ -9,9 +9,9 @@
 
 use std::error::Error;
 
-use ferrobridge_testkit::oidc::{Provider, TokenAnswer};
 use ferrobridge_console::server::ConsoleState;
 use ferrobridge_console::session::SessionId;
+use ferrobridge_testkit::oidc::{Provider, TokenAnswer};
 use http::StatusCode;
 use secrecy::ExposeSecret as _;
 
@@ -162,9 +162,9 @@ async fn a_refused_refresh_ends_the_session_and_drops_its_cookie() -> Result<(),
     let (response, _body) = send(&service, get_with(PAGE, &cookie)?).await?;
     let cookies = set_cookies(&response);
     assert!(
-        cookies
-            .iter()
-            .any(|set| set.starts_with("ferrobridge_console_session=;") && set.contains("Max-Age=0")),
+        cookies.iter().any(
+            |set| set.starts_with("ferrobridge_console_session=;") && set.contains("Max-Age=0")
+        ),
         "{cookies:?}"
     );
     assert_eq!(0, state.sessions().occupancy()?.sessions);

@@ -11,6 +11,8 @@
 
 #![allow(clippy::panic_in_result_fn, reason = "test assertions")]
 
+#[cfg(feature = "database")]
+mod athena;
 mod catalogue;
 mod ddl;
 #[cfg(feature = "database")]
@@ -22,6 +24,8 @@ mod graph;
 mod init;
 mod pins;
 mod quality;
+#[cfg(feature = "database")]
+mod relay;
 mod tables;
 #[cfg(feature = "database")]
 mod tls;

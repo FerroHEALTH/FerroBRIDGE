@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The batch jobs beside `serve`: `cdm init`, `etl run` and `mapping check`.
+//! The batch jobs beside `serve`: `cdm init`, `vocab load`, `etl run` and
+//! `mapping check`.
 //!
 //! Each builds its own runtime, does its one job and prints what it did for
 //! the operator. No specification governs the job output: our own design.
@@ -44,7 +45,9 @@ pub(crate) fn cdm_init_command(
         );
         let pool = database::CdmPool::connect(
             sqlx::postgres::PgPoolOptions::new().max_connections(1),
-            cdm.connection.pool_options(),
+            cdm.connection
+                .pool_options()
+                .context("preparing the connection to the CDM database")?,
             cdm.schema.clone(),
         )
         .await
@@ -100,6 +103,66 @@ pub(crate) fn cdm_init_command(
             bridge_schema = %cdm.bridge_schema,
             "the CDM schema and the bridge schema are in place"
         );
+        Ok(())
+    })
+}
+
+/// Loads the Athena vocabulary download in `directory` into the vocabulary
+/// tables of `schema` in the configured database, and prints what it wrote.
+///
+/// Each table is replaced in a transaction of its own
+/// ([`omop_cdm::athena::load`]); the files the download carries beside the
+/// vocabulary tables are named and left alone.
+#[expect(
+    clippy::print_stdout,
+    reason = "what the job loaded is its output, written to stdout for the operator"
+)]
+pub(crate) fn vocab_load_command(
+    cdm: &config::CdmSettings,
+    directory: &std::path::Path,
+    schema: &str,
+) -> anyhow::Result<()> {
+    use anyhow::Context;
+    use omop_cdm::athena::{self, Export};
+
+    let schema = omop_cdm::ddl::SchemaName::new(schema)
+        .with_context(|| format!("the schema name {schema}"))?;
+    let export = Export::read(directory)?;
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async {
+        tracing::info!(
+            schema = %schema,
+            directory = %directory.display(),
+            ssl_mode = %cdm.connection.ssl_mode(),
+            "connecting to the CDM database"
+        );
+        let pool = omop_cdm::database::CdmPool::connect(
+            sqlx::postgres::PgPoolOptions::new().max_connections(1),
+            cdm.connection
+                .pool_options()
+                .context("preparing the connection to the CDM database")?,
+            schema.clone(),
+        )
+        .await
+        .context("connecting to the CDM database")?;
+        let loaded = athena::load(&pool, &export)
+            .await
+            .with_context(|| format!("loading the vocabulary into schema {schema}"))?;
+        pool.pool().close().await;
+        for (table, rows) in loaded.tables() {
+            println!("vocabulary schema {schema}: {table} holds {rows} rows");
+        }
+        for name in export.ignored() {
+            println!("vocabulary schema {schema}: {name} is not a vocabulary table, left alone");
+        }
+        match loaded.vocabulary_version() {
+            Some(version) => println!("vocabulary schema {schema}: vocabulary version {version}"),
+            None => println!(
+                "vocabulary schema {schema}: VOCABULARY holds no `None` row, so the download names no version"
+            ),
+        }
         Ok(())
     })
 }

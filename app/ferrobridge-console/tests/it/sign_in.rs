@@ -12,9 +12,10 @@
 use std::error::Error;
 
 use base64::Engine as _;
-use ferrobridge_testkit::oidc::{IdTokenClaims, Provider, TokenAnswer};
-use ferrobridge_console::locale::{Msg, catalog, tr_in};
+use ferrobridge_console::locale::messages::Msg;
+use ferrobridge_console::locale::{catalog, tr_in};
 use ferrobridge_console::session::Occupancy;
+use ferrobridge_testkit::oidc::{IdTokenClaims, Provider, TokenAnswer};
 use ferrohealth_ui::i18n::Locale;
 use http::StatusCode;
 use jsonwebtoken::{Algorithm, Header};

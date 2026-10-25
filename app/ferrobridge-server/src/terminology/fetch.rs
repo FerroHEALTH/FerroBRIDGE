@@ -18,7 +18,8 @@ use fhir_types::r4::operations::code_system_lookup::CodeSystemLookupResponse;
 use fhir_types::r4::operations::concept_map_translate::{
     ConceptMapTranslateResponse, ConceptMapTranslateResponseMatch,
 };
-use fhir_types::r4::primitives::{Boolean, Canonical, Code, String as FhirString, Uri};
+use fhir_types::r4::primitives;
+use fhir_types::r4::primitives::{Boolean, Canonical, Code, Uri};
 
 /// What the server answered for one `$translate`, shared across the repeated
 /// runs.
@@ -46,6 +47,7 @@ impl Lookup {
             system: self.system.clone(),
             code: self.code.clone(),
             version: self.version.clone(),
+            date: None,
         }
     }
 }
@@ -153,13 +155,13 @@ fn response(outcome: &TranslateOutcome) -> Answer {
     match outcome {
         TranslateOutcome::Translated { matches, message } => Ok(ConceptMapTranslateResponse {
             result: Boolean::from(true),
-            message: message.as_deref().map(FhirString::from),
+            message: message.as_deref().map(primitives::String::from),
             r#match: matches.iter().map(matched).collect(),
             ..ConceptMapTranslateResponse::default()
         }),
         TranslateOutcome::NoMatch { message } => Ok(ConceptMapTranslateResponse {
             result: Boolean::from(false),
-            message: message.as_deref().map(FhirString::from),
+            message: message.as_deref().map(primitives::String::from),
             ..ConceptMapTranslateResponse::default()
         }),
         _ => Err(shared(UnexpectedAnswer)),
@@ -179,9 +181,9 @@ fn displayed(outcome: &LookupOutcome) -> Displayed {
             display,
             ..
         } => Ok(Some(CodeSystemLookupResponse {
-            name: FhirString::from(name.as_str()),
-            version: version.as_deref().map(FhirString::from),
-            display: FhirString::from(display.as_str()),
+            name: primitives::String::from(name.as_str()),
+            version: version.as_deref().map(primitives::String::from),
+            display: primitives::String::from(display.as_str()),
             ..CodeSystemLookupResponse::default()
         })),
         LookupOutcome::NotFound { .. } => Ok(None),
@@ -206,9 +208,9 @@ fn matched(found: &Match) -> ConceptMapTranslateResponseMatch {
 fn coding(concept: &Concept) -> Coding {
     Coding {
         system: concept.system.as_deref().map(Uri::from),
-        version: concept.version.as_deref().map(FhirString::from),
+        version: concept.version.as_deref().map(primitives::String::from),
         code: concept.code.as_deref().map(Code::from),
-        display: concept.display.as_deref().map(FhirString::from),
+        display: concept.display.as_deref().map(primitives::String::from),
         ..Coding::default()
     }
 }

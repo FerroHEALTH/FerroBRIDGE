@@ -55,10 +55,11 @@ v0.0.4 (OMOP). Nothing is scaffolded before its issues are filed.
 ## Repo map
 
 The Cargo workspace (#107) holds the root manifests with the full lint set,
-eleven library crates (five at 0.0.0, the version that holds their crates.io
-names until a first publish, and `fhir-types`, `openehr-mapping-core`,
-`fhirconnect`, `ferrobridge-term`, `ferrobridge-fhirpath` and
-`ferrobridge-validator` on the published crate line), and
+eleven library crates (three at 0.0.0, the version that holds their crates.io
+names until a first publish, and `fhir-types`, `hl7v2-types`,
+`openehr-mapping-core`, `fhirconnect`, `ferrobridge-term`,
+`ferrobridge-hl7v2`, `ferrobridge-fhirpath` and `ferrobridge-validator` on the
+published crate line), and
 the testkit tool crate. Beside it:
 
 - `app/ferrobridge-server`: the bridge's one binary, `ferrobridge` (#21). A thin
@@ -119,8 +120,9 @@ the testkit tool crate. Beside it:
   at entry. `src/mappings/compile.rs` is the one FHIRconnect load path the
   lanes, `mapping check` and the reload share (#725).
 - `app/ferrobridge-console`: the operator console (#599, `docs/architecture.md`
-  §4.10), its own binary `ferrobridge-console`: a Leptos app rendered on the
-  server and hydrated, halves chosen by target, with `serve`, `config check`
+  §4.10), its own binary `ferrobridge-console`: a Leptos app in islands mode
+  on FerroUI 0.3.6 (the server draws each page, the browser hydrates its
+  islands, every action a plain form post), halves chosen by target, with `serve`, `config check`
   and `healthcheck`, the TOML configuration with `FERROBRIDGE_CONSOLE__`
   overrides and `_file` secrets, the nonce CSP and the other browser security
   headers, and the typed bridge client (`src/bridge/`). Its server half
@@ -264,6 +266,10 @@ the testkit tool crate. Beside it:
   usage report switched off; `todo-issues.sh`, which fails a `TODO(#N)` or a pending subcommand's issue
   that the tracker reports closed;
   `changelog-released.sh`, every released changelog section against its tag;
+  `changelog-structure.sh` and `changelog-security.sh`, the Keep a Changelog
+  types and the CRA Security rules (a reason line, a `GHSA-` id or VEX path
+  per entry) over `[Unreleased]` and, through `scripts/release/plan.sh`, over
+  the section a release cuts;
   `pin-freshness.sh`, every pin no ecosystem watches against its newest
   upstream release; and `conformance.sh`, the pass-list gate over the six
   corpora under `conformance/` (fifteen: the two mapping libraries, the
@@ -276,11 +282,13 @@ the testkit tool crate. Beside it:
   CI lanes a pull request runs, and `fast.sh` is the default local gate over
   the same set (`docs/ci-cd.md`).
 - `.github/`: issue and pull-request templates, CODEOWNERS, Dependabot, and
-  twelve workflows (CI, Docs, Scorecard, CodeQL, SonarQube Cloud, Release,
-  Release build, Release image, Release console, Publish crates, Pin
-  freshness, Fuzz). `ci.yml` runs
+  fifteen workflows (CI, PR guards, Docs, Scorecard, CodeQL, SonarQube Cloud,
+  Release, Release build, Release image, Release console, Scan and tag images,
+  Published image scan, Publish crates, Pin freshness, Fuzz). `ci.yml` runs
   its workflow, shell, container and guard tier beside the Rust tier; its
   `conclusion` job is the single required check on `main` (`docs/ci-cd.md`).
+  `pr-guards.yml` re-runs the guard a changed label or description affects
+  in the head commit's CI run.
   `release.yml` is dormant until a `v*` tag is pushed and cuts a release from
   the changelog section, and its `crates` leg publishes the library crates
   through Trusted Publishing. `release-build.yml`, `release-image.yml` and
@@ -288,8 +296,16 @@ the testkit tool crate. Beside it:
   what puts the signing identity out of reach of caller-defined steps (SLSA
   Build Level 3); they produce the attested tarballs, the SBOMs per target,
   and the multi-platform GHCR images of the bridge and of the operator
-  console (`docs/release.md`). `pin-freshness.yml` reads every pin no Dependabot
-  ecosystem covers against its newest upstream release each week.
+  console, pushed by digest. Its `vulnerability-record` job scans both
+  images and the server tarballs at every severity and refuses the release
+  while a finding lacks an OpenVEX judgement under `security/vex/`
+  (`scripts/checks/vex-coverage.sh`); `scan-and-tag.yml` then gates each
+  digest on fixable HIGH and CRITICAL findings before it applies the tags,
+  and `image-scan.yml` scans the published images weekly with the VEX
+  applied. `security/vex/rust-advisories.openvex.json` is generated from
+  `deny.toml` and checked in the `cargo-deny` job. `pin-freshness.yml` reads
+  every pin no Dependabot ecosystem covers against its newest upstream
+  release each week.
 - Root markdown: this file, `README.md`, and the community and governance set.
 
 When the workspace lands, each crate carries its own `CLAUDE.md` with
@@ -482,6 +498,8 @@ apply always. Read the relevant one before working in that area.
 - `.claude/rules/ci-cd.md`, `ai-code-review.md`, `crates-publishing.md`: the
   workflow-security discipline, the advisory-analyzer policy (SonarQube Cloud,
   CodeQL), and the crates.io bump and publish rules.
+- `.claude/rules/changelog.md`: the changelog structure and the Security
+  rules a release cut is refused on (`docs/release.md`, `docs/post-market.md`).
 - `.claude/rules/issue-workflow.md`, `issue-relationships.md`,
   `project-board.md`: the tracker work style.
 - Skills: `/spec-lookup` (find the authoritative answer in oracle order),

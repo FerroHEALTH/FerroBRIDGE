@@ -19,13 +19,13 @@
 //! pool to a CDM schema and applies the DDL to it, the `vocabulary` resolver
 //! resolves source codes to standard concepts over the loaded vocabulary tables,
 //! `writer` commits one record graph at a time, `derived` rebuilds the
-//! tables the CDM leaves to the ETL, and `quality::run` runs the checks. The
+//! tables the CDM leaves to the ETL, `athena` loads an Athena vocabulary
+//! download, and `quality::run` runs the checks. The
 //! model is documented at <https://ohdsi.github.io/CommonDataModel/cdm54.html>.
 #![doc(test(attr(deny(warnings))))]
 
-// TODO(#233): the vocabulary loader for an Athena export, once #88 records the
-// observed file format.
-
+#[cfg(feature = "database")]
+pub mod athena;
 #[cfg(feature = "database")]
 pub mod connection;
 #[cfg(feature = "database")]

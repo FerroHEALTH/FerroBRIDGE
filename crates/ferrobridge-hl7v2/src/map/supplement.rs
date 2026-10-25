@@ -87,7 +87,8 @@ mod tests {
     use fhir_types::r4::concept_map::ConceptMap;
 
     use super::{CANONICAL_BASE, DIRECTORY, SHIPPED};
-    use crate::map::corpus::{CANONICAL_BASE as GUIDE_BASE, Corpus, Origin};
+    use crate::map::corpus;
+    use crate::map::corpus::{Corpus, Origin};
 
     fn package() -> std::path::PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -153,7 +154,7 @@ mod tests {
                 );
             } else {
                 assert_eq!(url, format!("{CANONICAL_BASE}{id}"), "{name}");
-                assert!(!url.starts_with(GUIDE_BASE), "{name}");
+                assert!(!url.starts_with(corpus::CANONICAL_BASE), "{name}");
                 assert!(description.starts_with("Adds "), "{name}: {description}");
             }
         }

@@ -12,8 +12,8 @@
 //! Any other kind is a typed refusal naming the element, and the engine writes
 //! no extension URL of its own for it.
 
+use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::Decimal;
-use fhir_types::r4::primitives::String as FhirString;
 use fhir_types::r4::quantity::Quantity;
 use openehr_rm::v1_2::data_types::quantity::dv_proportion::DvProportion;
 use openehr_rm::v1_2::data_types::quantity::proportion_kind::ProportionKind;
@@ -64,7 +64,7 @@ impl Lens<DvProportion, Quantity> for PercentLens {
                 value: Some(render(source.numerator, source.precision)),
                 ..Decimal::default()
             }),
-            unit: Some(FhirString::from(PERCENT)),
+            unit: Some(primitives::String::from(PERCENT)),
             ..Quantity::default()
         })
     }
@@ -145,8 +145,8 @@ mod tests {
     use super::PercentLens;
     use crate::engine::lens::Lens;
     use crate::engine::lens::LensError;
+    use fhir_types::r4::primitives;
     use fhir_types::r4::primitives::Decimal;
-    use fhir_types::r4::primitives::String as FhirString;
     use fhir_types::r4::quantity::Quantity;
     use openehr_rm::v1_2::data_types::quantity::dv_proportion::DvProportion;
     use openehr_rm::v1_2::data_types::quantity::proportion_kind::ProportionKind;
@@ -243,7 +243,7 @@ mod tests {
                 value: Some(String::from("5")),
                 ..Decimal::default()
             }),
-            unit: Some(FhirString::from("mg")),
+            unit: Some(primitives::String::from("mg")),
             ..Quantity::default()
         };
         let error = PercentLens

@@ -152,6 +152,23 @@ pub struct Decoded {
 /// MSH-18 names a set this crate does not decode, when MSH-18 repeats and
 /// MSH-20 names a switching scheme, and when a byte
 /// sequence falls outside the set.
+///
+/// # Examples
+///
+/// ```
+/// use ferrobridge_hl7v2::decode::{Charset, DecodeError, decode};
+///
+/// let latin1 = b"MSH|^~\\&|LAB|NORTHLAB|EHR|SOUTHCLINIC|20260925143000||ORU^R01|M1|P|2.5.1||||||8859/1\rPID|1||P1||M\xFCller^J\xF6rg\r";
+/// let decoded = decode(latin1, Charset::Ascii)?;
+/// assert_eq!(decoded.charset, Charset::Iso8859(1));
+/// assert!(decoded.declared);
+/// assert!(decoded.text.contains("M\u{FC}ller^J\u{F6}rg"));
+///
+/// // A byte outside the set MSH-18 declares is refused, never replaced.
+/// let ascii = b"MSH|^~\\&|LAB|NORTHLAB|EHR|SOUTHCLINIC|20260925143000||ORU^R01|M1|P|2.5.1||||||ASCII\rPID|1||P1||M\xFCller\r";
+/// assert!(matches!(decode(ascii, Charset::Ascii), Err(DecodeError::Undeclared { .. })));
+/// # Ok::<(), DecodeError>(())
+/// ```
 pub fn decode(message: &[u8], default: Charset) -> Result<Decoded, DecodeError> {
     let (charset, declared) = match declared_charset(message)? {
         Some(code) => (

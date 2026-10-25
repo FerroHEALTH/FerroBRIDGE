@@ -22,6 +22,7 @@
 //! journeys: our own design.
 
 mod browser;
+mod configuration;
 mod editor;
 mod engine;
 mod playground;

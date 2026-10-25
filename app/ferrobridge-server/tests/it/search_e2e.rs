@@ -26,7 +26,7 @@ use ferrobridge_testkit::fixtures;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use tower::ServiceExt as _;
 
@@ -45,7 +45,7 @@ const BASE: &str = "http://ferrobridge.invalid/fhir/";
 
 #[tokio::test]
 async fn a_patient_search_pages_the_committed_conditions_back_from_a_real_cdr()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }
@@ -126,7 +126,7 @@ const KDS_SEARCH: &str = "context: ferrobridge_kds_diagnose.context\nparameters:
 
 #[tokio::test]
 async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // #526 and R4 search.html#token: `[system]|[code]` matches one Coding, so a
     // composition holding diagnosis 1 (S1, X) and diagnosis 2 (S2, Y) answers
     // `S2|X` with nothing, and each diagnosis that matches is one resource.
@@ -240,7 +240,7 @@ async fn commit_two_diagnoses(
     client: &CdrClient,
     ehr_id: &ferrobridge_server::cdr::ids::EhrId,
     versioned_object_uid: &str,
-) -> Result<(String, String), Box<dyn StdError>> {
+) -> Result<(String, String), Box<dyn Error>> {
     let answered = client
         .composition(
             ehr_id,
@@ -288,6 +288,7 @@ async fn commit_two_diagnoses(
     let commit = ferrobridge_server::facade::commit::context(
         ferrobridge_server::facade::commit::Change::Creation,
         "ferrobridge.e2e",
+        &ferrobridge_server::facade::commit::Committer::Bridge,
         fixtures::KDS_DIAGNOSE_TEMPLATE_ID,
     )?;
     let committed = client
@@ -341,7 +342,7 @@ fn recode(entry: &mut serde_json::Value, system: &str, code: &str) -> Option<()>
 
 /// Returns a create of the synthetic `Condition` under the sender id
 /// `sender`, coded `code`, its subject a literal reference.
-fn post_condition(sender: &str, code: &str) -> Result<Request<Body>, Box<dyn StdError>> {
+fn post_condition(sender: &str, code: &str) -> Result<Request<Body>, Box<dyn Error>> {
     let mut resource: serde_json::Value = serde_json::from_str(fixtures::R4_CONDITION)
         .map_err(|error| format!("the synthetic Condition fixture is not JSON: {error}"))?;
     resource["id"] = serde_json::json!(sender);
@@ -380,7 +381,7 @@ fn link<'a>(body: &'a serde_json::Value, relation: &str) -> Option<&'a str> {
 async fn get(
     facade: &Arc<Facade>,
     path_and_query: &str,
-) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     call(
         app(facade),
         Request::get(format!("/fhir/{path_and_query}")).body(Body::empty())?,
@@ -413,7 +414,7 @@ fn app(facade: &Arc<Facade>) -> Router {
 async fn call(
     app: Router,
     request: Request<Body>,
-) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     let call = format!("{} {}", request.method(), request.uri());
     let response = app.oneshot(request).await?;
     let status = response.status();

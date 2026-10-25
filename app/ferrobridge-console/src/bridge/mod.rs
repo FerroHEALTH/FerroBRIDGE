@@ -16,6 +16,7 @@ use http::{HeaderValue, StatusCode};
 use secrecy::{ExposeSecret as _, SecretString};
 use url::Url;
 
+use ferrobridge_operator_api::configuration::Configuration;
 use ferrobridge_operator_api::health::{Info, Readiness};
 use ferrobridge_operator_api::operator::{EngineState, Listed};
 use fhir_types::codec::{Json as _, Path, Value};
@@ -307,6 +308,24 @@ impl Bridge {
         self.document("operator/state", "engine state", token, &[StatusCode::OK])
             .await
             .map(|(_status, state)| state)
+    }
+
+    /// Reads the configuration the bridge started on from the operator API,
+    /// `GET {base}operator/configuration`, every secret by reference alone.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Refused`] for any status but `200` (a `404`
+    /// where the operator API is off, a `403` without the operator scope),
+    /// and the body errors of [`Self::health_info`].
+    pub async fn configuration(&self, token: &AccessToken) -> Result<Configuration, BridgeError> {
+        self.document(
+            "operator/configuration",
+            "running configuration",
+            token,
+            &[StatusCode::OK],
+        )
+        .await
+        .map(|(_status, configuration)| configuration)
     }
 
     /// Reads the bridge's SMART discovery document, `GET

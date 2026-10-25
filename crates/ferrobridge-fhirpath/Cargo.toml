@@ -4,7 +4,7 @@
 name = "ferrobridge-fhirpath"
 description = "A FHIRPath Normative Release 2.0.0 evaluator with the FHIR R4 additions, over the fhir-types element table"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.127"
+version = "0.1.128"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

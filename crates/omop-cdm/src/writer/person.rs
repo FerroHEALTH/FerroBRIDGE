@@ -22,8 +22,10 @@ use crate::writer::error::WriteError;
 use crate::writer::input::PersonPolicy;
 use crate::writer::side_table::allocate;
 
-/// The width of `person.person_source_value`, `varchar(50)` in CDM v5.4.
-const SOURCE_VALUE_WIDTH: usize = 50;
+/// The width of the `*_source_value` columns the writer fills itself
+/// (`person_source_value`, `provider_source_value`,
+/// `visit_detail_source_value`), `varchar(50)` in CDM v5.4.
+pub(super) const SOURCE_VALUE_WIDTH: usize = 50;
 
 /// Resolves `ehr_id` to its `person_id` in the person map, assigning one when
 /// `create` allows.
@@ -107,15 +109,16 @@ pub(super) async fn person_id(
     Ok(id)
 }
 
-/// Records the columns of the `PERSON` rows `persons` names, as the
-/// composition `versioned_object_uid` just wrote them, as the newest writes of
-/// those rows.
+/// Records the columns of the rows of `table`, `person` or `death`, that
+/// `persons` names, as the composition `versioned_object_uid` just wrote
+/// them, as the newest writes of those rows in `<table>_row`.
 ///
-/// [`restore_persons`] reads them back when a newer writer of the row goes.
-pub(super) async fn record_person_rows(
+/// [`restore_rows`] reads them back when a newer writer of the row goes.
+pub(super) async fn record_rows(
     transaction: &Transaction<'_>,
     cdm: &SchemaName,
     bridge: &SchemaName,
+    table: &'static str,
     versioned_object_uid: &str,
     persons: &[i32],
 ) -> Result<(), WriteError> {
@@ -127,9 +130,9 @@ pub(super) async fn record_person_rows(
     transaction
         .execute(
             &format!(
-                "INSERT INTO {bridge}.person_row (versioned_object_uid, person_id, written, columns)
+                "INSERT INTO {bridge}.{table}_row (versioned_object_uid, person_id, written, columns)
                  SELECT $1, p.person_id, nextval('{bridge}.person_row_written_seq'), to_jsonb(p)
-                 FROM {cdm}.person AS p WHERE p.person_id = ANY($2) ORDER BY p.person_id"
+                 FROM {cdm}.{table} AS p WHERE p.person_id = ANY($2) ORDER BY p.person_id"
             ),
             &[&versioned_object_uid, &persons],
         )
@@ -138,51 +141,53 @@ pub(super) async fn record_person_rows(
     Ok(())
 }
 
-/// Rewrites the `PERSON` row of each of `persons` from the newest write of it
-/// that the side table still holds.
+/// Rewrites the row of `table`, `person` or `death`, of each of `persons`
+/// from the newest write of it that the side table still holds.
 ///
-/// A person whose writers all go keeps its row for [`retire_persons`] to
-/// decide. A writer committed before the side table recorded columns has
+/// A person whose writers all go keeps its row for [`retire_persons`] or
+/// [`retire_deaths`] to decide. A writer committed before the side table recorded columns has
 /// none, and every writer that has columns was committed after it, so a
 /// person left with only such writers keeps the row it has.
 ///
 /// [`retire_persons`]: crate::writer::side_table::retire_persons
-pub(super) async fn restore_persons(
+/// [`retire_deaths`]: crate::writer::side_table::retire_deaths
+pub(super) async fn restore_rows(
     transaction: &Transaction<'_>,
     cdm: &SchemaName,
     bridge: &SchemaName,
+    table: &'static str,
     persons: &[i32],
 ) -> Result<(), WriteError> {
     if persons.is_empty() {
         return Ok(());
     }
-    // NOTE: no specification governs this: our own design; CDM v5.4 PERSON holds one row
-    // per person, so the newest writer that remains gives it its columns.
+    // NOTE: no specification governs this: our own design; CDM v5.4 PERSON and DEATH hold
+    // one row per person, so the newest writer that remains gives it its columns.
     let newest = format!(
-        "SELECT DISTINCT ON (person_id) person_id, columns FROM {bridge}.person_row
+        "SELECT DISTINCT ON (person_id) person_id, columns FROM {bridge}.{table}_row
          WHERE person_id = ANY($1) ORDER BY person_id, written DESC"
     );
     transaction
         .execute(
             &format!(
-                "DELETE FROM {cdm}.person AS p
+                "DELETE FROM {cdm}.{table} AS p
                  WHERE p.person_id IN (SELECT person_id FROM ({newest}) AS n)"
             ),
             &[&persons],
         )
         .await
-        .map_err(database(Step::Delete("person")))?;
+        .map_err(database(Step::Delete(table)))?;
     transaction
         .execute(
             &format!(
-                "INSERT INTO {cdm}.person
-                 SELECT (jsonb_populate_record(NULL::{cdm}.person, n.columns)).*
+                "INSERT INTO {cdm}.{table}
+                 SELECT (jsonb_populate_record(NULL::{cdm}.{table}, n.columns)).*
                  FROM ({newest}) AS n"
             ),
             &[&persons],
         )
         .await
-        .map_err(database(Step::Insert("person")))?;
+        .map_err(database(Step::Insert(table)))?;
     Ok(())
 }
 

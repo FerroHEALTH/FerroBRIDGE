@@ -61,7 +61,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
     ) -> Result<(), EngineError> {
         let node = openehr.node();
         let segments = tail_segments(openehr);
-        if openehr.on_element() && segments == [rm::NULL_FLAVOUR] {
+        if openehr.on_element() && segments == [rm::null_flavour::NULL_FLAVOUR] {
             let refuse = |source: LensError| EngineError::Cell {
                 mapping: String::from(mapping.name()),
                 element: String::from(target.expression().as_str()),
@@ -82,14 +82,13 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let leaf = openehr
             .leaf_class()
             .ok_or_else(|| unsupported_tail(mapping, openehr))?;
-        let produced =
-            cell::put(view, leaf, None, self.binding_of(node).as_deref()).map_err(|source| {
-                EngineError::Cell {
-                    mapping: String::from(mapping.name()),
-                    element: String::from(target.expression().as_str()),
-                    source: Box::new(source),
-                }
-            })?;
+        let produced = cell::put(view, leaf, None, self.binding_of(node).as_deref(), &[]).map_err(
+            |source| EngineError::Cell {
+                mapping: String::from(mapping.name()),
+                element: String::from(target.expression().as_str()),
+                source: Box::new(source),
+            },
+        )?;
         for taken in &produced.fallbacks {
             self.warnings.push(Warning::fallback(
                 taken,
@@ -177,6 +176,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 leaf,
                 existing.as_ref(),
                 self.binding_of(node).as_deref(),
+                &[],
             )
             .map_err(|source| EngineError::Cell {
                 mapping: String::from(mapping.name()),
@@ -287,7 +287,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         binding: &Binding,
     ) -> Result<(), EngineError> {
         let produced =
-            cell::put(view, DV_DATE_TIME, None, None).map_err(|source| EngineError::Cell {
+            cell::put(view, DV_DATE_TIME, None, None, &[]).map_err(|source| EngineError::Cell {
                 mapping: String::from(mapping.name()),
                 element: String::from(target.expression().as_str()),
                 source: Box::new(source),

@@ -163,6 +163,25 @@ impl From<&Refusal> for Error {
 }
 
 /// Renders the acknowledgment of the message `header` names.
+///
+/// # Examples
+///
+/// ```
+/// use ferrobridge_hl7v2::ack::{Code, Error, Header, Stamp, render};
+/// use ferrobridge_hl7v2::parse::ErrorCode;
+///
+/// let header = Header::from_text("MSH|^~\\&|LAB|NORTHLAB|EHR|SOUTHCLINIC|20260925||ORU^R01|MSG00001|P|2.5.1\r")
+///     .expect("an MSH segment");
+/// let refusal = Error {
+///     location: None,
+///     code: ErrorCode::UnsupportedMessageType,
+///     text: String::from("no structure for ORU^R99"),
+/// };
+/// let stamp = Stamp { control_id: "ACK00001", timestamp: "20260925143001" };
+/// let reply = render(&header, Code::Reject, &[refusal], stamp);
+/// assert!(reply.contains("\rMSA|AR|MSG00001"));
+/// assert!(reply.contains("\rERR|"));
+/// ```
 #[must_use]
 pub fn render(header: &Header, code: Code, errors: &[Error], stamp: Stamp<'_>) -> String {
     let field = header.field.to_string();

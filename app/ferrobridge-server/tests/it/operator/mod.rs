@@ -5,7 +5,7 @@
 //! scope, over a `wiremock` authorization server and a synthetic mapping
 //! tree. No specification governs the operator surface: our own design.
 
-use std::error::Error as StdError;
+use std::error::Error;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -24,6 +24,7 @@ use tower::ServiceExt as _;
 
 use crate::facade::auth::{Issuer, SigningKey, authority, bearing, challenge, ec_key, mint};
 
+mod configuration;
 mod save;
 
 /// The clean mapping set the facade suite runs.
@@ -52,7 +53,15 @@ struct Case {
 
 impl Case {
     /// Builds the tree, the issuer and the router.
-    async fn new() -> Result<Self, Box<dyn StdError>> {
+    async fn new() -> Result<Self, Box<dyn Error>> {
+        Self::answering(None).await
+    }
+
+    /// Builds the tree, the issuer and the router, the operator API
+    /// answering `configuration` as the running configuration when given.
+    async fn answering(
+        configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
+    ) -> Result<Self, Box<dyn Error>> {
         let tree = tempfile::tempdir()?;
         let mappings = tree.path().join("mappings");
         let templates = tree.path().join("templates");
@@ -89,6 +98,10 @@ impl Case {
             roots,
             Snapshot::new(report, std::collections::BTreeMap::new()),
         );
+        let operator = match configuration {
+            Some(configuration) => operator.with_configuration(configuration),
+            None => operator,
+        };
         let state = AppState::with_health(Registry::default())
             .with_auth(authority)
             .with_operator(Arc::new(operator));
@@ -111,7 +124,7 @@ impl Case {
         &self,
         path: &str,
         scope: Option<&str>,
-    ) -> Result<http::Response<Body>, Box<dyn StdError>> {
+    ) -> Result<http::Response<Body>, Box<dyn Error>> {
         let request = Request::get(path).body(Body::empty())?;
         let request = match scope {
             Some(scope) => bearing(request, &self.token(scope)),
@@ -122,7 +135,7 @@ impl Case {
 }
 
 /// Reads the body of `response` as bytes.
-async fn bytes(response: http::Response<Body>) -> Result<Vec<u8>, Box<dyn StdError>> {
+async fn bytes(response: http::Response<Body>) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(axum::body::to_bytes(response.into_body(), 1024 * 1024)
         .await?
         .to_vec())
@@ -140,15 +153,16 @@ fn digest(bytes: &[u8]) -> String {
         })
 }
 
-/// The three operator routes, as a client calls them.
-const ROUTES: [&str; 3] = [
+/// The read-only operator routes, as a client calls them.
+const ROUTES: [&str; 4] = [
     "/operator/state",
+    "/operator/configuration",
     "/operator/mappings",
     "/operator/mappings/fhirconnect/ferrobridge_facade.yml",
 ];
 
 #[tokio::test]
-async fn every_route_answers_401_without_a_token() -> Result<(), Box<dyn StdError>> {
+async fn every_route_answers_401_without_a_token() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     for route in ROUTES {
         let response = case.get(route, None).await?;
@@ -163,7 +177,7 @@ async fn every_route_answers_401_without_a_token() -> Result<(), Box<dyn StdErro
 }
 
 #[tokio::test]
-async fn every_route_answers_403_without_the_operator_scope() -> Result<(), Box<dyn StdError>> {
+async fn every_route_answers_403_without_the_operator_scope() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     for route in ROUTES {
         let response = case.get(route, Some("system/*.cruds openid")).await?;
@@ -178,8 +192,8 @@ async fn every_route_answers_403_without_the_operator_scope() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn the_state_names_each_compiled_context_and_where_it_came_from()
--> Result<(), Box<dyn StdError>> {
+async fn the_state_names_each_compiled_context_and_where_it_came_from() -> Result<(), Box<dyn Error>>
+{
     let case = Case::new().await?;
     let response = case.get("/operator/state", Some(OPERATOR)).await?;
     assert_eq!(StatusCode::OK, response.status());
@@ -219,7 +233,7 @@ async fn the_state_names_each_compiled_context_and_where_it_came_from()
 }
 
 #[tokio::test]
-async fn the_listing_names_every_file_with_its_digest_and_owner() -> Result<(), Box<dyn StdError>> {
+async fn the_listing_names_every_file_with_its_digest_and_owner() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let response = case.get("/operator/mappings", Some(OPERATOR)).await?;
     assert_eq!(StatusCode::OK, response.status());
@@ -261,7 +275,7 @@ async fn the_listing_names_every_file_with_its_digest_and_owner() -> Result<(), 
 }
 
 #[tokio::test]
-async fn a_file_is_served_verbatim_with_its_digest_as_the_etag() -> Result<(), Box<dyn StdError>> {
+async fn a_file_is_served_verbatim_with_its_digest_as_the_etag() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     for (route, on_disk) in [
         (
@@ -288,7 +302,7 @@ async fn a_file_is_served_verbatim_with_its_digest_as_the_etag() -> Result<(), B
 }
 
 #[tokio::test]
-async fn a_path_that_names_no_mapping_file_answers_404() -> Result<(), Box<dyn StdError>> {
+async fn a_path_that_names_no_mapping_file_answers_404() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     for route in [
         "/operator/mappings/fhirconnect/absent.yml",
@@ -302,7 +316,7 @@ async fn a_path_that_names_no_mapping_file_answers_404() -> Result<(), Box<dyn S
 }
 
 #[tokio::test]
-async fn a_path_that_escapes_its_directory_answers_404() -> Result<(), Box<dyn StdError>> {
+async fn a_path_that_escapes_its_directory_answers_404() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let outside = case.tree.path().join("outside.yml");
     std::fs::write(&outside, "secret: outside the mapping tree\n")?;
@@ -323,7 +337,7 @@ async fn a_path_that_escapes_its_directory_answers_404() -> Result<(), Box<dyn S
 
 #[test]
 fn the_audit_line_names_the_caller_and_the_route_and_never_the_content()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let logs = crate::support::Logs::default();
     let capture = ferrobridge_server::telemetry::subscriber(
         ferrobridge_server::telemetry::Rendering::Json,
@@ -370,7 +384,7 @@ fn the_audit_line_names_the_caller_and_the_route_and_never_the_content()
 }
 
 #[tokio::test]
-async fn without_a_mapping_dir_the_api_checks_and_saves_nothing() -> Result<(), Box<dyn StdError>> {
+async fn without_a_mapping_dir_the_api_checks_and_saves_nothing() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let token = case.token(OPERATOR);
     for request in [

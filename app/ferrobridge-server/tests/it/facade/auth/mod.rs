@@ -10,6 +10,7 @@
 mod audit;
 mod basic;
 mod batch;
+mod committer;
 mod compartment;
 mod discovery;
 mod forwarding;

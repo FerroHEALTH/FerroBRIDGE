@@ -329,7 +329,7 @@ mod tests {
     use super::{
         EhrId, IdError, RequestId, entity_tag, template_id, version_from_etag, versioned_object_uid,
     };
-    use openehr_base::v1_3::base_types::identification::lexical::IdError as BaseIdError;
+    use openehr_base::v1_3::base_types::identification::lexical;
 
     /// A synthetic version container.
     const CONTAINER: &str = "8849182c-82ad-4088-a07f-48ead4180515";
@@ -388,7 +388,7 @@ mod tests {
             Err(IdError::Openehr {
                 kind: "OBJECT_VERSION_ID",
                 found: text.clone(),
-                source: BaseIdError::PartCount {
+                source: lexical::IdError::PartCount {
                     expected: 3,
                     found: 2
                 },

@@ -5,7 +5,7 @@
 //! answers the same `401` (RFC 6750 §3.1) with an `OperationOutcome` that
 //! names no claim.
 
-use std::error::Error as StdError;
+use std::error::Error;
 use std::time::Duration;
 
 use ferrohealth_smart::resource::TokenProfile;
@@ -39,7 +39,7 @@ const REFUSED: &str = "the request carries no valid access token for this server
 async fn read_with(
     app: axum::Router,
     token: Option<&str>,
-) -> Result<(StatusCode, Option<String>, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, Option<String>, serde_json::Value), Box<dyn Error>> {
     let request = match token {
         Some(token) => bearing(get(UNKNOWN), token),
         None => get(UNKNOWN),
@@ -73,7 +73,7 @@ fn assert_refused((status, challenge, body): &(StatusCode, Option<String>, serde
 }
 
 #[tokio::test]
-async fn a_valid_token_reaches_the_handler() -> Result<(), Box<dyn StdError>> {
+async fn a_valid_token_reaches_the_handler() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -86,7 +86,7 @@ async fn a_valid_token_reaches_the_handler() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_missing_token_is_challenged_without_an_error_code() -> Result<(), Box<dyn StdError>> {
+async fn a_missing_token_is_challenged_without_an_error_code() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -101,7 +101,7 @@ async fn a_missing_token_is_challenged_without_an_error_code() -> Result<(), Box
 }
 
 #[tokio::test]
-async fn another_scheme_is_a_missing_bearer_token() -> Result<(), Box<dyn StdError>> {
+async fn another_scheme_is_a_missing_bearer_token() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -118,7 +118,7 @@ async fn another_scheme_is_a_missing_bearer_token() -> Result<(), Box<dyn StdErr
 }
 
 #[tokio::test]
-async fn every_invalid_token_gets_the_same_body_naming_no_claim() -> Result<(), Box<dyn StdError>> {
+async fn every_invalid_token_gets_the_same_body_naming_no_claim() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -172,8 +172,8 @@ async fn every_invalid_token_gets_the_same_body_naming_no_claim() -> Result<(), 
 }
 
 #[tokio::test]
-async fn a_token_signed_by_another_key_under_a_known_kid_is_refused()
--> Result<(), Box<dyn StdError>> {
+async fn a_token_signed_by_another_key_under_a_known_kid_is_refused() -> Result<(), Box<dyn Error>>
+{
     let key = ec_key("k1", Algorithm::ES256);
     let forger = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
@@ -185,7 +185,7 @@ async fn a_token_signed_by_another_key_under_a_known_kid_is_refused()
 }
 
 #[tokio::test]
-async fn an_algorithm_outside_the_configured_set_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn an_algorithm_outside_the_configured_set_is_refused() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k384", Algorithm::ES384);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -198,7 +198,7 @@ async fn an_algorithm_outside_the_configured_set_is_refused() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn a_symmetric_token_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn a_symmetric_token_is_refused() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -218,7 +218,7 @@ async fn a_symmetric_token_is_refused() -> Result<(), Box<dyn StdError>> {
 }
 
 #[tokio::test]
-async fn a_token_that_is_no_jwt_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn a_token_that_is_no_jwt_is_refused() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -229,7 +229,7 @@ async fn a_token_that_is_no_jwt_is_refused() -> Result<(), Box<dyn StdError>> {
 
 #[tokio::test]
 async fn the_rfc_9068_profile_refuses_a_plain_jwt_and_the_jwt_profile_takes_it()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -252,7 +252,7 @@ async fn the_rfc_9068_profile_refuses_a_plain_jwt_and_the_jwt_profile_takes_it()
 }
 
 #[tokio::test]
-async fn an_unknown_kid_reads_the_key_set_once_more_and_passes() -> Result<(), Box<dyn StdError>> {
+async fn an_unknown_kid_reads_the_key_set_once_more_and_passes() -> Result<(), Box<dyn Error>> {
     let old = ec_key("old", Algorithm::ES256);
     let rotated = ec_key("rotated", Algorithm::ES256);
     let issuer = Issuer::bare().await;
@@ -272,7 +272,7 @@ async fn an_unknown_kid_reads_the_key_set_once_more_and_passes() -> Result<(), B
 
 #[tokio::test]
 async fn an_unknown_kid_within_the_interval_reads_nothing_and_is_refused()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let stranger = ec_key("stranger", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
@@ -289,7 +289,7 @@ async fn an_unknown_kid_within_the_interval_reads_nothing_and_is_refused()
 }
 
 #[tokio::test]
-async fn a_key_set_that_cannot_be_read_again_answers_503() -> Result<(), Box<dyn StdError>> {
+async fn a_key_set_that_cannot_be_read_again_answers_503() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let stranger = ec_key("stranger", Algorithm::ES256);
     let issuer = Issuer::bare().await;
@@ -309,7 +309,7 @@ async fn a_key_set_that_cannot_be_read_again_answers_503() -> Result<(), Box<dyn
 
 #[tokio::test]
 async fn a_key_the_issuer_withdrew_stops_verifying_once_the_set_is_past_its_max_age()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // NOTE: RFC 7517 §5 has a resource server read the issuer's current key
     // set, so a key withdrawn from it verifies nothing after the next read.
     let withdrawn = ec_key("withdrawn", Algorithm::ES256);
@@ -350,7 +350,7 @@ async fn a_key_the_issuer_withdrew_stops_verifying_once_the_set_is_past_its_max_
 }
 
 #[tokio::test]
-async fn with_auth_off_the_facade_is_open() -> Result<(), Box<dyn StdError>> {
+async fn with_auth_off_the_facade_is_open() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let (status, challenge, body) = read_with(harness.app(), None).await?;
     assert_eq!(StatusCode::NOT_FOUND, status, "{body}");
@@ -363,7 +363,7 @@ async fn with_auth_off_the_facade_is_open() -> Result<(), Box<dyn StdError>> {
 // NOTE: RFC 9068 §2.2 requires `sub`, and RFC 7519 §4.1.2 has it identify a
 // principal, which an empty or whitespace-only value does not.
 #[tokio::test]
-async fn a_token_with_a_blank_sub_is_the_generic_401() -> Result<(), Box<dyn StdError>> {
+async fn a_token_with_a_blank_sub_is_the_generic_401() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -379,7 +379,7 @@ async fn a_token_with_a_blank_sub_is_the_generic_401() -> Result<(), Box<dyn Std
 // NOTE: RFC 6750 §2.1 fixes the `b64token` syntax, and §3.1 answers a token
 // that is "malformed" with `invalid_token`.
 #[tokio::test]
-async fn a_bearer_value_outside_b64token_is_the_generic_401() -> Result<(), Box<dyn StdError>> {
+async fn a_bearer_value_outside_b64token_is_the_generic_401() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;

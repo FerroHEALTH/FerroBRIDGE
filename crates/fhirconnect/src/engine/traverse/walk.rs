@@ -434,8 +434,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
             let segments = tail_segments(input);
             let (_class, carried) = rm::carried(input.tail_class(), &segments)
                 .ok_or_else(|| unsupported_tail(mapping, input))?;
-            if input.on_element() && segments == [rm::NULL_FLAVOUR] {
-                return rm::null_flavour_of(&value, node.aql_path().as_str())
+            if input.on_element() && segments == [rm::null_flavour::NULL_FLAVOUR] {
+                return rm::null_flavour::null_flavour_of(&value, node.aql_path().as_str())
                     .map(|found| found.map(|flavour| Leaf::NullFlavour(Box::new(flavour))))
                     .map_err(|source| EngineError::Rm {
                         mapping: String::from(mapping.name()),

@@ -13,7 +13,7 @@ use ferrobridge_server::mappings;
 use ferrobridge_server::state::AppState;
 use http::StatusCode;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
+use std::error::Error as _;
 use wiremock::Mock;
 use wiremock::MockServer;
 use wiremock::ResponseTemplate;
@@ -29,7 +29,9 @@ const ADL14_ROUTE: &str = "/definition/template/adl1.4/ferrobridge.diagnose.v1";
 const ADL2_ROUTE: &str = "/definition/template/adl2/ferrobridge.diagnose.v1";
 
 /// Returns the settings `text` describes.
-fn settings(text: &str) -> Result<ferrobridge_server::config::Settings, Box<dyn StdError>> {
+fn settings(
+    text: &str,
+) -> Result<ferrobridge_server::config::Settings, Box<dyn std::error::Error>> {
     Ok(Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?)
 }
 
@@ -56,7 +58,7 @@ async fn serve_template(cdr: &MockServer) {
 
 /// Returns the mapping-set refusal inside a boot refusal.
 fn refusal(error: &ferrobridge_server::config::error::Error) -> Option<&mappings::Error> {
-    let mut cause = StdError::source(error);
+    let mut cause = std::error::Error::source(error);
     while let Some(current) = cause {
         if let Some(found) = current.downcast_ref::<mappings::Error>() {
             return Some(found);
@@ -72,7 +74,7 @@ fn refusal(error: &ferrobridge_server::config::error::Error) -> Option<&mappings
 
 #[tokio::test]
 async fn with_no_template_directory_the_lane_compiles_against_the_cdr_templates()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let cdr = MockServer::start().await;
     serve_template(&cdr).await;
 
@@ -92,7 +94,7 @@ async fn with_no_template_directory_the_lane_compiles_against_the_cdr_templates(
 
 #[tokio::test]
 async fn a_template_the_cdr_does_not_hold_refuses_the_start_naming_it_and_the_status()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let cdr = MockServer::start().await;
     for route in [ADL14_ROUTE, ADL2_ROUTE] {
         Mock::given(matchers::method("GET"))
@@ -125,7 +127,7 @@ async fn a_template_the_cdr_does_not_hold_refuses_the_start_naming_it_and_the_st
 
 #[tokio::test]
 async fn a_template_fetch_the_cdr_refuses_carries_the_upstream_status()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(ADL14_ROUTE))
@@ -149,7 +151,7 @@ async fn a_template_fetch_the_cdr_refuses_carries_the_upstream_status()
 
 #[tokio::test]
 async fn a_cdr_that_fails_the_fetch_refuses_the_start_with_the_status_in_its_cause()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(ADL14_ROUTE))
@@ -171,7 +173,7 @@ async fn a_cdr_that_fails_the_fetch_refuses_the_start_with_the_status_in_its_cau
 }
 
 #[tokio::test]
-async fn a_template_directory_wins_over_the_cdr() -> Result<(), Box<dyn StdError>> {
+async fn a_template_directory_wins_over_the_cdr() -> Result<(), Box<dyn std::error::Error>> {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(ADL14_ROUTE))
@@ -205,7 +207,7 @@ async fn a_template_directory_wins_over_the_cdr() -> Result<(), Box<dyn StdError
 
 #[tokio::test]
 async fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     // The refusal comes from resolving the configuration, before any client
     // is built or any CDR is called.
     let text = format!("[mappings]\ndirectory = \"{FIXTURES}\"\n\n[auth]\nenabled = false\n");
@@ -230,7 +232,8 @@ async fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused()
 }
 
 #[tokio::test]
-async fn a_disabled_operations_lane_needs_no_template_source() -> Result<(), Box<dyn StdError>> {
+async fn a_disabled_operations_lane_needs_no_template_source()
+-> Result<(), Box<dyn std::error::Error>> {
     let text = format!("[mappings]\ndirectory = \"{FIXTURES}\"\n\n[operations]\nenabled = false\n");
     let state = AppState::build(&settings(&text)?).await?;
     assert!(state.operations().is_none());

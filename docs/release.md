@@ -25,25 +25,33 @@ flowchart LR
   draft --> b3["binaries<br/>aarch64 gnu"]
   draft --> b4["binaries<br/>aarch64 musl"]
   draft --> console["console<br/>binaries, site bundle, image"]
-  b2 --> image["image<br/>linux/amd64, linux/arm64"]
+  b2 --> image["image<br/>linux/amd64, linux/arm64<br/>pushed by digest"]
   b4 --> image
-  b1 --> publish["finalize-release<br/>asset set, then publish"]
-  b3 --> publish
-  image --> publish
-  console --> publish
+  b1 --> record["vulnerability-record<br/>every finding judged"]
+  b3 --> record
+  image --> record
+  console --> record
+  record --> publish["finalize-release<br/>asset set, then publish"]
+  record --> tag["scan-and-tag<br/>HIGH/CRITICAL gate, then tags"]
   publish --> crates["crates.io<br/>approval-gated"]
   crates --> milestone["milestone<br/>closed"]
+  tag --> milestone
 ```
 
 - **plan** validates the tag shape, refuses a dispatch that is not at the tag
-  it names, refuses the tag when no milestone is titled exactly as it or that
+  it names, and runs `scripts/release/plan.sh checks`, the one list of
+  release facts ([Preflight](#preflight-the-plan-job-before-the-tag)): it
+  refuses the tag when no milestone is titled exactly as it or that
   milestone still holds an open issue or pull request (naming each one),
-  checks the tag against every file that declares the product
-  version, and extracts the `## [X.Y.Z]` section of `CHANGELOG.md` as the
-  release notes. A missing or empty section fails the release, so a cut can
-  never ship with notes generated from the commit range standing in for the
-  changelog. It also emits the target matrix, which the build jobs and the
-  asset check both read, so the two cannot drift apart.
+  checks the tag against every file that declares the product version,
+  checks the changelog's structure and the Security rules of the section
+  being cut, and extracts the `## [X.Y.Z]` section of `CHANGELOG.md` as the
+  release notes with the support period and the link to the CRA user
+  information appended. A missing or empty section
+  fails the release, so a cut can never ship with notes generated from the
+  commit range standing in for the changelog. It also emits the target
+  matrix, which the build jobs and the asset check both read, so the two
+  cannot drift apart.
 - **github-release** creates the release as a draft carrying those notes and
   attaches `compose.yaml`. A draft is mutable and invisible to anyone browsing
   releases, which is the window the asset uploads need.
@@ -52,13 +60,29 @@ flowchart LR
   emulation.
 - **build-image** calls `release-image.yml` once the musl binaries exist, and
   builds `ghcr.io/ferrohealth/ferrobridge` for `linux/amd64` and `linux/arm64`
-  from them.
+  from them. It pushes the image by digest with no tag.
 - **build-console** calls `release-console.yml` once the draft exists. It
   builds the operator console's musl binaries and its site bundle, attaches
   them to the draft, and builds `ghcr.io/ferrohealth/ferrobridge-console` for
-  `linux/amd64` and `linux/arm64` from them.
-- **finalize-release** checks that the draft carries every asset this version
-  promises, then publishes. Publishing last means a half-assembled release is
+  `linux/amd64` and `linux/arm64` from them, pushed by digest with no tag.
+- **vulnerability-record** scans both images on both platforms and the four
+  server tarballs with Trivy at every severity, unfixed findings included,
+  with an empty configuration so the gate's floor and exceptions stay out.
+  `scripts/checks/vex-coverage.sh` joins every finding with the OpenVEX
+  statement under `security/vex/` that judges it and refuses the release
+  while one has none (CRA Annex I Part I(2)(a)). It attaches
+  `ferrobridge-vX.Y.Z-vulnerability-record.json` and the raw reports
+  (`ferrobridge-vX.Y.Z-trivy-reports.tar.gz`) to the draft, and keeps them as
+  a run artifact when it refuses.
+- **scan-and-tag** calls `scan-and-tag.yml` once the record passes. It scans
+  each pushed digest against `trivy.yaml` (HIGH and CRITICAL, fixed findings
+  only, `.trivyignore.yaml`) and only then applies the tags, so a refused
+  image is never referencable by tag. `imagetools create` re-tags the same
+  digest, so the attestations hold, and each tag is verified as a consumer
+  would.
+- **finalize-release** waits for the vulnerability record, checks that the
+  draft carries every asset this version promises, the record included, then
+  publishes. Publishing last means a half-assembled release is
   never visible. A pre-release publishes with `--latest=false`, so it never
   becomes the repository's latest release.
 - **crates** uploads the `crates/*` members to crates.io once the release is
@@ -187,8 +211,10 @@ architecture, and that Dockerfile runs none, being a single distroless stage
 that copies a binary already built for each platform ([multi-platform
 builds](https://docs.docker.com/build/building/multi-platform/)).
 
-The index is tagged with the version, and for a release that is not a
-pre-release also with its major.minor and with `latest`. BuildKit's own
+The index is pushed by digest with no tag. The lane computes the tags (the
+version, and for a release that is not a pre-release also its major.minor and
+`latest`) and hands them to `scan-and-tag`, which applies them once the
+vulnerability record and the image scan pass. BuildKit's own
 provenance and SBOM attestations are off, because the GitHub attestations carry
 both, keyless-signed through Sigstore, while BuildKit's are unsigned
 attestation manifests inside the index. Five attestations are pushed as OCI
@@ -227,11 +253,23 @@ Every name below is prefixed `ferrobridge-console-vX.Y.Z-`:
 takes the tarballs from this run's artifacts, verifies each against
 `release-console.yml`'s own signer identity, stages them for
 `docker/console/Dockerfile`, and from there runs the steps `release-image.yml`
-runs: one buildx build for both platforms with no QEMU, the version and, for
-a release that is not a pre-release, the major.minor and `latest` tags, five
+runs: one buildx build for both platforms with no QEMU, pushed by digest
+with the version and, for a release that is not a pre-release, the
+major.minor and `latest` tags left for `scan-and-tag` to apply, five
 attestations pushed as OCI referrers (provenance for the index, provenance
 plus an SPDX SBOM per platform manifest), and a verification of its own
 output as a consumer would run it.
+
+## Between releases: the weekly image scan
+
+`.github/workflows/image-scan.yml` scans both published images at `latest`
+every Monday, both platforms, with `trivy.yaml` and every OpenVEX document
+under `security/vex/` passed as `--vex`. A finding files or comments on one
+tracking issue and the run stays green; the run goes red only when the scan
+itself fails. `scripts/security/scan-images.sh` replays the same scan
+locally, and `--candidate <image>` scans a local build before you release
+it. The Trivy version of all three lanes is the `trivy` row of
+`docs/VERSIONS.md`.
 
 ## The pre-release rule
 
@@ -278,16 +316,74 @@ before a real cut.
 5. **The changelog names the release.** `[Unreleased]` becomes the version and
    the date, with a fresh empty `[Unreleased]` above it and a new link
    reference. What sits under the version heading is what the release notes
-   say, so read it as the release notes before you tag.
-6. **The gates pass on the release commit.** The tier-1 set is
+   say, so read it as the release notes before you tag. The heading carries
+   the date, because the support period in the notes counts from it.
+6. **Every Security entry names its advisory.** Each `### Security` entry
+   carries the `GHSA-` id of the draft advisory on this repository, or the
+   path of a VEX statement under `security/vex/`, and a Security section
+   beside other change subsections opens with
+   `Shipped with functional changes because: <reason>`
+   (`.claude/rules/changelog.md`). The drafted advisories are published in
+   the same hour as the release (`post-market.md`).
+7. **The gates pass on the release commit.** The tier-1 set is
    `zizmor --min-severity=low .github/`, `actionlint`, `shellcheck
    --severity=style` over every tracked shell program, `hadolint` over every
    tracked Dockerfile, `scripts/checks/comment-style.sh --all`,
    `scripts/checks/versions.sh`, and `mdbook build website/book`, beside the
    Rust lanes (`docs/ci-cd.md`).
-7. **A pre-release has rehearsed any change to the lane itself.** Tag
+8. **A pre-release has rehearsed any change to the lane itself.** Tag
    `vX.Y.Z-rc.1`, watch the whole graph run, and read what it produced. A
    pre-release takes the same path and is never marked latest.
+9. **The preflight passes** at the commit you are about to tag
+   (below).
+
+## Preflight: the plan job, before the tag
+
+The `plan` job verifies every release fact at the tagged commit before
+anything is built or published. Its checks are one list,
+`scripts/release/plan.sh`, and `scripts/release/preflight.sh` runs the same
+list on your machine:
+
+```sh
+bash scripts/release/preflight.sh v0.0.11
+bash scripts/release/preflight.sh v0.0.11 --notes /tmp/notes.md   # keep the notes
+```
+
+Run it on the release branch once the release pull request is ready, and
+again on `main` after the merge, at the commit you are about to tag. It exits
+0 when the plan job would pass, names every check that refuses, and prints the
+path of the release notes it composed so you can read them before they are
+published.
+
+The checks, in the order the plan job runs them:
+
+| Check | Script |
+|---|---|
+| The milestone titled as the tag holds no open item | `scripts/release/milestone.sh check` |
+| The tag equals the version in `Cargo.toml`, `CITATION.cff` and `docs/VERSIONS.md` | `plan.sh` |
+| The changelog has only Keep a Changelog types, each once per section | `scripts/checks/changelog-structure.sh` |
+| The section being cut opens its `### Security` with the reason when it mixes security and functional changes, and every Security entry names a GHSA id or a `security/vex/` path | `scripts/checks/changelog-security.sh --section X.Y.Z` |
+| The previous release resolves from the pushed tags | `plan.sh prev-tag` |
+| The changelog section becomes the notes, with the support period and the CRA user information link | `plan.sh notes` |
+
+The previous release is resolved from `git ls-remote --tags origin 'v*'`, by
+version order. A tag that was pushed but whose release never published still
+counts, and ancestry plays no part (`bash scripts/release/plan.sh prev-tag
+vX.Y.Z` prints it). The support period is the month and year five years
+after the date on the release heading (CRA Art 13(8) and (19)), computed in
+bash so the preflight gives the same month on macOS as the plan job on Linux.
+The notes end with a link to the book's
+[CRA information for users](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)
+page, the Annex II information CRA Art 13(18) has accompany each release. The
+book is published from `main`, so every release links the same address, and
+`plan.sh notes` refuses when `website/book/src/SUMMARY.md` does not list the
+page.
+
+You need `gh` logged in, because the milestone check reads the tracker. A
+missing tool refuses its check; it is never skipped.
+
+To add a release fact, add a function and a line to the list in
+`scripts/release/plan.sh`. The plan job and the preflight both pick it up.
 
 ## The tag
 

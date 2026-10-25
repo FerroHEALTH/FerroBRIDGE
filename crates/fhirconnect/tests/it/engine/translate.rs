@@ -16,9 +16,9 @@ use fhir_types::r4::coding::Coding;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateRequest;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateResponse;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateResponseMatch;
+use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::Boolean;
 use fhir_types::r4::primitives::Code;
-use fhir_types::r4::primitives::String as FhirString;
 use fhir_types::r4::primitives::Uri;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
@@ -141,7 +141,7 @@ fn coding(system: &str, code: &str, display: Option<&str>) -> Coding {
     Coding {
         system: Some(Uri::from(system)),
         code: Some(Code::from(code)),
-        display: display.map(FhirString::from),
+        display: display.map(primitives::String::from),
         ..Coding::default()
     }
 }

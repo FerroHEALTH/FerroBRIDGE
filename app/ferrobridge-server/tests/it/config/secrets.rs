@@ -8,11 +8,10 @@ use ferrobridge_server::config::error::Error;
 use ferrohealth_smart::config::ConfigError;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 use std::io::Write;
 
 #[test]
-fn a_secret_file_sibling_is_read_at_boot() -> Result<(), Box<dyn StdError>> {
+fn a_secret_file_sibling_is_read_at_boot() -> Result<(), Box<dyn std::error::Error>> {
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "synthetic-password")?;
     let text = format!(
@@ -36,7 +35,7 @@ fn a_secret_file_sibling_is_read_at_boot() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn a_cdm_url_file_sibling_is_read_at_boot() -> Result<(), Box<dyn StdError>> {
+fn a_cdm_url_file_sibling_is_read_at_boot() -> Result<(), Box<dyn std::error::Error>> {
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "postgres://bridge@db.invalid/cdm?sslmode=disable")?;
     let text = format!("[cdm]\nurl_file = {:?}\n", file.path());
@@ -50,7 +49,8 @@ fn a_cdm_url_file_sibling_is_read_at_boot() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn a_cdm_tls_ca_file_is_read_through_its_environment_name() -> Result<(), Box<dyn StdError>> {
+fn a_cdm_tls_ca_file_is_read_through_its_environment_name() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "not a certificate")?;
     let environment = BTreeMap::from([(
@@ -70,7 +70,8 @@ fn a_cdm_tls_ca_file_is_read_through_its_environment_name() -> Result<(), Box<dy
 }
 
 #[test]
-fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
     let text = concat!(
         "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
         "[cdr.credentials]\nuser = \"bridge\"\npassword = \"inline\"\npassword_file = \"/run/secrets/password\"\n",
@@ -92,7 +93,7 @@ fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
         "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
         "[cdr.credentials]\nuser = \"bridge\"\npassword_file = \"/nonexistent/password\"\n",
@@ -108,7 +109,7 @@ fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn Std
             assert_eq!("cdr.credentials", section);
             assert_eq!(std::path::Path::new("/nonexistent/password"), path);
             assert!(
-                StdError::source(&error).is_some(),
+                std::error::Error::source(&error).is_some(),
                 "the refusal keeps the file system's own cause"
             );
         }
@@ -118,7 +119,7 @@ fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn Std
 }
 
 #[test]
-fn a_user_without_a_password_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_user_without_a_password_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
         "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
         "[cdr.credentials]\nuser = \"bridge\"\n",
@@ -154,14 +155,14 @@ fn a_user_file_sibling_is_an_unknown_key() {
             .expect_err("user_file is no key of the table");
         assert!(matches!(error, Error::Parse { .. }), "{error:?}");
         assert!(
-            format!("{:?}", StdError::source(&error)).contains("user_file"),
+            format!("{:?}", std::error::Error::source(&error)).contains("user_file"),
             "the refusal names the key: {error:?}"
         );
     }
 }
 
 #[test]
-fn a_password_without_a_user_refuses_to_boot() -> Result<(), Box<dyn StdError>> {
+fn a_password_without_a_user_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
         "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
         "[cdr.credentials]\npassword = \"p\"\n",
@@ -187,7 +188,7 @@ fn a_password_without_a_user_refuses_to_boot() -> Result<(), Box<dyn StdError>> 
 
 #[test]
 fn no_inline_secret_reaches_the_debug_rendering_of_the_tree_or_the_settings()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
         "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
         "[cdr.credentials]\nuser = \"bridge\"\npassword = \"synthetic-cdr-password\"\n\n",
@@ -214,8 +215,8 @@ fn no_inline_secret_reaches_the_debug_rendering_of_the_tree_or_the_settings()
 }
 
 #[test]
-fn no_inline_client_secret_reaches_the_debug_rendering_of_the_tree() -> Result<(), Box<dyn StdError>>
-{
+fn no_inline_client_secret_reaches_the_debug_rendering_of_the_tree()
+-> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
         "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
         "[cdr.credentials.oauth]\ntoken_endpoint = \"https://idp.invalid/token\"\n",

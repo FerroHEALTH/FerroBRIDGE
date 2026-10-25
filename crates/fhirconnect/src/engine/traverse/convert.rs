@@ -183,6 +183,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             node.rm_type(),
             held.as_ref(),
             self.binding_of(node).as_deref(),
+            self.index.ordinal_options(node).unwrap_or_default(),
         )
         .map_err(|source| EngineError::Cell {
             mapping: String::from(mapping.name()),

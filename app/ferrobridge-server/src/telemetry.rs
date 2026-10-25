@@ -11,7 +11,7 @@
 //! `[telemetry]` section. No specification governs the console: our own
 //! design.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::io::{self, Write};
 use tracing::{Metadata, Subscriber};
@@ -33,7 +33,7 @@ pub const FORMAT_ENV: &str = "FERROBRIDGE_LOG_FORMAT";
 pub const FILTER_ENV: &str = "RUST_LOG";
 
 /// The rendering a deployment asks for.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase", deny_unknown_fields)]
 pub enum Format {
     /// `pretty` on a terminal, `json` otherwise.

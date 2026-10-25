@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: BUSL-1.1
 [package]
 name = "ferrobridge-term"
-description = "The FerroBRIDGE FHIR terminology client for $lookup, $translate and $validate-code"
+description = "The FerroBRIDGE FHIR terminology client for $lookup, $translate, $validate-code, $expand and $subsumes"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.129"
+version = "0.1.134"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -38,8 +38,12 @@ ferrobridge-testkit.workspace = true
 http.workspace = true
 secrecy.workspace = true
 serde_json.workspace = true
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time", "net", "io-util"] }
 wiremock.workspace = true
+# The mutual-TLS stub a caller-built client is tested against (#1180).
+rcgen.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
 
 [lints]
 workspace = true

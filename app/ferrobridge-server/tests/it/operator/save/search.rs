@@ -6,7 +6,7 @@
 //! the facade's programs. No specification governs the declaration file or
 //! the operator surface: our own design.
 
-use std::error::Error as StdError;
+use std::error::Error;
 
 use axum::body::Body;
 use http::{Request, StatusCode, header};
@@ -37,7 +37,7 @@ parameters:
 
 impl Case {
     /// Saves the console's model and context, so `Observation` is mapped.
-    async fn map_observation(&self) -> Result<(), Box<dyn StdError>> {
+    async fn map_observation(&self) -> Result<(), Box<dyn Error>> {
         for (relative, body) in [
             ("ferrobridge_console.yml", MODEL),
             ("ferrobridge_console.context.yml", CONTEXT),
@@ -50,7 +50,7 @@ impl Case {
 
     /// Returns the search parameter names the `CapabilityStatement` gives
     /// `Observation`.
-    async fn observation_parameters(&self) -> Result<Vec<String>, Box<dyn StdError>> {
+    async fn observation_parameters(&self) -> Result<Vec<String>, Box<dyn Error>> {
         let response = self
             .app
             .clone()
@@ -68,7 +68,7 @@ impl Case {
     }
 
     /// Searches `Observation` by `code` under a system token.
-    async fn search_observation(&self) -> Result<http::Response<Body>, Box<dyn StdError>> {
+    async fn search_observation(&self) -> Result<http::Response<Body>, Box<dyn Error>> {
         let token = mint(&self.key, &self.issuer.claims("system/Observation.rs"));
         let request = Request::get("/fhir/Observation?code=http://snomed.info/sct%7C2024001")
             .body(Body::empty())?;
@@ -78,7 +78,7 @@ impl Case {
 
 #[tokio::test]
 async fn a_console_declaration_checks_against_its_context_and_serves_search()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/query/aql"))
@@ -138,7 +138,7 @@ async fn a_console_declaration_checks_against_its_context_and_serves_search()
 
 #[tokio::test]
 async fn a_declaration_that_does_not_bind_is_refused_and_changes_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     case.map_observation().await?;
     let response = case
@@ -167,7 +167,7 @@ async fn a_declaration_that_does_not_bind_is_refused_and_changes_nothing()
 
 #[tokio::test]
 async fn a_draft_declaration_check_answers_its_diagnostics_and_writes_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     case.map_observation().await?;
     let check = |body: &str| {
@@ -187,7 +187,7 @@ async fn a_draft_declaration_check_answers_its_diagnostics_and_writes_nothing()
 }
 
 #[tokio::test]
-async fn a_save_over_a_provisioned_declaration_is_refused() -> Result<(), Box<dyn StdError>> {
+async fn a_save_over_a_provisioned_declaration_is_refused() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let response = case
         .send(

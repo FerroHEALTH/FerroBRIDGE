@@ -15,8 +15,12 @@ set -euo pipefail
 
 payload="$(cat)"
 
-# Only concern ourselves with git commit / PR creation / push commands.
-if ! printf '%s' "$payload" | grep -qiE 'git[[:space:]]+commit|gh[[:space:]]+pr[[:space:]]+create|git[[:space:]]+push'; then
+# shellcheck source=.claude/hooks/lib/target.sh
+. "$(dirname "$0")/lib/target.sh"
+
+# Only concern ourselves with git commit / PR creation / push commands, in any
+# repository: the rule is the same everywhere. `git -C <dir> commit` counts.
+if ! printf '%s' "$payload" | grep -qiE "$GIT_COMMIT_OR_PUSH|gh[[:space:]]+pr[[:space:]]+create"; then
   exit 0
 fi
 

@@ -6,7 +6,7 @@
 //! is not processed again as a root
 //! (`docs/specs/fhirconnect/modules/ROOT/pages/engine/bundles.adoc`).
 
-use std::error::Error as StdError;
+use std::error::Error;
 
 use http::StatusCode;
 
@@ -97,7 +97,7 @@ async fn a_sub_context_is_no_program_and_its_template_is_never_fetched() {
 
 #[tokio::test]
 async fn a_resource_a_sub_context_consumed_is_not_processed_again_as_a_root()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // bundles.adoc §Resources consumed by a sub-context: "A resource that a parent context pulls
     // in via `slotContext` is marked as resolved. The engine does not process it again as a
     // root". No program maps an Observation, so a transaction would refuse it as a root.
@@ -144,8 +144,7 @@ async fn a_resource_a_sub_context_consumed_is_not_processed_again_as_a_root()
 }
 
 #[tokio::test]
-async fn a_resource_nothing_consumes_is_still_processed_as_a_root() -> Result<(), Box<dyn StdError>>
-{
+async fn a_resource_nothing_consumes_is_still_processed_as_a_root() -> Result<(), Box<dyn Error>> {
     // bundles.adoc: "Resources nothing consumes are still processed as roots", so the
     // Observation no program maps refuses the transaction.
     let harness = harness().await;

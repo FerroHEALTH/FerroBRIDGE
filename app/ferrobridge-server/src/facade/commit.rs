@@ -8,12 +8,23 @@
 //! facts as schema members instead (`ehr-codegen.openapi.yaml`,
 //! `contribution_create`). This module builds both from one description, so a
 //! single write and a transaction record the same committer and change type.
+//!
+//! The committer is the caller the request authenticated, provisioned "based
+//! on authentication and authorization runtime data" as ITS-REST 1.1.0
+//! §openehr-version and openehr-audit-details recommends, and the bridge
+//! itself only for a write no caller made; `system_id` always names the
+//! bridge, so the version records both who asked and what committed.
 
 use std::collections::BTreeMap;
 
 use crate::cdr::commit::CommitContext;
 use crate::cdr::ids::IdError;
 use crate::cdr::ids::template_id;
+use ferrohealth_smart::resource::Access;
+use ferrohealth_smart::resource::Via;
+use openehr_base::v1_3::base_types::identification::generic_id::GenericId;
+use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
+use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
 use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
 use openehr_its::rest::generated::common::UpdateAudit;
 use openehr_its::rest::generated::common::UpdateAuditData;
@@ -81,6 +92,90 @@ impl Change {
     }
 }
 
+/// The `PARTY_REF.type` of a caller: the abstract `PARTY`, since a token
+/// does not say whether its subject is a person or a client application
+/// (openEHR BASE, `PARTY_REF`: "Abstract supertypes are allowed").
+const CALLER_PARTY_TYPE: &str = "PARTY";
+
+/// The `GENERIC_ID.scheme` of a caller's identifier: the `sub` claim of
+/// RFC 7519 §4.1.2, or a Basic user-id (no specification governs the scheme
+/// name: our own design).
+const CALLER_ID_SCHEME: &str = "sub";
+
+/// Who a commit is attributed to as `AUDIT_DETAILS.committer`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Committer {
+    /// The bridge, named by its system id: a write no authenticated caller
+    /// made, such as an HL7 v2 message or a request on an open surface.
+    Bridge,
+    /// The caller the request authenticated.
+    Caller {
+        /// The token's `sub`, or the Basic user-id.
+        subject: String,
+        /// The namespace the subject belongs to: the issuer that vouched for
+        /// it, or the bridge's system id for a Basic user the bridge checked.
+        namespace: String,
+    },
+}
+
+impl Committer {
+    /// Returns the committer of a request admitted with `access`, the bridge
+    /// for an open surface.
+    #[must_use]
+    pub fn of(access: &Access, system_id: &str) -> Self {
+        let Some(caller) = access.caller() else {
+            return Self::Bridge;
+        };
+        let namespace = match (caller.via(), caller.issuer()) {
+            (Via::Bearer, Some(issuer)) => issuer,
+            _ => system_id,
+        };
+        Self::Caller {
+            subject: caller.subject().to_owned(),
+            namespace: namespace.to_owned(),
+        }
+    }
+
+    /// Returns the `PARTY_PROXY` this committer is written as.
+    ///
+    /// A caller is a `PARTY_IDENTIFIED` named by its subject, with a
+    /// `PARTY_REF` into the namespace of its issuer when that namespace is a
+    /// legal one (openEHR BASE, `OBJECT_REF.namespace`: the regex
+    /// `[a-zA-Z][a-zA-Z0-9_.:/&?=+-]*`); the name alone carries it otherwise.
+    fn party(&self, system_id: &str) -> PartyProxy {
+        let (name, external_ref) = match self {
+            Self::Bridge => (system_id, None),
+            Self::Caller { subject, namespace } => (
+                subject.as_str(),
+                legal_namespace(namespace).then(|| PartyRef {
+                    namespace: namespace.clone(),
+                    r#type: String::from(CALLER_PARTY_TYPE),
+                    id: ObjectId::GenericId(GenericId {
+                        value: subject.clone(),
+                        scheme: String::from(CALLER_ID_SCHEME),
+                    }),
+                }),
+            ),
+        };
+        PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(PartyIdentifiedData {
+            external_ref,
+            name: Some(String::from(name)),
+            identifiers: None,
+        }))
+    }
+}
+
+/// Returns whether `namespace` matches the `OBJECT_REF.namespace` regex
+/// `[a-zA-Z][a-zA-Z0-9_.:/&?=+-]*` of openEHR BASE.
+fn legal_namespace(namespace: &str) -> bool {
+    let mut characters = namespace.chars();
+    characters
+        .next()
+        .is_some_and(|first| first.is_ascii_alphabetic())
+        && characters
+            .all(|character| character.is_ascii_alphanumeric() || "_.:/&?=+-".contains(character))
+}
+
 /// Why the committal metadata could not be built.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -96,14 +191,16 @@ pub enum CommitError {
     },
 }
 
-/// Returns the commit headers one `EHR_STATUS` write carries: a modification
-/// by `system_id` in the lifecycle a composition write takes, and no
-/// template, since an `EHR_STATUS` is built from none.
+/// Returns the commit headers one `EHR_STATUS` write carries.
+///
+/// The write is a modification by `committer` through `system_id` in the
+/// lifecycle a composition write takes, with no template, since an
+/// `EHR_STATUS` is built from none.
 #[must_use]
-pub fn status_context(system_id: &str) -> CommitContext {
+pub fn status_context(system_id: &str, committer: &Committer) -> CommitContext {
     CommitContext {
         lifecycle_state: Some(lifecycle()),
-        audit: Some(audit_data(Change::Modification, system_id)),
+        audit: Some(audit_data(Change::Modification, system_id, committer)),
         template_id: None,
     }
 }
@@ -120,6 +217,7 @@ pub fn status_context(system_id: &str) -> CommitContext {
 pub fn context(
     change: Change,
     system_id: &str,
+    committer: &Committer,
     template: &str,
 ) -> Result<CommitContext, CommitError> {
     Ok(CommitContext {
@@ -129,7 +227,7 @@ pub fn context(
             Change::Deleted => coded(DELETED_LIFECYCLE_CODE, "deleted"),
             Change::Creation | Change::Modification => lifecycle(),
         }),
-        audit: Some(audit_data(change, system_id)),
+        audit: Some(audit_data(change, system_id, committer)),
         template_id: Some(
             template_id(template).map_err(|source| CommitError::Template {
                 template: String::from(template),
@@ -145,24 +243,18 @@ pub fn context(
 /// members rather than as headers, so a transaction records exactly what a
 /// single write does.
 #[must_use]
-pub fn audit(change: Change, system_id: &str) -> UpdateAudit {
-    UpdateAudit::UpdateAudit(audit_data(change, system_id))
+pub fn audit(change: Change, system_id: &str, committer: &Committer) -> UpdateAudit {
+    UpdateAudit::UpdateAudit(audit_data(change, system_id, committer))
 }
 
 /// Returns the `UPDATE_AUDIT` members one write states.
-fn audit_data(change: Change, system_id: &str) -> UpdateAuditData {
+fn audit_data(change: Change, system_id: &str, committer: &Committer) -> UpdateAuditData {
     UpdateAuditData {
         _type: Some(String::from("UPDATE_AUDIT")),
         system_id: Some(String::from(system_id)),
         change_type: coded(change.code(), change.rubric()),
         description: None,
-        committer: PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(
-            PartyIdentifiedData {
-                external_ref: None,
-                name: Some(String::from(system_id)),
-                identifiers: None,
-            },
-        )),
+        committer: committer.party(system_id),
         additional_properties: BTreeMap::new(),
     }
 }
@@ -194,8 +286,11 @@ fn coded(code: &str, rubric: &str) -> DvCodedText {
 
 #[cfg(test)]
 mod tests {
-    use super::{Change, audit, context, lifecycle};
+    use super::{Change, Committer, audit, context, legal_namespace, lifecycle};
+    use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
     use openehr_its::rest::generated::common::UpdateAudit;
+    use openehr_rm::v1_2::common::generic::party_identified::PartyIdentified;
+    use openehr_rm::v1_2::common::generic::party_proxy::PartyProxy;
 
     #[test]
     fn the_change_codes_are_the_openehr_terminology_ones() {
@@ -206,8 +301,13 @@ mod tests {
 
     #[test]
     fn a_commit_context_carries_the_change_type_the_system_and_the_template() {
-        let built = context(Change::Creation, "FerroBRIDGE", "ferrobridge.diagnose.v1")
-            .expect("the context builds");
+        let built = context(
+            Change::Creation,
+            "FerroBRIDGE",
+            &Committer::Bridge,
+            "ferrobridge.diagnose.v1",
+        )
+        .expect("the context builds");
         let audit = built.audit.as_ref().expect("the context carries an audit");
         assert_eq!("249", audit.change_type.defining_code.code_string);
         assert_eq!(Some("FerroBRIDGE"), audit.system_id.as_deref());
@@ -219,7 +319,9 @@ mod tests {
 
     #[test]
     fn the_contribution_audit_states_the_same_change_type_as_the_header() {
-        let UpdateAudit::UpdateAudit(data) = audit(Change::Modification, "FerroBRIDGE") else {
+        let UpdateAudit::UpdateAudit(data) =
+            audit(Change::Modification, "FerroBRIDGE", &Committer::Bridge)
+        else {
             panic!("the facade writes an UPDATE_AUDIT, never an attestation");
         };
         assert_eq!("251", data.change_type.defining_code.code_string);
@@ -232,6 +334,70 @@ mod tests {
 
     #[test]
     fn a_template_identifier_a_header_cannot_hold_is_refused() {
-        assert!(context(Change::Creation, "FerroBRIDGE", "").is_err());
+        assert!(context(Change::Creation, "FerroBRIDGE", &Committer::Bridge, "").is_err());
+    }
+
+    #[test]
+    fn a_caller_commits_under_its_subject_in_its_issuers_namespace() {
+        let caller = Committer::Caller {
+            subject: String::from("synthetic-sub"),
+            namespace: String::from("https://as.example.org/realms/ferro"),
+        };
+        let UpdateAudit::UpdateAudit(data) = audit(Change::Creation, "FerroBRIDGE", &caller) else {
+            panic!("the facade writes an UPDATE_AUDIT");
+        };
+        assert_eq!(
+            Some("FerroBRIDGE"),
+            data.system_id.as_deref(),
+            "the bridge commits"
+        );
+        let PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(party)) = data.committer
+        else {
+            panic!("a caller is a PARTY_IDENTIFIED");
+        };
+        assert_eq!(Some("synthetic-sub"), party.name.as_deref());
+        let reference = party
+            .external_ref
+            .expect("a legal namespace carries a PARTY_REF");
+        assert_eq!("https://as.example.org/realms/ferro", reference.namespace);
+        assert_eq!("PARTY", reference.r#type);
+        assert!(matches!(reference.id, ObjectId::GenericId(ref id) if id.value == "synthetic-sub"));
+    }
+
+    #[test]
+    fn a_namespace_outside_the_openehr_regex_leaves_the_name_alone() {
+        assert!(legal_namespace("https://as.example.org/realms/ferro"));
+        assert!(legal_namespace("FerroBRIDGE"));
+        for illegal in ["", "1as", "https://as.example.org/~user", "a b", "x%20"] {
+            assert!(!legal_namespace(illegal), "{illegal}");
+        }
+        let caller = Committer::Caller {
+            subject: String::from("synthetic-sub"),
+            namespace: String::from("https://as.example.org/~tenant"),
+        };
+        let UpdateAudit::UpdateAudit(data) = audit(Change::Creation, "FerroBRIDGE", &caller) else {
+            panic!("the facade writes an UPDATE_AUDIT");
+        };
+        let PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(party)) = data.committer
+        else {
+            panic!("a caller is a PARTY_IDENTIFIED");
+        };
+        assert_eq!(Some("synthetic-sub"), party.name.as_deref());
+        assert_eq!(None, party.external_ref);
+    }
+
+    #[test]
+    fn a_write_no_caller_made_is_the_bridges() {
+        let UpdateAudit::UpdateAudit(data) =
+            audit(Change::Creation, "FerroBRIDGE", &Committer::Bridge)
+        else {
+            panic!("the facade writes an UPDATE_AUDIT");
+        };
+        let PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(party)) = data.committer
+        else {
+            panic!("the bridge is a PARTY_IDENTIFIED");
+        };
+        assert_eq!(Some("FerroBRIDGE"), party.name.as_deref());
+        assert_eq!(None, party.external_ref);
     }
 }

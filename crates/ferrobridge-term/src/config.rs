@@ -18,7 +18,7 @@ use url::Url;
 ///
 /// The release decides which generated module writes the request and reads
 /// the `Parameters` and the `OperationOutcome` of a call. R4 and R4B declare
-/// the same `in` and `out` parameters for the three operations this client
+/// the same `in` and `out` parameters for the five operations this client
 /// sends. STU3 declares fewer, so a request naming a parameter STU3 has no
 /// equivalent for is refused with
 /// [`Error::UnsupportedParameter`](crate::error::Error::UnsupportedParameter)

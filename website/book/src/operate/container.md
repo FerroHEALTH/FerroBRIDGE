@@ -387,9 +387,9 @@ FERROBRIDGE_VOCAB_DIR=/srv/athena/2026-09 \
   docker compose --profile vocab run --rm vocab-load
 ```
 
-`vocab load DIR --schema NAME` exits 2 today with a line naming #233, the
-loader that waits on the observed export format, so that service is the shape
-the job runs in rather than a working load. `etl run` is a working job; the image runs it as
+`vocab load DIR --schema NAME` replaces each vocabulary table from the download; the
+[deployment shape](deployment-shape.md#loading-the-vocabulary) page has the
+files it reads and the licences you accept. `etl run` is a working job; the image runs it as
 `ferrobridge etl run` with the `[etl]` section the configuration page
 describes.
 

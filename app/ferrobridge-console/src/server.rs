@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The console's HTTP service: the health route, the sign-in routes, the
-//! Leptos pages, the server functions and the site bundle, under one set of
-//! browser security headers.
+//! Leptos pages, the form posts they send and the site bundle, under one
+//! set of browser security headers.
 //!
 //! Every response carries a Content-Security-Policy whose script source is a
 //! nonce minted for that response alone, `nosniff`, `DENY` framing and no
@@ -19,7 +19,7 @@ use axum::Extension;
 use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use http::header::{
     CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
     X_FRAME_OPTIONS,
@@ -35,7 +35,8 @@ use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::bridge::{Bridge, BridgeError};
 use crate::config::settings::{OidcSettings, Settings};
-use crate::locale::{Msg, catalog, negotiated, tr_in};
+use crate::locale::messages::Msg;
+use crate::locale::{catalog, negotiated, tr_in};
 use crate::session::Sessions;
 
 /// The path of the console's own liveness route.
@@ -119,30 +120,41 @@ pub fn router(state: ConsoleState) -> axum::Router {
     let options = leptos_options(state.settings());
     let form_action = form_action(state.settings());
     let routes = leptos_axum::generate_route_list(crate::app::App);
-    let context = {
-        let state = state.clone();
-        move || {
-            leptos::context::provide_context(state.clone());
-            provide_request_nonce();
-        }
-    };
+    let context = page_context(state.clone(), options.clone());
     let pages = axum::Router::new()
         .route(HEALTH, get(health))
         .route(crate::app::STYLESHEET, get(stylesheet))
         .route(crate::app::THEME, get(theme))
+        .route(crate::app::MARK_LIGHT, get(mark_light))
+        .route(crate::app::MARK_DARK, get(mark_dark))
+        .route(crate::pages::about::INFO_JSON, get(info_json))
+        .route(crate::prefs::PREFERENCE, post(crate::prefs::choose))
+        .route(crate::prefs::RESET, post(crate::prefs::reset))
+        .route(crate::prefs::SIDEBAR, post(crate::prefs::rail))
+        .route(crate::pages::mappings::RELOAD, post(crate::posts::reload))
+        .route(crate::app::NEW_FILE, post(crate::posts::edit))
+        .route(
+            &format!("{}/{{*path}}", crate::app::EDIT),
+            post(crate::posts::edit),
+        )
+        .route(crate::app::PLAYGROUND, post(crate::posts::run))
+        .route(
+            &format!("{}/{{tab}}", crate::app::PLAYGROUND),
+            post(crate::posts::run),
+        )
         .route(crate::oidc::LOGIN, get(crate::oidc::login))
         .route(crate::oidc::CALLBACK, get(crate::oidc::callback))
         .route(
             crate::oidc::logout::LOGOUT,
-            axum::routing::post(crate::oidc::logout::logout),
+            post(crate::oidc::logout::logout),
         )
         .leptos_routes_with_context(&options, routes, context.clone(), {
             let options = options.clone();
-            move || crate::app::shell(options.clone())
+            move || crate::app::document(options.clone())
         })
         .fallback(leptos_axum::file_and_error_handler_with_context(
             context,
-            crate::app::shell,
+            crate::app::document,
         ))
         .layer(axum::middleware::from_fn(
             crate::oidc::refresh::refresh_session,
@@ -155,8 +167,8 @@ pub fn router(state: ConsoleState) -> axum::Router {
 /// The fetch metadata header that names where a request comes from.
 const SEC_FETCH_SITE: &str = "sec-fetch-site";
 
-/// Refuses every request that is not a safe method, a server function call
-/// and a sign-out among them, unless it comes from the console's own pages
+/// Refuses every request that is not a safe method, every form post and
+/// the sign-out among them, unless it comes from the console's own pages
 /// ([`same_origin`]), before anything reads the session or asks the bridge.
 ///
 /// The session cookie is `SameSite=Lax` as well, so a cross-site `POST`
@@ -201,8 +213,8 @@ async fn same_origin_only(
 /// WHATWG Fetch standard, the request `Origin` header). The console's own
 /// forms, the sign-out among them, therefore pass by `Sec-Fetch-Site`
 /// alone, and a browser without fetch metadata is refused, which fails
-/// closed. The `Origin` and `Referer` fallbacks serve a server function the
-/// page calls with `fetch`.
+/// closed. The `Origin` and `Referer` fallbacks serve a client that sends
+/// them in place of fetch metadata.
 #[must_use]
 pub fn same_origin(headers: &http::HeaderMap, origin: Option<&str>) -> bool {
     if let Some(site) = headers.get(SEC_FETCH_SITE) {
@@ -252,8 +264,11 @@ struct Health {
     status: &'static str,
 }
 
-/// The console's brand theme, which loads after the library's stylesheet.
-const BRAND_THEME: &str = include_str!("../style/theme.css");
+/// The brand mark the lockup draws in the light theme.
+const MARK_LIGHT_SVG: &str = include_str!("../../../assets/brand/ferrobridge-icon.svg");
+
+/// The brand mark the lockup draws in the dark theme.
+const MARK_DARK_SVG: &str = include_str!("../../../assets/brand/ferrobridge-icon-dark.svg");
 
 /// A stylesheet answer of `text`.
 fn css(text: &'static str) -> Response {
@@ -273,9 +288,62 @@ async fn stylesheet() -> Response {
     css(ferrohealth_ui::style::STYLESHEET)
 }
 
-/// Serves the console's brand theme.
+/// Serves the FerroBRIDGE theme of `ferrohealth_ui`: the brand's accents
+/// and the two preview accents of Your preferences.
 async fn theme() -> Response {
-    css(BRAND_THEME)
+    css(crate::app::BRAND.theme())
+}
+
+/// An SVG image answer of `text`.
+fn svg(text: &'static str) -> Response {
+    (
+        [(CONTENT_TYPE, HeaderValue::from_static("image/svg+xml"))],
+        text,
+    )
+        .into_response()
+}
+
+/// Serves the bridge's `GET /health/info` document as a download, for a
+/// signed-in operator: the About page's self-description.
+async fn info_json(
+    Extension(state): Extension<ConsoleState>,
+    headers: http::HeaderMap,
+) -> Response {
+    let token = state
+        .sessions()
+        .cookie_in(&headers, crate::session::COOKIE)
+        .and_then(|id| state.sessions().access_token(&id).ok().flatten());
+    let Some(token) = token else {
+        return StatusCode::UNAUTHORIZED.into_response();
+    };
+    match state
+        .bridge()
+        .health_info(&crate::bridge::AccessToken::new(token))
+        .await
+    {
+        Ok(info) => (
+            [(
+                http::header::CONTENT_DISPOSITION,
+                HeaderValue::from_static("attachment; filename=\"health-info.json\""),
+            )],
+            axum::Json(info),
+        )
+            .into_response(),
+        Err(error) => {
+            tracing::warn!(error = %crate::command::chain(&error), "the bridge's info could not be read");
+            StatusCode::BAD_GATEWAY.into_response()
+        }
+    }
+}
+
+/// Serves the brand mark of the light theme.
+async fn mark_light() -> Response {
+    svg(MARK_LIGHT_SVG)
+}
+
+/// Serves the brand mark of the dark theme.
+async fn mark_dark() -> Response {
+    svg(MARK_DARK_SVG)
 }
 
 /// Serves `GET /health`: `200` while the process serves.
@@ -311,8 +379,8 @@ fn is_bundle(
 /// Compresses the site bundle with brotli or gzip, as the request's
 /// `Accept-Encoding` chooses, and marks it `Vary: Accept-Encoding`.
 ///
-/// Only the bundle is compressed. A document or a server function's answer
-/// can carry what the operator entered beside data an attacker would want,
+/// Only the bundle is compressed. A document, the answer to a form post
+/// among them, can carry what the operator entered beside data an attacker would want,
 /// so it is never compressed, which keeps a compression side channel (BREACH)
 /// shut. The Leptos book (`deployment/binary_size`) has a site serve its
 /// WebAssembly compressed.
@@ -375,6 +443,39 @@ async fn content_security_policy(
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
+}
+
+/// What every render of a page provides: the console's state, the Leptos
+/// options, the request's nonce and a fresh set of reads from the bridge.
+fn page_context(
+    state: ConsoleState,
+    options: LeptosOptions,
+) -> impl Fn() + Clone + Send + Sync + 'static {
+    move || {
+        leptos::context::provide_context(state.clone());
+        leptos::context::provide_context(options.clone());
+        leptos::context::provide_context(crate::load::Reads::new());
+        provide_request_nonce();
+    }
+}
+
+/// Draws the page at the address of `parts` with what `extra` provides
+/// beside the page context: the answer of a form post.
+pub async fn render(
+    state: ConsoleState,
+    parts: http::request::Parts,
+    extra: impl Fn() + Clone + Send + Sync + 'static,
+) -> Response {
+    let options = leptos_options(state.settings());
+    let context = page_context(state, options.clone());
+    let handler = leptos_axum::render_app_async_with_context(
+        move || {
+            context();
+            extra();
+        },
+        move || crate::app::document(options.clone()),
+    );
+    handler(Request::from_parts(parts, axum::body::Body::empty())).await
 }
 
 /// Re-provides the request's nonce into the render, so the bootstrap script

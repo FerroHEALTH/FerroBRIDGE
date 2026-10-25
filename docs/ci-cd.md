@@ -88,7 +88,7 @@ A changed path reaches packages in one of these ways:
 | `docs/VERSIONS.md` | `ferrobridge-testkit`, and through it every member testing with it (`matrix_pin`) |
 | `docs/architecture.md` | the testkit's own tests |
 | `scripts/checks/sqlx-offline.sh` | `omop-cdm` |
-| `.claude/rules/leptos-ui.md`, `scripts/release/console-*.sh`, `scripts/checks/console-*.sh`, `scripts/release/journey-tools.sh` | `ferrobridge-console` (the rule holds its bundle budget; the scripts build and measure its site bundle and install the browser its journeys drive) |
+| `.claude/rules/leptos-ui.md`, `scripts/release/console-*.sh`, `scripts/checks/console-*.sh`, `scripts/release/journey-tools.sh`, `scripts/checks/stray-literals.*` | `ferrobridge-console` (the rule holds its bundle budget; the scripts build and measure its site bundle, install the browser its journeys drive and check its sources for stray literals) |
 | `website/book/src/**` | the testkit's own tests (its screenshot guard reads every page of the book and every console screenshot) |
 | `.github/workflows/ci.yml`, `.github/actions/setup-rust/**`, `scripts/checks/affected.sh`, `scripts/checks/fast.sh` | everything |
 | the rest of `.github/`, the rest of `.claude/`, the rest of `website/`, `assets/`, `docker/`, `fuzz/`, `scripts/gh/`, the rest of `scripts/release/`, `docs/ci-cd.md`, `docs/release.md`, the root community files, and the guard scripts tier 1 runs | nothing |
@@ -523,6 +523,16 @@ workspace so the product stays on the pinned stable toolchain. Its
 push to `main` and a merge-group run each verify a commit that must keep its
 own result, while a superseded pull-request run verifies a commit nobody will
 merge.
+
+The pull-request trigger lists `opened`, `synchronize` and `reopened` only, so
+a commit gets one run. An `edited`, `labeled` or `unlabeled` event would start a
+second run on the same commit, the concurrency group would cancel the first,
+and that run's `conclusion` would report a failure on the head commit. The
+guards read the `no-crate-bump` label and the description from the API when
+they run, and `pr-guards.yml` listens for `labeled`, `unlabeled` and `edited`,
+waits for the CI run on the head commit to complete, and re-runs the guard the
+change affects, which re-runs `conclusion` with it
+(<https://docs.github.com/en/rest/actions/workflow-runs#re-run-a-job-from-a-workflow-run>).
 
 ## Owner actions (one-time, not scriptable)
 

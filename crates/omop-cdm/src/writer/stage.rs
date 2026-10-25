@@ -192,12 +192,13 @@ pub(super) async fn stage_graph(
     let mut tables = Tables::new();
     for row in graph.rows() {
         let table = row.table();
-        let Some(key_column) = graph::row::primary_key(table) else {
+        let key_column = graph::row::primary_key(table);
+        if key_column.is_none() && !graph::row::person_keyed(table) {
             return Err(WriteError::SideTable {
-                what: "a table with an integer key",
+                what: "a table with an integer key or keyed by its person",
                 value: table.name.to_owned(),
             });
-        };
+        }
         let id = resolver
             .ids
             .get(&(table.name, row.key()))
@@ -206,7 +207,12 @@ pub(super) async fn stage_graph(
                 table: table.name,
                 key: Box::new(row.key().clone()),
             })?;
-        let mut values = BTreeMap::from([(key_column.name, Staged::Integer(Some(id)))]);
+        // NOTE: no specification governs this: our own design; a person-keyed row has no key
+        // column, and its person_id cell names the person its id is.
+        let mut values: BTreeMap<&'static str, Staged> = key_column
+            .map(|key| (key.name, Staged::Integer(Some(id))))
+            .into_iter()
+            .collect();
         let mut concept_zero: BTreeMap<&'static str, u64> = BTreeMap::new();
         for (column, cell) in row.cells() {
             let meta = table.column(column);

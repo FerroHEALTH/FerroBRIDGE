@@ -8,7 +8,7 @@ use axum::body::Body;
 use ferrobridge_server::facade::identity::store::Store;
 use http::Request;
 use http::StatusCode;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
@@ -30,7 +30,7 @@ use super::stub::mount_read;
 use super::stub::mount_version_read;
 
 #[tokio::test]
-async fn the_same_composition_read_twice_yields_the_same_id() -> Result<(), Box<dyn StdError>> {
+async fn the_same_composition_read_twice_yields_the_same_id() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -51,8 +51,8 @@ async fn the_same_composition_read_twice_yields_the_same_id() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn a_read_names_the_subject_the_identity_map_binds_to_the_ehr()
--> Result<(), Box<dyn StdError>> {
+async fn a_read_names_the_subject_the_identity_map_binds_to_the_ehr() -> Result<(), Box<dyn Error>>
+{
     // R4 condition.html: Condition.subject is 1..1, and the fixture mapping
     // has no outbound row for it, so the facade writes it from the binding.
     let harness = harness().await;
@@ -88,7 +88,7 @@ async fn a_read_names_the_subject_the_identity_map_binds_to_the_ehr()
 
 #[tokio::test]
 async fn a_read_whose_ehr_has_no_recorded_person_is_refused_naming_the_element()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // A read never answers an instance R4 does not admit: without a person
     // bound to the EHR, Condition.subject (1..1) stays absent.
     let harness = harness().await;
@@ -130,7 +130,7 @@ async fn a_read_whose_ehr_has_no_recorded_person_is_refused_naming_the_element()
 }
 
 #[tokio::test]
-async fn a_new_version_keeps_the_id_and_moves_the_version_id() -> Result<(), Box<dyn StdError>> {
+async fn a_new_version_keeps_the_id_and_moves_the_version_id() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_TWO, &harness.composition()).await;
@@ -147,7 +147,7 @@ async fn a_new_version_keeps_the_id_and_moves_the_version_id() -> Result<(), Box
 
 #[tokio::test]
 async fn a_read_of_an_id_the_map_does_not_know_is_four_hundred_and_four()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let (status, body) = call(
         harness.app(),
@@ -161,7 +161,7 @@ async fn a_read_of_an_id_the_map_does_not_know_is_four_hundred_and_four()
 
 #[tokio::test]
 async fn a_composition_the_cdr_reports_deleted_is_four_hundred_and_ten()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     Mock::given(matchers::method("GET"))
@@ -183,7 +183,7 @@ async fn a_composition_the_cdr_reports_deleted_is_four_hundred_and_ten()
 
 #[tokio::test]
 async fn a_stored_container_the_uid_grammar_refuses_answers_a_typed_500_naming_the_key()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // A store an earlier build wrote may hold a version container the openEHR
     // BASE HIER_OBJECT_ID grammar refuses; the read names the resource and the
     // field, and asks the CDR for nothing.
@@ -242,7 +242,7 @@ async fn a_stored_container_the_uid_grammar_refuses_answers_a_typed_500_naming_t
 
 #[tokio::test]
 async fn a_composition_the_outbound_mapping_refuses_is_counted_as_a_mapping_failure()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // NOTE: R4 http.html §3.1.0.4: a read sends no content, so a stored composition the
     // engine refuses is the server's failure, a `500` with `processing` (#831).
     let harness = harness().await;
@@ -269,7 +269,7 @@ async fn a_composition_the_outbound_mapping_refuses_is_counted_as_a_mapping_fail
 
 #[tokio::test]
 async fn a_read_the_outbound_mapping_answers_counts_no_mapping_failure()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;

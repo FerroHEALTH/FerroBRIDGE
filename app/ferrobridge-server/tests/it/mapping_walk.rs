@@ -10,7 +10,6 @@
 #![cfg(unix)]
 
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::path::PathBuf;
@@ -27,7 +26,7 @@ const KEYS: [&str; 2] = ["ferrobridge_facade.yml", "ferrobridge_facade.context.y
 
 /// Lays the fixture mapping set out under `volume` the way the kubelet
 /// writes a `ConfigMap` volume.
-fn configmap_volume(volume: &Path) -> Result<(), Box<dyn StdError>> {
+fn configmap_volume(volume: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let timestamped = "..2026_10_08_12_00_00.000000001";
     std::fs::create_dir_all(volume.join(timestamped))?;
     for key in KEYS {
@@ -51,7 +50,7 @@ fn yaml_files(directory: &Path) -> Result<Vec<PathBuf>, walk::Error> {
 }
 
 #[test]
-fn a_configmap_volume_lists_each_mapping_once() -> Result<(), Box<dyn StdError>> {
+fn a_configmap_volume_lists_each_mapping_once() -> Result<(), Box<dyn std::error::Error>> {
     let volume = tempfile::tempdir()?;
     configmap_volume(volume.path())?;
 
@@ -62,7 +61,7 @@ fn a_configmap_volume_lists_each_mapping_once() -> Result<(), Box<dyn StdError>>
 }
 
 #[test]
-fn a_symlink_to_a_directory_is_not_followed() -> Result<(), Box<dyn StdError>> {
+fn a_symlink_to_a_directory_is_not_followed() -> Result<(), Box<dyn std::error::Error>> {
     let elsewhere = tempfile::tempdir()?;
     std::fs::copy(
         Path::new(FIXTURES).join("ferrobridge_facade.yml"),
@@ -76,7 +75,7 @@ fn a_symlink_to_a_directory_is_not_followed() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn a_real_subdirectory_is_walked() -> Result<(), Box<dyn StdError>> {
+fn a_real_subdirectory_is_walked() -> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
     std::fs::create_dir_all(directory.path().join("nested"))?;
     let nested = directory.path().join("nested").join("x.yaml");
@@ -87,7 +86,7 @@ fn a_real_subdirectory_is_walked() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn a_dangling_file_symlink_is_refused_naming_it() -> Result<(), Box<dyn StdError>> {
+fn a_dangling_file_symlink_is_refused_naming_it() -> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
     let dangling = directory.path().join("gone.yaml");
     symlink(directory.path().join("absent.yaml"), &dangling)?;
@@ -101,7 +100,7 @@ fn a_dangling_file_symlink_is_refused_naming_it() -> Result<(), Box<dyn StdError
 
 #[tokio::test]
 async fn a_configmap_volume_mapping_directory_boots_the_operations_lane()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let volume = tempfile::tempdir()?;
     configmap_volume(volume.path())?;
     let templates = tempfile::tempdir()?;
@@ -130,7 +129,7 @@ async fn a_configmap_volume_mapping_directory_boots_the_operations_lane()
 
 #[test]
 fn the_mapping_walk_reads_yaml_in_either_case_and_leaves_the_search_declarations_out()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
     for name in [
         "a.yml",

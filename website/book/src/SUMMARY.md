@@ -12,6 +12,7 @@
 - [Pinned versions](evaluate/versions.md)
 - [Build order](evaluate/build-order.md)
 - [Licensing](evaluate/licensing.md)
+- [CRA information for users](evaluate/cra-user-information.md)
 
 # Operate
 

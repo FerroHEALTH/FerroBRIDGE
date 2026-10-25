@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BUSL-1.1
 [package]
 name = "ferrobridge-console"
-description = "The FerroBRIDGE operator console: a Leptos app rendered on the server and hydrated, with a backend-for-frontend over the bridge's public HTTP surface"
+description = "The FerroBRIDGE operator console: a Leptos app rendered on the server with its interactive parts hydrated as islands, and a backend-for-frontend over the bridge's public HTTP surface"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,9 +14,9 @@ authors.workspace = true
 publish = false
 
 # One crate, two halves (the Leptos book, server-side rendering): the rlib
-# feeds the server binary and the cdylib is the WebAssembly bundle the
-# browser hydrates with. cargo-leptos builds the cdylib for wasm32 and the
-# binary for the host.
+# feeds the server binary and the cdylib is the WebAssembly bundle whose
+# islands the browser hydrates. cargo-leptos builds the cdylib for wasm32 and
+# the binary for the host.
 [lib]
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
@@ -31,18 +31,18 @@ path = "src/main.rs"
 # apply only to a build for that target (the Cargo reference, resolver
 # version 2 and later). No specification governs this: our own design.
 [dependencies]
-leptos.workspace = true
-leptos_meta.workspace = true
-leptos_router.workspace = true
-# The view models the server functions answer and the browser reads, and
-# their error.
+# Islands mode (the Leptos book, "Guide: Islands"): the server draws every
+# page whole and the browser hydrates only the islands.
+leptos = { workspace = true, features = ["islands"] }
+# The props of the console's islands, which cross to the browser as JSON.
 serde.workspace = true
-thiserror.workspace = true
 # The FerroHEALTH components, stylesheet and role tokens, in both halves;
-# the console keeps only its brand theme (style/theme.css) and its screens.
-ferrohealth-ui.workspace = true
-# The console's own string catalogs under locales/, in both halves.
-fluent-templates.workspace = true
+# the stylesheet and the FerroBRIDGE theme are served from it as they stand.
+# `split` keeps the lazy islands in chunks of their own, which only a site
+# built with `cargo leptos build --split` may turn on (FerroUI
+# `docs/consoles.md`, "How a console builds"); scripts/release/console-site.sh
+# is the one build and always splits.
+ferrohealth-ui = { workspace = true, features = ["split"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 leptos = { workspace = true, features = ["hydrate"] }
@@ -60,6 +60,9 @@ leptos = { workspace = true, features = ["ssr", "nonce"] }
 leptos_axum.workspace = true
 leptos_meta = { workspace = true, features = ["ssr"] }
 leptos_router = { workspace = true, features = ["ssr"] }
+# The console's own string catalogs under locales/, read on the server.
+fluent-templates.workspace = true
+thiserror.workspace = true
 # The random session ids, PKCE verifiers, states and nonces, the SHA-256 of
 # the PKCE challenge (RFC 7636 §4.2) and the constant-time comparisons, from
 # the crypto library rustls already builds on.
@@ -111,8 +114,8 @@ wiremock.workspace = true
 workspace = true
 
 # cargo-leptos: the site bundle (the WebAssembly and its JavaScript glue)
-# under target/site, the server binary beside it. The stylesheet is the
-# library's and the theme the console's, both served by the server from the
+# under target/site, the server binary beside it. The stylesheet and the
+# FerroBRIDGE theme are the library's, both served by the server from the
 # binary (crate::server), so the bundle carries no CSS.
 [package.metadata.leptos]
 output-name = "ferrobridge-console"

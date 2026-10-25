@@ -11,8 +11,9 @@
 # catches it before the commit exists, which is where the fix is a one-line
 # edit rather than a follow-up commit.
 #
-# Runs scripts/checks/crate-version-guard.sh against the merge base with
-# origin/main: WORKTREE for a `git commit`, so the staged change is what is
+# Only a commit or push in a checkout of this repository is judged, in that
+# checkout (lib/target.sh). Runs scripts/checks/crate-version-guard.sh against
+# the merge base with origin/main: WORKTREE for a `git commit`, so the staged change is what is
 # checked, and HEAD for a `git push`, where the commits already exist. Exit 2
 # blocks the tool call and returns the guard's findings; every other path is a
 # quiet exit 0.
@@ -29,13 +30,27 @@ fi
 
 [ -n "${command_text:-}" ] || exit 0
 
-case "$command_text" in
-*"git commit"*) head=WORKTREE ;;
-*"git push"*) head=HEAD ;;
+# shellcheck source=.claude/hooks/lib/target.sh
+. "$(dirname "$0")/lib/target.sh"
+
+case "$(git_commit_or_push "$command_text")" in
+commit) head=WORKTREE ;;
+push) head=HEAD ;;
 *) exit 0 ;;
 esac
 
-repo_root="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
+# The checkout the command commits or pushes in: a `git -C <dir>`, a leading
+# `cd <dir> &&`, or the session's working directory. A commit in another
+# repository, or one whose directory cannot be read, is not this guard's.
+if command -v jq > /dev/null 2>&1; then
+  cwd="$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)" || true
+fi
+target="$(command_target_dir "$command_text" "${cwd:-$(hook_repo_root)}")"
+[ -n "$target" ] || exit 0
+in_this_repository "$target" || exit 0
+repo_root="$(toplevel_of "$target")"
+[ -n "$repo_root" ] || exit 0
+
 guard="$repo_root/scripts/checks/crate-version-guard.sh"
 [ -x "$guard" ] || exit 0
 [ -d "$repo_root/crates" ] || exit 0

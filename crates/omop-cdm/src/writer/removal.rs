@@ -21,10 +21,11 @@ use crate::writer::CdmWriter;
 use crate::writer::database;
 use crate::writer::error::Step;
 use crate::writer::error::WriteError;
-use crate::writer::person::restore_persons;
+use crate::writer::person::restore_rows;
 use crate::writer::quoted;
 use crate::writer::side_table::delete_earlier;
 use crate::writer::side_table::earlier_rows;
+use crate::writer::side_table::retire_deaths;
 use crate::writer::side_table::retire_persons;
 
 /// One composition a watermark names: the versioned composition, its EHR and
@@ -170,8 +171,14 @@ impl CdmWriter {
         let deleted =
             delete_earlier(&transaction, cdm, bridge, versioned_object_uid, &earlier).await?;
         let written: Vec<i32> = deleted.written.iter().copied().collect();
-        restore_persons(&transaction, cdm, bridge, &written).await?;
+        restore_rows(&transaction, cdm, bridge, "person", &written).await?;
+        let deaths: Vec<i32> = deleted.deaths.iter().copied().collect();
+        restore_rows(&transaction, cdm, bridge, "death", &deaths).await?;
         let mut rows = deleted.rows;
+        let retired = retire_deaths(&transaction, cdm, bridge, &deleted.deaths).await?;
+        if retired > 0 {
+            rows.insert("death", retired);
+        }
         let persons = retire_persons(&transaction, cdm, bridge, &deleted.persons).await?;
         if persons > 0 {
             rows.insert("person", persons);

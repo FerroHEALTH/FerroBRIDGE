@@ -276,7 +276,7 @@ with no display keeps its code as the value.
 | `base_url` | none, required | The FHIR service base URL |
 | `wire_version` | `r4` | `stu3`, `r4` or `r4b`, the release the server answers in |
 | `timeout_ms` | `30000` | How long one call may take, connection included |
-| `display_fallback` | `false` | For a code the server does not know: `true` writes the code as the value of the `DV_CODED_TEXT`, `false` refuses the resource. A failed call refuses either way |
+| `display_fallback` | `false` | For a code the server does not know: `true` writes the code as the value of the `DV_CODED_TEXT` or `DV_TEXT`, `false` refuses the resource. A failed call refuses either way |
 
 As an environment variable, `display_fallback` reads
 `FERROBRIDGE__TERMINOLOGY__DISPLAY_FALLBACK`.
@@ -298,8 +298,12 @@ indicator that reports whether the database answers.
 
 Two clients open the database: the concept resolver's pool and the CDM
 writer's own connection. Both read the `sslmode` of `url` and the CA from
-`tls_ca` or `tls_ca_file`, so they agree on whether the connection is
-encrypted and what it trusts. The modes are the libpq ones that never fall
+`tls_ca` or `tls_ca_file`, and both handshake with one TLS configuration:
+the writer directly, and the pool through a relay on a private Unix socket
+that the bridge starts beside it. With a CA set, both trust that CA and
+nothing else; without one, `verify-ca` and `verify-full` trust the webpki
+root set. A URL that asks for TLS names one host and one port, the server the
+relay reaches; a list of hosts is refused. The modes are the libpq ones that never fall
 back to plaintext
 (<https://www.postgresql.org/docs/current/libpq-ssl.html>):
 
@@ -320,7 +324,8 @@ the three TLS modes everywhere else. Any other `ssl` parameter in the URL
 comes from `tls_ca_file`, and the bridge sends no client certificate. For the
 same reason the bridge refuses to start when `PGSSLROOTCERT`, `PGSSLCERT` or
 `PGSSLKEY` is set in its environment: the pool's PostgreSQL client reads
-those variables whatever the configuration says, and the writer does not. The CA is public material, so it is
+those variables whatever the configuration says, so the TLS settings stay in
+one place. The CA is public material, so it is
 not a secret, and `FERROBRIDGE__CDM__TLS_CA` and
 `FERROBRIDGE__CDM__TLS_CA_FILE` set the two keys from the environment; setting
 both is refused. A typical production URL, with the CA mounted beside it:

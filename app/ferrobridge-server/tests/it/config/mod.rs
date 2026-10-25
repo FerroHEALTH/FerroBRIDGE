@@ -19,7 +19,6 @@ mod usage_report;
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 
 /// A file with every section set, so a test can override one key at a time.
 const FULL: &str = r#"
@@ -68,7 +67,7 @@ fn env(name: &str, value: &str) -> BTreeMap<String, String> {
 }
 
 /// Returns the refusal `text` resolves to.
-fn refusal(text: &str) -> Result<Error, Box<dyn StdError>> {
+fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
     Ok(Config::from_sources(Some(text), &BTreeMap::new())?
         .resolve()
         .expect_err("the configuration is refused"))

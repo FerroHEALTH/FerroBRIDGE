@@ -34,6 +34,13 @@ const PROBLEM: &str =
 /// value admits `DV_TEXT` and `DV_DATE_TIME`: the operational template gains
 /// a second alternative under the `ELEMENT`'s `value`.
 fn polymorphic_template() -> Result<WebTemplateIndex, Box<dyn Error>> {
+    template_with(false)
+}
+
+/// Returns the diagnosis template with the problem name polymorphic as
+/// [`polymorphic_template`] does, the `DV_DATE_TIME` alternative first in
+/// template order when `date_time_first` holds.
+fn template_with(date_time_first: bool) -> Result<WebTemplateIndex, Box<dyn Error>> {
     let source = ferrobridge_testkit::fixtures::DIAGNOSE_OPT;
     let (head, rest) = source
         .split_once("<node_id>at0002</node_id>")
@@ -49,9 +56,18 @@ fn polymorphic_template() -> Result<WebTemplateIndex, Box<dyn Error>> {
         <occurrences><lower_included>true</lower_included><upper_included>true</upper_included>\
         <lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>\
         <lower>1</lower><upper>1</upper></occurrences><node_id></node_id></children>";
-    let xml = format!(
-        "{head}<node_id>at0002</node_id>{before}{text}{constraint}</children>{date_time}{tail}"
-    );
+    let xml = if date_time_first {
+        let (prefix, opener) = before
+            .rsplit_once("<children")
+            .ok_or("the text constraint opens")?;
+        format!(
+            "{head}<node_id>at0002</node_id>{prefix}{date_time}<children{opener}{text}{constraint}</children>{tail}"
+        )
+    } else {
+        format!(
+            "{head}<node_id>at0002</node_id>{before}{text}{constraint}</children>{date_time}{tail}"
+        )
+    };
     let opt = openehr_its::opt14::from_xml(&xml)?;
     Ok(WebTemplateIndex::build(&TemplateSource::Opt14(Box::new(
         opt,
@@ -269,5 +285,50 @@ fn a_typed_mapping_refuses_an_element_holding_another_alternative() -> Result<()
         error.to_string().contains("another value alternative"),
         "{error}"
     );
+    Ok(())
+}
+
+/// Runs `document` into openEHR through the mapping `fixture` against `index`.
+fn inbound(
+    fixture: &str,
+    index: &WebTemplateIndex,
+    document: &Value,
+) -> Result<CanonicalComposition, Box<dyn Error>> {
+    let program = compiled_against(fixture, index)?;
+    Ok(to_openehr(
+        &program,
+        &SCHEMAS,
+        index,
+        document,
+        &Seams::default(),
+        &defaults(),
+        &CallContext::new(),
+    )?
+    .into_value())
+}
+
+#[test]
+fn an_untyped_date_time_goes_into_the_date_time_alternative_in_either_template_order()
+-> Result<(), Box<dyn Error>> {
+    // DV_DATE_TIME.adoc §DateTime pairs dateTime with DV_DATE_TIME directly,
+    // while DV_TEXT.adoc §String pairs only string: the direct pair outranks
+    // the text fallback whichever alternative the template lists first.
+    let document = condition("onsetDateTime", "2026-09-01T08:00:00+02:00")?;
+    for date_time_first in [false, true] {
+        let index = template_with(date_time_first)?;
+        let composition = inbound("ferrobridge_onset_date_time", &index, &document)?;
+        let written = problem_value(&index, &composition, "DV_DATE_TIME")?
+            .ok_or("the date and time alternative holds the value")?;
+        assert_eq!(
+            written.get("value").and_then(serde_json::Value::as_str),
+            Some("2026-09-01T08:00:00+02:00"),
+            "date and time first: {date_time_first}"
+        );
+        assert_eq!(
+            problem_value(&index, &composition, "DV_TEXT")?,
+            None,
+            "date and time first: {date_time_first}"
+        );
+    }
     Ok(())
 }

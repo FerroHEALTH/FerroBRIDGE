@@ -6,7 +6,7 @@
 
 use ferrobridge_server::facade::identity::store::Store;
 use http::StatusCode;
-use std::error::Error as StdError;
+use std::error::Error;
 use wiremock::ResponseTemplate;
 
 use super::BASE_URL;
@@ -31,7 +31,7 @@ use super::stub::mount_version_two;
 use super::writes;
 
 #[tokio::test]
-async fn a_re_sent_resource_updates_the_same_composition() -> Result<(), Box<dyn StdError>> {
+async fn a_re_sent_resource_updates_the_same_composition() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -72,7 +72,7 @@ async fn a_re_sent_resource_updates_the_same_composition() -> Result<(), Box<dyn
 
 #[tokio::test]
 async fn a_create_re_sent_with_its_id_and_version_id_commits_nothing_and_names_the_first_composition()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -99,7 +99,7 @@ async fn a_create_re_sent_with_its_id_and_version_id_commits_nothing_and_names_t
 
 #[tokio::test]
 async fn a_create_of_a_known_id_at_a_new_version_id_commits_a_later_version()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -144,7 +144,7 @@ async fn a_create_of_a_known_id_at_a_new_version_id_commits_a_later_version()
 
 #[tokio::test]
 async fn a_create_re_sent_without_a_version_id_and_with_the_same_content_commits_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -166,7 +166,7 @@ async fn a_create_re_sent_without_a_version_id_and_with_the_same_content_commits
 
 #[tokio::test]
 async fn a_create_re_sent_without_a_version_id_and_with_other_content_commits_a_later_version()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, &harness.composition()).await;
@@ -188,10 +188,10 @@ async fn a_create_re_sent_without_a_version_id_and_with_other_content_commits_a_
 
 #[tokio::test]
 async fn a_create_of_an_id_the_map_binds_to_two_compositions_is_refused_and_commits_nothing()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
-    let source = |version: &str| -> Result<_, Box<dyn StdError>> {
+    let source = |version: &str| -> Result<_, Box<dyn Error>> {
         Ok(
             ferrobridge_server::facade::identity::record::SourceVersion::new(
                 "Condition",
@@ -225,7 +225,7 @@ async fn a_create_of_an_id_the_map_binds_to_two_compositions_is_refused_and_comm
 
 #[tokio::test]
 async fn the_refusal_of_a_split_id_names_the_update_of_each_resource_it_binds()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // A store an earlier build wrote bound each meta.versionId of one source
     // to its own composition and resource; the refusal names the update that
     // revises each (R4 http.html#update).

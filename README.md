@@ -86,13 +86,13 @@ and value sets. FerroEHR is the reference CDR and FerroTERM the reference
 terminology server; neither is a compile-time dependency.
 
 The latest release is
-[v0.0.10](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.10),
-cut on 2026-10-19. It brings openEHR demographics to the FHIR facade:
-`Patient`, `Practitioner`, `PractitionerRole` and `Organization` from
-FHIRconnect party contexts over the Demographic API, their search by
-identifier and name, and clinical searches chained through the patient
-identifier. The terminology lane gains OAuth 2.0 client credentials, and the
-static bearer token is gone.
+[v0.0.12](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.12),
+cut on 2026-10-25. A write through the FHIR facade now shows the client the
+losses its mapping declared, and the FHIRconnect operations answer `502` when
+the terminology server fails. FHIRconnect looks up the display of a `DV_TEXT`
+that fell back to a code, the `fhir-types` XML codec holds the narrative
+`div` to well-formed XHTML, and the terminology client gains `$expand`,
+`$subsumes` and mutual TLS.
 [`CHANGELOG.md`](CHANGELOG.md) lists what every release added, changed and
 fixed.
 
@@ -147,9 +147,8 @@ environment variables: `FERROBRIDGE__CDR__BASE_URL` for the CDR,
 Three profiles add services:
 
 - `cdm` starts a PostgreSQL CDM database and applies the CDM v5.4 DDL;
-- `vocab` runs `vocab load` over an OHDSI Athena export you downloaded
-  yourself. That job does not load yet: it exits naming
-  [#233](https://github.com/FerroHEALTH/FerroBRIDGE/issues/233);
+- `vocab` runs `vocab load` over an OHDSI Athena download you obtained
+  yourself, replacing each vocabulary table of the CDM schema;
 - `console` runs the operator console beside the bridge.
 
 ```bash
@@ -158,7 +157,7 @@ docker compose --profile console up
 ```
 
 To run the image without compose, pull
-`ghcr.io/ferrohealth/ferrobridge:0.0.10`. To run the binary, download the
+`ghcr.io/ferrohealth/ferrobridge:0.0.12`. To run the binary, download the
 archive for your architecture from the
 [release](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest). The
 binary's subcommands are `serve`, `cdm init`, `etl run`, `mapping check` and
@@ -170,9 +169,10 @@ both in full.
 ## Crates
 
 The library crates are published on crates.io. `fhir-types`,
-`openehr-mapping-core`, `fhirconnect`, `ferrobridge-term`,
-`ferrobridge-fhirpath` and `ferrobridge-validator` are on the crate line; the
-other crates hold their names at 0.0.0 until their first release on it. The book's
+`hl7v2-types`, `openehr-mapping-core`, `fhirconnect`, `ferrobridge-term`,
+`ferrobridge-hl7v2`, `ferrobridge-fhirpath` and `ferrobridge-validator` are on
+the crate line; the other crates hold their names at 0.0.0 until their first
+release on it. The book's
 [crate versions](https://ferrobridge.eu/docs/contribute/crate-versions.html)
 page explains how they move: every change moves a crate one patch, a breaking
 change included, so pin a crate exactly (for example `fhirconnect = "=0.1.136"`).

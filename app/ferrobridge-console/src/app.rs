@@ -1,29 +1,28 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The page tree the server renders and the browser hydrates.
+//! The page tree the server draws whole.
 //!
-//! It holds the document in the operator's theme and the request's locale
-//! (`crate::locale`), the shell a signed-in
-//! operator reads, the centred pages a visitor reads, the routes, and the
-//! pages for a path the console does not serve and for a session store it
-//! cannot read.
+//! The console renders in Leptos islands mode (the Leptos book, "Guide:
+//! Islands"): this tree runs on the server alone, and the browser hydrates
+//! only the islands inside it. The document carries the operator's theme,
+//! density, motion and hints from their cookies and the request's locale, so
+//! a page arrives right before any script runs. A signed-in operator reads
+//! the shell around the routes, a visitor the sign-in, and a request whose
+//! session store cannot be read the fault page.
 
-use ferrohealth_ui::i18n::{Locale, provide_locale};
-use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::theme::Theme;
-use ferrohealth_ui::view::button::{Variant, label};
-use ferrohealth_ui::view::shell::{MAIN_ID, Shell};
-use ferrohealth_ui::view::sign_in::{Provider, SignIn, sign_in};
-use leptos::either::Either;
+use ferrohealth_ui::i18n::provide_locale;
+use ferrohealth_ui::island::ToastRegion;
+use ferrohealth_ui::style::Brand;
+use ferrohealth_ui::widget::toast::{Flash, RegionWords};
 use leptos::prelude::*;
-use leptos_meta::{Stylesheet, Title, provide_meta_context};
+use leptos_meta::{MetaTags, Title, provide_meta_context};
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::{SsrMode, path};
 
-use crate::locale::{Msg, tr};
+use crate::locale::messages::Msg;
+use crate::locale::tr;
 use crate::model::SessionState;
-use crate::shell::Bar;
 
 /// The product name as an operator reads it.
 pub const PRODUCT: &str = "FerroBRIDGE Console";
@@ -31,16 +30,19 @@ pub const PRODUCT: &str = "FerroBRIDGE Console";
 /// The console's version, which the footer and the About page name.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Who makes the console, which the footer and the About page name.
-pub const MANUFACTURER: &str = "Cadasto B.V.";
-
 /// The path the server serves the `FerroHEALTH` stylesheet at, beside the
 /// site bundle.
 pub const STYLESHEET: &str = "/pkg/ferrohealth-ui.css";
 
-/// The path the server serves the console's brand theme at, which loads
-/// after the stylesheet.
+/// The path the server serves the FerroBRIDGE theme at, which loads after
+/// the stylesheet.
 pub const THEME: &str = "/pkg/ferrobridge-theme.css";
+
+/// The path of the brand mark the lockup draws in the light theme.
+pub const MARK_LIGHT: &str = "/pkg/ferrobridge-icon.svg";
+
+/// The path of the brand mark the lockup draws in the dark theme.
+pub const MARK_DARK: &str = "/pkg/ferrobridge-icon-dark.svg";
 
 /// The path of the sign-in route the server serves.
 pub const SIGN_IN: &str = "/login";
@@ -48,31 +50,83 @@ pub const SIGN_IN: &str = "/login";
 /// The path of the sign-out route the server serves.
 pub const SIGN_OUT: &str = "/logout";
 
-/// The path of the About page, which every page's footer links to.
+/// The page a signed-out operator lands on.
+pub const SIGNED_OUT: &str = "/signed-out";
+
+/// The dashboard.
+pub const DASHBOARD: &str = "/";
+
+/// The mapping set.
+pub const MAPPINGS: &str = "/mappings";
+
+/// The path a mapping file's page takes after it.
+pub const FILES: &str = "/mappings/files";
+
+/// The path a template's page takes after it.
+pub const TEMPLATES: &str = "/mappings/templates";
+
+/// The path the editor takes a file's path after.
+pub const EDIT: &str = "/mappings/edit";
+
+/// The editor of a new file.
+pub const NEW_FILE: &str = "/mappings/new";
+
+/// The playground.
+pub const PLAYGROUND: &str = "/playground";
+
+/// The FHIR facade.
+pub const FACADE: &str = "/facade";
+
+/// The HL7 v2 face.
+pub const HL7V2: &str = "/hl7v2";
+
+/// The OMOP ETL.
+pub const OMOP: &str = "/omop";
+
+/// The connections.
+pub const CONNECTIONS: &str = "/connections";
+
+/// The bridge's running configuration.
+pub const CONFIGURATION: &str = "/configuration";
+
+/// Your preferences.
+pub const PREFERENCES: &str = "/preferences";
+
+/// The About page, which every page's footer links to.
 pub const ABOUT: &str = "/about";
 
-/// The word the page shows for an operator the provider gave no name.
-fn unnamed_operator() -> String {
-    tr(Msg::Operator)
-}
+/// The brand whose theme the console draws in.
+pub const BRAND: Brand = Brand::Bridge;
 
-/// The whole HTML document the server renders around [`App`], in the theme
-/// the request's cookie names, so the page arrives in it before any script
-/// runs.
-#[cfg(not(target_arch = "wasm32"))]
+/// The toasts a form post's answer shows as the page arrives, which the
+/// server hands the region (FerroUI R17).
+#[derive(Debug, Clone, Default)]
+pub struct Flashes(pub Vec<Flash>);
+
+/// The whole HTML document the server renders around [`App`], in the
+/// preferences the request's cookies name and its locale, so the page
+/// arrives right before any script runs.
 #[must_use]
-pub fn shell(options: LeptosOptions) -> impl IntoView {
-    let theme = crate::theme::server::requested().key();
+pub fn document(options: LeptosOptions) -> impl IntoView {
+    let chosen = crate::prefs::requested().preferences;
     let lang = crate::locale::requested().tag();
     view! {
         <!DOCTYPE html>
-        <html lang=lang data-theme=theme>
+        <html
+            lang=lang
+            data-theme=chosen.theme.key()
+            data-density=chosen.density.key()
+            data-motion=chosen.motion.key()
+            data-hints=chosen.hints.key()
+        >
             <head>
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <AutoReload options=options.clone() />
-                <HydrationScripts options />
-                <leptos_meta::MetaTags />
+                <link rel="icon" href="/favicon.ico" sizes="any" />
+                <link rel="stylesheet" href=STYLESHEET />
+                <link rel="stylesheet" href=THEME />
+                <HydrationScripts options islands=true />
+                <MetaTags />
             </head>
             <body>
                 <App />
@@ -81,68 +135,45 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
     }
 }
 
-/// The root component: the stylesheet, the document title, and the shell
-/// the request's session is drawn in.
+/// The root component: the title format, the routes in the layout the
+/// request's session calls for, and the toast region.
 #[component]
+#[expect(
+    clippy::must_use_candidate,
+    reason = "the #[component] macro drops a #[must_use] from the function it writes"
+)]
 pub fn App() -> impl IntoView {
     provide_meta_context();
-    // NOTE: the Leptos book, `ssr/22_life_cycle`: a value the server decides reaches
-    // the hydrating page serialized, so both halves draw the same page.
-    let session = *SharedValue::new_str(session_state);
-    let operator = SharedValue::new_str(operator_name).into_inner();
-    let theme = *SharedValue::new_str(theme_requested);
-    let tag = SharedValue::new_str(locale_requested).into_inner();
-    provide_locale(Locale::parse(&tag).unwrap_or_default());
-    let bridge = SharedValue::new_str(bridge_base).into_inner();
-    let bar = (session == SessionState::SignedIn).then(|| Bar {
-        theme,
-        bridge: Resource::new_blocking(|| (), |()| crate::status::bridge_status()),
-    });
+    provide_locale(crate::locale::requested());
+    let session = crate::session::request::state();
+    let flash = use_context::<Flashes>().unwrap_or_default().0;
+    let region = (session == SessionState::SignedIn)
+        .then(|| view! { <ToastRegion words=RegionWords::of_page() flash /> });
     view! {
-        <Stylesheet id="ferrohealth-ui" href=STYLESHEET />
-        <Stylesheet id="theme" href=THEME />
-        <Title text=PRODUCT />
-        <Router>{layout(session, operator, bar, bridge)}</Router>
+        <Title formatter=|text: String| title(&text) text=String::new() />
+        <Router>{layout(session)}</Router>
+        {region}
     }
 }
 
-/// The page for a request whose session is `session`: the shell of a
-/// signed-in operator with its `bar`, or the page alone for a visitor and
-/// for a session store the console cannot read.
-fn layout(session: SessionState, operator: String, bar: Option<Bar>, bridge: String) -> AnyView {
+/// The document title of a page titled `text`: the page, then the product.
+fn title(text: &str) -> String {
+    if text.is_empty() {
+        PRODUCT.to_owned()
+    } else {
+        format!("{text} · {PRODUCT}")
+    }
+}
+
+/// The page for a request whose session is `session`.
+fn layout(session: SessionState) -> AnyView {
     // NOTE: leptos_axum, `generate_route_list`: the server lists its routes by
     // rendering the app with no request, so every layout draws the same routes.
-    let routes = routes(session, bridge);
-    match bar {
-        Some(bar) => signed_in(operator, bar, routes).into_any(),
-        None => visitor(routes).into_any(),
+    let routes = routes(session);
+    match session {
+        SessionState::SignedIn => crate::shell::shell(routes),
+        SessionState::SignedOut | SessionState::Unreadable => routes,
     }
-}
-
-/// The shell of a signed-in operator: the top bar, the navigation beside
-/// the page, and the footer.
-fn signed_in(operator: String, bar: Bar, routes: AnyView) -> AnyView {
-    ferrohealth_ui::view::shell::shell(Shell {
-        topbar: crate::shell::topbar(operator, bar),
-        banner: None,
-        sidebar: crate::shell::sidebar(),
-        content: routes,
-        footer: crate::shell::footer_names(),
-    })
-}
-
-/// The shell of a visitor: the page alone, and the footer.
-fn visitor(page: AnyView) -> AnyView {
-    let foot = crate::shell::footer().into_any();
-    view! {
-        <div class="fui-page">
-            <main id=MAIN_ID class="fui-main">
-                <div class="fui-column">{page}</div>
-            </main>
-            {foot}
-        </div>
-    }
-    .into_any()
 }
 
 /// The page `page` for a request whose session is `session`: the page for a
@@ -154,74 +185,140 @@ where
 {
     move || match session {
         SessionState::SignedIn => page().into_any(),
-        SessionState::SignedOut => view! { <SignInPage /> }.into_any(),
-        SessionState::Unreadable => unreadable().into_any(),
+        SessionState::SignedOut => crate::pages::sign_in::sign_in_page().into_any(),
+        SessionState::Unreadable => crate::pages::errors::unreadable().into_any(),
     }
 }
 
-/// The routes, for a request whose session is `session`; `bridge` is the
-/// bridge's base URL the About page shows a signed-in operator.
-fn routes(session: SessionState, bridge: String) -> AnyView {
+/// The routes, for a request whose session is `session`.
+fn routes(session: SessionState) -> AnyView {
     // NOTE: the Leptos book, `ssr/23_ssr_modes`: a page the bridge fills renders
     // `Async`, whole in one sweep, so no content waits on a script.
+    let fallback = move || match session {
+        SessionState::SignedIn => crate::pages::errors::not_found().into_any(),
+        SessionState::SignedOut => crate::pages::sign_in::sign_in_page().into_any(),
+        SessionState::Unreadable => crate::pages::errors::unreadable().into_any(),
+    };
     view! {
-        <Routes fallback=move || {
-            if session == SessionState::Unreadable {
-                Either::Left(unreadable())
-            } else {
-                Either::Right(view! { <NotFound /> })
-            }
-        }>
+        <Routes fallback>
             <Route
                 path=path!("/")
-                view=guarded(session, crate::engine::DashboardPage)
-                ssr=SsrMode::Async
-            />
-            <Route
-                path=path!("/capability")
-                view=guarded(session, crate::engine::CapabilityPage)
+                view=guarded(session, crate::pages::dashboard::page)
                 ssr=SsrMode::Async
             />
             <Route
                 path=path!("/mappings")
-                view=guarded(session, crate::engine::MappingsPage)
+                view=guarded(session, crate::pages::mappings::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/mappings/new")
+                view=guarded(session, crate::pages::editor::new_page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/mappings/:tab")
+                view=guarded(session, crate::pages::mappings::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/mappings/files/*path")
+                view=guarded(session, crate::pages::file::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/mappings/templates/:id")
+                view=guarded(session, crate::pages::template::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/mappings/edit/*path")
+                view=guarded(session, crate::pages::editor::page)
                 ssr=SsrMode::Async
             />
             <Route
                 path=path!("/playground")
-                view=guarded(session, crate::tools::PlaygroundPage)
+                view=guarded(session, crate::pages::playground::page)
                 ssr=SsrMode::Async
             />
             <Route
-                path=path!("/validate")
-                view=guarded(session, crate::tools::ValidatePage)
+                path=path!("/playground/:tab")
+                view=guarded(session, crate::pages::playground::page)
                 ssr=SsrMode::Async
             />
             <Route
-                path=path!("/edit")
-                view=guarded(session, crate::editor::EditPage)
+                path=path!("/facade")
+                view=guarded(session, crate::pages::facade::page)
                 ssr=SsrMode::Async
             />
             <Route
-                path=path!("/edit/*path")
-                view=guarded(session, crate::editor::EditPage)
+                path=path!("/facade/:tab")
+                view=guarded(session, crate::pages::facade::page)
                 ssr=SsrMode::Async
             />
             <Route
-                path=path!("/files")
-                view=guarded(session, crate::engine::FilesPage)
+                path=path!("/hl7v2")
+                view=guarded(session, crate::pages::hl7v2::page)
                 ssr=SsrMode::Async
             />
             <Route
-                path=path!("/files/*path")
-                view=guarded(session, crate::engine::FilePage)
+                path=path!("/hl7v2/:tab")
+                view=guarded(session, crate::pages::hl7v2::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/omop")
+                view=guarded(session, crate::pages::omop::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/omop/:tab")
+                view=guarded(session, crate::pages::omop::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/connections")
+                view=guarded(session, crate::pages::connections::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/connections/:name")
+                view=guarded(session, crate::pages::connections::connection_page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/connections/:name/:tab")
+                view=guarded(session, crate::pages::connections::connection_page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/configuration")
+                view=guarded(session, crate::pages::configuration::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/configuration/:tab")
+                view=guarded(session, crate::pages::configuration::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/preferences")
+                view=guarded(session, crate::pages::preferences::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/preferences/:section")
+                view=guarded(session, crate::pages::preferences::page)
                 ssr=SsrMode::Async
             />
             <Route
                 path=path!("/about")
-                view=move || {
-                    view! { <crate::about::AboutPage bridge=bridge.clone() /> }
-                }
+                view=guarded(session, crate::pages::about::page)
+                ssr=SsrMode::Async
+            />
+            <Route
+                path=path!("/signed-out")
+                view=move || crate::pages::sign_in::signed_out_page().into_any()
                 ssr=SsrMode::Async
             />
         </Routes>
@@ -229,168 +326,14 @@ fn routes(session: SessionState, bridge: String) -> AnyView {
     .into_any()
 }
 
-/// The landing page of a visitor: the sign-in, a plain link to the server's
-/// route, which the client router leaves alone.
-#[component]
-fn SignInPage() -> impl IntoView {
-    // NOTE: OpenID Connect Core 1.0 §3.1: the console signs an operator in at
-    // their provider alone, so the card offers the provider's button and no form.
-    let card = sign_in(SignIn {
-        lockup: crate::shell::lockup().into_any(),
-        notices: Vec::new(),
-        refusal: None,
-        basic: None,
-        provider: Some(Provider {
-            href: String::from(SIGN_IN),
-            label: tr(Msg::SignIn),
-        }),
-        links: Vec::new(),
-    });
-    view! {
-        <Title text=PRODUCT />
-        <div class="fui-centred">
-            <h1 class="fui-sr-only">{PRODUCT}</h1>
-            {card}
-        </div>
-    }
+/// The page's title in the document, `text` before the product.
+#[must_use]
+pub fn page_title(text: String) -> impl IntoView {
+    view! { <Title text /> }
 }
 
-/// The page a visitor reads when the console cannot read its session store:
-/// it cannot tell whether they are signed in, so it offers neither the
-/// sign-in nor the operator's pages, and answers `500`.
-fn unreadable() -> impl IntoView {
-    #[cfg(not(target_arch = "wasm32"))]
-    if let Some(response) = use_context::<leptos_axum::ResponseOptions>() {
-        response.set_status(http::StatusCode::INTERNAL_SERVER_ERROR);
-    }
-    let alert = ferrohealth_ui::view::refusal::fault(tr(Msg::UnreadableFault));
-    view! {
-        <Title text=tr(Msg::UnreadableTitle) />
-        <div class="fui-centred">
-            <div class="fui-card fui-sign-in">
-                <h1>{tr(Msg::UnreadableHeading)}</h1>
-                {alert}
-            </div>
-        </div>
-    }
-}
-
-/// The page for a path the console does not serve: `404`, and the way back.
-#[component]
-fn NotFound() -> impl IntoView {
-    #[cfg(not(target_arch = "wasm32"))]
-    if let Some(response) = use_context::<leptos_axum::ResponseOptions>() {
-        response.set_status(http::StatusCode::NOT_FOUND);
-    }
-    let back = view! {
-        <a href="/" class=Variant::Primary.class()>
-            {label(Some(Glyph::ARROW_LEFT), tr(Msg::NotFoundBack))}
-        </a>
-    };
-    let empty = ferrohealth_ui::view::empty::empty_state(
-        Glyph::COMPASS,
-        tr(Msg::NotFoundTitle),
-        tr(Msg::NotFoundBody),
-        back,
-    );
-    view! {
-        <Title text=tr(Msg::NotFoundTitle) />
-        <div class="fui-centred">
-            <h1 class="fui-sr-only">{tr(Msg::NotFoundTitle)}</h1>
-            <div class="fui-card">{empty}</div>
-        </div>
-    }
-}
-
-/// The state of the request's session, which the page is drawn for.
-fn session_state() -> SessionState {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        crate::session::request::state()
-    }
-    // NOTE: the browser reads the value the server decided; this runs only if
-    // that value is missing, and then draws the page a visitor sees.
-    #[cfg(target_arch = "wasm32")]
-    {
-        SessionState::SignedOut
-    }
-}
-
-/// The name the page shows for a signed-in operator: the provider's name for
-/// them, or [`unnamed_operator`] when it gave none.
-fn operator_name() -> String {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        crate::session::request::operator().unwrap_or_else(unnamed_operator)
-    }
-    // NOTE: the browser reads the value the server decided; this runs only if
-    // that value is missing, and then shows the word a nameless sign-in shows.
-    #[cfg(target_arch = "wasm32")]
-    {
-        unnamed_operator()
-    }
-}
-
-/// The theme the request's cookie names.
-fn theme_requested() -> Theme {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        crate::theme::server::requested()
-    }
-    // NOTE: the browser reads the value the server decided; this runs only if
-    // that value is missing, and then marks the theme that follows the system.
-    #[cfg(target_arch = "wasm32")]
-    {
-        Theme::default()
-    }
-}
-
-/// The tag of the locale the request is served in.
-fn locale_requested() -> String {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        crate::locale::requested().tag()
-    }
-    // NOTE: the browser reads the value the server decided; this runs only if
-    // that value is missing, and then draws the reference locale.
-    #[cfg(target_arch = "wasm32")]
-    {
-        Locale::english().tag()
-    }
-}
-
-/// The bridge's base URL, which the About page shows a signed-in operator,
-/// and empty for a visitor.
-fn bridge_base() -> String {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        let signed_in = session_state() == SessionState::SignedIn;
-        use_context::<crate::server::ConsoleState>()
-            .filter(|_state| signed_in)
-            .map(|state| state.settings().bridge.base.to_string())
-            .unwrap_or_default()
-    }
-    // NOTE: the browser reads the value the server decided; this runs only if
-    // that value is missing, and then shows no bridge.
-    #[cfg(target_arch = "wasm32")]
-    {
-        String::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::model::SessionState;
-
-    #[test]
-    fn the_state_the_page_carries_reads_back_as_itself() {
-        for state in [
-            SessionState::SignedIn,
-            SessionState::SignedOut,
-            SessionState::Unreadable,
-        ] {
-            assert_eq!(Ok(state), state.to_string().parse());
-        }
-        assert!("signed in".parse::<SessionState>().is_err());
-    }
+/// The word an unnamed operator is shown as.
+#[must_use]
+pub fn unnamed_operator() -> String {
+    tr(Msg::Operator)
 }

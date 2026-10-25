@@ -448,9 +448,17 @@ async fn a_daily_report_the_collector_answers_ends_its_window_even_when_refused(
 
 #[tokio::test]
 async fn a_daily_report_that_reaches_no_collector_keeps_its_window() {
-    let closed = std::net::TcpListener::bind("127.0.0.1:0").expect("a port");
-    let port = closed.local_addr().expect("an address").port();
-    drop(closed);
+    // A port the test holds for its whole run and whose every connection it
+    // closes unanswered, so no parallel test's server can take it.
+    let silent = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("a port");
+    let port = silent.local_addr().expect("an address").port();
+    let closer = tokio::spawn(async move {
+        while let Ok((connection, _)) = silent.accept().await {
+            drop(connection);
+        }
+    });
     let dir = tempfile::tempdir().expect("tempdir");
     let config = config(dir.path(), &format!("http://127.0.0.1:{port}/v1/report"));
     let state = state();
@@ -471,6 +479,7 @@ async fn a_daily_report_that_reaches_no_collector_keeps_its_window() {
         1,
         "the retry carries the window"
     );
+    closer.abort();
 }
 
 /// Runs `body` on a current-thread runtime with every log line kept in

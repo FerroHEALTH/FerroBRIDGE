@@ -25,7 +25,7 @@ use ferrobridge_testkit::fixtures;
 use http::Request;
 use http::StatusCode;
 use http::header;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::Arc;
 use tower::ServiceExt as _;
 
@@ -43,7 +43,7 @@ const SUBJECT_NAMESPACE: &str = "http://example.org/fhir/sid/ferrobridge-subject
 
 #[tokio::test]
 async fn the_facade_commits_a_condition_and_reads_it_back_from_a_real_cdr()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     if !containers::e2e_enabled() {
         return Ok(());
     }
@@ -124,7 +124,7 @@ async fn the_facade_commits_a_condition_and_reads_it_back_from_a_real_cdr()
 
 #[tokio::test]
 async fn an_update_following_the_read_etag_commits_the_next_version_on_a_real_cdr()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The ETag is the versionId as a weak entity tag, If-Match carries it back,
     // and a stale one is 412 (<https://hl7.org/fhir/R4/http.html#concurrency>).
     if !containers::e2e_enabled() {
@@ -227,7 +227,7 @@ fn put_condition(
     id: &str,
     resource: &serde_json::Value,
     if_match: &str,
-) -> Result<Request<Body>, Box<dyn StdError>> {
+) -> Result<Request<Body>, Box<dyn Error>> {
     let mut resource = resource.clone();
     resource["id"] = serde_json::json!(id);
     Ok(Request::put(format!("/fhir/Condition/{id}"))
@@ -245,7 +245,7 @@ struct Answered {
 }
 
 /// Sends `request` through `app` and keeps the headers a versioned write reads.
-async fn send(app: Router, request: Request<Body>) -> Result<Answered, Box<dyn StdError>> {
+async fn send(app: Router, request: Request<Body>) -> Result<Answered, Box<dyn Error>> {
     let response = app.oneshot(request).await?;
     let text = |name: &header::HeaderName| {
         response
@@ -285,7 +285,7 @@ pub(crate) fn app(facade: &Arc<Facade>) -> Router {
 }
 
 /// Uploads the synthetic diagnosis template through the CDR's own route.
-pub(crate) async fn upload_template(base_url: &str) -> Result<(), Box<dyn StdError>> {
+pub(crate) async fn upload_template(base_url: &str) -> Result<(), Box<dyn Error>> {
     let response = reqwest::Client::new()
         .post(format!("{base_url}/definition/template/adl1.4"))
         .header(header::CONTENT_TYPE, "application/xml")
@@ -302,7 +302,7 @@ pub(crate) async fn upload_template(base_url: &str) -> Result<(), Box<dyn StdErr
 }
 
 /// Returns the create request the case sends.
-fn post_condition() -> Result<Request<Body>, Box<dyn StdError>> {
+fn post_condition() -> Result<Request<Body>, Box<dyn Error>> {
     let mut resource: serde_json::Value = serde_json::from_str(fixtures::R4_CONDITION)?;
     resource["meta"] = serde_json::json!({ "profile": [PROFILE] });
     resource["subject"] = serde_json::json!({
@@ -314,12 +314,12 @@ fn post_condition() -> Result<Request<Body>, Box<dyn StdError>> {
 }
 
 /// Uploads the published `KDS_Diagnose` template through the CDR's own route.
-pub(crate) async fn upload_kds_template(base_url: &str) -> Result<(), Box<dyn StdError>> {
+pub(crate) async fn upload_kds_template(base_url: &str) -> Result<(), Box<dyn Error>> {
     upload_published(base_url, fixtures::KDS_DIAGNOSE_OPT).await
 }
 
 /// Uploads one published operational template through the CDR's own route.
-pub(crate) async fn upload_published(base_url: &str, opt: &str) -> Result<(), Box<dyn StdError>> {
+pub(crate) async fn upload_published(base_url: &str, opt: &str) -> Result<(), Box<dyn Error>> {
     let response = reqwest::Client::new()
         .post(format!("{base_url}/definition/template/adl1.4"))
         .header(header::CONTENT_TYPE, "application/xml")
@@ -336,7 +336,7 @@ pub(crate) async fn upload_published(base_url: &str, opt: &str) -> Result<(), Bo
 }
 
 /// Returns the entity tag of a `201` without its quotes.
-fn entity_tag(response: &reqwest::Response) -> Result<String, Box<dyn StdError>> {
+fn entity_tag(response: &reqwest::Response) -> Result<String, Box<dyn Error>> {
     let raw = response
         .headers()
         .get(header::ETAG)
@@ -347,7 +347,7 @@ fn entity_tag(response: &reqwest::Response) -> Result<String, Box<dyn StdError>>
 
 #[tokio::test]
 async fn the_kds_template_admits_the_synthetic_composition_on_a_real_cdr()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // The composition is committed over ITS-REST as canonical JSON and read
     // back; what the CDR sets on commit is the declared set of this leg.
     if !containers::e2e_enabled() {
@@ -409,8 +409,8 @@ async fn the_kds_template_admits_the_synthetic_composition_on_a_real_cdr()
 }
 
 #[tokio::test]
-async fn the_facade_round_trips_the_kds_condition_through_a_real_cdr()
--> Result<(), Box<dyn StdError>> {
+async fn the_facade_round_trips_the_kds_condition_through_a_real_cdr() -> Result<(), Box<dyn Error>>
+{
     if !containers::e2e_enabled() {
         return Ok(());
     }
@@ -529,7 +529,7 @@ fn strip_facade_owned(document: &mut serde_json::Value) {
 
 /// Returns the synthetic `Condition` with `id`, coded `code`, for the case's
 /// subject.
-fn condition_coded(id: &str, code: &str) -> Result<serde_json::Value, Box<dyn StdError>> {
+fn condition_coded(id: &str, code: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     let mut resource: serde_json::Value = serde_json::from_str(fixtures::R4_CONDITION)?;
     resource["id"] = serde_json::json!(id);
     resource["meta"] = serde_json::json!({ "profile": [PROFILE] });
@@ -541,7 +541,7 @@ fn condition_coded(id: &str, code: &str) -> Result<serde_json::Value, Box<dyn St
 }
 
 /// Returns how many compositions the CDR holds, over AQL.
-async fn compositions(client: &CdrClient) -> Result<usize, Box<dyn StdError>> {
+async fn compositions(client: &CdrClient) -> Result<usize, Box<dyn Error>> {
     let request = openehr_its::rest::generated::query::AdhocQueryExecute {
         q: String::from(
             "SELECT c/uid/value AS uid FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/uid/value",
@@ -562,7 +562,7 @@ async fn compositions(client: &CdrClient) -> Result<usize, Box<dyn StdError>> {
 
 #[tokio::test]
 async fn a_transaction_commits_once_and_reads_each_entry_back_from_a_real_cdr()
--> Result<(), Box<dyn StdError>> {
+-> Result<(), Box<dyn Error>> {
     // A committed transaction answers a `transaction-response` Bundle
     // (<https://hl7.org/fhir/R4/http.html#transaction-response>); the re-sent
     // Bundle rule is FerroBRIDGE's own design.
@@ -665,7 +665,7 @@ async fn a_transaction_commits_once_and_reads_each_entry_back_from_a_real_cdr()
 pub(crate) async fn call(
     app: Router,
     request: Request<Body>,
-) -> Result<(StatusCode, serde_json::Value), Box<dyn StdError>> {
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
     let response = app.oneshot(request).await?;
     let status = response.status();
     let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await?;
