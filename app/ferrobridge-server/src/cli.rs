@@ -127,8 +127,11 @@ impl Command {
     #[must_use]
     pub const fn pending_issue(&self) -> Option<u32> {
         match self {
-            Self::Serve | Self::Cdm { .. } | Self::Etl { .. } | Self::Mapping { .. } => None,
-            Self::Vocab { .. } => Some(233),
+            Self::Serve
+            | Self::Cdm { .. }
+            | Self::Etl { .. }
+            | Self::Mapping { .. }
+            | Self::Vocab { .. } => None,
         }
     }
 
@@ -304,7 +307,7 @@ mod tests {
         );
         assert_eq!("etl run", etl.spelling());
         assert_eq!(
-            Some(233),
+            None,
             Command::Vocab {
                 command: Vocab::Load {
                     directory: PathBuf::from("/srv/athena"),
@@ -312,7 +315,7 @@ mod tests {
                 },
             }
             .pending_issue(),
-            "the loader waits on the observed export format"
+            "the loader runs"
         );
         assert_eq!(
             None,

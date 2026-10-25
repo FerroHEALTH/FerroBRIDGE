@@ -1637,14 +1637,32 @@ reference engine's query has the right shape and none of the filters (no
 reported upstream. This lives in the `omop-cdm` crate as SQL over the
 vocabulary tables; the FHIR terminology client is a different component.
 
-**The Athena export format is an open research item.** The CDM documentation
-defines the ten vocabulary tables and says only "please visit athena.ohdsi.org"
-about their distribution; the site is an authenticated application. The loader
-is specified against the table definitions in the CDM CSVs, and the observed
-file format of one export is pinned under a `PROVENANCE.md` labelled as
-observed, never as a specification, before v0.0.4 is scheduled. The vocabulary
-is a licence-gated deployment input: never in the image, a release asset, the
-build context or CI.
+**The Athena download format is read from the application that writes it.**
+The CDM documentation defines the ten vocabulary tables and says only "please
+visit athena.ohdsi.org" about their distribution; the site is an authenticated
+application and OHDSI publishes no format document. The application's source
+is public (`OHDSI/Athena`), so the shape is pinned from it at a commit, with
+the files that state it vendored under `docs/specs/athena/` and labelled as
+read from code, never as a specification: one file per table named in upper
+case (`CONCEPT.csv`), a header row of column names, a tab between unquoted
+values, `\n` after each row, UTF-8, an empty field for null, and `yyyyMMdd`
+dates. The download carries the nine tables Athena serves; `SOURCE_TO_CONCEPT_MAP`
+is a site's own table. `CONCEPT_CPT4.csv` holds CPT4 concepts with an empty
+name and is left alone, as are the files that are not CDM v5.4 tables.
+
+`ferrobridge vocab load DIR --schema NAME` (`omop_cdm::athena`) takes the
+files by their exact names, refuses a download that lacks one of the nine,
+and replaces each table in a transaction of its own: `TRUNCATE`, then `COPY`
+in CSV form with a tab delimiter, the column list read from the header row
+and checked against the CDM definitions, and a quote byte the download never
+holds, so a file that carries it is refused before `COPY` reads it. It
+reports the release as the `vocabulary_version` of the `None` row of
+`VOCABULARY`, where the vocabulary build records it (`OHDSI/Vocabulary-v5.0`,
+`working/packages/vocabulary_pack/StartRelease.sql`). The synthetic vocabulary
+in the testkit has the download's shape and is loaded by the same loader. The
+vocabulary is a licence-gated deployment input: never in the image, a release
+asset, the build context or CI. No specification governs the loading: our own
+design.
 
 ### 5.4 Derived tables
 

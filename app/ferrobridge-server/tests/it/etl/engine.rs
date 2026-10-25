@@ -78,9 +78,8 @@ async fn laboratory_harness() -> Result<LaboratoryHarness, Box<dyn Error>> {
     )
     .await?;
     database::init(&pool).await?;
-    let mut connection = pool.pool().acquire().await?;
-    ferrobridge_testkit::vocabulary::load(&mut connection).await?;
-    drop(connection);
+    let download = omop_cdm::athena::Export::read(&ferrobridge_testkit::vocabulary::directory())?;
+    omop_cdm::athena::load(&pool, &download).await?;
     let mut writer = CdmWriter::connect(
         postgres.url(),
         SchemaName::new("cdm")?,

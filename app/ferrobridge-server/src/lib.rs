@@ -105,7 +105,9 @@ where
     };
     let resolved = Config::load(cli.config.as_deref()).and_then(|config| match job {
         Job::Serve => config.resolve(),
-        Job::CdmInit { .. } | Job::EtlRun(_) | Job::MappingCheck { .. } => config.resolve_job(),
+        Job::CdmInit { .. } | Job::VocabLoad { .. } | Job::EtlRun(_) | Job::MappingCheck { .. } => {
+            config.resolve_job()
+        }
     });
     let settings = match resolved {
         Ok(settings) => settings,
@@ -168,6 +170,15 @@ impl Job {
                 since: since.clone(),
             }),
             (
+                cli::Command::Vocab {
+                    command: cli::Vocab::Load { directory, schema },
+                },
+                None,
+            ) => Job::VocabLoad {
+                directory: directory.clone(),
+                schema: schema.clone(),
+            },
+            (
                 cli::Command::Mapping {
                     command: cli::Mapping::Check { format },
                 },
@@ -213,6 +224,19 @@ impl Job {
                     }
                 }
             }
+            Job::VocabLoad { directory, schema } => {
+                let Some(cdm) = settings.cdm else {
+                    eprintln!("ferrobridge: cannot start: `vocab load` needs a [cdm] section");
+                    return ExitCode::from(EXIT_CONFIG);
+                };
+                match jobs::vocab_load_command(&cdm, &directory, &schema) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(error) => {
+                        tracing::error!(error = format!("{error:#}"), "vocab load failed");
+                        ExitCode::FAILURE
+                    }
+                }
+            }
             Job::EtlRun(options) => {
                 if let Some(missing) = etl::job::missing_section(&settings) {
                     eprintln!("ferrobridge: cannot start: `etl run` needs {missing}");
@@ -250,6 +274,13 @@ enum Job {
     CdmInit {
         /// Whether OHDSI's foreign keys follow the tables.
         with_constraints: bool,
+    },
+    /// `vocab load`.
+    VocabLoad {
+        /// The directory holding the download.
+        directory: std::path::PathBuf,
+        /// The schema the vocabulary tables live in.
+        schema: String,
     },
     /// `etl run`.
     EtlRun(etl::RunOptions),

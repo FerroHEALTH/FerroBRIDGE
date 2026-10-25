@@ -1,0 +1,65 @@
+concept_id	concept_name	domain_id	vocabulary_id	concept_class_id	standard_concept	concept_code	valid_start_date	valid_end_date	invalid_reason
+1001	Synthetic standard measurement	Measurement	FB-STANDARD	FB-CLASS	S	STD-MEAS	19700101	20991231	
+1002	Synthetic standard condition one	Condition	FB-STANDARD	FB-CLASS	S	STD-COND-1	19700101	20991231	
+1003	Synthetic standard condition two	Condition	FB-STANDARD	FB-CLASS	S	STD-COND-2	19700101	20991231	
+1004	Synthetic standard condition three	Condition	FB-STANDARD	FB-CLASS	S	STD-COND-3	19700101	20991231	
+1005	Synthetic condition behind a deleted mapping	Condition	FB-STANDARD	FB-CLASS	S	STD-COND-4	19700101	20991231	
+1006	Synthetic condition marked as updated	Condition	FB-STANDARD	FB-CLASS	S	STD-COND-5	19700101	20991231	U
+1007	Synthetic condition behind a valid mapping	Condition	FB-STANDARD	FB-CLASS	S	STD-COND-6	19700101	20991231	
+1008	Synthetic measurement valid from 2030	Measurement	FB-STANDARD	FB-CLASS	S	STD-FUTURE	20300101	20991231	
+1009	Synthetic condition behind a later mapping	Condition	FB-STANDARD	FB-CLASS	S	STD-COND-7	19700101	20991231	
+1010	Synthetic drug, one tablet	Drug	FB-STANDARD	FB-CLASS	S	STD-DRUG	19700101	20991231	
+1011	Synthetic ingredient	Drug	FB-STANDARD	FB-INGREDIENT	S	STD-INGREDIENT	19700101	20991231	
+1012	Synthetic measurement valid until 2019	Measurement	FB-STANDARD	FB-CLASS	S	STD-PAST	19700101	20191231	
+1101	Synthetic laboratory analyte one	Measurement	LOINC	FB-CLASS	S	SYN-LAB-1	19700101	20991231	
+1102	Synthetic standard laboratory analyte two	Measurement	FB-STANDARD	FB-CLASS	S	STD-LAB-2	19700101	20991231	
+2001	Synthetic source code with one mapping	Condition	FB-SOURCE	FB-CLASS		SRC-ONE	19700101	20991231	
+2002	Synthetic source code with two mappings	Condition	FB-SOURCE	FB-CLASS		SRC-FAN	19700101	20991231	
+2003	Synthetic source code marked as deleted	Condition	FB-SOURCE	FB-CLASS		SRC-DELETED	19700101	20991231	D
+2004	Synthetic source code with stale mappings	Condition	FB-SOURCE	FB-CLASS		SRC-STALE	19700101	20991231	
+2005	Synthetic source code with a later mapping	Condition	FB-SOURCE	FB-CLASS		SRC-LATER	19700101	20991231	
+2006	Synthetic source code sharing its key (first)	Condition	FB-SOURCE	FB-CLASS		SRC-TWIN	19700101	20991231	
+2007	Synthetic source code sharing its key (second)	Condition	FB-SOURCE	FB-CLASS		SRC-TWIN	19700101	20991231	
+2008	Synthetic source code replaced by an update	Condition	FB-SOURCE	FB-CLASS		SRC-SUCCEEDED	19700101	20201231	U
+2009	Synthetic source code that replaced it	Condition	FB-SOURCE	FB-CLASS		SRC-SUCCEEDED	20210101	20991231	
+2010	Synthetic source code without a mapping	Condition	FB-SOURCE	FB-CLASS		SRC-NOMAP	19700101	20991231	
+2101	Synthetic laboratory analyte two	Measurement	LOINC	FB-CLASS		SYN-LAB-2	19700101	20991231	
+3001	Synthetic µ-unit	Unit	FB-UNIT	FB-CLASS	S	U-SYNTH	19700101	20991231	
+3101	Synthetic millimole per litre	Unit	UCUM	FB-CLASS	S	mmol/L	19700101	20991231	
+3102	Synthetic gram per litre	Unit	UCUM	FB-CLASS	S	g/L	19700101	20991231	
+4101	Synthetic specimen type	Specimen	SNOMED	FB-CLASS	S	SYN-SPEC-1	19700101	20991231	
+4201	<	Meas Value Operator	FB-STANDARD	FB-CLASS	S	OP-LT	19700101	20991231	
+4202	<=	Meas Value Operator	FB-STANDARD	FB-CLASS	S	OP-LE	19700101	20991231	
+4203	=	Meas Value Operator	FB-STANDARD	FB-CLASS	S	OP-EQ	19700101	20991231	
+4204	>=	Meas Value Operator	FB-STANDARD	FB-CLASS	S	OP-GE	19700101	20991231	
+4205	>	Meas Value Operator	FB-STANDARD	FB-CLASS	S	OP-GT	19700101	20991231	
+5001	Synthetic laboratory visit	Visit	FB-STANDARD	FB-CLASS	S	STD-VISIT	19700101	20991231	
+5101	Synthetic record type	Type Concept	FB-STANDARD	FB-CLASS	S	STD-TYPE-RECORD	19700101	20991231	
+5102	Synthetic observation period type	Type Concept	FB-STANDARD	FB-CLASS	S	STD-TYPE-PERIOD	19700101	20991231	
+6001	Synthetic female	Gender	FB-GENDER	FB-CLASS	S	SYN-GENDER-F	19700101	20991231	
+9001	FerroBRIDGE synthetic source vocabulary	Metadata	FB-META	FB-META		VOC-SOURCE	19700101	20991231	
+9002	FerroBRIDGE synthetic standard vocabulary	Metadata	FB-META	FB-META		VOC-STANDARD	19700101	20991231	
+9003	FerroBRIDGE synthetic unit vocabulary	Metadata	FB-META	FB-META		VOC-UNIT	19700101	20991231	
+9004	FerroBRIDGE synthetic metadata vocabulary	Metadata	FB-META	FB-META		VOC-META	19700101	20991231	
+9005	FerroBRIDGE synthetic stand-in for LOINC	Metadata	FB-META	FB-META		VOC-LOINC	19700101	20991231	
+9006	FerroBRIDGE synthetic stand-in for UCUM	Metadata	FB-META	FB-META		VOC-UCUM	19700101	20991231	
+9007	FerroBRIDGE synthetic stand-in for SNOMED	Metadata	FB-META	FB-META		VOC-SNOMED	19700101	20991231	
+9008	FerroBRIDGE synthetic gender vocabulary	Metadata	FB-META	FB-META		VOC-GENDER	19700101	20991231	
+9009	FerroBRIDGE synthetic vocabulary release	Metadata	FB-META	FB-META		VOC-NONE	19700101	20991231	
+9011	Synthetic Measurement domain	Metadata	FB-META	FB-META		DOM-MEASUREMENT	19700101	20991231	
+9012	Synthetic Condition domain	Metadata	FB-META	FB-META		DOM-CONDITION	19700101	20991231	
+9013	Synthetic Unit domain	Metadata	FB-META	FB-META		DOM-UNIT	19700101	20991231	
+9014	Synthetic Metadata domain	Metadata	FB-META	FB-META		DOM-METADATA	19700101	20991231	
+9015	Synthetic Drug domain	Metadata	FB-META	FB-META		DOM-DRUG	19700101	20991231	
+9016	Synthetic Specimen domain	Metadata	FB-META	FB-META		DOM-SPECIMEN	19700101	20991231	
+9017	Synthetic Meas Value Operator domain	Metadata	FB-META	FB-META		DOM-OPERATOR	19700101	20991231	
+9018	Synthetic Visit domain	Metadata	FB-META	FB-META		DOM-VISIT	19700101	20991231	
+9019	Synthetic Type Concept domain	Metadata	FB-META	FB-META		DOM-TYPE	19700101	20991231	
+9020	Synthetic Gender domain	Metadata	FB-META	FB-META		DOM-GENDER	19700101	20991231	
+9021	Synthetic concept class	Metadata	FB-META	FB-META		CLS-CLASS	19700101	20991231	
+9022	Synthetic ingredient class	Metadata	FB-META	FB-META		CLS-INGREDIENT	19700101	20991231	
+9023	Synthetic metadata class	Metadata	FB-META	FB-META		CLS-META	19700101	20991231	
+9031	Synthetic Maps to relationship	Metadata	FB-META	FB-META		REL-MAPS-TO	19700101	20991231	
+9032	Synthetic Mapped from relationship	Metadata	FB-META	FB-META		REL-MAPPED-FROM	19700101	20991231	
+9033	Synthetic unrelated relationship	Metadata	FB-META	FB-META		REL-RELATED	19700101	20991231	
+9034	Synthetic language	Metadata	FB-META	FB-META		LANG-SYNTH	19700101	20991231	
