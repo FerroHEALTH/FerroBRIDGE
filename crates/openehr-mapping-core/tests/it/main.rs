@@ -6,6 +6,7 @@
 
 #![allow(clippy::panic_in_result_fn, reason = "test assertions")]
 
+mod adl2_fixtures;
 mod alternatives;
 mod anchors;
 mod archetype_id;
