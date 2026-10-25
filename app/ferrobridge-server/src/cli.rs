@@ -76,6 +76,13 @@ pub enum Etl {
         #[arg(long, value_name = "TIME")]
         since: Option<String>,
     },
+    /// Loads FHIR R4 resources, a Bundle or an NDJSON file, into the CDM
+    /// database through FHIRconnect and OMOCL, with no CDR.
+    Fhir {
+        /// The Bundle, the resource or the NDJSON file to load.
+        #[arg(value_name = "PATH")]
+        input: PathBuf,
+    },
 }
 
 /// The `cdm` jobs.
@@ -162,6 +169,9 @@ impl Command {
             Self::Etl {
                 command: Etl::Run { .. },
             } => "etl run",
+            Self::Etl {
+                command: Etl::Fhir { .. },
+            } => "etl fhir",
             Self::Cdm {
                 command: Cdm::Init { .. },
             } => "cdm init",

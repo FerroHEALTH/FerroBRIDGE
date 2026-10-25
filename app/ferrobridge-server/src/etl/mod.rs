@@ -23,6 +23,7 @@
 
 pub mod aql;
 pub mod deletions;
+pub mod fhir;
 pub mod job;
 pub mod mapper;
 pub mod report;
@@ -63,8 +64,9 @@ pub struct VisitSettings {
 /// deployment configures.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EtlSettings {
-    /// The checked composition query.
-    pub compositions: CheckedQuery,
+    /// The checked composition query, which `etl run` needs and `etl fhir`
+    /// does not read.
+    pub compositions: Option<CheckedQuery>,
     /// How many rows one page of either query asks for.
     pub page_size: PageSize,
     /// The `*_type_concept_id` the mapper writes: the provenance of the
@@ -154,6 +156,9 @@ pub enum RunError {
         #[source]
         source: Box<CheckError>,
     },
+    /// `[etl] aql` names no composition query, which `etl run` reads by.
+    #[error("`etl run` needs [etl] aql, the composition query")]
+    NoQuery,
     /// The CDM database refused the visits, a derivation, or a read, or its
     /// connection closed.
     #[error("the CDM database stopped the run")]
@@ -304,7 +309,9 @@ pub async fn run<M: Mapper>(
     mapper: &M,
     run_id: &RunId,
 ) -> Result<RunReport, RunError> {
-    let query = &settings.compositions;
+    let Some(query) = settings.compositions.as_ref() else {
+        return Err(RunError::NoQuery);
+    };
     match (
         options.since.is_some(),
         query.names_parameter(SINCE_PARAMETER),
@@ -441,7 +448,7 @@ async fn read_visits(
 /// Retires the visits the visit query no longer answers, then rebuilds the
 /// derived tables whole, after every commit and removal of the run, and
 /// counts the `PERSON` rows.
-async fn derive(
+pub(crate) async fn derive(
     settings: &EtlSettings,
     writer: &mut CdmWriter,
     report: &mut RunReport,
@@ -475,7 +482,8 @@ async fn derive(
 
 /// One composition row and what the run knows when it maps it.
 struct Read<'r> {
-    /// The checked composition query.
+    /// The checked composition query, which `etl run` needs and `etl fhir`
+    /// does not read.
     query: &'r CheckedQuery,
     /// The row.
     row: &'r [serde_json::Value],

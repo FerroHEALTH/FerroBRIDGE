@@ -164,6 +164,9 @@ pub struct RunReport {
     /// `[etl] quality_checks` is set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quality: Option<crate::quality::QualityVerdicts>,
+    /// The FHIR resources an `etl fhir` run read, absent from an `etl run`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resources: Option<crate::etl::fhir::Resources>,
 }
 
 impl RunReport {
@@ -283,6 +286,9 @@ impl fmt::Display for RunReport {
         writeln!(f, "run {}", self.run_id)?;
         if let Some(ref quality) = self.quality {
             writeln!(f, "{quality}")?;
+        }
+        if let Some(ref resources) = self.resources {
+            writeln!(f, "{resources}")?;
         }
         writeln!(
             f,

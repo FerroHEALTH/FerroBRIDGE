@@ -11,6 +11,7 @@
 mod cdr_aql;
 mod deletions;
 mod engine;
+mod fhir;
 mod person;
 mod run;
 mod sources;
@@ -305,7 +306,7 @@ fn client(cdr: &MockServer) -> Result<CdrClient, Box<dyn Error>> {
 /// Returns the settings of a run, with the visit derivation when `visits`.
 fn settings(visits: bool) -> Result<EtlSettings, Box<dyn Error>> {
     Ok(EtlSettings {
-        compositions: CheckedQuery::compositions(COMPOSITIONS)?,
+        compositions: Some(CheckedQuery::compositions(COMPOSITIONS)?),
         page_size: ferrobridge_server::cdr::query::PageSize::new(100)?,
         type_concept_id: 32817,
         observation_period_type_concept_id: 32880,

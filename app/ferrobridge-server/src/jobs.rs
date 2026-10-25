@@ -227,6 +227,24 @@ pub(crate) fn dq_check_command(
     })
 }
 
+/// Loads the FHIR resources at `input` into the CDM once and prints the
+/// report as text and as JSON.
+///
+/// The job itself is [`etl::job::run_fhir`].
+#[expect(
+    clippy::print_stdout,
+    reason = "the run report is the job's output, written to stdout for the operator"
+)]
+pub(crate) fn etl_fhir_command(settings: &Settings, input: &std::path::Path) -> anyhow::Result<()> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    let report = runtime.block_on(etl::job::run_fhir(settings, input))?;
+    println!("{report}");
+    println!("{}", serde_json::to_string_pretty(&report)?);
+    Ok(())
+}
+
 /// Why `mapping check` stopped before it printed a report.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum CheckFailure {

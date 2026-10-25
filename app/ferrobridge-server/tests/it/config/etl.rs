@@ -71,7 +71,12 @@ fn an_etl_section_resolves_with_its_query_checked() -> Result<(), Box<dyn std::e
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert_eq!(32817, etl.type_concept_id);
     assert_eq!(32880, etl.observation_period_type_concept_id);
-    assert_eq!(Some(2), etl.compositions.column("version_uid"));
+    assert_eq!(
+        Some(2),
+        etl.compositions
+            .as_ref()
+            .and_then(|query| query.column("version_uid"))
+    );
     assert_eq!(100, etl.page_size.rows(), "the default page");
     assert!(etl.visits.is_none());
     Ok(())
@@ -106,8 +111,18 @@ fn a_composition_query_without_the_versioned_object_uid_boots()
     let text = ETL.replace("vo/uid/value AS versioned_object_uid, ", "");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
-    assert_eq!(None, etl.compositions.column("versioned_object_uid"));
-    assert_eq!(Some(1), etl.compositions.column("version_uid"));
+    assert_eq!(
+        None,
+        etl.compositions
+            .as_ref()
+            .and_then(|query| query.column("versioned_object_uid"))
+    );
+    assert_eq!(
+        Some(1),
+        etl.compositions
+            .as_ref()
+            .and_then(|query| query.column("version_uid"))
+    );
     Ok(())
 }
 

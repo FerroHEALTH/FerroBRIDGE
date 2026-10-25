@@ -214,3 +214,18 @@ fn dq_check_without_a_cdm_section_exits_seventy_eight() {
         "{stderr}"
     );
 }
+
+#[test]
+fn etl_fhir_without_an_etl_section_exits_seventy_eight() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_ferrobridge"))
+        .args(["etl", "fhir", "/srv/fhir/export.ndjson"])
+        .env_remove("FERROBRIDGE_CONFIG")
+        .output()
+        .expect("the binary runs");
+    assert_eq!(Some(i32::from(EXIT_CONFIG)), output.status.code());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("`etl fhir` needs an [etl] section"),
+        "the refusal names the job and the section: {stderr}"
+    );
+}

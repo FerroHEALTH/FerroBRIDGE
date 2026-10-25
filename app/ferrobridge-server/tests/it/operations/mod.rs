@@ -37,7 +37,8 @@ const FHIR_JSON: &str = "application/fhir+json";
 const OPENEHR_JSON: &str = "application/openehr+json";
 
 /// The profile the synthetic context claims.
-const PROFILE: &str = "http://example.org/fhir/StructureDefinition/ferrobridge-server-diagnose";
+pub(crate) const PROFILE: &str =
+    "http://example.org/fhir/StructureDefinition/ferrobridge-server-diagnose";
 
 /// A synthetic context mapping over the testkit's diagnosis template.
 const CONTEXT_FILE: &str = r#"grammar: FHIRConnect/v1.0.0
@@ -91,7 +92,7 @@ mappings:
 "#;
 
 /// Writes the synthetic mapping set into a temporary tree.
-fn mapping_tree() -> Result<tempfile::TempDir, Box<dyn Error>> {
+pub(crate) fn mapping_tree() -> Result<tempfile::TempDir, Box<dyn Error>> {
     mapping_tree_with(MODEL_FILE)
 }
 

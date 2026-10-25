@@ -554,11 +554,17 @@ fn resolve_aliases(aliases: &BTreeMap<String, String>) -> Result<VocabularyAlias
 
 /// Returns the ETL job `etl` describes, with both queries checked.
 pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
-    let compositions = query_of(
-        "etl.aql",
-        &etl.aql,
-        crate::etl::aql::CheckedQuery::compositions,
-    )?;
+    // NOTE: no specification governs this: our own design; `etl fhir` reads no CDR, so
+    // the composition query is optional here and `etl run` refuses a run without one.
+    let compositions = if etl.aql.is_empty() {
+        None
+    } else {
+        Some(query_of(
+            "etl.aql",
+            &etl.aql,
+            crate::etl::aql::CheckedQuery::compositions,
+        )?)
+    };
     let page_size =
         crate::cdr::query::PageSize::new(etl.page_size).map_err(|source| Error::PageSize {
             key: String::from("etl.page_size"),

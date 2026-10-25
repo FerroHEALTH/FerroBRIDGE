@@ -110,6 +110,7 @@ where
         | Job::VocabLoad { .. }
         | Job::EtlRun(_)
         | Job::DqCheck { .. }
+        | Job::EtlFhir { .. }
         | Job::MappingCheck { .. } => config.resolve_job(),
     });
     let settings = match resolved {
@@ -180,6 +181,14 @@ impl Job {
             ) => Job::VocabLoad {
                 directory: directory.clone(),
                 schema: schema.clone(),
+            },
+            (
+                cli::Command::Etl {
+                    command: cli::Etl::Fhir { input },
+                },
+                None,
+            ) => Job::EtlFhir {
+                input: input.clone(),
             },
             (
                 cli::Command::Mapping {
@@ -273,6 +282,19 @@ impl Job {
                     }
                 }
             }
+            Job::EtlFhir { input } => {
+                if let Some(missing) = etl::job::missing_fhir_section(&settings) {
+                    eprintln!("ferrobridge: cannot start: `etl fhir` needs {missing}");
+                    return ExitCode::from(EXIT_CONFIG);
+                }
+                match jobs::etl_fhir_command(&settings, &input) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(error) => {
+                        tracing::error!(error = format!("{error:#}"), "etl fhir failed");
+                        ExitCode::FAILURE
+                    }
+                }
+            }
             Job::MappingCheck { format } => match jobs::mapping_check_command(&settings, format) {
                 Ok(true) => ExitCode::SUCCESS,
                 Ok(false) => ExitCode::FAILURE,
@@ -311,6 +333,11 @@ enum Job {
     DqCheck {
         /// How the result is written.
         format: cli::ReportFormat,
+    },
+    /// `etl fhir`.
+    EtlFhir {
+        /// The FHIR input.
+        input: std::path::PathBuf,
     },
     /// `mapping check`.
     MappingCheck {

@@ -318,6 +318,41 @@ Leave leaf paths through a repeated node, such as two values of one
 each of them comes from, and a CDR may pair values of two different nodes in
 one row.
 
+## Loading FHIR with no CDR
+
+A site that exposes FHIR R4 and runs no openEHR CDR loads the CDM with
+`ferrobridge etl fhir PATH`. The job reads a Bundle, one resource or an NDJSON
+file of resources (the FHIR Bulk Data format), and runs each resource through
+the two mapping languages in turn: the FHIRconnect set of `[mappings]
+directory`, compiled against the templates of `[mappings] templates`, maps it
+into an openEHR composition held in memory, and the OMOCL set of `[mappings]
+omocl` maps that composition to CDM rows the writer commits. No composition is
+stored anywhere. The job reads `[etl]` for the type concepts and the
+vocabulary aliases, and `[cdm]` for the database; it needs no `[cdr]` and no
+`[etl] aql`. No specification governs the chaining: it is FerroBRIDGE's own
+design, and each hop stays governed by its own specification.
+
+- **Identity.** A composition built in memory has no identifiers a CDR issued,
+  so the job derives them: the versioned composition from the resource's type
+  and id, the version from `meta.versionId` when it is a positive integer
+  (`1` otherwise), and the EHR from the reference the resource names its
+  subject by, a Patient naming itself. Running the job again over the same
+  input writes the same rows under the same ids, and a resource whose
+  `meta.versionId` moves replaces its rows.
+- **Time.** A resource is mapped at its `meta.lastUpdated`, so a composition
+  field FHIRconnect defaults to the run time takes the same value on every
+  run. A resource without one takes the time the job started.
+- **What reaches the CDM** is what the two mapping sets cover. Over the
+  published libraries that is Patient, Condition, Procedure, the laboratory
+  DiagnosticReport, MedicationStatement and MedicationAdministration; an
+  Encounter reaches no VISIT_OCCURRENCE, and the job derives no visit, since
+  the visit query reads a CDR.
+- **Nothing disappears.** A resource no FHIRconnect program maps, one the
+  FHIRconnect run refuses, one with no id or no subject, and a composition
+  OMOCL refuses are each counted and listed in the run report, which adds a
+  `resources` line (read, mapped, unmapped, refused, and the losses the
+  FHIRconnect run declared).
+
 ## Checking a populated database with the Data Quality Dashboard
 
 The bridge carries a Rust port of the OHDSI Data Quality Dashboard's

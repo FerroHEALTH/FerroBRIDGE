@@ -56,6 +56,14 @@ crates on crates.io.
   context, the answer is held until its `exp` and at most
   `cache_max_age_seconds`, an inactive token answers `401` and an endpoint
   that fails `503` (#533). The Operate configuration page lists the keys.
+- `ferrobridge etl fhir PATH` loads FHIR R4 resources, a Bundle or an NDJSON
+  file, into the CDM with no CDR (#1209, decided on #407): each resource maps
+  through the FHIRconnect set into an openEHR composition held in memory,
+  which the OMOCL set maps to CDM rows the writer commits. The composition's
+  identifiers derive from the resource's type, id, `meta.versionId` and
+  subject, so a re-run writes the same rows, and the run report counts the
+  resources read, mapped, unmapped and refused. `[etl] aql` becomes optional
+  at load; `etl run` refuses to start without it.
 - `ferrobridge vocab load DIR --schema NAME` loads an OHDSI Athena vocabulary
   download into the vocabulary tables of the CDM schema (#233). It takes the
   nine files every download carries and `SOURCE_TO_CONCEPT_MAP.csv` when
