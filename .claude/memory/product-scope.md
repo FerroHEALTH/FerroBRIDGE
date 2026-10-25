@@ -1,6 +1,6 @@
 ---
 name: product-scope
-description: "What FerroBRIDGE is (the owner's product statement), the standalone-server decision, research-first on issue #1, and the expectation that FerroEHR's in-tree FHIR extension retires in favour of the bridge"
+description: "What FerroBRIDGE is (the owner's product statement), the standalone-server decision, the architecture of record from the issue #1 research, and that FHIR and OMOP are FerroBRIDGE's lane in the family, so FerroEHR carries no FHIR of its own"
 metadata:
   node_type: memory
   type: project
@@ -32,20 +32,20 @@ validated against published schemas. A hand-coded per-resource or per-table
 mapping defeats the premise, so it is refused in review
 (`.claude/rules/rust-style.md`).
 
-**Research first, on issue #1.** Everything else is open: the crate layout, the
-engine design, whether a generated model layer exists on either side, the
-version pins, and the acceptance instrument. `docs/architecture.md` does not
-exist and is the output of that program. Do not scaffold ahead of it
-(`owner-work-style.md`), and make no technical claim about a target beyond the
-statement above or a cited research finding.
+**Research first, on issue #1.** The crate layout, the engine design, the
+generated model layers, the version pins and the acceptance instrument were
+the research program's to settle, and `docs/architecture.md` is its output
+and the design of record. Make no technical claim about a target beyond the
+statement above, the architecture of record or a cited research finding
+(`owner-work-style.md`).
 
-**FerroEHR's in-tree FHIR extension is expected to retire.** FerroEHR ships
-FHIR conversion inside `app/ferroehr-ext` behind a cargo feature. Once
-FerroBRIDGE exists, that extension is expected to be removed in favour of the
-bridge, so the CDR stops carrying a second FHIR implementation. That retirement
-is FerroEHR's own tracker work, decided and executed there, never from this
-repository (`sibling-projects.md`). Design here as if the CDR has no FHIR
-surface of its own.
+**FHIR and OMOP are FerroBRIDGE's lane.** In the family architecture
+([[family-architecture]]) FerroEHR implements no FHIR and no OMOP; both are
+FerroBRIDGE's, and FerroBRIDGE in turn does no federation (FerroFED's) and no
+patient identity or IHE profile (FerroPIX's). Any FHIR conversion still
+inside FerroEHR is that repository's to remove, decided and executed there,
+never from this repository (`sibling-projects.md`). Design here as if the CDR
+has no FHIR surface of its own.
 
 Update 2026-09-03 (research closed): `docs/architecture.md` exists; pins are FHIRconnect v1.0.0, FHIR R4, OMOCL v1.0.0, OMOP CDM v5.4, ITS-REST 1.1.0; one shared foundation, two interpreters, two sinks; FHIR facade + OMOP batch ETL; the FHIR model is a dependency, the CDM types are generated from the OHDSI definitions.
 

@@ -509,10 +509,15 @@ apply always. Read the relevant one before working in that area.
 
 ## Sibling projects
 
+FerroBRIDGE is one of five FerroHEALTH products, each its own server reached
+only over a published protocol (`.claude/memory/family-architecture.md`).
 `FerroEHR` (`../ferroehr`) is the reference openEHR CDR and `FerroTERM`
-(`../FerroTERM`) the reference FHIR terminology server. Both are read-only
-prior art from here: read their code, rules, and history freely, and never edit
-either from this repository (`.claude/memory/sibling-projects.md`).
+(`../FerroTERM`) the reference FHIR terminology server; FerroFED is the
+federation gateway and FerroPIX the master patient index with the IHE
+profiles, so the bridge does no federation and no patient identity of its
+own. All are read-only prior art from here: read their code, rules, and
+history freely, and never edit one from this repository
+(`.claude/memory/sibling-projects.md`).
 
 ## References
 

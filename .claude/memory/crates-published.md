@@ -54,6 +54,8 @@ Rust projects can reuse, and the sibling's lane is proven.
   crates?": the twelve-way split (model, resolve, engine, tree per language)
   collapsed to one crate per language with modules (`fhirconnect`, `omocl`),
   one shared foundation (`openehr-mapping-core`), `omop-cdm`, the two clients
-  and `fhir-types`. Before proposing a crate, check both siblings for an
-  existing one and say in plain words what the crate does; the owner wants to
+  and `fhir-types`. Before proposing a crate, check the family's products and
+  shared-crate repositories for an existing one ([[family-architecture]]:
+  nothing is hand-written that a shared crate provides) and say in plain
+  words what the crate does; the owner wants to
   understand each boundary, and a finer split is a cost with no consumer.
