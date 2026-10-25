@@ -192,10 +192,13 @@ impl Job {
             },
             (
                 cli::Command::Mapping {
-                    command: cli::Mapping::Check { format },
+                    command: cli::Mapping::Check { format, vocabulary },
                 },
                 None,
-            ) => Job::MappingCheck { format: *format },
+            ) => Job::MappingCheck {
+                format: *format,
+                vocabulary: *vocabulary,
+            },
             (
                 cli::Command::Dq {
                     command: cli::Dq::Check { format },
@@ -295,18 +298,20 @@ impl Job {
                     }
                 }
             }
-            Job::MappingCheck { format } => match jobs::mapping_check_command(&settings, format) {
-                Ok(true) => ExitCode::SUCCESS,
-                Ok(false) => ExitCode::FAILURE,
-                Err(jobs::CheckFailure::Configuration(error)) => {
-                    eprintln!("ferrobridge: cannot check: {}", chain(&error));
-                    ExitCode::from(EXIT_CONFIG)
+            Job::MappingCheck { format, vocabulary } => {
+                match jobs::mapping_check_command(&settings, format, vocabulary) {
+                    Ok(true) => ExitCode::SUCCESS,
+                    Ok(false) => ExitCode::FAILURE,
+                    Err(jobs::CheckFailure::Configuration(error)) => {
+                        eprintln!("ferrobridge: cannot check: {}", chain(&error));
+                        ExitCode::from(EXIT_CONFIG)
+                    }
+                    Err(jobs::CheckFailure::Run(error)) => {
+                        eprintln!("ferrobridge: cannot check: {error:#}");
+                        ExitCode::from(EXIT_CHECK_UNAVAILABLE)
+                    }
                 }
-                Err(jobs::CheckFailure::Run(error)) => {
-                    eprintln!("ferrobridge: cannot check: {error:#}");
-                    ExitCode::from(EXIT_CHECK_UNAVAILABLE)
-                }
-            },
+            }
         }
     }
 }
@@ -343,6 +348,8 @@ enum Job {
     MappingCheck {
         /// How the report is written.
         format: cli::ReportFormat,
+        /// Whether the OMOCL literals are checked against the vocabulary.
+        vocabulary: bool,
     },
 }
 

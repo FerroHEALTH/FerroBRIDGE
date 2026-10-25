@@ -25,6 +25,10 @@ crates on crates.io.
 
 ### Added
 
+- `ferrobridge mapping check --vocabulary` checks every literal concept id of
+  the OMOCL files against the vocabulary loaded in the `[cdm]` database: a
+  literal the vocabulary does not hold, or whose domain is not one the CDM
+  field definitions name for its column, is a diagnostic (#97).
 - The profile package set pins `hl7.fhir.eu.laboratory` 2.0.0 and
   `hl7.fhir.eu.mpd` 1.0.0, the HL7 Europe Laboratory Report and Medication
   Prescription and Dispense guides the EU profile contexts target, fetched

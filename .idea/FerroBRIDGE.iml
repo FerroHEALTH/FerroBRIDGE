@@ -44,6 +44,10 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/ferrobridge-fhirpath/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/crates/ferrobridge-validator/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/ferrobridge-validator/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/app/ferrobridge-console/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/app/ferrobridge-console/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/ferrobridge-operator-api/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/hl7v2-types/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

@@ -453,3 +453,82 @@ fn an_unreadable_directory_exits_sixty_nine() -> Result<(), Box<dyn std::error::
     );
     Ok(())
 }
+
+/// The header of a synthetic OMOCL file over the laboratory analyte.
+const OMOCL_HEADER: &str = "grammar: OMOCL/v1.0.0\ntype: model\nmetadata:\n  name: Vocabulary_v1\n  \
+                            version: 1.0.0\nspec:\n  system: OMOP\n  version: 5.4\n  \
+                            openEhrConfig:\n    archetype: openEHR-EHR-OBSERVATION.vocabulary.v1\n\
+                            mappings:\n";
+
+/// A `type` record whose `concept_id` is the literal `code`.
+fn literal_record(kind: &str, code: i32) -> String {
+    format!("  - type: \"{kind}\"\n    concept_id:\n      alternatives:\n        - code: {code}\n")
+}
+
+#[tokio::test]
+async fn the_literals_are_checked_against_the_loaded_vocabulary()
+-> Result<(), Box<dyn std::error::Error>> {
+    if !ferrobridge_testkit::containers::e2e_enabled() {
+        return Ok(());
+    }
+    let postgres = ferrobridge_testkit::containers::postgres().await?;
+    let pool = omop_cdm::database::CdmPool::connect(
+        sqlx::postgres::PgPoolOptions::new().max_connections(1),
+        postgres.url().parse()?,
+        omop_cdm::ddl::SchemaName::new("cdm")?,
+    )
+    .await?;
+    omop_cdm::database::init(&pool).await?;
+    let download = omop_cdm::athena::Export::read(&ferrobridge_testkit::vocabulary::directory())?;
+    omop_cdm::athena::load(&pool, &download).await?;
+    let directory = tempfile::tempdir()?;
+    let file = directory.path().join("Vocabulary_v1.yml");
+    // 1001 is the synthetic standard Measurement concept, 1002 a Condition
+    // concept, and 424242 no concept of the synthetic vocabulary.
+    std::fs::write(
+        &file,
+        format!(
+            "{OMOCL_HEADER}{}{}{}",
+            literal_record("Measurement", 1001),
+            literal_record("ConditionOccurrence", 1001),
+            literal_record("Observation", 424_242)
+        ),
+    )?;
+    let resolver = omop_cdm::vocabulary::ConceptResolver::new(pool.clone());
+    let diagnostics = check::concept_domains(&[file], &resolver).await?;
+    let codes: Vec<String> = diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.code().to_string())
+        .collect();
+    assert_eq!(
+        vec!["omocl-domain-mismatch", "omocl-unknown-concept"],
+        codes,
+        "{diagnostics:?}"
+    );
+    let mismatch = diagnostics.first().ok_or("a mismatch")?;
+    assert!(
+        mismatch
+            .message()
+            .contains("condition_occurrence.condition_concept_id"),
+        "{mismatch}"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_vocabulary_check_without_a_cdm_section_refuses_to_start()
+-> Result<(), Box<dyn std::error::Error>> {
+    let tree = Tree::clean()?;
+    let output = tree.run(&["--vocabulary"])?;
+    let stderr = String::from_utf8(output.stderr)?;
+    assert_eq!(
+        Some(i32::from(EXIT_CONFIG)),
+        output.status.code(),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("checking against the vocabulary needs a [cdm] section"),
+        "{stderr}"
+    );
+    Ok(())
+}
