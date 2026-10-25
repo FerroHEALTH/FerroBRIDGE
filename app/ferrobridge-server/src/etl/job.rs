@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The `etl run` job over a resolved configuration.
+//! The `etl run` and `etl fhir` jobs over a resolved configuration.
 //!
 //! The job reads the OMOCL set from `[mappings] omocl` and the console's
 //! `[operator] mapping_dir`, builds the CDR client of `[cdr]`, the concept
@@ -51,6 +51,15 @@ pub enum JobError {
     /// The quality checks could not be planned.
     #[error("planning the quality checks")]
     Quality(#[source] omop_cdm::quality::plan::PlanError),
+    /// The configuration lacks a section `etl fhir` needs.
+    #[error("`etl fhir` needs {0}")]
+    MissingFhir(&'static str),
+    /// The FHIRconnect mapping set does not load.
+    #[error("reading the FHIRconnect mapping set")]
+    FhirMappings(#[source] crate::mappings::Error),
+    /// The FHIR input does not read.
+    #[error("reading the FHIR input")]
+    Input(#[source] crate::etl::fhir::InputError),
 }
 
 /// Returns the section `etl run` needs and `settings` lacks, the first
@@ -59,6 +68,12 @@ pub enum JobError {
 pub fn missing_section(settings: &Settings) -> Option<&'static str> {
     if settings.etl.is_none() {
         Some("an [etl] section")
+    } else if settings
+        .etl
+        .as_ref()
+        .is_some_and(|etl| etl.compositions.is_none())
+    {
+        Some("[etl] aql")
     } else if settings.cdm.is_none() {
         Some("a [cdm] section")
     } else if settings.cdr.is_none() {
@@ -149,12 +164,110 @@ pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport,
     let mut report = crate::etl::run(etl, options, &client, &mut writer, &mapper, &run_id)
         .await
         .map_err(JobError::Run)?;
+    quality_step(etl, &pool, &mut report).await?;
+    Ok(report)
+}
+
+/// Runs the quality checks over the tables `report` names when `etl` asks
+/// for them, and adds their verdicts to it.
+async fn quality_step(
+    etl: &crate::etl::EtlSettings,
+    pool: &CdmPool,
+    report: &mut RunReport,
+) -> Result<(), JobError> {
     if etl.quality_checks {
         let written = report.rows.keys().cloned().collect();
         let plan = crate::quality::plan(Some(&written)).map_err(JobError::Quality)?;
         // NOTE: no specification governs this: our own design; a failed check never rolls
         // the committed load back, it is reported.
-        report.quality = Some(crate::quality::run(&pool, &plan).await.verdicts());
+        report.quality = Some(crate::quality::run(pool, &plan).await.verdicts());
     }
+    Ok(())
+}
+
+/// Returns the section `etl fhir` needs and `settings` lacks, the first
+/// missing first.
+#[must_use]
+pub fn missing_fhir_section(settings: &Settings) -> Option<&'static str> {
+    if settings.etl.is_none() {
+        Some("an [etl] section")
+    } else if settings.cdm.is_none() {
+        Some("a [cdm] section")
+    } else if settings.mappings.is_none() {
+        Some("[mappings] directory and templates")
+    } else if omocl_roots(settings).is_empty() {
+        Some("[mappings] omocl")
+    } else {
+        None
+    }
+}
+
+/// Runs `etl fhir` once over the FHIR resources at `input` and returns its
+/// report.
+///
+/// The FHIRconnect set loads from `[mappings] directory` against the
+/// operational templates of `[mappings] templates`, with no CDR, and the
+/// OMOCL set as `etl run` reads it; both load and the input reads before the
+/// database is reached.
+///
+/// # Errors
+///
+/// Returns [`JobError::MissingFhir`] naming the first section the
+/// configuration lacks, [`JobError::FhirMappings`] and [`JobError::Mappings`]
+/// when a mapping set does not load, [`JobError::Input`] when the input does
+/// not read, the connection variants when a client cannot connect, and
+/// [`JobError::Run`] when the run stops.
+pub async fn run_fhir(settings: &Settings, input: &std::path::Path) -> Result<RunReport, JobError> {
+    let missing =
+        || JobError::MissingFhir(missing_fhir_section(settings).unwrap_or("its configuration"));
+    let roots = omocl_roots(settings);
+    let (Some(etl), Some(cdm), Some(mappings), false) = (
+        settings.etl.as_ref(),
+        settings.cdm.as_ref(),
+        settings.mappings.as_ref(),
+        roots.is_empty(),
+    ) else {
+        return Err(missing());
+    };
+    let programs = crate::mappings::load(mappings).map_err(JobError::FhirMappings)?;
+    let set = read_roots(&roots).map_err(JobError::Mappings)?;
+    let resources = crate::etl::fhir::read_input(input).map_err(JobError::Input)?;
+    let pool = CdmPool::connect(
+        sqlx::postgres::PgPoolOptions::new().max_connections(2),
+        cdm.connection
+            .pool_options()
+            .map_err(JobError::Connection)?,
+        cdm.schema.clone(),
+    )
+    .await
+    .map_err(JobError::Resolver)?;
+    let mapper = OmoclMapper::new(
+        set,
+        CdmVocabulary::new(ConceptResolver::new(pool.clone())),
+        etl.aliases.clone(),
+    );
+    let mut writer = CdmWriter::connect_with(
+        &cdm.connection,
+        cdm.schema.clone(),
+        cdm.bridge_schema.clone(),
+        cdm.person_policy,
+    )
+    .await
+    .map_err(JobError::Writer)?;
+    let run_id = RunId::new(uuid::Uuid::new_v4().to_string()).map_err(JobError::RunId)?;
+    let operations = &settings.operations;
+    let now = jiff::Timestamp::now().to_string();
+    let side = crate::etl::fhir::FhirSide {
+        programs: &programs,
+        device: &operations.device_reference,
+        composer: &operations.composer,
+        language: operations.composition_language.as_deref(),
+        territory: operations.composition_territory.as_deref(),
+        now: &now,
+    };
+    let mut report = crate::etl::fhir::run(&resources, &side, etl, &mut writer, &mapper, &run_id)
+        .await
+        .map_err(JobError::Run)?;
+    quality_step(etl, &pool, &mut report).await?;
     Ok(report)
 }

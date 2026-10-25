@@ -131,17 +131,34 @@ impl OperationsLane {
     /// Returns the settings of one run, stamped with the current time.
     #[must_use]
     pub fn settings(&self) -> fhirconnect::operations::run::Settings {
-        let now = jiff::Timestamp::now().to_string();
-        let mut defaults = Defaults::at(now.clone()).with_composer(self.composer.as_str());
-        if let Some(ref language) = self.language {
-            defaults = defaults.with_language(language.as_str());
-        }
-        if let Some(ref territory) = self.territory {
-            defaults = defaults.with_territory(territory.as_str());
-        }
-        fhirconnect::operations::run::Settings::new(self.device.as_str(), now)
-            .with_defaults(defaults)
+        run_settings(
+            &self.device,
+            &self.composer,
+            self.language.as_deref(),
+            self.territory.as_deref(),
+            &jiff::Timestamp::now().to_string(),
+        )
     }
+}
+
+/// Returns the settings of one FHIRconnect run at `now`: the engine's
+/// `device`, and the composer, language and territory the composition
+/// defaults to when no mapping writes them (`engine/defaults-for-fields.adoc`).
+pub(crate) fn run_settings(
+    device: &str,
+    composer: &str,
+    language: Option<&str>,
+    territory: Option<&str>,
+    now: &str,
+) -> fhirconnect::operations::run::Settings {
+    let mut defaults = Defaults::at(now).with_composer(composer);
+    if let Some(language) = language {
+        defaults = defaults.with_language(language);
+    }
+    if let Some(territory) = territory {
+        defaults = defaults.with_territory(territory);
+    }
+    fhirconnect::operations::run::Settings::new(device, now).with_defaults(defaults)
 }
 
 /// The composer the engine fills in when no mapping does.

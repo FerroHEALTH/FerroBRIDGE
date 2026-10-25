@@ -1745,6 +1745,56 @@ the row, the newest writer that remains rewrites it (our own design; a
 writer committed before the side table kept columns has none, and the row
 stays as it is while only such writers remain).
 
+### 5.6 FHIR to OMOP with no CDR
+
+A site that exposes FHIR and runs no openEHR CDR reaches the CDM through the
+two hops the bridge already holds: FHIRconnect maps a FHIR resource into an
+openEHR composition (section 4.7, `$toopenehr`), and OMOCL maps a composition
+to CDM rows (section 5.2). The decision is to chain them in memory: the
+composition is built, mapped by OMOCL and written through the same
+record-graph writer, and never committed anywhere. No third mapping language
+is introduced, each hop stays governed by its own specification, and openEHR
+is the internal model the operator never runs. No specification governs the
+chaining: our own design.
+
+The coverage that decides what the path delivers is measured over the
+vendored libraries (#407): of the resources the published FHIRconnect library
+maps, Patient (`person_data` into `PERSON`), Condition (`problem_diagnosis`
+into `CONDITION_OCCURRENCE`), Procedure (`ACTION.procedure` into
+`PROCEDURE_OCCURRENCE`), the laboratory DiagnosticReport (the analytes into
+`MEASUREMENT`) and MedicationStatement and MedicationAdministration (into
+`DRUG_EXPOSURE`) reach a CDM table end to end. Encounter reaches none,
+because the two libraries map sibling archetypes
+(`episode_institution_local.v0` against `episode_institution.v0`), and
+MedicationRequest has no FHIRconnect mapping. A site extends the path with
+mappings of its own in either language, never with code.
+
+The shape:
+
+- **A batch job first.** `ferrobridge etl fhir` reads a FHIR R4 Bundle or an
+  NDJSON export, runs each resource through the FHIRconnect program its
+  profile selects, and hands each composition to the OMOCL engine and the
+  writer as the CDR path does, one composition per commit. A facade route is
+  not part of this decision: a client posting to the facade already reaches a
+  CDR.
+- **Identity without a CDR.** A composition built in memory has no versioned
+  object id from a CDR, so the bridge derives one: a name-based UUID
+  (RFC 9562 version 5) of the resource's `type/id`, with a numeric
+  `meta.versionId` as the version and 1 otherwise, under the system id
+  `ferrobridge.fhir`. A re-run of the same input is idempotent and a new
+  numeric version of a resource replaces its rows. The EHR id is the same kind
+  of UUID of the resource's subject reference (`Patient/{id}` for a Patient),
+  so every resource of one patient lands on one person. The lineage back to
+  the resource is #409.
+- **Every element accounted for.** FHIRconnect reports each loss as a typed
+  outcome and OMOCL counts unmapped fields and refusals, so the run report
+  joins the two into one ledger per input resource (#408).
+- **Visits.** With no AQL to read visits from, a run derives no
+  `VISIT_OCCURRENCE` until an Encounter mapping exists in both languages; the
+  rows carry no visit, as a CDR run without `[etl.visits]` does.
+
+The work is filed as sub-issues of #407.
+
 ## 6. Terminology
 
 The FHIR side needs three operations on a FHIR terminology server: `$lookup`
@@ -2718,6 +2768,19 @@ Outside: FHIR Subscriptions (never mentioned), a materialised FHIR store, OMOP
 CDM versions other than 5.4, OMOP to openEHR (OMOCL has no construct for it), and the IHE
 audit and terminology-binding concerns that stay with the CDR (section 12).
 Each is a tracker issue, not silence.
+
+A UN/EDIFACT face for the Dutch healthcare messages of the 3i project
+(`MEDLAB`, `MEDEUR`, `MEDREC`, `MEDSPE`, `MEDVRI`, `MEDVRY`) is not built
+(#493). Nictiz publishes their definitions only as PDF documents with no
+stated licence ("Specificatie berichten 3i-project, Edifact", version 3.BSN of
+February 2014): prose and tables in the EDIFACT syntax with a data dictionary
+of their own (its §1.5 "Niet volledig Edifact" and §2.3.1), no
+machine-readable source to generate a model from, and no published mapping
+to FHIR R4 or openEHR. A face would be a hand-transcribed model and a
+hand-coded mapping per message, which section 10 and the mapping-language
+premise refuse. A site that receives these messages converts them before
+the bridge; the decision is reopened if a machine-readable, licensed
+definition appears.
 
 Recorded as `upstream-report` issues, each with the citation and the
 resolution an upstream would need. The issues are the record and stay in this

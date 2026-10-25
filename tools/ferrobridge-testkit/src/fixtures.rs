@@ -114,6 +114,18 @@ pub const KDS_PERSON_OPT: &str = include_str!("../fixtures/opt/kds-person/KDS_Pe
 /// The template identifier [`KDS_PERSON_OPT`] declares.
 pub const KDS_PERSON_TEMPLATE_ID: &str = "KDS_Person";
 
+/// The published `KDS_Prozedur` operational template, vendored verbatim.
+///
+/// One `COMPOSITION.report.v1` holding `ACTION.procedure.v1` with its
+/// anatomical location and case identification clusters.
+/// `scripts/vendor/kds-prozedur-opt.sh` fetches it at the commit
+/// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside it records its source
+/// and licence.
+pub const KDS_PROZEDUR_OPT: &str = include_str!("../fixtures/opt/kds-prozedur/KDS_Prozedur.opt");
+
+/// The template identifier [`KDS_PROZEDUR_OPT`] declares.
+pub const KDS_PROZEDUR_TEMPLATE_ID: &str = "KDS_Prozedur";
+
 /// The published `KDS_Laborauftrag` operational template, vendored verbatim.
 ///
 /// One `COMPOSITION.request.v1` holding `INSTRUCTION.service_request.v1` with

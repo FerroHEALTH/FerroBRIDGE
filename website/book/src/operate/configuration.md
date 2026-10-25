@@ -364,13 +364,13 @@ tables in place and no foreign key behind.
 
 ### `[etl]`
 
-The OMOP ETL job that `ferrobridge etl run` runs. Both queries are parsed and
+The OMOP ETL jobs `ferrobridge etl run` and `ferrobridge etl fhir` run. Both queries are parsed and
 checked when the configuration loads, so a query the runner cannot read
 refuses every job.
 
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
-| `aql` | none, required | no | The composition query. It aliases `ehr_id`, `version_uid` and the whole `composition`, carries an `ORDER BY` and no `LIMIT`. Every `COMPOSITION` it reads sits below `VERSION v[LATEST_VERSION]` ([The composition query](../integrate/omop-etl.md#the-composition-query)). It may name `$since`, which `--since` binds. It may also alias `versioned_object_uid`, which the runner then checks against the version; when it does not, the runner reads it from the `version_uid`, whose `object_id` part names the versioned object (openEHR RM Common 1.1.0, `OBJECT_VERSION_ID`) |
+| `aql` | none | no | The composition query, which `etl run` needs and `etl fhir` does not read; `etl run` refuses to start without it. It aliases `ehr_id`, `version_uid` and the whole `composition`, carries an `ORDER BY` and no `LIMIT`. Every `COMPOSITION` it reads sits below `VERSION v[LATEST_VERSION]` ([The composition query](../integrate/omop-etl.md#the-composition-query)). It may name `$since`, which `--since` binds. It may also alias `versioned_object_uid`, which the runner then checks against the version; when it does not, the runner reads it from the `version_uid`, whose `object_id` part names the versioned object (openEHR RM Common 1.1.0, `OBJECT_VERSION_ID`) |
 | `page_size` | `100` | no | The `fetch` of each page of either query, and the number of watermarks each batch of the deletion check reads |
 | `deletions` | `remove` | no | What a run does with a composition the CDR reports deleted: `remove` deletes its rows, links and watermark, `report` lists it in the run report and keeps them. Any other value refuses the start ([Deleted compositions](../integrate/omop-etl.md#deleted-compositions)) |
 | `quality_checks` | `false` | no | With `true`, `etl run` runs the ported Data Quality Dashboard checks over the tables it wrote, `PERSON` and the derived tables once the load is done, and the run report carries their verdicts and every failing check id. A failed check never rolls the committed load back. `ferrobridge dq check` runs the same checks over the whole CDM ([Checking a populated database](../integrate/omop-etl.md#checking-a-populated-database-with-the-data-quality-dashboard)) |
