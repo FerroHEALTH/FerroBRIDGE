@@ -1,9 +1,0 @@
-vocabulary_id,vocabulary_name,vocabulary_reference,vocabulary_version,vocabulary_concept_id
-FB-SOURCE,FerroBRIDGE synthetic source vocabulary,https://example.org/ferrobridge/vocabulary/source,synthetic-1,9001
-FB-STANDARD,FerroBRIDGE synthetic standard vocabulary,https://example.org/ferrobridge/vocabulary/standard,synthetic-1,9002
-FB-UNIT,FerroBRIDGE synthetic unit vocabulary,https://example.org/ferrobridge/vocabulary/unit,synthetic-1,9003
-FB-META,FerroBRIDGE synthetic metadata vocabulary,https://example.org/ferrobridge/vocabulary/meta,synthetic-1,9004
-LOINC,FerroBRIDGE synthetic stand-in for LOINC,https://example.org/ferrobridge/vocabulary/loinc,synthetic-1,9005
-UCUM,FerroBRIDGE synthetic stand-in for UCUM,https://example.org/ferrobridge/vocabulary/ucum,synthetic-1,9006
-SNOMED,FerroBRIDGE synthetic stand-in for SNOMED,https://example.org/ferrobridge/vocabulary/snomed,synthetic-1,9007
-FB-GENDER,FerroBRIDGE synthetic gender vocabulary,https://example.org/ferrobridge/vocabulary/gender,synthetic-1,9008

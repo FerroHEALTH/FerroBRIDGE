@@ -147,9 +147,8 @@ environment variables: `FERROBRIDGE__CDR__BASE_URL` for the CDR,
 Three profiles add services:
 
 - `cdm` starts a PostgreSQL CDM database and applies the CDM v5.4 DDL;
-- `vocab` runs `vocab load` over an OHDSI Athena export you downloaded
-  yourself. That job does not load yet: it exits naming
-  [#233](https://github.com/FerroHEALTH/FerroBRIDGE/issues/233);
+- `vocab` runs `vocab load` over an OHDSI Athena download you obtained
+  yourself, replacing each vocabulary table of the CDM schema;
 - `console` runs the operator console beside the bridge.
 
 ```bash

@@ -453,9 +453,8 @@ pub(super) async fn build_cdm(postgres: &Postgres) -> Result<(), Box<dyn Error>>
     )
     .await?;
     database::init(&pool).await?;
-    let mut connection = pool.pool().acquire().await?;
-    ferrobridge_testkit::vocabulary::load(&mut connection).await?;
-    drop(connection);
+    let download = omop_cdm::athena::Export::read(&ferrobridge_testkit::vocabulary::directory())?;
+    omop_cdm::athena::load(&pool, &download).await?;
     pool.pool().close().await;
     let mut writer = CdmWriter::connect(
         postgres.url(),

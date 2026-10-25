@@ -221,9 +221,6 @@ services:
   #
   #   FERROBRIDGE_VOCAB_DIR=/srv/athena/2026-09 \
   #     docker compose --profile vocab run --rm vocab-load
-  #
-  # TODO(#233): `vocab load` exits 2 today naming that issue, so this service is
-  # the shape the job runs in rather than a working load.
   vocab-load:
     image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.12}
     profiles: [vocab]

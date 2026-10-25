@@ -46,7 +46,7 @@ sqlx = { workspace = true, optional = true }
 thiserror.workspace = true
 # The CDM writer's client: binary COPY inside one transaction per composition,
 # on a connection of its own beside the sqlx pool.
-tokio = { workspace = true, optional = true, features = ["rt"] }
+tokio = { workspace = true, optional = true, features = ["rt", "fs", "io-util"] }
 tokio-postgres = { workspace = true, optional = true }
 # The writer's TLS, after the connection URL's `sslmode`.
 rustls = { workspace = true, optional = true }
@@ -59,6 +59,8 @@ csv.workspace = true
 ferrobridge-testkit.workspace = true
 # The era scripts are checked against the digest of the page they follow.
 sha2.workspace = true
+# The loader tests copy the synthetic download into directories of their own.
+tempfile.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time"] }
 tokio-postgres.workspace = true
 

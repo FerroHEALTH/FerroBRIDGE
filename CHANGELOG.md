@@ -23,6 +23,19 @@ crates on crates.io.
 
 ## [Unreleased]
 
+### Added
+
+- `ferrobridge vocab load DIR --schema NAME` loads an OHDSI Athena vocabulary
+  download into the vocabulary tables of the CDM schema (#233). It takes the
+  nine files every download carries and `SOURCE_TO_CONCEPT_MAP.csv` when
+  present, replaces each table in a transaction of its own through `COPY`
+  with the column list from the header row checked against the CDM
+  definitions, names every other file and leaves it alone, and prints the
+  rows per table and the vocabulary version. The format is the one the Athena
+  application writes, read from its source at a pinned commit and vendored
+  under `docs/specs/athena/` by `scripts/vendor/athena.sh` (#88). The Operate
+  pages describe the load and the vocabulary licences you accept.
+
 ## [0.0.12] - 2026-10-25
 
 The FHIRconnect and facade outcomes release. A write through the facade now
