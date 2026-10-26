@@ -24,11 +24,11 @@ spec:
 
 mappings:
   # NOTE: DV_CODED_TEXT.adoc, a FHIR `code` cannot convert to a DV_CODED_TEXT, so
-  # the status maps through `manual` tables, one per ISM_TRANSITION leaf.
+  # the status maps through a `manual` table that writes both ISM_TRANSITION leaves.
   - name: "status"
     with:
       fhir: "$resource"
-      openehr: "$archetype/ism_transition/careflow_step"
+      openehr: "$archetype/ism_transition"
     manual:
       - name: "dispensed"
         fhir:
@@ -40,37 +40,23 @@ mappings:
           operator: "one of"
           criteria: "completed"
         openehr:
-          - path: "defining_code/terminology_id/value"
+          - path: "current_state/defining_code/terminology_id/value"
+            value: "openehr"
+          - path: "current_state/defining_code/code_string"
+            value: "245"
+          - path: "current_state/value"
+            value: "active"
+          - path: "careflow_step/defining_code/terminology_id/value"
             value: "local"
-          - path: "defining_code/code_string"
+          - path: "careflow_step/defining_code/code_string"
             value: "at0003"
-          - path: "value"
+          - path: "careflow_step/value"
             value: "Prescription dispensed"
         openehrCondition:
           targetRoot: "$openehrRoot"
-          targetAttribute: "defining_code/code_string"
+          targetAttribute: "careflow_step/defining_code/code_string"
           operator: "one of"
           criteria: "at0003"
-
-  - name: "state"
-    unidirectional: "fhir->openEHR"
-    with:
-      fhir: "$resource"
-      openehr: "$archetype/ism_transition/current_state"
-    manual:
-      - name: "active"
-        fhirCondition:
-          targetRoot: "$fhirRoot"
-          targetAttribute: "status"
-          operator: "one of"
-          criteria: "completed"
-        openehr:
-          - path: "defining_code/terminology_id/value"
-            value: "openehr"
-          - path: "defining_code/code_string"
-            value: "245"
-          - path: "value"
-            value: "active"
 
   - name: "whenHandedOver"
     with:

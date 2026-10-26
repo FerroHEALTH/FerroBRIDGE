@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: BUSL-1.1
 # FerroBRIDGE's model mapping of the CKM CLUSTER.medication.v2 (revision
 # 2.0.6) to a FHIR R4 Medication. The library's medication.v2.yml targets a
-# BackboneElement and maps `amount` to an element Medication does not have,
-# so this one is FerroBRIDGE's: the name, the form, the batch and its
-# expiry, and the strength of the product as one ingredient.
+# BackboneElement, which defines none of the elements it maps, and maps the
+# strength (concentration) to the package amount (#1235), so this one is
+# FerroBRIDGE's: the name, the form, the batch and its expiry.
 grammar: FHIRConnect/v1.0.0
 type: model
 metadata:

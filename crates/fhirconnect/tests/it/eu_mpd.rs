@@ -451,7 +451,9 @@ fn the_profile_elements_of_the_dispense_survive_the_round_trip() -> Result<(), B
 }
 
 /// The dispense is the ACTION at its careflow step "Prescription dispensed"
-/// in the active state, the step the template records a dispense at.
+/// in the active state, the step the template records a dispense at. One
+/// `manual` entry writes both leaves of the `ism_transition`: its paths reach
+/// two data elements, and each is created (`manual.adoc`).
 #[test]
 fn the_dispense_is_recorded_at_the_dispensed_careflow_step() -> Result<(), Box<dyn Error>> {
     let (program, index) = program(DISPENSE)?;
