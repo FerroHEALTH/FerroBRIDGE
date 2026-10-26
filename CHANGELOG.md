@@ -33,7 +33,7 @@ crates on crates.io.
   dispense is the medication ACTION at its careflow step "Prescription
   dispensed". `scripts/vendor/ckm-medication.sh` vendors the archetypes at
   the CKM mirror commit `docs/VERSIONS.md` pins, and the suites build the
-  operational template at test time. `fhirconnect` 0.1.196 (with `ferrobridge-hl7v2` 0.1.150 and `openehr-mapping-core` 0.1.131) takes
+  operational template at test time. `fhirconnect` 0.1.196 (with `ferrobridge-hl7v2` 0.1.152 and `openehr-mapping-core` 0.1.131) takes
   `openehr-adl` as a test dependency, and the bridge moves to the
   `openehr-*` crates at 0.0.100, whose ADL 2 Web Template builder reads the
   ADL 1.4 term constraints of the CKM sources.
@@ -106,6 +106,16 @@ crates on crates.io.
   element the paths reach is now created, as FHIRconnect's manual mappings
   page says ("Full FHIR or openEHR elements are created from all given
   paths").
+### Security
+
+Shipped with functional changes because: the library crates publish from `main` one patch per change, and `main` already holds the unreleased changes above, so a separate security-only crate patch has no tree to come from.
+
+- The bridge and `ferrobridge-term`'s `smart` feature take
+  `ferrohealth-smart` 0.7.1 in place of 0.7.0: every earlier release can
+  render a configured URL's credentials in full (CWE-532,
+  GHSA-vphj-3f8c-5hpx). `ferrobridge-term` 0.1.137,
+  `ferrobridge-hl7v2` 0.1.152 and `ferrobridge-validator` 0.1.137 carry it, so
+  a product pinning `ferrobridge-term` can take the patched crate.
 
 ## [0.0.13] - 2026-10-25
 
