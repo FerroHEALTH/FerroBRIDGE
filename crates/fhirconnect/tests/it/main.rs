@@ -30,6 +30,7 @@ mod person;
 mod pins;
 mod published;
 mod readiness;
+mod repeated_start;
 mod resolve;
 mod roundtrip;
 mod support;

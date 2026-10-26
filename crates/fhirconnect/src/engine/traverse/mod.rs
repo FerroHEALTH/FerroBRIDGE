@@ -331,6 +331,11 @@ pub fn to_openehr<T: Table + ?Sized>(
 
 /// Runs `program` over a composition, producing a FHIR resource.
 ///
+/// The run maps the first occurrence of the context's start archetype. When
+/// the composition holds it more than once, the further occurrences are
+/// declared as [`crate::engine::outcome::Loss::UnmappedOccurrences`], never
+/// mixed into the resource; [`to_fhir_each`] maps every occurrence on its own.
+///
 /// `seams` carries what the run calls out to: the `mappingCode` registry and
 /// the sink that assigns the id of every resource a `reference` mapping or a
 /// `hierarchy.split` creates. Those resources travel as
@@ -356,11 +361,147 @@ pub fn to_fhir<T: Table + ?Sized>(
     context: &CallContext,
 ) -> Result<Outcome<Value>, EngineError> {
     composition_program(program)?;
-    read_out(program, table, index, composition, seams, context)
+    let instances = root_instances(program, index, composition)?;
+    let first = instances.first().cloned().unwrap_or_default();
+    let mut outcome = read_out(program, table, index, composition, seams, context, &first)?;
+    let further = instances.len().saturating_sub(1);
+    if further > 0 {
+        outcome.warn(Warning::new(
+            crate::engine::outcome::Loss::UnmappedOccurrences {
+                archetype: start_archetype(program),
+                count: further,
+            },
+            Location::default(),
+        ));
+    }
+    Ok(outcome)
+}
+
+/// One occurrence of a context's start archetype, run on its own by
+/// [`to_fhir_each`].
+#[derive(Debug)]
+pub enum Each {
+    /// The occurrence mapped to a resource.
+    Mapped {
+        /// The 1-based instance of each repeating axis down to the start
+        /// archetype.
+        occurrence: Vec<u32>,
+        /// The resource and what its run declared.
+        outcome: Outcome<Value>,
+    },
+    /// The context's `openehrCondition` does not hold at the occurrence.
+    NotApplicable {
+        /// The 1-based instance of each repeating axis down to the start
+        /// archetype.
+        occurrence: Vec<u32>,
+    },
+}
+
+/// Runs `program` once per occurrence of its start archetype in a
+/// composition, producing one resource per occurrence.
+///
+/// Each run reads its own occurrence's subtree alone, the start archetype's
+/// axes pinned to it the way a `hierarchy.split` pins its node
+/// (`types-of-mappings/concept-type/HierarchyMappings.adoc`, §split), and the
+/// context's `openehrCondition` is evaluated at that occurrence, so one
+/// occurrence may map while another is not applicable. FHIRconnect v1.0.0
+/// does not say how a context binds to a start archetype a composition holds
+/// more than once: no specification governs this, our own design. A
+/// composition that holds no occurrence answers an empty list.
+///
+/// # Errors
+///
+/// [`EngineError`] for any element one occurrence cannot map, and the
+/// [`EngineError::Invariant`] of a resource that breaks a constraint; a
+/// condition that does not hold is [`Each::NotApplicable`], never an error.
+pub fn to_fhir_each<T: Table + ?Sized>(
+    program: &Program,
+    table: &T,
+    index: &WebTemplateIndex,
+    composition: &CanonicalComposition,
+    seams: &Seams<'_>,
+    context: &CallContext,
+) -> Result<Vec<Each>, EngineError> {
+    composition_program(program)?;
+    let mut each = Vec::new();
+    for instance in root_instances(program, index, composition)? {
+        let occurrence: Vec<u32> = instance.iter().map(|position| position.get()).collect();
+        match read_out(
+            program,
+            table,
+            index,
+            composition,
+            seams,
+            context,
+            &instance,
+        ) {
+            Ok(outcome) => each.push(Each::Mapped {
+                occurrence,
+                outcome,
+            }),
+            Err(EngineError::NotApplicable { .. }) => {
+                each.push(Each::NotApplicable { occurrence });
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(each)
+}
+
+/// Returns every instance of the program's start archetype the composition
+/// holds, as the positions of its repeating axes, in document order.
+///
+/// A start archetype on no repeating axis has the one instance `[]`.
+fn root_instances(
+    program: &Program,
+    index: &WebTemplateIndex,
+    composition: &CanonicalComposition,
+) -> Result<Vec<Vec<RmPosition>>, EngineError> {
+    let mut found: Vec<Vec<RmPosition>> = vec![Vec::new()];
+    for axis in program.root_axes() {
+        let refuse = |source| EngineError::Template {
+            mapping: String::from(program.context().as_str()),
+            node: String::from(axis.as_str()),
+            source: Box::new(source),
+        };
+        let node = index.node_by_flat_id(axis).map_err(refuse)?;
+        let mut deeper = Vec::new();
+        for prefix in found {
+            let mut instance = 1u32;
+            while instance <= INSTANCE_CEILING {
+                let mut positions = prefix.clone();
+                positions.push(RmPosition::new(instance).map_err(|source| {
+                    EngineError::Position {
+                        mapping: String::from(program.context().as_str()),
+                        source,
+                    }
+                })?);
+                if !index.holds(composition, node, &positions).map_err(refuse)? {
+                    break;
+                }
+                deeper.push(positions);
+                instance = instance.saturating_add(1);
+            }
+        }
+        found = deeper;
+    }
+    Ok(found)
+}
+
+/// Returns the archetype id the context's start model mapping declares.
+fn start_archetype(program: &Program) -> String {
+    program
+        .models()
+        .iter()
+        .find(|model| model.name() == program.start())
+        .and_then(|model| model.archetype())
+        .map(ToString::to_string)
+        .unwrap_or_default()
 }
 
 /// Runs `program` over a canonical document, a composition or a party,
-/// producing a FHIR resource.
+/// producing a FHIR resource, with the start archetype's axes pinned to
+/// `instance` when it names one.
 fn read_out<T: Table + ?Sized>(
     program: &Program,
     table: &T,
@@ -368,6 +509,7 @@ fn read_out<T: Table + ?Sized>(
     document: &dyn CanonicalDocument,
     seams: &Seams<'_>,
     context: &CallContext,
+    instance: &[RmPosition],
 ) -> Result<Outcome<Value>, EngineError> {
     let mut run = Run::new(
         program,
@@ -379,6 +521,12 @@ fn read_out<T: Table + ?Sized>(
         empty_resource(program.resource().as_str()),
         Some(document),
     );
+    run.pins = program
+        .root_axes()
+        .iter()
+        .cloned()
+        .zip(instance.iter().copied())
+        .collect();
     run.admits_context()?;
     run.split_or_run(
         program.mappings(),

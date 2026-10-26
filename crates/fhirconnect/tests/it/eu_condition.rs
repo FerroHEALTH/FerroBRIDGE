@@ -66,7 +66,7 @@ const CONTEXT: &str = "ferrobridge_eu_condition.context";
 const CONDITION_EU_CORE: &str = "http://hl7.eu/fhir/base/StructureDefinition/condition-eu-core";
 
 /// Compiles the context against the published template.
-fn eu_condition_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
+pub(crate) fn eu_condition_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
     let index = kds_template()?;
     let files: Vec<String> = PUBLISHED
         .iter()
@@ -92,7 +92,7 @@ fn eu_condition_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Er
 
 /// A synthetic `Condition` carrying the elements `condition-eu-core`
 /// constrains.
-fn condition() -> serde_json::Value {
+pub(crate) fn condition() -> serde_json::Value {
     serde_json::json!({
         "resourceType": "Condition",
         "meta": {"profile": [CONDITION_EU_CORE]},

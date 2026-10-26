@@ -812,6 +812,16 @@ ours:
   check is added when a mapping can produce its breach; holding output to the
   whole constraint set is the profile validator's job (section 4.9). No
   specification governs where the check runs: our own design.
+- **A start archetype the composition holds more than once maps one
+  occurrence at a time** (#1254). FHIRconnect v1.0.0 does not say how a
+  context binds then; the per-occurrence runs of a `hierarchy.split`
+  (`HierarchyMappings.adoc` §split) are the analogy. `traverse::to_fhir_each`
+  pins the program's root axes to each instance in turn and runs the whole
+  program once per instance, the context's `openehrCondition` evaluated at
+  that instance, so each occurrence is its own resource or not applicable.
+  `traverse::to_fhir` maps the first instance and declares the rest as
+  `Loss::UnmappedOccurrences`, so two entries are never mixed into one
+  resource. No specification governs this: our own design.
 
 ### 4.5 The FHIR path model
 

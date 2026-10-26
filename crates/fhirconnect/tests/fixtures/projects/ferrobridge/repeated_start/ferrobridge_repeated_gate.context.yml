@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored context over the published KDS_Diagnose template,
+# whose start model admits only a diagnosis that carries a comment: the
+# fixture for a context condition evaluated per occurrence of a start
+# archetype the composition holds more than once.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_repeated_gate.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://example.org/fhir/StructureDefinition/ferrobridge-repeated-gate"
+  template:
+    id: "KDS_Diagnose"
+  archetypes:
+    - "ferrobridge_repeated_gate"
+  start: "ferrobridge_repeated_gate"

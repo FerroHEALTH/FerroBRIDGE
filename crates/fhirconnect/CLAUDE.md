@@ -327,6 +327,15 @@ instance, and going into openEHR with the FHIR `with` element pinned too. A
 pinned axis counts as bound, so every mapping under the node writes into the
 group's element and every mapping outside it runs as it would unsplit.
 
+A composition may hold the context's start archetype more than once (#1254),
+and FHIRconnect v1.0.0 is silent on how a context binds then: our own design.
+`traverse::to_fhir_each` pins the root axes to each instance in turn and runs
+the whole program once per instance, the context's `openehrCondition`
+evaluated at that instance, so each occurrence is its own resource
+(`Each::Mapped`) or not applicable (`Each::NotApplicable`). `traverse::to_fhir`
+maps the first instance and declares the rest as
+`Loss::UnmappedOccurrences`, never mixing them.
+
 ## Tests
 
 The corpus under `docs/specs/fhirconnect-mapping-lib/` is evidence of what real
