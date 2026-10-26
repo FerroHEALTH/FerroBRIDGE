@@ -1,0 +1,106 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM ACTION.medication.v1 (revision
+# 1.6.0) to a FHIR R4 MedicationDispense, the action recorded at its careflow
+# step at0003 "Prescription dispensed" in the active state (openehr 245).
+# The library's medication.v1.yml targets MedicationAdministration and walks
+# `data` and `events`, which an ACTION does not have, so this one is
+# FerroBRIDGE's. A dispense is `completed` once the step is recorded, and the
+# only status this mapping carries (no specification governs the pairing:
+# our own design).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ACTION.medication.v1
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-ACTION.medication.v1
+    revision: 1.6.0
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/MedicationDispense
+
+mappings:
+  # NOTE: DV_CODED_TEXT.adoc, a FHIR `code` cannot convert to a DV_CODED_TEXT, so
+  # the status maps through `manual` tables, one per ISM_TRANSITION leaf.
+  - name: "status"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/ism_transition/careflow_step"
+    manual:
+      - name: "dispensed"
+        fhir:
+          - path: "status"
+            value: "completed"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "completed"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at0003"
+          - path: "value"
+            value: "Prescription dispensed"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at0003"
+
+  - name: "state"
+    unidirectional: "fhir->openEHR"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/ism_transition/current_state"
+    manual:
+      - name: "active"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "completed"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "openehr"
+          - path: "defining_code/code_string"
+            value: "245"
+          - path: "value"
+            value: "active"
+
+  - name: "whenHandedOver"
+    with:
+      fhir: "$resource.whenHandedOver"
+      openehr: "$archetype/time"
+
+  - name: "medication"
+    with:
+      fhir: "$resource.medication.as(Reference)"
+      openehr: "$reference"
+    reference:
+      resourceType: "Medication"
+      mappings:
+        - name: "medicationDetails"
+          with:
+            fhir: "$fhirRoot"
+            openehr: "$archetype/description[at0017]/items[openEHR-EHR-CLUSTER.medication.v2]"
+          slotArchetype: "CLUSTER.medication.v2"
+
+  - name: "quantity"
+    with:
+      fhir: "$resource.quantity"
+      openehr: "$archetype/description[at0017]/items[openEHR-EHR-CLUSTER.medication.v2]/items[at0139]"
+
+  - name: "note"
+    with:
+      fhir: "$resource.note.text"
+      openehr: "$archetype/description[at0017]/items[at0024]"
+
+  - name: "performer"
+    with:
+      fhir: "$resource.performer.actor"
+      openehr: "$composition/composer"

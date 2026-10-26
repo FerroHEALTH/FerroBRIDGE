@@ -1146,7 +1146,20 @@ the composition's `other_context` bound to the R4 `diagnostic-report-status`
 value set, which a `manual` table carries, because a FHIR `code` cannot
 convert to a DV_CODED_TEXT. The profile's required
 `DiagnosticReportCompositionR5` extension references a `Composition-eu-lab`,
-which the document context of the next step writes.
+which the document context of the next step writes. Medication Prescription
+and Dispense 1.0.0 follows over FerroBRIDGE's own medication template
+(`tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_medication.adlt`), an
+encounter COMPOSITION holding one `INSTRUCTION.medication_order.v3` and one
+`ACTION.medication.v1`, whose template overlays fill the medication,
+therapeutic direction, dosage and daily timing slots with the published CKM
+archetypes (`scripts/vendor/ckm-medication.sh` vendors the seven at one CKM
+mirror commit). The suites build its ADL 2 operational template at test time,
+and a node under an overlay carries the published archetype's id. The
+prescription context maps the order to a `MedicationRequest-eu-mpd`, the
+dispense context maps the ACTION at its careflow step at0003 "Prescription
+dispensed" to a `MedicationDispense-eu-mpd`, each references a
+`Medication-eu-mpd` built from the medication details, and the dosage is a
+`Dosage-eu-mpd`; the round trips assert each profile's elements.
 
 **Decision:** profile mappings are authored in this repository, in the
 specification's own customisation mechanism (a context and its extensions per
@@ -1160,7 +1173,10 @@ matrix the CDR publishes per category (committed template, target profile,
 transform proven) is reproduced here from the same generated source. Two
 categories (dispensations, discharge reports) have no template in the openEHR
 international CKM, which publishes no EHDS template today; that is a corpus
-gap recorded as such, never filled with a hand-authored template. No openEHR
+gap recorded as such. The one exception is the medication template above
+(owner ruling on #116): FerroBRIDGE authors a template over published CKM
+archetypes only, never a new archetype, so the archetypes stay the community
+models, and the readiness matrix names the template as FerroBRIDGE's. No openEHR
 Foundation position on the exchange format was found, and no HL7 Europe guide
 or Xt-EHR deliverable references openEHR; the library's laboratory OPT is the
 one concrete openEHR-to-EEHRxF artefact.
@@ -2833,6 +2849,7 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | `alternatives` | ordered first-match | the only reading the library is consistent with | all-match; merge |
 | Incremental mode | a change-feed adapter over a configured stream, after the batch round trip, running the same per-composition commit | ITS-REST defines no feed; the reference CDR's outbox is the reference source | polling AQL by time; a bespoke feed |
 | Local codes | rubrics and bindings from the Web Template and OPT; only external systems go to the terminology server | the bridge holds the OPT; no specification defines a canonical for archetype-local terminology | `$lookup` for every code |
+| MPD template | FerroBRIDGE's ADL 2 template over seven published CKM archetypes, at-coded, its overlays filling the nested slots, built into an OPT2 at test time; the dispense is `ACTION.medication.v1` at the careflow step "Prescription dispensed" in the same template | the CKM publishes no prescription or dispense template; an overlay is a template-local specialisation (ADL2 and AOM2 §Templates), so the data keeps the published archetype ids; no specification governs authoring a template for a profile target: our own design (owner ruling on #116) | a hand-authored archetype; the KDS medication templates, which target the German profiles |
 | Profile targets | HL7 Europe Base and Core, Laboratory, MPD in that order; EPS planned, imaging and discharge deferred; authored here, never a conformance claim | R4 lines exist for every category; Laboratory has a published model map and an openEHR artefact; the legal pin does not exist (section 4.8) | waiting for the implementing act; pinning ballots |
 | FHIRPath release | the evaluator is FHIRPath N1 2.0.0 by default, so a function only a later release defines is an undefined-function error; the 13 functions FHIRPath 3.0.0 adds as STU that HL7's R4 suite exercises (`lowBoundary`, `highBoundary`, `precision`, `sort`, `matchesFull`, `comparable`, `trim`, `split`, `join`, `encode`, `decode`, `escape`, `unescape`) sit behind the opt-in `Environment::with_fhirpath_stu3_functions`; the suite's tests that call one of them are the `fhirpath-r4-stu3` corpus, with its own pass list and badge, and every other test is the `fhirpath-r4` corpus (#633) | FHIR R4 fhirpath.html §2.9 cites "FHIRPath (release 2)", N1 (<http://hl7.org/fhirpath/N1/>); each of the 13 is a section FHIRPath 3.0.0 marks Standard for Trial Use (<http://hl7.org/fhirpath/STU3/>); the opt-in widens only its own path, so the default pin is unchanged | widening the default to 3.0.0; leaving the 104 tests failing as undefined; reporting them out of scope |
 | Profile validation | `ferrobridge-validator` in this repository; profiles read at run time from FHIR packages into the generated R4 model; FHIRPath through `ferrobridge-fhirpath`; every unevaluated constraint named (section 4.9) | owner direction 2026-10-15; the model, element table, terminology client and FHIRPath evaluator live here; a profile set is per-deployment data | a validator per consumer; profiles generated into Rust; the HL7 FHIR Validator as a runtime dependency |

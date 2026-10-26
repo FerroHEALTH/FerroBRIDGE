@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the HL7 Europe MPD 1.0.0
+# MedicationDispense-eu-mpd profile over FerroBRIDGE's medication template:
+# the ACTION.medication.v1 recorded at the careflow step "Prescription
+# dispensed". The dispensed product becomes a Medication-eu-mpd the dispense
+# references.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_eu_mpd_dispense.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/mpd/StructureDefinition/MedicationDispense-eu-mpd"
+    version: "1.0.0"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_medication.v1.0.0"
+  archetypes:
+    - "ACTION.medication.v1"
+    - "CLUSTER.medication.v2"
+  extensions:
+    - "ferrobridge_eu_mpd_dispense"
+    - "ferrobridge_eu_mpd_medication"
+  start: "ACTION.medication.v1"

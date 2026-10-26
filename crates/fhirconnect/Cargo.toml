@@ -4,7 +4,7 @@
 name = "fhirconnect"
 description = "The FHIRconnect mapping language for Rust: the mapping file model and its validation, context resolution into an immutable program, and the bidirectional interpreter between openEHR compositions and FHIR resources"
 # On the crate line, the fhir-types line, since its first publish (docs/VERSIONS.md).
-version = "0.1.195"
+version = "0.1.196"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -55,6 +55,9 @@ thiserror.workspace = true
 [dev-dependencies]
 ferrobridge-testkit.workspace = true
 insta.workspace = true
+# Test-only: the HL7 Europe MPD round trip builds its ADL 2 operational
+# template from the vendored CKM archetypes and FerroBRIDGE's template.
+openehr-adl.workspace = true
 proptest.workspace = true
 tempfile.workspace = true
 

@@ -24,6 +24,7 @@ tools/ferrobridge-testkit/fixtures/opt/kds-medikamentenverabreichungen/** lingui
 tools/ferrobridge-testkit/fixtures/opt/kds-person-pseudonymisiert/** linguist-vendored -text
 tools/ferrobridge-testkit/fixtures/opt/kds-prozedur/** linguist-vendored -text
 tools/ferrobridge-testkit/fixtures/opt/kds-studienteilnahme/** linguist-vendored -text
+tools/ferrobridge-testkit/fixtures/ckm/medication/** linguist-vendored -text
 tools/ferrobridge-testkit/fixtures/opt/kds-todesursache/** linguist-vendored -text
 tools/ferrobridge-testkit/fixtures/opt/kds-vitalstatus/** linguist-vendored -text
 crates/ferrobridge-hl7v2/vendor/** linguist-vendored -text
