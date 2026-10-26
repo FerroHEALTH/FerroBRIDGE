@@ -12,6 +12,7 @@ use ferrobridge_operator_api::operator::LoadReport;
 use http::{HeaderValue, StatusCode};
 
 use crate::bridge::{AccessToken, Bridge, BridgeError, JSON, YAML};
+use crate::model::Answered;
 
 /// The header a save names its reason in.
 pub const REASON: &str = "ferrobridge-reason";
@@ -26,19 +27,6 @@ pub enum Precondition {
     Match(String),
     /// The file does not exist yet.
     Absent,
-}
-
-/// What the bridge answered a check, a save or a reload with: the status,
-/// the report of the set, and after a save the new file's digest.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Answered {
-    /// `200` for a set that compiled, `422` for one that did not.
-    pub status: StatusCode,
-    /// The report of the set: whether it compiled, its counts and every
-    /// diagnostic.
-    pub report: LoadReport,
-    /// The digest the new file's `ETag` names, after a save.
-    pub etag: Option<String>,
 }
 
 impl Bridge {

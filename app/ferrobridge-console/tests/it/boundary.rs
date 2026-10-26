@@ -1,12 +1,11 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The console's crate boundary, read from the graph Cargo resolves: the
-//! server half links `openehr-mapping-core`, `fhir-types` and
-//! `ferrobridge-operator-api` of the
-//! workspace's own crates and no other, and the browser half links none
-//! (docs/architecture.md section 4.10), so the console never compiles or
-//! runs a mapping itself.
+//! The console's crate boundary, read from the graph Cargo resolves: each
+//! half links `openehr-mapping-core`, `fhir-types` and
+//! `ferrobridge-operator-api` of the workspace's own crates and no other,
+//! so both halves draw the bridge's documents from one definition and the
+//! console never compiles or runs a mapping itself.
 //!
 //! The walk follows normal and build edges from the console through the
 //! whole resolved graph, so a workspace crate reached through a third-party
@@ -22,8 +21,8 @@ use serde_json::{Value, json};
 /// The console's package name.
 const CONSOLE: &str = "ferrobridge-console";
 
-/// The workspace crates the server half may link.
-const SERVER_ALLOWED: [&str; 3] = [
+/// The workspace crates either half may link.
+const ALLOWED: [&str; 3] = [
     "openehr-mapping-core",
     "fhir-types",
     "ferrobridge-operator-api",
@@ -162,7 +161,7 @@ fn the_server_half_links_only_the_three_allowed_workspace_crates() {
     let (workspace, _) = closure(&metadata, CONSOLE);
     assert_eq!(
         BTreeSet::new(),
-        outside(&workspace, &SERVER_ALLOWED),
+        outside(&workspace, &ALLOWED),
         "the console links a workspace crate the boundary does not allow"
     );
     assert!(
@@ -172,33 +171,32 @@ fn the_server_half_links_only_the_three_allowed_workspace_crates() {
 }
 
 #[test]
-fn an_injected_browser_dependency_on_the_operator_contract_is_refused() {
-    let mut metadata = metadata(Some(BROWSER));
-    inject(
-        &mut metadata,
-        CONSOLE,
-        "ferrobridge-operator-api",
-        &Value::Null,
-    );
-    let (workspace, _) = closure(&metadata, CONSOLE);
-    assert!(
-        workspace.contains("ferrobridge-operator-api"),
-        "the contract is the server half's alone: {workspace:?}"
-    );
-}
-
-#[test]
-fn the_browser_half_links_no_workspace_crate() {
+fn the_browser_half_links_only_the_three_allowed_workspace_crates() {
     let metadata = metadata(Some(BROWSER));
     let (workspace, other) = closure(&metadata, CONSOLE);
     assert_eq!(
         BTreeSet::new(),
-        workspace,
-        "the browser half links a workspace crate"
+        outside(&workspace, &ALLOWED),
+        "the browser half links a workspace crate the boundary does not allow"
+    );
+    assert!(
+        workspace.contains("ferrobridge-operator-api") && workspace.contains("fhir-types"),
+        "the walk reaches the browser half's own dependencies: {workspace:?}"
     );
     assert!(
         other.contains("leptos") && other.contains("wasm-bindgen"),
         "the walk reaches the browser half's own dependencies: {other:?}"
+    );
+}
+
+#[test]
+fn an_injected_browser_dependency_on_another_workspace_crate_is_refused() {
+    let mut metadata = metadata(Some(BROWSER));
+    inject(&mut metadata, CONSOLE, "fhirconnect", &Value::Null);
+    let (workspace, _) = closure(&metadata, CONSOLE);
+    assert!(
+        outside(&workspace, &ALLOWED).contains("fhirconnect"),
+        "the browser check names the injected crate: {workspace:?}"
     );
 }
 
@@ -208,7 +206,7 @@ fn an_injected_direct_dependency_on_another_workspace_crate_is_refused() {
     inject(&mut metadata, CONSOLE, "fhirconnect", &Value::Null);
     let (workspace, _) = closure(&metadata, CONSOLE);
     assert!(
-        outside(&workspace, &SERVER_ALLOWED).contains("fhirconnect"),
+        outside(&workspace, &ALLOWED).contains("fhirconnect"),
         "the check names the injected crate: {workspace:?}"
     );
 }
@@ -224,19 +222,24 @@ fn an_injected_dependency_reached_through_an_allowed_crate_is_refused() {
     );
     let (workspace, _) = closure(&metadata, CONSOLE);
     assert!(
-        outside(&workspace, &SERVER_ALLOWED).contains("ferrobridge-term"),
+        outside(&workspace, &ALLOWED).contains("ferrobridge-term"),
         "the check follows the graph past an allowed crate: {workspace:?}"
     );
 }
 
 #[test]
-fn an_injected_browser_dependency_is_refused() {
+fn an_injected_browser_dependency_reached_through_an_allowed_crate_is_refused() {
     let mut metadata = metadata(Some(BROWSER));
-    inject(&mut metadata, CONSOLE, "fhir-types", &Value::Null);
+    inject(
+        &mut metadata,
+        "ferrobridge-operator-api",
+        "ferrobridge-term",
+        &Value::Null,
+    );
     let (workspace, _) = closure(&metadata, CONSOLE);
     assert!(
-        workspace.contains("fhir-types"),
-        "the browser check names the injected crate: {workspace:?}"
+        outside(&workspace, &ALLOWED).contains("ferrobridge-term"),
+        "the browser check follows the graph past an allowed crate: {workspace:?}"
     );
 }
 

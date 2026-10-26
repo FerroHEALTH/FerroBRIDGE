@@ -71,10 +71,12 @@ pub fn console_lockup() -> AnyView {
 #[must_use]
 pub fn shell(content: AnyView) -> AnyView {
     let path = use_location().pathname.get_untracked();
+    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
+    let state = Resource::new(crate::load::changes, |_| crate::load::state_now());
     let bar = view! {
         <Suspense>
             {move || Suspend::new(async move {
-                let info = crate::load::info().await;
+                let info = info.await;
                 top_bar(&info)
             })}
         </Suspense>
@@ -87,7 +89,7 @@ pub fn shell(content: AnyView) -> AnyView {
                 move || {
                     let path = path.clone();
                     Suspend::new(async move {
-                        let state = crate::load::state().await;
+                        let state = state.await;
                         navigation(&path, &state)
                     })
                 }
@@ -115,8 +117,10 @@ fn top_bar(info: &Loaded<ferrobridge_operator_api::health::Info>) -> AnyView {
     } else {
         String::new()
     };
-    let chosen = crate::prefs::requested().preferences;
-    let operator = crate::session::request::operator().unwrap_or_else(crate::app::unnamed_operator);
+    let chosen = crate::visit::visit().chosen().preferences;
+    let operator = crate::visit::visit()
+        .operator
+        .unwrap_or_else(crate::app::unnamed_operator);
     let menu = user_menu(UserMenu {
         id: MENU_ID,
         label: operator.clone(),
@@ -126,7 +130,7 @@ fn top_bar(info: &Loaded<ferrobridge_operator_api::health::Info>) -> AnyView {
         preferences: String::from(PREFERENCES),
         theme: ThemeChoice {
             current: chosen.theme,
-            action: String::from(crate::prefs::PREFERENCE),
+            action: String::from(crate::app::PREFERENCE),
             back: path.clone(),
         },
         choices: Vec::new(),
@@ -213,7 +217,7 @@ pub fn error_count(state: &Loaded<EngineState>) -> Count {
 
 /// The navigation, the page at `path` marked, with the running load's count.
 fn navigation(path: &str, state: &Loaded<EngineState>) -> AnyView {
-    let rail = crate::prefs::requested().rail;
+    let rail = crate::visit::visit().chosen().rail;
     let entry = |href: &'static str, label: Msg, glyph: Glyph, exact: bool| Entry {
         href: Cow::Borrowed(href),
         label: Cow::Owned(tr(label)),
@@ -268,7 +272,7 @@ fn navigation(path: &str, state: &Loaded<EngineState>) -> AnyView {
         current: path.to_owned(),
         rail: Some(Rail {
             collapsed: rail,
-            action: String::from(crate::prefs::SIDEBAR),
+            action: String::from(crate::app::SIDEBAR),
             back: path.to_owned(),
         }),
         nest: None,

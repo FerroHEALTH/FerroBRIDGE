@@ -10,7 +10,9 @@
 //! the search page ([`SEARCH`]), which lists every hit in the page; with no
 //! WebAssembly the form submits there as a plain `GET`.
 
+#[cfg(not(target_arch = "wasm32"))]
 use axum::extract::{Extension, Query};
+#[cfg(not(target_arch = "wasm32"))]
 use axum::response::{IntoResponse, Response};
 use ferrobridge_operator_api::operator::EngineState;
 use ferrohealth_ui::icon::Glyph;
@@ -19,6 +21,7 @@ use ferrohealth_ui::view::search::{
     Hit, HitGroup, Mark, SearchAnswer, SearchBox, Way, find_results,
 };
 use ferrohealth_ui::view::surface::{Header, page_heading};
+#[cfg(not(target_arch = "wasm32"))]
 use http::StatusCode;
 use leptos::prelude::*;
 use leptos_router::hooks::use_query_map;
@@ -160,6 +163,7 @@ pub fn answer(words: &str, state: &EngineState) -> SearchAnswer {
 }
 
 /// What the panel under the field asks: the words typed.
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, serde::Deserialize)]
 pub struct Asked {
     /// The words typed.
@@ -170,6 +174,7 @@ pub struct Asked {
 /// Serves [`ANSWER`]: the answer over the running load for the words typed,
 /// as JSON; `401` without a live session and `502` when the bridge does not
 /// answer, which the panel shows as a row.
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn answer_route(
     Extension(state): Extension<crate::server::ConsoleState>,
     headers: http::HeaderMap,
@@ -201,13 +206,14 @@ pub fn page() -> impl IntoView {
     let words = use_query_map()
         .with_untracked(|query| query.get("q"))
         .unwrap_or_default();
+    let state = Resource::new(crate::load::changes, |_| crate::load::state_now());
     view! {
         {page_title(tr(Msg::SearchTitle))}
         <Suspense>
             {move || {
                 let words = words.clone();
                 Suspend::new(async move {
-                    let state = crate::load::state().await;
+                    let state = state.await;
                     drawn(words.trim(), &state)
                 })
             }}

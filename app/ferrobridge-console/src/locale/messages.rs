@@ -9,7 +9,7 @@
 macro_rules! messages {
     ($($(#[$meta:meta])+ $name:ident = $id:literal,)+) => {
         /// A string the console draws, by its message in the catalog.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
         pub enum Msg {
             $($(#[$meta])+ $name,)+
         }

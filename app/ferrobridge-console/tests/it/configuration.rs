@@ -12,7 +12,7 @@ use http::StatusCode;
 use wiremock::MockServer;
 
 use crate::stub::{answer, bridge, info, readiness, signed_in};
-use crate::support::{get_with, send};
+use crate::support::{drawn, get_with, send};
 
 #[tokio::test]
 async fn the_configuration_page_draws_each_tab_read_only_with_its_keys()
@@ -99,7 +99,7 @@ async fn a_connection_draws_its_credentials_by_reference() -> Result<(), Box<dyn
     let bridge = bridge().await;
     let (service, cookie) = signed_in(&bridge).await?;
     let (_response, cdr) = send(&service, get_with("/connections/cdr/settings", &cookie)?).await?;
-    let cdr = cdr.replace("<!>", "");
+    let cdr = drawn(&cdr);
     assert!(cdr.contains("cdr.credentials.oauth.client_secret"), "{cdr}");
     assert!(cdr.contains("/run/secrets/cdr.secret"), "{cdr}");
     assert!(
@@ -111,11 +111,11 @@ async fn a_connection_draws_its_credentials_by_reference() -> Result<(), Box<dyn
         get_with("/connections/terminology/settings", &cookie)?,
     )
     .await?;
-    let term = term.replace("<!>", "");
+    let term = drawn(&term);
     assert!(term.contains("terminology.credentials.password"), "{term}");
     assert!(term.contains("fui-secret-now"), "{term}");
     let (_response, cdm) = send(&service, get_with("/connections/cdm/settings", &cookie)?).await?;
-    let cdm = cdm.replace("<!>", "");
+    let cdm = drawn(&cdm);
     assert!(cdm.contains("/run/secrets/cdm-url"), "{cdm}");
     Ok(())
 }

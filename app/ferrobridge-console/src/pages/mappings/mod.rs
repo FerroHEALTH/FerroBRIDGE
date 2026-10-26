@@ -28,6 +28,7 @@ use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu, row_menu};
 use leptos::prelude::*;
 use leptos_router::hooks::{use_params_map, use_query_map};
 
+use crate::actions::{ReloadSet, Reloaded};
 use crate::app::{MAPPINGS, NEW_FILE, PLAYGROUND, TEMPLATES, page_title};
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
@@ -37,7 +38,6 @@ use crate::pages::parts::{
     by_file, diagnostics_state, edit_href, faulted, file_href, owner_tag, quiet, refused_operator,
     short, tally, wire_path,
 };
-use crate::posts::Reloaded;
 
 mod files;
 
@@ -78,18 +78,26 @@ pub fn page() -> impl IntoView {
         return crate::pages::errors::not_found().into_any();
     }
     let query = use_query_map().get_untracked();
-    let reloaded = use_context::<Reloaded>();
+    let posted = (*SharedValue::new(use_context::<Reloaded>)).clone();
+    let reload = ServerAction::<ReloadSet>::new();
+    crate::load::follow(reload);
+    let state = Resource::new(crate::load::changes, |_| crate::load::state_now());
+    let listing = Resource::new(crate::load::changes, |_| crate::load::listing_now());
     view! {
         {page_title(tr(Msg::MappingSet))}
         <Suspense>
             {move || {
                 let tab = tab.clone();
                 let query = query.clone();
-                let reloaded = reloaded.clone();
+                let reloaded = reload
+                    .value()
+                    .get()
+                    .map(|answer| answer.unwrap_or_else(|fault| Reloaded(Err(fault))))
+                    .or_else(|| posted.clone());
                 Suspend::new(async move {
-                    let state = crate::load::state().await;
-                    let listing = crate::load::listing().await;
-                    drawn(&tab, &query, reloaded.as_ref(), &state, &listing)
+                    let state = state.await;
+                    let listing = listing.await;
+                    drawn(&tab, &query, reloaded.as_ref(), &state, &listing, reload)
                 })
             }}
         </Suspense>
@@ -97,8 +105,9 @@ pub fn page() -> impl IntoView {
     .into_any()
 }
 
-/// The title row: New file and More with Reload the set….
-fn heading() -> AnyView {
+/// The title row: New file and More with Reload the set…, which posts
+/// through `reload` once the page has hydrated.
+fn heading(reload: ServerAction<ReloadSet>) -> AnyView {
     let more = Menu::new(
         "set-more",
         tr(Msg::SetMoreLabel),
@@ -124,7 +133,15 @@ fn heading() -> AnyView {
             message: tr(Msg::ReloadDialogBody).into(),
         },
         view! {
-            <form method="post" action=RELOAD class="fui-action-form">
+            <form
+                method="post"
+                action=RELOAD
+                class="fui-action-form"
+                on:submit=move |event| {
+                    event.prevent_default();
+                    reload.dispatch(ReloadSet {});
+                }
+            >
                 <button type="submit" class=Variant::Primary.class()>
                     {ferrohealth_ui::icon::icon(Glyph::REFRESH_CW, "16")}
                     {tr(Msg::ReloadSet)}
@@ -215,14 +232,15 @@ fn drawn(
     reloaded: Option<&Reloaded>,
     state: &Loaded<EngineState>,
     listing: &Loaded<Vec<Listed>>,
+    reload: ServerAction<ReloadSet>,
 ) -> AnyView {
     let (state, listing) = match (state, listing) {
         (Ok(Outcome::Shown(state)), Ok(Outcome::Shown(listing))) => (state, listing),
         (Err(fault), _) | (_, Err(fault)) => {
-            return view! { {heading()} {faulted(fault, &tab_href(tab))} }.into_any();
+            return view! { {heading(reload)} {faulted(fault, &tab_href(tab))} }.into_any();
         }
         (Ok(Outcome::Refused(refusal)), _) | (_, Ok(Outcome::Refused(refusal))) => {
-            return view! { {heading()} {refused_operator(refusal)} }.into_any();
+            return view! { {heading(reload)} {refused_operator(refusal)} }.into_any();
         }
     };
     let (report, reload_findings) = match reloaded {
@@ -235,7 +253,7 @@ fn drawn(
             Some((tr(Msg::WriteFirstFile), String::from(NEW_FILE))),
         );
         return view! {
-            {heading()}
+            {heading(reload)}
             <div class="fui-list-page">{report} {empty}</div>
         }
         .into_any();
@@ -261,7 +279,7 @@ fn drawn(
         None => tab_card(tab, query, state, listing),
     };
     view! {
-        {heading()}
+        {heading(reload)}
         <div class="fui-list-page">{report} {card}</div>
     }
     .into_any()

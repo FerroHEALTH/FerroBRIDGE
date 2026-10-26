@@ -30,7 +30,7 @@ use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 
 use crate::app::{FACADE, MAPPINGS, PLAYGROUND, page_title};
-use crate::load::{Capability, Ready};
+use crate::load::Capability;
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::model::{Loaded, Outcome};
@@ -68,25 +68,31 @@ pub fn page() -> impl IntoView {
     if !TABS.iter().any(|(key, _)| *key == tab) {
         return crate::pages::errors::not_found().into_any();
     }
+    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
+    let readiness = Resource::new(crate::load::changes, |_| crate::load::readiness_now());
+    let capability = Resource::new(crate::load::changes, |_| crate::load::capability_now());
+    let state = Resource::new(crate::load::changes, |_| crate::load::state_now());
+    let smart = (tab == "security")
+        .then(|| Resource::new(crate::load::changes, |_| crate::load::smart_now()));
+    let configuration = (tab == "settings")
+        .then(|| Resource::new(crate::load::changes, |_| crate::load::configuration_now()));
     view! {
         {page_title(tr(Msg::FhirFacade))}
         <Suspense>
             {move || {
                 let tab = tab.clone();
                 Suspend::new(async move {
-                    let info = crate::load::info().await;
-                    let readiness = crate::load::readiness().await;
-                    let capability = crate::load::capability().await;
-                    let state = crate::load::state().await;
-                    let smart = if tab == "security" {
-                        Some(crate::load::smart().await)
-                    } else {
-                        None
+                    let info = info.await;
+                    let readiness = readiness.await;
+                    let capability = crate::load::capability(capability.await);
+                    let state = state.await;
+                    let smart = match smart {
+                        Some(smart) => Some(smart.await),
+                        None => None,
                     };
-                    let configuration = if tab == "settings" {
-                        Some(crate::load::configuration().await)
-                    } else {
-                        None
+                    let configuration = match configuration {
+                        Some(configuration) => Some(configuration.await),
+                        None => None,
                     };
                     let reads = Reads {
                         info: &info,
@@ -117,7 +123,7 @@ struct Reads<'a> {
     /// The lanes and pins.
     info: &'a Loaded<Info>,
     /// The readiness of every indicator.
-    readiness: &'a Loaded<Ready>,
+    readiness: &'a Loaded<Readiness>,
     /// The `CapabilityStatement`.
     capability: &'a Loaded<Capability>,
     /// The running load.
@@ -257,12 +263,13 @@ fn type_of(resource: &CapabilityStatementRestResource) -> String {
 /// identity store.
 fn overview(
     info: &Info,
-    readiness: &Loaded<Ready>,
+    readiness: &Loaded<Readiness>,
     statement: Option<&CapabilityStatement>,
     state: &Loaded<EngineState>,
 ) -> AnyView {
-    let base = crate::session::request::signed_in()
-        .map(|(console, _token)| format!("{}fhir", console.settings().bridge.base))
+    let base = crate::visit::visit()
+        .settings
+        .map(|settings| format!("{}fhir", settings.bridge))
         .unwrap_or_default();
     let types = statement.map_or(0, |statement| resources(statement).len());
     let contexts = match state {
@@ -344,9 +351,9 @@ fn state_on() -> AnyView {
 }
 
 /// The identity store's facts from the readiness of `readiness`.
-fn identity(readiness: &Loaded<Ready>) -> AnyView {
+fn identity(readiness: &Loaded<Readiness>) -> AnyView {
     let value = match readiness {
-        Ok(Outcome::Shown((_, readiness))) => indicator(readiness, "identity-store"),
+        Ok(Outcome::Shown(readiness)) => indicator(readiness, "identity-store"),
         Ok(Outcome::Refused(_)) | Err(_) => String::from("–").into_any(),
     };
     definitions(vec![(tr(Msg::IndicatorIdentityStore), value)]).into_any()

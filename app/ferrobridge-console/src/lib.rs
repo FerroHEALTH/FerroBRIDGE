@@ -27,11 +27,21 @@
 //! `wasm32-unknown-unknown`; the target, never a Cargo feature, chooses
 //! between them.
 #![doc(test(attr(deny(warnings))))]
+// NOTE: the Rust reference, "Limits": the server's render of the library's
+// sign-in card nests deeper than the default query depth of 128.
+#![recursion_limit = "256"]
 
-pub mod islands;
-
-#[cfg(not(target_arch = "wasm32"))]
+pub mod actions;
 pub mod app;
+pub mod islands;
+pub mod load;
+pub mod locale;
+pub mod model;
+pub mod pages;
+pub mod routes;
+pub mod shell;
+pub mod visit;
+
 #[cfg(not(target_arch = "wasm32"))]
 pub mod bridge;
 #[cfg(not(target_arch = "wasm32"))]
@@ -43,15 +53,7 @@ pub mod config;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod healthcheck;
 #[cfg(not(target_arch = "wasm32"))]
-pub mod load;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod locale;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod model;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod oidc;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod pages;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod posts;
 #[cfg(not(target_arch = "wasm32"))]
@@ -60,15 +62,12 @@ pub mod prefs;
 pub mod server;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod session;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod shell;
 
-/// Hydrates the islands of the page the server drew: the console's own and
-/// the library's. Each island takes the words it draws as props, so the
-/// browser builds no locale.
+/// Hydrates the page the server drew, whole, its lazy routes loading their
+/// code from their own chunks.
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {
     console_error_panic_hook::set_once();
-    leptos::mount::hydrate_islands();
+    leptos::mount::hydrate_lazy(app::App);
 }

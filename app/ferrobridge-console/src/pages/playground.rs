@@ -8,10 +8,12 @@
 //! openEHR (`$toopenehr`) and Validate a resource (`$validate`). Each tab is
 //! one `POST` form: the options row with Run at its end, then the transform
 //! pair (B5), the input beside the answer. The answer is drawn in the page
-//! the post returns and nowhere else: no URL, no history, no store holds it
-//! (FerroBRIDGE's console rule, §0).
+//! the post returns, or in place through the `run` server function once the
+//! page has hydrated, and nowhere else: no URL, no history, no store holds
+//! it (FerroBRIDGE's console rule, §0).
 
 use ferrobridge_operator_api::health::Info;
+use ferrobridge_operator_api::operator::EngineState;
 use ferrohealth_ui::highlight::Language;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::action::ActionGroup;
@@ -25,26 +27,35 @@ use ferrohealth_ui::view::transform::{
     Answer, AnswerState, Density, Run, RunState, TransformPane, run_button, transform_options,
     transform_pair, transform_quiet,
 };
+#[cfg(not(target_arch = "wasm32"))]
 use fhir_types::r4::operation_outcome::OperationOutcome;
+#[cfg(not(target_arch = "wasm32"))]
 use fhir_types::r4::parameters::{Parameters, ParametersParameter, ParametersParameterValue};
+#[cfg(not(target_arch = "wasm32"))]
 use fhir_types::r4::primitives;
+#[cfg(not(target_arch = "wasm32"))]
 use fhir_types::r4::reference::Reference;
-use fhir_types::r4::resource::Resource;
+use leptos::form::FromFormData as _;
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 
+#[cfg(not(target_arch = "wasm32"))]
+use crate::actions::RunAnswer;
+use crate::actions::{PlaygroundAnswer, PlaygroundPost, Ran, RunOperation};
 use crate::app::{PLAYGROUND, page_title};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::bridge::AccessToken;
 use crate::islands::JsonInput;
 use crate::load::Capability;
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
-use crate::model::{Loaded, Outcome, loaded};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::model::loaded;
+use crate::model::{Loaded, Outcome};
 use crate::pages::mappings::template_id;
 use crate::pages::parts::{faulted, refused};
-use crate::posts::{PlaygroundAnswer, PlaygroundPost, Ran, RunAnswer};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::server::ConsoleState;
-use ferrobridge_operator_api::operator::EngineState;
 
 /// The tabs of the playground, each its key and its words.
 const TABS: [(&str, Msg); 3] = [
@@ -54,6 +65,7 @@ const TABS: [(&str, Msg); 3] = [
 ];
 
 /// The `$toopenehr` formats the REST API chapter defines.
+#[cfg(not(target_arch = "wasm32"))]
 const FORMATS: [&str; 2] = ["canonical", "flat"];
 
 /// The page of the tab `key`.
@@ -66,6 +78,7 @@ fn tab_href(key: &str) -> String {
 }
 
 /// The tab an address names, `tofhir` for the playground itself.
+#[cfg(not(target_arch = "wasm32"))]
 fn tab_of(address: &str) -> &str {
     address
         .strip_prefix(PLAYGROUND)
@@ -81,19 +94,27 @@ pub fn page() -> impl IntoView {
     if !TABS.iter().any(|(key, _)| *key == tab) {
         return crate::pages::errors::not_found().into_any();
     }
-    let ran = use_context::<Ran>();
+    let running = Running::new();
+    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
+    let capability = (tab == "validate")
+        .then(|| Resource::new(crate::load::changes, |_| crate::load::capability_now()));
+    let state = (tab != "validate")
+        .then(|| Resource::new(crate::load::changes, |_| crate::load::state_now()));
     view! {
         {page_title(tr(Msg::Playground))}
         <Suspense>
             {move || {
                 let tab = tab.clone();
-                let ran = ran.clone();
+                let ran = running.ran();
                 Suspend::new(async move {
-                    let info = crate::load::info().await;
-                    let (capability, templates) = if tab == "validate" {
-                        (Some(crate::load::capability().await), None)
-                    } else {
-                        (None, template_ids(&crate::load::state().await))
+                    let info = info.await;
+                    let capability = match capability {
+                        Some(capability) => Some(crate::load::capability(capability.await)),
+                        None => None,
+                    };
+                    let templates = match state {
+                        Some(state) => template_ids(&state.await),
+                        None => None,
                     };
                     drawn(
                         &tab,
@@ -101,12 +122,56 @@ pub fn page() -> impl IntoView {
                         &info,
                         capability.as_ref(),
                         templates.as_deref(),
+                        running,
                     )
                 })
             }}
         </Suspense>
     }
     .into_any()
+}
+
+/// How the playground's form posts once the page has hydrated: through the
+/// `run` server function, with the post it last sent.
+#[derive(Clone, Copy)]
+struct Running {
+    /// The server action the form dispatches.
+    run: ServerAction<RunOperation>,
+    /// The post the form last sent.
+    last: RwSignal<PlaygroundPost>,
+    /// The run the server drew the page with, after a post with no
+    /// WebAssembly.
+    posted: StoredValue<Option<Ran>>,
+}
+
+impl std::fmt::Debug for Running {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        out.debug_struct("Running").finish_non_exhaustive()
+    }
+}
+
+impl Running {
+    /// The running of a page.
+    fn new() -> Self {
+        Self {
+            run: ServerAction::<RunOperation>::new(),
+            last: RwSignal::new(PlaygroundPost::default()),
+            posted: StoredValue::new((*SharedValue::new(use_context::<Ran>)).clone()),
+        }
+    }
+
+    /// The run the page draws: the last one the form sent in the page, else
+    /// the one the server drew it with.
+    fn ran(self) -> Option<Ran> {
+        match self.run.value().get() {
+            Some(Ok(ran)) => Some(ran),
+            Some(Err(fault)) => Some(Ran {
+                post: self.last.get_untracked(),
+                answer: PlaygroundAnswer::Answered(Err(fault)),
+            }),
+            None => self.posted.get_value(),
+        }
+    }
 }
 
 /// The ids of the templates the running set compiled against, or `None`
@@ -162,6 +227,7 @@ fn drawn(
     info: &Loaded<Info>,
     capability: Option<&Loaded<Capability>>,
     templates: Option<&[String]>,
+    running: Running,
 ) -> AnyView {
     let header = page_heading(
         Header {
@@ -189,8 +255,25 @@ fn drawn(
         "validate" => validate(&post, ran, off, &types),
         _ => to_fhir(&post, ran, off, templates),
     };
+    let address = tab_href(tab);
+    // NOTE: no specification governs this: our own design; the form keeps its own
+    // route as `action`, so a post with no WebAssembly draws the page with its answer.
+    let submit = {
+        let address = address.clone();
+        move |event: leptos::ev::SubmitEvent| {
+            let Ok(post) = PlaygroundPost::from_event(&event) else {
+                return;
+            };
+            event.prevent_default();
+            running.last.set(post.clone());
+            running.run.dispatch(RunOperation {
+                address: address.clone(),
+                post,
+            });
+        }
+    };
     let panel = view! {
-        <form method="post" action=tab_href(tab) class="fui-panel">
+        <form method="post" action=address class="fui-panel" on:submit=submit>
             {options}
             {transform_pair(input, answer)}
         </form>
@@ -498,6 +581,7 @@ fn validate(
 }
 
 /// A parameter named `name` carrying `value`.
+#[cfg(not(target_arch = "wasm32"))]
 fn parameter(name: &str, value: ParametersParameterValue) -> ParametersParameter {
     ParametersParameter {
         name: primitives::String::from(name),
@@ -508,6 +592,7 @@ fn parameter(name: &str, value: ParametersParameterValue) -> ParametersParameter
 
 /// What the bridge answers the post `post` of the playground at `address`,
 /// as the operator whose access token is `token`.
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn answer(
     state: &ConsoleState,
     token: &AccessToken,
@@ -523,6 +608,7 @@ pub async fn answer(
 }
 
 /// Runs `$tofhir` over the composition `input`.
+#[cfg(not(target_arch = "wasm32"))]
 async fn to_fhir_answer(
     state: &ConsoleState,
     token: &AccessToken,
@@ -571,6 +657,7 @@ async fn to_fhir_answer(
 }
 
 /// Runs `$toopenehr` over the Bundle `input`.
+#[cfg(not(target_arch = "wasm32"))]
 async fn to_openehr_answer(
     state: &ConsoleState,
     token: &AccessToken,
@@ -612,6 +699,7 @@ async fn to_openehr_answer(
 }
 
 /// Runs `$validate` on the resource `input`.
+#[cfg(not(target_arch = "wasm32"))]
 async fn validate_answer(
     state: &ConsoleState,
     token: &AccessToken,
@@ -644,6 +732,7 @@ async fn validate_answer(
 /// parameter carries, with the issues of its `outcome` beside it, or the
 /// whole answer when it carries no composition (FHIRconnect
 /// `ToOpenEhr.fsh`).
+#[cfg(not(target_arch = "wasm32"))]
 fn converted(parameters: &Parameters, raw: serde_json::Value) -> RunAnswer {
     let named = |name: &str| {
         parameters
@@ -657,7 +746,9 @@ fn converted(parameters: &Parameters, raw: serde_json::Value) -> RunAnswer {
     });
     let issues = named("outcome")
         .and_then(|parameter| match &parameter.resource {
-            Some(Resource::OperationOutcome(outcome)) => Some(issue_words(outcome)),
+            Some(fhir_types::r4::resource::Resource::OperationOutcome(outcome)) => {
+                Some(issue_words(outcome))
+            }
             _ => None,
         })
         .unwrap_or_default();
@@ -673,6 +764,7 @@ fn converted(parameters: &Parameters, raw: serde_json::Value) -> RunAnswer {
 
 /// The words of each issue of `outcome`: its `details.text` and its
 /// `diagnostics`, each when present (FHIR R4 `OperationOutcome.issue`).
+#[cfg(not(target_arch = "wasm32"))]
 fn issue_words(outcome: &OperationOutcome) -> Vec<String> {
     outcome
         .issue

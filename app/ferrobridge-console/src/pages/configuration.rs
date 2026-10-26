@@ -52,13 +52,14 @@ pub fn page() -> impl IntoView {
     if !TABS.iter().any(|(key, _, _)| *key == tab) {
         return crate::pages::errors::not_found().into_any();
     }
+    let configuration = Resource::new(crate::load::changes, |_| crate::load::configuration_now());
     view! {
         {page_title(tr(Msg::Configuration))}
         <Suspense>
             {move || {
                 let tab = tab.clone();
                 Suspend::new(async move {
-                    let configuration = crate::load::configuration().await;
+                    let configuration = configuration.await;
                     drawn(&tab, &configuration)
                 })
             }}

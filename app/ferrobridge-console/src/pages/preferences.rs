@@ -30,6 +30,7 @@ pub fn page() -> impl IntoView {
         return crate::pages::errors::not_found().into_any();
     };
     let saved = use_query_map().with_untracked(|query| query.get("saved"));
+    let visit = crate::visit::visit();
     let routes = SectionRoutes {
         appearance: String::from(PREFERENCES),
         language: format!("{PREFERENCES}/language"),
@@ -39,15 +40,15 @@ pub fn page() -> impl IntoView {
         section,
         routes,
         reading: false,
-        preferences: crate::prefs::requested().preferences,
-        action: String::from(crate::prefs::PREFERENCE),
+        preferences: visit.chosen().preferences,
+        action: String::from(crate::app::PREFERENCE),
         saved,
         accent: tr(Msg::AccentIndigo),
         languages: crate::locale::shipped(),
-        browser: crate::locale::browser(),
+        browser: visit.browser(),
         week_from_language: Weekday::Monday,
         shortcuts: None,
-        reset: String::from(crate::prefs::RESET),
+        reset: String::from(crate::app::RESET),
         own: Vec::new(),
     });
     view! {

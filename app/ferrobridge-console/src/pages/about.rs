@@ -25,11 +25,12 @@ pub const INFO_JSON: &str = "/about/health-info.json";
 /// The About page.
 #[must_use]
 pub fn page() -> impl IntoView {
+    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
     view! {
         {page_title(tr(Msg::About))}
         <Suspense>
             {move || Suspend::new(async move {
-                let info = crate::load::info().await;
+                let info = info.await;
                 drawn(&info)
             })}
         </Suspense>
@@ -39,15 +40,8 @@ pub fn page() -> impl IntoView {
 /// The page over the bridge's info.
 fn drawn(info: &Loaded<Info>) -> AnyView {
     let footer = crate::shell::footer_names();
-    let (bridge, locale) = crate::session::request::signed_in().map_or_else(
-        |_| (String::new(), String::new()),
-        |(console, _token)| {
-            (
-                console.settings().bridge.base.to_string(),
-                console.settings().locale.tag(),
-            )
-        },
-    );
+    let crate::visit::Settings { bridge, locale } =
+        crate::visit::visit().settings.unwrap_or_default();
     let (versions, document) = match info {
         Ok(Outcome::Shown(info)) => {
             let mut rows = vec![

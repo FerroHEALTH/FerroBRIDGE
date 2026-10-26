@@ -16,9 +16,12 @@ use crate::locale::tr;
 
 /// Sets the answer's status to `status`, while the server draws it.
 fn answer_with(status: http::StatusCode) {
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(response) = use_context::<leptos_axum::ResponseOptions>() {
         response.set_status(status);
     }
+    #[cfg(target_arch = "wasm32")]
+    let _: http::StatusCode = status;
 }
 
 /// The page for a path the console does not serve: `404`, what it may

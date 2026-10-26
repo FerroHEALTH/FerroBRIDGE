@@ -7,19 +7,27 @@
 //! An answer is an [`Outcome`]: the document, or the bridge's refusal with
 //! its status. Only the console's own faults (no live session, a bridge it
 //! cannot reach, a body it cannot read) are a [`ViewError`], so a page
-//! branches on two distinct types. No specification governs the console:
-//! our own design.
+//! branches on two distinct types. Both cross to the browser as JSON, the
+//! answer of a server function, so a page drawn in the browser branches as
+//! the server's does. No specification governs the console: our own design.
 
+use ferrobridge_operator_api::operator::LoadReport;
+#[cfg(not(target_arch = "wasm32"))]
 use fhir_types::codec::{Json as _, Path, Value};
+#[cfg(not(target_arch = "wasm32"))]
 use fhir_types::r4::operation_outcome::OperationOutcome;
 use http::StatusCode;
+use leptos::server_fn::codec::JsonEncoding;
+use leptos::server_fn::error::{FromServerFnError, ServerFnErrorErr};
+use serde::{Deserialize, Serialize};
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::bridge::BridgeError;
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 
 /// What the bridge answered when the console did its part.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Outcome<T> {
     /// The document.
     Shown(T),
@@ -39,11 +47,12 @@ impl<T> Outcome<T> {
 }
 
 /// An expected refusal of the bridge's, with its status.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Refusal {
     /// The bridge refused the request.
     Bridge {
         /// The status the bridge answered with.
+        #[serde(with = "status_code")]
         status: StatusCode,
         /// The diagnostics of the `OperationOutcome` it answered with, in
         /// order; empty when its body carried none.
@@ -105,7 +114,7 @@ impl Refusal {
 
 /// A fault of the console: its session, its reach to the bridge, or a body
 /// it cannot read.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum ViewError {
     /// The request carries no live signed-in session.
     #[error("sign in to see this view")]
@@ -134,12 +143,68 @@ impl ViewError {
     }
 }
 
+impl FromServerFnError for ViewError {
+    type Encoder = JsonEncoding;
+
+    fn from_server_fn_error(value: ServerFnErrorErr) -> Self {
+        // NOTE: no specification governs this: our own design; a page that cannot
+        // reach the console's own server function is a view the console cannot serve.
+        leptos::logging::warn!("a server function did not answer: {value}");
+        Self::Unavailable
+    }
+}
+
 /// What a page loads: the bridge's answer, or the console's fault.
 pub type Loaded<T> = Result<Outcome<T>, ViewError>;
 
+/// The serde form of a status: its number.
+pub(crate) mod status_code {
+    use http::StatusCode;
+    use serde::{Deserialize as _, Deserializer, Serializer};
+
+    /// Writes `status` as its number.
+    #[expect(
+        clippy::trivially_copy_pass_by_ref,
+        reason = "serde's `with` calls the serializer with a reference to the field"
+    )]
+    pub(super) fn serialize<S: Serializer>(status: &StatusCode, out: S) -> Result<S::Ok, S::Error> {
+        out.serialize_u16(status.as_u16())
+    }
+
+    /// Reads a status from its number, refusing one outside 100 to 999.
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(input: D) -> Result<StatusCode, D::Error> {
+        let number = u16::deserialize(input)?;
+        StatusCode::from_u16(number).map_err(serde::de::Error::custom)
+    }
+}
+
+/// What the bridge answered a check, a save or a reload with: the status,
+/// the report of the set, and after a save the new file's digest.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Answered {
+    /// `200` for a set that compiled, `422` for one that did not.
+    #[serde(with = "status_code")]
+    pub status: StatusCode,
+    /// The report of the set: whether it compiled, its counts and every
+    /// diagnostic.
+    pub report: LoadReport,
+    /// The digest the new file's `ETag` names, after a save.
+    pub etag: Option<String>,
+}
+
+/// One mapping file as a page draws it: its text, and the digest of the
+/// bytes the bridge served.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OpenedFile {
+    /// The file's bytes as UTF-8 text, or `None` for bytes that are not.
+    pub text: Option<String>,
+    /// The digest its `ETag` names, the quotes removed, when it sent one.
+    pub etag: Option<String>,
+}
+
 /// What the server knows of the request's session, which decides the page
 /// drawn.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SessionState {
     /// A live signed-in session: the operator's pages and the sign-out.
     SignedIn,
@@ -159,6 +224,7 @@ pub enum SessionState {
 /// Returns [`ViewError::Unreachable`] for a bridge that gave no answer,
 /// [`ViewError::Unreadable`] for an answer this console cannot read, and
 /// [`ViewError::Unavailable`] for a request the console could not send.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn refusal(error: &BridgeError) -> Result<Refusal, ViewError> {
     match error {
         BridgeError::Refused { status, body } => {
@@ -207,6 +273,7 @@ pub fn refusal(error: &BridgeError) -> Result<Refusal, ViewError> {
 ///
 /// # Errors
 /// As [`refusal`].
+#[cfg(not(target_arch = "wasm32"))]
 pub fn loaded<T>(result: Result<T, BridgeError>) -> Loaded<T> {
     match result {
         Ok(document) => Ok(Outcome::Shown(document)),
@@ -217,6 +284,7 @@ pub fn loaded<T>(result: Result<T, BridgeError>) -> Loaded<T> {
 /// The words of each issue of the R4 `OperationOutcome` `body` holds, in
 /// order: its `details.text` and its `diagnostics`, each when present
 /// (FHIR R4 `operationoutcome.html`, `OperationOutcome.issue`).
+#[cfg(not(target_arch = "wasm32"))]
 fn diagnostics(body: &str) -> Vec<String> {
     // NOTE: no specification governs this: our own design; a refusal body
     // that is no OperationOutcome carries no diagnostics, and its status stands.

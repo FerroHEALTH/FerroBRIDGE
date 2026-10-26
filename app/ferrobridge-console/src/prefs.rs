@@ -21,76 +21,14 @@ use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Redirect, Response};
 use cookie::Cookie;
 use ferrohealth_ui::theme::{
-    Density, Hints, Language, Motion, Preference as _, Preferences, Theme, WeekStart, cookie,
+    Density, Hints, Language, Motion, Preference as _, Preferences, Theme, WeekStart,
 };
 use http::header::SET_COOKIE;
 use http::{HeaderValue, StatusCode};
-use leptos::context::use_context;
 
 use crate::locale::messages::Msg;
 use crate::locale::{catalog, negotiated, tr_in};
 use crate::server::ConsoleState;
-
-/// The route every preference posts to, its value under its cookie's name.
-pub const PREFERENCE: &str = "/preference";
-
-/// The route Reset to defaults posts to.
-pub const RESET: &str = "/preferences/reset";
-
-/// The route the sidebar's Collapse and Expand post to.
-pub const SIDEBAR: &str = "/sidebar";
-
-/// The name of the sidebar's cookie after [`crate::session::PREFERENCE_PREFIX`].
-pub const RAIL: &str = "sidebar";
-
-/// The preferences and the sidebar's state one request carries.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct Chosen {
-    /// The family's preferences.
-    pub preferences: Preferences,
-    /// Whether the navigation is folded to its rail.
-    pub rail: bool,
-}
-
-/// The preferences the `Cookie` header value `cookies` holds, each named
-/// `prefix` then its cookie's name.
-#[must_use]
-pub fn chosen_in(cookies: &str, prefix: &str) -> Chosen {
-    Chosen {
-        preferences: Preferences::read(cookies, prefix),
-        rail: cookie(cookies, &format!("{prefix}{RAIL}")) == Some("rail"),
-    }
-}
-
-/// The preferences of the request being rendered, the defaults where it
-/// carries none.
-#[must_use]
-pub fn requested() -> Chosen {
-    let Some(state) = use_context::<ConsoleState>() else {
-        return Chosen::default();
-    };
-    let Some(parts) = use_context::<http::request::Parts>() else {
-        return Chosen::default();
-    };
-    chosen_in(
-        &cookies_of(&parts.headers),
-        &state
-            .sessions()
-            .cookie_name(crate::session::PREFERENCE_PREFIX),
-    )
-}
-
-/// Every `Cookie` header of `headers`, joined as one header value.
-fn cookies_of(headers: &HeaderMap) -> String {
-    // NOTE: RFC 9113 §8.2.3: a request may split its cookies over several
-    // headers, which read as one list joined by `; `.
-    headers
-        .get_all(http::header::COOKIE)
-        .iter()
-        .filter_map(|value| value.to_str().ok())
-        .collect::<Vec<_>>()
-        .join("; ")
-}
 
 /// The value of the preference `name` as its cookie keeps it, when `value`
 /// is one the console offers for it, and `None` for anything else.
@@ -319,7 +257,7 @@ pub async fn rail(
     }
     redirect_with(
         return_path(&choice.back),
-        &[kept_cookie(&state, RAIL, &choice.sidebar)],
+        &[kept_cookie(&state, crate::visit::RAIL, &choice.sidebar)],
     )
 }
 
@@ -327,7 +265,8 @@ pub async fn rail(
 mod tests {
     use ferrohealth_ui::theme::{Density, Theme};
 
-    use super::{chosen_in, preference_return, preference_value, return_path};
+    use super::{preference_return, preference_value, return_path};
+    use crate::visit::chosen_in;
 
     #[test]
     fn a_preference_post_keeps_only_a_value_the_console_offers() {

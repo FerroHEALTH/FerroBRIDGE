@@ -34,10 +34,9 @@ use leptos_router::hooks::{use_params_map, use_query_map};
 use openehr_mapping_core::diagnostic::Diagnostic;
 
 use crate::app::{FACADE, FILES, TEMPLATES, page_title};
-use crate::bridge::MappingFile;
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
-use crate::model::{Loaded, Outcome};
+use crate::model::{Loaded, OpenedFile, Outcome};
 use crate::pages::parts::{
     diagnostics_state, edit_href, faulted, file_href, findings, language_name, line_diagnostics,
     quiet, refused_operator, section, short, tally, wire_path, with_markup,
@@ -64,15 +63,24 @@ pub fn page() -> impl IntoView {
     // NOTE: RFC 3986 §3.5: a fragment never reaches the server, so the line a
     // diagnostic links to is reached by the browser alone, unmarked.
     let current = None;
+    let file = Resource::new(
+        {
+            let path = path.clone();
+            move || (crate::load::changes(), path.clone())
+        },
+        |(_, path)| crate::load::file_now(path),
+    );
+    let listing = Resource::new(crate::load::changes, |_| crate::load::listing_now());
+    let state = Resource::new(crate::load::changes, |_| crate::load::state_now());
     view! {
         {page_title(short(&path).to_owned())}
         <Suspense>
             {move || {
                 let path = path.clone();
                 Suspend::new(async move {
-                    let file = crate::load::file(&path).await;
-                    let listing = crate::load::listing().await;
-                    let state = crate::load::state().await;
+                    let file = file.await;
+                    let listing = listing.await;
+                    let state = state.await;
                     drawn(&path, program_tab, current, &file, &listing, &state)
                 })
             }}
@@ -113,7 +121,7 @@ fn drawn(
     path: &str,
     program_tab: bool,
     current: Option<u32>,
-    file: &Loaded<MappingFile>,
+    file: &Loaded<OpenedFile>,
     listing: &Loaded<Vec<Listed>>,
     state: &Loaded<EngineState>,
 ) -> AnyView {
@@ -147,7 +155,7 @@ fn drawn(
         .contexts
         .iter()
         .find(|program| program.file.as_deref() == Some(path));
-    let text = String::from_utf8(file.bytes.clone()).ok();
+    let text = file.text.clone();
     let badge = if text.is_none() {
         ferrohealth_ui::view::state::state(Mark::Bad, tr(Msg::StateNotUtf8), None)
     } else {

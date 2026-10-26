@@ -14,7 +14,7 @@ use std::error::Error;
 use http::StatusCode;
 
 use crate::stub::{BROKEN, CONTEXT, bridge, post, signed_in};
-use crate::support::{OPERATOR_NAME, console, get, get_with, header, send, set_cookies};
+use crate::support::{OPERATOR_NAME, console, drawn, get, get_with, header, send, set_cookies};
 
 /// The value of the attribute `name` the page's `<html>` carries.
 fn root_attribute<'a>(page: &'a str, name: &str) -> &'a str {
@@ -249,6 +249,7 @@ async fn the_search_page_lists_contexts_files_and_templates_in_the_page()
         "never an overlay in the page: {page}"
     );
     let (_response, none) = send(&service, get_with("/search?q=nothing-here", &cookie)?).await?;
+    let none = drawn(&none);
     assert!(none.contains("Nothing found for “nothing-here”"), "{none}");
     assert!(!none.contains(BROKEN), "{none}");
     let (_response, dashboard) = send(&service, get_with("/?q=observation", &cookie)?).await?;
