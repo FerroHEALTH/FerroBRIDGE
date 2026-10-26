@@ -440,6 +440,7 @@ pub(crate) const fn loss_kind(loss: &Loss) -> &'static str {
         Loss::Defaulted { .. } => "defaulted",
         Loss::LastOfMany { .. } => "last-of-many",
         Loss::OneWayFallback { .. } => "one-way-fallback",
+        Loss::UnmappedOccurrences { .. } => "unmapped-occurrences",
     }
 }
 

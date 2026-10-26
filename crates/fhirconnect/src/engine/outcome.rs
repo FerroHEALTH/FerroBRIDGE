@@ -378,6 +378,19 @@ pub enum Loss {
         /// The attribute the row filled.
         field: String,
     },
+    /// The further occurrences of the start archetype a run over its first
+    /// occurrence left unmapped.
+    ///
+    /// No specification governs a context's start archetype held more than
+    /// once by one composition: our own design maps each occurrence on its own
+    /// through [`crate::engine::traverse::to_fhir_each`], and a run that maps
+    /// one names how many it left.
+    UnmappedOccurrences {
+        /// The archetype the context starts at.
+        archetype: String,
+        /// How many occurrences after the first the run did not map.
+        count: usize,
+    },
 }
 
 impl fmt::Display for Loss {
@@ -396,6 +409,13 @@ impl fmt::Display for Loss {
                 ref cell,
                 ref field,
             } => write!(f, "{cell} filled {field} by a rule that runs one way"),
+            Self::UnmappedOccurrences {
+                ref archetype,
+                count,
+            } => write!(
+                f,
+                "the composition holds {archetype} {count} more times, which this run over its first occurrence did not map"
+            ),
         }
     }
 }

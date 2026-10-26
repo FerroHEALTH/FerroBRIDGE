@@ -80,7 +80,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
         &self,
         gate: &crate::resolve::program::condition::Condition,
     ) -> Result<bool, EngineError> {
-        self.openehr_holds(self.program.context().as_str(), gate, &[])
+        // NOTE: no specification governs this: our own design, a run over one occurrence of
+        // the start archetype evaluates the context's condition at that occurrence.
+        let instance: Vec<RmPosition> = self.pins.iter().map(|&(_, position)| position).collect();
+        self.openehr_holds(self.program.context().as_str(), gate, &instance)
     }
 
     /// Runs a list of mappings under one binding, in program order.

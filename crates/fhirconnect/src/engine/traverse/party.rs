@@ -100,7 +100,7 @@ pub fn from_party<T: Table + ?Sized>(
     context: &CallContext,
 ) -> Result<Outcome<Value>, EngineError> {
     party_program(program)?;
-    read_out(program, table, index, party, seams, context)
+    read_out(program, table, index, party, seams, context, &[])
 }
 
 /// Refuses a composition program at a party entry point.
