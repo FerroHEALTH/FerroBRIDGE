@@ -39,13 +39,12 @@ the language crate applies its own grammar to them.
 
 - **A party is built through the `openehr-sdt` template walk.**
   `party::build_party` writes every value below the root under `raw` and
-  builds the party with `openehr_sdt::flat::build::build_root`, naming
+  builds the party with `openehr_sdt::flat::build::build_party`, naming
   `rm_version` 1.1.0, then decodes the result strictly as the root's class.
-  A value at the root node places its members on the root (`ROLE.performer`),
-  each an attribute of the root's class, because the builder takes no root
-  attribute of a party (#1000); and a `ROLE` with no `performer`,
-  built or accepted, is `PartyError::RoleWithoutPerformer` (RM Demographic
-  IM, the `ROLE` class).
+  A value at the root node passes each of its members, an attribute of the
+  root's class, to the builder as `<root>/<attribute>|raw` (`ROLE.performer`,
+  #1000); and a `ROLE` with no `performer`, built or accepted, is
+  `PartyError::RoleWithoutPerformer` (RM Demographic IM, the `ROLE` class).
 
 - **A polymorphic `ELEMENT` value node reads only its own class.** The
   alternatives share the element's `aqlPath` under one parent
