@@ -32,7 +32,7 @@ pub fn not_found() -> impl IntoView {
     let page = error_page(ErrorPage {
         status: Status::NotFound,
         title: tr(Msg::NotFoundTitle),
-        body: view! { <p>{tr(Msg::NotFoundBody)}</p> }.into_any(),
+        body: tr(Msg::NotFoundBody).into_any(),
         hint: None,
         ways: vec![
             Way {
@@ -64,7 +64,7 @@ pub fn unreadable() -> impl IntoView {
     let page = error_page(ErrorPage {
         status: Status::Fault,
         title: tr(Msg::UnreadableTitle),
-        body: view! { <p>{tr(Msg::UnreadableBody)}</p> }.into_any(),
+        body: tr(Msg::UnreadableBody).into_any(),
         hint: None,
         ways: Vec::new(),
         detail: None,
