@@ -50,7 +50,7 @@ crate.
   each to a live session from the console's own pages, and asserts the
   registered set. A component that shares state with the page (the mapping
   editor, the playground's input) lives in `editors`.
-- **A view draws with `ferrohealth-ui`** (FerroUI, pinned `=0.5.0`): its
+- **A view draws with `ferrohealth-ui`** (FerroUI, pinned `=0.5.1`): its
   templates, components and brand theme (`BRAND.theme()`), never a local
   copy or override; a gap is a FerroUI issue and a `TODO(#N)` naming its tracking issue here. Each
   preference is the server's, drawn from its own cookie

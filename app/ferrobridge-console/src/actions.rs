@@ -28,6 +28,9 @@ use serde::{Deserialize, Serialize};
 use crate::locale::messages::Msg;
 use crate::model::{Answered, Loaded, ViewError};
 
+// TODO(#1265): the forms post through `<ActionForm>` once FerroUI fixes its
+// fallback's dependence on the `Referer` (FerroHEALTH/FerroUI#449).
+
 /// The outcome of the reload the operator just asked for.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Reloaded(pub Loaded<LoadReport>);

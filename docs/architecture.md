@@ -1264,7 +1264,7 @@ page with no WebAssembly; once the page has hydrated the same action goes
 through a server function and every read through one of the reads' server
 functions, each checking the operator's session first. It is a
 backend-for-frontend, shipped as `ghcr.io/ferrohealth/ferrobridge-console`,
-drawn with FerroUI 0.5.0.
+drawn with FerroUI 0.5.1.
 The server half and the browser half are chosen by compilation target, never
 by Cargo feature, so a workspace `--all-features` build never enables both.
 The operator's OpenID Connect session (authorization code with PKCE) lives on

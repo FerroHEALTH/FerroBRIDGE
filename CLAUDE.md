@@ -121,7 +121,7 @@ the testkit tool crate. Beside it:
   lanes, `mapping check` and the reload share (#725).
 - `app/ferrobridge-console`: the operator console (#599, `docs/architecture.md`
   §4.10), its own binary `ferrobridge-console`: a Leptos app on FerroUI
-  0.5.0 that hydrates the whole page (#1256): the server draws the first
+  0.5.1 that hydrates the whole page (#1256): the server draws the first
   page, the browser draws every page after it from five lazy route groups
   (`src/routes.rs`), reads go through server functions (`src/load.rs`) and
   each action is a form post with no WebAssembly and a server function once

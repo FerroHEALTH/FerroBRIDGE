@@ -4,7 +4,7 @@
 # ferrobridge-console
 
 The FerroBRIDGE Console, the operator console: the `ferrobridge-console`
-binary, a Leptos app drawn with FerroUI 0.5.0 that hydrates the whole page:
+binary, a Leptos app drawn with FerroUI 0.5.1 that hydrates the whole page:
 the server draws the first page and the browser draws every page after it,
 so no link or form reloads the document, with a backend-for-frontend in
 front of the bridge.

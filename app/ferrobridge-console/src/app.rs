@@ -167,6 +167,7 @@ pub fn App() -> impl IntoView {
     provide_context(crate::load::Changes(RwSignal::new(0)));
     provide_locale(visits.with_untracked(crate::visit::Visit::locale));
     ferrohealth_ui::widget::prefetch::routes(crate::routes::ROUTES);
+    ferrohealth_ui::widget::hydration::mark();
     let session = Memo::new(move |_| visits.with(|visit| visit.session));
     let flash = (*SharedValue::new(|| use_context::<Flashes>().unwrap_or_default().0)).clone();
     let region = move || {
