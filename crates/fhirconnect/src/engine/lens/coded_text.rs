@@ -230,7 +230,6 @@ pub(crate) mod tests {
     use super::CodedTextLens;
     use crate::engine::lens::Fallback;
     use crate::engine::lens::Lens;
-    use crate::engine::lens::code_phrase::terminology_id;
     use crate::engine::lens::code_phrase::tests::code_phrase;
     use crate::engine::lens::code_phrase::tests::coding;
     use fhir_types::r4::codeable_concept::CodeableConcept;
@@ -239,6 +238,7 @@ pub(crate) mod tests {
     use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives::Uri;
     use openehr_base::containers::NonEmptyVec;
+    use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
     use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
     use openehr_rm::v1_2::data_types::text::term_mapping::TermMapping;
@@ -453,7 +453,7 @@ pub(crate) mod tests {
     /// A `DV_CODED_TEXT` whose mappings are an `=` one and one with `relation`.
     fn with_relation(relation: char) -> DvCodedText {
         let target = |system: &str, code: &str| CodePhrase {
-            terminology_id: terminology_id(system, ""),
+            terminology_id: TerminologyId::new(system, ""),
             code_string: String::from(code),
             preferred_term: None,
         };

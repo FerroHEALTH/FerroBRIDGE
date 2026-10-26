@@ -119,8 +119,8 @@ fn outbound(
 }
 
 /// Returns a composition of one point event at `time` whose history's origin
-/// is the instant the law's runs default it to, since the mapping carries no
-/// origin.
+/// is the instant the FLAT build defaults it to, the earliest event's time,
+/// since the mapping carries no origin.
 fn point_reading(
     index: &WebTemplateIndex,
     time: &str,
@@ -132,7 +132,7 @@ fn point_reading(
             .get_mut("data")
             .and_then(|data| data.get_mut("origin"))
         {
-            *origin = json!({"_type": "DV_DATE_TIME", "value": laws::NOW});
+            *origin = json!({"_type": "DV_DATE_TIME", "value": time});
         }
     })?)
 }
