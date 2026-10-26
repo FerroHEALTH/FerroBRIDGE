@@ -1,15 +1,17 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The console's own islands: the parts of a page the browser hydrates
-//! beside the library's ready islands (the Leptos book, "Guide: Islands").
+//! The console's own components: the mapping editor and the playground's
+//! input.
 //!
-//! The one island is the mapping editor: the library's code editor (B2)
-//! beside the diagnostics of its draft (B3), whose caret and current line
-//! the two share. It sits inside the editor page's form, so its text area
-//! posts the draft with no WebAssembly, and every word it draws arrives as
-//! a prop the server resolved. No specification governs the console: our
-//! own design.
+//! Each draws the library's code editor with state it shares with the
+//! console's own code (FerroUI `docs/consoles.md`, "What the console owns").
+//!
+//! The mapping editor is the library's code editor (B2) beside the
+//! diagnostics of its draft (B3), whose caret and current line the two
+//! share. It sits inside the editor page's form, so its text area posts the
+//! draft with no WebAssembly. No specification governs the console: our own
+//! design.
 use ferrohealth_ui::highlight::Language;
 use ferrohealth_ui::view::button::{Variant, label};
 use ferrohealth_ui::view::diagnostics::{DiagnosticsWords, FileFindings, Position};

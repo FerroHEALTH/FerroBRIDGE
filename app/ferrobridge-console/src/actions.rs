@@ -180,6 +180,6 @@ pub async fn run_operation(
     post: PlaygroundPost,
 ) -> Result<Ran, ViewError> {
     let (state, token) = crate::session::request::signed_in()?;
-    let answer = crate::pages::playground::answer(&state, &token, &address, &post).await;
+    let answer = crate::pages::playground::answer::answer(&state, &token, &address, &post).await;
     Ok(Ran { post, answer })
 }

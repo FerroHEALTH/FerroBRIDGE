@@ -90,7 +90,7 @@ pub async fn edited(
     // line break as CRLF, so the draft is read back with the LF the editor writes.
     post.draft = post.draft.replace("\r\n", "\n");
     let path = editor_path(address, &post);
-    let answer = crate::pages::editor::answer(state, token, path.as_deref(), &post).await;
+    let answer = crate::pages::editor::answer::answer(state, token, path.as_deref(), &post).await;
     Edited { post, answer }
 }
 
@@ -151,7 +151,8 @@ pub async fn run(Extension(state): Extension<ConsoleState>, request: Request) ->
     let Some(token) = token_of(&state, &parts) else {
         return back_to(&parts);
     };
-    let answer = crate::pages::playground::answer(&state, &token, parts.uri.path(), &post).await;
+    let answer =
+        crate::pages::playground::answer::answer(&state, &token, parts.uri.path(), &post).await;
     let ran = Ran { post, answer };
     crate::server::render(state, parts, move || {
         leptos::context::provide_context(ran.clone());

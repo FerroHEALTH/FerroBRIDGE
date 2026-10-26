@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The FerroBRIDGE operator console: a Leptos app the server draws whole,
-//! with its interactive parts hydrated in the browser as islands, and a
+//! The FerroBRIDGE operator console: a Leptos app the server draws and the
+//! browser hydrates whole, drawing every page after the first itself, and a
 //! backend-for-frontend in front of the bridge.
 //!
 //! The console is one more client of the bridge's public HTTP surface: its
@@ -14,11 +14,13 @@
 //!
 //! The page tree is [`app`], drawn in the [`shell`] with the components of
 //! `ferrohealth_ui` from the reviewed FerroBRIDGE design, its pages in
-//! [`pages`], what they read from the bridge in [`load`] and the request's
-//! words in [`locale`]. Every page works with no WebAssembly: each action is
-//! a link or a plain form the server answers ([`posts`], [`prefs`]). The
-//! browser half is the islands alone ([`islands`] and the library's own).
-//! [`server`] serves it all under the browser security headers, [`config`]
+//! [`pages`], grouped into lazy routes by [`routes`], what they read from the
+//! bridge in [`load`], what the server read of the request in [`visit`] and
+//! the request's words in [`locale`]. Every page works with no WebAssembly:
+//! each action is a link or a plain form the server answers ([`posts`],
+//! [`prefs`]); once the page has hydrated, a form posts through its server
+//! function ([`actions`]) and a link is followed in the page. [`editors`]
+//! holds the console's own components. [`server`] serves it all under the browser security headers, [`config`]
 //! reads the TOML configuration, [`cli`] and [`command`] run the binary, and
 //! [`healthcheck`] is the job a container runtime runs beside it. No
 //! specification governs the console: our own design.
@@ -33,7 +35,7 @@
 
 pub mod actions;
 pub mod app;
-pub mod islands;
+pub mod editors;
 pub mod load;
 pub mod locale;
 pub mod model;
