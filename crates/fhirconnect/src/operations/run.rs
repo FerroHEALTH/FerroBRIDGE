@@ -25,6 +25,7 @@ use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::index::WebTemplateIndex;
 
 use crate::engine::context::CallContext;
+use crate::engine::identity;
 use crate::engine::origin::Origin;
 use crate::engine::origin::SourceItem;
 use crate::engine::outcome::Location;
@@ -216,13 +217,14 @@ pub fn to_fhir_with_warnings<T: Table + ?Sized>(
     let resource_type = String::from(program.resource().as_str());
     let mut targets = Vec::new();
     let mut resources = Vec::new();
-    for (occurrence, outcome) in &occurrences {
+    for (occurrence, path, outcome) in &occurrences {
         let mut object = object_of(outcome.value())?;
         subject(table, &mut object, &resource_type, request.context())?;
         let mapped = Mapped {
             resource_type: &resource_type,
             template: template.as_str(),
             occurrence,
+            path,
         };
         let id = identity(&object, &composition, &mapped, seams)?;
         object.insert(String::from("id"), Value::String(id.clone()));
@@ -248,7 +250,7 @@ pub fn to_fhir_with_warnings<T: Table + ?Sized>(
         }
     }
     refuse_duplicates(&targets)?;
-    for (_, outcome) in &occurrences {
+    for (_, _, outcome) in &occurrences {
         warnings.extend_from_slice(outcome.warnings());
     }
     let source = match composition_uid(&composition) {
@@ -309,7 +311,12 @@ fn occurrences<T: Table + ?Sized>(
     if each.is_empty() {
         let outcome = traverse::to_fhir(program, table, index, composition, seams, context)
             .map_err(refused)?;
-        return Ok((vec![(Vec::new(), outcome)], Vec::new()));
+        // NOTE: a composition holding no occurrence maps one resource from
+        // the root; no specification governs this, our own design.
+        return Ok((
+            vec![(Vec::new(), String::from(identity::ROOT_PATH), outcome)],
+            Vec::new(),
+        ));
     }
     let mut mapped = Vec::new();
     let mut inapplicable = 0_usize;
@@ -317,8 +324,9 @@ fn occurrences<T: Table + ?Sized>(
         match one {
             Each::Mapped {
                 occurrence,
+                path,
                 outcome,
-            } => mapped.push((occurrence, outcome)),
+            } => mapped.push((occurrence, path, outcome)),
             Each::NotApplicable { .. } => inapplicable = inapplicable.saturating_add(1),
         }
     }
@@ -340,9 +348,9 @@ fn occurrences<T: Table + ?Sized>(
     Ok((mapped, warnings))
 }
 
-/// One occurrence of the start archetype that mapped: its positions and its
-/// run.
-type MappedOccurrence = (Vec<u32>, Outcome<Value>);
+/// One occurrence of the start archetype that mapped: its positions, its
+/// entry path and its run.
+type MappedOccurrence = (Vec<u32>, String, Outcome<Value>);
 
 /// Refuses an answer in which two resources take one `<type>/<id>`.
 ///
@@ -510,9 +518,10 @@ fn object_of(document: &Value) -> Result<Object, OperationError> {
 /// and the id it answers must fit the FHIR id grammar
 /// `[A-Za-z0-9\-\.]{1,64}` (<https://hl7.org/fhir/R4/resource.html>).
 /// Without one, a mapping that wrote an `id` keeps it, and otherwise the id
-/// is the `versioned_object_uid` of the composition, the leading segment of
-/// its `OBJECT_VERSION_ID`, which is the one part stable across versions
-/// (openEHR RM Common §`OBJECT_VERSION_ID`) and fits that grammar.
+/// is the deterministic id of the occurrence, the hash of the composition uid
+/// and the entry path (`engine/id-management.adoc` §Deterministic IDs,
+/// [`identity::deterministic_id`]), the id the FHIR facade gives the same
+/// occurrence.
 fn identity(
     object: &Object,
     composition: &CanonicalComposition,
@@ -522,7 +531,8 @@ fn identity(
     let resource_type = mapped.resource_type;
     if let Some(resources) = seams.resource_identity() {
         let mut request = ResourceRequest::new(resource_type, mapped.template)
-            .with_occurrence(mapped.occurrence.to_vec());
+            .with_occurrence(mapped.occurrence.to_vec())
+            .with_entry_path(mapped.path);
         if let Some(uid) = composition_uid(composition) {
             request = request.with_composition(uid);
         }
@@ -549,32 +559,10 @@ fn identity(
         return Ok(written.clone());
     }
     composition_uid(composition)
-        .and_then(|uid| uid.split("::").next())
-        .map(|root| occurrence_id(root, mapped.occurrence))
-        .filter(|candidate| is_fhir_id(candidate))
+        .map(|uid| identity::deterministic_id(identity::versioned_object_uid(uid), mapped.path))
         .ok_or_else(|| OperationError::Unidentified {
             resource: String::from(resource_type),
         })
-}
-
-/// Returns the id an occurrence of the start archetype derives from the
-/// composition's `versioned_object_uid`.
-///
-/// "We recommend generating an ID based on a hash of the Composition UID and
-/// the Entry Path" (`engine/id-management.adoc` §Deterministic IDs): the first
-/// occurrence keeps the uid alone, so a composition holding the start
-/// archetype once keeps the id it always had, and a further occurrence appends
-/// its positions, which stay the same on every export.
-fn occurrence_id(root: &str, occurrence: &[u32]) -> String {
-    if occurrence.iter().all(|&position| position == 1) {
-        return String::from(root);
-    }
-    let mut id = String::from(root);
-    for position in occurrence {
-        id.push('.');
-        id.push_str(&position.to_string());
-    }
-    id
 }
 
 /// The mapped resource of one `$tofhir` run, as its identity is asked for.
@@ -583,6 +571,7 @@ struct Mapped<'run> {
     resource_type: &'run str,
     template: &'run str,
     occurrence: &'run [u32],
+    path: &'run str,
 }
 
 /// Returns whether `text` fits the R4 `id` grammar.

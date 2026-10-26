@@ -11,6 +11,7 @@ use fhir_types::codec::Path;
 use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::identity::deterministic_id;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::operations::contract::CompositionPayload;
 use fhirconnect::operations::contract::Format;
@@ -502,10 +503,9 @@ fn a_composition_with_no_identity_is_refused() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn the_mapped_resource_takes_the_composition_version_object_id() -> Result<(), Box<dyn Error>> {
-    // The versioned_object_uid is the one part of an OBJECT_VERSION_ID stable
-    // across versions (RM Common), and it fits the R4 id grammar
-    // (<https://hl7.org/fhir/R4/resource.html>).
+fn the_mapped_resource_takes_the_deterministic_id_of_its_entry() -> Result<(), Box<dyn Error>> {
+    // NOTE: engine/id-management.adoc §Deterministic IDs, "a hash of the
+    // Composition UID and the Entry Path"; the uid enters as its stable object_id.
     let set = program_set(&[SUBJECT_CONTEXT])?;
     let committed = committed_composition()?;
     let request = ToFhirRequest::new(CompositionPayload::parse(&committed.to_string())?);
@@ -521,7 +521,13 @@ fn the_mapped_resource_takes_the_composition_version_object_id() -> Result<(), B
         .ok_or("the Bundle carries the mapped Condition")?;
     assert_eq!(
         condition.id.as_deref(),
-        Some("d2b3c1a0-0000-4000-8000-000000000001")
+        Some(
+            deterministic_id(
+                "d2b3c1a0-0000-4000-8000-000000000001",
+                "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"
+            )
+            .as_str()
+        )
     );
     Ok(())
 }

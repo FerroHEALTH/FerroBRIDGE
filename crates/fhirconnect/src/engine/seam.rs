@@ -268,6 +268,7 @@ pub struct ResourceRequest {
     composition: Option<String>,
     written: Option<String>,
     occurrence: Vec<u32>,
+    entry_path: Option<String>,
 }
 
 impl ResourceRequest {
@@ -281,6 +282,7 @@ impl ResourceRequest {
             composition: None,
             written: None,
             occurrence: Vec::new(),
+            entry_path: None,
         }
     }
 
@@ -290,6 +292,15 @@ impl ResourceRequest {
     #[must_use]
     pub fn with_occurrence(mut self, occurrence: Vec<u32>) -> Self {
         self.occurrence = occurrence;
+        self
+    }
+
+    /// Returns this request with the path that names the occurrence in the
+    /// composition, the entry path of its deterministic id
+    /// ([`crate::engine::identity::deterministic_id`]).
+    #[must_use]
+    pub fn with_entry_path(mut self, path: impl Into<String>) -> Self {
+        self.entry_path = Some(path.into());
         self
     }
 
@@ -329,6 +340,13 @@ impl ResourceRequest {
     #[must_use]
     pub fn written(&self) -> Option<&str> {
         self.written.as_deref()
+    }
+
+    /// Returns the path that names the occurrence in the composition, when
+    /// the run named one.
+    #[must_use]
+    pub fn entry_path(&self) -> Option<&str> {
+        self.entry_path.as_deref()
     }
 
     /// Returns the occurrence of the start archetype the resource maps;

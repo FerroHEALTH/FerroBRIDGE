@@ -581,6 +581,68 @@ impl WebTemplateIndex {
         Ok(Self::walk(composition.document(), element))
     }
 
+    /// Returns the path that names one instance of `node` in a composition,
+    /// or `None` when the composition does not hold that instance.
+    ///
+    /// The path follows the node's template path. At a repeating node, the
+    /// first instance keeps the template's predicate (the archetype node id
+    /// and, where the template names the node, its name) and a later one
+    /// takes the 1-based positional predicate of its place in the container,
+    /// as openEHR BASE Release 1.2.0, Paths and Locators, §Using Positional
+    /// Parameters, defines it, so the path parses and navigates back to the
+    /// instance. Keeping the first instance's predicate means a composition
+    /// that gains a second instance does not rename its first (no
+    /// specification governs the rendering: our own design).
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`WebTemplateIndex::read`], less the untyped value.
+    pub fn entry_path<D: CanonicalDocument + ?Sized>(
+        &self,
+        composition: &D,
+        node: &ResolvedNode,
+        occurrences: &[RmPosition],
+    ) -> Result<Option<RmPath>, PathError> {
+        if composition.document_template_id() != self.template_id() {
+            return Err(PathError::TemplateMismatch {
+                expected: self.template_id().to_owned(),
+                found: composition.document_template_id().to_owned(),
+            });
+        }
+        let path = self.instance_path(node, occurrences)?;
+        let mut current = composition.document();
+        let mut named = RmPath {
+            absolute: path.absolute,
+            segments: Vec::with_capacity(path.segments.len()),
+        };
+        for segment in &path.segments {
+            let mut identity = segment.clone();
+            identity.predicate.position = None;
+            let candidates = openehr_rm::v1_2::paths::select_children(current, &identity);
+            let nth = segment
+                .predicate
+                .position
+                .map_or(0, |position| position.saturating_sub(1));
+            let Some(&chosen) = candidates.get(nth) else {
+                return Ok(None);
+            };
+            if nth > 0 {
+                let place = current
+                    .get(&segment.attribute)
+                    .and_then(Value::as_array)
+                    .and_then(|items| items.iter().position(|item| core::ptr::eq(item, chosen)))
+                    .and_then(|index| index.checked_add(1));
+                identity.predicate = openehr_rm::v1_2::paths::Predicate {
+                    position: place,
+                    ..openehr_rm::v1_2::paths::Predicate::default()
+                };
+            }
+            named.segments.push(identity);
+            current = chosen;
+        }
+        Ok(Some(named))
+    }
+
     /// Walks the instance path `segments` down a canonical document.
     ///
     /// NOTE: no specification governs this: our own design, an absent optional

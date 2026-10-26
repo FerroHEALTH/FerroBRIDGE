@@ -4,8 +4,13 @@
 //! The two operations chained, a condition to a composition and back.
 
 use axum::body::Body;
+use fhirconnect::engine::identity::deterministic_id;
 use http::{Request, StatusCode, header};
 use std::error::Error;
+
+/// The `object_id` of the composition both legs carry: `$tofhir` ids are the
+/// hash of it and the entry path (`engine/id-management.adoc` §Deterministic IDs).
+const OBJECT_ID: &str = "d2b3c1a0-0000-4000-8000-000000000001";
 
 use super::FHIR_JSON;
 use super::PROFILE;
@@ -127,9 +132,13 @@ async fn the_two_operations_round_trip_a_condition_modulo_what_the_program_maps(
     );
     assert_eq!(
         set["changed"],
-        serde_json::json!([
-            "id: \"ferrobridge-synthetic-condition-1\" became \"d2b3c1a0-0000-4000-8000-000000000001\""
-        ]),
+        serde_json::json!([format!(
+            "id: \"ferrobridge-synthetic-condition-1\" became \"{}\"",
+            deterministic_id(
+                OBJECT_ID,
+                "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"
+            )
+        )]),
         "{set}"
     );
     Ok(())
@@ -187,8 +196,12 @@ async fn the_two_operations_round_trip_the_kds_condition_as_the_engine_does()
     assert_eq!(
         set["changed"],
         serde_json::json!([format!(
-            "id: {} became \"d2b3c1a0-0000-4000-8000-000000000001\"",
-            input["id"]
+            "id: {} became \"{}\"",
+            input["id"],
+            deterministic_id(
+                OBJECT_ID,
+                "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']"
+            )
         )]),
         "{set}"
     );

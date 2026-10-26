@@ -13,6 +13,8 @@ use std::sync::Mutex;
 
 use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
+use fhirconnect::engine::identity::deterministic_id;
+use fhirconnect::engine::identity::versioned_object_uid;
 use fhirconnect::engine::seam::ReferenceError;
 use fhirconnect::engine::seam::ResourceIdentity;
 use fhirconnect::engine::seam::ResourceRequest;
@@ -29,6 +31,9 @@ use crate::operations::TEMPLATE;
 use crate::operations::committed_composition;
 use crate::operations::program_set;
 use crate::operations::settings;
+
+/// The entry path of the one diagnosis the committed composition holds.
+const ENTRY_PATH: &str = "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]";
 
 /// An identity store that answers one fixed id, recording every request.
 #[derive(Debug)]
@@ -157,9 +162,17 @@ fn a_seam_id_outside_the_id_grammar_is_refused() -> Result<(), Box<dyn Error>> {
 #[test]
 fn without_a_seam_the_id_still_derives_from_the_composition() -> Result<(), Box<dyn Error>> {
     let answer = tofhir(&Seams::default())??;
-    assert_eq!(
-        condition_id(&answer).as_deref(),
-        COMPOSITION_UID.split("::").next()
-    );
+    let expected = deterministic_id(versioned_object_uid(COMPOSITION_UID), ENTRY_PATH);
+    assert_eq!(condition_id(&answer).as_deref(), Some(expected.as_str()));
+    Ok(())
+}
+
+#[test]
+fn the_seam_is_told_the_entry_path() -> Result<(), Box<dyn Error>> {
+    let store = Store::new(Ok("stored-condition-1"));
+    tofhir(&Seams::default().with_resource_identity(&store))??;
+    let seen = store.seen();
+    let paths: Vec<Option<&str>> = seen.iter().map(ResourceRequest::entry_path).collect();
+    assert_eq!(paths, [Some(ENTRY_PATH)]);
     Ok(())
 }
