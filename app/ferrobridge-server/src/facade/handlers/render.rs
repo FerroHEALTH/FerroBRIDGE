@@ -441,6 +441,7 @@ pub(crate) const fn loss_kind(loss: &Loss) -> &'static str {
         Loss::LastOfMany { .. } => "last-of-many",
         Loss::OneWayFallback { .. } => "one-way-fallback",
         Loss::UnmappedOccurrences { .. } => "unmapped-occurrences",
+        Loss::InapplicableOccurrences { .. } => "inapplicable-occurrences",
     }
 }
 

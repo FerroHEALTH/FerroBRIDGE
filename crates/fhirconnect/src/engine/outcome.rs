@@ -391,6 +391,18 @@ pub enum Loss {
         /// How many occurrences after the first the run did not map.
         count: usize,
     },
+    /// The occurrences of the start archetype at which the context's
+    /// `openehrCondition` does not hold, so a run over every occurrence
+    /// mapped no resource for them.
+    ///
+    /// No specification governs a start archetype held more than once: our
+    /// own design, after [`crate::engine::traverse::to_fhir_each`].
+    InapplicableOccurrences {
+        /// The archetype the context starts at.
+        archetype: String,
+        /// How many occurrences the condition did not admit.
+        count: usize,
+    },
 }
 
 impl fmt::Display for Loss {
@@ -415,6 +427,13 @@ impl fmt::Display for Loss {
             } => write!(
                 f,
                 "the composition holds {archetype} {count} more times, which this run over its first occurrence did not map"
+            ),
+            Self::InapplicableOccurrences {
+                ref archetype,
+                count,
+            } => write!(
+                f,
+                "the context's condition does not hold at {count} occurrences of {archetype}, so no resource maps them"
             ),
         }
     }

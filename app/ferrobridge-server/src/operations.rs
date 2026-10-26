@@ -457,6 +457,7 @@ const fn status_of(error: &OperationError) -> StatusCode {
         | OperationError::Mapped { .. }
         | OperationError::Encode { .. }
         | OperationError::Unidentified { .. }
+        | OperationError::DuplicateId { .. }
         | OperationError::SeveralSubjects { .. }
         | OperationError::SeveralSubjectResources { .. }
         | OperationError::NoSubjectResource { .. } => StatusCode::UNPROCESSABLE_ENTITY,

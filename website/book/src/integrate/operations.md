@@ -64,6 +64,15 @@ one answers `400` with the issue code `required`. When the payload and
 The answer is a `collection` Bundle carrying the mapped resources, exactly one
 `Provenance`, and an `OperationOutcome` entry when the run declared a loss.
 
+A composition can hold the archetype a context starts at more than once, for
+example two diagnoses. The answer then carries one resource per occurrence,
+and the one `Provenance` targets all of them. Without an identity seam, the
+first occurrence takes the composition's id and a further occurrence appends
+its position (`<uid>.2`), so every export answers the same ids. An occurrence
+the context's condition does not admit maps no resource and is counted as an
+`informational` issue; when the condition admits none, the call is refused.
+Two resources that would take one id refuse the call.
+
 ## `POST /fhir/$toopenehr`
 
 The body is a FHIR `Bundle`, or a `Parameters` carrying it under `bundle`. The

@@ -155,6 +155,16 @@ pub enum OperationError {
         /// The resource type the program maps.
         resource: String,
     },
+    /// Two resources of one answer took the same identity.
+    ///
+    /// A Bundle entry's `fullUrl` and the `Provenance` target name a resource
+    /// by `<type>/<id>`, so two resources sharing one could not be told apart
+    /// (<https://hl7.org/fhir/R4/bundle.html#references>).
+    #[error("two resources of the answer take the identity {reference}")]
+    DuplicateId {
+        /// The `<type>/<id>` the resources share.
+        reference: String,
+    },
     /// The caller's identity seam assigned the mapped resource no id.
     #[error("the identity seam assigned the mapped {resource} no id")]
     Identity {
@@ -197,9 +207,10 @@ impl OperationError {
                 SelectError::NoMatch { .. } | SelectError::ProfileVersion { .. } => "not-found",
             },
             Self::SeveralSubjectResources { .. } | Self::SeveralSubjects { .. } => "business-rule",
-            Self::Mapping { .. } | Self::Serialization { .. } | Self::Unidentified { .. } => {
-                "processing"
-            }
+            Self::Mapping { .. }
+            | Self::Serialization { .. }
+            | Self::Unidentified { .. }
+            | Self::DuplicateId { .. } => "processing",
             // NOTE: valueset-issue-type.html: a refusing identity seam is "an
             // unexpected internal error" (`exception`), and an id it answers
             // outside the `id` grammar fails "a content validation rule" (`value`).

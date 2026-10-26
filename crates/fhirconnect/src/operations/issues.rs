@@ -76,14 +76,14 @@ pub fn issue(severity: &str, code: &str, text: &str) -> OperationOutcomeIssue {
 #[must_use]
 pub fn of_warning(warning: &Warning) -> OperationOutcomeIssue {
     let severity = match *warning.loss() {
-        Loss::Defaulted { .. } => INFORMATION,
+        Loss::Defaulted { .. } | Loss::InapplicableOccurrences { .. } => INFORMATION,
         Loss::Skipped { .. }
         | Loss::LastOfMany { .. }
         | Loss::OneWayFallback { .. }
         | Loss::UnmappedOccurrences { .. } => WARNING,
     };
     let code = match *warning.loss() {
-        Loss::Defaulted { .. } => "informational",
+        Loss::Defaulted { .. } | Loss::InapplicableOccurrences { .. } => "informational",
         Loss::Skipped { .. }
         | Loss::LastOfMany { .. }
         | Loss::OneWayFallback { .. }

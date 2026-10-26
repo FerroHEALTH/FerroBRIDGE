@@ -489,7 +489,7 @@ fn root_instances(
 }
 
 /// Returns the archetype id the context's start model mapping declares.
-fn start_archetype(program: &Program) -> String {
+pub(crate) fn start_archetype(program: &Program) -> String {
     program
         .models()
         .iter()
