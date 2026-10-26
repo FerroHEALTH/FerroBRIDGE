@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored composition model mapping onto a FHIR R4
+# Composition: the composer as author, a fixed status, type and title, and
+# one section whose entry is the diagnosis, created as a Condition going
+# out (composition-element.adoc lets a context start at a composition model).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.ferrobridge_report.v1.Composition
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.ferrobridge_report.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Composition
+
+mappings:
+  - name: "author"
+    with:
+      fhir: "$resource.author"
+      openehr: "$composition/composer"
+
+  - name: "fixed"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "values"
+        fhir:
+          - path: "status"
+            value: "final"
+          - path: "title"
+            value: "Synthetic report"
+          - path: "type.text"
+            value: "Synthetic report"
+          - path: "date"
+            value: "2026-09-15T09:00:00Z"
+
+  - name: "section"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"
+    followedBy:
+      mappings:
+        - name: "problem"
+          with:
+            fhir: "entry"
+            openehr: "$reference"
+          reference:
+            resourceType: "Condition"
+            mappings:
+              - name: "problemMapping"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$openehrRoot"
+                slotArchetype: "ferrobridge_document_problem"

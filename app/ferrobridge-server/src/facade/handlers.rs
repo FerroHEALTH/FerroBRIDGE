@@ -138,6 +138,147 @@ pub async fn read_route(
         .unwrap_or_else(Refusal::into_response)
 }
 
+/// `GET [base]/{type}/{id}/$document`: the document Bundle of one mapped
+/// Composition (<https://hl7.org/fhir/R4/composition-operation-document.html>).
+pub async fn document_route(
+    State(facade): State<Arc<Facade>>,
+    access: Access,
+    Path((resource_type, id)): Path<(String, String)>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> Response {
+    document(&facade, &access, &resource_type, Some(&id), &headers, &uri)
+        .await
+        .unwrap_or_else(Refusal::into_response)
+}
+
+/// `GET [base]/{type}/$document?id=[id]`, identical in meaning to the
+/// instance form (<https://hl7.org/fhir/R4/composition-operation-document.html>).
+pub async fn document_type_route(
+    State(facade): State<Arc<Facade>>,
+    access: Access,
+    Path(resource_type): Path<String>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> Response {
+    document(&facade, &access, &resource_type, None, &headers, &uri)
+        .await
+        .unwrap_or_else(Refusal::into_response)
+}
+
+/// The `$document` operation behind its two routes.
+///
+/// The R4 `OperationDefinition` `Composition-document` takes `id`, `persist`
+/// and `graph`. This server stores no document and reads no `GraphDefinition`,
+/// so `persist=true` and any `graph` are refused rather than ignored, and a
+/// Composition on another server is refused; `persist=false` is honoured
+/// (no specification governs refusing them: our own design).
+async fn document(
+    facade: &Facade,
+    access: &Access,
+    resource_type: &str,
+    path_id: Option<&str>,
+    headers: &HeaderMap,
+    uri: &Uri,
+) -> Result<Response, Refusal> {
+    if resource_type != read::COMPOSITION {
+        return Err(reply::refusal(
+            StatusCode::NOT_FOUND,
+            Issue::error(IssueType::NotSupported).diagnosing(format!(
+                "$document is an operation of Composition, not of {resource_type}"
+            )),
+        ));
+    }
+    let invalid = |code: IssueType, text: String| {
+        reply::refusal(StatusCode::BAD_REQUEST, Issue::error(code).diagnosing(text))
+    };
+    let mut named = None;
+    for (name, value) in media::query_pairs(uri.query().unwrap_or_default().as_bytes()) {
+        match name.as_str() {
+            "id" => named = Some(value),
+            "persist" => match value.as_str() {
+                "false" => {}
+                "true" => {
+                    return Err(invalid(
+                        IssueType::NotSupported,
+                        String::from(
+                            "persist=true asks this server to store the document at /Bundle, which it does not do",
+                        ),
+                    ));
+                }
+                other => {
+                    return Err(invalid(
+                        IssueType::Invalid,
+                        format!("persist is a boolean, not {other:?}"),
+                    ));
+                }
+            },
+            "graph" => {
+                return Err(invalid(
+                    IssueType::NotSupported,
+                    String::from("this server reads no GraphDefinition, so graph is not supported"),
+                ));
+            }
+            "_format" | "_pretty" => {}
+            other => {
+                return Err(invalid(
+                    IssueType::NotSupported,
+                    format!("$document takes no parameter {other:?}"),
+                ));
+            }
+        }
+    }
+    let id = match (path_id, named) {
+        (Some(_), Some(_)) => {
+            return Err(invalid(
+                IssueType::Invalid,
+                String::from(
+                    "the id parameter SHALL NOT be used when the operation names a Composition",
+                ),
+            ));
+        }
+        (Some(id), None) => id.to_owned(),
+        (None, Some(id)) => local_id(facade, &id).ok_or_else(|| {
+            invalid(
+                IssueType::NotSupported,
+                format!("{id} names a Composition on another server"),
+            )
+        })?,
+        (None, None) => {
+            return Err(invalid(
+                IssueType::Required,
+                String::from("$document needs the Composition, in the path or as id"),
+            ));
+        }
+    };
+    admit_existing(facade, access, Permission::Read, read::COMPOSITION, &id)?;
+    read::document(
+        facade,
+        access,
+        &facade.client_for(headers),
+        &id,
+        headers,
+        uri,
+    )
+    .await
+}
+
+/// Returns the logical id an `id` parameter names on this server: a bare id,
+/// or the URL of a Composition under the facade's base.
+fn local_id(facade: &Facade, id: &str) -> Option<String> {
+    if !id.contains('/') {
+        return Some(id.to_owned());
+    }
+    let prefix = format!(
+        "{}/{}/",
+        facade.settings().base_url.trim_end_matches('/'),
+        read::COMPOSITION
+    );
+    id.strip_prefix(&prefix)
+        .filter(|rest| !rest.is_empty() && !rest.contains('/'))
+        .map(str::to_owned)
+}
+
 /// `GET [base]/{type}/{id}/_history/{vid}`: read one version of a mapped
 /// resource back out of the CDR.
 pub async fn vread_route(

@@ -6,13 +6,14 @@
 //! It names exactly what the loaded programs support
 //! (<https://hl7.org/fhir/R4/capabilitystatement.html>): one `rest.resource`
 //! per resource type a program maps, with the interactions the facade
-//! implements and the `$validate` operation. A type a search declaration
-//! answers also names `search-type` and exactly its declared parameters with
-//! `_id`; every other type names no search parameter. A type only a
-//! `reference` mapping creates names `read` and `vread` alone, because the
-//! facade answers it once the resource referencing it is answered. A type no
-//! program maps or creates is absent here and answers `404` with
-//! `not-supported` on the wire (no specification governs this: our own design).
+//! implements and the `$validate` operation, and `$document` on Composition.
+//! A type a search declaration answers also names `search-type` and exactly
+//! its declared parameters with `_id`; every other type names no search
+//! parameter. A type only a `reference` mapping creates names `read` and
+//! `vread` alone, because the facade answers it once the resource referencing
+//! it is answered. A type no program maps or creates is absent here and
+//! answers `404` with `not-supported` on the wire (no specification governs
+//! this: our own design).
 //!
 //! The statement declares `updateCreate: false`, because a `PUT` to an
 //! unknown id is a `404` rather than a create, `conditionalCreate` true,
@@ -66,6 +67,10 @@ const VERSIONING: &str = "versioned-update";
 
 /// The canonical `OperationDefinition` of `$validate`.
 const VALIDATE_DEFINITION: &str = "http://hl7.org/fhir/OperationDefinition/Resource-validate";
+
+/// The canonical `OperationDefinition` of `Composition/$document`
+/// (<https://hl7.org/fhir/R4/composition-operation-document.html>).
+const DOCUMENT_DEFINITION: &str = "http://hl7.org/fhir/OperationDefinition/Composition-document";
 
 /// The type-level interactions this facade implements.
 ///
@@ -554,11 +559,19 @@ fn resource(name: &str, search: &Catalog, chains: Chains) -> CapabilityStatement
         update_create: Some(false.into()),
         conditional_create: Some(true.into()),
         conditional_update: Some(false.into()),
-        operation: vec![CapabilityStatementRestResourceOperation {
-            name: "validate".into(),
-            definition: VALIDATE_DEFINITION.into(),
-            ..CapabilityStatementRestResourceOperation::default()
-        }],
+        operation: std::iter::once(("validate", VALIDATE_DEFINITION))
+            .chain(
+                (name == crate::facade::handlers::read::COMPOSITION)
+                    .then_some(("document", DOCUMENT_DEFINITION)),
+            )
+            .map(
+                |(code, definition)| CapabilityStatementRestResourceOperation {
+                    name: code.into(),
+                    definition: definition.into(),
+                    ..CapabilityStatementRestResourceOperation::default()
+                },
+            )
+            .collect(),
         ..CapabilityStatementRestResource::default()
     }
 }

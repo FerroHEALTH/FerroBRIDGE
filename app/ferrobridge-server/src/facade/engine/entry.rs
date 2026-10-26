@@ -5,9 +5,11 @@
 //! them.
 //!
 //! An entry is a `content` item carrying the archetype the start model mapping
-//! of a program declares. The identity map keys each entry by the path
-//! [`Entry::identity_path`] writes, and [`entry_named`] reads every path a
-//! build has written back to its entry.
+//! of a program declares, or the composition itself when that archetype is
+//! the composition's own, as a context whose start is a composition model
+//! maps it (`types-of-mapping-files/composition-element.adoc`). The identity
+//! map keys each entry by the path [`Entry::identity_path`] writes, and
+//! [`entry_named`] reads every path a build has written back to its entry.
 
 use fhirconnect::resolve::program::Program;
 use openehr_mapping_core::composition::CanonicalComposition;
@@ -28,6 +30,9 @@ pub struct Entry {
     index: usize,
     /// Whether the composition holds more than one item of the archetype.
     several: bool,
+    /// Whether the entry is the composition itself, the start of a context
+    /// whose start model mapping is a composition model.
+    root: bool,
 }
 
 impl Entry {
@@ -56,6 +61,9 @@ impl Entry {
     /// with the `openehr-rm` path types, so it parses back.
     #[must_use]
     pub fn identity_path(&self) -> String {
+        if self.root {
+            return String::from(ROOT);
+        }
         let predicate = if self.ordinal <= 1 {
             Predicate {
                 archetype_node_id: Some(self.archetype.clone()),
@@ -95,14 +103,16 @@ impl Entry {
         } else {
             self.ordinal
         };
-        self.several
-            .then(|| format!("/content[{}, {n}]", self.archetype))
+        (self.several && !self.root).then(|| format!("/content[{}, {n}]", self.archetype))
     }
 
     /// Returns `composition` with every other `content` item of this entry's
     /// archetype removed, so the program maps this entry alone.
     #[must_use]
     pub fn isolate(&self, composition: &CanonicalComposition) -> CanonicalComposition {
+        if self.root {
+            return composition.clone();
+        }
         let mut value = composition.value().clone();
         if let Some(content) = value
             .get_mut("content")
@@ -124,6 +134,9 @@ impl Entry {
     /// Returns the entry's item in `composition`.
     #[must_use]
     pub fn item<'c>(&self, composition: &'c CanonicalComposition) -> Option<&'c serde_json::Value> {
+        if self.root {
+            return Some(composition.value());
+        }
         composition
             .value()
             .get("content")
@@ -143,6 +156,13 @@ impl Entry {
         composition: &CanonicalComposition,
         item: serde_json::Value,
     ) -> CanonicalComposition {
+        if self.root {
+            return CanonicalComposition::new(
+                item,
+                composition.template_id(),
+                composition.generation(),
+            );
+        }
         let mut value = composition.value().clone();
         if let Some(slot) = value
             .get_mut("content")
@@ -262,6 +282,9 @@ fn named_in(
     archetype: &str,
     path: &str,
 ) -> Result<Option<Entry>, AmbiguousEntry> {
+    if path == ROOT {
+        return Ok(root_entry(composition, archetype));
+    }
     let Some(place) = place_of(path, archetype) else {
         return Ok(None);
     };
@@ -296,6 +319,28 @@ fn named_in(
 
 /// The `content` attribute every entry path starts with.
 const CONTENT: &str = "content";
+
+/// The path of the composition itself (openEHR BASE Release 1.2.0, Paths and
+/// Locators: `/` names the root of the archetyped structure).
+const ROOT: &str = "/";
+
+/// Returns the composition itself as the one entry of `archetype`, when the
+/// composition carries it.
+fn root_entry(composition: &CanonicalComposition, archetype: &str) -> Option<Entry> {
+    (archetype_node_id(composition.value()) == Some(archetype)).then(|| Entry {
+        uid: composition
+            .value()
+            .get("uid")
+            .and_then(|uid| uid.get("value"))
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
+        archetype: archetype.to_owned(),
+        ordinal: 1,
+        index: 0,
+        several: false,
+        root: true,
+    })
+}
 
 /// How an entry path names its entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -352,6 +397,9 @@ fn legacy_place(path: &str, archetype: &str) -> Option<usize> {
 
 /// Returns every `content` item of `composition` carrying `archetype`.
 fn entries_at(composition: &CanonicalComposition, archetype: &str) -> Vec<Entry> {
+    if let Some(root) = root_entry(composition, archetype) {
+        return vec![root];
+    }
     let Some(content) = composition
         .value()
         .get("content")
@@ -378,6 +426,7 @@ fn entries_at(composition: &CanonicalComposition, archetype: &str) -> Vec<Entry>
             ordinal,
             index,
             several,
+            root: false,
         })
         .collect()
 }
@@ -682,5 +731,36 @@ mod tests {
         let path = format!("/content[{DIAGNOSIS}, 2]");
         let refused = named(&built, &path).expect_err("two entries answer the path");
         assert_eq!(path, refused.path());
+    }
+
+    /// A context whose start is a composition model maps the composition
+    /// itself, so its one entry is the root, named `/`.
+    #[test]
+    fn a_composition_rooted_program_maps_the_composition_itself() {
+        let report = "openEHR-EHR-COMPOSITION.ferrobridge_report.v1";
+        let held = CanonicalComposition::new(
+            serde_json::json!({
+                "_type": "COMPOSITION",
+                "archetype_node_id": report,
+                "content": [{"archetype_node_id": DIAGNOSIS}]
+            }),
+            "ferrobridge.diagnose.v1",
+            Generation::Adl14,
+        );
+        let entries = entries_at(&held, report);
+        let [ref root] = *entries else {
+            panic!("one root entry, got {entries:?}");
+        };
+        assert_eq!("/", root.identity_path());
+        assert_eq!(None, root.legacy_path());
+        assert_eq!(Some(held.value()), root.item(&held));
+        assert_eq!(held, root.isolate(&held));
+        assert_eq!(Ok(Some(root.clone())), named_in(&held, report, "/"));
+        assert_eq!(Ok(None), named_in(&held, DIAGNOSIS, "/"));
+        let replaced = root.replaced(&held, serde_json::json!({"_type": "COMPOSITION"}));
+        assert_eq!(
+            &serde_json::json!({"_type": "COMPOSITION"}),
+            replaced.value()
+        );
     }
 }
