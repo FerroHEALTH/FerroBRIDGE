@@ -15,6 +15,7 @@ mod eu_condition;
 mod eu_laboratory;
 mod eu_mpd;
 mod eu_patient;
+mod eu_test_result;
 mod event_time;
 mod events;
 mod kds_coding;

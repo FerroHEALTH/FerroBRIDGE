@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension of OBSERVATION.laboratory_test_result.v1.Observation
+# for the HL7 Europe Base and Core 2.0.0 medicalTestResult-eu-core profile:
+# the canonical, and the required category, written out of openEHR, where a
+# laboratory test result is a laboratory result by its archetype.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_test_result
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: OBSERVATION.laboratory_test_result.v1.Observation
+
+mappings:
+  - name: "metaURL"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/base/StructureDefinition/medicalTestResult-eu-core"
+
+  - name: "categoryLaboratory"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.category.coding"
+    manual:
+      - name: "laboratory"
+        fhir:
+          - path: "system"
+            value: "http://terminology.hl7.org/CodeSystem/observation-category"
+          - path: "code"
+            value: "laboratory"
