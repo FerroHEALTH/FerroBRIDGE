@@ -457,9 +457,6 @@ fn held(declared_type: &str) -> Option<Carried> {
     }
 }
 
-// TODO(#618): the `_provider`, `_health_care_facility`, `_end_time` and
-// `_null_flavour` families are spelled here and in `family` until openehr-sdt honours `|raw` on `_`-prefixed attribute families
-// (sibling request S1).
 /// The attributes of a structural class FLAT writes as a `_`-prefixed family
 /// of the class's node.
 ///

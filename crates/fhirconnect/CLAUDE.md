@@ -252,9 +252,9 @@ Template node either: a mapping names them as `$archetype/data/origin` and
 `$archetype/time`, which `rm::ENTRY_TIMES` carries as `Carried::EntryTime`,
 and the engine writes them as the entry's `history_origin` and `time`
 (master05 §OBSERVATION, §ACTION).
-These families are the one place the engine still spells FLAT keys, because the
-builder takes no `|raw` on a `_`-prefixed family (the `TODO(#618)` in
-`engine::family`). Reading them back decodes typed `LINK` and
+The engine writes each of these families whole, as the typed `openehr-rm`
+value under `|raw` (master04 §Raw canonical JSON); only `_end_time` and
+`_null_flavour` keep their master05 suffix spellings. Reading them back decodes typed `LINK` and
 `PARTICIPATION` values, and a list that does not decode refuses the run. A
 run whose `Defaults` carry
 an `engine::origin::Origin` records the originating system, the source

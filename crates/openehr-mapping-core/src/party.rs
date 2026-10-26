@@ -220,14 +220,29 @@ impl WebTemplateIndex {
     /// root's class.
     pub fn build_party(&self, values: &[NodeValue]) -> Result<CanonicalParty, PartyError> {
         let kind = self.party_kind()?;
+        let root = self.root().flat_id().as_str().to_owned();
         let mut flat = Map::new();
-        let mut on_root = Vec::new();
+        let mut performed = false;
         for value in values {
             if self.party_value(value)? {
-                on_root.push(&value.value);
+                let Value::Object(ref members) = value.value else {
+                    return Err(PartyError::UnsupportedValue {
+                        place: root,
+                        reason: "no object",
+                    });
+                };
+                for (attribute, member) in self.root_members(members)? {
+                    performed |= attribute == "performer" && !member.is_null();
+                    flat.insert(format!("{root}/{attribute}|raw"), member.clone());
+                }
             } else {
                 flat.insert(self.flat_key(value)?.to_string(), value.value.clone());
             }
+        }
+        if kind == PartyClass::Role && !performed {
+            return Err(PartyError::RoleWithoutPerformer {
+                template_id: self.template_id().to_owned(),
+            });
         }
         let refused = |source| PartyError::Build {
             template_id: self.template_id().to_owned(),
@@ -235,21 +250,15 @@ impl WebTemplateIndex {
         };
         let document = openehr_sdt::flat::sim::flat::parse_flat(&flat).map_err(refused)?;
         let options = BuildOptions::default().with_rm_version(RM_RELEASE);
-        let built = openehr_sdt::flat::build::build_root(&document, self.web_template(), &options)
-            .map_err(refused)?;
-        let Value::Object(mut party) = built else {
-            return Err(refused(FlatError::Conversion(String::from(
-                "the party root built as no object",
-            ))));
-        };
-        for members in on_root {
-            root_members(&mut party, members).ok_or_else(|| PartyError::UnsupportedValue {
-                place: self.root().flat_id().as_str().to_owned(),
-                reason: "no object",
-            })??;
-        }
-        let built = Value::Object(party);
-        self.performed(kind, &built)?;
+        let built = openehr_sdt::flat::build::build_party(&document, self.web_template(), &options)
+            .map_err(|source| match source {
+                FlatError::PartyDecode { source, .. } => PartyError::Invalid {
+                    template_id: self.template_id().to_owned(),
+                    class: kind,
+                    source: Box::new(source),
+                },
+                other => refused(other),
+            })?;
         let value = decode(kind, &built).map_err(|source| PartyError::Invalid {
             template_id: self.template_id().to_owned(),
             class: kind,
@@ -303,6 +312,32 @@ impl WebTemplateIndex {
         Ok(())
     }
 
+    /// Returns the members of a value written at the party root, each an
+    /// attribute of the root's class the builder takes whole under `|raw`
+    /// (Simplified Formats master04 §Raw canonical JSON), `ROLE.performer`
+    /// first among them (RM Demographic IM); the `_type` names the class and
+    /// is not passed on.
+    fn root_members<'v>(
+        &self,
+        members: &'v Map<String, Value>,
+    ) -> Result<Vec<(&'v str, &'v Value)>, PartyError> {
+        let class = self.root().rm_type();
+        members
+            .iter()
+            .filter(|&(attribute, _)| attribute != TYPE)
+            .map(|(attribute, member)| {
+                if openehr_rm::v1_2::model::attribute(class, attribute).is_none() {
+                    return Err(PartyError::UnknownAttribute {
+                        path: format!("/{attribute}"),
+                        class: class.to_owned(),
+                        attribute: attribute.clone(),
+                    });
+                }
+                Ok((attribute.as_str(), member))
+            })
+            .collect()
+    }
+
     /// Returns the class the template is rooted at.
     fn party_kind(&self) -> Result<PartyClass, PartyError> {
         PartyClass::from_rm_type(self.root().rm_type()).ok_or_else(|| PartyError::NotAParty {
@@ -333,39 +368,6 @@ impl WebTemplateIndex {
         }
         Ok(self.node_by_flat_id(flat_id)?.flat_id() == self.root().flat_id())
     }
-}
-
-// TODO(#1000): pass the root's members to the openehr-sdt builder once it
-// takes a party root attribute, and build through `build_party`.
-/// Places the members of a value written at the party root onto the root,
-/// `None` when the value is no object.
-///
-/// An attribute of the root that no template node holds (`ROLE.performer`,
-/// RM Demographic IM) is written this way; every member must be an attribute
-/// of the root's class, and its `_type` names that class and is not copied.
-fn root_members(party: &mut Map<String, Value>, value: &Value) -> Option<Result<(), PartyError>> {
-    let Value::Object(members) = value else {
-        return None;
-    };
-    let class = party
-        .get(TYPE)
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_owned();
-    for (attribute, member) in members {
-        if attribute == TYPE {
-            continue;
-        }
-        if openehr_rm::v1_2::model::attribute(&class, attribute).is_none() {
-            return Some(Err(PartyError::UnknownAttribute {
-                path: format!("/{attribute}"),
-                class,
-                attribute: attribute.clone(),
-            }));
-        }
-        party.insert(attribute.clone(), member.clone());
-    }
-    Some(Ok(()))
 }
 
 /// Decodes `value` strictly as `class` and encodes it back.
