@@ -4,7 +4,8 @@
 //! A composition holding a context's start archetype more than once: one
 //! resource per occurrence, each from its own subtree, with the context's
 //! condition evaluated per occurrence (`to_fhir_each`), and the first-only
-//! run that declares the occurrences it left (`to_fhir`).
+//! run that declares the occurrences it left (`to_fhir`), and the `$tofhir`
+//! answer with one resource per occurrence.
 //!
 //! FHIRconnect v1.0.0 does not say how a context binds to a start archetype a
 //! composition holds more than once, so the behaviour is the engine's own
@@ -14,9 +15,13 @@
 use core::error::Error;
 
 use fhir_types::codec::Value;
+use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::outcome::Loss;
+use fhirconnect::engine::seam::ReferenceError;
+use fhirconnect::engine::seam::ResourceIdentity;
+use fhirconnect::engine::seam::ResourceRequest;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::Each;
 use fhirconnect::engine::traverse::to_fhir;
@@ -24,6 +29,14 @@ use fhirconnect::engine::traverse::to_fhir_each;
 use fhirconnect::engine::traverse::to_openehr;
 use fhirconnect::model::load::load_set;
 use fhirconnect::model::semantic::StaticMappingCodes;
+use fhirconnect::operations::contract::CompositionPayload;
+use fhirconnect::operations::contract::ToFhirRequest;
+use fhirconnect::operations::contract::ToFhirResponse;
+use fhirconnect::operations::error::OperationError;
+use fhirconnect::operations::programs::ProgramSet;
+use fhirconnect::operations::run;
+use fhirconnect::operations::run::Settings;
+use fhirconnect::operations::run::Transformed;
 use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
 use openehr_mapping_core::composition::CanonicalComposition;
@@ -256,5 +269,222 @@ fn the_contexts_condition_is_evaluated_per_occurrence() -> Result<(), Box<dyn Er
         Some("A synthetic first note"),
         "the admitted occurrence maps its own note: {json}"
     );
+    Ok(())
+}
+
+/// A synthetic `OBJECT_VERSION_ID` a CDR would have stamped.
+const UID: &str = "7c1e2a90-0000-4000-8000-000000001254::ferrobridge.example::1";
+
+/// The leading segment of [`UID`], the id a first occurrence takes.
+const ROOT: &str = "7c1e2a90-0000-4000-8000-000000001254";
+
+/// An identity seam that records every request and answers `answer`.
+#[derive(Debug)]
+struct Recorder {
+    answer: Option<&'static str>,
+    seen: std::sync::Mutex<Vec<ResourceRequest>>,
+}
+
+impl ResourceIdentity for Recorder {
+    fn identify(&self, request: &ResourceRequest) -> Result<String, ReferenceError> {
+        let mut seen = self
+            .seen
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        seen.push(request.clone());
+        Ok(self
+            .answer
+            .map_or_else(|| format!("seam-{}", seen.len()), String::from))
+    }
+}
+
+/// Runs `$tofhir` with `program` over the two-diagnosis composition, its
+/// `uid` stamped.
+fn tofhir(
+    program: std::sync::Arc<Program>,
+    index: WebTemplateIndex,
+    seams: &Seams<'_>,
+) -> Result<Result<Transformed<ToFhirResponse>, OperationError>, Box<dyn Error>> {
+    let (builder, _) = eu_condition_program()?;
+    let mut composition = two_diagnoses(&builder, &kds_template()?)?.value().clone();
+    composition
+        .as_object_mut()
+        .ok_or("the composition is an object")?
+        .insert(
+            "uid".to_owned(),
+            serde_json::json!({"_type": "OBJECT_VERSION_ID", "value": UID}),
+        );
+    let mut set = ProgramSet::new();
+    set.insert_template(index);
+    set.insert_program(program)?;
+    let patient = fhir_types::r4::reference::Reference {
+        reference: Some(fhir_types::r4::primitives::String::from(
+            "Patient/synthetic-1254",
+        )),
+        ..fhir_types::r4::reference::Reference::default()
+    };
+    let request = ToFhirRequest::new(CompositionPayload::parse(&composition.to_string())?)
+        .with_context(CallContext::new().with_patient(patient));
+    Ok(run::to_fhir_with_warnings(
+        &set,
+        &SCHEMAS,
+        seams,
+        &Settings::new("Device/ferrobridge", "2026-10-26T10:00:00Z"),
+        &request,
+    ))
+}
+
+/// The ids and codes of the Conditions an answer carries, and the Provenance
+/// targets.
+fn conditions(answer: &ToFhirResponse) -> (Vec<(String, String)>, Vec<String>) {
+    let mut found = Vec::new();
+    let mut targets = Vec::new();
+    for entry in &answer.bundle().entry {
+        match entry.resource {
+            Some(Resource::Condition(ref condition)) => found.push((
+                condition.id.as_deref().unwrap_or_default().to_owned(),
+                condition
+                    .code
+                    .as_ref()
+                    .and_then(|code| code.coding.first())
+                    .and_then(|coding| coding.code.as_ref()?.value.as_deref())
+                    .unwrap_or_default()
+                    .to_owned(),
+            )),
+            Some(Resource::Provenance(ref provenance)) => targets.extend(
+                provenance
+                    .target
+                    .iter()
+                    .filter_map(|target| target.reference.as_ref()?.value.clone()),
+            ),
+            _ => {}
+        }
+    }
+    (found, targets)
+}
+
+#[test]
+fn tofhir_answers_one_resource_per_occurrence() -> Result<(), Box<dyn Error>> {
+    let (program, index) = eu_condition_program()?;
+    let answer = tofhir(program, index, &Seams::default())??;
+    let (found, targets) = conditions(answer.response());
+    let second = format!("{ROOT}.2");
+    assert_eq!(
+        found,
+        [
+            (ROOT.to_owned(), "38341003".to_owned()),
+            (second.clone(), "195967001".to_owned())
+        ],
+        "one Condition per occurrence, the first keeping the composition's id"
+    );
+    assert_eq!(
+        targets,
+        [format!("Condition/{ROOT}"), format!("Condition/{second}")],
+        "one Provenance targets every occurrence"
+    );
+    assert!(
+        !answer
+            .warnings()
+            .iter()
+            .any(|warning| matches!(*warning.loss(), Loss::UnmappedOccurrences { .. })),
+        "no occurrence is left: {:?}",
+        answer.warnings()
+    );
+    Ok(())
+}
+
+#[test]
+fn tofhir_counts_the_occurrences_the_condition_does_not_admit() -> Result<(), Box<dyn Error>> {
+    let (_, index) = eu_condition_program()?;
+    let program = gated(&index)?;
+    let answer = tofhir(program, index, &Seams::default())??;
+    let notes: Vec<(Option<&str>, Option<&str>)> = answer
+        .response()
+        .bundle()
+        .entry
+        .iter()
+        .filter_map(|entry| match entry.resource {
+            Some(Resource::Condition(ref condition)) => Some((
+                condition.id.as_deref(),
+                condition
+                    .note
+                    .first()
+                    .and_then(|note| note.text.value.as_deref()),
+            )),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        notes,
+        [(Some(ROOT), Some("A synthetic first note"))],
+        "only the admitted occurrence maps, with its own note"
+    );
+    let counted: Vec<usize> = answer
+        .warnings()
+        .iter()
+        .filter_map(|warning| match *warning.loss() {
+            Loss::InapplicableOccurrences { count, .. } => Some(count),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(counted, [1], "the one occurrence left out is counted");
+    assert!(
+        answer
+            .response()
+            .bundle()
+            .entry
+            .iter()
+            .any(|entry| matches!(entry.resource, Some(Resource::OperationOutcome(_)))),
+        "the count travels in the answer's OperationOutcome"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_identity_seam_is_told_each_occurrence() -> Result<(), Box<dyn Error>> {
+    let (program, index) = eu_condition_program()?;
+    let recorder = Recorder {
+        answer: None,
+        seen: std::sync::Mutex::new(Vec::new()),
+    };
+    let answer = tofhir(
+        program,
+        index,
+        &Seams::default().with_resource_identity(&recorder),
+    )??;
+    let (found, _) = conditions(answer.response());
+    let ids: Vec<&str> = found.iter().map(|(id, _)| id.as_str()).collect();
+    assert_eq!(ids, ["seam-1", "seam-2"], "the seam's ids are kept");
+    let seen = recorder
+        .seen
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .iter()
+        .map(|request| request.occurrence().to_vec())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        seen,
+        [vec![1], vec![2]],
+        "each request names its occurrence"
+    );
+    Ok(())
+}
+
+#[test]
+fn two_occurrences_taking_one_id_refuse_the_run() -> Result<(), Box<dyn Error>> {
+    let (program, index) = eu_condition_program()?;
+    let recorder = Recorder {
+        answer: Some("one-id"),
+        seen: std::sync::Mutex::new(Vec::new()),
+    };
+    let refused = tofhir(
+        program,
+        index,
+        &Seams::default().with_resource_identity(&recorder),
+    )?;
+    let Err(OperationError::DuplicateId { reference }) = refused else {
+        return Err(format!("expected a duplicate-id refusal, got {refused:?}").into());
+    };
+    assert_eq!(reference, "Condition/one-id");
     Ok(())
 }

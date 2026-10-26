@@ -28,12 +28,16 @@ use crate::engine::context::CallContext;
 use crate::engine::origin::Origin;
 use crate::engine::origin::SourceItem;
 use crate::engine::outcome::Location;
+use crate::engine::outcome::Loss;
+use crate::engine::outcome::Outcome;
 use crate::engine::outcome::Warning;
 use crate::engine::seam::BundleReferences;
 use crate::engine::seam::ResourceRequest;
 use crate::engine::seam::Seams;
 use crate::engine::traverse;
 use crate::engine::traverse::Defaults;
+use crate::engine::traverse::Each;
+use crate::engine::traverse::error::EngineError;
 use crate::operations::contract::CompositionPayload;
 use crate::operations::contract::Format;
 use crate::operations::contract::ToFhirRequest;
@@ -207,40 +211,45 @@ pub fn to_fhir_with_warnings<T: Table + ?Sized>(
     let program = select_by_template(programs.programs(), &template)
         .map_err(|source| OperationError::Select { source })?;
     let context = request.context().cloned().unwrap_or_default();
-    let outcome = traverse::to_fhir(program, table, index, &composition, seams, &context).map_err(
-        |source| OperationError::Mapping {
-            source: Box::new(source),
-        },
-    )?;
+    let (occurrences, mut warnings) =
+        occurrences(program, table, index, &composition, seams, &context)?;
     let resource_type = String::from(program.resource().as_str());
-    let mut object = object_of(outcome.value())?;
-    subject(table, &mut object, &resource_type, request.context())?;
-    let mapped = Mapped {
-        resource_type: &resource_type,
-        template: template.as_str(),
-    };
-    let id = identity(&object, &composition, &mapped, seams)?;
-    object.insert(String::from("id"), Value::String(id.clone()));
-    let mapped = typed(&object, &resource_type)?;
-    let mut targets = vec![format!("{resource_type}/{id}")];
-    let mut resources = vec![mapped];
-    // NOTE: a created resource carries the id the identity sink gave it and is
-    // referenced as `<type>/<id>`, so it travels as one more entry of the answer
-    // (<https://hl7.org/fhir/R4/bundle.html#references>).
-    for created in outcome.created() {
-        let mut object = object_of(created)?;
-        let kind = object
-            .get("resourceType")
-            .and_then(Value::as_str)
-            .map(String::from)
-            .ok_or(OperationError::NotAnObject {
-                what: "created resource",
-            })?;
-        subject(table, &mut object, &kind, request.context())?;
-        if let Some(created_id) = object.get("id").and_then(Value::as_str) {
-            targets.push(format!("{kind}/{created_id}"));
+    let mut targets = Vec::new();
+    let mut resources = Vec::new();
+    for (occurrence, outcome) in &occurrences {
+        let mut object = object_of(outcome.value())?;
+        subject(table, &mut object, &resource_type, request.context())?;
+        let mapped = Mapped {
+            resource_type: &resource_type,
+            template: template.as_str(),
+            occurrence,
+        };
+        let id = identity(&object, &composition, &mapped, seams)?;
+        object.insert(String::from("id"), Value::String(id.clone()));
+        targets.push(format!("{resource_type}/{id}"));
+        resources.push(typed(&object, &resource_type)?);
+        // NOTE: a created resource carries the id the identity sink gave it and is
+        // referenced as `<type>/<id>`, so it travels as one more entry of the answer
+        // (<https://hl7.org/fhir/R4/bundle.html#references>).
+        for created in outcome.created() {
+            let mut object = object_of(created)?;
+            let kind = object
+                .get("resourceType")
+                .and_then(Value::as_str)
+                .map(String::from)
+                .ok_or(OperationError::NotAnObject {
+                    what: "created resource",
+                })?;
+            subject(table, &mut object, &kind, request.context())?;
+            if let Some(created_id) = object.get("id").and_then(Value::as_str) {
+                targets.push(format!("{kind}/{created_id}"));
+            }
+            resources.push(typed(&object, &kind)?);
         }
-        resources.push(typed(&object, &kind)?);
+    }
+    refuse_duplicates(&targets)?;
+    for (_, outcome) in &occurrences {
+        warnings.extend_from_slice(outcome.warnings());
     }
     let source = match composition_uid(&composition) {
         Some(uid) => CompositionSource::new(template.as_str()).with_uid(uid),
@@ -255,7 +264,7 @@ pub fn to_fhir_with_warnings<T: Table + ?Sized>(
     );
     let mut entry: Vec<BundleEntry> = resources.into_iter().map(entry_of).collect();
     entry.push(entry_of(Resource::Provenance(Box::new(provenance))));
-    if let Some(reported) = issues::of_warnings(outcome.warnings()) {
+    if let Some(reported) = issues::of_warnings(&warnings) {
         entry.push(entry_of(Resource::OperationOutcome(Box::new(reported))));
     }
     Ok(Transformed {
@@ -264,9 +273,92 @@ pub fn to_fhir_with_warnings<T: Table + ?Sized>(
             entry,
             ..Bundle::default()
         }),
-        warnings: outcome.warnings().to_vec(),
+        warnings,
         reads: Vec::new(),
     })
+}
+
+/// Returns every occurrence of the context's start archetype that maps, with
+/// the run of each, and the losses of the occurrences that did not.
+///
+/// `$tofhir` answers "one or more FHIR resources" (`engine/rest-api.adoc`
+/// §`$tofhir`), so each occurrence of a start archetype the composition holds
+/// more than once is its own resource ([`traverse::to_fhir_each`]). An
+/// occurrence the context's condition does not admit maps no resource and is
+/// counted as [`Loss::InapplicableOccurrences`]; when it admits none, the run
+/// refuses as [`traverse::to_fhir`] does. A composition holding no occurrence
+/// runs once, as before. No specification governs this: our own design.
+///
+/// # Errors
+///
+/// Returns [`OperationError::Mapping`] for an occurrence the program cannot
+/// map, and when the condition admits no occurrence.
+fn occurrences<T: Table + ?Sized>(
+    program: &Program,
+    table: &T,
+    index: &WebTemplateIndex,
+    composition: &CanonicalComposition,
+    seams: &Seams<'_>,
+    context: &CallContext,
+) -> Result<(Vec<MappedOccurrence>, Vec<Warning>), OperationError> {
+    let refused = |source| OperationError::Mapping {
+        source: Box::new(source),
+    };
+    let each = traverse::to_fhir_each(program, table, index, composition, seams, context)
+        .map_err(refused)?;
+    if each.is_empty() {
+        let outcome = traverse::to_fhir(program, table, index, composition, seams, context)
+            .map_err(refused)?;
+        return Ok((vec![(Vec::new(), outcome)], Vec::new()));
+    }
+    let mut mapped = Vec::new();
+    let mut inapplicable = 0_usize;
+    for one in each {
+        match one {
+            Each::Mapped {
+                occurrence,
+                outcome,
+            } => mapped.push((occurrence, outcome)),
+            Each::NotApplicable { .. } => inapplicable = inapplicable.saturating_add(1),
+        }
+    }
+    if mapped.is_empty() {
+        return Err(refused(EngineError::NotApplicable {
+            context: String::from(program.context().as_str()),
+        }));
+    }
+    let mut warnings = Vec::new();
+    if inapplicable > 0 {
+        warnings.push(Warning::new(
+            Loss::InapplicableOccurrences {
+                archetype: traverse::start_archetype(program),
+                count: inapplicable,
+            },
+            Location::default(),
+        ));
+    }
+    Ok((mapped, warnings))
+}
+
+/// One occurrence of the start archetype that mapped: its positions and its
+/// run.
+type MappedOccurrence = (Vec<u32>, Outcome<Value>);
+
+/// Refuses an answer in which two resources take one `<type>/<id>`.
+///
+/// # Errors
+///
+/// Returns [`OperationError::DuplicateId`] naming the first shared identity.
+fn refuse_duplicates(targets: &[String]) -> Result<(), OperationError> {
+    let mut seen = std::collections::BTreeSet::new();
+    for target in targets {
+        if !seen.insert(target.as_str()) {
+            return Err(OperationError::DuplicateId {
+                reference: target.clone(),
+            });
+        }
+    }
+    Ok(())
 }
 
 /// Runs `$toopenehr`: one FHIR Bundle to one openEHR composition.
@@ -429,7 +521,8 @@ fn identity(
 ) -> Result<String, OperationError> {
     let resource_type = mapped.resource_type;
     if let Some(resources) = seams.resource_identity() {
-        let mut request = ResourceRequest::new(resource_type, mapped.template);
+        let mut request = ResourceRequest::new(resource_type, mapped.template)
+            .with_occurrence(mapped.occurrence.to_vec());
         if let Some(uid) = composition_uid(composition) {
             request = request.with_composition(uid);
         }
@@ -457,11 +550,31 @@ fn identity(
     }
     composition_uid(composition)
         .and_then(|uid| uid.split("::").next())
+        .map(|root| occurrence_id(root, mapped.occurrence))
         .filter(|candidate| is_fhir_id(candidate))
-        .map(String::from)
         .ok_or_else(|| OperationError::Unidentified {
             resource: String::from(resource_type),
         })
+}
+
+/// Returns the id an occurrence of the start archetype derives from the
+/// composition's `versioned_object_uid`.
+///
+/// "We recommend generating an ID based on a hash of the Composition UID and
+/// the Entry Path" (`engine/id-management.adoc` §Deterministic IDs): the first
+/// occurrence keeps the uid alone, so a composition holding the start
+/// archetype once keeps the id it always had, and a further occurrence appends
+/// its positions, which stay the same on every export.
+fn occurrence_id(root: &str, occurrence: &[u32]) -> String {
+    if occurrence.iter().all(|&position| position == 1) {
+        return String::from(root);
+    }
+    let mut id = String::from(root);
+    for position in occurrence {
+        id.push('.');
+        id.push_str(&position.to_string());
+    }
+    id
 }
 
 /// The mapped resource of one `$tofhir` run, as its identity is asked for.
@@ -469,6 +582,7 @@ fn identity(
 struct Mapped<'run> {
     resource_type: &'run str,
     template: &'run str,
+    occurrence: &'run [u32],
 }
 
 /// Returns whether `text` fits the R4 `id` grammar.

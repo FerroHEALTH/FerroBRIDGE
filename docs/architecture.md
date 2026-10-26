@@ -1036,7 +1036,13 @@ transformations that change no server state:
   FLAT; FLAT requires `templateId`) and an optional `context` group
   (`ehr_id`, `patient`, `who`, `onBehalfOf`), and answers a `Bundle` of the
   mapped resources plus an engine-generated `Provenance` on every run, with an
-  `OperationOutcome` entry for warnings.
+  `OperationOutcome` entry for warnings. **As built (#1271):** a composition
+  holding the context's start archetype more than once answers one resource
+  per occurrence through `traverse::to_fhir_each` (section 4.4), with ids
+  derived from the composition uid and the occurrence
+  (`engine/id-management.adoc` §Deterministic IDs) and the occurrences the
+  condition does not admit counted; no specification governs this: our own
+  design.
 - `POST [base]/$toopenehr` takes a `Bundle` and `templateId` and `format`
   (`canonical`, the default, or `flat`), and answers `Parameters` with the
   composition string and an optional `outcome`.

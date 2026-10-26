@@ -267,6 +267,7 @@ pub struct ResourceRequest {
     template: String,
     composition: Option<String>,
     written: Option<String>,
+    occurrence: Vec<u32>,
 }
 
 impl ResourceRequest {
@@ -279,7 +280,17 @@ impl ResourceRequest {
             template: template.into(),
             composition: None,
             written: None,
+            occurrence: Vec::new(),
         }
+    }
+
+    /// Returns this request with the occurrence of the context's start
+    /// archetype the resource maps, the 1-based instance of each repeating
+    /// axis down to it.
+    #[must_use]
+    pub fn with_occurrence(mut self, occurrence: Vec<u32>) -> Self {
+        self.occurrence = occurrence;
+        self
     }
 
     /// Returns this request with the `OBJECT_VERSION_ID` of the composition.
@@ -318,6 +329,13 @@ impl ResourceRequest {
     #[must_use]
     pub fn written(&self) -> Option<&str> {
         self.written.as_deref()
+    }
+
+    /// Returns the occurrence of the start archetype the resource maps;
+    /// empty when the start archetype is on no repeating axis.
+    #[must_use]
+    pub fn occurrence(&self) -> &[u32] {
+        &self.occurrence
     }
 }
 
