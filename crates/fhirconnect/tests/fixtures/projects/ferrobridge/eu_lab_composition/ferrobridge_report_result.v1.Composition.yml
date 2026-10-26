@@ -1,0 +1,182 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's composition model mapping of the CKM
+# COMPOSITION.report-result.v1 to a FHIR R4 Composition, the start of the
+# Laboratory Report 2.0.0 document context (a context whose start is a
+# composition model slots no composition: composition-element.adoc). The
+# report's status, kept in KDS_Laborbericht's other_context (at0005) bound
+# to the R4 diagnostic-report-status value set, travels through the codes
+# that code system shares with composition-status; the type (LOINC 11502-2
+# "Laboratory report") and the title are fixed, and the one section carries
+# the test's code and references the DiagnosticReport (no specification
+# governs these choices: our own design).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.report_result.v1.Composition
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.report-result.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Composition
+
+mappings:
+  # NOTE: DV_CODED_TEXT.adoc, a FHIR `code` cannot convert to a DV_CODED_TEXT, so
+  # the status maps through a `manual` table over the codes both code systems define.
+  - name: "status"
+    with:
+      fhir: "$resource"
+      openehr: "$composition/context/other_context[at0001]/items[at0005]"
+    manual:
+      - name: "preliminary"
+        fhir:
+          - path: "status"
+            value: "preliminary"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "preliminary"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "preliminary"
+          - path: "value"
+            value: "Preliminary"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "preliminary"
+      - name: "final"
+        fhir:
+          - path: "status"
+            value: "final"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "final"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "final"
+          - path: "value"
+            value: "Final"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "final"
+      - name: "amended"
+        fhir:
+          - path: "status"
+            value: "amended"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "amended"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "amended"
+          - path: "value"
+            value: "Amended"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "amended"
+      - name: "entered-in-error"
+        fhir:
+          - path: "status"
+            value: "entered-in-error"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "entered-in-error"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "entered-in-error"
+          - path: "value"
+            value: "Entered in Error"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "entered-in-error"
+
+  # KDS_Laborbericht requires the report identifier (other_context at0002,
+  # occurrences 1..1), which the document's business identifier carries.
+  - name: "identifier"
+    with:
+      fhir: "$resource.identifier.value"
+      openehr: "$composition/context/other_context[at0001]/items[at0002]"
+
+  - name: "date"
+    with:
+      fhir: "$resource.date"
+      openehr: "$composition/context/start_time"
+
+  - name: "author"
+    with:
+      fhir: "$resource.author"
+      openehr: "$composition/composer"
+
+  - name: "type"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.type.coding"
+    manual:
+      - name: "laboratoryReport"
+        fhir:
+          - path: "system"
+            value: "http://loinc.org"
+          - path: "code"
+            value: "11502-2"
+          - path: "display"
+            value: "Laboratory report"
+
+  - name: "title"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "laboratoryReport"
+        fhir:
+          - path: "title"
+            value: "Laboratory report"
+
+  - name: "section"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1]"
+    followedBy:
+      mappings:
+        - name: "sectionCode"
+          with:
+            fhir: "code"
+            openehr: "data[at0001]/events[at0002]/data[at0003]/items[at0005]"
+
+        - name: "report"
+          with:
+            fhir: "entry"
+            openehr: "$reference"
+          reference:
+            resourceType: "DiagnosticReport"
+            mappings:
+              - name: "reportMapping"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$openehrRoot"
+                slotArchetype: "OBSERVATION.laboratory_test_result.v1"

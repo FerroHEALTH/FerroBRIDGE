@@ -1165,7 +1165,12 @@ dispensed" to a `MedicationDispense-eu-mpd`, each references a
 template: the laboratory test result is the Observation, with each analyte a
 member `Observation-resultslab-eu-lab` it references, and the result's status
 travels through the codes the R4 diagnostic-report-status and
-observation-status code systems share.
+observation-status code systems share. `Composition-eu-lab` is a document
+context over the same template whose `start` is a FerroBRIDGE composition
+model, which FHIRconnect's composition chapter lets a context start at
+without a composition slot: one section carries the test's code and
+references the `DiagnosticReport-eu-lab`, whose status and identifier it
+reads out of openEHR only, since the Composition writes those nodes going in.
 
 **Decision:** profile mappings are authored in this repository, in the
 specification's own customisation mechanism (a context and its extensions per

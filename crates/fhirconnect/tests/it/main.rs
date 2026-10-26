@@ -12,6 +12,7 @@ mod corpus;
 mod derive;
 mod engine;
 mod eu_condition;
+mod eu_lab_composition;
 mod eu_laboratory;
 mod eu_mpd;
 mod eu_patient;

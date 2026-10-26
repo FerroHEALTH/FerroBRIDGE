@@ -1,0 +1,256 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension of OBSERVATION.laboratory_test_result.v1 for the
+# DiagnosticReport-eu-lab a Composition-eu-lab document references: the
+# canonical, and the report's identifier and status read out of openEHR
+# only, because the document's Composition writes both nodes going in. It
+# is the variant of ferrobridge_eu_laboratory_result without the composition
+# slot, which the document context's start already is.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_lab_composition_report
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: OBSERVATION.laboratory_test_result.v1
+
+mappings:
+  - name: "metaURL"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab"
+
+  - name: "reportIdentifier"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.identifier.value"
+      openehr: "$composition/context/other_context[at0001]/items[at0002]"
+
+  # NOTE: DV_CODED_TEXT.adoc, a FHIR `code` cannot convert to a DV_CODED_TEXT, so
+  # the report status maps through a `manual` table over the R4 required binding.
+  - name: "status"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+      openehr: "$composition/context/other_context[at0001]/items[at0005]"
+    manual:
+      - name: "registered"
+        fhir:
+          - path: "status"
+            value: "registered"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "registered"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "registered"
+          - path: "value"
+            value: "Registered"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "registered"
+      - name: "partial"
+        fhir:
+          - path: "status"
+            value: "partial"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "partial"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "partial"
+          - path: "value"
+            value: "Partial"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "partial"
+      - name: "preliminary"
+        fhir:
+          - path: "status"
+            value: "preliminary"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "preliminary"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "preliminary"
+          - path: "value"
+            value: "Preliminary"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "preliminary"
+      - name: "final"
+        fhir:
+          - path: "status"
+            value: "final"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "final"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "final"
+          - path: "value"
+            value: "Final"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "final"
+      - name: "amended"
+        fhir:
+          - path: "status"
+            value: "amended"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "amended"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "amended"
+          - path: "value"
+            value: "Amended"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "amended"
+      - name: "corrected"
+        fhir:
+          - path: "status"
+            value: "corrected"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "corrected"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "corrected"
+          - path: "value"
+            value: "Corrected"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "corrected"
+      - name: "appended"
+        fhir:
+          - path: "status"
+            value: "appended"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "appended"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "appended"
+          - path: "value"
+            value: "Appended"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "appended"
+      - name: "cancelled"
+        fhir:
+          - path: "status"
+            value: "cancelled"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "cancelled"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "cancelled"
+          - path: "value"
+            value: "Cancelled"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "cancelled"
+      - name: "entered-in-error"
+        fhir:
+          - path: "status"
+            value: "entered-in-error"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "entered-in-error"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "entered-in-error"
+          - path: "value"
+            value: "Entered in Error"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "entered-in-error"
+      - name: "unknown"
+        fhir:
+          - path: "status"
+            value: "unknown"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "unknown"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "http://hl7.org/fhir/diagnostic-report-status"
+          - path: "defining_code/code_string"
+            value: "unknown"
+          - path: "value"
+            value: "Unknown"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "unknown"
