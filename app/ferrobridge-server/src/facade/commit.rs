@@ -34,6 +34,8 @@ use openehr_rm::v1_2::common::generic::party_proxy::PartyProxy;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::support::terminology::openehr_terminology_group_identifiers::OpenehrTerminologyGroupIdentifiersData;
+use openehr_term::codes::AuditChangeType;
+use openehr_term::codes::VersionLifecycleState;
 
 /// The terminology the openEHR audit code sets belong to.
 ///
@@ -41,23 +43,6 @@ use openehr_rm::v1_2::support::terminology::openehr_terminology_group_identifier
 /// the openEHR terminology
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/common.html>).
 const OPENEHR_TERMINOLOGY: &str = OpenehrTerminologyGroupIdentifiersData::TERMINOLOGY_ID_OPENEHR;
-
-// TODO(#618): take the three codes and their rubrics from named openehr-rm
-// constants once the crate carries them (sibling request S3).
-/// The `change_type` code of a first commit, "creation".
-const CREATION_CODE: &str = "249";
-
-/// The `change_type` code of a later commit, "modification".
-const MODIFICATION_CODE: &str = "251";
-
-/// The `change_type` code of a delete, "deleted".
-const DELETED_CODE: &str = "523";
-
-/// The `lifecycle_state` code of a committed version, "complete".
-const COMPLETE_CODE: &str = "532";
-
-/// The `lifecycle_state` code of a deleted version, "deleted".
-const DELETED_LIFECYCLE_CODE: &str = "523";
 
 /// Whether a write adds a version container or a version to one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,20 +59,21 @@ impl Change {
     /// Returns the openEHR `change_type` code of this change.
     #[must_use]
     pub const fn code(self) -> &'static str {
-        match self {
-            Self::Creation => CREATION_CODE,
-            Self::Modification => MODIFICATION_CODE,
-            Self::Deleted => DELETED_CODE,
-        }
+        self.change_type().code()
     }
 
     /// Returns the openEHR `change_type` rubric of this change.
     #[must_use]
     pub const fn rubric(self) -> &'static str {
+        self.change_type().rubric()
+    }
+
+    /// Returns the `audit_change_type` concept of this change.
+    const fn change_type(self) -> AuditChangeType {
         match self {
-            Self::Creation => "creation",
-            Self::Modification => "modification",
-            Self::Deleted => "deleted",
+            Self::Creation => AuditChangeType::Creation,
+            Self::Modification => AuditChangeType::Modification,
+            Self::Deleted => AuditChangeType::Deleted,
         }
     }
 }
@@ -224,7 +210,7 @@ pub fn context(
         lifecycle_state: Some(match change {
             // NOTE: RM Common IM, Logical Deletion: a delete commits a version in the `deleted`
             // lifecycle state (`version_lifecycle_state` 523 of the openEHR terminology).
-            Change::Deleted => coded(DELETED_LIFECYCLE_CODE, "deleted"),
+            Change::Deleted => lifecycle_state(VersionLifecycleState::Deleted),
             Change::Creation | Change::Modification => lifecycle(),
         }),
         audit: Some(audit_data(change, system_id, committer)),
@@ -262,7 +248,12 @@ fn audit_data(change: Change, system_id: &str, committer: &Committer) -> UpdateA
 /// Returns the `lifecycle_state` a contribution entry carries.
 #[must_use]
 pub fn lifecycle() -> DvCodedText {
-    coded(COMPLETE_CODE, "complete")
+    lifecycle_state(VersionLifecycleState::Complete)
+}
+
+/// Returns the `lifecycle_state` naming `state`.
+fn lifecycle_state(state: VersionLifecycleState) -> DvCodedText {
+    coded(state.code(), state.rubric())
 }
 
 /// Returns a `DV_CODED_TEXT` in the openEHR terminology.

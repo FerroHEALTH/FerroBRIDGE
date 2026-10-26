@@ -241,7 +241,6 @@ mod tests {
     use crate::engine::lens::Fallback;
     use crate::engine::lens::Lens;
     use crate::engine::lens::LensError;
-    use crate::engine::lens::code_phrase::terminology_id;
     use crate::engine::lens::code_phrase::tests::code_phrase;
     use crate::engine::lens::code_phrase::tests::coding;
     use fhir_types::r4::codeable_concept::CodeableConcept;
@@ -250,6 +249,7 @@ mod tests {
     use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives::Uri;
     use openehr_base::containers::NonEmptyVec;
+    use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
     use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
     use openehr_rm::v1_2::data_types::text::term_mapping::TermMapping;
@@ -371,7 +371,7 @@ mod tests {
                     r#match: '=',
                     purpose: None,
                     target: CodePhrase {
-                        terminology_id: terminology_id("http://loinc.org", ""),
+                        terminology_id: TerminologyId::new("http://loinc.org", ""),
                         code_string: String::from("LP74849-8"),
                         preferred_term: None,
                     },
@@ -380,7 +380,7 @@ mod tests {
                     r#match: '=',
                     purpose: None,
                     target: CodePhrase {
-                        terminology_id: terminology_id("http://snomed.info/sct", ""),
+                        terminology_id: TerminologyId::new("http://snomed.info/sct", ""),
                         code_string: String::from("386661006"),
                         preferred_term: None,
                     },
@@ -420,7 +420,7 @@ mod tests {
             r#match: relation,
             purpose: None,
             target: CodePhrase {
-                terminology_id: terminology_id(system, ""),
+                terminology_id: TerminologyId::new(system, ""),
                 code_string: String::from(code),
                 preferred_term: None,
             },

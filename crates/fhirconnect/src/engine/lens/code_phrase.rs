@@ -82,7 +82,7 @@ impl Lens<CodePhrase, Coding> for CodePhraseLens {
             })?;
         let version = text_of(view.version.as_ref().map(|version| &version.value)).unwrap_or("");
         Ok(CodePhrase {
-            terminology_id: terminology_id(system, version),
+            terminology_id: TerminologyId::new(system, version),
             code_string: String::from(code),
             preferred_term: text_of(view.display.as_ref().map(|display| &display.value))
                 .map(String::from),
@@ -139,29 +139,10 @@ pub fn terminology_parts<'value>(
     Ok((name, version))
 }
 
-/// Joins a system and a version into a `TERMINOLOGY_ID`.
-///
-/// An empty version is the absent `(version)` suffix, which is what makes
-/// `version_id` the empty string the `CODE_PHRASE` table asks for.
-// TODO(#618): build the id through an openehr-base constructor from a name
-// and a version once one exists (sibling request S4); the readers `name` and
-// `version_id` do.
-#[must_use]
-pub fn terminology_id(system: &str, version: &str) -> TerminologyId {
-    TerminologyId {
-        value: if version.is_empty() {
-            String::from(system)
-        } else {
-            format!("{system}({version})")
-        },
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use super::CELL;
     use super::CodePhraseLens;
-    use super::terminology_id;
     use super::terminology_parts;
     use crate::engine::lens::Lens;
     use crate::engine::lens::LensError;
@@ -183,7 +164,7 @@ pub(crate) mod tests {
             preferred in proptest::option::of("[A-Za-z ]{1,12}"),
         ) -> CodePhrase {
             CodePhrase {
-                terminology_id: terminology_id(&system, version.as_deref().unwrap_or("")),
+                terminology_id: TerminologyId::new(&system, version.as_deref().unwrap_or("")),
                 code_string: code,
                 preferred_term: preferred,
             }

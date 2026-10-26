@@ -209,10 +209,10 @@ mod tests {
     use super::mappings_of;
     use super::withheld;
     use crate::engine::lens::LensError;
-    use crate::engine::lens::code_phrase::terminology_id;
     use fhir_types::r4::coding::Coding;
     use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives::Uri;
+    use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
     use openehr_rm::v1_2::data_types::text::term_mapping::TermMapping;
 
@@ -227,7 +227,7 @@ mod tests {
             r#match: relation,
             purpose: None,
             target: CodePhrase {
-                terminology_id: terminology_id(system, ""),
+                terminology_id: TerminologyId::new(system, ""),
                 code_string: String::from(code),
                 preferred_term: None,
             },
@@ -314,7 +314,7 @@ mod tests {
                     language: None,
                     encoding: None,
                     defining_code: CodePhrase {
-                        terminology_id: terminology_id("http://example.org/purpose", ""),
+                        terminology_id: TerminologyId::new("http://example.org/purpose", ""),
                         code_string: String::from("bill"),
                         preferred_term: None,
                     },

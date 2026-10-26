@@ -3,6 +3,8 @@
 
 //! How a mapping path matches a node of a Web Template.
 
+use openehr_am::v2_4::aom2::archetype::archetype_hrid::ArchetypeHrid;
+use openehr_am::v2_4::aom2::archetype::archetype_hrid_impl::version_marker;
 use openehr_rm::v1_2::paths::PathSegment;
 use openehr_rm::v1_2::paths::RmPath;
 
@@ -106,13 +108,11 @@ pub fn node_id_matches(wanted: &str, carried: &str) -> bool {
 /// <https://specifications.openehr.org/releases/AM/latest/Overview.html>). A
 /// template served over the ADL 1.4 route carries the interface form alone and
 /// so states no release version.
-// TODO(#618): read the identifier through `ArchetypeHrid` once openehr-am
-// offers `FromStr` for it (sibling request S2), as the server CDR module does
-// through `openehr_adl::hrid::parse_hrid` today.
 #[must_use]
 pub fn archetype_release_version(id: &str) -> Option<&str> {
-    let without_namespace = id.rsplit_once("::").map_or(id, |(_, rest)| rest);
-    let (_, version) = without_namespace.rsplit_once(".v")?;
+    // NOTE: a node id that is no archetype HRID (a local `at` code) legitimately carries no release version.
+    id.parse::<ArchetypeHrid>().ok()?;
+    let version = id.get(version_marker(id)? + 2..)?;
     version.contains('.').then_some(version)
 }
 
