@@ -12,33 +12,38 @@
 //! under the `context` of a composition (openEHR ITS-REST 1.1.0, Simplified
 //! Formats, `docs/specs/its-rest/docs/simplified_formats/master05-rm_mapping.adoc`,
 //! the sections `EVENT_CONTEXT`, the `ENTRY` classes, `LINK`, `FEEDER_AUDIT`
-//! and `PARTICIPATION`). This module writes those keys as [`NodeValue`]s and
-//! reads the same attributes back out of the canonical JSON of the node as
-//! typed `openehr-rm` values.
+//! and `PARTICIPATION`). This module writes each family whole, as the typed
+//! `openehr-rm` value in canonical JSON under `|raw` (master04 §Raw canonical
+//! JSON), and reads the same attributes back out of the canonical JSON of the
+//! node as typed `openehr-rm` values.
 
-// TODO(#618): the write side spells the `_feeder_audit`, `_link:i`,
-// `_participation:i`, `_other_participation:i` and `_provider` families key by
-// key until openehr-sdt honours `|raw` on `_`-prefixed attribute families or
-// makes `emit_rm_attrs` public (sibling request S1).
-
+use openehr_base::v1_3::base_types::identification::generic_id::GenericId;
 use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
+use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
 
 use openehr_its::json::JsonParseError;
 use openehr_its::json::from_canonical_value;
+use openehr_its::json::to_canonical_value;
 use openehr_mapping_core::composition::NodeValue;
 use openehr_mapping_core::composition::RmPosition;
 use openehr_mapping_core::index::ResolvedNode;
+use openehr_rm::v1_2::common::archetyped::feeder_audit::FeederAudit;
+use openehr_rm::v1_2::common::archetyped::feeder_audit_details::FeederAuditDetails;
 use openehr_rm::v1_2::common::archetyped::link::Link;
 use openehr_rm::v1_2::common::generic::party_identified::PartyIdentified;
 use openehr_rm::v1_2::common::generic::party_identified::PartyIdentifiedData;
 use openehr_rm::v1_2::common::generic::party_proxy::PartyProxy;
+use openehr_rm::v1_2::data_types::basic::dv_identifier::DvIdentifier;
 use openehr_rm::v1_2::data_types::text::dv_text::DvText;
+use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
+use openehr_rm::v1_2::data_types::uri::dv_ehr_uri::DvEhrUri;
 use openehr_sdt::flat::path::Segment;
 
 use crate::engine::demographics::PartyIdentity;
 use crate::engine::lens::null_flavour::NullFlavour;
 use crate::engine::origin::Origin;
 use crate::engine::origin::UNKNOWN_SOURCE;
+use crate::engine::rm::RAW;
 
 /// The `feeder_system_item_ids` type every defaulted field is recorded under.
 ///
@@ -87,36 +92,45 @@ fn indexed(name: &str, index: usize) -> Segment {
 /// The allocation of facts to attributes is our own design.
 #[must_use]
 pub fn feeder_audit(root: &ResolvedNode, origin: &Origin, defaulted: &[String]) -> Vec<NodeValue> {
-    let at = |segment: Segment, datum: &str, value: &str| {
-        NodeValue::new(root, serde_json::Value::String(String::from(value)))
-            .under(vec![plain("_feeder_audit"), segment])
-            .with_datum(datum)
+    let details = |version_id: Option<&str>| FeederAuditDetails {
+        system_id: String::from(origin.system_id()),
+        location: None,
+        subject: None,
+        provider: None,
+        time: None,
+        version_id: version_id.map(String::from),
+        other_details: None,
     };
-    let originating = || plain("originating_system_audit");
-    let mut values = vec![at(originating(), "system_id", origin.system_id())];
-    if let Some(source) = origin.source() {
-        if let Some(version) = source.version_id() {
-            values.push(at(originating(), "version_id", version));
-        }
-        let item = || indexed("originating_system_item_id", 0);
-        values.push(at(item(), "id", source.id().unwrap_or(UNKNOWN_SOURCE)));
-        values.push(at(item(), "type", source.resource_type()));
-    }
-    if defaulted.is_empty() {
-        return values;
-    }
-    values.push(at(
-        plain("feeder_system_audit"),
-        "system_id",
-        origin.system_id(),
-    ));
-    for (index, field) in defaulted.iter().enumerate() {
-        let item = || indexed("feeder_system_item_id", index);
-        values.push(at(item(), "id", field));
-        values.push(at(item(), "type", DEFAULTED));
-        values.push(at(item(), "issuer", origin.system_id()));
-    }
-    values
+    let identifier = |id: &str, kind: &str, issuer: Option<&str>| DvIdentifier {
+        issuer: issuer.map(String::from),
+        assigner: None,
+        id: String::from(id),
+        r#type: Some(String::from(kind)),
+    };
+    let source = origin.source();
+    let audit = FeederAudit {
+        originating_system_item_ids: source.map(|source| {
+            vec![identifier(
+                source.id().unwrap_or(UNKNOWN_SOURCE),
+                source.resource_type(),
+                None,
+            )]
+        }),
+        feeder_system_item_ids: (!defaulted.is_empty()).then(|| {
+            defaulted
+                .iter()
+                .map(|field| identifier(field, DEFAULTED, Some(origin.system_id())))
+                .collect()
+        }),
+        original_content: None,
+        originating_system_audit: Box::new(details(source.and_then(|source| source.version_id()))),
+        feeder_system_audit: (!defaulted.is_empty()).then(|| Box::new(details(None))),
+    };
+    vec![
+        NodeValue::new(root, to_canonical_value(&audit))
+            .under(vec![plain("_feeder_audit")])
+            .with_datum(RAW),
+    ]
 }
 
 /// Returns the `_link:i` family of one `LINK` on `node`.
@@ -131,19 +145,31 @@ pub fn link(
     index: usize,
     parts: &LinkParts<'_>,
 ) -> Vec<NodeValue> {
-    [
-        ("meaning", parts.meaning),
-        ("type", parts.link_type),
-        ("target", parts.target),
-    ]
-    .into_iter()
-    .map(|(datum, value)| {
-        NodeValue::new(node, serde_json::Value::String(String::from(value)))
+    let link = Link {
+        meaning: plain_text(parts.meaning),
+        r#type: plain_text(parts.link_type),
+        target: DvEhrUri {
+            value: String::from(parts.target),
+        },
+    };
+    vec![
+        NodeValue::new(node, to_canonical_value(&link))
             .with_occurrences(positions.to_vec())
             .under(vec![indexed("_link", index)])
-            .with_datum(datum)
+            .with_datum(RAW),
+    ]
+}
+
+/// A plain `DV_TEXT` carrying `value`.
+fn plain_text(value: &str) -> DvText {
+    DvText::DvText(DvTextData {
+        value: String::from(value),
+        hyperlink: None,
+        formatting: None,
+        mappings: None,
+        language: None,
+        encoding: None,
     })
-    .collect()
 }
 
 /// The three attributes of one `LINK`.
@@ -214,9 +240,10 @@ pub fn participation_list(class: &str, tail: &[&str]) -> Option<ParticipationLis
 
 /// Returns the family of one `PARTICIPATION` of `list` on `node`.
 ///
-/// The performer is inlined as `|name`, `|id`, `|id_scheme` and
-/// `|id_namespace` on the participation itself (Simplified Formats, the
-/// `PARTICIPATION` mapping table).
+/// The performer is a `PARTY_IDENTIFIED` whose `external_ref` names a
+/// `GENERIC_ID` of `PERSON`, the party type the master05 `PARTICIPATION`
+/// spelling defaults to (Simplified Formats, the `PARTICIPATION` mapping
+/// table).
 #[must_use]
 pub fn participation(
     node: &ResolvedNode,
@@ -225,29 +252,38 @@ pub fn participation(
     index: usize,
     parts: &ParticipationParts<'_>,
 ) -> Vec<NodeValue> {
-    let mut data = vec![("function", parts.function)];
-    if let Some(name) = parts.name {
-        data.push(("name", name));
-    }
-    data.push(("id", parts.id));
-    data.push(("id_scheme", parts.id_scheme));
-    data.push(("id_namespace", parts.id_namespace));
-    data.into_iter()
-        .map(|(datum, value)| {
-            NodeValue::new(node, serde_json::Value::String(String::from(value)))
-                .with_occurrences(positions.to_vec())
-                .under(vec![indexed(list.family, index)])
-                .with_datum(datum)
-        })
-        .collect()
+    let participation = openehr_rm::v1_2::common::generic::participation::Participation {
+        function: plain_text(parts.function),
+        mode: None,
+        performer: PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(
+            PartyIdentifiedData {
+                external_ref: Some(PartyRef {
+                    namespace: String::from(parts.id_namespace),
+                    r#type: String::from("PERSON"),
+                    id: ObjectId::GenericId(GenericId {
+                        value: String::from(parts.id),
+                        scheme: String::from(parts.id_scheme),
+                    }),
+                }),
+                name: parts.name.map(String::from),
+                identifiers: None,
+            },
+        )),
+        time: None,
+    };
+    vec![
+        NodeValue::new(node, to_canonical_value(&participation))
+            .with_occurrences(positions.to_vec())
+            .under(vec![indexed(list.family, index)])
+            .with_datum(RAW),
+    ]
 }
 
 /// Returns the family of one `PARTY_IDENTIFIED` written under `family` on
-/// `node`, the `_provider` of an `ENTRY`.
+/// `node`: the `_provider` of an `ENTRY`, the `_health_care_facility` of an
+/// `EVENT_CONTEXT`.
 ///
-/// The party is `|name` plus one `_identifier:i` per identifier, each with
-/// `|id`, `|issuer`, `|assigner` and `|type` (Simplified Formats, the
-/// `PARTY_IDENTIFIED` and `DV_IDENTIFIER` tables).
+/// The party travels whole, its name, identifiers and external reference.
 #[must_use]
 pub fn provider(
     node: &ResolvedNode,
@@ -255,38 +291,13 @@ pub fn provider(
     family: &[Segment],
     party: &PartyIdentifiedData,
 ) -> Vec<NodeValue> {
-    let at = |below: Vec<Segment>, datum: &str, value: &str| {
-        let mut sub_path = family.to_vec();
-        sub_path.extend(below);
-        NodeValue::new(node, serde_json::Value::String(String::from(value)))
+    let party = PartyIdentified::PartyIdentified(party.clone());
+    vec![
+        NodeValue::new(node, to_canonical_value(&party))
             .with_occurrences(positions.to_vec())
-            .under(sub_path)
-            .with_datum(datum)
-    };
-    let mut values = Vec::new();
-    if let Some(ref name) = party.name {
-        values.push(at(Vec::new(), "name", name));
-    }
-    for (index, identifier) in party
-        .identifiers
-        .as_deref()
-        .unwrap_or_default()
-        .iter()
-        .enumerate()
-    {
-        let below = || vec![indexed("_identifier", index)];
-        values.push(at(below(), "id", &identifier.id));
-        for (datum, value) in [
-            ("issuer", identifier.issuer.as_deref()),
-            ("assigner", identifier.assigner.as_deref()),
-            ("type", identifier.r#type.as_deref()),
-        ] {
-            if let Some(value) = value {
-                values.push(at(below(), datum, value));
-            }
-        }
-    }
-    values
+            .under(family.to_vec())
+            .with_datum(RAW),
+    ]
 }
 
 /// Returns the family of one `DV_DATE_TIME` written under `family` on

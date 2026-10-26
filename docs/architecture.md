@@ -1161,6 +1161,16 @@ dispense context maps the ACTION at its careflow step at0003 "Prescription
 dispensed" to a `MedicationDispense-eu-mpd`, each references a
 `Medication-eu-mpd` built from the medication details, and the dosage is a
 `Dosage-eu-mpd`; the round trips assert each profile's elements.
+`medicalTestResult-eu-core` follows over the same `KDS_Laborbericht`
+template: the laboratory test result is the Observation, with each analyte a
+member `Observation-resultslab-eu-lab` it references, and the result's status
+travels through the codes the R4 diagnostic-report-status and
+observation-status code systems share. `Composition-eu-lab` is a document
+context over the same template whose `start` is a FerroBRIDGE composition
+model, which FHIRconnect's composition chapter lets a context start at
+without a composition slot: one section carries the test's code and
+references the `DiagnosticReport-eu-lab`, whose status and identifier it
+reads out of openEHR only, since the Composition writes those nodes going in.
 
 **Decision:** profile mappings are authored in this repository, in the
 specification's own customisation mechanism (a context and its extensions per
@@ -1387,13 +1397,13 @@ mapping rooted at a party: a context binds a composition template, and
   same `paths::item_at_path` it reads a composition with. The read path is the
   one section 4.4 describes.
 - **Toward openEHR.** The engine builds a canonical `PARTY` from the node
-  values through the template walk of `openehr-sdt` (`flat::build::build_root`,
-  0.0.89, #906), naming `rm_version` 1.1.0, and decodes the result strictly as
-  the root's class. No FLAT builder is written in this repository. Simplified
+  values through the party build of `openehr-sdt` (`flat::build::build_party`,
+  #906), naming `rm_version` 1.1.0, and decodes the result strictly as the
+  root's class. No FLAT builder is written in this repository. Simplified
   Formats defines FLAT for compositions only, so a party build over the same
   walk is the crate's own extension. One root attribute no template node
-  holds, `ROLE.performer`, is placed on the root after the walk, because the
-  builder takes no root attribute of a party (#1000). The
+  holds, `ROLE.performer`, reaches the builder whole as
+  `<root>/performer|raw` (master04 §Raw canonical JSON, #1000). The
   composition entry points of the engine refuse a party program
   (`EngineError::PartyProgram`).
 - **Serving.** The facade serves `Patient`, `Practitioner`, `PractitionerRole`
@@ -2868,7 +2878,7 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | YAML parser | `serde-saphyr` 1.2.0 | anchors, aliases, merge keys, spans, maintained | `serde_yaml` (archived), `serde-yaml-ng`, `serde_yml` |
 | Bulk load | binary `COPY` via `tokio-postgres`, `sqlx` for checked queries | throughput; the reference engine's per-row persist is its ceiling | ORM-style inserts |
 | Demographics | in order: the patient-to-EHR link through `EHR_STATUS.subject.external_ref`; `Patient` from EHR-side person templates through FHIRconnect; the FHIRconnect demographics endpoint as our own port over the identity store; `PARTY` objects over the ITS-REST Demographic API behind a feature labelled DEVELOPMENT; party-rooted mappings as our own extension; demographic AQL as Cadasto's experimental extension documents it, behind a feature labelled with that extension, backing demographic FHIR search (#465, #480) | the link and EHR-side templates rest on STABLE texts (RM Common IM §4.2.1.1, ITS-REST EHR); the Demographic API is `x-status: DEVELOPMENT` at 1.1.0 and on master and has no search; FHIRconnect `engine/demographics.adoc` defines no endpoint interface; AQL 1.1.0 defines no demographic semantics (QUERY §3.13.2), and the owner expects Cadasto's extension to become that specification (owner direction 2026-10-15) | demographics left outside |
-| Party context | a context whose OPT is rooted at a `PERSON`, `ORGANISATION` or `ROLE` archetype is a party context, recognised from the OPT root's RM type; `$composition`, the composition defaults, `ctx/`, `participationsFunction` onto `EVENT_CONTEXT`, `link` and a composition-slotting `slotContext` refused at load; read through `item_at_path`; the build through the `openehr-sdt` template walk, with `ROLE.performer` placed on the root after it (#906, #1000); the FHIR id the party's `versioned_object_uid`, with no identity-map entry (sections 4.11 and 9, #471) | FHIRconnect v1.0.0 admits an `openEHR-DEMOGRAPHIC-*` archetype id and defines no party root; Simplified Formats defines FLAT for compositions only; only the `object_id` of an `OBJECT_VERSION_ID` is stable across versions (RM Common §OBJECT_VERSION_ID); no specification governs this: our own design | a new context key; a per-resource Rust mapping; an identity-map entry per party; the full `OBJECT_VERSION_ID` as the FHIR id |
+| Party context | a context whose OPT is rooted at a `PERSON`, `ORGANISATION` or `ROLE` archetype is a party context, recognised from the OPT root's RM type; `$composition`, the composition defaults, `ctx/`, `participationsFunction` onto `EVENT_CONTEXT`, `link` and a composition-slotting `slotContext` refused at load; read through `item_at_path`; the build through the `openehr-sdt` party build, with `ROLE.performer` passed whole under `|raw` (#906, #1000); the FHIR id the party's `versioned_object_uid`, with no identity-map entry (sections 4.11 and 9, #471) | FHIRconnect v1.0.0 admits an `openEHR-DEMOGRAPHIC-*` archetype id and defines no party root; Simplified Formats defines FLAT for compositions only; only the `object_id` of an `OBJECT_VERSION_ID` is stable across versions (RM Common §OBJECT_VERSION_ID); no specification governs this: our own design | a new context key; a per-resource Rust mapping; an identity-map entry per party; the full `OBJECT_VERSION_ID` as the FHIR id |
 | Operator console shape | `app/ferrobridge-console`, a Leptos app rendered on the server and hydrated, with a backend-for-frontend, its own binary and image; halves chosen by target, never by feature; the operator's OIDC session on the console's server, which calls the bridge with the operator's token (section 4.10, #594) | the bridge authenticates every request by bearer token and holds no browser session (#400), so a console the bridge served would add a session and a static-asset surface; FerroFED's A55 is the family precedent; no specification governs the console: our own design | a client-side app served by the bridge; a console inside the server binary |
 | Console crate boundary | the server half links `openehr-mapping-core`, `fhir-types` (`r4`, `terminology`) and `ferrobridge-operator-api` (the serde types of the health and operator documents, #777) and no other workspace crate, and the browser half `openehr-mapping-core` and `ferrobridge-operator-api` alone, enforced by a dependency-closure test | `codegen.md` forbids a consumer shadowing a model the workspace defines (`Diagnostic`, `OperationOutcome`, `CapabilityStatement`, and the bridge's own documents); one contract crate both sides compile against turns a renamed field into a build failure; excluding the engine crates keeps every check, transform and save on the bridge | no workspace crate (shadow types for the three); the console reading the bridge's documents by field name; the engine crates linked so the console compiles mappings itself |
 | Operator API | `/operator` on the bridge's listener, off unless `[operator] enabled`, refused at load without `[auth]`, every route requiring the operator scope (`[auth] product_scope`); the log names actor and file, never content | SMART scopes cover FHIR resources only; the bridge has no admin listener and the writes touch mapping files, never clinical data; no specification governs it: our own design | a second admin listener; an unguarded API on a private network |

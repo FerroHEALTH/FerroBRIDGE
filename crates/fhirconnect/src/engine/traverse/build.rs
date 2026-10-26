@@ -5,7 +5,6 @@
 
 use std::collections::BTreeSet;
 
-use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
 use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::composition::NodeValue;
@@ -259,16 +258,16 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
     }
 
     /// Returns the values the run produced, as the composition builder wants
-    /// them, with the values the builder takes through the `ctx/` keys.
+    /// them, with the defaults the builder takes through the `ctx/` keys.
     ///
     /// Every value travels whole as its canonical JSON under `|raw`
-    /// (Simplified Formats, master04 §Raw canonical JSON), except at a
-    /// composition attribute the builder sets from the context vocabulary
-    /// ([`context_keys`]), whose value is returned beside its node so the run
-    /// can check the built composition carries it whole.
+    /// (Simplified Formats, master04 §Raw canonical JSON), the COMPOSITION
+    /// `language`, `territory` and `composer` included; each default the run
+    /// expects is returned beside its node so the run can check the built
+    /// composition carries it.
     pub(super) fn node_values(&self) -> Result<(Vec<NodeValue>, Vec<Routed>), EngineError> {
         let mut values = Vec::new();
-        let mut routed = self.expected.clone();
+        let routed = self.expected.clone();
         for written in &self.written {
             let node = self
                 .index
@@ -317,11 +316,6 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
                     .map_err(refuse)?
                 }
             };
-            if let Some(keys) = context_keys(node, &value) {
-                values.extend(keys);
-                routed.push((written.flat_id.clone(), value));
-                continue;
-            }
             values.push(
                 NodeValue::new(node, value.to_canonical().map_err(refuse)?)
                     .with_occurrences(written.positions.clone())
@@ -374,67 +368,6 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
     }
 }
 
-// TODO(#618): the three attributes travel as `ctx/` keys until openehr-sdt
-// honours `|raw` on the COMPOSITION `language`, `territory` and `composer`
-// nodes, which its builder routes through the context (new sibling request S6).
-/// Returns the `ctx/` keys a value at a composition attribute the FLAT
-/// builder sets from the context vocabulary travels as, `None` for any other
-/// node.
-///
-/// Simplified Formats, master06 §Composer and §Language and Territory:
-/// `ctx/language` and `ctx/territory` set the two codes, and the composer
-/// travels as [`composer_keys`]. A part the keys do not hold is left out
-/// here and refused by [`Run::carried_whole`] once the composition is built.
-pub(super) fn context_keys(node: &ResolvedNode, value: &RmValue) -> Option<Vec<NodeValue>> {
-    let field = match node.aql_path().as_str() {
-        "/language" => "language",
-        "/territory" => "territory",
-        COMPOSER => {
-            return Some(match *value {
-                RmValue::Party(ref party) => composer_keys(party),
-                _ => Vec::new(),
-            });
-        }
-        _ => return None,
-    };
-    Some(match *value {
-        RmValue::CodePhrase(ref code) => vec![context_key(field, &code.code_string)],
-        _ => Vec::new(),
-    })
-}
-
-/// Returns the `ctx/` keys a composer `PARTY_IDENTIFIED` travels as.
-///
-/// Simplified Formats, master06 §Composer and §ID Namespace and Scheme:
-/// `ctx/composer_name` sets the name, `ctx/composer_id` the
-/// `external_ref.id.value`, `ctx/id_namespace` its `namespace` and
-/// `ctx/id_scheme` the `id.scheme` of a `GENERIC_ID`. The vocabulary has no
-/// key for `identifiers`, so a party carrying them is refused by
-/// [`Run::carried_whole`].
-fn composer_keys(party: &PartyIdentifiedData) -> Vec<NodeValue> {
-    let mut keys: Vec<NodeValue> = party
-        .name
-        .iter()
-        .map(|name| context_key("composer_name", name))
-        .collect();
-    if let Some(ref reference) = party.external_ref {
-        let (id, scheme) = match reference.id {
-            ObjectId::GenericId(ref id) => (id.value.as_str(), Some(id.scheme.as_str())),
-            ObjectId::HierObjectId(ref id) => (id.value(), None),
-            ObjectId::ObjectVersionId(ref id) => (id.value(), None),
-            ObjectId::ArchetypeId(ref id) => (id.value.as_str(), None),
-            ObjectId::TemplateId(ref id) => (id.value.as_str(), None),
-            ObjectId::TerminologyId(ref id) => (id.value.as_str(), None),
-        };
-        keys.push(context_key("composer_id", id));
-        keys.push(context_key("id_namespace", &reference.namespace));
-        if let Some(scheme) = scheme {
-            keys.push(context_key("id_scheme", scheme));
-        }
-    }
-    keys
-}
-
 /// Returns whether `party` holds none of `name`, `identifiers` and
 /// `external_ref`.
 ///
@@ -444,11 +377,6 @@ fn void(party: &PartyIdentifiedData) -> bool {
     party.name.is_none() && party.identifiers.is_none() && party.external_ref.is_none()
 }
 
-/// Returns the `ctx/` key `field` carrying `text`.
-fn context_key(field: &str, text: &str) -> NodeValue {
-    NodeValue::context(field, serde_json::Value::String(String::from(text)))
-}
-
 #[cfg(test)]
 mod tests {
     use openehr_base::v1_3::base_types::identification::generic_id::GenericId;
@@ -456,8 +384,6 @@ mod tests {
     use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
     use openehr_rm::v1_2::common::generic::party_identified::PartyIdentifiedData;
 
-    use super::composer_keys;
-    use super::context_key;
     use super::void;
 
     fn party(name: Option<&str>, external_ref: Option<PartyRef>) -> PartyIdentifiedData {
@@ -480,33 +406,13 @@ mod tests {
     }
 
     #[test]
-    fn a_named_composer_travels_as_its_name() {
-        let named = party(Some("Synthetic Recorder"), None);
-        assert_eq!(
-            composer_keys(&named),
-            [context_key("composer_name", "Synthetic Recorder")]
-        );
-        assert!(!void(&named));
+    fn a_composer_with_a_name_or_a_reference_is_no_void() {
+        assert!(!void(&party(Some("Synthetic Recorder"), None)));
+        assert!(!void(&party(None, Some(external_ref()))));
     }
 
     #[test]
-    fn a_nameless_composer_travels_as_its_external_ref() {
-        let referenced = party(None, Some(external_ref()));
-        assert_eq!(
-            composer_keys(&referenced),
-            [
-                context_key("composer_id", "synthetic-practitioner-0001"),
-                context_key("id_namespace", "demographics"),
-                context_key("id_scheme", "local"),
-            ]
-        );
-        assert!(!void(&referenced));
-    }
-
-    #[test]
-    fn an_empty_composer_is_void_and_carries_no_key() {
-        let empty = party(None, None);
-        assert_eq!(composer_keys(&empty), []);
-        assert!(void(&empty));
+    fn an_empty_composer_is_void() {
+        assert!(void(&party(None, None)));
     }
 }

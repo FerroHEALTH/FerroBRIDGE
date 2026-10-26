@@ -25,6 +25,23 @@ crates on crates.io.
 
 ### Added
 
+- **The HL7 Europe Laboratory Report 2.0.0 `Composition-eu-lab` round trip**
+  (#116). A FerroBRIDGE document context starts at the report composition of
+  the published `KDS_Laborbericht` template and maps it to a
+  `Composition-eu-lab`: status, identifier, date, author, the LOINC 11502-2
+  type and a title, and one section that carries the test's code and
+  references the `DiagnosticReport-eu-lab`, which references its results and
+  specimens. The document's report reads its status and identifier out of
+  openEHR, because the Composition writes those nodes going in.
+
+- **The HL7 Europe Base and Core 2.0.0 `medicalTestResult-eu-core` round
+  trip** (#116). A FerroBRIDGE context maps the laboratory test result of the
+  published `KDS_Laborbericht` template to a `medicalTestResult-eu-core`
+  Observation, with its category, code, effective time, status and report
+  identifier, and each analyte as a member `Observation-resultslab-eu-lab`
+  it references. The result's status travels through the codes the R4
+  diagnostic-report-status and observation-status code systems share.
+
 - **The HL7 Europe Medication Prescription and Dispense 1.0.0 round trip**
   (#116). Two FerroBRIDGE contexts map FerroBRIDGE's medication template, an
   ADL 2 template over seven published CKM archetypes, to
@@ -33,7 +50,7 @@ crates on crates.io.
   dispense is the medication ACTION at its careflow step "Prescription
   dispensed". `scripts/vendor/ckm-medication.sh` vendors the archetypes at
   the CKM mirror commit `docs/VERSIONS.md` pins, and the suites build the
-  operational template at test time. `fhirconnect` 0.1.196 (with `ferrobridge-hl7v2` 0.1.150 and `openehr-mapping-core` 0.1.131) takes
+  operational template at test time. `fhirconnect` 0.1.196 (with `ferrobridge-hl7v2` 0.1.152 and `openehr-mapping-core` 0.1.131) takes
   `openehr-adl` as a test dependency, and the bridge moves to the
   `openehr-*` crates at 0.0.100, whose ADL 2 Web Template builder reads the
   ADL 1.4 term constraints of the CKM sources.
@@ -57,6 +74,19 @@ crates on crates.io.
   survive a link, and the user menu closes once one of its items is
   chosen. The library marks the page once it has hydrated, and a debug
   build names a page changed before then.
+
+- **The bridge writes the composition's `language`, `territory` and
+  `composer`, the `_feeder_audit`, `_link:i`, `_participation:i`,
+  `_other_participation:i`, `_provider` and `_health_care_facility`
+  families, and a role's `performer` whole, under `|raw`** (#618, #1000),
+  through the `openehr-sdt` 0.0.99 builder. A composer that carries
+  identifiers, and a provider or facility with an external reference, now
+  reach the composition whole, where the `ctx/` keys and the suffix
+  spellings left those parts out or refused them. A party builds through
+  `build_party`, with each member of a value at the root passed as
+  `<root>/<attribute>|raw`. The last local openEHR spellings of #618 are
+  gone. `fhirconnect` 0.1.197, `openehr-mapping-core` 0.1.132,
+  `ferrobridge-hl7v2` 0.1.151.
 
 - The operator console hydrates the whole page on FerroUI 0.5.0: the
   server draws the first page and the browser draws every page after it,
@@ -99,6 +129,16 @@ crates on crates.io.
   element the paths reach is now created, as FHIRconnect's manual mappings
   page says ("Full FHIR or openEHR elements are created from all given
   paths").
+### Security
+
+Shipped with functional changes because: the library crates publish from `main` one patch per change, and `main` already holds the unreleased changes above, so a separate security-only crate patch has no tree to come from.
+
+- The bridge and `ferrobridge-term`'s `smart` feature take
+  `ferrohealth-smart` 0.7.1 in place of 0.7.0: every earlier release can
+  render a configured URL's credentials in full (CWE-532,
+  GHSA-vphj-3f8c-5hpx). `ferrobridge-term` 0.1.137,
+  `ferrobridge-hl7v2` 0.1.152 and `ferrobridge-validator` 0.1.137 carry it, so
+  a product pinning `ferrobridge-term` can take the patched crate.
 
 ## [0.0.13] - 2026-10-25
 
