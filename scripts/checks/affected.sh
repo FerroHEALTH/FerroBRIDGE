@@ -204,6 +204,9 @@ classify() {
     # Write only the KDS templates under the testkit's fixtures: the testkit
     # embeds them for every package testing with it, fhirconnect's tests too.
     scripts/vendor/kds-*-opt.sh | scripts/vendor/lib/kds-opt.sh) echo "packages ferrobridge-testkit fhirconnect" ;;
+    # Writes only the CKM archetypes under the testkit's fixtures, which the
+    # medication template the testkit builds reads.
+    scripts/vendor/ckm-medication.sh) echo "packages ferrobridge-testkit fhirconnect" ;;
     crates/* | app/* | tools/*) echo member ;;
     *) echo global ;;
   esac
@@ -580,6 +583,9 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+ferrobridge-validator -fhir-codegen -ferrobridge-console"
   check "a KDS vendor script reaches the testkit and fhirconnect" \
     "scripts/vendor/kds-diagnose-opt.sh" false \
+    "+ferrobridge-testkit +fhirconnect +ferrobridge-server -fhir-codegen -fhir-types -hl7v2-types"
+  check "the CKM medication vendor script reaches the testkit and fhirconnect" \
+    "scripts/vendor/ckm-medication.sh" false \
     "+ferrobridge-testkit +fhirconnect +ferrobridge-server -fhir-codegen -fhir-types -hl7v2-types"
   check "the shared KDS vendor library reaches the testkit and fhirconnect" \
     "scripts/vendor/lib/kds-opt.sh" false \

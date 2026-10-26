@@ -56,6 +56,7 @@ its pin from this table, and `scripts/checks/versions.sh` reads each vendored
 | KDS Studienteilnahme operational template (fixture) | `openFHIR/openfhir` commit `5e4d68007518fcddae1907b333a86f495791aa53` path `core/src/test/resources/kds/studienteilnahme/Studienteilnahme.opt` sha256 `4e1e919e18f0f527661201819d3ed4b3ae2cab5cff88724edd70b7462d484004` | `scripts/vendor/kds-studienteilnahme-opt.sh`, `tools/ferrobridge-testkit/fixtures/opt/kds-studienteilnahme/PROVENANCE.md` |
 | KDS Todesursache operational template (fixture) | `openFHIR/openfhir` commit `5e4d68007518fcddae1907b333a86f495791aa53` path `core/src/test/resources/kds/todesursache/KDS_Todesursache.opt` sha256 `8140e5f7c8a18e460399977fc81110fcaeb1bc87c8c04a739fadfff81774e756` | `scripts/vendor/kds-todesursache-opt.sh`, `tools/ferrobridge-testkit/fixtures/opt/kds-todesursache/PROVENANCE.md` |
 | KDS Vitalstatus operational template (fixture) | `openFHIR/openfhir` commit `5e4d68007518fcddae1907b333a86f495791aa53` path `core/src/test/resources/kds/vitalstatus/KDS_Vitalstatus.opt` sha256 `48c66f243813890b00228a34df0f5f118da3a6f252fdc86020498b389b880332` | `scripts/vendor/kds-vitalstatus-opt.sh`, `tools/ferrobridge-testkit/fixtures/opt/kds-vitalstatus/PROVENANCE.md` |
+| CKM medication archetypes (fixture) | `openEHR/CKM-mirror` commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094` sha256 `d6ce595040d6a0fe2a10f5672b1a82a8ac8fb13ad0e9a0b0174346a35652ecf8` (`COMPOSITION.encounter.v1`, `INSTRUCTION.medication_order.v3`, `ACTION.medication.v1`, `CLUSTER.medication.v2`, `CLUSTER.therapeutic_direction.v1`, `CLUSTER.dosage.v2`, `CLUSTER.timing_daily.v1`) | `scripts/vendor/ckm-medication.sh`, `tools/ferrobridge-testkit/fixtures/ckm/medication/PROVENANCE.md` |
 | HL7 v2 definitions (v2ig source of truth, never committed) | `HL7/v2ig` commit `3adcdbfff654ccbff5cd33aa34bd909a087e8e19` path `input/sourceOfTruth` files `1694` digest `9a1fb2b974b69f575bcd9b30fa66d2ff7f13ef7869c1350eca7462067e974f93` | `scripts/vendor/v2ig.sh`, `tools/fhir-codegen/vendor/hl7-v2ig/PROVENANCE.md`, the `codegen-drift` job of `.github/workflows/ci.yml` (its cache key) |
 | HL7 v2 legacy tables (NIST IGAMT export, never committed) | `usnistgov/igamt-hl7Tools-service` commit `83322dffdac18cb129a1bd80149f5439cf5686fd` path `src/main/resources/hl7db` files `169` digest `967715c682b43383ba28894e171fd1e5c2a5980b16b5676a1c60f3fd0a5c2c92` | `scripts/vendor/v2-legacy.sh`, `tools/fhir-codegen/vendor/hl7-v2-legacy/PROVENANCE.md`, the `codegen-drift` and `test` jobs of `.github/workflows/ci.yml` and the coverage job of `.github/workflows/sonar.yml` (their cache key) |
 | HL7 v2 samples: Microsoft FHIR-Converter | `microsoft/FHIR-Converter` commit `70fd328e05019142f616a660cf65c6034baaa3c9` files `272` digest `8ba5602d3efc0f1161c1329887e3a9178983e1d2ed76f4353968aacd90c1420c` | `scripts/vendor/hl7v2-samples.sh`, `crates/ferrobridge-hl7v2/vendor/fhir-converter/PROVENANCE.md` |
@@ -80,14 +81,14 @@ carries the exact patch.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `openehr-base` | 0.0.99 | `docs/architecture.md`, later the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-rm` | 0.0.99 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-its` | 0.0.99 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-sdt` | 0.0.99 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the Simplified Data Template engines, split out of `openehr-its` at 0.0.68) |
-| `openehr-query` | 0.0.99 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-am` | 0.0.99 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the AOM2 OPT2 types an ADL 2 template decodes into) |
-| `openehr-adl` | 0.0.99 | the root `Cargo.toml` `[workspace.dependencies]`, test-only: the ADL 2 test fixtures of `openehr-mapping-core` are compiled from their `.adls` sources |
-| `openehr-term` | 0.0.99 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the `audit_change_type` and `version_lifecycle_state` concepts a commit codes) |
+| `openehr-base` | 0.0.100 | `docs/architecture.md`, later the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-rm` | 0.0.100 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-its` | 0.0.100 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-sdt` | 0.0.100 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the Simplified Data Template engines, split out of `openehr-its` at 0.0.68) |
+| `openehr-query` | 0.0.100 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-am` | 0.0.100 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the AOM2 OPT2 types an ADL 2 template decodes into) |
+| `openehr-adl` | 0.0.100 | the root `Cargo.toml` `[workspace.dependencies]`, test-only: the ADL 2 test fixtures of `openehr-mapping-core` are compiled from their `.adls` sources |
+| `openehr-term` | 0.0.100 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the `audit_change_type` and `version_lifecycle_state` concepts a commit codes) |
 
 ## Third-party crates
 

@@ -52,7 +52,7 @@ second, and changed seven things:
    targets and their order; the reference CDR's decision to author no profile
    mapping (its issue #3206) is inherited here, where the mappings belong.
 7. **The pins moved where the crates did.** The `openehr-*` crates are at
-   0.0.99 (0.0.65 to 0.0.67 changed only the copyright holder in every
+   0.0.100 (0.0.65 to 0.0.67 changed only the copyright holder in every
    source header; 0.0.68 split the Simplified Data Template engines out of
    `openehr-its` into `openehr-sdt`, 0.0.69 is the first lockstep publish
    of the nine, 0.0.71 adds the `rest` and `rest-client` features to
@@ -64,7 +64,8 @@ second, and changed seven things:
    `ferrohealth-smart` 0.3.1 pins; 0.0.99 adds `FromStr` for `ArchetypeHrid`,
    `TerminologyId::new`, the named `openehr-term` change-type and lifecycle
    concepts, and the FLAT builder's `|raw` on the root attributes and the
-   `_` families); the specification corpora did not move (every pinned commit is
+   `_` families; 0.0.100 reads the ADL 1.4 term constraints of an
+   archetype read in the ADL 1.4 dialect in the ADL 2 builder); the specification corpora did not move (every pinned commit is
    still the head of its default branch); OMOP CDM v5.5.0 shipped and stays
    tracked, never assumed; Eos, the OMOCL reference engine, has had no commit
    since 2026-03-09.
@@ -212,14 +213,14 @@ default branch.
 | HL7 v2 legacy tables | `usnistgov/igamt-hl7Tools-service` `src/main/resources/hl7db` at `83322dffdac18cb129a1bd80149f5439cf5686fd` (169 files, the NIST IGAMT export of HL7's v2 database for versions 2.1 to 2.8.2; no LICENSE, HL7's content) | the generator input for the structures v2.9.1 withdrew (#303); fetched at build time into an ignored directory and never committed, on the same terms as the definitions |
 | openEHR ITS-REST | 1.1.0 (OpenAPI at `openEHR/specifications-ITS-REST` tag `Release-1.1.0`, commit `24058992`; each document declares CC-BY-ND-3.0 in `info.license` while the repository's `LICENSE` file is Apache-2.0, both recorded in the provenance; modules Overview, System, EHR, Query and Definition, `STABLE`, and Demographic, `DEVELOPMENT`) | the released REST API a conformant CDR speaks; Admin and Demographic are `x-status: DEVELOPMENT` in the same release; the bridge reaches Demographic only behind `[cdr] demographic`, off by default and labelled DEVELOPMENT (section 15, #894), and does not vendor Admin; every tagged OAS file says `info.version: latest`, so provenance records tag and blob |
 | openEHR RM | 1.1.0 (Release 1.1.0, <https://specifications.openehr.org/releases/RM/Release-1.1.0/>; the code compiles against the `openehr_rm::v1_2` development generation) | the newest published RM release and the conformance target; ITS-REST 1.1.0 links its RM types to `releases/RM/latest`. openEHR has published no Release 1.2.0, and `openehr-rm` documents `v1_2` as specification version 1.2.0, the development baseline (<https://specifications.openehr.org/releases/RM/development/>). The code compiles against `v1_2` because `openehr-sdt` builds only against it and the canonical codecs and ITS-REST types of `openehr-its` are generated over it; `scripts/checks/versions.sh` fails a hand-written `openehr_rm::v1_N` path that names another generation. Against Release 1.1.0, `v1_2` adds `EHR.tags`, widens `GENERIC_ENTRY.data` from `ITEM_TREE` to `ITEM` (SPECRM-18), and removes `PARTY.reverse_relationships` (SPECRM-124), so a Release 1.1.0 `PARTY` carrying that attribute is refused by the strict reader (#845). The `ARCHETYPED.rm_version` stamp names Release 1.1.0 wherever the object conforms to it (section 3, #844) |
-| `openehr-base` | 0.0.99 (minor line 0.0; Apache-2.0) | the RM foundation types, including partial ISO 8601 dates (section 3); the line moved from 0.0.61 to 0.0.64 between passes, to 0.0.69 on 2026-09-24, to 0.0.71 on 2026-09-25 and to 0.0.72 the same day, to 0.0.84 on 2026-10-05, to 0.0.86 on 2026-10-15, to 0.0.87 on 2026-10-16, the line the federation gateway pins, and to 0.0.89 on 2026-10-19, which adds the `v1_3` generation with its `Hrid` and the BASE 1.3.0 `ARCHETYPE_ID` grammar, and to 0.0.90 on 2026-10-20, and to 0.0.99 on 2026-10-25 |
-| `openehr-rm` | 0.0.99 (Apache-2.0) | the RM model in two generations, `v1_1` (Release 1.1.0) and `v1_2` (the development baseline the bridge compiles against, see the openEHR RM row), its canonical JSON codec and the BASE path parser |
-| `openehr-its` | 0.0.99 (Apache-2.0) | the ITS wire layer: the OPT 1.4 codec, the canonical JSON and XML codecs, the ITS-REST 1.1.0 data types; the bridge takes `default-features = false` with `opt14`, `json` and `rest` (the DTOs without axum), and #285 adds `rest-client`, whose 0.0.72 commit headers, `4xx` error bodies and `SecretString` credentials the CDR client takes as they stand (#293) |
-| `openehr-sdt` | 0.0.99 (BUSL-1.1) | the Simplified Data Template engines split out of `openehr-its` at 0.0.68: the Web Template builder, the FLAT and STRUCTURED codecs, the composition builder (`flat::build`) and the RM-instance validation (`rm_instance`); the bridge takes `default-features = false` with `flat`, leaving the `moka` cache out |
-| `openehr-query` | 0.0.99 (BUSL-1.1) | the AQL 1.1.0 parser and canonical printer. `openehr-lang` arrives transitively |
-| `openehr-term` | 0.0.99 (Apache-2.0 AND CC-BY-SA-3.0) | the openEHR terminology; the server names its `audit_change_type` and `version_lifecycle_state` concepts (`codes`) for the `change_type` and `lifecycle_state` a commit carries |
-| `openehr-am` | 0.0.99 (Apache-2.0) | the generated AM 2.4 model: the AOM2 `OPERATIONAL_TEMPLATE` and `ARCHETYPE_HRID` types an ADL 2 template decodes into (section 3); taken directly because the bridge names those types |
-| `openehr-adl` | not taken in the first cut (0.0.99, BUSL-1.1) | the ADL 2 text parser, flattener and OPT2 generator; the bridge fetches an ADL 2 template as AOM2 canonical JSON, so it never parses ADL source (section 3); taken later only if a CDR serves ADL 2 templates as text alone |
+| `openehr-base` | 0.0.100 (minor line 0.0; Apache-2.0) | the RM foundation types, including partial ISO 8601 dates (section 3); the line moved from 0.0.61 to 0.0.64 between passes, to 0.0.69 on 2026-09-24, to 0.0.71 on 2026-09-25 and to 0.0.72 the same day, to 0.0.84 on 2026-10-05, to 0.0.86 on 2026-10-15, to 0.0.87 on 2026-10-16, the line the federation gateway pins, and to 0.0.89 on 2026-10-19, which adds the `v1_3` generation with its `Hrid` and the BASE 1.3.0 `ARCHETYPE_ID` grammar, and to 0.0.90 on 2026-10-20, and to 0.0.99 on 2026-10-25, and to 0.0.100 on 2026-10-26 |
+| `openehr-rm` | 0.0.100 (Apache-2.0) | the RM model in two generations, `v1_1` (Release 1.1.0) and `v1_2` (the development baseline the bridge compiles against, see the openEHR RM row), its canonical JSON codec and the BASE path parser |
+| `openehr-its` | 0.0.100 (Apache-2.0) | the ITS wire layer: the OPT 1.4 codec, the canonical JSON and XML codecs, the ITS-REST 1.1.0 data types; the bridge takes `default-features = false` with `opt14`, `json` and `rest` (the DTOs without axum), and #285 adds `rest-client`, whose 0.0.72 commit headers, `4xx` error bodies and `SecretString` credentials the CDR client takes as they stand (#293) |
+| `openehr-sdt` | 0.0.100 (BUSL-1.1) | the Simplified Data Template engines split out of `openehr-its` at 0.0.68: the Web Template builder, the FLAT and STRUCTURED codecs, the composition builder (`flat::build`) and the RM-instance validation (`rm_instance`); the bridge takes `default-features = false` with `flat`, leaving the `moka` cache out |
+| `openehr-query` | 0.0.100 (BUSL-1.1) | the AQL 1.1.0 parser and canonical printer. `openehr-lang` arrives transitively |
+| `openehr-term` | 0.0.100 (Apache-2.0 AND CC-BY-SA-3.0) | the openEHR terminology; the server names its `audit_change_type` and `version_lifecycle_state` concepts (`codes`) for the `change_type` and `lifecycle_state` a commit carries |
+| `openehr-am` | 0.0.100 (Apache-2.0) | the generated AM 2.4 model: the AOM2 `OPERATIONAL_TEMPLATE` and `ARCHETYPE_HRID` types an ADL 2 template decodes into (section 3); taken directly because the bridge names those types |
+| `openehr-adl` | not taken in the first cut (0.0.100, BUSL-1.1) | the ADL 2 text parser, flattener and OPT2 generator; the bridge fetches an ADL 2 template as AOM2 canonical JSON, so it never parses ADL source (section 3); taken later only if a CDR serves ADL 2 templates as text alone |
 | `fhir-types` | 0.1.128 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
 | openFHIR, the FHIRconnect reference engine | 3.0.1 (2026-09-09), read for behaviour only | never an oracle; section 4.4 records the 3.0.0 behaviour changes and what the bridge takes |
 | Eos, the OMOCL reference engine | 0.0.62 (2024-03-20), last commit 2026-03-09 | never an oracle; dormant, so its behaviour is prior art with no expected movement |
@@ -1146,7 +1147,20 @@ the composition's `other_context` bound to the R4 `diagnostic-report-status`
 value set, which a `manual` table carries, because a FHIR `code` cannot
 convert to a DV_CODED_TEXT. The profile's required
 `DiagnosticReportCompositionR5` extension references a `Composition-eu-lab`,
-which the document context of the next step writes.
+which the document context of the next step writes. Medication Prescription
+and Dispense 1.0.0 follows over FerroBRIDGE's own medication template
+(`tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_medication.adlt`), an
+encounter COMPOSITION holding one `INSTRUCTION.medication_order.v3` and one
+`ACTION.medication.v1`, whose template overlays fill the medication,
+therapeutic direction, dosage and daily timing slots with the published CKM
+archetypes (`scripts/vendor/ckm-medication.sh` vendors the seven at one CKM
+mirror commit). The suites build its ADL 2 operational template at test time,
+and a node under an overlay carries the published archetype's id. The
+prescription context maps the order to a `MedicationRequest-eu-mpd`, the
+dispense context maps the ACTION at its careflow step at0003 "Prescription
+dispensed" to a `MedicationDispense-eu-mpd`, each references a
+`Medication-eu-mpd` built from the medication details, and the dosage is a
+`Dosage-eu-mpd`; the round trips assert each profile's elements.
 
 **Decision:** profile mappings are authored in this repository, in the
 specification's own customisation mechanism (a context and its extensions per
@@ -1160,7 +1174,10 @@ matrix the CDR publishes per category (committed template, target profile,
 transform proven) is reproduced here from the same generated source. Two
 categories (dispensations, discharge reports) have no template in the openEHR
 international CKM, which publishes no EHDS template today; that is a corpus
-gap recorded as such, never filled with a hand-authored template. No openEHR
+gap recorded as such. The one exception is the medication template above
+(owner ruling on #116): FerroBRIDGE authors a template over published CKM
+archetypes only, never a new archetype, so the archetypes stay the community
+models, and the readiness matrix names the template as FerroBRIDGE's. No openEHR
 Foundation position on the exchange format was found, and no HL7 Europe guide
 or Xt-EHR deliverable references openEHR; the library's laboratory OPT is the
 one concrete openEHR-to-EEHRxF artefact.
@@ -2078,7 +2095,7 @@ that carries identifiable data says so at start-up.
 **Dependencies, verified against crates.io on 2026-09-12**, with `redb` and
 `jiff` re-verified on 2026-09-15 when the facade added them, and recorded in
 `docs/VERSIONS.md`: `openehr-base`, `openehr-rm`, `openehr-its`,
-`openehr-sdt`, `openehr-query`, `openehr-term` 0.0.99 (re-verified on 2026-10-25); `serde-saphyr` 1.3.0 (the
+`openehr-sdt`, `openehr-query`, `openehr-term` 0.0.100 (re-verified on 2026-10-26); `serde-saphyr` 1.3.0 (the
 maintained serde YAML with anchors, aliases, merge keys and spans;
 `serde_yaml` is archived, `serde-yaml-ng` and `serde_yml` unmaintained);
 `jsonschema` 0.57.0 with `default-features = false`; `axum` 0.8.9, `tower-http`
@@ -2093,7 +2110,7 @@ features (since 0.0.71 the DTOs ride `rest` over serde and `http` alone, and
 `rest-client` is the generated client, so `axum` no longer arrives through the
 ITS crate), and `openehr-sdt` with `flat` alone (which carries both Web
 Template builders and implies `openehr-its/opt14`) keeps `moka` out; the
-transitive cost (`quick-xml`, `reqwest`) is accepted and recorded here; `openehr-am` 0.0.99
+transitive cost (`quick-xml`, `reqwest`) is accepted and recorded here; `openehr-am` 0.0.100
 is taken directly for the OPT2 types. `openehr-adl` (until a CDR serves ADL 2 as text alone),
 `fhir-terminology`, `fhir-model` and every FHIRPath crate stay out.
 
@@ -2841,6 +2858,7 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | `alternatives` | ordered first-match | the only reading the library is consistent with | all-match; merge |
 | Incremental mode | a change-feed adapter over a configured stream, after the batch round trip, running the same per-composition commit | ITS-REST defines no feed; the reference CDR's outbox is the reference source | polling AQL by time; a bespoke feed |
 | Local codes | rubrics and bindings from the Web Template and OPT; only external systems go to the terminology server | the bridge holds the OPT; no specification defines a canonical for archetype-local terminology | `$lookup` for every code |
+| MPD template | FerroBRIDGE's ADL 2 template over seven published CKM archetypes, at-coded, its overlays filling the nested slots, built into an OPT2 at test time; the dispense is `ACTION.medication.v1` at the careflow step "Prescription dispensed" in the same template | the CKM publishes no prescription or dispense template; an overlay is a template-local specialisation (ADL2 and AOM2 §Templates), so the data keeps the published archetype ids; no specification governs authoring a template for a profile target: our own design (owner ruling on #116) | a hand-authored archetype; the KDS medication templates, which target the German profiles |
 | Profile targets | HL7 Europe Base and Core, Laboratory, MPD in that order; EPS planned, imaging and discharge deferred; authored here, never a conformance claim | R4 lines exist for every category; Laboratory has a published model map and an openEHR artefact; the legal pin does not exist (section 4.8) | waiting for the implementing act; pinning ballots |
 | FHIRPath release | the evaluator is FHIRPath N1 2.0.0 by default, so a function only a later release defines is an undefined-function error; the 13 functions FHIRPath 3.0.0 adds as STU that HL7's R4 suite exercises (`lowBoundary`, `highBoundary`, `precision`, `sort`, `matchesFull`, `comparable`, `trim`, `split`, `join`, `encode`, `decode`, `escape`, `unescape`) sit behind the opt-in `Environment::with_fhirpath_stu3_functions`; the suite's tests that call one of them are the `fhirpath-r4-stu3` corpus, with its own pass list and badge, and every other test is the `fhirpath-r4` corpus (#633) | FHIR R4 fhirpath.html §2.9 cites "FHIRPath (release 2)", N1 (<http://hl7.org/fhirpath/N1/>); each of the 13 is a section FHIRPath 3.0.0 marks Standard for Trial Use (<http://hl7.org/fhirpath/STU3/>); the opt-in widens only its own path, so the default pin is unchanged | widening the default to 3.0.0; leaving the 104 tests failing as undefined; reporting them out of scope |
 | Profile validation | `ferrobridge-validator` in this repository; profiles read at run time from FHIR packages into the generated R4 model; FHIRPath through `ferrobridge-fhirpath`; every unevaluated constraint named (section 4.9) | owner direction 2026-10-15; the model, element table, terminology client and FHIRPath evaluator live here; a profile set is per-deployment data | a validator per consumer; profiles generated into Rust; the HL7 FHIR Validator as a runtime dependency |

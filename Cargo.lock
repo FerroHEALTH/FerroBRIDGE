@@ -1540,7 +1540,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.149"
+version = "0.1.150"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1782,13 +1782,14 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.195"
+version = "0.1.196"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
  "fhir-types",
  "insta",
  "jsonschema",
+ "openehr-adl",
  "openehr-base",
  "openehr-its",
  "openehr-mapping-core",
@@ -3593,9 +3594,9 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "openehr-adl"
-version = "0.0.99"
+version = "0.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7241d58ed0e81c2f6ded477f133878530e0733f609e8936d7845c487abd2630"
+checksum = "f51f190fe3757c150efdd540113275b48f29b1570f08243d77166a3a09e86f96"
 dependencies = [
  "indexmap 2.14.2",
  "openehr-am",
@@ -3611,9 +3612,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-am"
-version = "0.0.99"
+version = "0.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "865d76e3f33151f13f5a05374ec0e00b62bb607eaec9426cb77f68bbecf18133"
+checksum = "5ac7acb9c2cd2454c3d5f551d34fd650927c4f3a1ced13cd6bbf378db8925ce1"
 dependencies = [
  "openehr-base",
  "openehr-lang",
@@ -3623,9 +3624,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-base"
-version = "0.0.99"
+version = "0.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9cd6103c2ff6cb88da1ca194d713d4dc6e8fc667f89dd033a7b809d9096c043"
+checksum = "dfb5b688717d43f81f9f9985af8bdc2e30a094fc7656e1e7d54baea6bc23b7c5"
 dependencies = [
  "serde",
  "serde_json",
@@ -3635,9 +3636,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-its"
-version = "0.0.99"
+version = "0.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb4a4224a626dc167b7ed2170b1aeb94783f95600c3b527b22b75854f3d7f13a"
+checksum = "b7859c7a581c563d34603791eff51783b3618727430c4ee030dbe4d4ba0ef335"
 dependencies = [
  "async-trait",
  "backon",
@@ -3663,9 +3664,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-lang"
-version = "0.0.99"
+version = "0.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18190a3f8d276d7fdb5809bb33baf6f60586e6bd948237e70684233d4a9490f3"
+checksum = "7da9156e4548880527aa485fcb810dc4966df0efa8edf54720bb380a1311d64b"
 dependencies = [
  "chumsky",
  "indexmap 2.14.2",
@@ -3678,7 +3679,7 @@ dependencies = [
 
 [[package]]
 name = "openehr-mapping-core"
-version = "0.1.130"
+version = "0.1.131"
 dependencies = [
  "ferrobridge-testkit",
  "insta",
@@ -3697,9 +3698,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-query"
-version = "0.0.99"
+version = "0.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be7b1774707174636f0a7e583337333e50b5b3b63f7835b33b7dbc33bb8b5166"
+checksum = "408adf312c19eb0866ba147d2f4be6e37367fb511b4091d2e113b044fbfe1dff"
 dependencies = [
  "chumsky",
  "logos",
@@ -3708,9 +3709,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-rm"
-version = "0.0.99"
+version = "0.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "087ab44770b03589884b820e5fef8044367699c73bfed887a61fba3e1af740d5"
+checksum = "5369266665ea6ba789be615d1e051bf0b06d4fc25ea98bc95d8087076eb21355"
 dependencies = [
  "openehr-base",
  "openehr-term",
@@ -3725,9 +3726,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-sdt"
-version = "0.0.99"
+version = "0.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "107cc426b4767eebea31a513bea6016da036e81cc9d050c9cd217a50b9cd9e83"
+checksum = "50db43fc5159d655407c04c1d0cb1e057771f2c827e251e9d5cccc14c3c254e0"
 dependencies = [
  "fancy-regex",
  "indexmap 2.14.2",
@@ -3746,9 +3747,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-term"
-version = "0.0.99"
+version = "0.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67f804bb2be42e44d45cfc74637e7373c3ccb7ef739b9be54e28ce3d20616f9a"
+checksum = "e3cd4781c1868a619f959a4459b8eaa457a47dc29fe23b74842312e8313b50f7"
 dependencies = [
  "openehr-base",
  "roxmltree",

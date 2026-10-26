@@ -25,6 +25,19 @@ crates on crates.io.
 
 ### Added
 
+- **The HL7 Europe Medication Prescription and Dispense 1.0.0 round trip**
+  (#116). Two FerroBRIDGE contexts map FerroBRIDGE's medication template, an
+  ADL 2 template over seven published CKM archetypes, to
+  `MedicationRequest-eu-mpd` and `MedicationDispense-eu-mpd`, each with a
+  referenced `Medication-eu-mpd` and the dosage as a `Dosage-eu-mpd`; the
+  dispense is the medication ACTION at its careflow step "Prescription
+  dispensed". `scripts/vendor/ckm-medication.sh` vendors the archetypes at
+  the CKM mirror commit `docs/VERSIONS.md` pins, and the suites build the
+  operational template at test time. `fhirconnect` 0.1.196 (with `ferrobridge-hl7v2` 0.1.150 and `openehr-mapping-core` 0.1.131) takes
+  `openehr-adl` as a test dependency, and the bridge moves to the
+  `openehr-*` crates at 0.0.100, whose ADL 2 Web Template builder reads the
+  ADL 1.4 term constraints of the CKM sources.
+
 - The run report of `etl fhir` carries an element ledger (#408): per input
   resource, every element with a value and one of four outcomes. `mapped`
   names the openEHR node a FHIRconnect mapping read the element into and the
@@ -69,6 +82,17 @@ crates on crates.io.
   ITS-REST client, which only the server adds, and the console CI lane
   checks the operator contract for wasm32
   ([#1256](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1256)).
+
+### Fixed
+
+- **A `manual` entry whose openEHR paths reach two data elements writes
+  both.** The engine merged every path of one entry into the element the
+  last path reached, so an entry that set the `current_state` and the
+  `careflow_step` below one `ism_transition` wrote only the careflow step,
+  with no diagnostic, and the build then defaulted the state. Each data
+  element the paths reach is now created, as FHIRconnect's manual mappings
+  page says ("Full FHIR or openEHR elements are created from all given
+  paths").
 
 ## [0.0.13] - 2026-10-25
 

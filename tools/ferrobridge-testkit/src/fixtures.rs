@@ -10,12 +10,23 @@
 //!
 //! Some fixtures name systems outside that domain. [`KDS_DIAGNOSE_OPT`],
 //! [`KDS_PERSON_OPT`], [`KDS_LABORAUFTRAG_OPT`] and [`KDS_LABORBERICHT_OPT`]
-//! are published operational templates vendored verbatim
-//! with their provenance beside them: a template carries constraints, never
-//! patient content.
+//! are published operational templates and [`CKM_MEDICATION_ARCHETYPES`]
+//! published archetypes, vendored verbatim with their provenance beside
+//! them: a template or an archetype carries constraints, never patient
+//! content.
 //! [`KDS_DIAGNOSE_CONDITION`] is synthetic, and names the profile and the
 //! systems and extension URLs the published KDS mappings match on, because a
 //! mapping condition only admits the value it names.
+
+/// One vendored CKM medication archetype as `(file name, source)`.
+macro_rules! ckm_medication {
+    ($file:literal) => {
+        (
+            $file,
+            include_str!(concat!("../fixtures/ckm/medication/", $file)),
+        )
+    };
+}
 
 /// A synthetic operational template: one `EVALUATION` with one `DV_TEXT`
 /// element under an `ITEM_TREE`.
@@ -150,6 +161,37 @@ pub const KDS_LABORAUFTRAG_TEMPLATE_ID: &str = "KDS_Laborauftrag";
 /// and licence.
 pub const KDS_LABORBERICHT_OPT: &str =
     include_str!("../fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt");
+
+/// FerroBRIDGE's ADL 2 medication template, with its template overlays.
+///
+/// An encounter `COMPOSITION` holding one `INSTRUCTION.medication_order.v3`
+/// and one `ACTION.medication.v1`, the overlays filling the medication,
+/// therapeutic direction, dosage and daily timing slots, at-coded with the
+/// ADL 1.4 codes of [`CKM_MEDICATION_ARCHETYPES`]. A suite builds the ADL 2
+/// operational template from the two at test time. The template identifier
+/// is [`FERROBRIDGE_MEDICATION_TEMPLATE_ID`].
+pub const FERROBRIDGE_MEDICATION_TEMPLATE: &str =
+    include_str!("../fixtures/adl2/ferrobridge_medication.adlt");
+
+/// The template identifier [`FERROBRIDGE_MEDICATION_TEMPLATE`] declares.
+pub const FERROBRIDGE_MEDICATION_TEMPLATE_ID: &str =
+    "openEHR-EHR-COMPOSITION.ferrobridge_medication.v1.0.0";
+
+/// The seven published CKM archetypes [`FERROBRIDGE_MEDICATION_TEMPLATE`]
+/// specialises, as `(file name, ADL 1.4 source)`.
+///
+/// `scripts/vendor/ckm-medication.sh` fetches them at the CKM mirror commit
+/// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
+/// source and licence.
+pub const CKM_MEDICATION_ARCHETYPES: [(&str, &str); 7] = [
+    ckm_medication!("openEHR-EHR-COMPOSITION.encounter.v1.adl"),
+    ckm_medication!("openEHR-EHR-INSTRUCTION.medication_order.v3.adl"),
+    ckm_medication!("openEHR-EHR-ACTION.medication.v1.adl"),
+    ckm_medication!("openEHR-EHR-CLUSTER.medication.v2.adl"),
+    ckm_medication!("openEHR-EHR-CLUSTER.therapeutic_direction.v1.adl"),
+    ckm_medication!("openEHR-EHR-CLUSTER.dosage.v2.adl"),
+    ckm_medication!("openEHR-EHR-CLUSTER.timing_daily.v1.adl"),
+];
 
 /// A synthetic FLAT composition of [`KDS_PERSON_OPT`]: one person with a
 /// name, the birth date `1984-03-17` and the administrative gender

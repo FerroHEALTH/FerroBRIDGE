@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension of ACTION.medication.v1 for the HL7 Europe MPD
+# 1.0.0 MedicationDispense-eu-mpd profile: its canonical, and the required
+# `recorded` extension (the FHIR R5 MedicationDispense.recorded carried into
+# R4), the time the dispense was recorded, which the composition's context
+# start time holds.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_mpd_dispense
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: ACTION.medication.v1
+
+mappings:
+  - name: "metaURL"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/mpd/StructureDefinition/MedicationDispense-eu-mpd"
+
+  - name: "recorded"
+    extension: "add"
+    with:
+      fhir: "$resource.extension"
+      openehr: "$composition/context/start_time"
+    fhirCondition:
+      targetRoot: "$resource.extension"
+      targetAttribute: "url"
+      operator: "one of"
+      criteria: "http://hl7.org/fhir/5.0/StructureDefinition/extension-MedicationDispense.recorded"
+    followedBy:
+      mappings:
+        - name: "recordedValue"
+          with:
+            fhir: "value.as(DateTime)"
+            openehr: "$composition/context/start_time"
+
+        - name: "recordedUrl"
+          with:
+            fhir: "$fhirRoot"
+          manual:
+            - name: "url"
+              fhir:
+                - path: "url"
+                  value: "http://hl7.org/fhir/5.0/StructureDefinition/extension-MedicationDispense.recorded"

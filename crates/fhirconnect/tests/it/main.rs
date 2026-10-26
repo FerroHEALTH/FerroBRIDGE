@@ -13,6 +13,7 @@ mod derive;
 mod engine;
 mod eu_condition;
 mod eu_laboratory;
+mod eu_mpd;
 mod eu_patient;
 mod event_time;
 mod events;

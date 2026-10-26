@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension of INSTRUCTION.medication_order.v3 for the HL7
+# Europe MPD 1.0.0 MedicationRequest-eu-mpd profile: its canonical.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_mpd_request
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: INSTRUCTION.medication_order.v3
+
+mappings:
+  - name: "metaURL"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/mpd/StructureDefinition/MedicationRequest-eu-mpd"

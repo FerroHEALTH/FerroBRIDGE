@@ -116,20 +116,26 @@ impl<T: Table + ?Sized> Run<'_, T> {
         }
     }
 
-    /// Writes the openEHR paths of one manual entry as one value.
+    /// Writes the openEHR paths of one manual entry, one value per node.
+    ///
+    /// "Full FHIR or openEHR elements are created from all given paths"
+    /// (`types-of-mappings/concept-type/manual.adoc`): the paths that reach
+    /// one data element merge into it, and paths that reach two (the
+    /// `current_state` and `careflow_step` below one `ism_transition`) write
+    /// two, in the order the entry first names each.
     fn manual_openehr(
         &mut self,
         mapping: &Mapping,
         entry: &Manual,
         binding: &Binding,
     ) -> Result<(), EngineError> {
-        let mut merged = serde_json::Map::new();
-        let mut node: Option<&OpenehrTarget> = None;
+        let mut elements: Vec<(&OpenehrTarget, serde_json::Map<String, serde_json::Value>)> =
+            Vec::new();
         for path in entry.openehr() {
             let Target::Openehr(ref target) = *path.target() else {
                 continue;
             };
-            node = Some(target.as_ref());
+            let target: &OpenehrTarget = target.as_ref();
             let segments: Vec<&str> = target
                 .tail()
                 .segments
@@ -154,31 +160,42 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 });
             }
             let text = self.manual_text(mapping, entry, path.value())?;
-            merge(&mut merged, &segments, text);
+            let flat_id = target.node().flat_id();
+            let merged = if let Some(at) = elements
+                .iter()
+                .position(|(seen, _)| seen.node().flat_id() == flat_id)
+            {
+                elements.get_mut(at).map(|(_, merged)| merged)
+            } else {
+                elements.push((target, serde_json::Map::new()));
+                elements.last_mut().map(|(_, merged)| merged)
+            };
+            if let Some(merged) = merged {
+                merge(merged, &segments, text);
+            }
         }
-        let Some(target) = node else {
-            return Ok(());
-        };
-        let rm_type = target.node().rm_type();
-        merged.insert(
-            String::from("_type"),
-            serde_json::Value::String(String::from(rm_type)),
-        );
-        let value = RmValue::from_canonical(
-            rm_type,
-            target.node().aql_path().as_str(),
-            &serde_json::Value::Object(merged),
-        )
-        .map_err(|source| EngineError::Rm {
-            mapping: format!("{}.{}", mapping.name(), entry.name()),
-            node: String::from(target.node().aql_path().as_str()),
-            source: Box::new(source),
-        })?;
-        self.store(Written {
-            flat_id: target.node().flat_id().clone(),
-            positions: binding.openehr.clone(),
-            value: Held::Value(value),
-        });
+        for (target, mut merged) in elements {
+            let rm_type = target.node().rm_type();
+            merged.insert(
+                String::from("_type"),
+                serde_json::Value::String(String::from(rm_type)),
+            );
+            let value = RmValue::from_canonical(
+                rm_type,
+                target.node().aql_path().as_str(),
+                &serde_json::Value::Object(merged),
+            )
+            .map_err(|source| EngineError::Rm {
+                mapping: format!("{}.{}", mapping.name(), entry.name()),
+                node: String::from(target.node().aql_path().as_str()),
+                source: Box::new(source),
+            })?;
+            self.store(Written {
+                flat_id: target.node().flat_id().clone(),
+                positions: binding.openehr.clone(),
+                value: Held::Value(value),
+            });
+        }
         Ok(())
     }
 

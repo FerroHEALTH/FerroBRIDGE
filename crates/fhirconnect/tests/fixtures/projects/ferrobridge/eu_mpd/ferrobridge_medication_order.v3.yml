@@ -1,0 +1,119 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM INSTRUCTION.medication_order.v3
+# (revision 3.2.1) to a FHIR R4 MedicationRequest. The mapping library
+# publishes none for this archetype. The order's activity carries the
+# medication, its directions and its dosage; the composition carries the
+# authoring time and the prescriber. An INSTRUCTION records no request
+# status, so the resource says `unknown` and a status going in is a declared
+# loss; it is always an `order` (no specification governs the two fixed
+# values: our own design).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: INSTRUCTION.medication_order.v3
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-INSTRUCTION.medication_order.v3
+    revision: 3.2.1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/MedicationRequest
+
+mappings:
+  - name: "status"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "unknown"
+        fhir:
+          - path: "status"
+            value: "unknown"
+
+  - name: "intent"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "order"
+        fhir:
+          - path: "intent"
+            value: "order"
+
+  - name: "identifier"
+    with:
+      fhir: "$resource.identifier"
+      openehr: "$archetype/protocol[at0005]/items[at0004]"
+
+  - name: "authoredOn"
+    with:
+      fhir: "$resource.authoredOn"
+      openehr: "$composition/context/start_time"
+
+  - name: "requester"
+    with:
+      fhir: "$resource.requester"
+      openehr: "$composition/composer"
+
+  # The activity repeats (0..*), so one mapping holds it and every element
+  # of the order runs below it, in the one activity the request describes.
+  - name: "order"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/activities[at0001]"
+    followedBy:
+      mappings:
+        - name: "medicationCode"
+          with:
+            fhir: "medication.as(CodeableConcept)"
+            openehr: "description[at0002]/items[at0070]"
+
+        - name: "medication"
+          with:
+            fhir: "medication.as(Reference)"
+            openehr: "$reference"
+          reference:
+            resourceType: "Medication"
+            mappings:
+              - name: "medicationDetails"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "description[at0002]/items[openEHR-EHR-CLUSTER.medication.v2]"
+                slotArchetype: "CLUSTER.medication.v2"
+
+        - name: "reasonCode"
+          with:
+            fhir: "reasonCode"
+            openehr: "description[at0002]/items[at0018]"
+
+        - name: "note"
+          with:
+            fhir: "note.text"
+            openehr: "description[at0002]/items[at0167]"
+
+        - name: "dosageInstruction"
+          with:
+            fhir: "dosageInstruction"
+            openehr: "description[at0002]/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[openEHR-EHR-CLUSTER.dosage.v2]"
+          slotArchetype: "CLUSTER.dosage.v2"
+          # The order's route sits beside the therapeutic direction, two
+          # levels above the dosage, and FHIR carries it on the dosage.
+          followedBy:
+            mappings:
+              - name: "route"
+                with:
+                  fhir: "route"
+                  openehr: "../../items[at0091]"
+
+        - name: "validityStart"
+          with:
+            fhir: "dispenseRequest.validityPeriod.start"
+            openehr: "description[at0002]/items[at0129]/items[at0155]"
+
+        - name: "validityEnd"
+          with:
+            fhir: "dispenseRequest.validityPeriod.end"
+            openehr: "description[at0002]/items[at0129]/items[at0161]"
