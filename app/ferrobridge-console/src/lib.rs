@@ -66,10 +66,32 @@ pub mod server;
 pub mod session;
 
 /// Hydrates the page the server drew, whole, its lazy routes loading their
-/// code from their own chunks.
+/// code from their own chunks, and marks the root element `data-hydrated`
+/// once the page and its route have hydrated.
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {
     console_error_panic_hook::set_once();
-    leptos::mount::hydrate_lazy(app::App);
+    // NOTE: leptos 0.8 `src/mount.rs`: `hydrate_lazy` runs this future and drops what
+    // follows it; `hydrate_from_async` starts the executor itself.
+    wasm_bindgen_futures::spawn_local(async {
+        let Some(body) = leptos::prelude::document().body() else {
+            leptos::logging::warn!("the page has no body to hydrate");
+            return;
+        };
+        let page = leptos::mount::hydrate_from_async(body, app::App).await;
+        page.forget();
+        mark_hydrated();
+    });
+}
+
+/// Marks the root element `data-hydrated`, which a journey and the
+/// screenshot capture wait for before they act.
+#[cfg(target_arch = "wasm32")]
+fn mark_hydrated() {
+    if let Some(root) = leptos::prelude::document().document_element()
+        && let Err(error) = root.set_attribute("data-hydrated", "")
+    {
+        leptos::logging::warn!("the browser refused the hydrated mark: {error:?}");
+    }
 }

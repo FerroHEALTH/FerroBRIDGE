@@ -206,6 +206,10 @@ leptos_axum = "0.8.10"
 leptos_meta = "0.8.7"
 leptos_router = "0.8.17"
 wasm-bindgen = "0.2.129"
+# The console drives its hydration itself, so it marks the page hydrated
+# once its lazy route has (FerroUI `docs/consoles.md`); already in the lock
+# through leptos. Verified against crates.io on 2026-10-26.
+wasm-bindgen-futures = "0.4.79"
 console_error_panic_hook = "0.1.7"
 # The FerroHEALTH components the console draws with: the shell, the views,
 # the table model, the highlighter, the Lucide icons, the stylesheet and the

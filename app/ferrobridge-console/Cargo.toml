@@ -62,6 +62,8 @@ url.workspace = true
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 leptos = { workspace = true, features = ["hydrate"] }
 wasm-bindgen.workspace = true
+# The hydration future, run before the leptos executor exists.
+wasm-bindgen-futures.workspace = true
 console_error_panic_hook.workspace = true
 
 # The server half. Of the workspace's own crates it may link

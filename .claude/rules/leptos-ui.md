@@ -321,6 +321,13 @@ clinical content. What is particular here:
 - The crate's `[package.metadata.leptos]` sets
   `disable-erase-components = true`, so a dev build keeps its component
   types in the browser half as the server half does and hydrates.
+- **The hydration mark.** A route group's page hydrates once its chunk has
+  arrived, after the shell. `hydrate()` runs `hydrate_from_async` itself
+  and marks `<html data-hydrated>` when it resolves, which is when the page
+  and its route have hydrated. A journey, and the screenshot capture, wait
+  for the mark before they act (`journeys::playground::hydrated`): a click
+  sent while the route still hydrates makes the router change the DOM under
+  the hydration walk, which panics.
 - `leptos_meta` (`<Title>`, `<Stylesheet>`, `<Meta>`) is used from component
   bodies, never by editing the shell's `<head>` by hand (`metadata`). Every
   routed page sets a `<Title>`.

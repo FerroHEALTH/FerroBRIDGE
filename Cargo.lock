@@ -1515,6 +1515,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wiremock",
 ]
 
