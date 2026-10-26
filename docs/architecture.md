@@ -1191,7 +1191,10 @@ issue #3206) with two reopen triggers: the implementing act adopted, or
 FerroBRIDGE shipping its first round trip. The second trigger is this
 project's third release, so the obligation lands here, and the readiness
 matrix the CDR publishes per category (committed template, target profile,
-transform proven) is reproduced here from the same generated source. Two
+transform proven) is generated here from committed metadata
+(`docs/ehds/readiness.toml`) into the book's EHDS readiness page, by a test
+that fails when a template, a context or a round-trip test a row names is
+gone. Two
 categories (dispensations, discharge reports) have no template in the openEHR
 international CKM, which publishes no EHDS template today; that is a corpus
 gap recorded as such. The one exception is the medication template above
