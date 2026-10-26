@@ -11,7 +11,7 @@ use std::error::Error;
 use http::StatusCode;
 
 use crate::stub::{CONTEXT, bridge, signed_in};
-use crate::support::{OPERATOR_NAME, OPERATOR_TOKEN, console, get, get_with, send};
+use crate::support::{OPERATOR_NAME, OPERATOR_TOKEN, console, drawn, get, get_with, send};
 
 /// Every route of the console, each with words its page draws.
 const PAGES: [(&str, &str); 29] = [
@@ -84,7 +84,7 @@ async fn every_page_is_drawn_whole_for_a_signed_in_operator() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn the_page_hydrates_islands_alone() -> Result<(), Box<dyn Error>> {
+async fn the_page_hydrates_whole() -> Result<(), Box<dyn Error>> {
     let bridge = bridge().await;
     let (service, cookie) = signed_in(&bridge).await?;
     let (_response, body) = send(
@@ -92,8 +92,12 @@ async fn the_page_hydrates_islands_alone() -> Result<(), Box<dyn Error>> {
         get_with(&format!("/mappings/edit/{CONTEXT}"), &cookie)?,
     )
     .await?;
-    assert!(body.contains("<leptos-island"), "{body}");
-    assert!(body.contains("MappingEditor"), "{body}");
+    assert!(body.contains("mod.hydrate()"), "{body}");
+    assert!(!body.contains("<leptos-island"), "no island: {body}");
+    assert!(
+        drawn(&body).contains(r#"name="draft""#),
+        "the editor is drawn in the page: {body}"
+    );
     Ok(())
 }
 

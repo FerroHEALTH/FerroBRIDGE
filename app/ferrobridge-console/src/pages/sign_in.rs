@@ -29,8 +29,9 @@ fn arrived() -> State {
     if let Some(Arrived(state)) = use_context::<Arrived>() {
         return state;
     }
-    if crate::session::request::configured_sign_in() {
-        if crate::session::request::ended() {
+    let visit = crate::visit::visit();
+    if visit.sign_in {
+        if visit.ended {
             State::Expired(Notice::new(tr(Msg::SignInExpired)))
         } else {
             State::Ready

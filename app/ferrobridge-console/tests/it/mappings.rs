@@ -14,7 +14,7 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use crate::stub::{BROKEN, CONTEXT, MODEL, OMOCL, answer, bridge, post, signed_in};
-use crate::support::{get_with, send};
+use crate::support::{drawn, get_with, send};
 
 #[tokio::test]
 async fn the_contexts_tab_lists_each_context_with_its_owner_state_and_row_menu()
@@ -64,6 +64,7 @@ async fn the_files_tab_filters_by_the_query_and_says_what_it_shows() -> Result<(
         get_with("/mappings/files?owner=console", &cookie)?,
     )
     .await?;
+    let console_files = drawn(&console_files);
     assert!(console_files.contains(CONTEXT), "{console_files}");
     assert!(!console_files.contains(MODEL), "{console_files}");
     assert!(console_files.contains("Owner: console"), "{console_files}");

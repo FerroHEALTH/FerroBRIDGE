@@ -1238,12 +1238,16 @@ is for an operator who wants to see what the bridge runs and work with its
 mapping files without a shell on the host.
 
 **The console is its own binary and image.** `app/ferrobridge-console` is a
-Leptos application in islands mode: the server draws every page whole, the
-browser hydrates only its islands (the menus, the code editor, the JSON
-input), and every action is a plain form post the server answers with the
-page it draws, so no server function exists. It is a backend-for-frontend,
-shipped as `ghcr.io/ferrohealth/ferrobridge-console`, drawn with FerroUI
-0.3.6.
+Leptos application that hydrates the whole page (FerroUI #410, `docs/consoles.md`
+"How a console builds"): the server draws the first page, the browser takes
+it over and draws every page after it, its pages loaded in five lazy route
+groups, so no link or form reloads the document (#1256). Every action is
+still a form post the server answers with the page it draws, which is the
+page with no WebAssembly; once the page has hydrated the same action goes
+through a server function and every read through one of the reads' server
+functions, each checking the operator's session first. It is a
+backend-for-frontend, shipped as `ghcr.io/ferrohealth/ferrobridge-console`,
+drawn with FerroUI 0.5.0.
 The server half and the browser half are chosen by compilation target, never
 by Cargo feature, so a workspace `--all-features` build never enables both.
 The operator's OpenID Connect session (authorization code with PKCE) lives on
@@ -1254,13 +1258,17 @@ token. The bridge validates that token as the resource server it already is
 **The console links three workspace crates and no others.** The server half
 may depend on `openehr-mapping-core`, for the `Diagnostic` a check answers;
 on `fhir-types` with the `r4` and `terminology` features (the root set that
-emits them), for the `OperationOutcome` and the `CapabilityStatement` it
-renders; and on `ferrobridge-operator-api` (#777), the serde types of the
+emits them), for the `OperationOutcome`, the `Parameters` of a run and the
+`CapabilityStatement` it reads; and on `ferrobridge-operator-api` (#777), the serde types of the
 bridge's health and operator documents, which the bridge serializes and the
 console decodes, so a field renamed on one side fails the other's build. The
 contract crate carries serde types and nothing else: no engine, no I/O. The
-browser half links none of them and receives its islands' props in the
-page the server draws. A dependency-closure test fails on any other workspace member, so
+browser half links `openehr-mapping-core` and `ferrobridge-operator-api`
+alone, which compile for `wasm32-unknown-unknown`, so both halves draw a
+document from one definition. The FHIR model stays out of the browser: the
+console's server reduces the facade's `CapabilityStatement` to the contract
+crate's `capability::Capability`, the facts a page draws, since the R4 codec
+in the browser cost more than the rest of the bundle's growth (#1256). A dependency-closure test fails on any other workspace member, so
 the console can never compile or run a mapping itself: every check,
 transform and save goes through the bridge. Linking these crates is what
 `codegen.md` asks of a consumer, which may not shadow a model the workspace
@@ -2844,7 +2852,7 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | Demographics | in order: the patient-to-EHR link through `EHR_STATUS.subject.external_ref`; `Patient` from EHR-side person templates through FHIRconnect; the FHIRconnect demographics endpoint as our own port over the identity store; `PARTY` objects over the ITS-REST Demographic API behind a feature labelled DEVELOPMENT; party-rooted mappings as our own extension; demographic AQL as Cadasto's experimental extension documents it, behind a feature labelled with that extension, backing demographic FHIR search (#465, #480) | the link and EHR-side templates rest on STABLE texts (RM Common IM §4.2.1.1, ITS-REST EHR); the Demographic API is `x-status: DEVELOPMENT` at 1.1.0 and on master and has no search; FHIRconnect `engine/demographics.adoc` defines no endpoint interface; AQL 1.1.0 defines no demographic semantics (QUERY §3.13.2), and the owner expects Cadasto's extension to become that specification (owner direction 2026-10-15) | demographics left outside |
 | Party context | a context whose OPT is rooted at a `PERSON`, `ORGANISATION` or `ROLE` archetype is a party context, recognised from the OPT root's RM type; `$composition`, the composition defaults, `ctx/`, `participationsFunction` onto `EVENT_CONTEXT`, `link` and a composition-slotting `slotContext` refused at load; read through `item_at_path`; the build through the `openehr-sdt` template walk, with `ROLE.performer` placed on the root after it (#906, #1000); the FHIR id the party's `versioned_object_uid`, with no identity-map entry (sections 4.11 and 9, #471) | FHIRconnect v1.0.0 admits an `openEHR-DEMOGRAPHIC-*` archetype id and defines no party root; Simplified Formats defines FLAT for compositions only; only the `object_id` of an `OBJECT_VERSION_ID` is stable across versions (RM Common §OBJECT_VERSION_ID); no specification governs this: our own design | a new context key; a per-resource Rust mapping; an identity-map entry per party; the full `OBJECT_VERSION_ID` as the FHIR id |
 | Operator console shape | `app/ferrobridge-console`, a Leptos app rendered on the server and hydrated, with a backend-for-frontend, its own binary and image; halves chosen by target, never by feature; the operator's OIDC session on the console's server, which calls the bridge with the operator's token (section 4.10, #594) | the bridge authenticates every request by bearer token and holds no browser session (#400), so a console the bridge served would add a session and a static-asset surface; FerroFED's A55 is the family precedent; no specification governs the console: our own design | a client-side app served by the bridge; a console inside the server binary |
-| Console crate boundary | the server half links `openehr-mapping-core`, `fhir-types` (`r4`, `terminology`) and `ferrobridge-operator-api` (the serde types of the health and operator documents, #777) and no other workspace crate, enforced by a dependency-closure test; the browser half links none | `codegen.md` forbids a consumer shadowing a model the workspace defines (`Diagnostic`, `OperationOutcome`, `CapabilityStatement`, and the bridge's own documents); one contract crate both sides compile against turns a renamed field into a build failure; excluding the engine crates keeps every check, transform and save on the bridge | no workspace crate (shadow types for the three); the console reading the bridge's documents by field name; the engine crates linked so the console compiles mappings itself |
+| Console crate boundary | the server half links `openehr-mapping-core`, `fhir-types` (`r4`, `terminology`) and `ferrobridge-operator-api` (the serde types of the health and operator documents, #777) and no other workspace crate, and the browser half `openehr-mapping-core` and `ferrobridge-operator-api` alone, enforced by a dependency-closure test | `codegen.md` forbids a consumer shadowing a model the workspace defines (`Diagnostic`, `OperationOutcome`, `CapabilityStatement`, and the bridge's own documents); one contract crate both sides compile against turns a renamed field into a build failure; excluding the engine crates keeps every check, transform and save on the bridge | no workspace crate (shadow types for the three); the console reading the bridge's documents by field name; the engine crates linked so the console compiles mappings itself |
 | Operator API | `/operator` on the bridge's listener, off unless `[operator] enabled`, refused at load without `[auth]`, every route requiring the operator scope (`[auth] product_scope`); the log names actor and file, never content | SMART scopes cover FHIR resources only; the bridge has no admin listener and the writes touch mapping files, never clinical data; no specification governs it: our own design | a second admin listener; an unguarded API on a private network |
 | Mapping ownership and saving | provisioned directories read-only; console saves go to `[operator] mapping_dir`, written to a temporary file, synced and renamed; a save over a provisioned path is refused | one owner per file (FerroFED A88); the server runs with a read-only root file system; a rename is atomic within one file system, so a reader sees the old file or the new one | writing back into the provisioned tree; saving without a check |
 | Mapping reload | the whole set compiled, any error keeps the running set; a clean set swapped in one pointer swap that each request reads at entry; each replica reloads on its own call or restart | requests in flight finish on the set they started with; a half-loaded set is never served; shared revisions are v0.0.16 | per-file hot reload; a file watcher; reload on save across replicas |

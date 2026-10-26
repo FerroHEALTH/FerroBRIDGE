@@ -70,28 +70,40 @@ pub fn console_lockup() -> AnyView {
 /// navigation and the footer, each part reading the bridge as it is drawn.
 #[must_use]
 pub fn shell(content: AnyView) -> AnyView {
-    let path = use_location().pathname.get_untracked();
+    let location = use_location();
+    let query = leptos_router::hooks::use_query_map();
+    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
+    let state = Resource::new(crate::load::changes, |_| crate::load::state_now());
+    // NOTE: no specification governs this: our own design; the shell outlives a
+    // navigation in the page, so it reads the address and the visit as they change.
     let bar = view! {
         <Suspense>
-            {move || Suspend::new(async move {
-                let info = crate::load::info().await;
-                top_bar(&info)
-            })}
+            {move || {
+                let path = location.pathname.get();
+                let words = if path == crate::pages::search::SEARCH {
+                    query.with(|query| query.get("q")).unwrap_or_default()
+                } else {
+                    String::new()
+                };
+                let visit = crate::visit::visit();
+                Suspend::new(async move {
+                    let info = info.await;
+                    top_bar(&info, &path, &words, &visit)
+                })
+            }}
         </Suspense>
     }
     .into_any();
     let nav = view! {
         <Suspense>
-            {
-                let path = path.clone();
-                move || {
-                    let path = path.clone();
-                    Suspend::new(async move {
-                        let state = crate::load::state().await;
-                        navigation(&path, &state)
-                    })
-                }
-            }
+            {move || {
+                let path = location.pathname.get();
+                let rail = crate::visit::visit().chosen().rail;
+                Suspend::new(async move {
+                    let state = state.await;
+                    navigation(&path, rail, &state)
+                })
+            }}
         </Suspense>
     }
     .into_any();
@@ -105,18 +117,19 @@ pub fn shell(content: AnyView) -> AnyView {
     })
 }
 
-/// The top bar, with the bridge's state from `info`.
-fn top_bar(info: &Loaded<ferrobridge_operator_api::health::Info>) -> AnyView {
-    let path = use_location().pathname.get_untracked();
-    let words = if path == crate::pages::search::SEARCH {
-        leptos_router::hooks::use_query_map()
-            .with_untracked(|query| query.get("q"))
-            .unwrap_or_default()
-    } else {
-        String::new()
-    };
-    let chosen = crate::prefs::requested().preferences;
-    let operator = crate::session::request::operator().unwrap_or_else(crate::app::unnamed_operator);
+/// The top bar of the page at `path` in the visit `visit`, with the
+/// bridge's state from `info` and the search's `words`.
+fn top_bar(
+    info: &Loaded<ferrobridge_operator_api::health::Info>,
+    path: &str,
+    words: &str,
+    visit: &crate::visit::Visit,
+) -> AnyView {
+    let chosen = visit.chosen().preferences;
+    let operator = visit
+        .operator
+        .clone()
+        .unwrap_or_else(crate::app::unnamed_operator);
     let menu = user_menu(UserMenu {
         id: MENU_ID,
         label: operator.clone(),
@@ -126,8 +139,8 @@ fn top_bar(info: &Loaded<ferrobridge_operator_api::health::Info>) -> AnyView {
         preferences: String::from(PREFERENCES),
         theme: ThemeChoice {
             current: chosen.theme,
-            action: String::from(crate::prefs::PREFERENCE),
-            back: path.clone(),
+            action: String::from(crate::app::PREFERENCE),
+            back: path.to_owned(),
         },
         choices: Vec::new(),
         links: Vec::new(),
@@ -140,7 +153,7 @@ fn top_bar(info: &Loaded<ferrobridge_operator_api::health::Info>) -> AnyView {
         {menu}
     }
     .into_any();
-    let search = crate::pages::search::search_box(&words);
+    let search = crate::pages::search::search_box(words);
     topbar(TopBar {
         sidebar: SIDEBAR_ID,
         lockup: console_lockup(),
@@ -211,9 +224,9 @@ pub fn error_count(state: &Loaded<EngineState>) -> Count {
     }
 }
 
-/// The navigation, the page at `path` marked, with the running load's count.
-fn navigation(path: &str, state: &Loaded<EngineState>) -> AnyView {
-    let rail = crate::prefs::requested().rail;
+/// The navigation, the page at `path` marked and folded to its rail when
+/// `rail`, with the running load's count.
+fn navigation(path: &str, rail: bool, state: &Loaded<EngineState>) -> AnyView {
     let entry = |href: &'static str, label: Msg, glyph: Glyph, exact: bool| Entry {
         href: Cow::Borrowed(href),
         label: Cow::Owned(tr(label)),
@@ -268,7 +281,7 @@ fn navigation(path: &str, state: &Loaded<EngineState>) -> AnyView {
         current: path.to_owned(),
         rail: Some(Rail {
             collapsed: rail,
-            action: String::from(crate::prefs::SIDEBAR),
+            action: String::from(crate::app::SIDEBAR),
             back: path.to_owned(),
         }),
         nest: None,

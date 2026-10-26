@@ -32,7 +32,6 @@ use ferrohealth_ui::view::surface::{
 use leptos::prelude::*;
 
 use crate::app::{CONNECTIONS, FACADE, HL7V2, MAPPINGS, OMOP, page_title};
-use crate::load::Ready;
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::model::{Loaded, Outcome};
@@ -45,13 +44,16 @@ pub const UPSTREAMS: [&str; 3] = ["cdr", "terminology", "cdm"];
 /// The dashboard.
 #[must_use]
 pub fn page() -> impl IntoView {
+    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
+    let readiness = Resource::new(crate::load::changes, |_| crate::load::readiness_now());
+    let state = Resource::new(crate::load::changes, |_| crate::load::state_now());
     view! {
         {page_title(tr(Msg::Dashboard))}
         <Suspense>
             {move || Suspend::new(async move {
-                let info = crate::load::info().await;
-                let readiness = crate::load::readiness().await;
-                let state = crate::load::state().await;
+                let info = info.await;
+                let readiness = readiness.await;
+                let state = state.await;
                 drawn(&info, &readiness, &state)
             })}
         </Suspense>
@@ -59,9 +61,14 @@ pub fn page() -> impl IntoView {
 }
 
 /// The dashboard over what the bridge answered.
-fn drawn(info: &Loaded<Info>, readiness: &Loaded<Ready>, state: &Loaded<EngineState>) -> AnyView {
-    let bridge = crate::session::request::signed_in()
-        .map(|(console, _token)| console.settings().bridge.base.to_string())
+fn drawn(
+    info: &Loaded<Info>,
+    readiness: &Loaded<Readiness>,
+    state: &Loaded<EngineState>,
+) -> AnyView {
+    let bridge = crate::visit::visit()
+        .settings
+        .map(|settings| settings.bridge)
         .unwrap_or_default();
     let header = page_heading(
         Header {
@@ -72,7 +79,7 @@ fn drawn(info: &Loaded<Info>, readiness: &Loaded<Ready>, state: &Loaded<EngineSt
         ActionGroup::none(),
     )
     .into_any();
-    let (Ok(Outcome::Shown(info)), Ok(Outcome::Shown((_, readiness)))) = (info, readiness) else {
+    let (Ok(Outcome::Shown(info)), Ok(Outcome::Shown(readiness))) = (info, readiness) else {
         let fault = match (info, readiness) {
             (Err(fault), _) | (_, Err(fault)) => faulted(fault, crate::app::DASHBOARD),
             (Ok(Outcome::Refused(refusal)), _) | (_, Ok(Outcome::Refused(refusal))) => {

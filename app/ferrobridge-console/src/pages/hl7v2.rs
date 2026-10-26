@@ -21,13 +21,13 @@ use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 
 use crate::app::{HL7V2, page_title};
-use crate::load::Ready;
 use crate::locale::messages::Msg;
 use crate::locale::tr;
 use crate::model::{Loaded, Outcome};
 use crate::pages::facade::indicator;
 use crate::pages::parts::{faulted, quiet, refused, section};
 use crate::pages::settings::rows;
+use ferrobridge_operator_api::health::Readiness;
 
 /// The tabs, each its key and its words.
 const TABS: [(&str, Msg); 2] = [
@@ -55,18 +55,21 @@ pub fn page() -> impl IntoView {
     if !TABS.iter().any(|(key, _)| *key == tab) {
         return crate::pages::errors::not_found().into_any();
     }
+    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
+    let readiness = Resource::new(crate::load::changes, |_| crate::load::readiness_now());
+    let configuration = (tab == "settings")
+        .then(|| Resource::new(crate::load::changes, |_| crate::load::configuration_now()));
     view! {
         {page_title(tr(Msg::Hl7v2))}
         <Suspense>
             {move || {
                 let tab = tab.clone();
                 Suspend::new(async move {
-                    let info = crate::load::info().await;
-                    let readiness = crate::load::readiness().await;
-                    let configuration = if tab == "settings" {
-                        Some(crate::load::configuration().await)
-                    } else {
-                        None
+                    let info = info.await;
+                    let readiness = readiness.await;
+                    let configuration = match configuration {
+                        Some(configuration) => Some(configuration.await),
+                        None => None,
                     };
                     drawn(&tab, &info, &readiness, configuration.as_ref())
                 })
@@ -93,7 +96,7 @@ fn tabs(tab: &str) -> TabRow {
 fn drawn(
     tab: &str,
     info: &Loaded<Info>,
-    readiness: &Loaded<Ready>,
+    readiness: &Loaded<Readiness>,
     configuration: Option<&Loaded<Configuration>>,
 ) -> AnyView {
     let info = match info {
@@ -146,7 +149,7 @@ fn drawn(
         });
     };
     let listening = match readiness {
-        Ok(Outcome::Shown((_, readiness))) => indicator(readiness, "hl7v2-listener"),
+        Ok(Outcome::Shown(readiness)) => indicator(readiness, "hl7v2-listener"),
         Ok(Outcome::Refused(_)) | Err(_) => String::from("–").into_any(),
     };
     let address = lane.listen.clone().unwrap_or_else(|| String::from("–"));

@@ -1,28 +1,17 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The console's own islands: the parts of a page the browser hydrates
-//! beside the library's ready islands (the Leptos book, "Guide: Islands").
+//! The console's own components: the mapping editor and the playground's
+//! input.
 //!
-//! The one island is the mapping editor: the library's code editor (B2)
-//! beside the diagnostics of its draft (B3), whose caret and current line
-//! the two share. It sits inside the editor page's form, so its text area
-//! posts the draft with no WebAssembly, and every word it draws arrives as
-//! a prop the server resolved. No specification governs the console: our
-//! own design.
-#![expect(
-    clippy::mem_forget,
-    reason = "the island macro of leptos_macro 0.8 keeps each hydrated island alive by forgetting its view state, in the browser entry it writes"
-)]
-#![expect(
-    clippy::must_use_candidate,
-    reason = "the #[island] macro drops a #[must_use] from the function it writes"
-)]
-#![expect(
-    missing_docs,
-    reason = "the #[island] macro writes an undocumented struct of each island's props as they cross to the browser"
-)]
-
+//! Each draws the library's code editor with state it shares with the
+//! console's own code (FerroUI `docs/consoles.md`, "What the console owns").
+//!
+//! The mapping editor is the library's code editor (B2) beside the
+//! diagnostics of its draft (B3), whose caret and current line the two
+//! share. It sits inside the editor page's form, so its text area posts the
+//! draft with no WebAssembly. No specification governs the console: our own
+//! design.
 use ferrohealth_ui::highlight::Language;
 use ferrohealth_ui::view::button::{Variant, label};
 use ferrohealth_ui::view::diagnostics::{DiagnosticsWords, FileFindings, Position};
@@ -82,10 +71,14 @@ fn marks_of(findings: &FileFindings) -> Vec<LineMark> {
 
 /// The mapping editor: the code editor of `draft` beside the diagnostics
 /// `findings` of its last check, in step with its caret.
-#[island(lazy)]
+#[component]
 #[expect(
     clippy::needless_pass_by_value,
-    reason = "an island takes its props by value, as they arrive from the page"
+    reason = "a component takes its props by value"
+)]
+#[expect(
+    clippy::must_use_candidate,
+    reason = "the #[component] macro drops a #[must_use] from the function it writes"
 )]
 pub fn MappingEditor(
     /// The draft the text area holds.
@@ -156,7 +149,11 @@ pub const INPUT: &str = "input";
 
 /// The playground's input: the highlighted editor of the JSON the operator
 /// runs an operation on, which the form around it posts.
-#[island(lazy)]
+#[component]
+#[expect(
+    clippy::must_use_candidate,
+    reason = "the #[component] macro drops a #[must_use] from the function it writes"
+)]
 pub fn JsonInput(
     /// The text area's accessible name.
     label: String,

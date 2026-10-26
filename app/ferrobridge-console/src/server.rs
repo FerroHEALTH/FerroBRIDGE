@@ -132,9 +132,9 @@ pub fn router(state: ConsoleState) -> axum::Router {
             crate::pages::search::ANSWER,
             get(crate::pages::search::answer_route),
         )
-        .route(crate::prefs::PREFERENCE, post(crate::prefs::choose))
-        .route(crate::prefs::RESET, post(crate::prefs::reset))
-        .route(crate::prefs::SIDEBAR, post(crate::prefs::rail))
+        .route(crate::app::PREFERENCE, post(crate::prefs::choose))
+        .route(crate::app::RESET, post(crate::prefs::reset))
+        .route(crate::app::SIDEBAR, post(crate::prefs::rail))
         .route(crate::pages::mappings::RELOAD, post(crate::posts::reload))
         .route(crate::app::NEW_FILE, post(crate::posts::edit))
         .route(
@@ -458,7 +458,7 @@ fn page_context(
     move || {
         leptos::context::provide_context(state.clone());
         leptos::context::provide_context(options.clone());
-        leptos::context::provide_context(crate::load::Reads::new());
+        leptos::context::provide_context(crate::load::cached::Reads::new());
         provide_request_nonce();
     }
 }

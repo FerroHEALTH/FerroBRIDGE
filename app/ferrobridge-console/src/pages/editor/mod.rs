@@ -12,9 +12,10 @@
 //! the save sends the draft under `If-Match` on the digest it was opened
 //! from, with its reason. A provisioned file is never saved over: its draft
 //! is checked, and saved under a path of its own. A new file names its path
-//! below `fhirconnect/` or `omocl/`. The page works with no WebAssembly; the
-//! island adds the highlighting and keeps the caret and the diagnostics in
-//! step.
+//! below `fhirconnect/` or `omocl/`. The page works with no WebAssembly;
+//! once it has hydrated, the form posts through the `edit` server function
+//! and the page draws the answer in place, and the mapping editor adds the
+//! highlighting and keeps the caret and the diagnostics in step.
 
 use ferrobridge_operator_api::operator::{Listed, LoadReport};
 use ferrohealth_ui::icon::Glyph;
@@ -25,33 +26,35 @@ use ferrohealth_ui::view::diagnostics::{DiagnosticsWords, FileFindings};
 use ferrohealth_ui::view::dock::{
     Decision, DecisionBar, DecisionState, DockField, DockForm, DockLine, decision_bar,
 };
-use ferrohealth_ui::view::form::{ERROR, Field, error_id};
+use ferrohealth_ui::view::form::{ERROR, error_id};
 use ferrohealth_ui::view::load_report;
 use ferrohealth_ui::view::load_report::{Arrival, Count};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::surface::{Crumb, Header, Mode, card, editor_heading};
 use ferrohealth_ui::widget::editor::{EditorWords, Opened};
 use http::StatusCode;
+use leptos::form::FromFormData as _;
 use leptos::prelude::*;
-use leptos_router::hooks::use_params_map;
+use leptos_router::NavigateOptions;
+use leptos_router::hooks::{use_navigate, use_params_map};
 
+use crate::actions::{EditDraft, Edited, EditorAnswer, EditorPost, Field};
 use crate::app::{EDIT, MAPPINGS, NEW_FILE, page_title};
-use crate::bridge::AccessToken;
-use crate::bridge::editing::{Answered, MAX_REASON, Precondition};
-use crate::islands::{EditorText, MappingEditor};
+use crate::editors::{EditorText, MappingEditor};
 use crate::locale::messages::Msg;
 use crate::locale::{message, tr, tr_with};
-use crate::model::{Outcome, Refusal, loaded};
+use crate::model::{Answered, Outcome, Refusal};
 use crate::pages::file::short_digest;
 use crate::pages::parts::{
     faulted, file_href, findings, refused, refused_operator, short, tally, wire_path,
 };
-use crate::posts::{Edited, EditorAnswer, EditorPost};
-use crate::server::ConsoleState;
 
 /// The id of the editor's form, which the docked bar's fields and
 /// decisions join.
 pub const FORM: &str = "editor";
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod answer;
 
 /// The editor of the file the route names.
 #[must_use]
@@ -60,19 +63,27 @@ pub fn page() -> impl IntoView {
         .with_untracked(|params| params.get("path"))
         .and_then(|raw| crate::pages::parts::decoded(&raw))
         .unwrap_or_default();
-    let edited = use_context::<Edited>();
+    let posting = Posting::new();
+    let file = Resource::new(
+        {
+            let path = path.clone();
+            move || (crate::load::changes(), path.clone())
+        },
+        |(_, path)| crate::load::file_now(path),
+    );
+    let listing = Resource::new(crate::load::changes, |_| crate::load::listing_now());
     view! {
         {page_title(tr_with(Msg::EditTitle, &[("name", short(&path).into())]))}
         <Suspense>
             {move || {
                 let path = path.clone();
-                let edited = edited.clone();
+                let edited = posting.edited();
                 Suspend::new(async move {
-                    let file = crate::load::file(&path).await;
-                    let listing = crate::load::listing().await;
+                    let file = file.await;
+                    let listing = listing.await;
                     match (file, listing) {
                         (Ok(Outcome::Shown(file)), Ok(Outcome::Shown(listing))) => {
-                            let Ok(text) = String::from_utf8(file.bytes) else {
+                            let Some(text) = file.text else {
                                 return crate::pages::parts::quiet(tr(Msg::FileNotUtf8), None);
                             };
                             let listed = listing.iter().find(|each| each.path == path).cloned();
@@ -82,7 +93,7 @@ pub fn page() -> impl IntoView {
                                 base: file.etag.unwrap_or_default(),
                                 listed,
                             };
-                            editor(&opened, edited.as_ref())
+                            editor(&opened, edited.as_ref(), posting)
                         }
                         (Err(fault), _) | (_, Err(fault)) => faulted(&fault, &format!("{EDIT}/{path}")),
                         (Ok(Outcome::Refused(refusal)), _) => {
@@ -103,7 +114,7 @@ pub fn page() -> impl IntoView {
 /// The editor of a new mapping file.
 #[must_use]
 pub fn new_page() -> impl IntoView {
-    let edited = use_context::<Edited>();
+    let posting = Posting::new();
     let opened = Opening {
         path: String::new(),
         text: String::new(),
@@ -112,7 +123,70 @@ pub fn new_page() -> impl IntoView {
     };
     view! {
         {page_title(tr(Msg::NewMappingFile))}
-        {editor(&opened, edited.as_ref())}
+        {move || editor(&opened, posting.edited().as_ref(), posting)}
+    }
+}
+
+/// How the editor's form posts once the page has hydrated: through the
+/// `edit` server function, with the post it last sent.
+#[derive(Clone, Copy)]
+struct Posting {
+    /// The server action the form dispatches.
+    edit: ServerAction<EditDraft>,
+    /// The post the form last sent.
+    last: RwSignal<EditorPost>,
+    /// The answer the server drew the page with, after a post with no
+    /// WebAssembly.
+    posted: StoredValue<Option<Edited>>,
+}
+
+impl std::fmt::Debug for Posting {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        out.debug_struct("Posting").finish_non_exhaustive()
+    }
+}
+
+impl Posting {
+    /// The posting of a page, counting a change after each save the bridge
+    /// took, so the file and the set are read again.
+    fn new() -> Self {
+        let edit = ServerAction::<EditDraft>::new();
+        Effect::watch(
+            move || edit.version().get(),
+            move |_, _, _| {
+                let took = edit.value().with_untracked(|answer| {
+                    matches!(
+                        answer,
+                        Some(Ok(Edited {
+                            answer: EditorAnswer::Saved(Ok(Outcome::Shown(answered))),
+                            ..
+                        })) if answered.status == StatusCode::OK
+                    )
+                });
+                if took {
+                    crate::load::changed();
+                }
+            },
+            false,
+        );
+        Self {
+            edit,
+            last: RwSignal::new(EditorPost::default()),
+            posted: StoredValue::new((*SharedValue::new(use_context::<Edited>)).clone()),
+        }
+    }
+
+    /// The post and the answer the page draws: the last one the form sent
+    /// in the page, else the one the server drew it with.
+    fn edited(self) -> Option<Edited> {
+        match self.edit.value().get() {
+            Some(Ok(edited)) => Some(edited),
+            Some(Err(fault)) => Some(Edited {
+                post: self.last.get_untracked(),
+                answer: EditorAnswer::Checked(Err(fault)),
+            }),
+            None => self.posted.get_value(),
+        }
     }
 }
 
@@ -202,8 +276,8 @@ fn shown(edited: &Edited, path: &str) -> Shown {
         },
         EditorAnswer::Back => Shown::default(),
         EditorAnswer::Invalid { field, said } => Shown {
-            reason_error: (*field == "reason").then(|| tr(*said)),
-            path_error: (*field == "path").then(|| tr(*said)),
+            reason_error: (*field == Field::Reason).then(|| tr(*said)),
+            path_error: (*field == Field::Path).then(|| tr(*said)),
             ..Shown::default()
         },
         EditorAnswer::Checked(Ok(Outcome::Shown(answered))) => {
@@ -319,8 +393,8 @@ fn refusal_shown(refusal: &Refusal) -> Shown {
 }
 
 /// The editor page over the file `opened`, after the post `edited` when one
-/// was sent.
-fn editor(opened: &Opening, edited: Option<&Edited>) -> AnyView {
+/// was sent, its form posting through `posting` once the page has hydrated.
+fn editor(opened: &Opening, edited: Option<&Edited>, posting: Posting) -> AnyView {
     let post = edited.map(|edited| edited.post.clone()).unwrap_or_default();
     let draft = if edited.is_some() {
         post.draft.clone()
@@ -350,7 +424,7 @@ fn editor(opened: &Opening, edited: Option<&Edited>) -> AnyView {
     let findings = FileFindings {
         file: save_path.clone(),
         href: None,
-        lines: format!("#{}-L", crate::islands::DRAFT),
+        lines: format!("#{}-L", crate::editors::DRAFT),
         current: None,
         findings: shown.findings.clone(),
         all: None,
@@ -389,8 +463,9 @@ fn editor(opened: &Opening, edited: Option<&Edited>) -> AnyView {
     .into_any();
     let base = view! { <input type="hidden" name="base" value=opened.base.clone() /> }.into_any();
     let action = edit_href_of(&opened.path);
+    let submit = submitted(opened, action.clone(), posting);
     let form = view! {
-        <form id=FORM method="post" action=action class="fui-stack">
+        <form id=FORM method="post" action=action class="fui-stack" on:submit=submit>
             {base}
             {path_card}
             {island}
@@ -404,6 +479,39 @@ fn editor(opened: &Opening, edited: Option<&Edited>) -> AnyView {
         {dock}
     }
     .into_any()
+}
+
+/// The editor form's submit listener once the page has hydrated: Discard
+/// goes back to the file, every other decision posts through `posting` as
+/// the form's route `address` would.
+fn submitted(
+    opened: &Opening,
+    address: String,
+    posting: Posting,
+) -> impl Fn(leptos::ev::SubmitEvent) + 'static {
+    let back = if opened.is_new() {
+        String::from(MAPPINGS)
+    } else {
+        file_href(&opened.path)
+    };
+    let navigate = use_navigate();
+    // NOTE: no specification governs this: our own design; the form keeps its own
+    // route as `action`, so a post with no WebAssembly draws the page with its answer.
+    move |event: leptos::ev::SubmitEvent| {
+        let Ok(post) = EditorPost::from_event(&event) else {
+            return;
+        };
+        event.prevent_default();
+        if post.decision == "discard" {
+            navigate(&back, NavigateOptions::default());
+            return;
+        }
+        posting.last.set(post.clone());
+        posting.edit.dispatch(EditDraft {
+            address: address.clone(),
+            post,
+        });
+    }
 }
 
 /// The title row of the editor of `opened`, saying the new digest once
@@ -477,7 +585,7 @@ fn path_card(opened: &Opening, value: &str, error: Option<String>) -> AnyView {
             </p>
         }
     });
-    let shown = Field::new("editor-path", tr(label))
+    let shown = ferrohealth_ui::view::form::Field::new("editor-path", tr(label))
         .help(tr(help))
         .after(error)
         .view(control);
@@ -562,133 +670,4 @@ fn dock(opened: &Opening, post: &EditorPost, shown: &Shown) -> AnyView {
         line: shown.line.clone(),
         decisions,
     })
-}
-
-/// Why `reason` cannot go with a save, or `None` when it can: one line of
-/// printable ASCII, at most [`MAX_REASON`] characters.
-fn reason_fault(reason: &str) -> Option<Msg> {
-    let reason = reason.trim();
-    if reason.is_empty() {
-        Some(Msg::ReasonMissing)
-    } else if reason.chars().count() > MAX_REASON {
-        Some(Msg::ReasonTooLong)
-    } else if !reason.chars().all(|c| c.is_ascii_graphic() || c == ' ') {
-        Some(Msg::ReasonCharacters)
-    } else {
-        None
-    }
-}
-
-/// Why `path` cannot name a mapping file, or `None` when it can: plain
-/// segments below `fhirconnect/` or `omocl/`, ending in `.yml`.
-fn path_fault(path: &str) -> Option<Msg> {
-    let segments = path.split('/').collect::<Vec<_>>();
-    if path.is_empty() {
-        Some(Msg::PathMissing)
-    } else if segments
-        .iter()
-        .any(|segment| segment.is_empty() || *segment == "." || *segment == "..")
-    {
-        Some(Msg::PathSteps)
-    } else if !matches!(segments.first(), Some(&("fhirconnect" | "omocl"))) || segments.len() < 2 {
-        Some(Msg::PathRoot)
-    } else if !std::path::Path::new(path)
-        .extension()
-        .is_some_and(|extension| extension == "yml" || extension == "yaml")
-    {
-        Some(Msg::PathExtension)
-    } else {
-        None
-    }
-}
-
-/// What the bridge answers the post `post` of the editor of `path`, as the
-/// operator whose access token is `token`.
-pub async fn answer(
-    state: &ConsoleState,
-    token: &AccessToken,
-    path: Option<&str>,
-    post: &EditorPost,
-) -> EditorAnswer {
-    let named = post.path.trim();
-    let Some(path) = path else {
-        return EditorAnswer::Invalid {
-            field: "path",
-            said: Msg::PathMissing,
-        };
-    };
-    if !named.is_empty()
-        && let Some(said) = path_fault(named)
-    {
-        return EditorAnswer::Invalid {
-            field: "path",
-            said,
-        };
-    }
-    match post.decision.as_str() {
-        "check" => EditorAnswer::Checked(loaded(
-            state
-                .bridge()
-                .check_mapping(path, post.draft.clone().into_bytes(), token)
-                .await,
-        )),
-        "save" => match reason_fault(&post.reason) {
-            Some(said) => EditorAnswer::Invalid {
-                field: "reason",
-                said,
-            },
-            None => EditorAnswer::Confirm,
-        },
-        "confirm" => {
-            if let Some(said) = reason_fault(&post.reason) {
-                return EditorAnswer::Invalid {
-                    field: "reason",
-                    said,
-                };
-            }
-            // NOTE: RFC 9110 §13.1.2: a file named anew must not exist yet, and one
-            // edited in place must still hold the digest it was opened at.
-            let precondition = if post.base.is_empty() || !named.is_empty() {
-                Precondition::Absent
-            } else {
-                Precondition::Match(post.base.clone())
-            };
-            EditorAnswer::Saved(loaded(
-                state
-                    .bridge()
-                    .save_mapping(
-                        path,
-                        post.draft.clone().into_bytes(),
-                        &precondition,
-                        &post.reason,
-                        token,
-                    )
-                    .await,
-            ))
-        }
-        _ => EditorAnswer::Back,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{path_fault, reason_fault};
-
-    #[test]
-    fn a_reason_is_one_line_of_plain_characters_and_not_too_long() {
-        assert_eq!(None, reason_fault("Follow version 1.3.0 of the profile"));
-        assert!(reason_fault("  ").is_some());
-        assert!(reason_fault("tick \u{2713}").is_some());
-        assert!(reason_fault(&"a".repeat(201)).is_some());
-    }
-
-    #[test]
-    fn a_new_path_is_plain_segments_below_a_mapping_root() {
-        assert_eq!(None, path_fault("fhirconnect/models/a.model.yml"));
-        assert_eq!(None, path_fault("omocl/drug.yml"));
-        assert!(path_fault("fhirconnect/../a.yml").is_some());
-        assert!(path_fault("templates/a.yml").is_some());
-        assert!(path_fault("fhirconnect/a.json").is_some());
-        assert!(path_fault("").is_some());
-    }
 }

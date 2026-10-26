@@ -28,14 +28,16 @@ pub fn page() -> impl IntoView {
         .with_untracked(|params| params.get("id"))
         .and_then(|raw| crate::pages::parts::decoded(&raw))
         .unwrap_or_default();
+    let state = Resource::new(crate::load::changes, |_| crate::load::state_now());
+    let listing = Resource::new(crate::load::changes, |_| crate::load::listing_now());
     view! {
         {page_title(id.clone())}
         <Suspense>
             {move || {
                 let id = id.clone();
                 Suspend::new(async move {
-                    let state = crate::load::state().await;
-                    let listing = crate::load::listing().await;
+                    let state = state.await;
+                    let listing = listing.await;
                     drawn(&id, &state, &listing)
                 })
             }}

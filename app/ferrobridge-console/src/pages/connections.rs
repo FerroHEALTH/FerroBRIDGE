@@ -28,7 +28,6 @@ use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 
 use crate::app::{CONNECTIONS, page_title};
-use crate::load::Ready;
 use crate::locale::messages::Msg;
 use crate::locale::tr;
 use crate::model::{Loaded, Outcome};
@@ -114,13 +113,16 @@ fn credentials_words(configuration: &Configuration, name: &str) -> String {
 /// The page that lists the upstreams.
 #[must_use]
 pub fn page() -> impl IntoView {
+    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
+    let readiness = Resource::new(crate::load::changes, |_| crate::load::readiness_now());
+    let configuration = Resource::new(crate::load::changes, |_| crate::load::configuration_now());
     view! {
         {page_title(tr(Msg::Connections))}
         <Suspense>
             {move || Suspend::new(async move {
-                let info = crate::load::info().await;
-                let readiness = crate::load::readiness().await;
-                let configuration = crate::load::configuration().await;
+                let info = info.await;
+                let readiness = readiness.await;
+                let configuration = configuration.await;
                 list(&info, &readiness, &configuration)
             })}
         </Suspense>
@@ -130,7 +132,7 @@ pub fn page() -> impl IntoView {
 /// The list over the lanes, the readiness and the running configuration.
 fn list(
     info: &Loaded<Info>,
-    readiness: &Loaded<Ready>,
+    readiness: &Loaded<Readiness>,
     configuration: &Loaded<Configuration>,
 ) -> AnyView {
     let header = page_heading(
@@ -143,7 +145,7 @@ fn list(
     )
     .into_any();
     let (info, readiness) = match (info, readiness) {
-        (Ok(Outcome::Shown(info)), Ok(Outcome::Shown((_, readiness)))) => (info, readiness),
+        (Ok(Outcome::Shown(info)), Ok(Outcome::Shown(readiness))) => (info, readiness),
         (Err(fault), _) | (_, Err(fault)) => {
             return view! { {header} {faulted(fault, CONNECTIONS)} }.into_any();
         }
@@ -246,6 +248,10 @@ pub fn connection_page() -> impl IntoView {
     if !UPSTREAMS.contains(&name.as_str()) || !TABS.iter().any(|(key, _)| *key == tab) {
         return crate::pages::errors::not_found().into_any();
     }
+    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
+    let readiness = Resource::new(crate::load::changes, |_| crate::load::readiness_now());
+    let configuration = (tab == "settings")
+        .then(|| Resource::new(crate::load::changes, |_| crate::load::configuration_now()));
     view! {
         {page_title(indicator_name(&name))}
         <Suspense>
@@ -253,12 +259,11 @@ pub fn connection_page() -> impl IntoView {
                 let name = name.clone();
                 let tab = tab.clone();
                 Suspend::new(async move {
-                    let info = crate::load::info().await;
-                    let readiness = crate::load::readiness().await;
-                    let configuration = if tab == "settings" {
-                        Some(crate::load::configuration().await)
-                    } else {
-                        None
+                    let info = info.await;
+                    let readiness = readiness.await;
+                    let configuration = match configuration {
+                        Some(configuration) => Some(configuration.await),
+                        None => None,
                     };
                     detail(&name, &tab, &info, &readiness, configuration.as_ref())
                 })
@@ -282,11 +287,11 @@ fn detail(
     name: &str,
     tab: &str,
     info: &Loaded<Info>,
-    readiness: &Loaded<Ready>,
+    readiness: &Loaded<Readiness>,
     configuration: Option<&Loaded<Configuration>>,
 ) -> AnyView {
     let (info, readiness) = match (info, readiness) {
-        (Ok(Outcome::Shown(info)), Ok(Outcome::Shown((_, readiness)))) => (info, readiness),
+        (Ok(Outcome::Shown(info)), Ok(Outcome::Shown(readiness))) => (info, readiness),
         (Err(fault), _) | (_, Err(fault)) => {
             return faulted(fault, &tab_href(name, tab));
         }

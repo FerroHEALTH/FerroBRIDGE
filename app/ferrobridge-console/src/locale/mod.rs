@@ -18,8 +18,11 @@
 //! best language of the request's `Accept-Language` the catalog holds, else
 //! the configured `[server] locale`. [`crate::app::App`] provides it, so the
 //! console's words and the components' words follow the same choice, and
-//! the document writes it as `<html lang>` (WCAG 2.2 SC 3.1.1). No
-//! specification governs the catalog layout or the choice: our own design.
+//! the document writes it as `<html lang>` (WCAG 2.2 SC 3.1.1). The catalog
+//! is embedded in both halves, and the browser takes the server's choice
+//! with the page ([`crate::visit`]), so a page drawn in the browser speaks
+//! as the server's does. No specification governs the catalog layout or the
+//! choice: our own design.
 
 use ferrohealth_ui::i18n::{Arg, Locale, Message, locale};
 use fluent_templates::Loader;
@@ -95,6 +98,7 @@ pub fn shipped() -> Vec<Locale> {
 }
 
 /// The configured locale, English with no configuration in reach.
+#[cfg(not(target_arch = "wasm32"))]
 fn configured() -> Locale {
     use leptos::context::use_context;
     use_context::<crate::server::ConsoleState>()
@@ -104,6 +108,7 @@ fn configured() -> Locale {
 /// The locale the request's browser asks for: the best language of its
 /// `Accept-Language` the catalog holds, else the configured one.
 #[must_use]
+#[cfg(not(target_arch = "wasm32"))]
 pub fn browser() -> Locale {
     use leptos::context::use_context;
     match use_context::<http::request::Parts>() {
@@ -115,8 +120,12 @@ pub fn browser() -> Locale {
 /// The locale of the request being served: the language the operator chose
 /// when the console ships it, else the one the browser asks for.
 #[must_use]
+#[cfg(not(target_arch = "wasm32"))]
 pub fn requested() -> Locale {
-    let chosen = crate::prefs::requested().preferences.language;
+    let (preferences, prefix) = crate::visit::requested_preferences();
+    let chosen = crate::visit::chosen_in(&preferences, &prefix)
+        .preferences
+        .language;
     chosen
         .tag()
         .filter(|tag| shipped().iter().any(|shipped| shipped.tag() == *tag))
@@ -128,6 +137,7 @@ pub fn requested() -> Locale {
 /// `Accept-Language` the catalog holds, else `configured`. For a plain axum
 /// handler, which runs outside the page tree.
 #[must_use]
+#[cfg(not(target_arch = "wasm32"))]
 pub fn negotiated(headers: &http::HeaderMap, configured: Locale) -> Locale {
     // NOTE: RFC 9110 §12.5.4: a header that is no visible ASCII names no
     // language, so the request falls to the configured one.

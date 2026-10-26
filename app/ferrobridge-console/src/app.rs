@@ -1,28 +1,33 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The page tree the server draws whole.
+//! The page tree the server draws and the browser hydrates whole.
 //!
-//! The console renders in Leptos islands mode (the Leptos book, "Guide:
-//! Islands"): this tree runs on the server alone, and the browser hydrates
-//! only the islands inside it. The document carries the operator's theme,
+//! The server draws the first page and the browser takes the whole tree
+//! over, then draws every page after it, each group of pages a lazy route
+//! ([`crate::routes`]), so no link or form reloads the document (FerroUI
+//! `docs/consoles.md`, "How a console builds"). The document carries the operator's theme,
 //! density, motion and hints from their cookies and the request's locale, so
 //! a page arrives right before any script runs. A signed-in operator reads
 //! the shell around the routes, a visitor the sign-in, and a request whose
 //! session store cannot be read the fault page.
 
 use ferrohealth_ui::i18n::provide_locale;
-use ferrohealth_ui::island::ToastRegion;
+use ferrohealth_ui::island::{FormNavigator, PageAnnouncer, ToastRegion};
 use ferrohealth_ui::style::Brand;
 use ferrohealth_ui::widget::toast::{Flash, RegionWords};
 use leptos::prelude::*;
-use leptos_meta::{MetaTags, Title, provide_meta_context};
+#[cfg(not(target_arch = "wasm32"))]
+use leptos_meta::MetaTags;
+use leptos_meta::{Title, provide_meta_context};
 use leptos_router::components::{Route, Router, Routes};
-use leptos_router::{SsrMode, path};
+use leptos_router::{Lazy, SsrMode, path};
 
 use crate::locale::messages::Msg;
 use crate::locale::tr;
 use crate::model::SessionState;
+use crate::routes::{LBridge, LConsole, LMappings, LOverview, LWorkbench};
+use crate::visit::{FollowVisit, Visits};
 
 /// The product name as an operator reads it.
 pub const PRODUCT: &str = "FerroBRIDGE Console";
@@ -92,6 +97,15 @@ pub const CONFIGURATION: &str = "/configuration";
 /// Your preferences.
 pub const PREFERENCES: &str = "/preferences";
 
+/// The route every preference posts to, its value under its cookie's name.
+pub const PREFERENCE: &str = "/preference";
+
+/// The route Reset to defaults posts to.
+pub const RESET: &str = "/preferences/reset";
+
+/// The route the sidebar's Collapse and Expand post to.
+pub const SIDEBAR: &str = "/sidebar";
+
 /// The About page, which every page's footer links to.
 pub const ABOUT: &str = "/about";
 
@@ -106,10 +120,12 @@ pub struct Flashes(pub Vec<Flash>);
 /// The whole HTML document the server renders around [`App`], in the
 /// preferences the request's cookies name and its locale, so the page
 /// arrives right before any script runs.
+#[cfg(not(target_arch = "wasm32"))]
 #[must_use]
 pub fn document(options: LeptosOptions) -> impl IntoView {
-    let chosen = crate::prefs::requested().preferences;
-    let lang = crate::locale::requested().tag();
+    let visit = crate::visit::Visit::requested();
+    let chosen = visit.chosen().preferences;
+    let lang = visit.locale().tag();
     view! {
         <!DOCTYPE html>
         <html
@@ -125,7 +141,7 @@ pub fn document(options: LeptosOptions) -> impl IntoView {
                 <link rel="icon" href="/favicon.ico" sizes="any" />
                 <link rel="stylesheet" href=STYLESHEET />
                 <link rel="stylesheet" href=THEME />
-                <HydrationScripts options islands=true />
+                <HydrationScripts options />
                 <MetaTags />
             </head>
             <body>
@@ -136,23 +152,37 @@ pub fn document(options: LeptosOptions) -> impl IntoView {
 }
 
 /// The root component: the title format, the routes in the layout the
-/// request's session calls for, and the toast region.
+/// visit's session calls for, the toast region and the page announcer.
+///
+/// The server draws it and the browser hydrates it whole, both from the
+/// same [`crate::visit::Visit`], which the browser asks for again after
+/// each navigation.
 #[component]
-#[expect(
-    clippy::must_use_candidate,
-    reason = "the #[component] macro drops a #[must_use] from the function it writes"
-)]
 pub fn App() -> impl IntoView {
     provide_meta_context();
-    provide_locale(crate::locale::requested());
-    let session = crate::session::request::state();
-    let flash = use_context::<Flashes>().unwrap_or_default().0;
-    let region = (session == SessionState::SignedIn)
-        .then(|| view! { <ToastRegion words=RegionWords::of_page() flash /> });
+    // NOTE: the Leptos book, `ssr/22_life_cycle`: what the server read reaches the
+    // hydrating page serialized, so both halves draw the same page.
+    let visits = RwSignal::new((*SharedValue::new(crate::visit::server_visit)).clone());
+    provide_context(Visits(visits));
+    provide_context(crate::load::Changes(RwSignal::new(0)));
+    provide_locale(visits.with_untracked(crate::visit::Visit::locale));
+    ferrohealth_ui::widget::prefetch::routes(crate::routes::ROUTES);
+    let session = Memo::new(move |_| visits.with(|visit| visit.session));
+    let flash = (*SharedValue::new(|| use_context::<Flashes>().unwrap_or_default().0)).clone();
+    let region = move || {
+        (session.get() == SessionState::SignedIn).then(|| {
+            view! { <ToastRegion words=RegionWords::of_page() flash=flash.clone() /> }
+        })
+    };
     view! {
         <Title formatter=|text: String| title(&text) text=String::new() />
-        <Router>{layout(session)}</Router>
+        <Router>
+            <FollowVisit />
+            <FormNavigator />
+            {move || layout(session.get())}
+        </Router>
         {region}
+        <PageAnnouncer />
     }
 }
 
@@ -176,14 +206,14 @@ fn layout(session: SessionState) -> AnyView {
     }
 }
 
-/// The page `page` for a request whose session is `session`: the page for a
-/// signed-in operator, the sign-in for a visitor, and the fault page when the
-/// console cannot read its session store.
-fn guarded<V>(session: SessionState, page: fn() -> V) -> impl Fn() -> AnyView + Clone + Send + Sync
+/// The page `page` for the visit's session: the page for a signed-in
+/// operator, the sign-in for a visitor, and the fault page when the console
+/// cannot read its session store.
+pub fn guarded<V>(page: fn() -> V) -> AnyView
 where
     V: IntoView + 'static,
 {
-    move || match session {
+    match crate::visit::visit_untracked().session {
         SessionState::SignedIn => page().into_any(),
         SessionState::SignedOut => crate::pages::sign_in::sign_in_page().into_any(),
         SessionState::Unreadable => crate::pages::errors::unreadable().into_any(),
@@ -201,126 +231,62 @@ fn routes(session: SessionState) -> AnyView {
     };
     view! {
         <Routes fallback>
-            <Route
-                path=path!("/")
-                view=guarded(session, crate::pages::dashboard::page)
-                ssr=SsrMode::Async
-            />
-            <Route
-                path=path!("/mappings")
-                view=guarded(session, crate::pages::mappings::page)
-                ssr=SsrMode::Async
-            />
-            <Route
-                path=path!("/mappings/new")
-                view=guarded(session, crate::pages::editor::new_page)
-                ssr=SsrMode::Async
-            />
-            <Route
-                path=path!("/mappings/:tab")
-                view=guarded(session, crate::pages::mappings::page)
-                ssr=SsrMode::Async
-            />
+            <Route path=path!("/") view={Lazy::<LOverview>::new()} ssr=SsrMode::Async />
+            <Route path=path!("/search") view={Lazy::<LOverview>::new()} ssr=SsrMode::Async />
+            <Route path=path!("/mappings") view={Lazy::<LMappings>::new()} ssr=SsrMode::Async />
+            <Route path=path!("/mappings/new") view={Lazy::<LWorkbench>::new()} ssr=SsrMode::Async />
+            <Route path=path!("/mappings/:tab") view={Lazy::<LMappings>::new()} ssr=SsrMode::Async />
             <Route
                 path=path!("/mappings/files/*path")
-                view=guarded(session, crate::pages::file::page)
+                view={Lazy::<LMappings>::new()}
                 ssr=SsrMode::Async
             />
             <Route
                 path=path!("/mappings/templates/:id")
-                view=guarded(session, crate::pages::template::page)
+                view={Lazy::<LMappings>::new()}
                 ssr=SsrMode::Async
             />
             <Route
                 path=path!("/mappings/edit/*path")
-                view=guarded(session, crate::pages::editor::page)
+                view={Lazy::<LWorkbench>::new()}
                 ssr=SsrMode::Async
             />
-            <Route
-                path=path!("/playground")
-                view=guarded(session, crate::pages::playground::page)
-                ssr=SsrMode::Async
-            />
+            <Route path=path!("/playground") view={Lazy::<LWorkbench>::new()} ssr=SsrMode::Async />
             <Route
                 path=path!("/playground/:tab")
-                view=guarded(session, crate::pages::playground::page)
+                view={Lazy::<LWorkbench>::new()}
                 ssr=SsrMode::Async
             />
-            <Route
-                path=path!("/facade")
-                view=guarded(session, crate::pages::facade::page)
-                ssr=SsrMode::Async
-            />
-            <Route
-                path=path!("/facade/:tab")
-                view=guarded(session, crate::pages::facade::page)
-                ssr=SsrMode::Async
-            />
-            <Route
-                path=path!("/hl7v2")
-                view=guarded(session, crate::pages::hl7v2::page)
-                ssr=SsrMode::Async
-            />
-            <Route
-                path=path!("/hl7v2/:tab")
-                view=guarded(session, crate::pages::hl7v2::page)
-                ssr=SsrMode::Async
-            />
-            <Route
-                path=path!("/omop")
-                view=guarded(session, crate::pages::omop::page)
-                ssr=SsrMode::Async
-            />
-            <Route
-                path=path!("/omop/:tab")
-                view=guarded(session, crate::pages::omop::page)
-                ssr=SsrMode::Async
-            />
-            <Route
-                path=path!("/connections")
-                view=guarded(session, crate::pages::connections::page)
-                ssr=SsrMode::Async
-            />
+            <Route path=path!("/facade") view={Lazy::<LBridge>::new()} ssr=SsrMode::Async />
+            <Route path=path!("/facade/:tab") view={Lazy::<LBridge>::new()} ssr=SsrMode::Async />
+            <Route path=path!("/hl7v2") view={Lazy::<LBridge>::new()} ssr=SsrMode::Async />
+            <Route path=path!("/hl7v2/:tab") view={Lazy::<LBridge>::new()} ssr=SsrMode::Async />
+            <Route path=path!("/omop") view={Lazy::<LBridge>::new()} ssr=SsrMode::Async />
+            <Route path=path!("/omop/:tab") view={Lazy::<LBridge>::new()} ssr=SsrMode::Async />
+            <Route path=path!("/connections") view={Lazy::<LBridge>::new()} ssr=SsrMode::Async />
             <Route
                 path=path!("/connections/:name")
-                view=guarded(session, crate::pages::connections::connection_page)
+                view={Lazy::<LBridge>::new()}
                 ssr=SsrMode::Async
             />
             <Route
                 path=path!("/connections/:name/:tab")
-                view=guarded(session, crate::pages::connections::connection_page)
+                view={Lazy::<LBridge>::new()}
                 ssr=SsrMode::Async
             />
-            <Route
-                path=path!("/configuration")
-                view=guarded(session, crate::pages::configuration::page)
-                ssr=SsrMode::Async
-            />
+            <Route path=path!("/configuration") view={Lazy::<LConsole>::new()} ssr=SsrMode::Async />
             <Route
                 path=path!("/configuration/:tab")
-                view=guarded(session, crate::pages::configuration::page)
+                view={Lazy::<LConsole>::new()}
                 ssr=SsrMode::Async
             />
-            <Route
-                path=path!("/preferences")
-                view=guarded(session, crate::pages::preferences::page)
-                ssr=SsrMode::Async
-            />
+            <Route path=path!("/preferences") view={Lazy::<LConsole>::new()} ssr=SsrMode::Async />
             <Route
                 path=path!("/preferences/:section")
-                view=guarded(session, crate::pages::preferences::page)
+                view={Lazy::<LConsole>::new()}
                 ssr=SsrMode::Async
             />
-            <Route
-                path=path!("/search")
-                view=guarded(session, crate::pages::search::page)
-                ssr=SsrMode::Async
-            />
-            <Route
-                path=path!("/about")
-                view=guarded(session, crate::pages::about::page)
-                ssr=SsrMode::Async
-            />
+            <Route path=path!("/about") view={Lazy::<LConsole>::new()} ssr=SsrMode::Async />
             <Route
                 path=path!("/signed-out")
                 view=move || crate::pages::sign_in::signed_out_page().into_any()

@@ -104,6 +104,18 @@ pub(crate) async fn send(
 }
 
 /// A `GET` of `path` with no body.
+/// The page `page` as it is drawn: without its scripts, which carry the
+/// documents the page read serialized for the browser, and without the
+/// hydration markers between its text nodes.
+pub(crate) fn drawn(page: &str) -> String {
+    let mut pieces = page.split("<script");
+    let mut out = pieces.next().unwrap_or_default().to_owned();
+    for piece in pieces {
+        out.push_str(piece.split_once("</script>").map_or("", |(_, after)| after));
+    }
+    out.replace("<!>", "")
+}
+
 pub(crate) fn get(path: &str) -> Result<Request<Body>, Box<dyn Error>> {
     Ok(Request::get(path).body(Body::empty())?)
 }

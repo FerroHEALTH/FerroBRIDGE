@@ -8,10 +8,12 @@
 //! openEHR (`$toopenehr`) and Validate a resource (`$validate`). Each tab is
 //! one `POST` form: the options row with Run at its end, then the transform
 //! pair (B5), the input beside the answer. The answer is drawn in the page
-//! the post returns and nowhere else: no URL, no history, no store holds it
-//! (FerroBRIDGE's console rule, §0).
+//! the post returns, or in place through the `run` server function once the
+//! page has hydrated, and nowhere else: no URL, no history, no store holds
+//! it (FerroBRIDGE's console rule, §0).
 
 use ferrobridge_operator_api::health::Info;
+use ferrobridge_operator_api::operator::EngineState;
 use ferrohealth_ui::highlight::Language;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::action::ActionGroup;
@@ -25,26 +27,22 @@ use ferrohealth_ui::view::transform::{
     Answer, AnswerState, Density, Run, RunState, TransformPane, run_button, transform_options,
     transform_pair, transform_quiet,
 };
-use fhir_types::r4::operation_outcome::OperationOutcome;
-use fhir_types::r4::parameters::{Parameters, ParametersParameter, ParametersParameterValue};
-use fhir_types::r4::primitives;
-use fhir_types::r4::reference::Reference;
-use fhir_types::r4::resource::Resource;
+use leptos::form::FromFormData as _;
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 
+use crate::actions::{PlaygroundAnswer, PlaygroundPost, Ran, RunOperation};
 use crate::app::{PLAYGROUND, page_title};
-use crate::bridge::AccessToken;
-use crate::islands::JsonInput;
-use crate::load::Capability;
+use crate::editors::JsonInput;
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
-use crate::model::{Loaded, Outcome, loaded};
+use crate::model::{Loaded, Outcome};
 use crate::pages::mappings::template_id;
 use crate::pages::parts::{faulted, refused};
-use crate::posts::{PlaygroundAnswer, PlaygroundPost, Ran, RunAnswer};
-use crate::server::ConsoleState;
-use ferrobridge_operator_api::operator::EngineState;
+use ferrobridge_operator_api::capability::Capability;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod answer;
 
 /// The tabs of the playground, each its key and its words.
 const TABS: [(&str, Msg); 3] = [
@@ -52,9 +50,6 @@ const TABS: [(&str, Msg); 3] = [
     ("toopenehr", Msg::TabToOpenehr),
     ("validate", Msg::TabValidate),
 ];
-
-/// The `$toopenehr` formats the REST API chapter defines.
-const FORMATS: [&str; 2] = ["canonical", "flat"];
 
 /// The page of the tab `key`.
 fn tab_href(key: &str) -> String {
@@ -65,14 +60,6 @@ fn tab_href(key: &str) -> String {
     }
 }
 
-/// The tab an address names, `tofhir` for the playground itself.
-fn tab_of(address: &str) -> &str {
-    address
-        .strip_prefix(PLAYGROUND)
-        .and_then(|rest| rest.strip_prefix('/'))
-        .unwrap_or("tofhir")
-}
-
 /// The playground, on the tab the route names.
 #[must_use]
 pub fn page() -> impl IntoView {
@@ -81,19 +68,27 @@ pub fn page() -> impl IntoView {
     if !TABS.iter().any(|(key, _)| *key == tab) {
         return crate::pages::errors::not_found().into_any();
     }
-    let ran = use_context::<Ran>();
+    let running = Running::new();
+    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
+    let capability = (tab == "validate")
+        .then(|| Resource::new(crate::load::changes, |_| crate::load::capability_now()));
+    let state = (tab != "validate")
+        .then(|| Resource::new(crate::load::changes, |_| crate::load::state_now()));
     view! {
         {page_title(tr(Msg::Playground))}
         <Suspense>
             {move || {
                 let tab = tab.clone();
-                let ran = ran.clone();
+                let ran = running.ran();
                 Suspend::new(async move {
-                    let info = crate::load::info().await;
-                    let (capability, templates) = if tab == "validate" {
-                        (Some(crate::load::capability().await), None)
-                    } else {
-                        (None, template_ids(&crate::load::state().await))
+                    let info = info.await;
+                    let capability = match capability {
+                        Some(capability) => Some(capability.await),
+                        None => None,
+                    };
+                    let templates = match state {
+                        Some(state) => template_ids(&state.await),
+                        None => None,
                     };
                     drawn(
                         &tab,
@@ -101,12 +96,56 @@ pub fn page() -> impl IntoView {
                         &info,
                         capability.as_ref(),
                         templates.as_deref(),
+                        running,
                     )
                 })
             }}
         </Suspense>
     }
     .into_any()
+}
+
+/// How the playground's form posts once the page has hydrated: through the
+/// `run` server function, with the post it last sent.
+#[derive(Clone, Copy)]
+struct Running {
+    /// The server action the form dispatches.
+    run: ServerAction<RunOperation>,
+    /// The post the form last sent.
+    last: RwSignal<PlaygroundPost>,
+    /// The run the server drew the page with, after a post with no
+    /// WebAssembly.
+    posted: StoredValue<Option<Ran>>,
+}
+
+impl std::fmt::Debug for Running {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        out.debug_struct("Running").finish_non_exhaustive()
+    }
+}
+
+impl Running {
+    /// The running of a page.
+    fn new() -> Self {
+        Self {
+            run: ServerAction::<RunOperation>::new(),
+            last: RwSignal::new(PlaygroundPost::default()),
+            posted: StoredValue::new((*SharedValue::new(use_context::<Ran>)).clone()),
+        }
+    }
+
+    /// The run the page draws: the last one the form sent in the page, else
+    /// the one the server drew it with.
+    fn ran(self) -> Option<Ran> {
+        match self.run.value().get() {
+            Some(Ok(ran)) => Some(ran),
+            Some(Err(fault)) => Some(Ran {
+                post: self.last.get_untracked(),
+                answer: PlaygroundAnswer::Answered(Err(fault)),
+            }),
+            None => self.posted.get_value(),
+        }
+    }
 }
 
 /// The ids of the templates the running set compiled against, or `None`
@@ -141,17 +180,9 @@ fn operations_off(info: &Loaded<Info>) -> Option<String> {
 /// The resource types the bridge declares `$validate` on, in its order.
 fn validate_types(capability: &Capability) -> Vec<String> {
     capability
-        .0
-        .rest
-        .iter()
-        .flat_map(|rest| rest.resource.iter())
-        .filter(|resource| {
-            resource
-                .operation
-                .iter()
-                .any(|operation| operation.name.value.as_deref() == Some("validate"))
-        })
-        .filter_map(|resource| resource.r#type.value.clone())
+        .declaring("validate")
+        .into_iter()
+        .map(str::to_owned)
         .collect()
 }
 
@@ -162,6 +193,7 @@ fn drawn(
     info: &Loaded<Info>,
     capability: Option<&Loaded<Capability>>,
     templates: Option<&[String]>,
+    running: Running,
 ) -> AnyView {
     let header = page_heading(
         Header {
@@ -189,8 +221,25 @@ fn drawn(
         "validate" => validate(&post, ran, off, &types),
         _ => to_fhir(&post, ran, off, templates),
     };
+    let address = tab_href(tab);
+    // NOTE: no specification governs this: our own design; the form keeps its own
+    // route as `action`, so a post with no WebAssembly draws the page with its answer.
+    let submit = {
+        let address = address.clone();
+        move |event: leptos::ev::SubmitEvent| {
+            let Ok(post) = PlaygroundPost::from_event(&event) else {
+                return;
+            };
+            event.prevent_default();
+            running.last.set(post.clone());
+            running.run.dispatch(RunOperation {
+                address: address.clone(),
+                post,
+            });
+        }
+    };
     let panel = view! {
-        <form method="post" action=tab_href(tab) class="fui-panel">
+        <form method="post" action=address class="fui-panel" on:submit=submit>
             {options}
             {transform_pair(input, answer)}
         </form>
@@ -495,199 +544,4 @@ fn validate(
             "$validate",
         ),
     )
-}
-
-/// A parameter named `name` carrying `value`.
-fn parameter(name: &str, value: ParametersParameterValue) -> ParametersParameter {
-    ParametersParameter {
-        name: primitives::String::from(name),
-        value: Some(value),
-        ..ParametersParameter::default()
-    }
-}
-
-/// What the bridge answers the post `post` of the playground at `address`,
-/// as the operator whose access token is `token`.
-pub async fn answer(
-    state: &ConsoleState,
-    token: &AccessToken,
-    address: &str,
-    post: &PlaygroundPost,
-) -> PlaygroundAnswer {
-    let input = post.input.trim();
-    match tab_of(address) {
-        "toopenehr" => to_openehr_answer(state, token, input, post).await,
-        "validate" => validate_answer(state, token, input, post).await,
-        _ => to_fhir_answer(state, token, input, post).await,
-    }
-}
-
-/// Runs `$tofhir` over the composition `input`.
-async fn to_fhir_answer(
-    state: &ConsoleState,
-    token: &AccessToken,
-    input: &str,
-    post: &PlaygroundPost,
-) -> PlaygroundAnswer {
-    if input.is_empty() {
-        return PlaygroundAnswer::Invalid(Msg::CompositionEmpty);
-    }
-    let mut parameters = vec![parameter(
-        "composition",
-        ParametersParameterValue::String(primitives::String::from(input)),
-    )];
-    let template = post.template.trim();
-    if !template.is_empty() {
-        parameters.push(parameter(
-            "templateId",
-            ParametersParameterValue::String(primitives::String::from(template)),
-        ));
-    }
-    let patient = post.patient.trim();
-    if !patient.is_empty() {
-        // NOTE: FHIRconnect REST API chapter, `ToFhir.fsh`: the patient
-        // travels as `context.patient`, a `Reference`, in the request body.
-        let reference = Reference {
-            reference: Some(primitives::String::from(patient)),
-            ..Reference::default()
-        };
-        parameters.push(ParametersParameter {
-            name: primitives::String::from("context"),
-            part: vec![parameter(
-                "patient",
-                ParametersParameterValue::Reference(Box::new(reference)),
-            )],
-            ..ParametersParameter::default()
-        });
-    }
-    let request = Parameters {
-        parameter: parameters,
-        ..Parameters::default()
-    };
-    PlaygroundAnswer::Answered(
-        loaded(state.bridge().to_fhir(&request, token).await)
-            .map(|outcome| outcome.map(RunAnswer::from)),
-    )
-}
-
-/// Runs `$toopenehr` over the Bundle `input`.
-async fn to_openehr_answer(
-    state: &ConsoleState,
-    token: &AccessToken,
-    input: &str,
-    post: &PlaygroundPost,
-) -> PlaygroundAnswer {
-    let format = if post.format.is_empty() {
-        "canonical"
-    } else {
-        post.format.as_str()
-    };
-    if !FORMATS.contains(&format) {
-        return PlaygroundAnswer::Invalid(Msg::FormatNotKnown);
-    }
-    // NOTE: no specification governs this: our own design; text that is no
-    // JSON is the operator's input to correct, never sent.
-    let Ok(bundle) = serde_json::from_str::<serde_json::Value>(input) else {
-        return PlaygroundAnswer::Invalid(Msg::BundleNotJson);
-    };
-    if bundle
-        .get("resourceType")
-        .and_then(serde_json::Value::as_str)
-        != Some("Bundle")
-    {
-        return PlaygroundAnswer::Invalid(Msg::BundleNotBundle);
-    }
-    let mut parameter = vec![serde_json::json!({ "name": "bundle", "resource": bundle })];
-    let template = post.template.trim();
-    if !template.is_empty() {
-        parameter.push(serde_json::json!({ "name": "templateId", "valueString": template }));
-    }
-    parameter.push(serde_json::json!({ "name": "format", "valueCode": format }));
-    // NOTE: FHIRconnect `ToOpenEhr.fsh` declares `bundle` a resource part; the
-    // console's model holds no clinical resource, so the Bundle passes as JSON.
-    let envelope = serde_json::json!({ "resourceType": "Parameters", "parameter": parameter });
-    let answer = loaded(state.bridge().to_openehr(&envelope, token).await)
-        .map(|outcome| outcome.map(|(parameters, raw)| converted(&parameters, raw)));
-    PlaygroundAnswer::Answered(answer)
-}
-
-/// Runs `$validate` on the resource `input`.
-async fn validate_answer(
-    state: &ConsoleState,
-    token: &AccessToken,
-    input: &str,
-    post: &PlaygroundPost,
-) -> PlaygroundAnswer {
-    // NOTE: no specification governs this: our own design; text that is no
-    // JSON is the operator's input to correct, never sent.
-    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(input) else {
-        return PlaygroundAnswer::Invalid(Msg::ResourceNotJson);
-    };
-    if parsed
-        .get("resourceType")
-        .and_then(serde_json::Value::as_str)
-        != Some(post.resource_type.as_str())
-    {
-        return PlaygroundAnswer::Invalid(Msg::ResourceTypeMismatch);
-    }
-    let answer = loaded(
-        state
-            .bridge()
-            .validate(&post.resource_type, input.to_owned(), token)
-            .await,
-    )
-    .map(|outcome| outcome.map(|(_outcome, raw)| RunAnswer::from(raw)));
-    PlaygroundAnswer::Answered(answer)
-}
-
-/// What a `$toopenehr` answer shows: the composition its `composition`
-/// parameter carries, with the issues of its `outcome` beside it, or the
-/// whole answer when it carries no composition (FHIRconnect
-/// `ToOpenEhr.fsh`).
-fn converted(parameters: &Parameters, raw: serde_json::Value) -> RunAnswer {
-    let named = |name: &str| {
-        parameters
-            .parameter
-            .iter()
-            .find(|parameter| parameter.name.value.as_deref() == Some(name))
-    };
-    let composition = named("composition").and_then(|parameter| match &parameter.value {
-        Some(ParametersParameterValue::String(text)) => text.value.as_deref(),
-        _ => None,
-    });
-    let issues = named("outcome")
-        .and_then(|parameter| match &parameter.resource {
-            Some(Resource::OperationOutcome(outcome)) => Some(issue_words(outcome)),
-            _ => None,
-        })
-        .unwrap_or_default();
-    let Some(text) = composition else {
-        return RunAnswer::from(raw);
-    };
-    // NOTE: FHIRconnect `ToOpenEhr.fsh`: the composition is serialized as a string;
-    // one that is no JSON is shown as the text it is.
-    let document =
-        serde_json::from_str(text).unwrap_or_else(|_| serde_json::Value::String(text.to_owned()));
-    RunAnswer { document, issues }
-}
-
-/// The words of each issue of `outcome`: its `details.text` and its
-/// `diagnostics`, each when present (FHIR R4 `OperationOutcome.issue`).
-fn issue_words(outcome: &OperationOutcome) -> Vec<String> {
-    outcome
-        .issue
-        .iter()
-        .flat_map(|issue| {
-            let details = issue
-                .details
-                .as_ref()
-                .and_then(|details| details.text.as_ref())
-                .and_then(|text| text.value.clone());
-            let diagnostics = issue
-                .diagnostics
-                .as_ref()
-                .and_then(|text| text.value.clone());
-            details.into_iter().chain(diagnostics)
-        })
-        .collect()
 }

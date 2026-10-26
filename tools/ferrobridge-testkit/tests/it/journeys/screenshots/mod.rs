@@ -108,7 +108,7 @@ struct Shot {
     url: &'static str,
     /// The `XPath` of an element the page shows once it has loaded.
     ready: &'static str,
-    /// Whether the page is drawn in the shell, whose islands the capture
+    /// Whether the page is drawn in the shell, whose hydration the capture
     /// waits for.
     shell: bool,
 }

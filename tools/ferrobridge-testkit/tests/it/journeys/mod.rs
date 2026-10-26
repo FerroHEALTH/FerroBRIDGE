@@ -25,6 +25,8 @@ mod browser;
 mod configuration;
 mod editor;
 mod engine;
+mod navigation;
+mod no_wasm;
 mod playground;
 mod screenshots;
 mod shell;

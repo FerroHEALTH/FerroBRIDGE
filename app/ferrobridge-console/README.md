@@ -4,9 +4,10 @@
 # ferrobridge-console
 
 The FerroBRIDGE Console, the operator console: the `ferrobridge-console`
-binary, a Leptos app in islands mode drawn with FerroUI 0.3.6: the server
-draws every page whole and the browser hydrates only its islands, with a
-backend-for-frontend in front of the bridge.
+binary, a Leptos app drawn with FerroUI 0.5.0 that hydrates the whole page:
+the server draws the first page and the browser draws every page after it,
+so no link or form reloads the document, with a backend-for-frontend in
+front of the bridge.
 
 Part of [FerroBRIDGE](https://ferrobridge.eu), a pure-Rust bridge between
 openEHR and two interoperability targets: HL7 FHIR through the FHIRconnect
@@ -19,9 +20,11 @@ itself. It serves the dashboard with the flow, the Mapping set with its
 tabs and reload, each mapping file and template, the mapping editor (check,
 save under `If-Match` with a reason), the playground (`$tofhir`,
 `$toopenehr`, `$validate`), the FHIR facade, HL7 v2 and OMOP ETL pages,
-the connections, Your preferences and About. Every action is a plain form
-post the server answers with the page it draws; the console registers no
-server function. Under them: the browser security headers, operator sign-in
+the connections, Your preferences and About. Every action is a form post
+the server answers with the page it draws, which is the page with no
+WebAssembly; once the page has hydrated, the action and every read go
+through the console's server functions, each checking the session first.
+Under them: the browser security headers, operator sign-in
 with OpenID Connect, the configuration with its environment overrides and
 `_file` secrets, the typed bridge client that calls the bridge with the
 operator's own access token, and the check that holds the crate to the

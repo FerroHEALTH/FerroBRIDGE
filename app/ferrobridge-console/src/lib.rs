@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The FerroBRIDGE operator console: a Leptos app the server draws whole,
-//! with its interactive parts hydrated in the browser as islands, and a
+//! The FerroBRIDGE operator console: a Leptos app the server draws and the
+//! browser hydrates whole, drawing every page after the first itself, and a
 //! backend-for-frontend in front of the bridge.
 //!
 //! The console is one more client of the bridge's public HTTP surface: its
@@ -14,11 +14,13 @@
 //!
 //! The page tree is [`app`], drawn in the [`shell`] with the components of
 //! `ferrohealth_ui` from the reviewed FerroBRIDGE design, its pages in
-//! [`pages`], what they read from the bridge in [`load`] and the request's
-//! words in [`locale`]. Every page works with no WebAssembly: each action is
-//! a link or a plain form the server answers ([`posts`], [`prefs`]). The
-//! browser half is the islands alone ([`islands`] and the library's own).
-//! [`server`] serves it all under the browser security headers, [`config`]
+//! [`pages`], grouped into lazy routes by [`routes`], what they read from the
+//! bridge in [`load`], what the server read of the request in [`visit`] and
+//! the request's words in [`locale`]. Every page works with no WebAssembly:
+//! each action is a link or a plain form the server answers ([`posts`],
+//! [`prefs`]); once the page has hydrated, a form posts through its server
+//! function ([`actions`]) and a link is followed in the page. [`editors`]
+//! holds the console's own components. [`server`] serves it all under the browser security headers, [`config`]
 //! reads the TOML configuration, [`cli`] and [`command`] run the binary, and
 //! [`healthcheck`] is the job a container runtime runs beside it. No
 //! specification governs the console: our own design.
@@ -27,11 +29,21 @@
 //! `wasm32-unknown-unknown`; the target, never a Cargo feature, chooses
 //! between them.
 #![doc(test(attr(deny(warnings))))]
+// NOTE: the Rust reference, "Limits": the server's render of the library's
+// sign-in card nests deeper than the default query depth of 128.
+#![recursion_limit = "256"]
 
-pub mod islands;
-
-#[cfg(not(target_arch = "wasm32"))]
+pub mod actions;
 pub mod app;
+pub mod editors;
+pub mod load;
+pub mod locale;
+pub mod model;
+pub mod pages;
+pub mod routes;
+pub mod shell;
+pub mod visit;
+
 #[cfg(not(target_arch = "wasm32"))]
 pub mod bridge;
 #[cfg(not(target_arch = "wasm32"))]
@@ -43,15 +55,7 @@ pub mod config;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod healthcheck;
 #[cfg(not(target_arch = "wasm32"))]
-pub mod load;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod locale;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod model;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod oidc;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod pages;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod posts;
 #[cfg(not(target_arch = "wasm32"))]
@@ -60,15 +64,34 @@ pub mod prefs;
 pub mod server;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod session;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod shell;
 
-/// Hydrates the islands of the page the server drew: the console's own and
-/// the library's. Each island takes the words it draws as props, so the
-/// browser builds no locale.
+/// Hydrates the page the server drew, whole, its lazy routes loading their
+/// code from their own chunks, and marks the root element `data-hydrated`
+/// once the page and its route have hydrated.
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {
     console_error_panic_hook::set_once();
-    leptos::mount::hydrate_islands();
+    // NOTE: leptos 0.8 `src/mount.rs`: `hydrate_lazy` runs this future and drops what
+    // follows it; `hydrate_from_async` starts the executor itself.
+    wasm_bindgen_futures::spawn_local(async {
+        let Some(body) = leptos::prelude::document().body() else {
+            leptos::logging::warn!("the page has no body to hydrate");
+            return;
+        };
+        let page = leptos::mount::hydrate_from_async(body, app::App).await;
+        page.forget();
+        mark_hydrated();
+    });
+}
+
+/// Marks the root element `data-hydrated`, which a journey and the
+/// screenshot capture wait for before they act.
+#[cfg(target_arch = "wasm32")]
+fn mark_hydrated() {
+    if let Some(root) = leptos::prelude::document().document_element()
+        && let Err(error) = root.set_attribute("data-hydrated", "")
+    {
+        leptos::logging::warn!("the browser refused the hydrated mark: {error:?}");
+    }
 }
