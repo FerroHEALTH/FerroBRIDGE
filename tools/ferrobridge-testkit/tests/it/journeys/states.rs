@@ -22,10 +22,14 @@ use thirtyfour::{By, Cookie, WebElement};
 use crate::journeys::browser::{Browser, with_browser};
 use crate::journeys::playground::hydrated;
 use crate::journeys::sign_in::sign_in;
-use crate::journeys::stack::Stack;
+use crate::journeys::stack::{Lanes, Stack};
 
 /// The environment variable that opts in to the capture.
 const SCREENSHOTS_GATE: &str = "FERROBRIDGE_SCREENSHOTS";
+
+/// The loopback port of the bridge the states are captured from, fixed so
+/// the address a state draws is the same every run.
+const BRIDGE_PORT: u16 = 47182;
 
 /// The ignored folder of the state images, from the workspace root.
 const STATES: &str = "target/console-screenshots/states";
@@ -200,8 +204,9 @@ async fn every_console_state_is_captured_in_light_and_dark() -> Result<(), Box<d
     }
     std::fs::create_dir_all(file("x", "light").parent().ok_or("a parent")?)?;
     for theme in ["light", "dark"] {
-        let stack = Stack::start().await?;
+        let stack = Stack::capture(Lanes::All, BRIDGE_PORT).await?;
         with_browser(async |browser| every_state(browser, &stack, theme).await).await?;
+        stack.stop().await?;
     }
     Ok(())
 }

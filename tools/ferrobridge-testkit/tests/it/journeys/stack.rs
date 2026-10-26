@@ -120,6 +120,17 @@ pub(crate) struct Stack {
     cookie: String,
     /// The operator's access token, which never reaches the browser.
     access_token: String,
+    /// The bridge's own thread and the sender that stops it.
+    bridge: Running,
+}
+
+/// A bridge serving on a thread of its own, and the way to stop it.
+#[derive(Debug)]
+struct Running {
+    /// Sending on it starts the bridge's drain.
+    stop: tokio::sync::oneshot::Sender<()>,
+    /// The bridge's thread, which ends once the drain has.
+    thread: std::thread::JoinHandle<anyhow::Result<()>>,
 }
 
 impl Stack {
@@ -131,12 +142,31 @@ impl Stack {
 
     /// Starts the stack with the bridge running `lanes`.
     pub(crate) async fn start_with(lanes: Lanes) -> Result<Self, Box<dyn Error>> {
+        Self::start_on(lanes, 0).await
+    }
+
+    /// Starts the stack for a capture, with the bridge running `lanes` on
+    /// the loopback port `port`, so every page that names the bridge's
+    /// address draws the same one each run and a capture rewrites only the
+    /// images that changed.
+    pub(crate) async fn capture(lanes: Lanes, port: u16) -> Result<Self, Box<dyn Error>> {
+        Self::start_on(lanes, port).await
+    }
+
+    /// Starts the stack with the bridge running `lanes` on the loopback port
+    /// `port`, `0` for one the system chooses.
+    async fn start_on(lanes: Lanes, port: u16) -> Result<Self, Box<dyn Error>> {
         let site = site_root()?;
-        let cdr = cdr().await;
-        let tree = tree()?;
-        let provider = Provider::start().await?;
+        // NOTE: no specification governs this: our own design; a capture's CDR and
+        // provider sit beside its bridge's port, since the pages draw their addresses.
+        let cdr = cdr(neighbour(port, 10)?).await?;
+        let tree = tree(port)?;
+        let provider = match neighbour(port, 20)? {
+            0 => Provider::start().await?,
+            fixed => Provider::start_on(listen(fixed)?).await?,
+        };
         provider.publish_metadata().await;
-        let bridge = bridge(tree.path(), &cdr, &provider, lanes).await?;
+        let (bridge, running) = bridge(tree.path(), &cdr, &provider, lanes, port).await?;
 
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let console = format!("http://{}", listener.local_addr()?);
@@ -175,7 +205,22 @@ impl Stack {
             console,
             cookie,
             access_token,
+            bridge: running,
         })
+    }
+
+    /// Stops the bridge and waits until its thread has ended, so its port is
+    /// free for the next stack that asks for it.
+    pub(crate) async fn stop(self) -> Result<(), Box<dyn Error>> {
+        let Running { stop, thread } = self.bridge;
+        if stop.send(()).is_err() {
+            return Err("the bridge had stopped already".into());
+        }
+        match tokio::task::spawn_blocking(move || thread.join()).await? {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(error)) => Err(format!("the bridge ended with an error: {error:#}").into()),
+            Err(_panic) => Err("the bridge panicked".into()),
+        }
     }
 
     /// The operator's access token, which the console keeps on its server.
@@ -222,12 +267,27 @@ fn site_root() -> Result<PathBuf, Box<dyn Error>> {
     Ok(site)
 }
 
+/// The port `offset` above `port` for a capture, `0` when `port` is `0`.
+fn neighbour(port: u16, offset: u16) -> Result<u16, Box<dyn Error>> {
+    if port == 0 {
+        return Ok(0);
+    }
+    port.checked_add(offset)
+        .ok_or_else(|| format!("no port {offset} above {port}").into())
+}
+
+/// A listener on the loopback port `port`, `0` for one the system chooses.
+fn listen(port: u16) -> Result<std::net::TcpListener, Box<dyn Error>> {
+    std::net::TcpListener::bind(("127.0.0.1", port))
+        .map_err(|error| format!("nothing can listen on 127.0.0.1:{port}: {error}").into())
+}
+
 /// A CDR that answers the bridge's reachability probe, the template list,
 /// with an empty list, and the template fetch of the diagnosis template the
 /// facade starts with (openEHR ITS-REST 1.1.0,
-/// `definition-codegen.openapi.yaml`).
-async fn cdr() -> MockServer {
-    let cdr = MockServer::start().await;
+/// `definition-codegen.openapi.yaml`), on the loopback port `port`.
+async fn cdr(port: u16) -> Result<MockServer, Box<dyn Error>> {
+    let cdr = MockServer::builder().listener(listen(port)?).start().await;
     Mock::given(method("GET"))
         .and(path("/definition/template/adl1.4"))
         .respond_with(ResponseTemplate::new(200).set_body_raw(b"[]".to_vec(), "application/json"))
@@ -245,13 +305,32 @@ async fn cdr() -> MockServer {
         )
         .mount(&cdr)
         .await;
-    cdr
+    Ok(cdr)
 }
 
 /// The mapping tree: the provisioned mappings, the template, and the
-/// console's empty directory.
-fn tree() -> Result<tempfile::TempDir, Box<dyn Error>> {
-    let tree = tempfile::tempdir()?;
+/// console's empty directory. A capture's tree (`port` not `0`) is
+/// `target/journey-capture/bridge-<port>`, the same path each run, since
+/// the configuration and diagnostics pages draw it; every other tree is a
+/// fresh temporary directory.
+fn tree(port: u16) -> Result<tempfile::TempDir, Box<dyn Error>> {
+    let tree = if port == 0 {
+        tempfile::tempdir()?
+    } else {
+        let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/journey-capture");
+        let name = format!("bridge-{port}");
+        std::fs::create_dir_all(&base)?;
+        let base = base.canonicalize()?;
+        match std::fs::remove_dir_all(base.join(&name)) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+        tempfile::Builder::new()
+            .prefix(&name)
+            .rand_bytes(0)
+            .tempdir_in(&base)?
+    };
     let mappings = tree.path().join("mappings");
     let templates = tree.path().join("templates");
     for directory in [&mappings, &templates, &tree.path().join("console")] {
@@ -272,15 +351,17 @@ fn tree() -> Result<tempfile::TempDir, Box<dyn Error>> {
     Ok(tree)
 }
 
-/// Starts the bridge over the tree at `tree` and the CDR `cdr`, trusting the
+/// Starts the bridge over the tree at `tree` and the CDR `cdr` on the
+/// loopback port `port` (`0` for one the system chooses), trusting the
 /// operator's token `provider` issues, and returns its base URL.
 async fn bridge(
     tree: &Path,
     cdr: &MockServer,
     provider: &Provider,
     lanes: Lanes,
-) -> Result<String, Box<dyn Error>> {
-    let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+    port: u16,
+) -> Result<(String, Running), Box<dyn Error>> {
+    let listener = listen(port)?;
     listener.set_nonblocking(true)?;
     let bridge = format!("http://{}", listener.local_addr()?);
     let [mappings, templates, identity, console] = [
@@ -307,6 +388,7 @@ async fn bridge(
     // NOTE: no specification governs this: our own design; the binary drives
     // `serve_settings` on its main thread, so the bridge runs on a runtime of
     // its own thread, as the binary does.
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
     let serving = std::thread::spawn(move || -> anyhow::Result<()> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
@@ -318,19 +400,24 @@ async fn bridge(
                 initial: Duration::from_millis(20),
                 max: Duration::from_millis(50),
             },
-            std::future::pending(),
+            async move {
+                // NOTE: no specification governs this: our own design; a dropped
+                // sender stops the bridge as a sent stop does.
+                let _sent_or_dropped = stopped.await;
+            },
         ))
     });
-    ready(&bridge, serving).await?;
-    Ok(bridge)
+    let thread = ready(&bridge, serving).await?;
+    Ok((bridge, Running { stop, thread }))
 }
 
 /// Waits until the bridge at `bridge` answers its readiness probe with
-/// `200`, and fails with the bridge's own error when `serving` ends first.
+/// `200` and hands its thread `serving` back, and fails with the bridge's own
+/// error when `serving` ends first.
 async fn ready(
     bridge: &str,
     serving: std::thread::JoinHandle<anyhow::Result<()>>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<std::thread::JoinHandle<anyhow::Result<()>>, Box<dyn Error>> {
     let client = reqwest::Client::new();
     let mut last = String::new();
     for _ in 0..100 {
@@ -347,7 +434,7 @@ async fn ready(
             .send()
             .await
         {
-            Ok(answer) if answer.status() == reqwest::StatusCode::OK => return Ok(()),
+            Ok(answer) if answer.status() == reqwest::StatusCode::OK => return Ok(serving),
             Ok(answer) => last = format!("{}: {}", answer.status(), answer.text().await?),
             Err(error) => last = error.to_string(),
         }

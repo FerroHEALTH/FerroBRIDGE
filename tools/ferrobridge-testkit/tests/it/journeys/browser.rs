@@ -251,6 +251,17 @@ impl Browser {
         capabilities.set_no_sandbox()?;
         capabilities.set_disable_dev_shm_usage()?;
         capabilities.add_arg("--window-size=1280,1024")?;
+        // NOTE: no specification governs this: our own design; text drawn without
+        // hinting, subpixel positions or LCD antialiasing is the same pixel each run.
+        for flag in [
+            "--font-render-hinting=none",
+            "--disable-font-subpixel-positioning",
+            "--disable-lcd-text",
+            "--force-color-profile=srgb",
+            "--disable-gpu",
+        ] {
+            capabilities.add_arg(flag)?;
+        }
         capabilities.set_browser_log_level(LoggingPrefsLogLevel::Info)?;
         let chrome = std::env::var_os(CHROME_ENV)
             .map(PathBuf::from)
