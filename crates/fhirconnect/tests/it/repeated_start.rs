@@ -18,6 +18,7 @@ use fhir_types::codec::Value;
 use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::identity::deterministic_id;
 use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::seam::ReferenceError;
 use fhirconnect::engine::seam::ResourceIdentity;
@@ -144,6 +145,7 @@ fn each_occurrence_of_the_start_archetype_is_its_own_resource() -> Result<(), Bo
         let Each::Mapped {
             occurrence,
             outcome,
+            ..
         } = occurrence
         else {
             return Err(format!("every occurrence maps: {each:?}").into());
@@ -153,6 +155,17 @@ fn each_occurrence_of_the_start_archetype_is_its_own_resource() -> Result<(), Bo
             .to_serde_json(&mut fhir_types::codec::Path::root("Condition"))?;
         mapped.push((occurrence.clone(), code_of(outcome.value())?, json));
     }
+    let paths: Vec<&str> = each
+        .iter()
+        .map(|one| match *one {
+            Each::Mapped { ref path, .. } | Each::NotApplicable { ref path, .. } => path.as_str(),
+        })
+        .collect();
+    assert_eq!(
+        paths,
+        [FIRST_PATH, SECOND_PATH],
+        "the first occurrence keeps its template predicate and the second names its place"
+    );
     let codes: Vec<(Vec<u32>, &str)> = mapped
         .iter()
         .map(|(occurrence, code, _)| (occurrence.clone(), code.as_str()))
@@ -247,8 +260,11 @@ fn the_contexts_condition_is_evaluated_per_occurrence() -> Result<(), Box<dyn Er
         Each::Mapped {
             occurrence: first,
             outcome,
+            ..
         },
-        Each::NotApplicable { occurrence: second },
+        Each::NotApplicable {
+            occurrence: second, ..
+        },
     ] = each.as_slice()
     else {
         return Err(format!(
@@ -275,8 +291,15 @@ fn the_contexts_condition_is_evaluated_per_occurrence() -> Result<(), Box<dyn Er
 /// A synthetic `OBJECT_VERSION_ID` a CDR would have stamped.
 const UID: &str = "7c1e2a90-0000-4000-8000-000000001254::ferrobridge.example::1";
 
-/// The leading segment of [`UID`], the id a first occurrence takes.
+/// The leading segment of [`UID`], its `object_id`.
 const ROOT: &str = "7c1e2a90-0000-4000-8000-000000001254";
+
+/// The entry path of the first diagnosis: the template predicate it keeps,
+/// the archetype and the name `KDS_Diagnose` gives the node.
+const FIRST_PATH: &str = "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']";
+
+/// The entry path of the second diagnosis: its place in `content`.
+const SECOND_PATH: &str = "/content[2]";
 
 /// An identity seam that records every request and answers `answer`.
 #[derive(Debug)]
@@ -368,18 +391,19 @@ fn tofhir_answers_one_resource_per_occurrence() -> Result<(), Box<dyn Error>> {
     let (program, index) = eu_condition_program()?;
     let answer = tofhir(program, index, &Seams::default())??;
     let (found, targets) = conditions(answer.response());
-    let second = format!("{ROOT}.2");
+    let first = deterministic_id(ROOT, FIRST_PATH);
+    let second = deterministic_id(ROOT, SECOND_PATH);
     assert_eq!(
         found,
         [
-            (ROOT.to_owned(), "38341003".to_owned()),
+            (first.clone(), "38341003".to_owned()),
             (second.clone(), "195967001".to_owned())
         ],
-        "one Condition per occurrence, the first keeping the composition's id"
+        "one Condition per occurrence, each with the hash of the composition uid and its entry path"
     );
     assert_eq!(
         targets,
-        [format!("Condition/{ROOT}"), format!("Condition/{second}")],
+        [format!("Condition/{first}"), format!("Condition/{second}")],
         "one Provenance targets every occurrence"
     );
     assert!(
@@ -416,7 +440,10 @@ fn tofhir_counts_the_occurrences_the_condition_does_not_admit() -> Result<(), Bo
         .collect();
     assert_eq!(
         notes,
-        [(Some(ROOT), Some("A synthetic first note"))],
+        [(
+            Some(deterministic_id(ROOT, FIRST_PATH).as_str()),
+            Some("A synthetic first note")
+        )],
         "only the admitted occurrence maps, with its own note"
     );
     let counted: Vec<usize> = answer

@@ -1038,11 +1038,15 @@ transformations that change no server state:
   mapped resources plus an engine-generated `Provenance` on every run, with an
   `OperationOutcome` entry for warnings. **As built (#1271):** a composition
   holding the context's start archetype more than once answers one resource
-  per occurrence through `traverse::to_fhir_each` (section 4.4), with ids
-  derived from the composition uid and the occurrence
-  (`engine/id-management.adoc` §Deterministic IDs) and the occurrences the
-  condition does not admit counted; no specification governs this: our own
-  design.
+  per occurrence through `traverse::to_fhir_each` (section 4.4), and the
+  occurrences the condition does not admit counted; no specification governs
+  this: our own design. **As built (#1276):** a resource without an id from
+  the identity seam or the mapping takes the deterministic id
+  `engine/id-management.adoc` §Deterministic IDs recommends, "a hash of the
+  Composition UID and the Entry Path": `fhirconnect::engine::identity`
+  hashes the composition's `object_id` and the entry path
+  `WebTemplateIndex::entry_path` names the occurrence by, the id the facade
+  gives the same occurrence (section 9).
 - `POST [base]/$toopenehr` takes a `Bundle` and `templateId` and `format`
   (`canonical`, the default, or `flat`), and answers `Parameters` with the
   composition string and an optional `outcome`.

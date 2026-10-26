@@ -310,6 +310,7 @@ impl<'a> Compiler<'a> {
             .template
             .nodes()
             .find(|node| *node.rm_path() == archetype);
+        let root_node = root.map(|node| node.flat_id().clone());
         let root_axes = match root.map(|node| occurrences(self.template, node)) {
             Some(Ok(axes)) => axes,
             None => Vec::new(),
@@ -366,6 +367,7 @@ impl<'a> Compiler<'a> {
                 mappings,
             })
             .with_root_axes(root_axes)
+            .with_root(root_node)
             .with_party(self.party),
         )
     }

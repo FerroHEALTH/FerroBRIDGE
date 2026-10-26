@@ -66,12 +66,20 @@ The answer is a `collection` Bundle carrying the mapped resources, exactly one
 
 A composition can hold the archetype a context starts at more than once, for
 example two diagnoses. The answer then carries one resource per occurrence,
-and the one `Provenance` targets all of them. Without an identity seam, the
-first occurrence takes the composition's id and a further occurrence appends
-its position (`<uid>.2`), so every export answers the same ids. An occurrence
+and the one `Provenance` targets all of them. An occurrence
 the context's condition does not admit maps no resource and is counted as an
 `informational` issue; when the condition admits none, the call is refused.
 Two resources that would take one id refuse the call.
+
+Without an identity seam, and when the mapping writes no `id`, a resource
+takes the deterministic id the FHIRconnect engine chapter recommends: a hash
+of the composition uid and the entry path. FerroBRIDGE hashes the
+composition's `object_id`, the part of its `OBJECT_VERSION_ID` that stays the
+same across versions, with the path that names the occurrence: the template
+path, with a later occurrence named by its place in its container, as in
+`/content[2]`. The hash is SHA-256, written as 52 lowercase base32
+characters. A new version of the composition keeps every id, and the FHIR
+facade gives the same occurrence the same id.
 
 ## `POST /fhir/$toopenehr`
 

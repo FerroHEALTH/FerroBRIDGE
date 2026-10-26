@@ -58,6 +58,7 @@ pub struct Program {
     mappings: Vec<Mapping>,
     warnings: Vec<Diagnostic>,
     root_axes: Vec<FlatId>,
+    root: Option<FlatId>,
     party: Option<PartyClass>,
 }
 
@@ -101,6 +102,7 @@ impl Program {
             mappings: parts.mappings,
             warnings: Vec::new(),
             root_axes: Vec::new(),
+            root: None,
             party: None,
         }
     }
@@ -111,6 +113,21 @@ impl Program {
     pub(crate) fn with_root_axes(mut self, axes: Vec<FlatId>) -> Self {
         self.root_axes = axes;
         self
+    }
+
+    /// Returns this program with the template node of the start model's
+    /// archetype root.
+    #[must_use]
+    pub(crate) fn with_root(mut self, root: Option<FlatId>) -> Self {
+        self.root = root;
+        self
+    }
+
+    /// Returns the template node of the start model's archetype root, `None`
+    /// when the template holds no node at that path.
+    #[must_use]
+    pub const fn root(&self) -> Option<&FlatId> {
+        self.root.as_ref()
     }
 
     /// Returns the repeating nodes on the way to the start model's archetype

@@ -386,6 +386,11 @@ pub enum Each {
         /// The 1-based instance of each repeating axis down to the start
         /// archetype.
         occurrence: Vec<u32>,
+        /// The path that names the occurrence in the composition
+        /// ([`openehr_mapping_core::index::WebTemplateIndex::entry_path`]),
+        /// the entry path its deterministic id derives from
+        /// ([`crate::engine::identity::deterministic_id`]).
+        path: String,
         /// The resource and what its run declared.
         outcome: Outcome<Value>,
     },
@@ -394,6 +399,8 @@ pub enum Each {
         /// The 1-based instance of each repeating axis down to the start
         /// archetype.
         occurrence: Vec<u32>,
+        /// The path that names the occurrence in the composition.
+        path: String,
     },
 }
 
@@ -426,6 +433,12 @@ pub fn to_fhir_each<T: Table + ?Sized>(
     let mut each = Vec::new();
     for instance in root_instances(program, index, composition)? {
         let occurrence: Vec<u32> = instance.iter().map(|position| position.get()).collect();
+        // NOTE: an instance of the axes that holds no start archetype root is
+        // no occurrence of it, a legitimate absence; no specification governs
+        // this, our own design.
+        let Some(path) = entry_path(program, index, composition, &instance)? else {
+            continue;
+        };
         match read_out(
             program,
             table,
@@ -437,10 +450,11 @@ pub fn to_fhir_each<T: Table + ?Sized>(
         ) {
             Ok(outcome) => each.push(Each::Mapped {
                 occurrence,
+                path,
                 outcome,
             }),
             Err(EngineError::NotApplicable { .. }) => {
-                each.push(Each::NotApplicable { occurrence });
+                each.push(Each::NotApplicable { occurrence, path });
             }
             Err(error) => return Err(error),
         }
@@ -486,6 +500,39 @@ fn root_instances(
         found = deeper;
     }
     Ok(found)
+}
+
+/// Returns the path that names one instance of the program's start archetype
+/// root in `composition`, or `None` when the instance holds no root.
+///
+/// A program with no root node in its template, a context whose start is the
+/// composition itself, names [`crate::engine::identity::ROOT_PATH`].
+fn entry_path(
+    program: &Program,
+    index: &WebTemplateIndex,
+    composition: &CanonicalComposition,
+    instance: &[RmPosition],
+) -> Result<Option<String>, EngineError> {
+    let Some(root) = program.root() else {
+        return Ok(Some(String::from(crate::engine::identity::ROOT_PATH)));
+    };
+    let refuse = |source| EngineError::Template {
+        mapping: String::from(program.context().as_str()),
+        node: String::from(root.as_str()),
+        source: Box::new(source),
+    };
+    let node = index.node_by_flat_id(root).map_err(refuse)?;
+    let named = index
+        .entry_path(composition, node, instance)
+        .map_err(refuse)?;
+    Ok(named.map(|path| {
+        let rendered = path.to_string();
+        if rendered.is_empty() {
+            String::from(crate::engine::identity::ROOT_PATH)
+        } else {
+            rendered
+        }
+    }))
 }
 
 /// Returns the archetype id the context's start model mapping declares.
