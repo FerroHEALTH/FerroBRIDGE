@@ -11,7 +11,8 @@ of its own.
 The facade runs. It is off until `[facade] enabled` turns it on, and a disabled
 facade mounts no route, so a request answers `404` rather than `403`. What this
 page describes is what the server answers today: conformance, create, read,
-vread, update, search, transaction, batch and `$validate`.
+vread, update, search, transaction, batch, `$validate` and
+`Composition/$document`.
 
 <!-- toc -->
 
@@ -37,6 +38,7 @@ for `spec.version`. The service base is `/fhir`.
 | `GET /fhir/{type}?…` | Search the type over the AQL its search declaration states |
 | `POST /fhir/{type}/_search` | The same search, its parameters in a form body |
 | `POST /fhir/{type}/$validate` | The dry run that commits nothing |
+| `GET /fhir/Composition/{id}/$document` | The document Bundle of one Composition; also `GET /fhir/Composition/$document?id={id}` |
 | `GET /fhir/{type}/{id}` | Read one resource back out of its composition |
 | `GET /fhir/{type}/{id}/_history/{vid}` | Vread: read the version a write's `Location` named |
 | `PUT /fhir/{type}/{id}` | Update, with `If-Match` |
@@ -53,7 +55,8 @@ page it did not ask for.
 
 The `CapabilityStatement` names exactly the resource types the loaded programs
 map, with `create`, `read`, `vread` and `update` per type, `transaction` and
-`batch` at system level, the `$validate` operation, `updateCreate: false`,
+`batch` at system level, the `$validate` operation, `$document` on
+`Composition`, `updateCreate: false`,
 `conditionalCreate` true, `conditionalUpdate` false (no `PUT [type]?[search]`
 is served; `If-Match` on an update is the version-aware update),
 `versioning: versioned-update` and `readHistory: true` per type, and
@@ -123,6 +126,7 @@ on the resource type in the path or in the entry:
 |---|---|
 | create | `c`, and `u` too when the create revises a resource the facade already holds (a new `meta.versionId` of a known `id`); a replay that changes nothing needs `c` only |
 | read, vread, history (a party resource) | `r` |
+| `Composition/$document` | `r` on `Composition` and on every type the document carries |
 | delete (a party resource) | `d` |
 | search (`GET [base]/{type}`, `POST [base]/{type}/_search`) | `s` |
 | update | `u` |
@@ -537,6 +541,29 @@ relative (`Practitioner/<id>`) or under the facade's base, and carry nothing
 beside `reference`; the facade answers any other reference, and a role with
 no practitioner, with an error rather than dropping it. These rules are FerroBRIDGE's own design: no
 specification defines a FHIRconnect mapping rooted at a party.
+
+## `Composition/$document` assembles a document
+
+FHIR R4 defines `Composition/$document`
+(<https://hl7.org/fhir/R4/composition-operation-document.html>) and leaves the
+assembly to the server. For a Composition a loaded context maps, such as
+`Composition-eu-lab`, the facade reads the Composition as a read would and
+answers a Bundle of `type` `document`:
+
+- its `identifier` is a name-based UUID of the composition version the
+  content came from, so one version always names one document, and its
+  `timestamp` is the moment of assembly;
+- entry 0 is the Composition, and every resource the context's outbound run
+  creates follows it, in the order the run creates them, each with the URL a
+  read answers it at as its `fullUrl`.
+
+How the Bundle is assembled is FerroBRIDGE's own design. The server stores no
+document and reads no `GraphDefinition`, so `persist=true` and any `graph` are
+refused with a `400` `OperationOutcome` rather than ignored; `persist=false`
+is honoured. A Composition named by the URL of another server is refused the
+same way. The operation is declared on `Composition` in the
+`CapabilityStatement`. The R4 `OperationDefinition` describes the document as
+wrapped inside a search Bundle; the facade answers the document Bundle itself.
 
 ## `$validate` is a dry run of this server
 

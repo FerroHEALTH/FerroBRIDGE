@@ -20,6 +20,7 @@
 pub mod capability;
 pub mod commit;
 pub mod compartment;
+pub mod document;
 pub mod edge;
 pub mod ehr;
 pub mod engine;
@@ -430,7 +431,8 @@ impl Facade {
 ///
 /// Only what is implemented is mounted: the conformance statement, a
 /// type-level create and search (`GET` and `POST _search`), `$validate`, an
-/// instance read and update, a vread, and a system-level transaction. Batch has
+/// instance read and update, a vread, `Composition/$document`, and a
+/// system-level transaction. Batch has
 /// no route, so a request for it answers `404`
 /// (<https://hl7.org/fhir/R4/http.html>). `shape`
 /// says whether the same router serves the FHIRconnect operations, whether
@@ -467,6 +469,14 @@ pub fn routes(
         .route(
             &format!("{BASE_PATH}/{{resource_type}}/$validate"),
             post(handlers::validate_route),
+        )
+        .route(
+            &format!("{BASE_PATH}/{{resource_type}}/$document"),
+            get(handlers::document_type_route),
+        )
+        .route(
+            &format!("{BASE_PATH}/{{resource_type}}/{{id}}/$document"),
+            get(handlers::document_route),
         )
         .route(
             &format!("{BASE_PATH}/{{resource_type}}/{{id}}/_history/{{vid}}"),

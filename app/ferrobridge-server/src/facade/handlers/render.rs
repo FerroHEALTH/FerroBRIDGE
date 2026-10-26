@@ -218,6 +218,57 @@ pub(crate) async fn render_units(
     Ok(units)
 }
 
+/// Returns the resource `composition` maps to and every resource the
+/// outbound run creates beside it, of any type, in the order the run creates
+/// them, each decorated as [`render`] and [`render_created`] decorate them:
+/// the parts of a `Composition/$document` answer ([`crate::facade::document`]).
+///
+/// # Errors
+///
+/// The engine's refusal, the `500` of a created resource whose id is outside
+/// the R4 grammar, and the `500` of [`complete::refusal`].
+pub(crate) async fn render_document(
+    program: &Program,
+    index: &WebTemplateIndex,
+    composition: &CanonicalComposition,
+    origin: Origin<'_>,
+    session: &Session<'_>,
+) -> Result<(Rendered, Vec<Rendered>), Refusal> {
+    let resource_type = program.resource().as_str();
+    let (value, created, warnings) = produce(program, index, composition, &origin, session).await?;
+    let body = resource_object(value, resource_type)?;
+    let own = decorate(
+        body,
+        resource_type,
+        origin.id,
+        &origin,
+        Some(program.profile().url().as_str()),
+        warnings,
+    )?;
+    let mut parts = Vec::with_capacity(created.len());
+    for resource in created {
+        let Value::Object(body) = resource else {
+            continue;
+        };
+        let kind = body
+            .get("resourceType")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        let text = body.get("id").and_then(Value::as_str).unwrap_or_default();
+        let id = FhirResourceId::new(text).map_err(|error| {
+            reply::refusal(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Issue::error(IssueType::Exception).diagnosing(format!(
+                    "a {kind} the mapping created carries an id outside the R4 grammar: {error}"
+                )),
+            )
+        })?;
+        parts.push(decorate(body, &kind, &id, &origin, None, Vec::new())?);
+    }
+    Ok((own, parts))
+}
+
 /// Runs the outbound mapping, binding every resource it creates under the
 /// entry's own resource.
 ///

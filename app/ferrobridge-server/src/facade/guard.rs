@@ -61,6 +61,8 @@ pub enum Interaction {
     History,
     /// `POST [base]/{type}/$validate`.
     Validate,
+    /// `GET [base]/Composition/[id]/$document` and its type-level form.
+    Document,
     /// `GET [base]/{type}` and `POST [base]/{type}/_search`.
     Search,
     /// `POST [base]` carrying a `transaction` Bundle, and the route itself.
@@ -99,7 +101,7 @@ impl Interaction {
             Self::Search => "search-type",
             Self::Transaction => "transaction",
             Self::Batch => "batch",
-            Self::Operation => "operation",
+            Self::Operation | Self::Document => "operation",
             Self::Discovery => "smart-configuration",
             Self::Unclassified => "unclassified",
         }
@@ -125,7 +127,7 @@ impl Interaction {
         match self {
             Self::Capabilities | Self::Discovery => Requirement::Public,
             Self::Create => fhir(Permission::Create),
-            Self::Read | Self::Vread | Self::History => fhir(Permission::Read),
+            Self::Read | Self::Vread | Self::History | Self::Document => fhir(Permission::Read),
             Self::Update => fhir(Permission::Update),
             Self::Delete => fhir(Permission::Delete),
             Self::Search => fhir(Permission::Search),
@@ -156,7 +158,7 @@ impl Interaction {
 /// [`Interaction::Unclassified`], which a guarded deployment refuses, so a
 /// route mounted without a classification fails closed (no specification
 /// governs the table: our own design).
-pub const CLASSIFIED: [(Method, &str, Interaction); 16] = [
+pub const CLASSIFIED: [(Method, &str, Interaction); 18] = [
     (Method::GET, "/metadata", Interaction::Capabilities),
     (Method::GET, SMART_CONFIGURATION, Interaction::Discovery),
     (Method::POST, "", Interaction::Transaction),
@@ -171,6 +173,16 @@ pub const CLASSIFIED: [(Method, &str, Interaction); 16] = [
         Method::POST,
         "/{resource_type}/$validate",
         Interaction::Validate,
+    ),
+    (
+        Method::GET,
+        "/{resource_type}/$document",
+        Interaction::Document,
+    ),
+    (
+        Method::GET,
+        "/{resource_type}/{id}/$document",
+        Interaction::Document,
     ),
     (Method::GET, "/{resource_type}/{id}", Interaction::Read),
     (Method::PUT, "/{resource_type}/{id}", Interaction::Update),
@@ -227,6 +239,7 @@ pub fn classify(method: &Method, template: &str, path: &str) -> Option<Classifie
     let second = segments.next().map(str::to_owned);
     let (resource_type, id) = match interaction {
         Interaction::Create | Interaction::Search | Interaction::Validate => (first, None),
+        Interaction::Document => (first, second.filter(|segment| segment != "$document")),
         Interaction::Read
         | Interaction::Update
         | Interaction::Vread

@@ -904,6 +904,16 @@ expression is a load error: the reference CDR's connector let `where()` and
 - **Requests speak FHIR media types.** `application/fhir+json` is accepted and
   produced; `application/json` is accepted; anything else is `415`. A
   malformed `_count` is `400 invalid`, never ignored.
+- **`Composition/$document` answers a document Bundle.** `GET
+  [base]/Composition/[id]/$document`, and the type-level form with `id`
+  (R4 `OperationDefinition` `Composition-document`), reads the Composition as
+  a read does and answers a Bundle of `type` `document`: an `identifier`
+  derived from the composition version, the assembly `timestamp`, entry 0 the
+  Composition and then every resource the context's outbound run creates,
+  each with its read URL as `fullUrl`. The assembly is our own design
+  (`facade::document`); `persist=true` and `graph` are refused, never
+  ignored. A context whose start is a composition model binds the composition
+  itself as its one entry, under the path `/`.
 - **`$validate` is a dry run that commits nothing.** `POST [base]/{type}/$validate`
   runs the full inbound path (program selection, mapping, composition build,
   the CDR's own template validation through a commit the bridge never

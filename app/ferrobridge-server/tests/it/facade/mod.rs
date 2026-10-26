@@ -15,6 +15,7 @@ mod conditional;
 mod created;
 mod credentials;
 mod demographic;
+mod document;
 mod ehr_status;
 mod examples;
 mod linked;

@@ -11,6 +11,7 @@
 //! (<https://hl7.org/fhir/R4/http.html#vread>). Both answer `Last-Modified`
 //! from the commit time the CDR's revision history records for the version.
 
+use fhir_types::codec::Value;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
@@ -96,6 +97,98 @@ pub(crate) async fn read(
         &answer_headers(&version, modified),
     ))
 }
+
+/// `GET [base]/Composition/[id]/$document`: the document Bundle of one
+/// mapped Composition (<https://hl7.org/fhir/R4/composition-operation-document.html>).
+///
+/// The Composition is read as an instance read reads it, and every resource
+/// its context's outbound run creates follows it in the Bundle
+/// [`crate::facade::document`] assembles. The caller needs read on every
+/// type the Bundle carries, as a read of each would. A Composition that
+/// another resource's mapping creates has no context of its own to run, so it
+/// is refused (no specification governs either rule: our own design).
+pub(crate) async fn document(
+    facade: &Facade,
+    access: &ferrohealth_smart::resource::Access,
+    client: &CdrClient,
+    id: &str,
+    headers: &HeaderMap,
+    uri: &Uri,
+) -> Result<axum::response::Response, Refusal> {
+    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
+    crate::facade::handlers::supported(facade, COMPOSITION)?;
+    let internal = internal_id(id)?;
+    let binding =
+        binding(facade, COMPOSITION, &internal)?.ok_or_else(|| unknown(COMPOSITION, id))?;
+    if binding.created.is_some() {
+        return Err(reply::refusal(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Issue::error(IssueType::NotSupported).diagnosing(format!(
+                "Composition/{id} is created by another resource's mapping, so no Composition context assembles its document"
+            )),
+        ));
+    }
+    let program = &program_of(facade, &binding)?;
+    let ehr_id = binding
+        .ehr(&internal)
+        .map_err(|error| stored_identifier(&error))?;
+    let container = binding
+        .container(&internal)
+        .map_err(|error| stored_identifier(&error))?;
+    let (version, composition) =
+        fetch(facade, client, &ehr_id, &container, &binding.template_id).await?;
+    let composition = entry_view(program, &composition, &binding, &internal)?;
+    let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
+    let subject = render::subject_of(facade, &ehr_id)?;
+    let (own, created) = render::render_document(
+        program.program(),
+        program.index(),
+        &composition,
+        render::Origin {
+            id: &internal,
+            version: &version,
+            source: &source,
+            subject: subject.as_ref(),
+            store: facade.store(),
+            usage: facade.usage(),
+            demographics: facade.demographics(),
+        },
+        &facade.translator().session(),
+    )
+    .await?;
+    render::log_outcome(&own);
+    let kinds: std::collections::BTreeSet<&str> = created
+        .iter()
+        .filter_map(|rendered| rendered.body.get("resourceType").and_then(Value::as_str))
+        .collect();
+    for kind in kinds {
+        crate::facade::compartment::admit_ehr(
+            facade,
+            access,
+            ferrohealth_smart::scope::Permission::Read,
+            kind,
+            &ehr_id,
+        )?;
+    }
+    let base = url::Url::parse(&facade.settings().base_url).map_err(|error| {
+        reply::refusal(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Issue::error(IssueType::Exception)
+                .diagnosing(format!("the facade base URL does not parse: {error}")),
+        )
+    })?;
+    let bundle = crate::facade::document::assemble(crate::facade::document::Parts {
+        composition: own.body,
+        created: created.into_iter().map(|rendered| rendered.body).collect(),
+        base: &base,
+        source: &source,
+        timestamp: &jiff::Timestamp::now().to_string(),
+    });
+    Ok(reply::resource(StatusCode::OK, &bundle, &[]))
+}
+
+/// The one type `$document` is defined on.
+pub(crate) const COMPOSITION: &str = "Composition";
 
 /// `GET [base]/{type}/{id}/_history/{vid}`.
 ///
