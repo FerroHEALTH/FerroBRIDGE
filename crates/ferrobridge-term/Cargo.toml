@@ -4,7 +4,7 @@
 name = "ferrobridge-term"
 description = "The FerroBRIDGE FHIR terminology client for $lookup, $translate, $validate-code, $expand and $subsumes"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.138"
+version = "0.1.139"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

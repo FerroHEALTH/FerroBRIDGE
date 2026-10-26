@@ -99,6 +99,10 @@ crates on crates.io.
 
 ### Changed
 
+- **`ferrobridge-term` 0.1.139 requires `ferrohealth-smart` 0.7.4 as a caret
+  requirement** in place of an exact pin, so a smart patch reaches a product
+  through its lockfile without a release of this line first. The products
+  keep pinning `ferrobridge-term` exactly.
 - **`ferrohealth-smart` 0.7.3** for the workspace and `ferrobridge-term`'s
   `smart` feature (`ferrobridge-term` 0.1.138, with `ferrobridge-hl7v2`
   0.1.155 and `ferrobridge-validator` 0.1.138). It renders every secret and
