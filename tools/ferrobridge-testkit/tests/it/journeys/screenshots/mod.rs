@@ -59,6 +59,13 @@ mod catalogue;
 /// The environment variable that opts in to the capture.
 const SCREENSHOTS_GATE: &str = "FERROBRIDGE_SCREENSHOTS";
 
+/// The loopback port of the bridge the book's pages are captured from, fixed
+/// so the address the pages draw is the same every run.
+const BRIDGE_PORT: u16 = 47180;
+
+/// The loopback port of the bridge whose operations lane is off.
+const BRIDGE_PORT_OFF: u16 = 47181;
+
 /// The book's folder of console screenshots, from the workspace root.
 const IMAGES: &str = "website/book/src/operate/img/console";
 
@@ -417,14 +424,16 @@ async fn the_book_shows_every_console_page_in_light_and_dark() -> Result<(), Box
     // made is not on another pass's pages.
     for width in [Width::Wide, Width::Narrow] {
         for theme in [Theme::Light, Theme::Dark] {
-            let stack = Stack::start().await?;
-            let off = Stack::start_with(Lanes::WithoutOperations).await?;
+            let stack = Stack::capture(Lanes::All, BRIDGE_PORT).await?;
+            let off = Stack::capture(Lanes::WithoutOperations, BRIDGE_PORT_OFF).await?;
             with_browser(async |browser| {
                 window(browser, width, HEIGHT).await?;
                 every_page(browser, &stack, (theme, width)).await?;
                 lane_off(browser, &off, (theme, width)).await
             })
             .await?;
+            stack.stop().await?;
+            off.stop().await?;
         }
     }
     std::fs::write(

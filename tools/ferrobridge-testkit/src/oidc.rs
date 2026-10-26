@@ -89,6 +89,20 @@ impl Provider {
     /// Returns [`ProviderError`] when the key pair cannot be generated or
     /// described.
     pub async fn start() -> Result<Self, ProviderError> {
+        Self::serve(MockServer::start().await).await
+    }
+
+    /// Starts a provider as [`Self::start`] does, its server listening on
+    /// `listener`, so its issuer identifier names the same port every run.
+    ///
+    /// # Errors
+    /// As [`Self::start`].
+    pub async fn start_on(listener: std::net::TcpListener) -> Result<Self, ProviderError> {
+        Self::serve(MockServer::builder().listener(listener).start().await).await
+    }
+
+    /// The provider on `server`, its key generated and its metadata published.
+    async fn serve(server: MockServer) -> Result<Self, ProviderError> {
         let pkcs8 =
             EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &SystemRandom::new())
                 .map_err(|_unspecified| ProviderError::Generate)?;
@@ -99,7 +113,7 @@ impl Provider {
         jwk.common.public_key_use = Some(PublicKeyUse::Signature);
         jwk.common.key_algorithm = Some(KeyAlgorithm::ES256);
         let provider = Self {
-            server: MockServer::start().await,
+            server,
             encoding,
             jwk,
         };
