@@ -1161,6 +1161,11 @@ dispense context maps the ACTION at its careflow step at0003 "Prescription
 dispensed" to a `MedicationDispense-eu-mpd`, each references a
 `Medication-eu-mpd` built from the medication details, and the dosage is a
 `Dosage-eu-mpd`; the round trips assert each profile's elements.
+`medicalTestResult-eu-core` follows over the same `KDS_Laborbericht`
+template: the laboratory test result is the Observation, with each analyte a
+member `Observation-resultslab-eu-lab` it references, and the result's status
+travels through the codes the R4 diagnostic-report-status and
+observation-status code systems share.
 
 **Decision:** profile mappings are authored in this repository, in the
 specification's own customisation mechanism (a context and its extensions per
