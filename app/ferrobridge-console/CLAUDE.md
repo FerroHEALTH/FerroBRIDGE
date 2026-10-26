@@ -12,7 +12,9 @@ crate.
   module for one half carries `#[cfg(target_arch …)]`.
 - **The boundary is a test.** The server half links `openehr-mapping-core`,
   `fhir-types` (`r4`) and `ferrobridge-operator-api` of the workspace and
-  nothing else; the browser half links none. The bridge's health and
+  nothing else; the browser half `openehr-mapping-core` and
+  `ferrobridge-operator-api` alone, never the FHIR model (a page draws the
+  contract's `capability::Capability`, which the server reduces). The bridge's health and
   operator documents decode into the contract crate's types, never by field
   name. `tests/it/boundary.rs` walks the graph `cargo metadata`
   resolves, and its injected-edge cases prove it refuses another crate. A
@@ -32,14 +34,23 @@ crate.
   line; `tests/it/sign_in.rs` and `tests/it/refresh.rs` read the captured
   log and the page for each. Sign-in, refresh and sign-out are tested
   against the test OpenID Provider of `ferrobridge_testkit::oidc`.
-- **Islands mode, no server function.** The page tree is server-only; the
-  browser half compiles `islands` alone (`MappingEditor`, `JsonInput`, both
-  `#[island(lazy)]`, and the library's islands). Every action is a plain
-  form post (`prefs`, `posts`) that checks the session first and answers
-  with the page `server::render` draws, the outcome in context;
-  `tests/it/forms.rs` lists every post, holds each to a live session from
-  the console's own pages, and asserts no server function is registered.
-- **A view draws with `ferrohealth-ui`** (FerroUI, pinned `=0.3.6`): its
+- **The whole page hydrates; every page after the first is drawn in the
+  browser.** `app::App` runs in both halves from one `visit::Visit` (the
+  session, the operator, the preference cookies without the session's, the
+  locale), which the browser takes as a `SharedValue` and asks for again
+  after each navigation and post (`visit::FollowVisit`). The pages sit in
+  five lazy route groups (`routes`), each drawing the page its address
+  names as the address changes. A read is a server function under a
+  `Resource` keyed on `load::changes` (`load`); an action keeps its form
+  post to its own axum route, which answers with the page `server::render`
+  draws (the page with no WebAssembly), and once hydrated the form's
+  `on:submit` sends the same work through its server function (`actions`).
+  Every server function checks the session before it asks the bridge;
+  `tests/it/forms.rs` lists every post and every server function, holds
+  each to a live session from the console's own pages, and asserts the
+  registered set. A component that shares state with the page (the mapping
+  editor, the playground's input) lives in `editors`.
+- **A view draws with `ferrohealth-ui`** (FerroUI, pinned `=0.5.0`): its
   templates, components and brand theme (`BRAND.theme()`), never a local
   copy or override; a gap is a FerroUI issue and a `TODO(#N)` naming its tracking issue here. Each
   preference is the server's, drawn from its own cookie

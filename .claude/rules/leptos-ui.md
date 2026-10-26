@@ -8,21 +8,20 @@ paths: ["app/ferrobridge-console/**"]
 # Leptos console rules (`app/ferrobridge-console`, and any Leptos code)
 
 **FerroUI leads the UI.** The console draws with `ferrohealth-ui`, pinned
-exactly in the root `[workspace.dependencies]` (today `=0.3.6`, with
-its `split` feature on in the console crate), and the
+exactly in the root `[workspace.dependencies]` (today `=0.5.0`), and the
 FerroUI repository (FerroHEALTH/FerroUI) is the source for its components,
 design, tokens, icons, accessibility bar, interaction contract, words and
 quality control. Read these first, at the git tag that matches the pin
-(today `v0.3.6`):
+(today `v0.5.0`):
 
-- [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.6/docs/consoles.md):
+- [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.0/docs/consoles.md):
   the consumer guide, how a console uses the library.
-- [`.claude/rules/leptos-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.6/.claude/rules/leptos-ui.md):
+- [`.claude/rules/leptos-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.0/.claude/rules/leptos-ui.md):
   the component rules of every FerroHEALTH console. The section numbers this
-  file cites (FerroUI §N) are those of the `v0.3.6` copy.
-- [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.6/crates/ferrohealth-ui/CLAUDE.md):
+  file cites (FerroUI §N) are those of the `v0.5.0` copy.
+- [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.0/crates/ferrohealth-ui/CLAUDE.md):
   the crate's own discipline.
-- [`design/consoles/ferrobridge/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.3.6/design/consoles/ferrobridge):
+- [`design/consoles/ferrobridge/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.5.0/design/consoles/ferrobridge):
   this console's pages, at 1440 and 390 pixels in both themes, which the
   screenshots are checked against.
 
@@ -33,7 +32,9 @@ four-layer interaction contract, the templates and components of
 and is never synced from. The console moved to 0.3.3 with #1154, which
 drew the parts the rollout had found missing (#1146), and to 0.3.4 with
 #1155, which drew the flow's last two (its glyphs and How it is drawn), and to 0.3.5 with #1166 and 0.3.6 with #1168, which it
-follows with no change of its own. A component this console needs and the library
+follows with no change of its own. It moved to 0.5.0 with #1256, which
+hydrates the whole page and draws every page after the first in the
+browser (FerroUI #410). A component this console needs and the library
 lacks, or a component that behaves wrongly, is an issue filed in
 FerroHEALTH/FerroUI and linked from the work here: never a local copy, a
 shadow component, a stylesheet override or a hand-written script in this
@@ -49,22 +50,23 @@ every Leptos question is the official Leptos book
 never memory; citations below are book chapters (`view/04_iteration`,
 `ssr/23_ssr_modes`) and pinned crate documentation.
 
-**The console runs in Leptos islands mode** (the book's "Guide: Islands"),
-with a backend-for-frontend (BFF) on the same server, built by cargo-leptos
-with `--split`, which is why the console turns on `ferrohealth-ui`'s `split`
-feature (FerroUI `docs/consoles.md`, "How a console builds"). The server
-draws every page whole; the browser hydrates the
-islands alone: the library's (the menus, the search, the dialogs) and the
-console's two, `MappingEditor` and `JsonInput`, both `#[island(lazy)]` so
-each loads in a chunk of its own. The page tree (`app`, `shell`, `pages`)
-is server-only and compiles for the host alone. The two halves are chosen by
-**compilation target, never by Cargo feature**: the host build is the server
-half (`leptos/ssr`, axum, the bridge client), the `wasm32-unknown-unknown`
-build is the browser half (`leptos/hydrate`, `islands`). The
-crate has no `ssr` or `hydrate` feature, so a workspace `--all-features`
-build never turns both on. A change that brings back an `ssr`/`hydrate`
-feature pair is an architecture change, returned to the orchestrator, never
-made in a slice.
+**The console hydrates the whole page** (FerroUI `docs/consoles.md`, "How a
+console builds", and FerroUI §15), with a backend-for-frontend (BFF) on the
+same server, built by cargo-leptos with `--split`. The server draws the
+first page, the browser takes the whole tree over (`hydrate_lazy`) and
+draws every page after it, so no link, tab, search or action reloads the
+document; the browser's back and forward walk the pages it drew. The pages
+sit in five lazy route groups (`crate::routes`: Overview, Mappings,
+Workbench, Bridge, Console), each a chunk of its own that a page loads the
+first time it draws one of its pages and `widget::prefetch::routes` loads
+while the browser is idle. The two halves are chosen by **compilation
+target, never by Cargo feature**: the host build is the server half
+(`leptos/ssr`, axum, the bridge client), the `wasm32-unknown-unknown`
+build is the browser half (`leptos/hydrate`). Neither turns on the
+`leptos` feature `islands`. The crate has no `ssr` or `hydrate` feature, so
+a workspace `--all-features` build never turns both on. A change that
+brings back an `ssr`/`hydrate` feature pair is an architecture change,
+returned to the orchestrator, never made in a slice.
 
 ## 0. The mandates (absolute)
 
@@ -80,10 +82,12 @@ made in a slice.
   through `crate::bridge`, server to server. Of the workspace's own crates
   the server half links `openehr-mapping-core` (the `Diagnostic` a check
   answers), `fhir-types` with `r4` (the `OperationOutcome` and the
-  `CapabilityStatement` it renders) and `ferrobridge-operator-api` (the
+  `CapabilityStatement` it reads) and `ferrobridge-operator-api` (the
   bridge's health and operator documents, which the bridge serializes with
   the same types) and nothing else; the browser half links
-  none and receives its islands' props in the page the server draws. `tests/it/boundary.rs`
+  `openehr-mapping-core` and `ferrobridge-operator-api` alone, never the
+  FHIR model: a page draws the contract's `capability::Capability`, the
+  facade's `CapabilityStatement` the server reduced. `tests/it/boundary.rs`
   walks the resolved graph and fails on any other workspace crate, so the
   console never compiles, transforms or saves a mapping itself: every check,
   transform and save goes through the bridge. A screen that needs what the
@@ -103,17 +107,27 @@ made in a slice.
   path segment or a query parameter the router or the browser keeps, and a
   test over the rendered output and the request log proves it for each
   screen that takes one.
-- **No server function; every action is a plain form post.** A page's
-  form posts to an axum route of `prefs` or `posts`, which checks the
-  session itself before it touches the bridge or session state, and answers
-  with a redirect (a preference) or with the page drawn again by
+- **Every action works with no WebAssembly, and reloads nothing with it.**
+  A page's form posts to an axum route of `prefs` or `posts`, which checks
+  the session itself before it touches the bridge or session state, and
+  answers with a redirect (a preference) or with the page drawn again by
   `server::render` with the outcome in context (a reload, a check, a save, a
-  run). Every action works before any WebAssembly arrives. The server's
-  same-origin check passes safe methods only, so an action is never a
-  `GET`. `tests/it/forms.rs` lists every post and holds each to a live
-  session from the console's own pages before it asks the bridge or sets a
-  cookie, and asserts `server_fn_paths()` is empty. A new post joins that
-  list in the change that adds it.
+  run): that is the page with no WebAssembly. Once the page has hydrated,
+  the form's own `on:submit` prevents the browser's post and sends the same
+  work through its server function in `crate::actions` (`reload`, `edit`,
+  `run`), and the page draws the answer in place; a preference form is the
+  library's, marked `widget::submit::NAVIGATES`, which `FormNavigator`
+  posts in the background. The form keeps its route as `action`, because
+  the console answers `Referrer-Policy: no-referrer`, so a plain post to a
+  server function's own address could not be sent back to its page. Every
+  read is a server function of `crate::load`, and the visit (`crate::visit`)
+  one more. Every server function checks the session before it asks the
+  bridge, and the same-origin check refuses an unsafe method from anywhere
+  else. `tests/it/forms.rs` lists every post and every server function,
+  holds each to a live session from the console's own pages, asserts the
+  registered set, and holds the visit to carry no session cookie and no
+  token. A new post or server function joins those lists in the change
+  that adds it.
 
 ## 1. Crate and build discipline
 
@@ -123,11 +137,13 @@ made in a slice.
   for one half only carries the matching `#[cfg(target_arch …)]`. Keep the
   lib compiling for `wasm32-unknown-unknown` at all times: the CI `console`
   job runs clippy on that target.
-- **A server function is an architecture change**, returned to the
-  orchestrator: the console's actions are form posts (§0).
-- **WebAssembly is 32-bit: never `usize`/`isize` in an island's props or in
-  any serialized shared type.** Fixed-size integers only (`server/25`
-  quirks).
+- **A new server function is a reviewed change**: it reads through
+  `crate::load` or acts through `crate::actions`, checks the session first,
+  and joins `tests/it/forms.rs` (§0). Its answer is `no-store`, as every
+  answer outside `/pkg/` is.
+- **WebAssembly is 32-bit: never `usize`/`isize` in a serialized shared
+  type** (a server function's arguments and answer, the visit, a
+  `SharedValue`). Fixed-size integers only (`server/25` quirks).
 - Signals hold `Send + Sync` values, because the server renders on a
   multi-threaded tokio runtime. The `_local` variants (`signal_local`,
   `LocalResource`, `Action::new_local`) are only for genuinely `!Send`
@@ -206,27 +222,43 @@ with its label's `for`, a `<textarea>` filled through `prop:value` alone
 clinical content. What is particular here:
 
 - Every form is a plain `<form method="post">` to its own route, drawn
-  whole on the server with its values, and works with no WebAssembly. An
-  island inside it (the editor's text area, the playground's input) is a
-  real control with its `name`, so the browser posts what it holds.
+  whole on the server with its values, and works with no WebAssembly. Once
+  hydrated its `on:submit` reads the form with `FromFormData::from_event`,
+  the submitter's `name` and `value` included, and dispatches the action's
+  server function; a form that does not read falls through to the
+  browser's post. A component inside it (the editor's text area, the
+  playground's input, `crate::editors`) is a real control with its `name`,
+  so the browser posts what it holds.
 - The decision of a form with several buttons is its submit button's
   `name="decision"` and `value` (the editor: `check`, `save`, `confirm`,
   `back`, `discard`), and the post draws the page again with the answer.
+  In the page, Discard follows the link back to the file, and every other
+  decision goes through the `edit` server function.
 - A text area submits its line breaks as CRLF (HTML Living Standard
-  §4.10.11); the editor's post reads the draft back with LF, so a save is
-  the bytes the editor showed.
+  §4.10.11); the editor's post and its server function read the draft back
+  with LF, so a save is the bytes the editor showed.
 - Parse user input yourself. `type="number"` is not validation.
 - The playground's composition or Bundle can carry a patient identifier, so
-  its form is a `POST` (§0).
+  its form is a `POST` (§0), and its server function takes it in the
+  request body.
+- A post sent before the WebAssembly arrives is drawn by the server with
+  its answer, and the page carries that answer as a `SharedValue`, so the
+  browser hydrates the page the server drew.
 
 ## 6. Async data (the BFF pattern)
 
-- A page reads the bridge on the server, in a `Suspense` over
-  `Suspend::new(async { … })`, through `crate::load`, whose per-request
-  `Reads` cache asks the bridge once for a document the shell and the page
-  both draw (`async/11_suspense`).
-- A mutation is a form post (§0), never a fetch from the browser.
-- Only the visible tab reads.
+- A page reads the bridge through a server function of `crate::load`
+  under a `Resource` it creates at its setup, never inside a `Suspend`
+  (§4), keyed on `load::changes`, and draws it in a `Suspense` over
+  `Suspend::new(async { … })` (`async/11_suspense`). In the server's own
+  render the server function is a plain call into `load::cached`, whose
+  per-request `Reads` cache asks the bridge once for a document the shell
+  and the page both draw; the resource's value reaches the browser with
+  the page, so hydration asks the bridge nothing.
+- A mutation is a form post (§0); in the page, its server function. After
+  a reload or a save the page counts a change (`load::changed`), and every
+  read keyed on `load::changes` asks again, the shell's included.
+- Only the visible tab reads: a tab's resources are created only on it.
 
 ## 7. The server half
 
@@ -237,8 +269,10 @@ clinical content. What is particular here:
   second client, a shadow type for a body the workspace already models, or a
   `reqwest` call from a page or a post (`.claude/rules/codegen.md`,
   `.claude/rules/spec-adherence.md`).
-- A post handler is thin: check the session, call `crate::bridge`, render.
-  Logic lives in plain modules with ordinary unit tests.
+- A post handler and a server function are thin: check the session, call
+  `crate::bridge`, render or answer. The two share their work (`posts`,
+  `pages::editor::answer`, `pages::playground::answer`), which lives in
+  plain modules with ordinary unit tests.
 - Errors are typed: the bridge's `StatusCode` and body are carried as data
   (`BridgeError::Refused`), and a non-2xx answer is never an empty value.
 - **An expected outcome is drawn as a page.** A read or a post yields a
@@ -248,9 +282,9 @@ clinical content. What is particular here:
   whose data it is. A caller branches on the three, so they are distinct
   types (`.claude/rules/reliability.md`, errors are types at a boundary that
   branches).
-- Shared state reaches a render through `leptos_routes_with_context` and
-  `provide_context`, and the plain axum handlers through `Extension`
-  (`server/26_extractors`).
+- Shared state reaches a render and a server function through
+  `leptos_routes_with_context` and `provide_context`, and the plain axum
+  handlers through `Extension` (`server/26_extractors`).
 - **The security headers are the server's**, on every answer: a
   Content-Security-Policy with a nonce minted per response and no
   `'unsafe-inline'` or `'unsafe-eval'` for scripts, `nosniff`, `DENY`
@@ -260,18 +294,33 @@ clinical content. What is particular here:
 
 ## 8. SSR and hydration correctness (`ssr/22` to `ssr/24`)
 
-- An island runs on both halves, so its server HTML and its hydrated view
-  must be identical. Never branch an island's view **structure** on
-  `cfg!(target_arch = "wasm32")`. Everything an island draws arrives as a
-  prop the server resolved, the words included.
-- Browser-only calls (`window`, storage, timers) go inside `Effect::new` in
-  an island; everything else is server-only.
+- The whole tree runs on both halves, so the server's HTML and the
+  hydrated view must be identical. Never branch a view's **structure** on
+  `cfg!(target_arch = "wasm32")`. What the server read of the request
+  reaches the browser through `crate::visit` (a `SharedValue`), never a
+  cookie or the request read on the server alone (FerroUI
+  `docs/consoles.md`, step 4); the visit carries the preference cookies and
+  never the session's.
+- Browser-only calls (`window`, storage, timers) go inside an `Effect`;
+  a form's `on:submit` runs in the browser alone.
+- A component that outlives a navigation in the page reads the address
+  reactively: the shell redraws its top bar and navigation as the path and
+  the visit change, and a route group draws the page its address names as
+  the address changes (`crate::routes`).
 - Valid HTML and a deterministic first render are FerroUI §4; hydration
-  walks the DOM, so a breach of either is a hydration error here.
+  walks the DOM, so a breach of either is a hydration error here. A view
+  handed to a library slot that wraps it already (the error page's body is
+  `<p>{body}</p>`) is text, never a second `<p>`. The journeys catch a
+  mismatch as a browser panic; run them against the debug bundle
+  (`scripts/release/console-site.sh` without `--release`), which names the
+  element, when one fails.
 - **A route whose content comes from the bridge renders `SsrMode::Async`**
   (`ssr/23_ssr_modes`): the server waits for every resource and sends the
   whole page, so nothing arrives in a `<template>` for an inline script to
   swap in, and the page reads with no script.
+- The crate's `[package.metadata.leptos]` sets
+  `disable-erase-components = true`, so a dev build keeps its component
+  types in the browser half as the server half does and hydrates.
 - `leptos_meta` (`<Title>`, `<Stylesheet>`, `<Meta>`) is used from component
   bodies, never by editing the shell's `<head>` by hand (`metadata`). Every
   routed page sets a `<Title>`.
@@ -286,7 +335,12 @@ clinical content. What is particular here:
 - Filter, search and pagination state lives in the URL (`router/20_form`),
   except a value that can identify a patient (§0).
 - A param a same-route navigation can change is read reactively, never
-  `get_untracked` at setup.
+  `get_untracked` at setup. A page of a route group may read its params at
+  setup, because its group draws it again whenever the path or the query
+  changes (`crate::routes`).
+- A link to an axum route the router must not follow (the sign-in, a
+  download) carries `rel="external"` or `download`, as the library's own
+  links do; the router leaves both to the browser.
 
 ## 10. Accessibility
 
@@ -327,7 +381,12 @@ here, checked per slice:
   logs. A new screen or route gets its journey and its light and dark
   screenshots (`FERROBRIDGE_SCREENSHOTS=1`, shown on the book's operator
   console page) in the same change; the screenshot guard of the ordinary
-  suite fails on a route without both.
+  suite fails on a route without both. `journeys::navigation` marks the
+  window and holds a followed link, the search's `GET` form, a form post,
+  and the browser's back and forward to the same document, and shows its
+  mark is lost on a real load. `journeys::no_wasm` refuses the browser the
+  bundle and holds every navigation entry and a form post to their pages
+  with nothing hydrated (FerroUI §15.7).
 - **Never weaken a gate to make a change pass.** A failing wasm32 clippy pass
   usually means a dependency cannot compile for the browser, which is the
   gate working.
@@ -344,15 +403,29 @@ changes here and nowhere else.
 
 | Measure | Budget |
 |---|---|
-| WebAssembly, brotli-compressed | 458752 bytes |
+| WebAssembly, brotli-compressed | 661504 bytes |
 
 - **The gating number is the brotli-compressed WebAssembly the page loads
   first.** The book's `deployment/binary_size` chapter has a site serve its
   WebAssembly compressed, every current browser accepts brotli, and the
   compressed size is the download. The raw and gzip sizes are reported beside
-  it, ungated, and so are the lazy island chunks `--split` writes, which a
-  page loads only when it draws that island.
-- **The budget is 448 KiB.** The move to FerroUI 0.3.6 (#1168, 2026-10-24,
+  it, ungated, and so are the lazy route chunks `--split` writes, which a
+  page loads the first time it draws a page of that group, or earlier while
+  the browser is idle.
+- **The budget is 646 KiB**, a quarter over the 528557 bytes the move to
+  FerroUI 0.5.0 measured (#1256, 2026-10-26, cargo-leptos 0.3.11,
+  wasm-bindgen 0.2.129, wasm-opt 133, Rust 1.99.1): whole-page hydration
+  puts the renderer, the reactive graph, the router, the shell, the visit
+  and the reads' serde in the entry, and every data segment stays there,
+  since `--split` moves code alone. The five route groups measured 61656
+  (Bridge), 57221 (Console), 85562 (Mappings), 97004 (Overview) and 150861
+  (Workbench, with the code editor), and the 25 chunks they share 301372.
+  With About alone converted the entry measured 467850; carrying fhir-types
+  R4 to the browser for the `CapabilityStatement` measured 583098, its
+  regex's Unicode tables in the entry, so the facade and the playground draw
+  the operator contract's reduced `capability::Capability`. FerroUI's own
+  gallery, hydrated whole, measures 483968. Before it, 448 KiB was the
+  islands-mode budget. The move to FerroUI 0.3.6 (#1168, 2026-10-24,
   the same tools) measured 323191 bytes for the entry, 70% of it, with
   294668 more in the lazy chunks: 221197 in the five `split_*` files and
   73471 in the thirteen `chunk_*` files. The move to FerroUI 0.3.5 (#1166, 2026-10-24,
@@ -498,8 +571,11 @@ catalog file with no code change. What is particular here:
   else the best language of `Accept-Language` the catalog holds, else
   `[server] locale`. `App` provides it with
   `ferrohealth_ui::i18n::provide_locale`, so the console's words and the
-  library's switch together, the document writes it as `<html lang>`, and an
-  island receives its words resolved as props.
+  library's switch together, and the document writes it as `<html lang>`.
+  The browser takes the same choice from the visit (`crate::visit`) and
+  provides it as well; the console's catalog is embedded in both halves.
+  A language chosen in Your preferences loads the page as a document, since
+  every word of a page is drawn in its locale.
 - Numbers go through the `format_number` formatter registered in the
   `static_loader!` customise hook, with the catalog's `number-group` and
   `number-decimal` messages.

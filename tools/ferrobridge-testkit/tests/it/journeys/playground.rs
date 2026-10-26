@@ -3,8 +3,8 @@
 
 //! The playground against the running bridge: a `$toopenehr` the bridge
 //! answers, a `$tofhir` it refuses, and a bridge whose operations lane is
-//! off. Each run is a plain form post the page answers; what the operator
-//! entered reaches no URL.
+//! off. Each run is the playground's form, which the page answers in place;
+//! what the operator entered reaches no URL.
 
 use std::error::Error;
 
@@ -34,15 +34,15 @@ pub(crate) fn bundle() -> Result<String, Box<dyn Error>> {
     }))?)
 }
 
-/// The user menu's button once its island runs: it says whether the menu is
-/// open only then.
+/// The user menu's button once the page has hydrated: it says whether the
+/// menu is open only then.
 const HYDRATED: &str = "//button[@aria-controls = 'user-menu-menu' and @aria-expanded]";
 
 /// The id of the playground's run button.
 const RUN: &str = "pg-run";
 
-/// Waits for the page's islands to hydrate, which the user menu's island
-/// shows by saying whether its menu is open.
+/// Waits for the page to hydrate, which the user menu shows by saying
+/// whether its menu is open.
 pub(crate) async fn hydrated(browser: &Browser) -> Result<(), Box<dyn Error>> {
     browser.element(By::XPath(HYDRATED)).await?;
     Ok(())

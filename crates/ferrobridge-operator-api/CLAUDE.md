@@ -4,8 +4,8 @@
 # ferrobridge-operator-api
 
 The contract of the bridge's health and operator documents, shared by
-`ferrobridge-server`, which serializes them, and the server half of
-`ferrobridge-console`, which decodes them (`docs/architecture.md` §4.10).
+`ferrobridge-server`, which serializes them, and `ferrobridge-console`,
+which decodes them in both its halves (`docs/architecture.md` §4.10).
 
 - **Serde types and nothing else.** No HTTP, no I/O, no logic beyond a
   constructor a type needs. Behaviour stays in the server; a status code a
@@ -16,5 +16,10 @@ The contract of the bridge's health and operator documents, shared by
   `skip_serializing_if`, so the wire stays what it was.
 - **Diagnostics are `openehr_mapping_core::diagnostic::Diagnostic`.** Never
   a local diagnostic shape (`.claude/rules/codegen.md`).
-- **The console links this crate on its server half alone**, which
-  `app/ferrobridge-console/tests/it/boundary.rs` holds.
+- **It compiles for `wasm32-unknown-unknown`**: the console draws these
+  documents in its browser half too, which
+  `app/ferrobridge-console/tests/it/boundary.rs` holds and the CI `console`
+  lane checks. A dependency that does not build for the browser is refused.
+- **`capability` is the one document the bridge does not write**: the
+  console's server reduces the facade's R4 `CapabilityStatement` to it, so
+  the FHIR model stays out of the browser.

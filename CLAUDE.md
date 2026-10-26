@@ -120,14 +120,19 @@ the testkit tool crate. Beside it:
   at entry. `src/mappings/compile.rs` is the one FHIRconnect load path the
   lanes, `mapping check` and the reload share (#725).
 - `app/ferrobridge-console`: the operator console (#599, `docs/architecture.md`
-  §4.10), its own binary `ferrobridge-console`: a Leptos app in islands mode
-  on FerroUI 0.3.6 (the server draws each page, the browser hydrates its
-  islands, every action a plain form post), halves chosen by target, with `serve`, `config check`
+  §4.10), its own binary `ferrobridge-console`: a Leptos app on FerroUI
+  0.5.0 that hydrates the whole page (#1256): the server draws the first
+  page, the browser draws every page after it from five lazy route groups
+  (`src/routes.rs`), reads go through server functions (`src/load.rs`) and
+  each action is a form post with no WebAssembly and a server function once
+  hydrated (`src/actions.rs`), halves chosen by target, with `serve`, `config check`
   and `healthcheck`, the TOML configuration with `FERROBRIDGE_CONSOLE__`
   overrides and `_file` secrets, the nonce CSP and the other browser security
   headers, and the typed bridge client (`src/bridge/`). Its server half
   links only `openehr-mapping-core`, `fhir-types` and
-  `ferrobridge-operator-api` of the workspace and its browser half none, held by `tests/it/boundary.rs`; the CI `console` lane
+  `ferrobridge-operator-api` of the workspace and its browser half
+  `openehr-mapping-core` and `ferrobridge-operator-api` alone, held by
+  `tests/it/boundary.rs`; the CI `console` lane
   lints the wasm32 half and builds the site bundle against its budget
   (`.claude/rules/leptos-ui.md`). FerroUI (`ferrohealth-ui`, pinned exactly)
   leads its UI: its components, design and component rules come from the
@@ -149,7 +154,9 @@ the testkit tool crate. Beside it:
   Never hand-edited.
 - `crates/ferrobridge-operator-api`: the bridge's health and operator
   documents as serde types (#777), which the server writes and the operator
-  console reads, so the two sides compile against one definition.
+  console reads in both its halves, so the two sides compile against one
+  definition, with the facade's `CapabilityStatement` reduced to what the
+  console draws (`capability`).
 - `crates/openehr-mapping-core`: the half of the mapping foundation both
   languages share (#74): the header they standardize between them, the YAML
   loader with anchors and source positions, the registry by mapping name and

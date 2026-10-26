@@ -31,7 +31,7 @@ const ENTRIES: [(&str, &str, &str); 9] = [
     ("Dashboard", "/", "Dashboard"),
 ];
 
-/// Opens the user menu once its island runs.
+/// Opens the user menu once the page has hydrated.
 pub(crate) async fn open_user_menu(browser: &Browser) -> Result<(), Box<dyn Error>> {
     hydrated(browser).await?;
     browser
