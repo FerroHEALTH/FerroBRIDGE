@@ -99,6 +99,12 @@ crates on crates.io.
 
 ### Changed
 
+- **`ferrohealth-smart` 0.7.3** for the workspace and `ferrobridge-term`'s
+  `smart` feature (`ferrobridge-term` 0.1.138, with `ferrobridge-hl7v2`
+  0.1.155 and `ferrobridge-validator` 0.1.138). It renders every secret and
+  masked URL of the shared sections through `ferrohealth-secret`, the
+  family's one mask: a secret shows as `***` in place of `[redacted]`, and a
+  masked URL hides its query too.
 - The operator console takes FerroUI 0.5.1. Its shell is drawn once and
   follows the router, so the search's words and the navigation's scroll
   survive a link, and the user menu closes once one of its items is
