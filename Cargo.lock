@@ -1540,7 +1540,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.156"
+version = "0.1.157"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1632,7 +1632,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.1.138"
+version = "0.1.139"
 dependencies = [
  "async-trait",
  "backon",
@@ -1685,7 +1685,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.1.138"
+version = "0.1.139"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
@@ -1705,9 +1705,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-secret"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e41064ea7f807d837b9e61d4b8b493d426fb0da7570a915864f71b422d55d87e"
+checksum = "2e3ae7119d5b5d61931890e902125642d79baae5dc252525ee4bb2a28fbc5f49"
 dependencies = [
  "secrecy",
  "serde",
@@ -1717,9 +1717,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba3025630ed34cfafe8c48feeb571748c5356b2ad06d23671a8e294f37a8e8e5"
+checksum = "339de07221ad48e7c5193890d12d351c14293e8213210c9cef8372197c93025e"
 dependencies = [
  "argon2",
  "aws-lc-rs",
