@@ -200,8 +200,8 @@ pub mod cached {
     /// The bridge's build facts, pins and lanes, `GET /health/info`.
     ///
     /// # Errors
-    /// Returns [`ViewError::SignedOut`] without a live session, and the
-    /// console's other faults as their [`ViewError`].
+    /// Returns [`crate::model::ViewError::SignedOut`] without a live session, and the
+    /// console's other faults as their [`crate::model::ViewError`].
     pub async fn info() -> Loaded<Info> {
         let cell = reads().info;
         cell.get_or_init(|| async {
