@@ -72,6 +72,7 @@ pub mod session;
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {
     console_error_panic_hook::set_once();
+    ferrohealth_ui::widget::hydration::explain();
     // NOTE: leptos 0.8 `src/mount.rs`: `hydrate_lazy` runs this future and drops what
     // follows it; `hydrate_from_async` starts the executor itself.
     wasm_bindgen_futures::spawn_local(async {
@@ -85,8 +86,13 @@ pub fn hydrate() {
     });
 }
 
-/// Marks the root element `data-hydrated`, which a journey and the
-/// screenshot capture wait for before they act.
+/// Marks the root element `data-hydrated` once the page and its lazy route
+/// have hydrated, which a journey and the screenshot capture wait for before
+/// they act.
+///
+/// The library's `data-ferroui-hydrated` (`widget::hydration::mark`) comes
+/// from an `Effect` of the root component, which runs while a lazy route's
+/// chunk is still on its way, so it can land before the route has hydrated.
 #[cfg(target_arch = "wasm32")]
 fn mark_hydrated() {
     if let Some(root) = leptos::prelude::document().document_element()

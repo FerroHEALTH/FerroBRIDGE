@@ -70,21 +70,25 @@ pub fn console_lockup() -> AnyView {
 /// navigation and the footer, each part reading the bridge as it is drawn.
 #[must_use]
 pub fn shell(content: AnyView) -> AnyView {
-    let location = use_location();
-    let query = leptos_router::hooks::use_query_map();
+    // NOTE: FerroUI `docs/consoles.md`, "How a console builds", step 10: the shell
+    // is drawn once, and the navigation and the `back` of its forms follow the router.
+    ferrohealth_ui::widget::nav::follow_path();
+    let path = use_location().pathname.get_untracked();
+    let words = if path == crate::pages::search::SEARCH {
+        leptos_router::hooks::use_query_map()
+            .with_untracked(|query| query.get("q"))
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
     let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
     let state = Resource::new(crate::load::changes, |_| crate::load::state_now());
-    // NOTE: no specification governs this: our own design; the shell outlives a
-    // navigation in the page, so it reads the address and the visit as they change.
+    let drawn_at = path.clone();
     let bar = view! {
         <Suspense>
             {move || {
-                let path = location.pathname.get();
-                let words = if path == crate::pages::search::SEARCH {
-                    query.with(|query| query.get("q")).unwrap_or_default()
-                } else {
-                    String::new()
-                };
+                let path = drawn_at.clone();
+                let words = words.clone();
                 let visit = crate::visit::visit();
                 Suspend::new(async move {
                     let info = info.await;
@@ -97,7 +101,7 @@ pub fn shell(content: AnyView) -> AnyView {
     let nav = view! {
         <Suspense>
             {move || {
-                let path = location.pathname.get();
+                let path = path.clone();
                 let rail = crate::visit::visit().chosen().rail;
                 Suspend::new(async move {
                     let state = state.await;
@@ -117,8 +121,9 @@ pub fn shell(content: AnyView) -> AnyView {
     })
 }
 
-/// The top bar of the page at `path` in the visit `visit`, with the
-/// bridge's state from `info` and the search's `words`.
+/// The top bar of the shell drawn at `path` in the visit `visit`, with the
+/// bridge's state from `info` and the search's `words`; the theme choice's
+/// `back` follows the router from there.
 fn top_bar(
     info: &Loaded<ferrobridge_operator_api::health::Info>,
     path: &str,
@@ -224,8 +229,9 @@ pub fn error_count(state: &Loaded<EngineState>) -> Count {
     }
 }
 
-/// The navigation, the page at `path` marked and folded to its rail when
-/// `rail`, with the running load's count.
+/// The navigation of the shell drawn at `path`, folded to its rail when
+/// `rail`, with the running load's count; the page it marks follows the
+/// router from there.
 fn navigation(path: &str, rail: bool, state: &Loaded<EngineState>) -> AnyView {
     let entry = |href: &'static str, label: Msg, glyph: Glyph, exact: bool| Entry {
         href: Cow::Borrowed(href),

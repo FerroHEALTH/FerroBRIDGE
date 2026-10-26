@@ -8,20 +8,20 @@ paths: ["app/ferrobridge-console/**"]
 # Leptos console rules (`app/ferrobridge-console`, and any Leptos code)
 
 **FerroUI leads the UI.** The console draws with `ferrohealth-ui`, pinned
-exactly in the root `[workspace.dependencies]` (today `=0.5.0`), and the
+exactly in the root `[workspace.dependencies]` (today `=0.5.1`), and the
 FerroUI repository (FerroHEALTH/FerroUI) is the source for its components,
 design, tokens, icons, accessibility bar, interaction contract, words and
 quality control. Read these first, at the git tag that matches the pin
-(today `v0.5.0`):
+(today `v0.5.1`):
 
-- [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.0/docs/consoles.md):
+- [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.1/docs/consoles.md):
   the consumer guide, how a console uses the library.
-- [`.claude/rules/leptos-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.0/.claude/rules/leptos-ui.md):
+- [`.claude/rules/leptos-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.1/.claude/rules/leptos-ui.md):
   the component rules of every FerroHEALTH console. The section numbers this
-  file cites (FerroUI §N) are those of the `v0.5.0` copy.
-- [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.0/crates/ferrohealth-ui/CLAUDE.md):
+  file cites (FerroUI §N) are those of the `v0.5.1` copy.
+- [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.1/crates/ferrohealth-ui/CLAUDE.md):
   the crate's own discipline.
-- [`design/consoles/ferrobridge/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.5.0/design/consoles/ferrobridge):
+- [`design/consoles/ferrobridge/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.5.1/design/consoles/ferrobridge):
   this console's pages, at 1440 and 390 pixels in both themes, which the
   screenshots are checked against.
 
@@ -34,7 +34,10 @@ drew the parts the rollout had found missing (#1146), and to 0.3.4 with
 #1155, which drew the flow's last two (its glyphs and How it is drawn), and to 0.3.5 with #1166 and 0.3.6 with #1168, which it
 follows with no change of its own. It moved to 0.5.0 with #1256, which
 hydrates the whole page and draws every page after the first in the
-browser (FerroUI #410). A component this console needs and the library
+browser (FerroUI #410), and to 0.5.1, whose shell is drawn once
+and follows the router (`widget::nav::follow_path`) and whose
+`widget::hydration` marks and explains the hydration (`docs/consoles.md`
+steps 9 and 10). A component this console needs and the library
 lacks, or a component that behaves wrongly, is an issue filed in
 FerroHEALTH/FerroUI and linked from the work here: never a local copy, a
 shadow component, a stylesheet override or a hand-written script in this
@@ -119,7 +122,9 @@ returned to the orchestrator, never made in a slice.
   library's, marked `widget::submit::NAVIGATES`, which `FormNavigator`
   posts in the background. The form keeps its route as `action`, because
   the console answers `Referrer-Policy: no-referrer`, so a plain post to a
-  server function's own address could not be sent back to its page. Every
+  server function's own address could not be sent back to its page. That
+  is a stopgap the owner accepted: the forms move to `<ActionForm>` once
+  FerroUI fixes its Referer-bound fallback (FerroUI #449, here #1265). Every
   read is a server function of `crate::load`, and the visit (`crate::visit`)
   one more. Every server function checks the session before it asks the
   bridge, and the same-origin check refuses an unsafe method from anywhere
@@ -303,10 +308,14 @@ clinical content. What is particular here:
   never the session's.
 - Browser-only calls (`window`, storage, timers) go inside an `Effect`;
   a form's `on:submit` runs in the browser alone.
-- A component that outlives a navigation in the page reads the address
-  reactively: the shell redraws its top bar and navigation as the path and
-  the visit change, and a route group draws the page its address names as
-  the address changes (`crate::routes`).
+- **The shell is drawn once** (FerroUI `docs/consoles.md`, step 10): it
+  calls `widget::nav::follow_path()` first, so the navigation marks the
+  page in view and the rail's and the theme choice's `back` name it as the
+  router moves. The shell is drawn again only when the session changes,
+  and its top bar only when the visit does, never for the path, so the
+  search's words and the navigation's scroll survive a link. A route group
+  draws the page its address names as the address changes
+  (`crate::routes`).
 - Valid HTML and a deterministic first render are FerroUI §4; hydration
   walks the DOM, so a breach of either is a hydration error here. A view
   handed to a library slot that wraps it already (the error page's body is
@@ -321,10 +330,16 @@ clinical content. What is particular here:
 - The crate's `[package.metadata.leptos]` sets
   `disable-erase-components = true`, so a dev build keeps its component
   types in the browser half as the server half does and hydrates.
-- **The hydration mark.** A route group's page hydrates once its chunk has
-  arrived, after the shell. `hydrate()` runs `hydrate_from_async` itself
-  and marks `<html data-hydrated>` when it resolves, which is when the page
-  and its route have hydrated. A journey, and the screenshot capture, wait
+- **The hydration mark** (FerroUI `docs/consoles.md`, step 9). `App` calls
+  `widget::hydration::mark()` and `hydrate()` calls
+  `widget::hydration::explain()` after the panic hook, so a debug build
+  names a page changed before hydration ended. The library's
+  `data-ferroui-hydrated` comes from an `Effect` of the root component,
+  which can run while a route group's chunk is still on its way. A route
+  group's page hydrates once its chunk has arrived, after the shell, so
+  `hydrate()` also runs `hydrate_from_async` itself and marks
+  `<html data-hydrated>` when it resolves, which is when the page and its
+  route have hydrated. A journey, and the screenshot capture, wait
   for the mark before they act (`journeys::playground::hydrated`): a click
   sent while the route still hydrates makes the router change the DOM under
   the hydration walk, which panics.

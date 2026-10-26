@@ -215,8 +215,8 @@ console_error_panic_hook = "0.1.7"
 # the table model, the highlighter, the Lucide icons, the stylesheet and the
 # role tokens, shared by every FerroHEALTH console. Pinned exactly, so the
 # console moves to a new version deliberately. Verified against crates.io on
-# 2026-10-25.
-ferrohealth-ui = "=0.5.0"
+# 2026-10-26.
+ferrohealth-ui = "=0.5.1"
 # The console's string catalogs (#956): Project Fluent messages embedded at
 # build time from app/ferrobridge-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
