@@ -19,6 +19,9 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
   start block inside it, an end block without its carriage return, or a size
   past the ceiling is refused, and the handler may answer it with `AR` before
   the connection closes.
+  `send` is the other side: it connects within a connect timeout, writes one
+  frame and returns the reply frame within a reply timeout, with a typed error
+  for each way the exchange fails.
 - `decode`: the character set MSH-18 names (HL7 table 0211): ASCII, ISO 8859
   parts 1 to 9 and 15, and UTF-8, with a per-connection default for an empty
   MSH-18. A byte outside the declared set is refused, never replaced.
