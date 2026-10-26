@@ -11,6 +11,7 @@
 - [The two mapping specifications](evaluate/mapping-specifications.md)
 - [Pinned versions](evaluate/versions.md)
 - [Build order](evaluate/build-order.md)
+- [EHDS readiness](evaluate/ehds-readiness.md)
 - [Licensing](evaluate/licensing.md)
 - [CRA information for users](evaluate/cra-user-information.md)
 

@@ -1,0 +1,170 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+#
+# The EHDS readiness matrix: per priority category of Regulation (EU)
+# 2025/327 Article 14(1), each target profile with the committed template it
+# maps from, the context that maps it, and the round-trip test that proves
+# the transform. crates/fhirconnect/tests/it/readiness.rs checks every path
+# and test named here and renders the matrix into
+# website/book/src/evaluate/ehds-readiness.md; a row whose template, context
+# or test is gone fails that test rather than being skipped. No
+# specification governs this file: our own design.
+#
+# Paths are relative to the workspace root. A test is `<file>::<function>`.
+# `target` is what the matrix shows; `profile` is the canonical the context's
+# project directory must name, unless `claimed = false` says the resource is
+# produced without claiming it.
+
+[[category]]
+article = "14(1)(a)"
+name = "Patient summaries"
+note = "HL7 Europe Patient Summary 1.0.0-ballot is pinned for the profile validator; no context maps its Composition yet. The Base and Core profiles below are its building blocks."
+
+[[category.row]]
+target = "patient-eu-core"
+profile = "http://hl7.eu/fhir/base/StructureDefinition/patient-eu-core"
+package = "hl7.fhir.eu.base 2.0.0"
+template = "KDS_Person"
+template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-person/KDS_Person.opt"
+context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_patient/ferrobridge_eu_patient.context.yml"
+test = "crates/fhirconnect/tests/it/eu_patient.rs::the_profile_elements_of_patient_eu_core_survive_the_round_trip"
+
+[[category.row]]
+target = "condition-eu-core"
+profile = "http://hl7.eu/fhir/base/StructureDefinition/condition-eu-core"
+package = "hl7.fhir.eu.base 2.0.0"
+template = "KDS_Diagnose"
+template_file = "tools/ferrobridge-testkit/fixtures/opt/kds/KDS_Diagnose.opt"
+context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_condition/ferrobridge_eu_condition.context.yml"
+test = "crates/fhirconnect/tests/it/eu_condition.rs::the_profile_elements_of_condition_eu_core_survive_the_round_trip"
+
+[[category.row]]
+target = "medicalTestResult-eu-core"
+profile = "http://hl7.eu/fhir/base/StructureDefinition/medicalTestResult-eu-core"
+package = "hl7.fhir.eu.base 2.0.0"
+template = "KDS_Laborbericht"
+template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
+context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_test_result/ferrobridge_eu_test_result.context.yml"
+test = "crates/fhirconnect/tests/it/eu_test_result.rs::the_profile_elements_of_the_test_result_survive_the_round_trip"
+
+[[category.row]]
+target = "Patient summary Composition"
+package = "hl7.fhir.eu.eps 1.0.0-ballot"
+gap = "no patient summary template in the openEHR international CKM"
+
+[[category]]
+article = "14(1)(b)"
+name = "Electronic prescriptions"
+
+[[category.row]]
+target = "MedicationRequest-eu-mpd"
+profile = "http://hl7.eu/fhir/mpd/StructureDefinition/MedicationRequest-eu-mpd"
+package = "hl7.fhir.eu.mpd 1.0.0"
+template = "FerroBRIDGE medication template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_medication.adlt"
+context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_mpd/ferrobridge_eu_mpd_request.context.yml"
+test = "crates/fhirconnect/tests/it/eu_mpd.rs::the_profile_elements_of_the_prescription_survive_the_round_trip"
+
+[[category.row]]
+target = "Medication-eu-mpd"
+profile = "http://hl7.eu/fhir/mpd/StructureDefinition/Medication-eu-mpd"
+package = "hl7.fhir.eu.mpd 1.0.0"
+template = "FerroBRIDGE medication template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_medication.adlt"
+context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_mpd/ferrobridge_eu_mpd_request.context.yml"
+test = "crates/fhirconnect/tests/it/eu_mpd.rs::the_product_of_the_prescription_survives_the_round_trip"
+
+[[category.row]]
+target = "Dosage-eu-mpd"
+profile = "http://hl7.eu/fhir/mpd/StructureDefinition/Dosage-eu-mpd"
+package = "hl7.fhir.eu.mpd 1.0.0"
+template = "FerroBRIDGE medication template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_medication.adlt"
+context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_mpd/ferrobridge_eu_mpd_request.context.yml"
+test = "crates/fhirconnect/tests/it/eu_mpd.rs::the_dosage_of_the_prescription_survives_the_round_trip"
+claimed = false
+
+[[category]]
+article = "14(1)(c)"
+name = "Electronic dispensations"
+note = "The openEHR international CKM publishes no dispensation template; the template is FerroBRIDGE's, over published CKM archetypes only (owner ruling on #116)."
+
+[[category.row]]
+target = "MedicationDispense-eu-mpd"
+profile = "http://hl7.eu/fhir/mpd/StructureDefinition/MedicationDispense-eu-mpd"
+package = "hl7.fhir.eu.mpd 1.0.0"
+template = "FerroBRIDGE medication template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_medication.adlt"
+context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_mpd/ferrobridge_eu_mpd_dispense.context.yml"
+test = "crates/fhirconnect/tests/it/eu_mpd.rs::the_profile_elements_of_the_dispense_survive_the_round_trip"
+
+[[category]]
+article = "14(1)(d)"
+name = "Medical imaging studies and related reports"
+note = "HL7 Europe Imaging Report is at 1.0.0-ballot and deferred (docs/architecture.md section 4.8)."
+
+[[category.row]]
+target = "Imaging report Composition"
+package = "hl7.fhir.eu.imaging 1.0.0-ballot"
+gap = "no imaging report template in the openEHR international CKM"
+
+[[category]]
+article = "14(1)(e)"
+name = "Medical test results, laboratory results and related reports"
+
+[[category.row]]
+target = "DiagnosticReport-eu-lab"
+profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab"
+package = "hl7.fhir.eu.laboratory 2.0.0"
+template = "KDS_Laborbericht"
+template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
+context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_laboratory/ferrobridge_eu_laboratory.context.yml"
+test = "crates/fhirconnect/tests/it/eu_laboratory.rs::the_profile_elements_of_the_laboratory_report_survive_the_round_trip"
+
+[[category.row]]
+target = "Observation-resultslab-eu-lab"
+profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Observation-resultslab-eu-lab"
+package = "hl7.fhir.eu.laboratory 2.0.0"
+template = "KDS_Laborbericht"
+template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
+context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_laboratory/ferrobridge_eu_laboratory.context.yml"
+test = "crates/fhirconnect/tests/it/eu_laboratory.rs::the_profile_elements_of_the_laboratory_result_survive_the_round_trip"
+
+[[category.row]]
+target = "Specimen-eu-lab"
+profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Specimen-eu-lab"
+package = "hl7.fhir.eu.laboratory 2.0.0"
+template = "KDS_Laborbericht"
+template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
+context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_laboratory/ferrobridge_eu_laboratory.context.yml"
+test = "crates/fhirconnect/tests/it/eu_laboratory.rs::the_profile_elements_of_the_laboratory_specimen_survive_the_round_trip"
+
+[[category.row]]
+target = "Composition-eu-lab"
+profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Composition-eu-lab"
+package = "hl7.fhir.eu.laboratory 2.0.0"
+template = "KDS_Laborbericht"
+template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
+context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_lab_composition/ferrobridge_eu_lab_composition.context.yml"
+test = "crates/fhirconnect/tests/it/eu_lab_composition.rs::the_profile_elements_of_the_document_composition_survive_the_round_trip"
+
+[[category.row]]
+target = "Bundle-eu-lab"
+profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu-lab"
+package = "hl7.fhir.eu.laboratory 2.0.0"
+template = "KDS_Laborbericht"
+template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
+context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_lab_composition/ferrobridge_eu_lab_composition.context.yml"
+test = "app/ferrobridge-server/tests/it/facade/document.rs::the_document_is_the_composition_and_every_resource_it_creates"
+claimed = false
+remark = "assembled by the facade's Composition/$document; the assembly is proven on a synthetic Composition context"
+
+[[category]]
+article = "14(1)(f)"
+name = "Discharge reports"
+note = "HL7 Europe Hospital Discharge Report is at 0.1.0-ballot on superseded dependencies and deferred (docs/architecture.md section 4.8)."
+
+[[category.row]]
+target = "Discharge report Composition"
+package = "hl7.fhir.eu.hdr 0.1.0-ballot"
+gap = "no discharge report template in the openEHR international CKM"
