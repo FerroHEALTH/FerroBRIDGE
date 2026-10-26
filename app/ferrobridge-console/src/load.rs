@@ -23,18 +23,14 @@
     )
 )]
 
+use ferrobridge_operator_api::capability::Capability;
 use ferrobridge_operator_api::configuration::Configuration;
 use ferrobridge_operator_api::health::{Info, Readiness};
 use ferrobridge_operator_api::operator::{EngineState, Listed};
-use fhir_types::codec::{Json as _, Path, Value};
-use fhir_types::r4::capability_statement::CapabilityStatement;
 use leptos::prelude::*;
 use leptos::server_fn::ServerFn;
 
-use crate::model::{Loaded, OpenedFile, Outcome, ViewError};
-
-/// The bridge's `CapabilityStatement` with the JSON it arrived in.
-pub type Capability = (CapabilityStatement, serde_json::Value);
+use crate::model::{OpenedFile, Outcome, ViewError};
 
 /// The count of the changes the operator made in the page, which every
 /// read keys on, so a read drawn after a reload or a save asks again.
@@ -67,32 +63,6 @@ where
         move |_, _, _| changed(),
         false,
     );
-}
-
-/// The `CapabilityStatement` the JSON `raw` holds, with that JSON.
-///
-/// # Errors
-/// Returns [`ViewError::Unreadable`] for JSON that is no R4
-/// `CapabilityStatement` (FHIR R4 `capabilitystatement.html`).
-pub fn capability_of(raw: serde_json::Value) -> Result<Capability, ViewError> {
-    let Value::Object(object) = Value::from_serde_json(raw.clone()) else {
-        return Err(ViewError::Unreadable);
-    };
-    CapabilityStatement::from_json(&object, &mut Path::root("CapabilityStatement"))
-        .map(|statement| (statement, raw))
-        .map_err(|_error| ViewError::Unreadable)
-}
-
-/// The bridge's `CapabilityStatement` as a page draws it, from the answer
-/// of [`capability_now`].
-///
-/// # Errors
-/// As [`capability_of`], and the fault or refusal `answer` carries.
-pub fn capability(answer: Loaded<serde_json::Value>) -> Loaded<Capability> {
-    match answer? {
-        Outcome::Shown(raw) => capability_of(raw).map(Outcome::Shown),
-        Outcome::Refused(refusal) => Ok(Outcome::Refused(refusal)),
-    }
 }
 
 /// The bridge's build facts, pins and lanes, `GET /health/info`.
@@ -133,16 +103,14 @@ pub async fn listing_now() -> Result<Outcome<Vec<Listed>>, ViewError> {
     cached::listing().await
 }
 
-/// The JSON of the bridge's `CapabilityStatement`, `GET /fhir/metadata`,
-/// which [`capability`] reads.
+/// The bridge's `CapabilityStatement`, `GET /fhir/metadata`, reduced to
+/// what a page draws of it.
 ///
 /// # Errors
 /// As [`info_now`].
 #[server(endpoint = "capability")]
-pub async fn capability_now() -> Result<Outcome<serde_json::Value>, ViewError> {
-    cached::capability()
-        .await
-        .map(|outcome| outcome.map(|(_statement, raw)| raw))
+pub async fn capability_now() -> Result<Outcome<Capability>, ViewError> {
+    cached::capability().await
 }
 
 /// The configuration the bridge started on, `GET /operator/configuration`.
@@ -192,8 +160,10 @@ pub mod cached {
     use leptos::context::use_context;
     use tokio::sync::OnceCell;
 
+    use ferrobridge_operator_api::capability::{Capability, Resource};
+    use fhir_types::r4::capability_statement::CapabilityStatement;
+
     use crate::bridge::MappingFile;
-    use crate::load::Capability;
     use crate::model::{Loaded, loaded};
 
     /// The documents one request has read from the bridge.
@@ -286,7 +256,8 @@ pub mod cached {
         .clone()
     }
 
-    /// The bridge's `CapabilityStatement`, `GET /fhir/metadata`.
+    /// The bridge's `CapabilityStatement`, `GET /fhir/metadata`, reduced to
+    /// what a page draws of it.
     ///
     /// # Errors
     /// As [`info`].
@@ -294,10 +265,52 @@ pub mod cached {
         let cell = reads().capability;
         cell.get_or_init(|| async {
             let (state, token) = crate::session::request::signed_in()?;
-            loaded(state.bridge().capability(&token).await)
+            loaded(state.bridge().capability_statement(&token).await)
+                .map(|outcome| outcome.map(|statement| reduced(&statement)))
         })
         .await
         .clone()
+    }
+
+    /// What `statement` declares, as a page draws it: its FHIR version and
+    /// each resource of its `rest` blocks (FHIR R4 `capabilitystatement.html`).
+    #[must_use]
+    pub fn reduced(statement: &CapabilityStatement) -> Capability {
+        let words = |values: Vec<Option<String>>| values.into_iter().flatten().collect();
+        Capability {
+            fhir_version: statement.fhir_version.value.clone(),
+            resources: statement
+                .rest
+                .iter()
+                .flat_map(|rest| rest.resource.iter())
+                .map(|resource| Resource {
+                    r#type: resource.r#type.value.clone().unwrap_or_default(),
+                    supported_profiles: u32::try_from(resource.supported_profile.len())
+                        .unwrap_or(u32::MAX),
+                    interactions: words(
+                        resource
+                            .interaction
+                            .iter()
+                            .map(|interaction| interaction.code.value.clone())
+                            .collect(),
+                    ),
+                    search_params: words(
+                        resource
+                            .search_param
+                            .iter()
+                            .map(|param| param.name.value.clone())
+                            .collect(),
+                    ),
+                    operations: words(
+                        resource
+                            .operation
+                            .iter()
+                            .map(|operation| operation.name.value.clone())
+                            .collect(),
+                    ),
+                })
+                .collect(),
+        }
     }
 
     /// The configuration the bridge started on, `GET /operator/configuration`.

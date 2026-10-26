@@ -15,7 +15,7 @@ use axum::body::Body;
 use http::{Method, Request, StatusCode};
 
 use crate::stub::{CONTEXT, bridge, signed_in};
-use crate::support::{OPERATOR_TOKEN, ORIGIN, send};
+use crate::support::{OPERATOR_TOKEN, ORIGIN, header, send};
 
 /// Every form post the console takes, each with a body it accepts.
 fn posts() -> Vec<(String, &'static str)> {
@@ -185,6 +185,11 @@ async fn the_visit_carries_no_session_cookie_and_no_token() -> Result<(), Box<dy
     )
     .await?;
     assert_eq!(StatusCode::OK, response.status());
+    assert_eq!(
+        "no-store",
+        header(&response, "cache-control"),
+        "no answer of a server function is kept"
+    );
     assert!(answer.contains(r#""session":"SignedIn""#), "{answer}");
     let session = cookie.split_once('=').map_or("", |(_, value)| value);
     assert!(!session.is_empty() && !answer.contains(session), "{answer}");

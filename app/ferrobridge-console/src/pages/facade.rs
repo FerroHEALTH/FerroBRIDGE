@@ -10,6 +10,7 @@
 //! and Security shows the SMART discovery document (SMART App Launch
 //! 2.2.0, conformance). A facade that is off keeps only Overview.
 
+use ferrobridge_operator_api::capability::Capability;
 use ferrobridge_operator_api::configuration::Configuration;
 use ferrobridge_operator_api::health::{Info, Readiness, State};
 use ferrobridge_operator_api::operator::EngineState;
@@ -25,12 +26,10 @@ use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::{Header, definitions, facts_row, panel_sections};
 use ferrohealth_ui::view::tabs::{Tab, TabRow};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
-use fhir_types::r4::capability_statement::{CapabilityStatement, CapabilityStatementRestResource};
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 
 use crate::app::{FACADE, MAPPINGS, PLAYGROUND, page_title};
-use crate::load::Capability;
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::model::{Loaded, Outcome};
@@ -84,7 +83,7 @@ pub fn page() -> impl IntoView {
                 Suspend::new(async move {
                     let info = info.await;
                     let readiness = readiness.await;
-                    let capability = crate::load::capability(capability.await);
+                    let capability = capability.await;
                     let state = state.await;
                     let smart = match smart {
                         Some(smart) => Some(smart.await),
@@ -206,12 +205,12 @@ fn drawn(tab: &str, reads: &Reads<'_>) -> AnyView {
         });
     }
     let statement = match capability {
-        Ok(Outcome::Shown((statement, _raw))) => Some(statement),
+        Ok(Outcome::Shown(statement)) => Some(statement),
         Ok(Outcome::Refused(_)) | Err(_) => None,
     };
     let body = match tab {
         "capability" => match capability {
-            Ok(Outcome::Shown((statement, _raw))) => capability_panel(statement, running),
+            Ok(Outcome::Shown(statement)) => capability_panel(statement, running),
             Ok(Outcome::Refused(refusal)) => refused(refusal),
             Err(fault) => faulted(fault, &tab_href(tab)),
         },
@@ -226,7 +225,7 @@ fn drawn(tab: &str, reads: &Reads<'_>) -> AnyView {
             .map(|(key, words)| {
                 let drawn = Tab::new(*key, tab_href(key), tr(*words));
                 match (*key, capability) {
-                    ("capability", Ok(Outcome::Shown((statement, _raw)))) => drawn.count(
+                    ("capability", Ok(Outcome::Shown(statement))) => drawn.count(
                         u64::try_from(resources(statement).len()).unwrap_or(u64::MAX),
                         tr(*words),
                     ),
@@ -246,17 +245,13 @@ fn drawn(tab: &str, reads: &Reads<'_>) -> AnyView {
 }
 
 /// The resources of `statement`'s server `rest` blocks.
-fn resources(statement: &CapabilityStatement) -> Vec<&CapabilityStatementRestResource> {
-    statement
-        .rest
-        .iter()
-        .flat_map(|rest| rest.resource.iter())
-        .collect()
+fn resources(statement: &Capability) -> Vec<&ferrobridge_operator_api::capability::Resource> {
+    statement.resources.iter().collect()
 }
 
 /// The resource type a resource declares.
-fn type_of(resource: &CapabilityStatementRestResource) -> String {
-    resource.r#type.value.clone().unwrap_or_default()
+fn type_of(resource: &ferrobridge_operator_api::capability::Resource) -> String {
+    resource.r#type.clone()
 }
 
 /// The Overview tab: the facade, what it serves, its operations and its
@@ -264,7 +259,7 @@ fn type_of(resource: &CapabilityStatementRestResource) -> String {
 fn overview(
     info: &Info,
     readiness: &Loaded<Readiness>,
-    statement: Option<&CapabilityStatement>,
+    statement: Option<&Capability>,
     state: &Loaded<EngineState>,
 ) -> AnyView {
     let base = crate::visit::visit()
@@ -279,7 +274,7 @@ fn overview(
         Ok(Outcome::Refused(_)) | Err(_) => String::from("–").into_any(),
     };
     let version = statement
-        .and_then(|statement| statement.fhir_version.value.clone())
+        .and_then(|statement| statement.fhir_version.clone())
         .unwrap_or_else(|| String::from("–"));
     let facts = facts_row(vec![
         (tr(Msg::FactBase), view! { <code>{base}</code> }.into_any()),
@@ -294,7 +289,7 @@ fn overview(
     let searchable = statement.map_or(0, |statement| {
         resources(statement)
             .iter()
-            .filter(|resource| !resource.search_param.is_empty())
+            .filter(|resource| !resource.search_params.is_empty())
             .count()
     });
     let validated = statement.map_or(0, |statement| {
@@ -302,9 +297,9 @@ fn overview(
             .iter()
             .filter(|resource| {
                 resource
-                    .operation
+                    .operations
                     .iter()
-                    .any(|operation| operation.name.value.as_deref() == Some("validate"))
+                    .any(|operation| operation == "validate")
             })
             .count()
     });
@@ -370,7 +365,7 @@ pub fn indicator(readiness: &Readiness, name: &str) -> AnyView {
 }
 
 /// The Capability tab: every resource type the statement declares.
-fn capability_panel(statement: &CapabilityStatement, state: &Loaded<EngineState>) -> AnyView {
+fn capability_panel(statement: &Capability, state: &Loaded<EngineState>) -> AnyView {
     let programs = match state {
         Ok(Outcome::Shown(state)) => state.contexts.clone(),
         Ok(Outcome::Refused(_)) | Err(_) => Vec::new(),
@@ -405,32 +400,19 @@ fn capability_panel(statement: &CapabilityStatement, state: &Loaded<EngineState>
                     words.join(", ")
                 }
             };
-            let codes = joined(
-                resource
-                    .interaction
-                    .iter()
-                    .filter_map(|interaction| interaction.code.value.clone())
-                    .collect(),
-            );
-            let params = joined(
-                resource
-                    .search_param
-                    .iter()
-                    .filter_map(|param| param.name.value.clone())
-                    .collect(),
-            );
+            let codes = joined(resource.interactions.clone());
+            let params = joined(resource.search_params.clone());
             let ops = joined(
                 resource
-                    .operation
+                    .operations
                     .iter()
-                    .filter_map(|operation| operation.name.value.clone())
                     .map(|name| format!("${name}"))
                     .collect(),
             );
             view! {
                 <tr>
                     {title_cell(href.as_deref(), kind.clone(), None)}
-                    {cell(profiles, resource.supported_profile.len().to_string())}
+                    {cell(profiles, resource.supported_profiles.to_string())}
                     {cell(interactions, codes)}
                     {cell(search, params)}
                     {cell(operations, view! { <code>{ops}</code> })}

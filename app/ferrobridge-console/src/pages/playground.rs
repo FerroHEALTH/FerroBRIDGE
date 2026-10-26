@@ -46,7 +46,6 @@ use crate::app::{PLAYGROUND, page_title};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::bridge::AccessToken;
 use crate::islands::JsonInput;
-use crate::load::Capability;
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 #[cfg(not(target_arch = "wasm32"))]
@@ -56,6 +55,7 @@ use crate::pages::mappings::template_id;
 use crate::pages::parts::{faulted, refused};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::server::ConsoleState;
+use ferrobridge_operator_api::capability::Capability;
 
 /// The tabs of the playground, each its key and its words.
 const TABS: [(&str, Msg); 3] = [
@@ -109,7 +109,7 @@ pub fn page() -> impl IntoView {
                 Suspend::new(async move {
                     let info = info.await;
                     let capability = match capability {
-                        Some(capability) => Some(crate::load::capability(capability.await)),
+                        Some(capability) => Some(capability.await),
                         None => None,
                     };
                     let templates = match state {
@@ -206,17 +206,9 @@ fn operations_off(info: &Loaded<Info>) -> Option<String> {
 /// The resource types the bridge declares `$validate` on, in its order.
 fn validate_types(capability: &Capability) -> Vec<String> {
     capability
-        .0
-        .rest
-        .iter()
-        .flat_map(|rest| rest.resource.iter())
-        .filter(|resource| {
-            resource
-                .operation
-                .iter()
-                .any(|operation| operation.name.value.as_deref() == Some("validate"))
-        })
-        .filter_map(|resource| resource.r#type.value.clone())
+        .declaring("validate")
+        .into_iter()
+        .map(str::to_owned)
         .collect()
 }
 

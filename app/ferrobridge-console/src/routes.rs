@@ -83,24 +83,31 @@ impl Page {
 /// `$page` by its function `$draw` behind the session's guard.
 ///
 /// Each group matches its own pages alone, so its chunks hold their code
-/// and no other group's.
+/// and no other group's, and draws its page again when the address changes.
 macro_rules! group {
     ($(#[$doc:meta])* $name:ident { $($(#[$arm:meta])* $page:ident => $draw:path),+ $(,)? }) => {
         $(#[$doc])*
         #[derive(Debug, Clone, Copy)]
-        pub struct $name(Option<Page>);
+        pub struct $name;
 
         #[lazy_route]
         impl LazyRoute for $name {
             fn data() -> Self {
-                Self(Page::of(&leptos_router::hooks::use_location().pathname.get_untracked()))
+                Self
             }
 
-            fn view(this: Self) -> AnyView {
-                match this.0 {
-                    $($(#[$arm])* Some(Page::$page) => crate::app::guarded($draw),)+
-                    _ => ().into_any(),
-                }
+            fn view(_this: Self) -> AnyView {
+                let location = leptos_router::hooks::use_location();
+                // NOTE: leptos_router, `Route`: a navigation that stays on a route keeps
+                // its view, so the group draws the page its address names as it changes.
+                (move || {
+                    location.search.track();
+                    match Page::of(&location.pathname.get()) {
+                        $($(#[$arm])* Some(Page::$page) => crate::app::guarded($draw),)+
+                        _ => ().into_any(),
+                    }
+                })
+                .into_any()
             }
         }
     };
