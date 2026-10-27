@@ -47,10 +47,10 @@ rust_decimal = { version = "1.43.0", default-features = false, features = ["std"
 regex = "1.13.1"
 # The openEHR RM model and the BASE path parser: the code conforms to RM
 # Release 1.1.0 and compiles against the `v1_2` generation (docs/VERSIONS.md).
-openehr-rm = "0.0.100"
+openehr-rm = "0.0.109"
 # The BASE identification types the RM leaves to it: TERMINOLOGY_ID is a
 # CODE_PHRASE field, so a lens that builds one names this crate.
-openehr-base = "0.0.100"
+openehr-base = "0.0.109"
 # anyhow is a binary-only error type (.claude/rules/rust-style.md).
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
@@ -68,7 +68,7 @@ socket2 = "0.6.5"
 # version: cargo resolves the path locally and the version on crates.io.
 fhir-types = { path = "crates/fhir-types", version = "0.1.128", default-features = false }
 hl7v2-types = { path = "crates/hl7v2-types", version = "0.1.127" }
-openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "0.1.133" }
+openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "0.1.134" }
 # The health and operator documents the server writes and the console reads.
 ferrobridge-operator-api = { path = "crates/ferrobridge-operator-api", version = "0.0.0" }
 # The OMOP CDM layer, taken metadata-only by default: a consumer that writes
@@ -79,18 +79,18 @@ omop-cdm = { path = "crates/omop-cdm", version = "0.0.0", default-features = fal
 ferrobridge-testkit = { path = "tools/ferrobridge-testkit" }
 # Published from this workspace and consumed by the published
 # ferrobridge-hl7v2, so the requirement carries both a path and a version.
-ferrobridge-term = { path = "crates/ferrobridge-term", version = "0.1.140" }
+ferrobridge-term = { path = "crates/ferrobridge-term", version = "0.1.141" }
 # Published from this workspace and consumed by the published
 # ferrobridge-validator, so the requirement carries both a path and a version.
 ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "0.1.128" }
 # The HL7 v2 face's crate (MLLP, MSH-18 decoding, parsing, the ACK and the
 # v2-to-FHIR ConceptMap interpreter): published from this workspace, so the
 # requirement carries both a path and a version.
-ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "0.1.159" }
+ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "0.1.160" }
 # The FHIRconnect language crate: the facade, the operations surface and the
 # published ferrobridge-hl7v2 consume it, so the requirement carries both a
 # path and a version.
-fhirconnect = { path = "crates/fhirconnect", version = "0.1.201" }
+fhirconnect = { path = "crates/fhirconnect", version = "0.1.202" }
 # The OMOCL language crate: the ETL runner is its one in-process consumer, so
 # the requirement is path-only too.
 omocl = { path = "crates/omocl" }
@@ -104,20 +104,20 @@ omocl = { path = "crates/omocl" }
 # .claude/rules/codegen.md forbids. From 0.0.69 the Simplified Data Template
 # engines (FLAT, STRUCTURED, Web Template, TDD, RM-instance validation) live in
 # openehr-sdt, taken without its `cache` feature (`moka`).
-openehr-its = { version = "0.0.100", default-features = false, features = ["opt14", "json"] }
-openehr-sdt = { version = "0.0.100", default-features = false, features = ["flat"] }
-openehr-am = "0.0.100"
+openehr-its = { version = "0.0.109", default-features = false, features = ["opt14", "json"] }
+openehr-sdt = { version = "0.0.109", default-features = false, features = ["flat"] }
+openehr-am = "0.0.109"
 # The AQL 1.1.0 parser: the ETL checks its configured queries at load
 # (docs/architecture.md section 5.4). Verified against crates.io on 2026-09-25.
-openehr-query = "0.0.100"
+openehr-query = "0.0.109"
 # The ADL 2 parser: openehr-mapping-core compiles its ADL 2 test fixtures from
 # their .adls sources with it, and the server reads the archetype HRID an adl2
 # template ETag carries with its `hrid::parse_hrid`.
-openehr-adl = "0.0.100"
+openehr-adl = "0.0.109"
 # The openEHR terminology: the `audit_change_type` and
 # `version_lifecycle_state` concepts a commit codes (`codes`). Verified against
 # crates.io on 2026-10-25.
-openehr-term = "0.0.100"
+openehr-term = "0.0.109"
 # The HTTP client for the CDR wire. reqwest 0.13 spells the rustls selection
 # "rustls"; it carries its own platform verifier and aws-lc-rs provider.
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "http2"] }
@@ -127,11 +127,11 @@ backon = "1.6.0"
 # audit line, and the client credentials token of the CDR and terminology
 # lanes, and the RFC 7662 introspection check of `[auth] mode =
 # "introspection"`. A caret requirement, as a shared crate takes another (owner
-# decision, 2026-10-26); verified against crates.io on 2026-10-27 (0.8.3). `fetch` reads each issuer's metadata and key
+# decision, 2026-10-26); verified against crates.io on 2026-10-27 (0.8.6). `fetch` reads each issuer's metadata and key
 # set and runs the client credentials token client and the introspector.
 # The server adds `axum` for its guard; ferrobridge-term's `smart` feature
 # takes the token client alone.
-ferrohealth-smart = { version = "0.8.3", default-features = false, features = ["fetch"] }
+ferrohealth-smart = { version = "0.8.6", default-features = false, features = ["fetch"] }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off. Verified against crates.io on 2026-10-16 (11.1.0,
