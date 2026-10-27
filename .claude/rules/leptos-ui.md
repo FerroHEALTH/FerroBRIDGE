@@ -37,8 +37,9 @@ hydrates the whole page and draws every page after the first in the
 browser (FerroUI #410), and to 0.5.1, whose shell is drawn once
 and follows the router (`widget::nav::follow_path`) and whose
 `widget::hydration` marks and explains the hydration (`docs/consoles.md`
-steps 9 and 10). A component this console needs and the library
-lacks, or a component that behaves wrongly, is an issue filed in
+steps 9 and 10), and to 0.5.5, whose `<ActionForm>` answer mode draws an
+action's answer on its page with no WebAssembly (FerroUI #485, #1265).
+A component this console needs and the library lacks, or a component that behaves wrongly, is an issue filed in
 FerroHEALTH/FerroUI and linked from the work here: never a local copy, a
 shadow component, a stylesheet override or a hand-written script in this
 repository.
@@ -111,20 +112,20 @@ returned to the orchestrator, never made in a slice.
   test over the rendered output and the request log proves it for each
   screen that takes one.
 - **Every action works with no WebAssembly, and reloads nothing with it.**
-  A page's form posts to an axum route of `prefs` or `posts`, which checks
-  the session itself before it touches the bridge or session state, and
-  answers with a redirect (a preference) or with the page drawn again by
-  `server::render` with the outcome in context (a reload, a check, a save, a
-  run): that is the page with no WebAssembly. Once the page has hydrated,
-  the form's own `on:submit` prevents the browser's post and sends the same
-  work through its server function in `crate::actions` (`reload`, `edit`,
-  `run`), and the page draws the answer in place; a preference form is the
+  Reload, the editor's check and save, and the playground's runs are server
+  functions of `crate::actions` (`reload`, `edit`, `run`) behind
+  `<ActionForm>` in FerroUI's answer mode (`docs/consoles.md`, An action
+  that answers on its page): each form draws `widget::action::answer_field()`,
+  each page calls `widget::action::answered(&action)` where it makes the
+  action, and `server::router` wraps the whole router in
+  `widget::action::draw_answers`. Once the page has hydrated the form calls
+  the function and the page draws the answer in place; with no WebAssembly
+  the plain post goes to the function and the page it came from is drawn
+  with the answer and the posted fields, the browser staying at the
+  function's address. A preference is an axum route of `prefs` that checks
+  the session itself and answers with a redirect; its form is the
   library's, marked `widget::submit::NAVIGATES`, which `FormNavigator`
-  posts in the background. The form keeps its route as `action`, because
-  the console answers `Referrer-Policy: no-referrer`, so a plain post to a
-  server function's own address could not be sent back to its page. That
-  is a stopgap the owner accepted: the forms move to `<ActionForm>` once
-  FerroUI fixes its Referer-bound fallback (FerroUI #449, here #1265). Every
+  posts in the background. Every
   read is a server function of `crate::load`, and the visit (`crate::visit`)
   one more. Every server function checks the session before it asks the
   bridge, and the same-origin check refuses an unsafe method from anywhere
@@ -226,19 +227,24 @@ with its label's `for`, a `<textarea>` filled through `prop:value` alone
 (the hazard measured in #608), and no `GET` form for a field that can carry
 clinical content. What is particular here:
 
-- Every form is a plain `<form method="post">` to its own route, drawn
-  whole on the server with its values, and works with no WebAssembly. Once
-  hydrated its `on:submit` reads the form with `FromFormData::from_event`,
-  the submitter's `name` and `value` included, and dispatches the action's
-  server function; a form that does not read falls through to the
-  browser's post. A component inside it (the editor's text area, the
+- An action's form is an `<ActionForm>` drawn whole on the server with its
+  values, posting to its server function, and works with no WebAssembly.
+  Its arguments are form fields: the page's own address as `address`, and
+  the post's struct as a `#[server(flatten)]` argument, so a field's
+  `name` is the struct's field. Once hydrated `<ActionForm>` reads the
+  form, the submitter's `name` and `value` included, and calls the
+  function; a capture listener on an ancestor keeps the post it sends, so
+  a failed call draws the page again with what the operator entered. A
+  component inside it (the editor's text area, the
   playground's input, `crate::editors`) is a real control with its `name`,
   so the browser posts what it holds.
 - The decision of a form with several buttons is its submit button's
   `name="decision"` and `value` (the editor: `check`, `save`, `confirm`,
   `back`, `discard`), and the post draws the page again with the answer.
-  In the page, Discard follows the link back to the file, and every other
-  decision goes through the `edit` server function.
+  In the page, the capture listener sends Discard back to the file before
+  `<ActionForm>` sees it; a plain Discard reaches the `edit` function,
+  which answers `303 See Other` to the file itself, since
+  `leptos_axum::redirect` answers the forwarded post with `200`.
 - A text area submits its line breaks as CRLF (HTML Living Standard
   §4.10.11); the editor's post and its server function read the draft back
   with LF, so a save is the bytes the editor showed.
@@ -247,8 +253,8 @@ clinical content. What is particular here:
   its form is a `POST` (§0), and its server function takes it in the
   request body.
 - A post sent before the WebAssembly arrives is drawn by the server with
-  its answer, and the page carries that answer as a `SharedValue`, so the
-  browser hydrates the page the server drew.
+  its answer, and `answered` carries that answer to the browser with the
+  page, so the browser hydrates the page the server drew.
 
 ## 6. Async data (the BFF pattern)
 
@@ -275,7 +281,7 @@ clinical content. What is particular here:
   `reqwest` call from a page or a post (`.claude/rules/codegen.md`,
   `.claude/rules/spec-adherence.md`).
 - A post handler and a server function are thin: check the session, call
-  `crate::bridge`, render or answer. The two share their work (`posts`,
+  `crate::bridge`, answer. The two share their work (`posts`,
   `pages::editor::answer`, `pages::playground::answer`), which lives in
   plain modules with ordinary unit tests.
 - Errors are typed: the bridge's `StatusCode` and body are carried as data

@@ -223,17 +223,6 @@ pub fn router(state: ConsoleState) -> axum::Router {
         .route(crate::app::PREFERENCE, post(crate::prefs::choose))
         .route(crate::app::RESET, post(crate::prefs::reset))
         .route(crate::app::SIDEBAR, post(crate::prefs::rail))
-        .route(crate::pages::mappings::RELOAD, post(crate::posts::reload))
-        .route(crate::app::NEW_FILE, post(crate::posts::edit))
-        .route(
-            &format!("{}/{{*path}}", crate::app::EDIT),
-            post(crate::posts::edit),
-        )
-        .route(crate::app::PLAYGROUND, post(crate::posts::run))
-        .route(
-            &format!("{}/{{tab}}", crate::app::PLAYGROUND),
-            post(crate::posts::run),
-        )
         .route(crate::oidc::LOGIN, get(crate::oidc::login))
         .route(crate::oidc::CALLBACK, get(crate::oidc::callback))
         .route(
@@ -258,12 +247,16 @@ pub fn router(state: ConsoleState) -> axum::Router {
         ))
         .layer(Extension(state));
     let headers = ConsoleHeaders::new(form_action).with_bundle(BUNDLE);
-    pages
-        .layer(bundle_compression())
-        .layer(axum::middleware::from_fn(
-            move |request: Request, next: Next| console::headers(headers.clone(), request, next),
-        ))
-        .with_state(options)
+    ferrohealth_ui::widget::action::draw_answers(
+        pages
+            .layer(bundle_compression())
+            .layer(axum::middleware::from_fn(
+                move |request: Request, next: Next| {
+                    console::headers(headers.clone(), request, next)
+                },
+            ))
+            .with_state(options),
+    )
 }
 
 /// The same-origin check of every request that is not a safe method, every

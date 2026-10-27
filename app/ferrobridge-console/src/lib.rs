@@ -17,9 +17,11 @@
 //! [`pages`], grouped into lazy routes by [`routes`], what they read from the
 //! bridge in [`load`], what the server read of the request in [`visit`] and
 //! the request's words in [`locale`]. Every page works with no WebAssembly:
-//! each action is a link or a plain form the server answers ([`posts`],
-//! [`prefs`]); once the page has hydrated, a form posts through its server
-//! function ([`actions`]) and a link is followed in the page. [`editors`]
+//! a preference is a plain form the server answers ([`prefs`]), and every
+//! other action is a server function behind an `<ActionForm>` ([`actions`],
+//! its work in [`posts`]) whose plain post is drawn on its page; once the
+//! page has hydrated, the form calls the function and a link is followed in
+//! the page. [`editors`]
 //! holds the console's own components. [`server`] serves it all under the
 //! family's browser security headers, [`config`] reads the configuration
 //! through `ferrohealth-config`, and [`cli`] and [`command`] run the binary

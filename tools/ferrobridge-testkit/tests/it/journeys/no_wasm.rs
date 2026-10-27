@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The console with its WebAssembly withheld: every page the navigation
-//! leads to still draws its content, and a form post still answers with
-//! its page (FerroUI `.claude/rules/leptos-ui.md` §15.7).
+//! leads to still draws its content, and a plain post of the playground and
+//! of the editor draws its page with the answer and the posted fields
+//! (FerroUI `docs/consoles.md`, An action that answers on its page).
 //!
 //! The browser is refused the bundle's WebAssembly, its glue and its
 //! chunks, so nothing hydrates, as on a page whose WebAssembly has not
@@ -17,10 +18,14 @@ use serde_json::json;
 use thirtyfour::By;
 
 use crate::journeys::browser::{Browser, with_browser};
+use crate::journeys::editor::{MISSING_TEMPLATE, context, context_path, press};
 use crate::journeys::journeys_enabled;
 use crate::journeys::playground::bundle;
 use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::Stack;
+
+/// The slug of the context the editor checks with the WebAssembly withheld.
+const NO_WASM: &str = "nowasm";
 
 /// The bundle files the browser is refused.
 const WITHHELD: [&str; 3] = [
@@ -127,9 +132,51 @@ async fn every_page_and_a_post_work_with_the_webassembly_withheld() -> Result<()
             .await?;
         browser.element(By::Id("pg-run")).await?.click().await?;
         browser.text("main", "Answered").await?;
-        browser.at(&stack.url("/playground/toopenehr")).await?;
+        browser.at(&stack.url("/api/run")).await?;
+        assert_eq!(
+            bundle.trim(),
+            posted(browser, "input").await?.trim(),
+            "the playground's answer keeps the posted input"
+        );
         not_hydrated(browser, "the playground's answer").await?;
+
+        let draft = context(NO_WASM, MISSING_TEMPLATE);
+        browser.goto(&stack.url("/mappings/new")).await?;
+        not_hydrated(browser, "the editor").await?;
+        browser
+            .element(By::Id("editor-path"))
+            .await?
+            .send_keys(&context_path(NO_WASM))
+            .await?;
+        browser
+            .element(By::Id("draft"))
+            .await?
+            .send_keys(&draft)
+            .await?;
+        press(browser, "check").await?;
+        browser
+            .text("main", "The set does not compile with this draft")
+            .await?;
+        browser.at(&stack.url("/api/edit")).await?;
+        assert_eq!(
+            draft.trim(),
+            posted(browser, "draft").await?.trim(),
+            "the editor's answer keeps the posted draft"
+        );
+        not_hydrated(browser, "the editor's answer").await?;
         only_the_bundle_refused(browser, "a post").await
     })
     .await
+}
+
+/// The value of the field `id` on the page drawn after a plain post, with
+/// the CRLF line breaks a form submits read back as LF.
+async fn posted(browser: &Browser, id: &str) -> Result<String, Box<dyn Error>> {
+    let value = browser
+        .element(By::Id(id))
+        .await?
+        .prop("value")
+        .await?
+        .ok_or("a text field has a value")?;
+    Ok(value.replace("\r\n", "\n"))
 }

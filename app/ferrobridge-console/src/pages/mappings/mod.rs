@@ -24,7 +24,9 @@ use ferrohealth_ui::view::load_report::{Arrival, Count, LoadReport};
 use ferrohealth_ui::view::surface::{Header, page_heading};
 use ferrohealth_ui::view::tabs::{Tab, TabRow};
 use ferrohealth_ui::view::template::list::{ListCard, list_card};
+use ferrohealth_ui::widget::action::{answer_field, answered};
 use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu, row_menu};
+use leptos::form::ActionForm;
 use leptos::prelude::*;
 use leptos_router::hooks::{use_params_map, use_query_map};
 
@@ -43,10 +45,6 @@ mod files;
 
 /// The id of the reload's confirmation dialog.
 pub const RELOAD_DIALOG: &str = "reload-set";
-
-/// The route the reload posts to: the Mapping set itself, which the post
-/// draws again with the reload's outcome.
-pub const RELOAD: &str = MAPPINGS;
 
 /// The tabs of the mapping set, each its key and its words.
 const TABS: [(&str, Msg); 5] = [
@@ -78,8 +76,10 @@ pub fn page() -> impl IntoView {
         return crate::pages::errors::not_found().into_any();
     }
     let query = use_query_map().get_untracked();
-    let posted = (*SharedValue::new(use_context::<Reloaded>)).clone();
     let reload = ServerAction::<ReloadSet>::new();
+    // NOTE: no specification governs this: our own design; Reload posts no field,
+    // so its answer alone is drawn again.
+    let _posted = answered(&reload);
     crate::load::follow(reload);
     let state = Resource::new(crate::load::changes, |_| crate::load::state_now());
     let listing = Resource::new(crate::load::changes, |_| crate::load::listing_now());
@@ -92,8 +92,7 @@ pub fn page() -> impl IntoView {
                 let reloaded = reload
                     .value()
                     .get()
-                    .map(|answer| answer.unwrap_or_else(|fault| Reloaded(Err(fault))))
-                    .or_else(|| posted.clone());
+                    .map(|answer| answer.unwrap_or_else(|fault| Reloaded(Err(fault))));
                 Suspend::new(async move {
                     let state = state.await;
                     let listing = listing.await;
@@ -105,8 +104,8 @@ pub fn page() -> impl IntoView {
     .into_any()
 }
 
-/// The title row: New file and More with Reload the set…, which posts
-/// through `reload` once the page has hydrated.
+/// The title row: New file and More with Reload the set…, whose form calls
+/// `reload`.
 fn heading(reload: ServerAction<ReloadSet>) -> AnyView {
     let more = Menu::new(
         "set-more",
@@ -133,20 +132,13 @@ fn heading(reload: ServerAction<ReloadSet>) -> AnyView {
             message: tr(Msg::ReloadDialogBody).into(),
         },
         view! {
-            <form
-                method="post"
-                action=RELOAD
-                class="fui-action-form"
-                on:submit=move |event| {
-                    event.prevent_default();
-                    reload.dispatch(ReloadSet {});
-                }
-            >
+            <ActionForm action=reload attr:class="fui-action-form">
+                {answer_field()}
                 <button type="submit" class=Variant::Primary.class()>
                     {ferrohealth_ui::icon::icon(Glyph::REFRESH_CW, "16")}
                     {tr(Msg::ReloadSet)}
                 </button>
-            </form>
+            </ActionForm>
         },
     )
     .into_any();

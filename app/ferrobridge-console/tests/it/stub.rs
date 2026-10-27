@@ -302,6 +302,26 @@ pub(crate) async fn signed_in(
     Ok((service, cookie))
 }
 
+/// A plain post of `form` to the server function at `function` from the
+/// answer form of the console's page at `page`, carrying `cookie`, as the
+/// browser sends it with no WebAssembly.
+pub(crate) fn answer_post(
+    function: &str,
+    page: &str,
+    form: &str,
+    cookie: &str,
+) -> Result<Request<Body>, Box<dyn Error>> {
+    let answer = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("ferroui_answer", page)
+        .finish();
+    let body = if form.is_empty() {
+        answer
+    } else {
+        format!("{form}&{answer}")
+    };
+    post(function, &body, cookie)
+}
+
 /// A plain form post of `form` to `route` from the console's own page,
 /// carrying `cookie`.
 pub(crate) fn post(route: &str, form: &str, cookie: &str) -> Result<Request<Body>, Box<dyn Error>> {
