@@ -5,7 +5,7 @@
 #
 # Three ecosystems, all three live. `github-actions` bumps the digest-pinned
 # actions the workflows in this directory use, `cargo` the workspace
-# dependencies, and `docker` the digest-pinned base image of docker/Dockerfile.
+# dependencies and the fuzz crate's own lock under fuzz/, and `docker` the digest-pinned base image of docker/Dockerfile.
 #
 # COOLDOWN is the delay between a release being published and this bot
 # proposing it, so a compromised or yanked release has a window to be caught
@@ -43,7 +43,9 @@ updates:
       prefix: "ci"
 
   - package-ecosystem: "cargo"
-    directory: "/"
+    directories:
+      - "/"
+      - "/fuzz"
     # Dependency bumps default to the changelog-guard escape: triage adds a
     # fragment when a bump is user-visible, which the guard accepts with the
     # label present.

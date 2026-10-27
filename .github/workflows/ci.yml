@@ -1018,6 +1018,9 @@ jobs:
       # Reads the same RustSec advisory database as cargo-audit and adds
       # yanked, licences, bans and sources, so there is no separate audit job.
       - run: cargo deny check
+      # The fuzz crate keeps a lock of its own outside the workspace; its
+      # advisories are held to the same floor.
+      - run: cargo deny --manifest-path fuzz/Cargo.toml --config deny.toml --locked check advisories
       # The OpenVEX side of the same exceptions (security/vex/README.md): the
       # generated document is exactly what deny.toml and the prose produce, no
       # exception outlives its finding, and every statement's dependency path
