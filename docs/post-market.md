@@ -46,9 +46,10 @@ statement's path instead.
    `Shipped with functional changes because: <reason>`
    (`.claude/rules/changelog.md`).
 3. **The changelog entry** under `### Security` carries the advisory's `GHSA-`
-   identifier. `scripts/checks/changelog-security.sh` refuses an entry without
-   one in CI over `[Unreleased]`, and the release `plan` job refuses it over
-   the section being cut.
+   identifier; it lands as a `security` fragment under `changelog.d/`.
+   `scripts/checks/changelog-security.sh` refuses an entry without one in CI
+   over `[Unreleased]` with every fragment folded in, and the release `plan`
+   job refuses it over the section being cut.
 4. **Publish the advisory** in the same hour as the GitHub release, and
    request a CVE through it where the vulnerability warrants one.
 

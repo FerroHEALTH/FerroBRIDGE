@@ -45,7 +45,8 @@ flowchart LR
   milestone still holds an open issue or pull request (naming each one),
   checks the tag against every file that declares the product version,
   checks the changelog's structure and the Security rules of the section
-  being cut, and extracts the `## [X.Y.Z]` section of `CHANGELOG.md` as the
+  being cut, refuses a tree that still holds a fragment under `changelog.d/`,
+  and extracts the `## [X.Y.Z]` section of `CHANGELOG.md` as the
   release notes with the support period and the link to the CRA user
   information appended. A missing or empty section
   fails the release, so a cut can never ship with notes generated from the
@@ -313,9 +314,14 @@ before a real cut.
    ran at to `website/book/src/operate/img/console/captured-version.txt`, and
    the screenshot guard of the ordinary suite fails until that names the
    workspace version. Read every image before the bump merges.
-5. **The changelog names the release.** `[Unreleased]` becomes the version and
-   the date, with a fresh empty `[Unreleased]` above it and a new link
-   reference. What sits under the version heading is what the release notes
+5. **The changelog names the release.** Run
+   `scripts/release/changelog.sh --assemble X.Y.Z YYYY-MM-DD` on the release
+   branch: it writes `## [X.Y.Z] - YYYY-MM-DD` under the empty `[Unreleased]`
+   from every fragment under `changelog.d/`, section by section in the Keep a
+   Changelog order, moves the link references on and `git rm`s the fragments
+   (`changelog.d/README.md`). Then write the release summary under the new
+   heading. `scripts/release/changelog.sh --preview` shows the section before
+   you cut. What sits under the version heading is what the release notes
    say, so read it as the release notes before you tag. The heading carries
    the date, because the support period in the notes counts from it.
 6. **Every Security entry names its advisory.** Each `### Security` entry
@@ -363,6 +369,7 @@ The checks, in the order the plan job runs them:
 | The tag equals the version in `Cargo.toml`, `CITATION.cff` and `docs/VERSIONS.md` | `plan.sh` |
 | The changelog has only Keep a Changelog types, each once per section | `scripts/checks/changelog-structure.sh` |
 | The section being cut opens its `### Security` with the reason when it mixes security and functional changes, and every Security entry names a GHSA id or a `security/vex/` path | `scripts/checks/changelog-security.sh --section X.Y.Z` |
+| No fragment is left under `changelog.d/` for the notes to miss | `plan.sh` (`check_changelog_fragments`, with `scripts/release/changelog.sh --check`) |
 | The previous release resolves from the pushed tags | `plan.sh prev-tag` |
 | The changelog section becomes the notes, with the support period and the CRA user information link | `plan.sh notes` |
 

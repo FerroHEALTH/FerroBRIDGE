@@ -313,14 +313,18 @@ jobs:
       # Every released changelog section against its text at its tag, which
       # it fetches from origin when the shallow checkout lacks it.
       - run: bash scripts/checks/changelog-released.sh
-      # The changelog's Keep a Changelog structure, and the Security rules
-      # over [Unreleased]: a Security section beside other changes gives its
-      # reason, and every entry names a GHSA id or a security/vex/ path (CRA
-      # Annex I Part II(2), (4) and (8)). The release plan job runs both over
-      # the section being cut, through scripts/release/plan.sh.
+      # The changelog's Keep a Changelog structure, every fragment under
+      # changelog.d/ well formed, and the structure and Security rules over
+      # [Unreleased] with every fragment folded in, as the next cut writes it:
+      # a Security section beside other changes gives its reason, and every
+      # entry names a GHSA id or a security/vex/ path (CRA Annex I Part II(2),
+      # (4) and (8)). The release plan job runs both over the section being
+      # cut, through scripts/release/plan.sh.
       - run: bash scripts/checks/changelog-structure.sh
       - run: bash scripts/checks/changelog-security.sh --self-test
-      - run: bash scripts/checks/changelog-security.sh
+      - run: bash scripts/release/changelog.sh --self-test
+      - run: bash scripts/release/changelog.sh --check
+      - run: bash scripts/release/changelog.sh --check-preview
       - run: bash scripts/release/plan.sh --self-test
       # The weekly freshness read's own reader of the Chrome for Testing
       # feed, over fixtures and with no network.
@@ -433,7 +437,6 @@ jobs:
           bash scripts/gh/fields.sh --self-test
           bash scripts/gh/labels.sh --self-test
           bash scripts/gh/migrate-fields.sh --self-test
-          bash scripts/gh/changelog-merge.sh --self-test
           bash scripts/gh/watch-prs.sh --self-test
           bash scripts/deploy-probe.sh --self-test
           bash scripts/release/milestone.sh --self-test
@@ -1234,6 +1237,46 @@ jobs:
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo run --locked -p omop-cdm-codegen -- emit --check
 
+  # The changelog guard (Keep a Changelog 1.1.0; the fragments are our own
+  # design, no specification governs them): a pull request that changes a
+  # user-visible surface adds a fragment under changelog.d/
+  # (changelog.d/README.md), and no pull request writes under CHANGELOG.md's
+  # [Unreleased], the lines every open pull request used to conflict on. The
+  # `no-changelog` label waives the entry, never the [Unreleased] refusal. The
+  # fragments' form and the preview's structure and Security rules run in the
+  # `versions` job on every event. Pull requests only: the entry is a
+  # base..head diff plus a label, which a merge group does not carry.
+  changelog-guard:
+    name: changelog-guard
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read # the labels when the step runs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - run: bash scripts/checks/changelog-guard.sh --self-test
+      - name: Require a changelog fragment for user-visible changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Read when the step runs: a re-run replays the event payload (#1160).
+          if [ "$(gh api "repos/${GH_REPO}/pulls/${PR}" --jq 'any(.labels[].name; . == "no-changelog")')" = true ]; then
+            echo "no-changelog label set: the entry is waived, an [Unreleased] edit is still refused."
+            bash scripts/checks/changelog-guard.sh --waived "$BASE" "$HEAD"
+            exit 0
+          fi
+          bash scripts/checks/changelog-guard.sh "$BASE" "$HEAD"
+
   # The per-crate bump rule (.claude/rules/crates-publishing.md): a pull
   # request that changes a crate's packaged content moves that crate's version
   # in the same change, because a published version is immutable. The
@@ -1408,6 +1451,7 @@ jobs:
       - codegen-drift
       - codegen-emit-tests
       - omop-cdm-codegen-drift
+      - changelog-guard
       - crate-version-guard
       - publish-dry-run
       - dependency-review
