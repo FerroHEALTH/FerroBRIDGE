@@ -3,9 +3,11 @@
 
 # Configuring the server
 
-FerroBRIDGE reads an optional TOML file, then environment variables over it.
-Nothing else configures the process. No specification governs this; it is
-FerroBRIDGE's own design.
+FerroBRIDGE reads its defaults, an optional TOML file, environment variables
+over it, and the `--set key=value` pairs of the command line last, through the
+FerroHEALTH family's loader (`ferrohealth-config`), so every FerroHEALTH
+product reads its configuration the same way. Nothing else configures the
+process. No specification governs this; it is FerroBRIDGE's own design.
 
 <!-- toc -->
 
@@ -13,7 +15,24 @@ FerroBRIDGE's own design.
 
 `ferrobridge serve --config /etc/ferrobridge/config.toml` names the file. With
 no flag, `FERROBRIDGE_CONFIG` names it. With neither, the defaults below stand
-and the server serves with no upstream configured.
+and the server serves with no upstream configured. `--set` sets one key over
+the file and the environment, and repeats:
+
+```sh
+ferrobridge serve --set server.listen=0.0.0.0:8080 --set telemetry.format=json
+```
+
+## Checking a configuration before a restart
+
+`ferrobridge config check` reads the configuration exactly as `serve` would,
+prints the running tree one key per line with where each value came from (the
+default, the file, the environment or a `--set`), with every secret shown as
+`***`, and then resolves it as `serve` does. It exits 0 when `serve` would
+start, and 78 with every refusal on stderr when it would not:
+
+```sh
+ferrobridge config check --config /etc/ferrobridge/config.toml
+```
 
 ## How an environment variable maps to a key
 
@@ -39,24 +58,50 @@ the key.
 
 Every key below is settable in the file and as `FERROBRIDGE__<SECTION>__<KEY>`.
 A key marked secret also accepts a `<key>_file` sibling naming a file the
-server reads once at boot, with surrounding whitespace trimmed.
+server reads once at boot, with its trailing line ending removed; an empty
+file is refused.
 
 ### `[server]`
+
+The section is the FerroHEALTH family's (`ferrohealth-server`).
 
 | Key | Default | Meaning |
 |---|---|---|
 | `listen` | `127.0.0.1:8080` | The socket address to bind |
+| `base_path` | empty | The path every route is served under: empty, or starting with `/` and not ending with one |
 | `request_timeout_ms` | `30000` | How long one request may take before the server answers `408` (`504` under `/fhir`) |
-| `shutdown_timeout_ms` | `10000` | How long the drain may take after `SIGTERM` or `SIGINT` |
+| `header_read_timeout_ms` | `30000` | How long a client may take to send a request head; a client still sending one then is disconnected |
 | `body_limit_bytes` | `1048576` | The largest request body read before the server answers `413` |
+| `drain_delay_ms` | `0` | How long readiness stays withdrawn after `SIGTERM` or `SIGINT` before the listener closes |
+| `shutdown_timeout_ms` | `10000` | How long the requests in flight may take once the listener closed |
+| `max_concurrent_requests` | unset | How many requests the server serves at once; past it a request is answered `503` with `Retry-After`, and the health routes are never refused |
+| `retry_after_s` | `1` | The seconds a refused request is told to wait |
+| `trusted_proxies` | `[]` | The reverse proxies, each an address or a CIDR block, whose forwarded client address is believed |
+| `forwarded_header` | `forwarded` | The header a trusted proxy names the client in: `forwarded` or `x-forwarded-for` |
+| `compression` | `true` | Whether a response is compressed with gzip or Brotli when the client accepts one |
+| `compression_min_bytes` | `1024` | The smallest response body that is compressed |
+
+`[server.tls]` serves the listener over TLS: `certificate_file` and
+`key_file` (PEM), `client_auth` (`none`, `optional` or `required`) with
+`client_ca_file`, `reload_interval_s` (unset, only `SIGHUP` reads the files
+again), `healthcheck_identity_file` for `ferrobridge healthcheck` against a
+listener that asks a client certificate, and `min_version` (`"1.3"` unless
+lowered to `"1.2"`). Without it the listener speaks plain HTTP behind a proxy
+that terminates TLS. `[server.caller_rate]` is refused: the bridge limits no
+caller's rate; bound the server with `max_concurrent_requests`.
 
 ### `[telemetry]`
 
 | Key | Default | Meaning |
 |---|---|---|
 | `format` | `auto` | `auto`, `json` or `pretty`; `auto` is `pretty` on a terminal and `json` otherwise |
-| `filter` | `info,hyper=warn,tower=warn,h2=warn` | A `RUST_LOG`-style directive; a directive that does not parse falls back to this default and says so once |
+| `filter` | `info,hyper=warn,tower=warn,h2=warn` | A `RUST_LOG`-style directive; a directive that does not parse refuses the start, naming the key |
 | `logged_query_parameters` | `[]` | The query parameter names whose values may reach the request log, each value cut at 64 characters |
+| `environment` | unset | The deployment environment, such as `production` |
+
+The section is the FerroHEALTH family's (`ferrohealth-telemetry`). This build
+exports no traces and no metrics, so a `[telemetry.otlp]` table refuses the
+start.
 
 Nothing else about a request is logged. Add a name to
 `logged_query_parameters` only for a parameter you know carries no identifying
@@ -76,17 +121,17 @@ and over `FERROBRIDGE__TELEMETRY__FORMAT` and `FERROBRIDGE__TELEMETRY__FILTER`:
 FERROBRIDGE_LOG_FORMAT=pretty RUST_LOG=debug ferrobridge serve
 ```
 
-`auto` writes `pretty` with colour on a terminal and `json` without colour
-anywhere else, so a container or a log pipeline gets one JSON object per line
-with no configuration. An explicit `pretty` keeps its colour into a pipe.
-Colour only wraps text, so a line reads the same once a collector strips the
-escapes. In `pretty`, a carriage return or line feed inside a logged value is
-written as the two characters `\r` or `\n`, so no value can start a second
-line; `json` escapes it inside the string.
+`auto` writes `pretty` on a terminal and `json` anywhere else, so a container
+or a log pipeline gets one JSON object per line with no configuration.
+`pretty` writes colour on a terminal unless `NO_COLOR` is set. In `pretty`, a
+carriage return or line feed inside a logged value is written as the two
+characters `\r` or `\n`, so no value can start a second line; `json` escapes
+it inside the string.
 
-Under `pretty`, `ferrobridge serve` prints a banner to stdout before the first
-log line: the wordmark, the version, the pins this build serves, the commit and
-build instant, and each lane with the hosts it reaches. A host is the URL's
+Under `pretty`, `ferrobridge serve` prints the family's banner to stdout
+before the first log line: the wordmark, the version with the commit, the
+build instant and the compiler, the product line, the maintainer and the site,
+the pins this build serves, and each lane with the hosts it reaches. A host is the URL's
 host and port and never its user information. Under `json` nothing but log
 lines reaches stdout.
 
@@ -94,7 +139,7 @@ The first boot events describe the process:
 
 | Event | Fields |
 |---|---|
-| `console` | `format`, `rendering`, `filter` (the one in effect, after a fallback), `colour` |
+| `console` | `format` (the rendering in effect), `colour`, `filter` |
 | `build` | `version`, `commit`, `built_at`, `rustc`, `openehr_crates`, `fhir_types` |
 | `lane` | `lane` (`facade`, `operations`, `etl` or `terminology`), `enabled`, `identifiable`, and where set `cdr_host`, `terminology_host`, `cdm_host`, `cdm_schema`, `bridge_schema`, `contexts`, `programs`, `templates` |
 
@@ -890,12 +935,15 @@ a file never shows up in `docker inspect` or a process listing.
 
 ## What a bad configuration does
 
-The server refuses to start and prints one line on stderr naming the key, then
-exits 78, `EX_CONFIG`. Seven things are refused:
+The server refuses to start and prints the refusal on stderr naming the key,
+the variable that set it and, for an unknown key, the closest known one, then
+exits 78, `EX_CONFIG`; up to several refused keys are reported at once. These
+are refused:
 
 - an unknown key or an unknown section;
-- a value of the wrong type, or one that is not a socket address, a URL, or a
-  release name;
+- a value of the wrong type, or one that is not a socket address, a URL, a
+  release name or a `tracing` filter;
+- `[server.caller_rate]`, and `[telemetry.otlp]` in this build;
 - a user beside the OAuth section of the same credentials section, an OAuth
   section with both an `issuer` and a `token_endpoint` or neither, an
   `issuer` that is not an `https` URL free of a query and a fragment, a

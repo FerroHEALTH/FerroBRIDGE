@@ -56,7 +56,7 @@ lane is mounted and compiled without needing a composition of yours.
 
 A readiness `503` is `failing`, and the script prints the start of its body,
 which names the indicator that is down. During the start, before the lanes are
-mounted, every route but `/` and the two health probes answers `503`, so run the
+mounted, every route but `/` and the health routes answers `503`, so run the
 script after readiness answers `200`.
 
 An `uncovered` lane is never counted as passed. The script cannot tell you

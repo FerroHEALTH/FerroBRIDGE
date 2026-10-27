@@ -25,6 +25,23 @@ crates on crates.io.
 
 ### Added
 
+- **`ferrobridge config check` and `ferrobridge healthcheck`** (#1260), the
+  FerroHEALTH family's subcommands from `ferrohealth-server`. `config check`
+  prints the running configuration one key per line with where each value
+  came from and every secret as `***`, then resolves it as `serve` does and
+  exits 78 with every refusal on stderr. `healthcheck` asks the running
+  server for `/health/readiness` on loopback and exits 0 only on `200`, and
+  the image declares a `HEALTHCHECK` through it. Every subcommand takes
+  `--set key=value`, applied over the file and the environment.
+- **`GET /operator/readiness`** behind the operator scope: the readiness
+  document with why each indicator is down, which the open route no longer
+  names. The operator console reads it, and falls back to the open route
+  while the operator API is off.
+- **The family's `[server]` keys** (#1287): `base_path`,
+  `header_read_timeout_ms`, `drain_delay_ms`, `max_concurrent_requests`,
+  `retry_after_s`, `trusted_proxies`, `forwarded_header`, `compression`,
+  `compression_min_bytes` and `[server.tls]`, and `[telemetry] environment`.
+
 - **`ferrobridge-hl7v2` sends over MLLP** (#1281). `mllp::send` opens a
   connection within a connect timeout, writes one message as one MLLP frame
   and returns the one reply frame within a reply timeout, bounded by the
@@ -106,6 +123,38 @@ crates on crates.io.
   (`Program::column_reads`), and `ferrobridge-hl7v2` moves to 0.1.147.
 
 ### Changed
+
+- **The server runs on the FerroSYS crates** (#1287): `ferrohealth-config`,
+  `ferrohealth-secret`, `ferrohealth-telemetry`, `ferrohealth-health`,
+  `ferrohealth-server` and `ferrohealth-usage-report`, pinned exactly, in
+  place of its own configuration loader, console, request log, request id,
+  panic catch, health registry, drain and usage report. Every key and
+  variable keeps its name. What an operator sees change: a secret renders as
+  `***`; a `_file` secret loses its trailing line ending alone and an empty
+  file is refused; a `[telemetry] filter` that does not parse refuses the
+  start; a refusal names the closest known key and several are reported at
+  once; `[server.caller_rate]` and `[telemetry.otlp]` are refused; a
+  response is compressed when the client accepts gzip or Brotli. The
+  readiness document is the family's: `phase` beside `state`, the indicators
+  as a list sorted by name, readiness `503` while the process boots or
+  drains, `GET /health` answers the state alone, and the open route names no
+  indicator's detail. The request log never logs the client's
+  `X-Request-Id`: the line, a panic or refusal body and the CDR calls name the
+  server's own id, and the client's is echoed on the response. The panic line
+  never names the panic message. The banner is the family's, and
+  `/health/info` names the commit in seven characters. The usage report
+  leaves out a counter that stayed at 0.
+- **The operator console runs on the FerroSYS crates** (#1287): its
+  configuration through `ferrohealth-config` and `ferrohealth-secret` (every
+  `FERROBRIDGE_CONSOLE__` variable keeps its name, `--set` joins them,
+  `RUST_LOG` is the alias of the new `[telemetry] filter`), its log through
+  `ferrohealth-telemetry`, and its security headers, same-origin check,
+  health routes, drain, healthcheck and subcommands through
+  `ferrohealth-server`. `config check` prints the running configuration with
+  every secret as `***`; `healthcheck` asks `/health/readiness`; `GET /health`
+  answers `{"state":"up"}`; a `_file` secret loses its trailing line ending
+  alone; the 403 of a cross-site post is in the console's configured
+  language.
 
 - **`ferrohealth-smart` 0.8.6 and the `openehr-*` crates 0.0.109** (#1287).
   The workspace requires `ferrohealth-smart` as the caret `0.8.6` and the

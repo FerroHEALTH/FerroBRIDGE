@@ -31,6 +31,8 @@ pub struct Settings {
     pub session: SessionSettings,
     /// The OpenID Provider operators sign in with, when one is configured.
     pub oidc: Option<OidcSettings>,
+    /// The console log, the family's `[telemetry]` section.
+    pub telemetry: ferrohealth_telemetry::section::TelemetrySection,
 }
 
 /// The resolved `[bridge]`.
@@ -158,6 +160,7 @@ impl Config {
             bridge: BridgeSettings { base, timeout },
             session,
             oidc,
+            telemetry: self.telemetry.clone(),
         })
     }
 }

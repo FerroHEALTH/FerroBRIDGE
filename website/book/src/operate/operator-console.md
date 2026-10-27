@@ -10,6 +10,20 @@ access token, so the bridge checks that token as it checks any other
 client's. No specification governs the console: it is FerroBRIDGE's own
 design.
 
+## Configuring and checking it
+
+The console reads its configuration the way the bridge does, through the
+FerroHEALTH family's loader: its defaults, the file `--config` or
+`FERROBRIDGE_CONSOLE_CONFIG` names, `FERROBRIDGE_CONSOLE__<SECTION>__<KEY>`
+variables over it, and `--set key=value` pairs last. A secret is set inline
+or through its `<key>_file` sibling, whose trailing line ending is removed.
+`[telemetry]` is the family's console section, and `RUST_LOG` sets its
+`filter`. `ferrobridge-console config check` prints the running configuration
+with every secret as `***` and exits 78 when the console would not start.
+`ferrobridge-console healthcheck` asks the console on loopback for
+`GET /health/readiness` and exits 0 only on `200`; the image's `HEALTHCHECK`
+runs it.
+
 ## Signing in
 
 Operators sign in at your OpenID Provider. The console is an OAuth 2.0
@@ -97,7 +111,8 @@ page it drew.
 - **Dashboard** (`/`): the running load's contexts, its errors and
   warnings, the upstreams the bridge reaches, what needs attention, and
   the flow from the callers through the faces and the mapping set to the
-  upstreams (`GET /health/info`, `GET /health/readiness`,
+  upstreams (`GET /health/info`, `GET /operator/readiness` or, with the
+  operator API off, `GET /health/readiness`,
   `GET /operator/state`).
 - **Mapping set** (`/mappings`): the load report and five tabs. Contexts
   lists each context with its resource type, template, models, search

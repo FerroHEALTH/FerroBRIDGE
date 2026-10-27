@@ -1491,7 +1491,11 @@ dependencies = [
  "cookie",
  "ferrobridge-operator-api",
  "ferrobridge-testkit",
+ "ferrohealth-config",
  "ferrohealth-health",
+ "ferrohealth-secret",
+ "ferrohealth-server",
+ "ferrohealth-telemetry",
  "ferrohealth-ui",
  "fhir-types",
  "fluent-templates",
@@ -1509,7 +1513,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
- "toml",
  "tower",
  "tower-http 0.7.1",
  "tracing",
@@ -1771,6 +1774,7 @@ dependencies = [
  "tower",
  "tower-http 0.7.1",
  "tracing",
+ "url",
  "uuid",
 ]
 

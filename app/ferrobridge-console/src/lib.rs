@@ -20,9 +20,10 @@
 //! each action is a link or a plain form the server answers ([`posts`],
 //! [`prefs`]); once the page has hydrated, a form posts through its server
 //! function ([`actions`]) and a link is followed in the page. [`editors`]
-//! holds the console's own components. [`server`] serves it all under the browser security headers, [`config`]
-//! reads the TOML configuration, [`cli`] and [`command`] run the binary, and
-//! [`healthcheck`] is the job a container runtime runs beside it. No
+//! holds the console's own components. [`server`] serves it all under the
+//! family's browser security headers, [`config`] reads the configuration
+//! through `ferrohealth-config`, and [`cli`] and [`command`] run the binary
+//! with the family's `serve`, `config check` and `healthcheck`. No
 //! specification governs the console: our own design.
 //!
 //! The server half compiles for the host and the browser half for
@@ -52,8 +53,6 @@ pub mod cli;
 pub mod command;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod config;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod healthcheck;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod oidc;
 #[cfg(not(target_arch = "wasm32"))]

@@ -228,7 +228,7 @@ pub fn registry(
 /// and the lanes join the same listener once they start. A `shutdown` during
 /// the wait ends the function without an error. Once the lanes start, the
 /// usage report logs its boot line and, when it is on, runs in the background
-/// until serving ends ([`crate::usage_report::reporter::start`]).
+/// until serving ends ([`crate::usage_report::start`]).
 ///
 /// # Errors
 /// Returns the error of a start that fails for any reason other than a CDR
