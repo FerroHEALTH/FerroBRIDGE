@@ -23,9 +23,10 @@ and the two say the same thing.
    `compose.yaml`. `scripts/checks/versions.sh` fails on any file left behind.
    This is the product line only; the library crates keep their own versions
    ([crate versions](crate-versions.md)).
-3. **The changelog names the release.** `[Unreleased]` becomes the version and
-   the date, with a fresh empty `[Unreleased]` above it and a new link
-   reference. What sits under the version heading is what the release notes
+3. **The changelog names the release.**
+   `scripts/release/changelog.sh --assemble X.Y.Z YYYY-MM-DD` writes the
+   version's section from the fragments under `changelog.d/`, deletes them
+   and moves the link references on. What sits under the version heading is what the release notes
    say, so read it as the release notes before you tag.
 4. **The gates pass on the release commit.** The same set CI runs
    ([checks and gates](checks-and-gates.md)).

@@ -23,8 +23,8 @@
 #   plan.sh support-end <YYYY-MM-DD>
 #       Prints the month the support period of a release of that date ends.
 #   plan.sh --self-test
-#       Proves prev-tag's ordering, support-end's arithmetic and the notes
-#       composition offline.
+#       Proves prev-tag's ordering, support-end's arithmetic, the notes
+#       composition and the fragment check offline.
 #
 # The milestone check reads the tracker through gh (GH_TOKEN in CI, the
 # logged-in gh locally). Exit 2 on a usage error.
@@ -206,6 +206,21 @@ check_changelog_security() {
   bash scripts/checks/changelog-security.sh --section "$VERSION"
 }
 
+# The cut assembles every fragment under changelog.d/ into the section it
+# writes and deletes them (scripts/release/changelog.sh --assemble), so a
+# fragment left at the tagged commit is an entry the release notes would miss.
+check_changelog_fragments() {
+  local left
+  bash scripts/release/changelog.sh --check
+  left="$(find changelog.d -maxdepth 1 -type f ! -name README.md | sort)"
+  if [[ -n "$left" ]]; then
+    echo "::error::changelog.d/ still holds fragments the cut did not assemble; run scripts/release/changelog.sh --assemble $VERSION <date> on the release branch:" >&2
+    echo "$left" >&2
+    return 1
+  fi
+  echo "no fragment is left under changelog.d/"
+}
+
 # The previous release, by version order from `git ls-remote`, named in the
 # log so the cut reads what it is measured against.
 check_prev_tag() {
@@ -227,6 +242,7 @@ check_milestone The milestone titled as the tag holds no open item
 check_version The tag matches the declared product version
 check_changelog_structure Changelog structure (no duplicate subsections, canonical types)
 check_changelog_security The Security section of the cut names its advisories and its reason
+check_changelog_fragments No changelog fragment is left unassembled
 check_prev_tag The previous release resolves from the pushed tags
 check_notes The changelog section for this tag becomes the release notes, with the support period and the CRA user information link
 EOF
@@ -296,6 +312,23 @@ self_test_notes() {
   rm -rf "$tmp"
 }
 
+# The fragment check in a scratch tree: a changelog.d/ holding only its README
+# passes, and a fragment the cut did not assemble is refused.
+self_test_fragments() {
+  local tmp script
+  tmp="$(mktemp -d)"
+  script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/changelog.sh"
+  mkdir -p "$tmp/scripts/release" "$tmp/changelog.d"
+  cp "$script" "$tmp/scripts/release/changelog.sh"
+  printf 'The fragment format.\n' >"$tmp/changelog.d/README.md"
+  expect "a changelog.d/ holding only its README passes" \
+    "$( (cd "$tmp" && VERSION=1.2.3 check_changelog_fragments) >/dev/null 2>&1 && echo passed || echo "$refused")" passed
+  printf -- '- An entry.\n' >"$tmp/changelog.d/7-left.added.md"
+  expect "a fragment left unassembled is refused" \
+    "$( (cd "$tmp" && VERSION=1.2.3 check_changelog_fragments) >/dev/null 2>&1 && echo passed || echo "$refused")" "$refused"
+  rm -rf "$tmp"
+}
+
 self_test() {
   local fails=0 got refused="refused"
   expect() {
@@ -323,6 +356,7 @@ self_test() {
   expect "a month out of range" "$(support_end 2026-13-01 || echo "$refused")" "$refused"
   expect "a day out of range" "$(support_end 2026-04-31 || echo "$refused")" "$refused"
   self_test_notes
+  self_test_fragments
   if [[ "$fails" -gt 0 ]]; then
     echo "plan.sh self-test FAILED ($fails case(s))" >&2
     exit 1

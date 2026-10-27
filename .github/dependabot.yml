@@ -44,8 +44,12 @@ updates:
 
   - package-ecosystem: "cargo"
     directory: "/"
+    # Dependency bumps default to the changelog-guard escape: triage adds a
+    # fragment when a bump is user-visible, which the guard accepts with the
+    # label present.
     labels:
       - "dependencies"
+      - "no-changelog"
     schedule:
       interval: "weekly"
     # Longer for a major than for an action: a compromised crate executes in
@@ -80,8 +84,10 @@ updates:
     directories:
       - "/docker"
       - "/docker/console"
+    # The changelog-guard escape, as for the cargo bumps above.
     labels:
       - "dependencies"
+      - "no-changelog"
     schedule:
       interval: "weekly"
     # The base image is pinned by index digest, so a bump is a change of
