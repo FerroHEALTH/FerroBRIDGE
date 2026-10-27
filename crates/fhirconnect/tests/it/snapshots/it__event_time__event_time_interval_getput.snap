@@ -19,6 +19,7 @@ expression: interval
     "ctx/time = \"2026-09-13T08:00:00Z\""
   ],
   "changed": [
-    "ctx/composer_name: \"FerroBRIDGE\" became \"FHIRconnect\""
+    "ctx/composer_name: \"FerroBRIDGE\" became \"FHIRconnect\"",
+    "synthetic_observation_events/synthetic_reading/reading:0/math_function|value: \"synthetic function\" became \"actual\""
   ]
 }
