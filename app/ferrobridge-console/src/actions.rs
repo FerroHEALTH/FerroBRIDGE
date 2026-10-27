@@ -4,14 +4,14 @@
 //! What the operator posts and what the bridge answered: Reload the set,
 //! the editor's check and save, and the playground's runs.
 //!
-//! Each action is a `POST` form to its own route, which works with no
-//! WebAssembly: the route draws the page again with the outcome in context
-//! (`crate::posts`). Once the page has hydrated, the form's own submit
-//! listener sends the same post through the server function here and the
-//! page draws the outcome in place, so nothing reloads the document.
-//! Either way nothing the operator entered or the bridge answered reaches a
-//! URL, the history or a store. No specification governs the console: our
-//! own design.
+//! Each action is a server function behind FerroUI's `<ActionForm>` in its
+//! answer mode. Once the page has hydrated, the form calls the function and
+//! the page draws its answer in place. With no WebAssembly the form posts to
+//! the function, and `ferrohealth_ui::widget::action::draw_answers` draws
+//! the page the form was on with the answer and the posted fields. Either
+//! way nothing the operator entered or the bridge answered reaches a URL,
+//! the history or a store. No specification governs the console: our own
+//! design.
 #![cfg_attr(
     target_arch = "wasm32",
     allow(
@@ -21,15 +21,12 @@
 )]
 
 use ferrobridge_operator_api::operator::LoadReport;
+use ferrohealth_ui::widget::action::Posted;
 use leptos::prelude::*;
-use leptos::server_fn::codec::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::locale::messages::Msg;
 use crate::model::{Answered, Loaded, ViewError};
-
-// TODO(#1265): the forms post through `<ActionForm>` once its plain post can
-// bring an answer back to its page (FerroHEALTH/FerroUI#485).
 
 /// The outcome of the reload the operator just asked for.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -50,6 +47,22 @@ pub struct EditorPost {
     pub reason: String,
     /// What the post asks: `check`, `save`, `confirm`, `back` or `discard`.
     pub decision: String,
+}
+
+impl EditorPost {
+    /// The post a plain post of the editor's form carried, as `posted`
+    /// holds it.
+    #[must_use]
+    pub fn from_posted(posted: &Posted) -> Self {
+        let field = |name: &str| posted.field(name).unwrap_or_default().to_owned();
+        Self {
+            draft: field("draft"),
+            base: field("base"),
+            path: field("path"),
+            reason: field("reason"),
+            decision: field("decision"),
+        }
+    }
 }
 
 /// The field of the editor's form a post is refused for.
@@ -106,6 +119,22 @@ pub struct PlaygroundPost {
     pub resource_type: String,
 }
 
+impl PlaygroundPost {
+    /// The post a plain post of the playground's form carried, as `posted`
+    /// holds it.
+    #[must_use]
+    pub fn from_posted(posted: &Posted) -> Self {
+        let field = |name: &str| posted.field(name).unwrap_or_default().to_owned();
+        Self {
+            input: field("input"),
+            template: field("template"),
+            patient: field("patient"),
+            format: field("format"),
+            resource_type: field("resource_type"),
+        }
+    }
+}
+
 /// What the bridge answered a run of the playground.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PlaygroundAnswer {
@@ -143,7 +172,7 @@ pub struct Ran {
     pub answer: PlaygroundAnswer,
 }
 
-/// Reloads the set, as `POST /mappings` does.
+/// Reloads the set.
 ///
 /// # Errors
 /// Returns [`ViewError::SignedOut`] without a live session, and
@@ -154,32 +183,43 @@ pub async fn reload_set() -> Result<Reloaded, ViewError> {
     Ok(crate::posts::reloaded(&state, &token).await)
 }
 
-/// Checks the draft, asks to confirm a save, saves it, or steps back, as
-/// the editor's post to `address` does.
+/// Checks the draft, asks to confirm a save, saves it, or steps back, for
+/// the editor at `address`. Discard answers `303 See Other` to the file the
+/// draft was opened from; only a plain post sends it, as the page discards
+/// in place once it has hydrated.
 ///
 /// # Errors
 /// As [`reload_set`].
-#[server(endpoint = "edit", input = Json)]
+#[server(endpoint = "edit")]
 pub async fn edit_draft(
     /// The editor's own address.
     address: String,
     /// What the editor posts.
+    #[server(flatten)]
     post: EditorPost,
 ) -> Result<Edited, ViewError> {
     let (state, token) = crate::session::request::signed_in()?;
+    if post.decision == "discard" {
+        crate::posts::leave_for(&crate::posts::discarded(&address))?;
+        return Ok(Edited {
+            post,
+            answer: EditorAnswer::Back,
+        });
+    }
     Ok(crate::posts::edited(&state, &token, &address, post).await)
 }
 
 /// Runs the operation of the playground's tab at `address` over what the
-/// operator entered, as its post does.
+/// operator entered.
 ///
 /// # Errors
 /// As [`reload_set`].
-#[server(endpoint = "run", input = Json)]
+#[server(endpoint = "run")]
 pub async fn run_operation(
     /// The address of the playground's tab.
     address: String,
     /// What the playground posts.
+    #[server(flatten)]
     post: PlaygroundPost,
 ) -> Result<Ran, ViewError> {
     let (state, token) = crate::session::request::signed_in()?;

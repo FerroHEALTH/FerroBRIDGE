@@ -15,8 +15,21 @@ use serde_json::json;
 use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use crate::stub::{CONTEXT, DIGEST, MODEL, bridge, post, signed_in};
+use crate::stub::{CONTEXT, DIGEST, MODEL, answer_post, bridge, signed_in};
 use crate::support::{Captured, get_with, send};
+
+/// A plain post of `form` from the editor at `page`, as its answer form sends
+/// it to `/api/edit` with the page's address, carrying `cookie`.
+fn post(
+    page: &str,
+    form: &str,
+    cookie: &str,
+) -> Result<http::Request<axum::body::Body>, Box<dyn Error>> {
+    let address = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("address", page)
+        .finish();
+    answer_post("/api/edit", page, &format!("{form}&{address}"), cookie)
+}
 
 /// The draft the operator saves, with a marker no log may carry.
 const DRAFT: &str = "grammar: FHIRConnect/v1.0.0\ntype: context\nmetadata:\n  name: synthetic-draft-marker\n# naïve <b>\n";
@@ -71,7 +84,7 @@ async fn the_editor_opens_a_console_file_in_a_post_form_with_its_digest_and_the_
     let (response, body) = send(&service, get_with(&editor(), &cookie)?).await?;
     assert_eq!(StatusCode::OK, response.status());
     assert!(
-        body.contains(r#"<form id="editor" method="post""#),
+        body.contains(r#"<form action="/api/edit" method="post" id="editor""#),
         "{body}"
     );
     assert!(
@@ -404,5 +417,25 @@ async fn a_draft_posted_with_the_crlf_a_text_area_submits_is_saved_with_lf()
         vec![DRAFT.as_bytes().to_vec()],
         received(&bridge, "PUT").await?
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_plain_discard_goes_back_to_the_file_and_sends_nothing() -> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let before = bridge.received_requests().await.ok_or("recorded")?.len();
+    let (response, _body) = send(
+        &service,
+        post(&editor(), &form("discard", "", DIGEST, ""), &cookie)?,
+    )
+    .await?;
+    assert_eq!(StatusCode::SEE_OTHER, response.status());
+    assert_eq!(
+        format!("/mappings/files/{CONTEXT}"),
+        crate::support::header(&response, "location")
+    );
+    let after = bridge.received_requests().await.ok_or("recorded")?.len();
+    assert_eq!(before, after, "a discard asked the bridge");
     Ok(())
 }

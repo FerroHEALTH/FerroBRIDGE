@@ -27,7 +27,8 @@ use ferrohealth_ui::view::transform::{
     Answer, AnswerState, Density, Run, RunState, TransformPane, run_button, transform_options,
     transform_pair, transform_quiet,
 };
-use leptos::form::FromFormData as _;
+use ferrohealth_ui::widget::action::{answer_field, answered};
+use leptos::form::{ActionForm, FromFormData as _};
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 
@@ -105,17 +106,15 @@ pub fn page() -> impl IntoView {
     .into_any()
 }
 
-/// How the playground's form posts once the page has hydrated: through the
-/// `run` server function, with the post it last sent.
+/// How the playground's form posts: through the `run` server function,
+/// with the post it last sent.
 #[derive(Clone, Copy)]
 struct Running {
-    /// The server action the form dispatches.
+    /// The server action the form calls.
     run: ServerAction<RunOperation>,
-    /// The post the form last sent.
+    /// The post the form last sent: in the page, or the plain post the
+    /// server drew the page after.
     last: RwSignal<PlaygroundPost>,
-    /// The run the server drew the page with, after a post with no
-    /// WebAssembly.
-    posted: StoredValue<Option<Ran>>,
 }
 
 impl std::fmt::Debug for Running {
@@ -129,24 +128,22 @@ impl Running {
     fn new() -> Self {
         let run = ServerAction::<RunOperation>::new();
         crate::load::drawn_after(run);
+        let posted = answered(&run);
         Self {
             run,
-            last: RwSignal::new(PlaygroundPost::default()),
-            posted: StoredValue::new((*SharedValue::new(use_context::<Ran>)).clone()),
+            last: RwSignal::new(PlaygroundPost::from_posted(&posted)),
         }
     }
 
-    /// The run the page draws: the last one the form sent in the page, else
-    /// the one the server drew it with.
+    /// The run the page draws: the last answer of the form, in the page or
+    /// to the plain post the server drew it after.
     fn ran(self) -> Option<Ran> {
-        match self.run.value().get() {
-            Some(Ok(ran)) => Some(ran),
-            Some(Err(fault)) => Some(Ran {
+        self.run.value().get().map(|answer| {
+            answer.unwrap_or_else(|fault| Ran {
                 post: self.last.get_untracked(),
                 answer: PlaygroundAnswer::Answered(Err(fault)),
-            }),
-            None => self.posted.get_value(),
-        }
+            })
+        })
     }
 }
 
@@ -224,27 +221,20 @@ fn drawn(
         _ => to_fhir(&post, ran, off, templates),
     };
     let address = tab_href(tab);
-    // NOTE: no specification governs this: our own design; the form keeps its own
-    // route as `action`, so a post with no WebAssembly draws the page with its answer.
-    let submit = {
-        let address = address.clone();
-        move |event: leptos::ev::SubmitEvent| {
-            let Ok(post) = PlaygroundPost::from_event(&event) else {
-                return;
-            };
-            event.prevent_default();
-            running.last.set(post.clone());
-            running.run.dispatch(RunOperation {
-                address: address.clone(),
-                post,
-            });
+    // NOTE: UI Events §3.1: a capture listener on an ancestor runs before the form's
+    // own, so the post is kept before `<ActionForm>` sends it.
+    let submit = move |event: leptos::ev::SubmitEvent| {
+        if let Ok(post) = PlaygroundPost::from_event(&event) {
+            running.last.set(post);
         }
     };
     let panel = view! {
-        <form method="post" action=address class="fui-panel" on:submit=submit>
+        <ActionForm action=running.run attr:class="fui-panel">
+            {answer_field()}
+            <input type="hidden" name="address" value=address />
             {options}
             {transform_pair(input, answer)}
-        </form>
+        </ActionForm>
     }
     .into_any();
     let tabs = TABS
@@ -253,7 +243,9 @@ fn drawn(
         .collect();
     view! {
         {header}
-        <div class="fui-stack">{binder(tr(Msg::Playground), tabs, tab, panel)}</div>
+        <div class="fui-stack" on:submit:capture=submit>
+            {binder(tr(Msg::Playground), tabs, tab, panel)}
+        </div>
     }
     .into_any()
 }

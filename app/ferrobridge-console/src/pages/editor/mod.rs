@@ -31,9 +31,10 @@ use ferrohealth_ui::view::load_report;
 use ferrohealth_ui::view::load_report::{Arrival, Count};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::surface::{Crumb, Header, Mode, card, editor_heading};
+use ferrohealth_ui::widget::action::{answer_field, answered};
 use ferrohealth_ui::widget::editor::{EditorWords, Opened};
 use http::StatusCode;
-use leptos::form::FromFormData as _;
+use leptos::form::{ActionForm, FromFormData as _};
 use leptos::prelude::*;
 use leptos_router::NavigateOptions;
 use leptos_router::hooks::{use_navigate, use_params_map};
@@ -127,17 +128,15 @@ pub fn new_page() -> impl IntoView {
     }
 }
 
-/// How the editor's form posts once the page has hydrated: through the
-/// `edit` server function, with the post it last sent.
+/// How the editor's form posts: through the `edit` server function, with
+/// the post it last sent.
 #[derive(Clone, Copy)]
 struct Posting {
-    /// The server action the form dispatches.
+    /// The server action the form calls.
     edit: ServerAction<EditDraft>,
-    /// The post the form last sent.
+    /// The post the form last sent: in the page, or the plain post the
+    /// server drew the page after.
     last: RwSignal<EditorPost>,
-    /// The answer the server drew the page with, after a post with no
-    /// WebAssembly.
-    posted: StoredValue<Option<Edited>>,
 }
 
 impl std::fmt::Debug for Posting {
@@ -170,24 +169,22 @@ impl Posting {
             },
             false,
         );
+        let posted = answered(&edit);
         Self {
             edit,
-            last: RwSignal::new(EditorPost::default()),
-            posted: StoredValue::new((*SharedValue::new(use_context::<Edited>)).clone()),
+            last: RwSignal::new(EditorPost::from_posted(&posted)),
         }
     }
 
-    /// The post and the answer the page draws: the last one the form sent
-    /// in the page, else the one the server drew it with.
+    /// The post and the answer the page draws: the last answer of the form,
+    /// in the page or to the plain post the server drew it after.
     fn edited(self) -> Option<Edited> {
-        match self.edit.value().get() {
-            Some(Ok(edited)) => Some(edited),
-            Some(Err(fault)) => Some(Edited {
+        self.edit.value().get().map(|answer| {
+            answer.unwrap_or_else(|fault| Edited {
                 post: self.last.get_untracked(),
                 answer: EditorAnswer::Checked(Err(fault)),
-            }),
-            None => self.posted.get_value(),
-        }
+            })
+        })
     }
 }
 
@@ -463,55 +460,49 @@ fn editor(opened: &Opening, edited: Option<&Edited>, posting: Posting) -> AnyVie
     }
     .into_any();
     let base = view! { <input type="hidden" name="base" value=opened.base.clone() /> }.into_any();
-    let action = edit_href_of(&opened.path);
-    let submit = submitted(opened, action.clone(), posting);
+    let address = edit_href_of(&opened.path);
+    let submit = submitted(opened, posting);
     let form = view! {
-        <form id=FORM method="post" action=action class="fui-stack" on:submit=submit>
+        <ActionForm action=posting.edit attr:id=FORM attr:class="fui-stack">
+            {answer_field()}
+            <input type="hidden" name="address" value=address />
             {base}
             {path_card}
             {island}
-        </form>
+        </ActionForm>
     }
     .into_any();
     let dock = dock(opened, &post, &shown);
     view! {
         {header}
-        <div class="fui-stack">{lock} {shown.strip} {form}</div>
+        <div class="fui-stack" on:submit:capture=submit>{lock} {shown.strip} {form}</div>
         {dock}
     }
     .into_any()
 }
 
-/// The editor form's submit listener once the page has hydrated: Discard
-/// goes back to the file, every other decision posts through `posting` as
-/// the form's route `address` would.
-fn submitted(
-    opened: &Opening,
-    address: String,
-    posting: Posting,
-) -> impl Fn(leptos::ev::SubmitEvent) + 'static {
+/// The editor form's submit listener once the page has hydrated, ahead of
+/// the form's own: Discard goes back to the file in the page, and every
+/// other decision is kept as the post `<ActionForm>` sends.
+fn submitted(opened: &Opening, posting: Posting) -> impl Fn(leptos::ev::SubmitEvent) + 'static {
     let back = if opened.is_new() {
         String::from(MAPPINGS)
     } else {
         file_href(&opened.path)
     };
     let navigate = use_navigate();
-    // NOTE: no specification governs this: our own design; the form keeps its own
-    // route as `action`, so a post with no WebAssembly draws the page with its answer.
+    // NOTE: UI Events §3.1: a capture listener on an ancestor runs before the form's
+    // own, so Discard is prevented before `<ActionForm>` would send it.
     move |event: leptos::ev::SubmitEvent| {
         let Ok(post) = EditorPost::from_event(&event) else {
             return;
         };
-        event.prevent_default();
         if post.decision == "discard" {
+            event.prevent_default();
             navigate(&back, NavigateOptions::default());
             return;
         }
-        posting.last.set(post.clone());
-        posting.edit.dispatch(EditDraft {
-            address: address.clone(),
-            post,
-        });
+        posting.last.set(post);
     }
 }
 

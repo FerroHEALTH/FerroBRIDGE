@@ -1,58 +1,18 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The plain form posts a page sends, each answered with the page it came
-//! from, drawn again with the outcome.
+//! What the server functions of `crate::actions` ask the bridge.
 //!
-//! Every action the console offers works with no WebAssembly (FerroUI's
-//! interaction contract): Reload the set, the editor's check and save, and
-//! the playground's runs are `POST` forms. Each handler checks the session
-//! before it asks the bridge anything, sends the request, and draws the
-//! page at the same address with the answer in its context, so nothing the
-//! operator entered or the bridge answered reaches a URL, the history or a
-//! store. A post without a live session is sent back to the page, which
-//! then draws the sign-in. The server functions of `crate::actions` run the
-//! same work for a page that has hydrated. No specification governs the
-//! console: our own design.
+//! Reload the set, the editor's post, and where a discarded draft goes back
+//! to. No specification governs the console: our own design.
 
-use axum::Extension;
-use axum::extract::{FromRequest as _, Request};
-use axum::response::{IntoResponse, Redirect, Response};
+use http::{HeaderValue, StatusCode, header};
+use leptos_axum::ResponseOptions;
 
-use crate::actions::{Edited, EditorPost, PlaygroundPost, Ran, Reloaded};
+use crate::actions::{Edited, EditorPost, Reloaded};
 use crate::bridge::AccessToken;
-use crate::model::{Outcome, loaded};
+use crate::model::{Outcome, ViewError, loaded};
 use crate::server::ConsoleState;
-
-/// The page at `parts`' address again, by `GET`, for a post that carries
-/// no live session: the page then draws the sign-in.
-fn back_to(parts: &http::request::Parts) -> Response {
-    Redirect::to(parts.uri.path()).into_response()
-}
-
-/// The request's parts and its body read as the form `T`, or the answer to
-/// a body that is no such form.
-async fn form<T: serde::de::DeserializeOwned>(
-    request: Request,
-) -> Result<(http::request::Parts, T), Box<Response>> {
-    let (parts, body) = request.into_parts();
-    let rebuilt = Request::from_parts(parts.clone(), body);
-    match axum::extract::Form::<T>::from_request(rebuilt, &()).await {
-        Ok(axum::extract::Form(form)) => Ok((parts, form)),
-        Err(rejection) => Err(Box::new(rejection.into_response())),
-    }
-}
-
-/// The access token of the session `parts` carry, when it is live.
-fn token_of(state: &ConsoleState, parts: &http::request::Parts) -> Option<AccessToken> {
-    let id = state
-        .sessions()
-        .cookie_in(&parts.headers, crate::session::COOKIE)?;
-    // NOTE: no specification governs this: our own design; a store that
-    // cannot be read admits no post, and the page drawn after says why.
-    let token = state.sessions().access_token(&id).ok().flatten()?;
-    Some(AccessToken::new(token))
-}
 
 /// The outcome of reloading the set as the operator whose token is `token`.
 pub async fn reloaded(state: &ConsoleState, token: &AccessToken) -> Reloaded {
@@ -62,20 +22,6 @@ pub async fn reloaded(state: &ConsoleState, token: &AccessToken) -> Reloaded {
             Outcome::Refused(refusal) => Outcome::Refused(refusal),
         }),
     )
-}
-
-/// Serves `POST /mappings`: reloads the set and draws the Mapping
-/// set with the reload's outcome.
-pub async fn reload(Extension(state): Extension<ConsoleState>, request: Request) -> Response {
-    let (parts, _body) = request.into_parts();
-    let Some(token) = token_of(&state, &parts) else {
-        return back_to(&parts);
-    };
-    let reloaded = reloaded(&state, &token).await;
-    crate::server::render(state, parts, move || {
-        leptos::context::provide_context(reloaded.clone());
-    })
-    .await
 }
 
 /// The answer to the editor's post `post` at `address`, as the operator
@@ -94,25 +40,26 @@ pub async fn edited(
     Edited { post, answer }
 }
 
-/// Serves `POST /mappings/edit/{path}` and `POST /mappings/new`: checks the
-/// draft, asks to confirm a save, saves it, or steps back, and draws the
-/// editor with the answer.
-pub async fn edit(Extension(state): Extension<ConsoleState>, request: Request) -> Response {
-    let (parts, post) = match form::<EditorPost>(request).await {
-        Ok(read) => read,
-        Err(answer) => return *answer,
-    };
-    let Some(token) = token_of(&state, &parts) else {
-        return back_to(&parts);
-    };
-    if post.decision == "discard" {
-        return Redirect::to(&discarded(parts.uri.path())).into_response();
-    }
-    let edited = edited(&state, &token, parts.uri.path(), post).await;
-    crate::server::render(state, parts, move || {
-        leptos::context::provide_context(edited.clone());
-    })
-    .await
+/// Answers the running server function with `303 See Other` to `page`, a
+/// path on the console's own origin.
+///
+/// `leptos_axum::redirect` answers a call that asks for no HTML with `200`
+/// and a header only its own client reads, and the plain post FerroUI's
+/// `draw_answers` forwards asks for none, so the status is set here.
+///
+/// # Errors
+/// Returns [`ViewError::Unavailable`] outside a server function's request
+/// or for a `page` that is no header value.
+pub fn leave_for(page: &str) -> Result<(), ViewError> {
+    let response =
+        leptos::prelude::use_context::<ResponseOptions>().ok_or(ViewError::Unavailable)?;
+    let location = HeaderValue::from_str(page).map_err(|error| {
+        tracing::error!(%error, "a discarded draft's page is no header value");
+        ViewError::Unavailable
+    })?;
+    response.insert_header(header::LOCATION, location);
+    response.set_status(StatusCode::SEE_OTHER);
+    Ok(())
 }
 
 /// The page a discarded draft of the editor at `address` goes back to: the
@@ -139,23 +86,4 @@ fn editor_path(address: &str, post: &EditorPost) -> Option<String> {
     } else {
         Some(given.to_owned())
     }
-}
-
-/// Serves `POST /playground` and its tabs: runs the tab's operation over
-/// what the operator entered and draws the playground with the answer.
-pub async fn run(Extension(state): Extension<ConsoleState>, request: Request) -> Response {
-    let (parts, post) = match form::<PlaygroundPost>(request).await {
-        Ok(read) => read,
-        Err(answer) => return *answer,
-    };
-    let Some(token) = token_of(&state, &parts) else {
-        return back_to(&parts);
-    };
-    let answer =
-        crate::pages::playground::answer::answer(&state, &token, parts.uri.path(), &post).await;
-    let ran = Ran { post, answer };
-    crate::server::render(state, parts, move || {
-        leptos::context::provide_context(ran.clone());
-    })
-    .await
 }

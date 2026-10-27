@@ -17,30 +17,55 @@ use http::{Method, Request, StatusCode};
 use crate::stub::{CONTEXT, bridge, signed_in};
 use crate::support::{OPERATOR_TOKEN, ORIGIN, header, send};
 
-/// Every form post the console takes, each with a body it accepts.
-fn posts() -> Vec<(String, &'static str)> {
+/// Every form post the console takes, each with a body it accepts: the
+/// three answer forms post to their server functions with the page they
+/// were on.
+fn posts() -> Vec<(String, String)> {
+    let edit = format!("/mappings/edit/{CONTEXT}");
     vec![
-        (String::from("/mappings"), ""),
         (
-            format!("/mappings/edit/{CONTEXT}"),
-            "draft=x&base=&path=&reason=r&decision=check",
+            String::from("/api/reload"),
+            String::from("ferroui_answer=%2Fmappings"),
         ),
         (
-            String::from("/mappings/new"),
-            "draft=x&base=&path=fhirconnect%2Fa.yml&reason=r&decision=check",
-        ),
-        (String::from("/playground"), "input=x&template=&patient="),
-        (
-            String::from("/playground/toopenehr"),
-            "input=x&template=&format=canonical",
+            String::from("/api/edit"),
+            format!(
+                "draft=x&base=&path=&reason=r&decision=check&address={edit}&ferroui_answer={edit}"
+            ),
         ),
         (
-            String::from("/playground/validate"),
-            "resource_type=Patient&input=x",
+            String::from("/api/edit"),
+            String::from(
+                "draft=x&base=&path=fhirconnect%2Fa.yml&reason=r&decision=check&address=%2Fmappings%2Fnew&ferroui_answer=%2Fmappings%2Fnew",
+            ),
         ),
-        (String::from("/preference"), "back=%2F&theme=dark"),
-        (String::from("/preferences/reset"), "back=%2F"),
-        (String::from("/sidebar"), "sidebar=rail&back=%2F"),
+        (
+            String::from("/api/run"),
+            String::from(
+                "input=x&template=&patient=&address=%2Fplayground&ferroui_answer=%2Fplayground",
+            ),
+        ),
+        (
+            String::from("/api/run"),
+            String::from(
+                "input=x&template=&format=canonical&address=%2Fplayground%2Ftoopenehr&ferroui_answer=%2Fplayground%2Ftoopenehr",
+            ),
+        ),
+        (
+            String::from("/api/run"),
+            String::from(
+                "resource_type=Patient&input=x&address=%2Fplayground%2Fvalidate&ferroui_answer=%2Fplayground%2Fvalidate",
+            ),
+        ),
+        (
+            String::from("/preference"),
+            String::from("back=%2F&theme=dark"),
+        ),
+        (String::from("/preferences/reset"), String::from("back=%2F")),
+        (
+            String::from("/sidebar"),
+            String::from("sidebar=rail&back=%2F"),
+        ),
     ]
 }
 
@@ -66,16 +91,13 @@ fn posted(
 /// type and a body it accepts.
 fn server_functions() -> Vec<(&'static str, &'static str, String)> {
     let form = "application/x-www-form-urlencoded";
-    let json = "application/json";
     vec![
         ("/api/capability", form, String::new()),
         ("/api/configuration", form, String::new()),
         (
             "/api/edit",
-            json,
-            format!(
-                r#"{{"address":"/mappings/edit/{CONTEXT}","post":{{"draft":"x","decision":"check"}}}}"#
-            ),
+            form,
+            format!("address=%2Fmappings%2Fedit%2F{CONTEXT}&draft=x&decision=check"),
         ),
         ("/api/file", form, format!("path={CONTEXT}")),
         ("/api/info", form, String::new()),
@@ -84,8 +106,8 @@ fn server_functions() -> Vec<(&'static str, &'static str, String)> {
         ("/api/reload", form, String::new()),
         (
             "/api/run",
-            json,
-            String::from(r#"{"address":"/playground","post":{"input":"x"}}"#),
+            form,
+            String::from("address=%2Fplayground&input=x"),
         ),
         ("/api/smart", form, String::new()),
         ("/api/state", form, String::new()),
@@ -229,7 +251,7 @@ async fn every_post_refuses_a_caller_without_a_live_session_before_the_bridge()
     for (route, form) in posts() {
         for cookie in [None, Some("ferrobridge_console_session=forged")] {
             let (response, _body) =
-                send(&service, posted(&route, form, "same-origin", cookie)?).await?;
+                send(&service, posted(&route, &form, "same-origin", cookie)?).await?;
             assert_ne!(StatusCode::OK, response.status(), "{route} {cookie:?}");
             assert!(
                 response.headers().get("set-cookie").is_none(),
@@ -248,8 +270,11 @@ async fn every_post_refuses_a_request_from_another_origin() -> Result<(), Box<dy
     let (service, cookie) = signed_in(&bridge).await?;
     let before = bridge.received_requests().await.ok_or("recorded")?.len();
     for (route, form) in posts() {
-        let (response, body) =
-            send(&service, posted(&route, form, "cross-site", Some(&cookie))?).await?;
+        let (response, body) = send(
+            &service,
+            posted(&route, &form, "cross-site", Some(&cookie))?,
+        )
+        .await?;
         assert_eq!(StatusCode::FORBIDDEN, response.status(), "{route}");
         assert!(
             body.contains("the console takes this request only from its own pages"),
@@ -258,5 +283,32 @@ async fn every_post_refuses_a_request_from_another_origin() -> Result<(), Box<dy
     }
     let after = bridge.received_requests().await.ok_or("recorded")?.len();
     assert_eq!(before, after, "a foreign post asked the bridge");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_plain_answer_post_without_a_live_session_draws_the_sign_in_and_asks_nothing()
+-> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, _cookie) = signed_in(&bridge).await?;
+    let before = bridge.received_requests().await.ok_or("recorded")?.len();
+    for (route, form) in posts()
+        .into_iter()
+        .filter(|(route, _)| route.starts_with("/api/"))
+    {
+        let request = crate::stub::post(&route, &form, "ferrobridge_console_session=forged")?;
+        let (response, body) = send(&service, request).await?;
+        assert!(
+            response.headers().get("set-cookie").is_none(),
+            "{route} set a cookie"
+        );
+        assert!(body.contains("Sign in"), "{route}: {body}");
+        assert!(
+            !body.contains("synthetic"),
+            "{route} drew something the bridge holds: {body}"
+        );
+    }
+    let after = bridge.received_requests().await.ok_or("recorded")?.len();
+    assert_eq!(before, after, "a post without a session asked the bridge");
     Ok(())
 }
