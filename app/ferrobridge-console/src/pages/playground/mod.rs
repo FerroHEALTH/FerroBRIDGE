@@ -127,8 +127,10 @@ impl std::fmt::Debug for Running {
 impl Running {
     /// The running of a page.
     fn new() -> Self {
+        let run = ServerAction::<RunOperation>::new();
+        crate::load::drawn_after(run);
         Self {
-            run: ServerAction::<RunOperation>::new(),
+            run,
             last: RwSignal::new(PlaygroundPost::default()),
             posted: StoredValue::new((*SharedValue::new(use_context::<Ran>)).clone()),
         }

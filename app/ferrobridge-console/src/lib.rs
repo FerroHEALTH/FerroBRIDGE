@@ -30,9 +30,6 @@
 //! `wasm32-unknown-unknown`; the target, never a Cargo feature, chooses
 //! between them.
 #![doc(test(attr(deny(warnings))))]
-// NOTE: the Rust reference, "Limits": the server's render of the library's
-// sign-in card nests deeper than the default query depth of 128.
-#![recursion_limit = "256"]
 
 pub mod actions;
 pub mod app;
@@ -64,39 +61,15 @@ pub mod server;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod session;
 
-/// Hydrates the page the server drew, whole, its lazy routes loading their
-/// code from their own chunks, and marks the root element `data-hydrated`
-/// once the page and its route have hydrated.
+/// Hydrates the page the server drew, whole, through FerroUI's entry.
+///
+/// Its lazy routes load their code from their own chunks, and the root
+/// element takes `data-ferroui-hydrated` once the page and its route have
+/// hydrated.
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {
     console_error_panic_hook::set_once();
     ferrohealth_ui::widget::hydration::explain();
-    // NOTE: leptos 0.8 `src/mount.rs`: `hydrate_lazy` runs this future and drops what
-    // follows it; `hydrate_from_async` starts the executor itself.
-    wasm_bindgen_futures::spawn_local(async {
-        let Some(body) = leptos::prelude::document().body() else {
-            leptos::logging::warn!("the page has no body to hydrate");
-            return;
-        };
-        let page = leptos::mount::hydrate_from_async(body, app::App).await;
-        page.forget();
-        mark_hydrated();
-    });
-}
-
-/// Marks the root element `data-hydrated` once the page and its lazy route
-/// have hydrated, which a journey and the screenshot capture wait for before
-/// they act.
-///
-/// The library's `data-ferroui-hydrated` (`widget::hydration::mark`) comes
-/// from an `Effect` of the root component, which runs while a lazy route's
-/// chunk is still on its way, so it can land before the route has hydrated.
-#[cfg(target_arch = "wasm32")]
-fn mark_hydrated() {
-    if let Some(root) = leptos::prelude::document().document_element()
-        && let Err(error) = root.set_attribute("data-hydrated", "")
-    {
-        leptos::logging::warn!("the browser refused the hydrated mark: {error:?}");
-    }
+    ferrohealth_ui::widget::hydration::hydrate(app::App);
 }

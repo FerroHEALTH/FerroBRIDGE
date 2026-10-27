@@ -330,19 +330,14 @@ clinical content. What is particular here:
 - The crate's `[package.metadata.leptos]` sets
   `disable-erase-components = true`, so a dev build keeps its component
   types in the browser half as the server half does and hydrates.
-- **The hydration mark** (FerroUI `docs/consoles.md`, step 9). `App` calls
-  `widget::hydration::mark()` and `hydrate()` calls
-  `widget::hydration::explain()` after the panic hook, so a debug build
-  names a page changed before hydration ended. The library's
-  `data-ferroui-hydrated` comes from an `Effect` of the root component,
-  which can run while a route group's chunk is still on its way. A route
-  group's page hydrates once its chunk has arrived, after the shell, so
-  `hydrate()` also runs `hydrate_from_async` itself and marks
-  `<html data-hydrated>` when it resolves, which is when the page and its
-  route have hydrated. A journey, and the screenshot capture, wait
-  for the mark before they act (`journeys::playground::hydrated`): a click
-  sent while the route still hydrates makes the router change the DOM under
-  the hydration walk, which panics.
+- **The hydration mark** (FerroUI `docs/consoles.md`, step 9). `hydrate()`
+  calls `widget::hydration::explain()` after the panic hook, so a debug build
+  names a page changed before hydration ended, then FerroUI's
+  `widget::hydration::hydrate(App)`, which marks
+  `<html data-ferroui-hydrated>` once the page and its route group have
+  hydrated and leaves every click and submit to the browser until then. A
+  journey, and the screenshot capture, wait for the mark before they act
+  (`journeys::playground::hydrated`). The console keeps no mark of its own.
 - `leptos_meta` (`<Title>`, `<Stylesheet>`, `<Meta>`) is used from component
   bodies, never by editing the shell's `<head>` by hand (`metadata`). Every
   routed page sets a `<Title>`.

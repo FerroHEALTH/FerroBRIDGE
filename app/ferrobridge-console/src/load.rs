@@ -52,7 +52,8 @@ pub fn changed() {
 }
 
 /// Counts a change each time `action` resolves, so the reads drawn after a
-/// reload or a save ask the bridge again.
+/// reload or a save ask the bridge again, and counts the answer as drawn
+/// ([`drawn_after`]).
 pub fn follow<A>(action: ServerAction<A>)
 where
     A: ServerFn + Clone + Send + Sync + 'static,
@@ -61,7 +62,26 @@ where
 {
     Effect::watch(
         move || action.version().get(),
-        move |_, _, _| changed(),
+        move |_, _, _| {
+            changed();
+            ferrohealth_ui::widget::submit::drawn();
+        },
+        false,
+    );
+}
+
+/// Counts each answer of `action` the page draws in place as a drawn post
+/// (`ferrohealth_ui::widget::submit::drawn`), so a busy search box ends its
+/// wait.
+pub fn drawn_after<A>(action: ServerAction<A>)
+where
+    A: ServerFn + Clone + Send + Sync + 'static,
+    A::Output: Send + Sync + 'static,
+    A::Error: Send + Sync + 'static,
+{
+    Effect::watch(
+        move || action.version().get(),
+        move |_, _, _| ferrohealth_ui::widget::submit::drawn(),
         false,
     );
 }

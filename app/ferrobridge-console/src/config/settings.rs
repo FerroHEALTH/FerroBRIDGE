@@ -12,6 +12,8 @@ use ferrohealth_ui::i18n::Locale;
 use secrecy::SecretString;
 use url::Url;
 
+use ferrohealth_smart::oidc::OFFLINE_ACCESS;
+
 use crate::config::error::Error;
 use crate::config::{Config, Oidc};
 
@@ -98,10 +100,6 @@ impl OidcSettings {
         self.redirect_uri.origin().ascii_serialization()
     }
 }
-
-/// The scope value that asks for a refresh token that outlives the
-/// operator's session at the provider (OpenID Connect Core 1.0 §11).
-pub const OFFLINE_ACCESS: &str = "offline_access";
 
 impl Config {
     /// Checks every value and reads every `_file` secret.
